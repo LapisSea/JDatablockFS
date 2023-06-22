@@ -7,6 +7,7 @@ import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
@@ -15,6 +16,15 @@ import java.io.IOException;
 import java.util.Objects;
 
 public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<String>{
+		public Usage(){ super(String.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldInlineString<>(field);
+		}
+	}
 	
 	public IOFieldInlineString(FieldAccessor<CTyp> accessor){
 		super(accessor);

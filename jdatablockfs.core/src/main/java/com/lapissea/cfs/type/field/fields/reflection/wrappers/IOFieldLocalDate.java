@@ -22,6 +22,15 @@ import java.util.Objects;
 
 public class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDate>{
 	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<LocalDate>{
+		public Usage(){ super(LocalDate.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldLocalDate<>(field);
+		}
+	}
+	
 	private final VaryingSize varSize;
 	
 	public IOFieldLocalDate(FieldAccessor<CTyp> accessor){ this(accessor, null); }

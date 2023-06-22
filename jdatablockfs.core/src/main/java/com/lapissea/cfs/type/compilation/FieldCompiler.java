@@ -532,9 +532,9 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final LateInit.Safe<RegistryNode.FieldRegistry> REGISTRY = FieldRegistry.make();
+	private static final LateInit.Safe<IOField.FieldUsage.Registry> REGISTRY = FieldRegistry.make();
 	
-	protected static RegistryNode.FieldRegistry registry(){
+	protected static IOField.FieldUsage.Registry registry(){
 		return REGISTRY.get();
 	}
 	

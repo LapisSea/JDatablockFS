@@ -4,11 +4,13 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
+import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
@@ -18,9 +20,14 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +38,93 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType{
+	
+	public interface FieldUsage{
+		sealed class AnyOf implements FieldUsage{
+			private final List<FieldUsage> usages;
+			public AnyOf(List<FieldUsage> usages){
+				this.usages = usages;
+			}
+			
+			@Override
+			public boolean isCompatible(Type type, GetAnnotation annotations){
+				for(var usage : usages){
+					if(usage.isCompatible(type, annotations)){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+				var ann  = GetAnnotation.from(field);
+				var type = field.getGenericType(genericContext);
+				
+				FieldUsage compatible;
+				find:
+				{
+					for(var usage : usages){
+						if(usage.isCompatible(type, ann)){
+							compatible = usage;
+							break find;
+						}
+					}
+					throw fail(type.getTypeName());
+				}
+				
+				return compatible.create(field, genericContext);
+			}
+			
+			protected IllegalField fail(String typeName){
+				throw new IllegalField("Unable to create field from " + typeName);
+			}
+		}
+		
+		final class Registry extends AnyOf{
+			public Registry(List<FieldUsage> usages){
+				super(usages);
+			}
+			
+			public void requireCanCreate(Type type, GetAnnotation annotations){
+				if(!isCompatible(type, annotations)){
+					throw fail(type.getTypeName());
+				}
+			}
+			@Override
+			protected IllegalField fail(String typeName){
+				throw new IllegalField("Unable to find implementation of " + IOField.class.getSimpleName() + " from " + typeName);
+			}
+			
+		}
+		
+		abstract class InstanceOf<Typ> implements FieldUsage{
+			private final Class<Typ> typ;
+			public InstanceOf(Class<Typ> typ){
+				this.typ = typ;
+			}
+			
+			public Class<Typ> getType(){
+				return typ;
+			}
+			
+			@Override
+			public final boolean isCompatible(Type type, GetAnnotation annotations){
+				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
+			}
+			@Override
+			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field, GenericContext genericContext);
+		}
+		
+		boolean isCompatible(Type type, GetAnnotation annotations);
+		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext);
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.TYPE)
+	public @interface FieldUsageRef{
+		Class<FieldUsage>[] value();
+	}
 	
 	private final FieldAccessor<T> accessor;
 	

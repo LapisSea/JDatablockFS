@@ -1,18 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.internal.Runner;
-import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.GetAnnotation;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.fields.CollectionAddapter;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
@@ -23,9 +12,7 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldObjectReference;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
 import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInlineString;
@@ -35,203 +22,85 @@ import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalDateTi
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalTime;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.UtilL;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 class FieldRegistry{
-	static LateInit.Safe<RegistryNode.FieldRegistry> make(){
+	static LateInit.Safe<IOField.FieldUsage.Registry> make(){
 		return Runner.async(() -> {
-			var reg = new RegistryNode.FieldRegistry();
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					return IOFieldTools.isGeneric(annotations);
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new IOFieldDynamicReferenceObject<>(field);
-					}
-					return new IOFieldDynamicInlineObject<>(field);
-				}
-			});
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					return SupportedPrimitive.isAny(type);
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return IOFieldPrimitive.make(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(Enum.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldEnum<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(ChunkPointer.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldChunkPointer<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(byte[].class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldByteArray<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(boolean[].class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldBooleanArray<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(float[].class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldFloatArray<>(field);
-				}
-			});
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					var raw = Utils.typeToRaw(type);
-					if(!raw.isArray()) return false;
-					return IOInstance.isManaged(raw.componentType());
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
-					}
-					return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
-				}
-			});
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
-					var args = parmType.getActualTypeArguments();
-					return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
-					}
-					return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(String.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldInlineString<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(Duration.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, Duration> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldDuration<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(Instant.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldInstant<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(LocalDate.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldLocalDate<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(LocalTime.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, LocalTime> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldLocalTime<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(LocalDateTime.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, LocalDateTime> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldLocalDateTime<>(field);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(String[].class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
-				}
-			});
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
-					var args = parmType.getActualTypeArguments();
-					return Utils.typeToRaw(args[0]) == String.class;
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
-				}
-			});
-			reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
-					Class<?> raw       = field.getType();
-					var      unmanaged = !IOInstance.isManaged(raw);
-					
-					if(unmanaged){
-						return new IOFieldUnmanagedObjectReference<>(field);
-					}
-					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new IOFieldObjectReference<>(field);
-					}
-					return new IOFieldInlineObject<>(field);
-				}
-			});
+			var                tasks  = new ArrayList<LateInit.Safe<IOField.FieldUsage>>();
+			Consumer<Class<?>> submit = type -> tasks.add(Runner.async(() -> getFieldUsage(type)));
+			submit.accept(IOFieldDynamicReferenceObject.class);
+			submit.accept(IOFieldDynamicInlineObject.class);
+			submit.accept(IOFieldPrimitive.class);
+			submit.accept(IOFieldEnum.class);
+			submit.accept(IOFieldChunkPointer.class);
+			submit.accept(IOFieldByteArray.class);
+			submit.accept(IOFieldBooleanArray.class);
+			submit.accept(IOFieldFloatArray.class);
+			submit.accept(InstanceCollection.class);
+			submit.accept(IOFieldInlineString.class);
+			submit.accept(IOFieldDuration.class);
+			submit.accept(IOFieldInstant.class);
+			submit.accept(IOFieldLocalDate.class);
+			submit.accept(IOFieldLocalTime.class);
+			submit.accept(IOFieldLocalDateTime.class);
+			submit.accept(IOFieldStringCollection.class);
+			submit.accept(IOFieldInlineObject.class);
+			submit.accept(IOFieldEnumArray.class);
+			submit.accept(IOFieldEnumList.class);
 			
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					var raw = Utils.typeToRaw(type);
-					if(!raw.isArray()) return false;
-					return raw.componentType().isEnum();
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldEnumArray<>(field);
-				}
-			});
-			reg.register(new RegistryNode(){
-				@Override
-				public boolean canCreate(Type type, GetAnnotation annotations){
-					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
-					var args = parmType.getActualTypeArguments();
-					return Utils.typeToRaw(args[0]).isEnum();
-				}
-				@Override
-				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldEnumList<>(field);
-				}
-			});
-			return reg;
+			var usages = tasks.stream()
+			                  .map(LateInit::get)
+			                  .toList();
+//			NanoTimer          t      = new NanoTimer.Simple();
+//			t.start();
+//			t.end();
+//			LogUtil.println(t);
+//			System.exit(0);
+			return new IOField.FieldUsage.Registry(usages);
 		});
+	}
+	
+	private static IOField.FieldUsage getFieldUsage(Class<?> type){
+		var usageClasses = Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
+		                           .map(IOField.FieldUsageRef::value).filter(a -> a.length>0)
+		                           .map(List::of).orElseGet(() -> {
+				var l = Arrays.stream(type.getDeclaredClasses())
+				              .filter(c -> UtilL.instanceOf(c, IOField.FieldUsage.class))
+				              .map(c -> (Class<IOField.FieldUsage>)c)
+				              .toList();
+				if(l.isEmpty()){
+					throw new IllegalStateException(
+						type.getName() + " has no " + IOField.FieldUsageRef.class.getName() + " annotation nor has " +
+						IOField.FieldUsage.class.getName() + " inner class(es). Please define one of them");
+				}
+				return l;
+			});
+		
+		var usages = usageClasses.stream().map(FieldRegistry::make).toList();
+		if(usages.size() == 1) return usages.get(0);
+		return new IOField.FieldUsage.AnyOf(usages);
+	}
+	
+	private static IOField.FieldUsage make(Class<IOField.FieldUsage> usageClass){
+		Constructor<IOField.FieldUsage> constr;
+		try{
+			constr = usageClass.getDeclaredConstructor();
+		}catch(NoSuchMethodException e){
+			throw UtilL.exitWithErrorMsg(usageClass.getName() + " does not have an empty constructor");
+		}
+		try{
+			constr.setAccessible(true);
+			return constr.newInstance();
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException("There was an issue instantiating " + usageClass.getName(), e);
+		}
 	}
 }

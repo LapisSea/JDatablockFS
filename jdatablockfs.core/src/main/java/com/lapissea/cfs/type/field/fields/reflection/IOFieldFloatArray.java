@@ -17,6 +17,15 @@ import java.util.OptionalLong;
 
 public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float[]>{
 	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<float[]>{
+		public Usage(){ super(float[].class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldFloatArray<>(field);
+		}
+	}
+	
 	private IOFieldPrimitive.FInt<T> arraySize;
 	
 	
