@@ -26,7 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.OptionalLong;
 
-public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, List<E>>{
+public final class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, List<E>>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{

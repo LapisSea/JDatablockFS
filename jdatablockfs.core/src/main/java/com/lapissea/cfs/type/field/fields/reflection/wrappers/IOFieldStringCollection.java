@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
 
-public class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOField<T, CollectionType>{
+public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOField<T, CollectionType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{

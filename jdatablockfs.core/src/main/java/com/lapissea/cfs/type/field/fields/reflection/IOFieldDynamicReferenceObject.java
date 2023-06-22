@@ -35,7 +35,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
+public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{

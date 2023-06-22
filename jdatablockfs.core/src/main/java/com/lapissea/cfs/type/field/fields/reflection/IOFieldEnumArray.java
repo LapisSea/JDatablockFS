@@ -23,7 +23,7 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.OptionalLong;
 
-public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
+public final class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{

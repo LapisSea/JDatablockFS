@@ -33,7 +33,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
-public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{

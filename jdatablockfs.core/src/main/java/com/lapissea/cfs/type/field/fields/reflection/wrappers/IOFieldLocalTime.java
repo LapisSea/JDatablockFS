@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.util.Objects;
 
-public class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalTime>{
+public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalTime>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<LocalTime>{

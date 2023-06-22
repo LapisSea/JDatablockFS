@@ -18,6 +18,19 @@ import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.BitField;
+import com.lapissea.cfs.type.field.fields.NoIOField;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -37,7 +50,10 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType{
+public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger,
+	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumArray, IOFieldEnumList,
+	        IOFieldFloatArray, IOFieldPrimitive, IOFieldStringCollection{
 	
 	public interface FieldUsage{
 		sealed class AnyOf implements FieldUsage{

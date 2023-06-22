@@ -25,7 +25,7 @@ import java.lang.invoke.MethodHandle;
 import java.time.Instant;
 import java.util.Objects;
 
-public class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
+public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<Instant>{

@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import java.io.IOException;
 import java.util.Objects;
 
-public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
+public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{

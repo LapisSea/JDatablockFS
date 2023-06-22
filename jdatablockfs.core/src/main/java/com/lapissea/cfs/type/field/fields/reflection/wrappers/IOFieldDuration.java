@@ -25,7 +25,7 @@ import java.lang.invoke.MethodHandle;
 import java.time.Duration;
 import java.util.Objects;
 
-public class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Duration>{
+public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Duration>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<Duration>{

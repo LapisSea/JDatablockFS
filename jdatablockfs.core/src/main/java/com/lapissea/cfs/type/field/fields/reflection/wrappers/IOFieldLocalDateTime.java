@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
 
-public class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDateTime>{
+public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDateTime>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<LocalDateTime>{

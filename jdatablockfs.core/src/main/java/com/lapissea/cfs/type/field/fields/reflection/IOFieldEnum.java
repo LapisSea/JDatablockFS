@@ -19,7 +19,7 @@ import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
+public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage extends FieldUsage.InstanceOf<Enum>{

@@ -76,7 +76,7 @@ public class InstanceCollection{
 		}
 	}
 	
-	public static class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
+	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends NullFlagCompanyField<T, CollectionType>{
 		
 		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;
@@ -164,7 +164,7 @@ public class InstanceCollection{
 		}
 	}
 	
-	public static class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
+	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends RefField.ReferenceCompanion<T, CollectionType>{
 		
 		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;

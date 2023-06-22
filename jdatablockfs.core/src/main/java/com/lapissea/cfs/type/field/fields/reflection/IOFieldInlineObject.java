@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
 	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{

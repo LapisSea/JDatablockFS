@@ -18,7 +18,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.util.OptionalLong;
 
-public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boolean[]>{
+public final class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boolean[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<boolean[]>{
