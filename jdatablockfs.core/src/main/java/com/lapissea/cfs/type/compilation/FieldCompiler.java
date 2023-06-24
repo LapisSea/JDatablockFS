@@ -152,7 +152,7 @@ public final class FieldCompiler{
 			logic.validate(field.getAccessor(), annotation);
 			
 			var depNames = logic.getDependencyValueNames(field.getAccessor(), annotation);
-			if(depNames.size() == 0) continue;
+			if(depNames.isEmpty()) continue;
 			
 			var missingNames = depNames.stream()
 			                           .filter(name -> fields.stream().noneMatch(f -> f.field.getName().equals(name)))
