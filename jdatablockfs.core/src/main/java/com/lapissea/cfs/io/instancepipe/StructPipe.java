@@ -35,6 +35,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -320,6 +321,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			if(field instanceof RefField){
 				builder.referenceField();
+				continue;
+			}
+			if(field instanceof IOFieldInlineSealedObject){
+				builder.dynamic();//TODO determine if sealed object can have pointers, if not skip here
 				continue;
 			}
 			

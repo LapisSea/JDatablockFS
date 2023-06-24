@@ -405,4 +405,81 @@ public class GeneralTypeHandlingTests{
 			}
 		});
 	}
+	
+	sealed interface Seal{
+		
+		final class A extends IOInstance.Managed<A> implements Seal{
+			@IOValue
+			int a;
+			public A(){ }
+			public A(int a){
+				this.a = a;
+			}
+		}
+		
+		final class B extends IOInstance.Managed<B> implements Seal{
+			@IOValue
+			Instant b;
+			public B(){ }
+			public B(Instant b){
+				this.b = b;
+			}
+		}
+		
+		final class C extends IOInstance.Managed<C> implements Seal{
+			@IOValue
+			int c1;
+			@IOValue
+			int c2;
+			@IOValue
+			int c3;
+			
+			public C(int c1, int c2, int c3){
+				this.c1 = c1;
+				this.c2 = c2;
+				this.c3 = c3;
+			}
+			public C(){ }
+		}
+		
+		final class D extends IOInstance.Managed<D> implements Seal{
+			@IOValue
+			float d;
+			public D(){ }
+			public D(float d){
+				this.d = d;
+			}
+		}
+		
+	}
+	
+	@Test
+	void testSealedType() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			@IOInstance.Def.Order({"seal1", "seal2"})
+			interface Container extends IOInstance.Def<Container>{
+				Seal seal1();
+				Seal seal2();
+			}
+			
+			var hold  = StandardStructPipe.of(Container.class);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
+			{
+				var val = IOInstance.Def.of(Container.class, new Seal.A(69), new Seal.C(1, 2, 3));
+				
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+			{
+				var val = IOInstance.Def.of(Container.class, new Seal.C(4, 5, -6), new Seal.D(420.69F));
+				
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+		});
+	}
 }

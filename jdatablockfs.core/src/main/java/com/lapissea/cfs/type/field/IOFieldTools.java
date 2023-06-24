@@ -186,6 +186,9 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
 		return makeVirtualName(field.getName(), "typeID");
 	}
+	public static <T extends IOInstance<T>> String makeUniverseIDFieldName(FieldAccessor<T> field){
+		return makeVirtualName(field.getName(), "localID");
+	}
 	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
 		return makeVirtualName(field.getName(), "isNull");
 	}

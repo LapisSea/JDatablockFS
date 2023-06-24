@@ -7,6 +7,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -17,8 +18,10 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.LongBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -238,6 +241,38 @@ public class Utils{
 			Log.warn("Failed to create fetch chunk size: {}", e);
 		}
 		return Optional.empty();
+	}
+	
+	public static <T> OptionalLong combineIfBoth(OptionalLong a, OptionalLong b, LongBinaryOperator funct){
+		if(a.isEmpty()) return a;
+		if(b.isEmpty()) return b;
+		return OptionalLong.of(funct.applyAsLong(a.getAsLong(), b.getAsLong()));
+	}
+	
+	public static <T> Optional<Set<Class<T>>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
+		if(!type.isSealed()){
+			return Optional.empty();
+		}
+		var universe = new HashSet<Class<T>>();
+		if(!type.isInterface() && !Modifier.isAbstract(type.getModifiers())){
+			universe.add(type);
+		}
+		for(var sub : (Class<T>[])type.getPermittedSubclasses()){
+			if(sub.isSealed()){
+				var uni = getSealedUniverse(sub, allowUnbounded);
+				if(uni.isEmpty()) return Optional.empty();
+				universe.addAll(uni.get());
+				continue;
+			}
+			if(Modifier.isFinal(sub.getModifiers())){
+				universe.add(sub);
+				continue;
+			}
+			//Non sealed make for an unbounded universe
+			return Optional.empty();
+		}
+		if(universe.isEmpty()) throw new IllegalStateException();
+		return Optional.of(Set.copyOf(universe));
 	}
 	
 }
