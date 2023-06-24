@@ -750,16 +750,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Override
 	public int hashCode(){
-		int result = 1;
-		
-		result = 31*result + getPtr().hashCode();
-		result = 31*result + bodyNumSize.hashCode();
-		result = 31*result + Long.hashCode(getCapacity());
-		result = 31*result + Long.hashCode(getSize());
-		result = 31*result + nextSize.hashCode();
-		result = 31*result + Objects.hashCode(getNextPtr());
-		
-		return result;
+		return getPtr().hashCode();
 	}
 	
 	public boolean rangeIntersects(long index){
