@@ -6,6 +6,7 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.Blob;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -698,6 +699,79 @@ public class SlowTests{
 			assertEquals(reFail, Optional.of(fail), "Fail not stable" + reFail.map(f -> "\n" + f.trace()).orElse(""));
 			Assert.fail("There were fails!");
 		}
+	}
+	
+	sealed interface BlobAction{
+		record Write(int off, byte[] data) implements BlobAction{
+			@Override
+			public boolean equals(Object o){
+				if(this == o) return true;
+				if(!(o instanceof Write write)) return false;
+				
+				if(off != write.off) return false;
+				return Arrays.equals(data, write.data);
+			}
+		}
+		
+		record Trim(int newSiz) implements BlobAction{ }
+	}
+	
+	@Test
+	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
+		record BlobState(IOInterface blob, IOInterface mem){ }
+		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingRunner.StateEnv<>(){
+			
+			@Override
+			public boolean shouldRun(FuzzingRunner.Sequence sequence){
+				return true;
+			}
+			
+			@Override
+			public void applyAction(BlobState state, long actionIdx, BlobAction action) throws IOException{
+				switch(action){
+					case BlobAction.Write(var off, var data) -> {
+						var siz = state.mem.getIOSize();
+						if(siz>0) off = (int)(off%siz);
+						else off = 0;
+						state.mem.write(off, false, data);
+						state.blob.write(off, false, data);
+					}
+					case BlobAction.Trim(var siz) -> {
+						var siz0 = state.mem.getIOSize();
+						if(siz0>0) siz = (int)(siz%siz0);
+						else siz = 0;
+						state.mem.ioAt(siz, RandomIO::trim);
+						state.blob.ioAt(siz, RandomIO::trim);
+					}
+				}
+				
+				assertEquals(state.blob.getIOSize(), state.mem.getIOSize());
+				var a = state.blob.readAll();
+				var b = state.mem.readAll();
+				assertEquals(a, b);
+			}
+			
+			@Override
+			public BlobState create(Random random, long sequenceIndex) throws IOException{
+				var initial = new byte[random.nextInt(0, 100)];
+				random.nextBytes(initial);
+				
+				var cl   = Cluster.emptyMem();
+				var blob = cl.getRootProvider().request("blob", Blob.class);
+				blob.write(true, initial);
+				
+				return new BlobState(blob, MemoryData.builder().withRaw(initial).build());
+			}
+		}, RNGType.<BlobAction>of(List.of(
+			r -> {
+				var bb = new byte[r.nextInt(1, 50)];
+				r.nextBytes(bb);
+				return new BlobAction.Write(r.nextInt(500), bb);
+			},
+			r -> new BlobAction.Trim(r.nextInt(500))
+		)).chanceFor(BlobAction.Trim.class, 1F/20));
+		
+		runner.runAndAssert(69, 2000000, 10000);
 	}
 	
 }
