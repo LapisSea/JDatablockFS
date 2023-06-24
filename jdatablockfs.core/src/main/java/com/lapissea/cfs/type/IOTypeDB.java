@@ -3,10 +3,12 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
@@ -23,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,7 @@ import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
  * interacting with a value of unknown implicit type.
  */
 public sealed interface IOTypeDB{
+	
 	sealed interface MemoryOnlyDB extends IOTypeDB{
 		@Override
 		TypeID toID(Class<?> type, boolean recordNew);
@@ -62,6 +66,25 @@ public sealed interface IOTypeDB{
 			private       int                    maxID   = 0;
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
+			
+			private static class MemUniverse<T>{
+				private final Map<Integer, Class<T>> id2cl = new HashMap<>();
+				private final Map<Class<T>, Integer> cl2id = new HashMap<>();
+				private       int                    idCounter;
+				
+				public MemUniverse(int start){
+					this.idCounter = start;
+				}
+				
+				private int newId(Class<T> type){
+					var id = idCounter++;
+					cl2id.put(type, id);
+					id2cl.put(id, type);
+					return id;
+				}
+			}
+			
+			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse = new HashMap<>();
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
@@ -127,6 +150,29 @@ public sealed interface IOTypeDB{
 					throw new RuntimeException("Unknown type from ID of " + id);
 				}
 				return type;
+			}
+			
+			private <T> MemUniverse<T> getUniverse(Class<T> rootType){
+				//noinspection unchecked
+				return (MemUniverse<T>)sealedMultiverse.computeIfAbsent(rootType, m -> new MemUniverse<>(1));
+			}
+			
+			@Override
+			public <T> Class<T> fromID(Class<T> rootType, int id){
+				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				var universe = getUniverse(rootType);
+				return universe.id2cl.get(id);
+			}
+			
+			@Override
+			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
+				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				var universe = getUniverse(rootType);
+				var id       = universe.cl2id.get(type);
+				if(id == null){
+					id = universe.newId(type);
+				}
+				return id;
 			}
 			
 			@Override
@@ -199,6 +245,18 @@ public sealed interface IOTypeDB{
 					return super.hasID(id);
 				}
 			}
+			@Override
+			public <T> Class<T> fromID(Class<T> rootType, int id){
+				try(var ignored = rwLock.read()){
+					return super.fromID(rootType, id);
+				}
+			}
+			@Override
+			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
+				try(var ignored = rwLock.read()){
+					return super.toID(rootType, type, record);
+				}
+			}
 		}
 		
 		final class Fixed implements MemoryOnlyDB{
@@ -207,6 +265,19 @@ public sealed interface IOTypeDB{
 			
 			private final TypeLink[]             idToTyp;
 			private final Map<TypeLink, Integer> typToID;
+			
+			private static class MemUniverse<T>{
+				private final Class<T>[]             id2cl;
+				private final Map<Class<T>, Integer> cl2id;
+				private MemUniverse(Map<Class<T>, Integer> cl2id){
+					this.cl2id = Map.copyOf(cl2id);
+					var maxId = this.cl2id.values().stream().mapToInt(i -> i).max().orElse(0);
+					id2cl = new Class[maxId];
+					this.cl2id.forEach((t, i) -> id2cl[i] = t);
+				}
+			}
+			
+			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse = new HashMap<>();
 			
 			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp){
 				this.defs = new HashMap<>(defs);
@@ -255,6 +326,27 @@ public sealed interface IOTypeDB{
 				}
 				return type;
 			}
+			
+			private <T> MemUniverse<T> getUniverse(Class<T> rootType){
+				//noinspection unchecked
+				return (MemUniverse<T>)sealedMultiverse.get(rootType);
+			}
+			@Override
+			public <T> Class<T> fromID(Class<T> rootType, int id){
+				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				var universe = getUniverse(rootType);
+				if(universe == null) return null;
+				if(id>=universe.id2cl.length || id<0) return null;
+				return universe.id2cl[id];
+			}
+			
+			@Override
+			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
+				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				var universe = getUniverse(rootType);
+				return universe.cl2id.get(type);
+			}
+			
 			private TypeLink idToTyp(int id){
 				return id>=idToTyp.length || id<0? null : idToTyp[id];
 			}
@@ -561,6 +653,67 @@ public sealed interface IOTypeDB{
 			return type;
 		}
 		
+		@IOValue
+		private IOMap<String, IOList<String>> sealedMultiverse;
+		
+		@Override
+		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
+			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			var universe = sealedMultiverse.get(rootType.getName());
+			if(universe == null || id<0 || id>=universe.size()){
+				return null;
+			}
+			var name = universe.get(id);
+			if(name == null) return null;
+			//noinspection unchecked
+			return (Class<T>)loadClass(name);
+		}
+		
+		private final Map<Class<?>, MemoryOnlyDB.Basic.MemUniverse<?>> sealedMultiverseTouch     = new HashMap<>();
+		private final ReadWriteClosableLock                            sealedMultiverseTouchLock = ReadWriteClosableLock.reentrant();
+		
+		@Override
+		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
+			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			
+			try(var ignored = sealedMultiverseTouchLock.read()){
+				var touched = getTouched(rootType, type);
+				if(touched.isPresent()) return touched.get();
+			}
+			
+			var typeName = type.getName();
+			var universe = sealedMultiverse.get(typeName);
+			if(universe == null){
+				return touch(rootType, type, 0);
+			}
+			
+			var max = Math.toIntExact(universe.size());
+			for(int i = 0; i<max; i++){
+				var name = universe.get(i);
+				if(name.equals(typeName)){
+					return i;
+				}
+			}
+			
+			return touch(rootType, type, max);
+		}
+		
+		private <T> int touch(Class<T> rootType, Class<T> type, int newId){
+			try(var ignored = sealedMultiverseTouchLock.write()){
+				var touched = getTouched(rootType, type);
+				if(touched.isPresent()) return touched.get();
+				@SuppressWarnings("unchecked")
+				var touchU =
+					(MemoryOnlyDB.Basic.MemUniverse<T>)
+						sealedMultiverseTouch.computeIfAbsent(rootType, t -> new MemoryOnlyDB.Basic.MemUniverse<>(newId));
+				return touchU.newId(type);
+			}
+		}
+		
+		private <T> Optional<Integer> getTouched(Class<T> rootType, Class<T> type){
+			return Optional.ofNullable(sealedMultiverseTouch.get(rootType)).map(u -> u.cl2id.get(type));
+		}
+		
 		@Override
 		public TypeDef getDefinitionFromClassName(String className) throws IOException{
 			var builtIn = BUILT_IN.get();
@@ -641,7 +794,25 @@ public sealed interface IOTypeDB{
 	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
 	TypeLink fromID(int id) throws IOException;
 	
+	
+	<T> Class<T> fromID(Class<T> rootType, int id) throws IOException;
+	<T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException;
+	
 	TypeDef getDefinitionFromClassName(String className) throws IOException;
 	
 	ClassLoader getTemplateLoader();
+	
+	
+	default Class<?> loadClass(String name){
+		try{
+			return Class.forName(name);
+		}catch(ClassNotFoundException e){
+			Log.trace("Loading template: {}#yellow", name);
+			try{
+				return Class.forName(name, true, getTemplateLoader());
+			}catch(ClassNotFoundException ex){
+				throw new RuntimeException(ex);
+			}
+		}
+	}
 }

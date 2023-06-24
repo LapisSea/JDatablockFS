@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
@@ -23,9 +24,7 @@ import java.util.List;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits IOFieldDynamicInlineObject, IOFieldInlineObject, InstanceCollection.InlineField,
-	        IOFieldInlineString,
-	        IOFieldDuration, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime{
+	permits IOFieldDynamicInlineObject, IOFieldInlineObject, IOFieldInlineSealedObject, InstanceCollection.InlineField, IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	

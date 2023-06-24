@@ -616,6 +616,17 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public SELF clone() throws UnsupportedOperationException{
 			throw new UnsupportedOperationException("Unmanaged objects can not be cloned");
 		}
+		
+		@Override
+		public boolean equals(Object o){
+			return o == this ||
+			       o instanceof IOInstance.Unmanaged<?> that &&
+			       this.getIdentity().equals(that.getIdentity());
+		}
+		@Override
+		public int hashCode(){
+			return getIdentity().hashCode();
+		}
 	}
 	
 	

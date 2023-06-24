@@ -16,6 +16,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +41,8 @@ final class FieldRegistry{
 					e -> scanned.put(e.getKey(), e.getValue())
 				);
 			}
-			var usages = scanned.values().stream().flatMap(Collection::stream).toList();
+			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
+			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
 			Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
 		}

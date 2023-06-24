@@ -35,6 +35,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -165,7 +166,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw e;
 			}
 			
-			put(struct, created);
+			put(struct, created);//TODO: replace put/remove with scoped value as temporary storage before putting. Avoid potentially invalid result
+			if(runNow){
+				try{
+					created.postValidate();
+				}catch(Throwable e){
+					remove(struct);
+				}
+			}
 			
 			if(PRINT_COMPILATION){
 				StagedInit.runBaseStageTask(() -> {
@@ -254,7 +262,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
-		}, this::postValidate);
+			//Do not post validate now, will create issues with recursive types. It is called in registration
+		}, initNow? null : this::postValidate);
 	}
 	
 	protected void postValidate(){
@@ -320,6 +329,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			if(field instanceof RefField){
 				builder.referenceField();
+				continue;
+			}
+			if(field instanceof IOFieldInlineSealedObject){
+				builder.dynamic();//TODO determine if sealed object can have pointers, if not skip here
 				continue;
 			}
 			

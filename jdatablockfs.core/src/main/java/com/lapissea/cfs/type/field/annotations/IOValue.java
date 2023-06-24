@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -20,9 +21,11 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
@@ -39,16 +42,31 @@ public @interface IOValue{
 		@NotNull
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IOValue annotation){
+			return Stream.concat(collectionInject(field), sealedInject(field)).toList();
+		}
+		private <T extends IOInstance<T>> Stream<VirtualFieldDefinition<T, ?>> sealedInject(FieldAccessor<T> field){
+			if(!IOFieldInlineSealedObject.isCompatible(field.getType())){
+				return Stream.empty();
+			}
+			return Stream.of(new VirtualFieldDefinition<>(
+				IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
+				List.of(
+					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
+					Unsigned.INSTANCE
+				)
+			));
+		}
+		private <T extends IOInstance<T>> Stream<VirtualFieldDefinition<T, ?>> collectionInject(FieldAccessor<T> field){
 			var type   = field.getType();
 			var isList = type == List.class || type == ArrayList.class;
-			if(!type.isArray() && !isList) return List.of();
-			if(field.hasAnnotation(Reference.class)) return List.of();
+			if(!type.isArray() && !isList) return Stream.empty();
+			if(field.hasAnnotation(Reference.class)) return Stream.empty();
 			
 			var arrayLengthSizeName = field.getAnnotation(IODependency.ArrayLenSize.class)
 			                               .map(IODependency.ArrayLenSize::name)
 			                               .orElseGet(() -> IOFieldTools.makeNumberSizeName(IOFieldTools.makeCollectionLenName(field)));
 			
-			return List.of(new VirtualFieldDefinition<>(
+			return Stream.of(new VirtualFieldDefinition<>(
 				IO, IOFieldTools.makeCollectionLenName(field), int.class,
 				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value) -> {
 					if(value>0) return value;
@@ -67,10 +85,15 @@ public @interface IOValue{
 		@NotNull
 		@Override
 		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOValue annotation){
+			var set  = HashSet.<String>newHashSet(2);
 			var type = field.getType();
-			if(!type.isArray() && !UtilL.instanceOf(type, Collection.class)) return Set.of();
-			
-			return Set.of(IOFieldTools.makeCollectionLenName(field));
+			if(type.isArray() || UtilL.instanceOf(type, Collection.class)){
+				set.add(IOFieldTools.makeCollectionLenName(field));
+			}
+			if(IOFieldInlineSealedObject.isCompatible(field.getType())){
+				set.add(IOFieldTools.makeUniverseIDFieldName(field));
+			}
+			return Set.copyOf(set);
 		}
 		@Override
 		public void validate(FieldAccessor<?> field, IOValue annotation){
@@ -243,7 +266,7 @@ public @interface IOValue{
 					IO,
 					IOFieldTools.makeGenericIDFieldName(field),
 					int.class,
-					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()), Unsigned.INSTANCE)
+					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class), Unsigned.INSTANCE)
 				));
 			}
 			@NotNull

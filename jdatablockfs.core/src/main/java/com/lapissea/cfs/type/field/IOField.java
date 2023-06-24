@@ -127,7 +127,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return f;
 	}
 	
-	public int getInStructUID(){
+	public final int getInStructUID(){
 		return inStructUID;
 	}
 	
@@ -301,21 +301,21 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	public String getName(){ return getAccessor().getName(); }
 	@Override
-	public Class<?> getType(){ return getAccessor().getType(); }
+	public final Class<?> getType(){ return getAccessor().getType(); }
 	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
 		var acc = getAccessor();
 		return acc == null? null : acc.getDeclaringStruct();
 	}
-	public boolean isVirtual(){
+	public final boolean isVirtual(){
 		return getAccessor() instanceof VirtualAccessor;
 	}
 	
-	public boolean isVirtual(StoragePool pool){
+	public final boolean isVirtual(StoragePool pool){
 		return getAccessor() instanceof VirtualAccessor<?> acc &&
 		       (pool == null || acc.getStoragePool() == pool);
 	}
-	public VirtualAccessor<T> getVirtual(StoragePool pool){
+	public final VirtualAccessor<T> getVirtual(StoragePool pool){
 		return getAccessor() instanceof VirtualAccessor<T> acc &&
 		       (pool == null || acc.getStoragePool() == pool)
 		       ? acc : null;
@@ -415,20 +415,20 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	@NotNull
 	@Override
-	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+	public final <Ty extends Annotation> Optional<Ty> getAnnotation(Class<Ty> annotationClass){
 		var acc = getAccessor();
 		if(acc == null) return Optional.empty();
 		return acc.getAnnotation(annotationClass);
 	}
 	@Override
-	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+	public final boolean hasAnnotation(Class<? extends Annotation> annotationClass){
 		var acc = getAccessor();
 		if(acc == null) return false;
 		return acc.hasAnnotation(annotationClass);
 	}
 	
 	@Override
-	public Type getGenericType(GenericContext genericContext){
+	public final Type getGenericType(GenericContext genericContext){
 		return getAccessor().getGenericType(genericContext);
 	}
 	
