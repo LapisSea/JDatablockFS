@@ -177,7 +177,7 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	public static byte[] make() throws IOException{
-		var data = MemoryData.builder().build();
+		var data = MemoryData.empty();
 		Cluster.init(data).getRootProvider().request("hello!", EnumContainer.class);
 		return data.readAll();
 	}

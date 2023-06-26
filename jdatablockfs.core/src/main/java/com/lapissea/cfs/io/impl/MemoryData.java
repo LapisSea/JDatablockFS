@@ -453,6 +453,9 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	protected abstract long readWord(DataType fileData, int fileOffset, int len);
 	protected abstract void writeWord(long value, DataType fileData, int fileOffset, int len);
 	
+	public static MemoryData<?> empty(){
+		return new Builder().build();
+	}
 	public static Builder builder(){
 		return new Builder();
 	}

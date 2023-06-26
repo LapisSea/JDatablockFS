@@ -64,7 +64,7 @@ Create database and add sample data:
 
 ```java
 //init and create new Cluster with in memory (byte[]) data
-Cluster cluster=Cluster.init(MemoryData.builder().build());
+Cluster cluster=Cluster.init(MemoryData.empty());
 
 //Ask root provider for list of IPs with the id of "my ips"
 IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
@@ -83,6 +83,7 @@ Details:
 `ips.add` writes to the database immediately. This only happens with unmanaged instances. Setting a values on a regular instance changes no data on the actual database.
 
 _Alternative IP type definition with an interface_
+
 ```java
 @IOInstance.Def.Order({"latitude", "longitude", "v6"})
 @IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
@@ -114,6 +115,7 @@ NOTE: You *can* create your own implementation of an interface like this, but it
 ### Maven:
 
 Simply paste this in to your pom.xml
+
 ```xml
 <dependencies>
 	<dependency>

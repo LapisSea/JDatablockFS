@@ -434,11 +434,11 @@ public final class FieldCompiler{
 		return fieldName;
 	}
 	
-	static Type getType(Field field){
+	public static Type getType(Field field){
 		return getType(field.getGenericType(), field::getAnnotation);
 	}
 	
-	static Type getType(Type defaultType, GetAnnotation getAnnotation){
+	public static Type getType(Type defaultType, GetAnnotation getAnnotation){
 		Type type         = defaultType;
 		var  typeOverride = getAnnotation.get(IOValue.OverrideType.class);
 		if(typeOverride != null){

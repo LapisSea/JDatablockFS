@@ -1,13 +1,19 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TypeGenTests{
+	
+	interface DefaultImplType extends IOInstance.Def<DefaultImplType>{
+		IOList<Integer> list();
+	}
 	
 	interface SimpleType extends IOInstance.Def<SimpleType>{
 		int getNum();
@@ -16,6 +22,14 @@ public class TypeGenTests{
 		@IOValue.Generic
 		Object getDyn();
 		void setDyn(Object a);
+	}
+	
+	@Test
+	void overrideType(){
+		var type = DefaultImplType.class;
+		assertTrue(IOList.class.isAnnotationPresent(IOValue.OverrideType.DefaultImpl.class));
+		var struct = Struct.of(type, Struct.STATE_DONE);
+		struct.emptyConstructor().make();
 	}
 	
 	@Test

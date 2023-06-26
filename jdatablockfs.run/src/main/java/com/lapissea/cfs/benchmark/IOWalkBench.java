@@ -44,7 +44,7 @@ public class IOWalkBench{
 	
 	public IOWalkBench(){
 		try{
-			IOInterface mem  = MemoryData.builder().build();
+			IOInterface mem  = MemoryData.empty();
 			var         c    = Cluster.init(mem);
 			var         conf = new Configuration();
 			
