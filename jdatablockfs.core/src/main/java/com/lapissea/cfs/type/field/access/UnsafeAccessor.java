@@ -1,7 +1,5 @@
 package com.lapissea.cfs.type.field.access;
 
-import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -35,26 +33,8 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, name, genericType);
 			
-			getter.ifPresent(get -> {
-				if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
-					throw new MalformedStruct("getter returns\n" + get.getGenericReturnType() + " but\n" + genericType + " is required\nGetter: " + get);
-				}
-				if(get.getParameterCount() != 0){
-					throw new MalformedStruct("getter must not have arguments\n" + get);
-				}
-			});
-			
-			setter.ifPresent(set -> {
-				if(!Utils.genericInstanceOf(set.getReturnType(), Void.TYPE)){
-					throw new MalformedStruct("setter returns\n" + set.getReturnType() + " but\n" + genericType + " is required\nSetter: " + set);
-				}
-				if(set.getParameterCount() != 1){
-					throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + set);
-				}
-				if(!Utils.genericInstanceOf(set.getGenericParameterTypes()[0], genericType)){
-					throw new MalformedStruct("setter argument is " + set.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + set);
-				}
-			});
+			getter.ifPresent(get -> validateGetter(genericType, get));
+			setter.ifPresent(set -> validateSetter(genericType, set));
 			
 			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
