@@ -309,6 +309,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	private       long             used;
 	
 	private final boolean readOnly;
+	private       boolean closed;
 	
 	@SuppressWarnings("unused")
 	private       boolean             transactionOpen;
@@ -327,9 +328,14 @@ public final class IOFileData implements IOInterface, Closeable{
 		this.used = getLength();
 	}
 	
+	private void checkClosed(){
+		if(closed) throw new IllegalStateException("Data closed");
+	}
+	
 	@Override
 	@NotNull
 	public FileRandomIO io(){
+		checkClosed();
 		return new FileRandomIO();
 	}
 	@Override
@@ -347,6 +353,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	private void setCapacity(long newCapacity) throws IOException{
 		if(readOnly) throw new UnsupportedOperationException();
+		checkClosed();
 		if(transactionOpen){
 			var siz = transactionBuff.getCapacity(used);
 			transactionBuff.capacityChange(Math.min(siz, newCapacity));
@@ -377,12 +384,14 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	@Override
 	public IOTransaction openIOTransaction(){
+		checkClosed();
 		if(IOTransaction.DISABLE_TRANSACTIONS) return IOTransaction.NOOP;
 		return transactionBuff.open(this, TRANSACTION_OPEN);
 	}
 	
 	@Override
 	public byte[] readAll() throws IOException{
+		checkClosed();
 		if(transactionOpen) return IOInterface.super.readAll();
 		var usedI = Math.toIntExact(used);
 		var copy  = new byte[usedI];
@@ -392,25 +401,27 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	@Override
 	public String toString(){
-		return IOFileData.class.getSimpleName() + "{" + file + "}";
+		return "IOFileData{" + file + "}";
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		return this == o ||
 		       o instanceof IOFileData that &&
-		       fileData.equals(that.fileData);
+		       file.equals(that.file);
 	}
 	
 	@Override
 	public int hashCode(){
-		return fileData.hashCode();
+		return file.hashCode();
 	}
 	
 	private long getLength() throws IOException{
+		checkClosed();
 		return fileData.length();
 	}
 	private void resize(long newSize) throws IOException{
+		checkClosed();
 		fileData.setLength(newSize);
 	}
 	
