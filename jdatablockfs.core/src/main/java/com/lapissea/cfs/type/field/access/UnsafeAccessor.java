@@ -37,7 +37,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			
 			getter.ifPresent(get -> {
 				if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
-					throw new MalformedStruct("getter returns " + get.getGenericReturnType() + " but " + genericType + " is required\n" + get);
+					throw new MalformedStruct("getter returns\n" + get.getGenericReturnType() + " but\n" + genericType + " is required\nGetter: " + get);
 				}
 				if(get.getParameterCount() != 0){
 					throw new MalformedStruct("getter must not have arguments\n" + get);
@@ -46,7 +46,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			
 			setter.ifPresent(set -> {
 				if(!Utils.genericInstanceOf(set.getReturnType(), Void.TYPE)){
-					throw new MalformedStruct("setter returns " + set.getReturnType() + " but " + genericType + " is required\n" + set);
+					throw new MalformedStruct("setter returns\n" + set.getReturnType() + " but\n" + genericType + " is required\nSetter: " + set);
 				}
 				if(set.getParameterCount() != 1){
 					throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + set);
