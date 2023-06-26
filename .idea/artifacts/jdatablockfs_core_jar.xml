@@ -1,0 +1,19 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="jdatablockfs.core:jar">
+    <output-path>$PROJECT_DIR$/target/artifacts/jdatablockfs_core_jar</output-path>
+    <root id="archive" name="jdatablockfs.core.jar">
+      <element id="module-output" name="jdatablockfs.core" />
+      <element id="module-output" name="Jorth" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/atteo/evo-inflector/1.3/evo-inflector-1.3.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/ow2/asm/asm/9.4/asm-9.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/roaringbitmap/shims/0.9.39/shims-0.9.39.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/ru/vyarus/generics-resolver/3.0.3/generics-resolver-3.0.3.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/ow2/asm/asm-tree/9.4/asm-tree-9.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/roaringbitmap/RoaringBitmap/0.9.39/RoaringBitmap-0.9.39.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/github/lapissea/jlapisutil/1.2.2/jlapisutil-1.2.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/ow2/asm/asm-analysis/9.4/asm-analysis-9.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/ow2/asm/asm-util/9.4/asm-util-9.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/lz4/lz4-java/1.8.0/lz4-java-1.8.0.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
