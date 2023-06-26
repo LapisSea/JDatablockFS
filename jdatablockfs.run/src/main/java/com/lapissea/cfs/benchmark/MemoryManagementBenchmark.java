@@ -33,7 +33,7 @@ public class MemoryManagementBenchmark{
 	private byte[] src;
 	
 	private static byte[] generate(UnsafeConsumer<Cluster, IOException> action) throws IOException{
-		var data = MemoryData.builder().build();
+		var data = MemoryData.empty();
 		var c    = Cluster.init(data);
 		action.accept(c);
 		return data.readAll();

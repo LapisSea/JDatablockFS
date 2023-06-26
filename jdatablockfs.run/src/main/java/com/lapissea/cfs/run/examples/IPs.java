@@ -32,7 +32,7 @@ public class IPs{
 			LoggedMemoryUtils.simpleLoggedMemorySession(IPs::run);
 		}else{
 			//No need to hassle with a real file, just make an empty in ram IOInterface
-			run(MemoryData.builder().build());
+			run(MemoryData.empty());
 		}
 	}
 	

@@ -71,7 +71,7 @@ public class SlowTests{
 		
 		byte[] baked;
 		{
-			var d = MemoryData.builder().build();
+			var d = MemoryData.empty();
 			Cluster.init(d);
 			baked = d.readAll();
 		}

@@ -56,7 +56,7 @@ public class QueryTests{
 	}
 	
 	<T extends IOInstance<T>> Object[][] lists(Class<T> el) throws IOException{
-		var cl = Cluster.init(new MemoryData.Builder().build());
+		var cl = Cluster.init(MemoryData.empty());
 		return new Object[][]{
 			{IOList.wrap(new ArrayList<>())},
 			{cl.getRootProvider().request("arr", ContiguousIOList.class, el)},
