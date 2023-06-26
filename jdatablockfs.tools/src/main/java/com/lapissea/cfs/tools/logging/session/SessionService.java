@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools.logging.session;
 
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.IOFileData;
 import com.lapissea.cfs.objects.Blob;
@@ -24,7 +25,7 @@ import java.util.stream.LongStream;
 
 public abstract sealed class SessionService implements Closeable{
 	
-	public abstract static class Writer{
+	public abstract static class Writer implements Closeable, IOHook{
 		private final String name;
 		protected Writer(String name){ this.name = name; }
 		
@@ -36,7 +37,8 @@ public abstract sealed class SessionService implements Closeable{
 		
 		private record FramePair(IOSnapshot.Full newFrame, OptionalPP<IOSnapshot.Full> lastFrame){ }
 		
-		public void snap(IOInterface data, LongStream writeIdx) throws IOException{
+		@Override
+		public void writeEvent(IOInterface data, LongStream writeIdx) throws IOException{
 			var p = computeRelation(data, writeIdx);
 			
 			syncSubmit(p);
@@ -61,7 +63,8 @@ public abstract sealed class SessionService implements Closeable{
 			write(lastFrame.map(last -> IOSnapshot.Diff.make(last, pair.newFrame)).orElse(pair.newFrame));
 		}
 		
-		private void close() throws IOException{ }//TODO
+		@Override
+		public void close() throws IOException{ }//TODO
 		
 		@Override
 		public String toString(){ return "Writer{" + name + "}"; }
@@ -154,5 +157,6 @@ public abstract sealed class SessionService implements Closeable{
 		throw new NotImplementedException();//TODO
 	}
 	
+	public final Writer openSession() throws IOException{ return openSession("default"); }
 	public abstract Writer openSession(String name) throws IOException;
 }
