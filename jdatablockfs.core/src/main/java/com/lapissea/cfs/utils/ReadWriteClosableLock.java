@@ -1,5 +1,7 @@
 package com.lapissea.cfs.utils;
 
+import com.lapissea.util.function.UnsafeSupplier;
+
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -84,5 +86,16 @@ public interface ReadWriteClosableLock{
 	
 	LockSession read();
 	LockSession write();
+	
+	default <T, E extends Throwable> T read(UnsafeSupplier<T, E> fun) throws E{
+		try(var ignore = read()){
+			return fun.get();
+		}
+	}
+	default <T, E extends Throwable> T write(UnsafeSupplier<T, E> fun) throws E{
+		try(var ignore = write()){
+			return fun.get();
+		}
+	}
 	
 }
