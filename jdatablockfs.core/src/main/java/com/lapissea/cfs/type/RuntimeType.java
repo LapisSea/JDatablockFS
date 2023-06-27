@@ -5,7 +5,7 @@ public interface RuntimeType<T>{
 	abstract class Abstract<L> implements RuntimeType<L>{
 		
 		private final Class<L> typ;
-		protected Abstract(Class<L> typ){this.typ=typ;}
+		protected Abstract(Class<L> typ){ this.typ = typ; }
 		
 		@Override
 		public Class<L> getType(){
@@ -14,14 +14,14 @@ public interface RuntimeType<T>{
 		
 		@Override
 		public boolean equals(Object o){
-			return this==o||
-			       o instanceof RuntimeType<?> runtimeType&&
+			return this == o ||
+			       o instanceof RuntimeType<?> runtimeType &&
 			       getType().equals(runtimeType.getType());
 		}
 		
 		@Override
 		public int hashCode(){
-			return typ!=null?typ.hashCode():0;
+			return typ != null? typ.hashCode() : 0;
 		}
 	}
 	
@@ -31,7 +31,7 @@ public interface RuntimeType<T>{
 		
 		Lambda(Class<L> typ, NewObj<L> sup){
 			super(typ);
-			this.sup=sup;
+			this.sup = sup;
 		}
 		
 		@Override
@@ -50,7 +50,7 @@ public interface RuntimeType<T>{
 			return (RuntimeType<T>)Struct.ofUnknown(type);
 		}
 		
-		return SupportedPrimitive.get(type).map(t->(RuntimeType<T>)t).orElseGet(()->new Abstract<>(type){
+		return SupportedPrimitive.get(type).map(t -> (RuntimeType<T>)t).orElseGet(() -> new Abstract<>(type){
 			private NewObj<T> sup;
 			
 			@Override
@@ -59,10 +59,10 @@ public interface RuntimeType<T>{
 			}
 			@Override
 			public NewObj<T> emptyConstructor(){
-				if(sup==null){
+				if(sup == null){
 					try{
-						var constr=getType().getConstructor();
-						sup=()->{
+						var constr = getType().getConstructor();
+						sup = () -> {
 							try{
 								return constr.newInstance();
 							}catch(ReflectiveOperationException e){

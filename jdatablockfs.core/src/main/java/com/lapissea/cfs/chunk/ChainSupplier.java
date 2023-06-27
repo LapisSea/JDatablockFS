@@ -10,21 +10,21 @@ public class ChainSupplier implements Supplier<Chunk>{
 	private IOException e;
 	
 	public ChainSupplier(Chunk chunk){
-		this.chunk=chunk;
+		this.chunk = chunk;
 	}
 	
 	@Override
 	public Chunk get(){
-		if(e!=null){
+		if(e != null){
 			throw UtilL.uncheckedThrow(e);
 		}
 		
-		Chunk c=chunk;
-		if(c==null) return null;
+		Chunk c = chunk;
+		if(c == null) return null;
 		try{
-			chunk=c.next();
+			chunk = c.next();
 		}catch(IOException e){
-			this.e=e;
+			this.e = e;
 		}
 		return c;
 	}

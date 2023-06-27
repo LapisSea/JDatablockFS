@@ -8,8 +8,8 @@ public class BooleanContainer extends IOInstance.Managed<BooleanContainer>{
 	@IOValue
 	public boolean value;
 	
-	public BooleanContainer(){}
+	public BooleanContainer(){ }
 	public BooleanContainer(boolean value){
-		this.value=value;
+		this.value = value;
 	}
 }

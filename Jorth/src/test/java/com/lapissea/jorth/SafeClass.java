@@ -9,7 +9,7 @@ public final class SafeClass{
 	}
 	
 	private SafeClass(int field){
-		safeField=field;
+		safeField = field;
 	}
 	
 	public int getSafeField(){

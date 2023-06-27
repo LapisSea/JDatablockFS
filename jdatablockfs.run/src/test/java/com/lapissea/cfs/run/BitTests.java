@@ -20,55 +20,55 @@ public class BitTests{
 	@Test
 	void bitStreamIntegrity(){
 		
-		Random r=new Random(1);
-		for(int i=0;i<10000;i++){
+		Random r = new Random(1);
+		for(int i = 0; i<10000; i++){
 			boolean[] bs;
 			boolean[] rbs;
 			try{
 				
-				bs=new boolean[i];
-				for(int j=0;j<bs.length;j++){
-					bs[j]=r.nextBoolean();
+				bs = new boolean[i];
+				for(int j = 0; j<bs.length; j++){
+					bs[j] = r.nextBoolean();
 				}
 				
-				var buff=new ByteArrayOutputStream();
-				try(var out=new BitOutputStream(new ContentOutputStream.Wrapp(buff))){
+				var buff = new ByteArrayOutputStream();
+				try(var out = new BitOutputStream(new ContentOutputStream.Wrapp(buff))){
 					out.writeBits(bs);
 				}
-				rbs=new boolean[bs.length];
-				try(var in=new BitInputStream(new ContentInputStream.BA(buff.toByteArray()), rbs.length)){
+				rbs = new boolean[bs.length];
+				try(var in = new BitInputStream(new ContentInputStream.BA(buff.toByteArray()), rbs.length)){
 					in.readBits(rbs);
 				}
 			}catch(Throwable e){
-				throw new RuntimeException("failed iter "+i, e);
+				throw new RuntimeException("failed iter " + i, e);
 			}
 			
-			assertEquals(rbs, bs, ""+i);
+			assertEquals(rbs, bs, "" + i);
 		}
 	}
 	
 	@Test
 	void bitFlagIntegrity() throws IOException{
 		
-		Random r=new Random(1);
-		for(int i=0;i<10000;i++){
+		Random r = new Random(1);
+		for(int i = 0; i<10000; i++){
 			for(var siz : NumberSize.FLAG_INFO){
-				var bs=new boolean[r.nextInt(siz.bits()+1)];
-				for(int j=0;j<bs.length;j++){
-					bs[j]=r.nextBoolean();
+				var bs = new boolean[r.nextInt(siz.bits() + 1)];
+				for(int j = 0; j<bs.length; j++){
+					bs[j] = r.nextBoolean();
 				}
 				
-				var buff=new ByteArrayOutputStream();
-				try(var out=new FlagWriter.AutoPop(siz, new ContentOutputStream.Wrapp(buff))){
+				var buff = new ByteArrayOutputStream();
+				try(var out = new FlagWriter.AutoPop(siz, new ContentOutputStream.Wrapp(buff))){
 					out.writeBits(bs);
 				}
 				
-				var rbs=new boolean[bs.length];
-				try(var in=FlagReader.read(new ContentInputStream.BA(buff.toByteArray()), siz)){
+				var rbs = new boolean[bs.length];
+				try(var in = FlagReader.read(new ContentInputStream.BA(buff.toByteArray()), siz)){
 					in.readBits(rbs);
 				}
 				
-				assertEquals(rbs, bs, siz+" "+i);
+				assertEquals(rbs, bs, siz + " " + i);
 			}
 		}
 	}

@@ -7,7 +7,6 @@ module JDatablockFS.tools {
 	requires jlapisvector;
 	requires org.lwjgl.glfw;
 	requires org.lwjgl.opengl;
-	requires org.lwjgl.stb;
 	requires com.google.gson;
 	requires java.sql;
 	requires com.esotericsoftware.kryo;

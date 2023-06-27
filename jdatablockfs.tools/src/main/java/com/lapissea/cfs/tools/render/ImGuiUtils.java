@@ -8,7 +8,7 @@ import java.util.Objects;
 
 public class ImGuiUtils{
 	
-	public static void load(){}
+	public static void load(){ }
 	static{
 		init();
 	}
@@ -18,14 +18,13 @@ public class ImGuiUtils{
 			System.setProperty("imgui.library.path", "./lib");
 			ImGui.createContext();
 			
-			var    io=ImGui.getIO();
-			var    f =io.getFonts();
+			var    io = ImGui.getIO();
+			var    f  = io.getFonts();
 			byte[] bb;
-			try(var t=Objects.requireNonNull(DisplayManager.class.getResourceAsStream("/CourierPrime/Regular/font.ttf"))){
-				bb=t.readAllBytes();
+			try(var t = Objects.requireNonNull(DisplayManager.class.getResourceAsStream("/CourierPrime/Regular/font.ttf"))){
+				bb = t.readAllBytes();
 			}
 			f.clearFonts();
-//			f.addFontFromMemoryTTF(bb, 16);
 			f.addFontFromMemoryTTF(bb, 16);
 			f.build();
 		}catch(Throwable e){
@@ -35,12 +34,12 @@ public class ImGuiUtils{
 	}
 	
 	public static synchronized ImGuiImplGl3 makeGL3Impl(){
-		var impl=new ImGuiImplGl3();
+		var impl = new ImGuiImplGl3();
 		impl.init("#version 330 core");
 		return impl;
 	}
 	public static synchronized ImGuiImplG2D makeG2DImpl(){
-		var impl=new ImGuiImplG2D();
+		var impl = new ImGuiImplG2D();
 		impl.init();
 		return impl;
 	}

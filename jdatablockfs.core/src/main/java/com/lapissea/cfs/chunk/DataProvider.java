@@ -1,6 +1,9 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.MagicID;
+import com.lapissea.cfs.exceptions.CacheOutOfSync;
+import com.lapissea.cfs.exceptions.PointerOutsideFile;
+import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -12,7 +15,7 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.function.Function;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public interface DataProvider{
 	
@@ -21,13 +24,13 @@ public interface DataProvider{
 	}
 	
 	class VerySimple implements DataProvider{
-		private final IOTypeDB      typeDB       =new IOTypeDB.MemoryOnlyDB();
-		private final ChunkCache    cache        =ChunkCache.strong();
-		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
+		private final IOTypeDB      typeDB        = new IOTypeDB.MemoryOnlyDB.Synchronized();
+		private final ChunkCache    cache         = ChunkCache.strong();
+		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
 		
 		public VerySimple(IOInterface data){
-			this.data=data;
+			this.data = data;
 		}
 		
 		@Override
@@ -48,7 +51,7 @@ public interface DataProvider{
 		}
 		@Override
 		public Chunk getFirstChunk() throws IOException{
-			return getChunk(ChunkPointer.of(Cluster.getMagicId().limit()));
+			return getChunk(ChunkPointer.of(MagicID.size()));
 		}
 		@Override
 		public String toString(){
@@ -56,15 +59,15 @@ public interface DataProvider{
 		}
 	}
 	
-	static DataProvider newVerySimpleProvider() throws IOException{
-		return newVerySimpleProvider((MemoryData.EventLogger)null);
+	static DataProvider newVerySimpleProvider(){
+		return newVerySimpleProvider((IOHook)null);
 	}
 	
-	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
-		var data=new MemoryData.Builder()
-			         .withOnWrite(onWrite)
-			         .withInitial(dest->dest.write(Cluster.getMagicId()))
-			         .build();
+	static DataProvider newVerySimpleProvider(IOHook onWrite){
+		var data = new MemoryData.Builder()
+			           .withOnWrite(onWrite)
+			           .withInitial(MagicID::write)
+			           .build();
 		return newVerySimpleProvider(data);
 	}
 	
@@ -85,19 +88,33 @@ public interface DataProvider{
 		return getChunkCache().get(ptr);
 	}
 	default Chunk getChunk(ChunkPointer ptr) throws IOException{
-		Objects.requireNonNull(ptr);
+		ptr.requireNonNull();
 		if(DEBUG_VALIDATION){
 			ensureChunkValid(ptr);
 		}
-		return getChunkCache().getOr(ptr, this::readChunk);
+		var cc = getChunkCache();
+		synchronized(cc){
+			var ch = cc.get(ptr);
+			if(ch != null) return ch;
+			
+			var read = readChunk(ptr);
+			Objects.requireNonNull(read);
+			cc.add(read);
+			return read;
+		}
 	}
 	
 	private void ensureChunkValid(ChunkPointer ptr) throws IOException{
-		var cached=getChunkCache().get(ptr);
-		if(cached==null) return;
-		var read=readChunk(ptr);
+		var siz = getSource().getIOSize();
+		if(ptr.getValue()>=siz){
+			throw new PointerOutsideFile(ptr.getValue() + " outside " + siz + " file");
+		}
+		
+		var cached = getChunkCache().get(ptr);
+		if(cached == null) return;
+		var read = readChunk(ptr);
 		if(!read.equals(cached)){
-			throw new DesyncedCacheException(read, cached);
+			throw new CacheOutOfSync(read, cached);
 		}
 	}
 	
@@ -112,12 +129,12 @@ public interface DataProvider{
 	default boolean isLastPhysical(Chunk chunk) throws IOException{
 		return chunk.dataEnd()>=getSource().getIOSize();
 	}
-	default void validate(){}
+	default void validate(){ }
 	
 	default void checkCached(Chunk chunk){
-		Chunk cached=getChunkCached(chunk.getPtr());
-		if(cached!=chunk){
-			throw new IllegalStateException("Fake "+chunk);
+		Chunk cached = getChunkCached(chunk.getPtr());
+		if(cached != chunk){
+			throw new IllegalStateException("Fake " + chunk);
 		}
 	}
 	
@@ -128,22 +145,22 @@ public interface DataProvider{
 			}
 			
 			@Override
-			public IOTypeDB getTypeDb(){return DataProvider.this.getTypeDb();}
+			public IOTypeDB getTypeDb(){ return DataProvider.this.getTypeDb(); }
 			@Override
-			public IOInterface getSource(){return DataProvider.this.getSource();}
+			public IOInterface getSource(){ return DataProvider.this.getSource(); }
 			@Override
-			public MemoryManager getMemoryManager(){return this;}
+			public MemoryManager getMemoryManager(){ return this; }
 			@Override
-			public ChunkCache getChunkCache(){return DataProvider.this.getChunkCache();}
+			public ChunkCache getChunkCache(){ return DataProvider.this.getChunkCache(); }
 			@Override
-			public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
+			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
 			
 			@Override
-			public DefragSes openDefragmentMode(){return src().openDefragmentMode();}
+			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override
-			public IOList<ChunkPointer> getFreeChunks(){return src().getFreeChunks();}
+			public IOList<ChunkPointer> getFreeChunks(){ return src().getFreeChunks(); }
 			@Override
-			public DataProvider getDataProvider(){return this;}
+			public DataProvider getDataProvider(){ return this; }
 			@Override
 			public void free(Collection<Chunk> toFree) throws IOException{
 				src().free(toFree);
@@ -156,6 +173,10 @@ public interface DataProvider{
 			@Override
 			public Chunk alloc(AllocateTicket ticket) throws IOException{
 				return src().alloc(router.apply(ticket));
+			}
+			@Override
+			public String toString(){
+				return DataProvider.this.toString();
 			}
 		}
 		

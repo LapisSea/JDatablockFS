@@ -1,250 +1,204 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.jorth.BracketType;
+import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.lang.type.KeyedEnum;
+import com.lapissea.util.ZeroArrays;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
+import java.util.Optional;
+import java.util.function.Function;
 
-public class Token{
+public sealed interface Token{
 	
-	public final int    line;
-	public final String source;
-	
-	public Token(int line, String source){
-		this.line=line;
-		this.source=source;
-	}
-	public String getSource(){
-		return source;
-	}
-	
-	public boolean isFloating(){
-		try{
-			Double.parseDouble(source);
-			return true;
-		}catch(NumberFormatException e){
-			return false;
+	record KWord(int line, Keyword keyword) implements Token{
+		public void require(Keyword keyword) throws MalformedJorth{
+			if(this.keyword != keyword) throw new MalformedJorth("Required keyword is " + keyword + " but got " + this.keyword);
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of((T)new Word(line, keyword.name().toLowerCase()));
+			}
+			return Token.super.as(type);
+		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(clazz == Keyword.class? (E)keyword : KeyedEnum.getOptional(clazz, keyword.key()));
 		}
 	}
 	
-	public boolean isNumber(){
-		return isInteger()||isFloating();
-	}
-	
-	public boolean isInteger(){
-		try{
-			Long.parseLong(source);
-			return true;
-		}catch(NumberFormatException e){
-			return false;
+	record EWord<E extends Enum<E>>(int line, E value) implements Token{
+		public EWord(int line, Class<E> type, String word) throws MalformedJorth{
+			this(line, KeyedEnum.get(type, word));
+		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			
+			return Optional.ofNullable(
+				clazz == value.getClass()?
+				(E)value :
+				KeyedEnum.getOptional(
+					clazz,
+					value instanceof KeyedEnum e?
+					e.key() : value.name().toLowerCase()
+				)
+			);
 		}
 	}
 	
-	public boolean isStringLiteral(){
-		return source.startsWith("'")&&source.endsWith("'");
-	}
-	public String getStringLiteralValue(){
-		assert isStringLiteral();
-		return source.substring(1, source.length()-1);
-	}
-	
-	public String lower(){
-		return source.toLowerCase();
-	}
-	
-	
-	public Visibility asVisibility() throws MalformedJorthException{
-		return Visibility.fromName(source);
-	}
-	
-	@Override
-	public String toString(){
-		return source;
-	}
-	
-	public interface Sequence{
-		
-		private static MalformedJorthException fail() throws MalformedJorthException{
-			throw new MalformedJorthException("Unexpected end of tokens");
+	record Word(int line, String value) implements Token{
+		public boolean is(String check){
+			return value.equals(check);
 		}
 		
-		Sized EMPTY=new Sized(){
-			@Override
-			public Token pop() throws MalformedJorthException{
-				throw fail();
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == ClassWord.class){
+				return Optional.of((T)new ClassWord(line, ClassName.dotted(value)));
 			}
-			@Override
-			public Token peek() throws MalformedJorthException{
-				throw fail();
+			if(type == SmolWord.class){
+				if(value.length() == 1){
+					return Optional.of((T)new SmolWord(line, value.charAt(0)));
+				}else{
+					return Optional.empty();
+				}
 			}
-			@Override
-			public Sequence clone(){
-				return this;
-			}
-			@Override
-			public int getRemaining(){
-				return 0;
-			}
-			@Override
-			public String toString(){
-				return "";
-			}
-		};
-		
-		static Sized of(){
-			return EMPTY;
+			return Token.super.as(type);
+		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(KeyedEnum.getOptional(clazz, value));
+		}
+	}
+	
+	record SmolWord(int line, char value) implements Token{
+		public boolean is(char check){
+			return value == check;
 		}
 		
-		static Sized of(Collection<Token> token){
-			return new Writable(token);
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of((T)new Word(line, value + ""));
+			}
+			if(type == ClassWord.class){
+				return Optional.of((T)new ClassWord(line, ClassName.dotted(value + "")));
+			}
+			return Token.super.as(type);
+		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(KeyedEnum.getOptional(clazz, value));
+		}
+	}
+	
+	record ClassWord(int line, ClassName value) implements Token{
+		public boolean is(ClassName check){
+			return value.equals(check);
 		}
 		
-		static Sequence of(Token token){
-			Objects.requireNonNull(token);
-			return new Sized(){
-				private boolean read=false;
-				@Override
-				public Token pop() throws MalformedJorthException{
-					if(read) fail();
-					read=true;
-					return token;
+		public ClassWord resolve(Function<ClassName, ClassName> imports){
+			var imported = imports.apply(value);
+			if(imported.equals(value)) return this;
+			return new ClassWord(line, imported);
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of((T)new Word(line, value.dotted()));
+			}
+			return Token.super.as(type);
+		}
+	}
+	
+	record StrValue(int line, String value) implements Token{ }
+	
+	sealed interface NumToken extends Token{
+		
+		record IntVal(int line, int value) implements NumToken{
+			@Override
+			public Number getNum(){
+				return value;
+			}
+		}
+		
+		record FloatVal(int line, float value) implements NumToken{
+			@Override
+			public Number getNum(){
+				return value;
+			}
+		}
+		
+		Number getNum();
+	}
+	
+	
+	record Null(int line) implements Token{ }
+	
+	record Bool(int line, boolean value) implements Token{ }
+	
+	record BracketedSet(int line, BracketType type, List<Token> contents) implements Token{
+		public Object singleTypeUnpack() throws MalformedJorth{
+			if(contents.isEmpty()) return ZeroArrays.ZERO_OBJECT;
+			return switch(contents.get(0)){
+				case Token.NumToken.IntVal t -> {
+					var val = new int[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.NumToken.IntVal)contents.get(i)).value();
+					}
+					yield val;
 				}
-				@Override
-				public Token peek() throws MalformedJorthException{
-					if(read) fail();
-					return token;
+				case Token.NumToken.FloatVal t -> {
+					var val = new float[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.NumToken.FloatVal)contents.get(i)).value();
+					}
+					yield val;
 				}
-				@Override
-				public Sequence clone(){
-					return read?EMPTY:of(token);
+				case Token.StrValue t -> {
+					var val = new String[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.StrValue)contents.get(i)).value();
+					}
+					yield val;
 				}
-				@Override
-				public int getRemaining(){
-					return read?0:1;
+				case Token.Bool t -> {
+					var val = new boolean[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.Bool)contents.get(i)).value();
+					}
+					yield val;
 				}
-				@Override
-				public String toString(){
-					return read?"":"L"+token.line+" - "+token.source;
-				}
+				default -> throw new MalformedJorth("Illegal token type " + contents.get(0) + " inside bracket block");
 			};
 		}
-		abstract class Sized implements Sequence{
-			public abstract int getRemaining();
-			
-			@Override
-			public boolean isEmpty(){
-				return getRemaining()==0;
-			}
-			@Override
-			public void requireCount(int count) throws MalformedJorthException{
-				if(getRemaining()<count) throw new MalformedJorthException("token requires at least "+count+" words!");
-			}
-			public abstract String toString();
-			public abstract Sequence clone();
+	}
+	
+	
+	int line();
+	
+	default <T extends Token> Optional<T> as(Class<T> type){
+		if(type.isInstance(this)){
+			return Optional.of(type.cast(this));
 		}
-		
-		final class Writable extends Sized{
-			private final List<Token> buffer=new ArrayList<>();
-			
-			public Writable(){}
-			public Writable(Collection<Token> initial){
-				buffer.addAll(initial);
-				for(Token token : buffer){
-					if(token==null) throw new NullPointerException();
-				}
-			}
-			private Writable(List<Token> initial, int ignore){
-				buffer.addAll(initial);
-			}
-			
-			public void write(Token token){
-				buffer.add(token);
-			}
-			@Override
-			public Token pop() throws MalformedJorthException{
-				if(isEmpty()) throw new MalformedJorthException("Unexpected end of tokens");
-				return buffer.remove(buffer.size()-1);
-			}
-			@Override
-			public Token peek() throws MalformedJorthException{
-				if(isEmpty()) throw new MalformedJorthException("Unexpected end of tokens");
-				return buffer.get(buffer.size()-1);
-			}
-			@Override
-			public Sequence clone(){
-				return new Writable(buffer, 0);
-			}
-			@Override
-			public int getRemaining(){
-				return buffer.size();
-			}
-			@Override
-			public boolean isEmpty(){
-				return buffer.isEmpty();
-			}
-			@Override
-			public void requireCount(int count) throws MalformedJorthException{
-				if(buffer.size()<count) throw new MalformedJorthException("token requires at least "+count+" words!");
-			}
-			@Override
-			public String toString(){
-				if(buffer.isEmpty()) return "";
-				
-				var sb       =new StringBuilder();
-				int firstLine=-1;
-				int lastLine =-1;
-				for(Token token : buffer){
-					if(firstLine==-1) firstLine=token.line;
-					if(token.line!=lastLine){
-						sb.append("\nL").append(token.line).append(" -");
-						lastLine=token.line;
-					}
-					sb.append(' ').append(token.source);
-				}
-				if(firstLine==lastLine){
-					sb.setCharAt(0, '\u200B');
-				}
-				return sb.toString();
-			}
+		return Optional.empty();
+	}
+	default <T extends Token> T requireAs(Class<T> type) throws MalformedJorth{
+		var o = as(type);
+		if(o.isPresent()){
+			return o.get();
 		}
-		
-		void requireCount(int count) throws MalformedJorthException;
-		boolean isEmpty();
-		
-		Token pop() throws MalformedJorthException;
-		Token peek() throws MalformedJorthException;
-		Sequence clone();
-		
-		default Stream<Token> cloneTokens(){
-			return clone().parseStream(Sequence::pop);
-		}
-		
-		default <T> void parseAll(Consumer<T> dest, UnsafeFunction<Sequence, T, MalformedJorthException> parser) throws MalformedJorthException{
-			while(!isEmpty()){
-				dest.accept(parser.apply(this));
-			}
-		}
-		
-		default <T> Stream<T> parseStream(UnsafeFunction<Sequence, T, MalformedJorthException> parser){
-			return Stream.generate(()->{
-				if(isEmpty()) return null;
-				try{
-					return Objects.requireNonNull(parser.apply(this));
-				}catch(MalformedJorthException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-			}).takeWhile(Objects::nonNull);
-		}
-		default <T> List<T> parseAll(UnsafeFunction<Sequence, T, MalformedJorthException> parser) throws MalformedJorthException{
-			var result=new ArrayList<T>();
-			parseAll(result::add, parser);
-			return result;
-		}
+		throw new MalformedJorth("Required token type " + type.getSimpleName() + " but got " + this);
+	}
+	
+	default <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+		return as(Word.class).map(Word::value).map(KeyedEnum.getLookup(clazz)::getOptional);
 	}
 }

@@ -21,8 +21,8 @@ public interface AnnotatedType{
 		private final Class<?>                            type;
 		
 		public Simple(Collection<? extends Annotation> annotations, Class<?> type){
-			this.annotations=annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity()));
-			this.type=type;
+			this.annotations = annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity()));
+			this.type = type;
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -52,7 +52,7 @@ public interface AnnotatedType{
 	Type getGenericType(GenericContext genericContext);
 	
 	default Class<?> getType(){
-		var generic=getGenericType(null);
-		return (Class<?>)(generic instanceof ParameterizedType p?p.getRawType():generic);
+		var generic = getGenericType(null);
+		return (Class<?>)(generic instanceof ParameterizedType p? p.getRawType() : generic);
 	}
 }

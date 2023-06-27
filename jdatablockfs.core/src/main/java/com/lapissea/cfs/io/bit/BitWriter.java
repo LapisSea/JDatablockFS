@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.bit;
 
 import java.io.IOException;
+import java.util.List;
 
 public interface BitWriter<SELF extends BitWriter<SELF>>{
 	
@@ -12,7 +13,7 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 	}
 	
 	default SELF writeBoolBit(boolean bool) throws IOException{
-		writeBits(bool?1:0, 1);
+		writeBits(bool? 1 : 0, 1);
 		return self();
 	}
 	
@@ -25,6 +26,10 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 		info.write(val, this);
 		return self();
 	}
+	default <T extends Enum<T>> SELF writeEnums(EnumUniverse<T> info, List<T> val) throws IOException{
+		info.write(val, this);
+		return self();
+	}
 	
 	
 	default SELF writeBits(int data, int bitCount) throws IOException{
@@ -33,13 +38,13 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 	}
 	
 	default SELF writeBits(boolean[] data) throws IOException{
-		int maxBatch=64;
-		for(int start=0;start<data.length;start+=maxBatch){
-			var batchSize=Math.min(data.length-start, maxBatch);
+		int maxBatch = 64;
+		for(int start = 0; start<data.length; start += maxBatch){
+			var batchSize = Math.min(data.length - start, maxBatch);
 			
-			long batch=0;
-			for(int i=0;i<batchSize;i++){
-				batch|=(data[i+start]?1L:0L)<<i;
+			long batch = 0;
+			for(int i = 0; i<batchSize; i++){
+				batch |= (data[i + start]? 1L : 0L)<<i;
 			}
 			
 			writeBits(batch, batchSize);
@@ -49,9 +54,9 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 	
 	
 	default SELF fillNOne(int n) throws IOException{
-		int maxBatch=63;
-		for(int start=0;start<n;start+=maxBatch){
-			var batchSize=Math.min(n-start, maxBatch);
+		int maxBatch = 63;
+		for(int start = 0; start<n; start += maxBatch){
+			var batchSize = Math.min(n - start, maxBatch);
 			
 			writeBits(BitUtils.makeMask(batchSize), batchSize);
 		}

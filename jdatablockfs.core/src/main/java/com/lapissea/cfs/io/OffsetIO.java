@@ -2,59 +2,60 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.Stringify;
 
 import java.io.IOException;
 import java.util.Collection;
 
-public final class OffsetIO implements RandomIO{
+public final class OffsetIO implements RandomIO, Stringify{
 	
 	public static RandomIO of(RandomIO.Creator parent, long offset) throws IOException{
-		return offset==0?parent.io():new OffsetIO(parent, offset);
+		return offset == 0? parent.io() : new OffsetIO(parent, offset);
 	}
 	public static RandomIO of(RandomIO parent, long offset) throws IOException{
-		return offset==0?parent:new OffsetIO(parent, offset);
+		return offset == 0? parent : new OffsetIO(parent, offset);
 	}
 	
 	private final RandomIO parent;
 	private final long     offset;
 	
 	public OffsetIO(RandomIO parent, long offset) throws IOException{
-		this.parent=parent;
-		this.offset=offset;
+		this.parent = parent;
+		this.offset = offset;
 		parent.setPos(0);
 		parent.skipExact(offset);
 	}
 	
 	public OffsetIO(RandomIO.Creator parent, long offset) throws IOException{
-		this.parent=parent.io();
-		this.offset=offset;
+		this.parent = parent.io();
+		this.offset = offset;
 		this.parent.skipExact(offset);
 	}
 	
 	@Override
 	public void setSize(long requestedSize) throws IOException{
-		parent.setSize(requestedSize+offset);
+		parent.setSize(requestedSize + offset);
 	}
 	@Override
 	public long getSize() throws IOException{
-		return parent.getSize()-offset;
+		return parent.getSize() - offset;
 	}
 	@Override
 	public long getPos() throws IOException{
-		return parent.getPos()-offset;
+		return parent.getPos() - offset;
 	}
 	@Override
 	public RandomIO setPos(long pos) throws IOException{
-		parent.setPos(pos+offset);
+		parent.setPos(pos + offset);
 		return this;
 	}
 	@Override
 	public long getCapacity() throws IOException{
-		return parent.getCapacity()-offset;
+		return parent.getCapacity() - offset;
 	}
 	@Override
 	public RandomIO setCapacity(long newCapacity) throws IOException{
-		parent.setCapacity(newCapacity+offset);
+		parent.setCapacity(newCapacity + offset);
 		return this;
 	}
 	@Override
@@ -83,6 +84,11 @@ public final class OffsetIO implements RandomIO{
 	}
 	
 	@Override
+	public boolean inTransaction(){
+		return parent.inTransaction();
+	}
+	
+	@Override
 	public int read(byte[] b, int off, int len) throws IOException{
 		return parent.read(b, off, len);
 	}
@@ -98,7 +104,7 @@ public final class OffsetIO implements RandomIO{
 	}
 	@Override
 	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
-		parent.writeAtOffsets(data.stream().map(d->d.withOffset(d.ioOffset()+offset)).toList());
+		parent.writeAtOffsets(data.stream().map(d -> d.withOffset(d.ioOffset() + offset)).toList());
 	}
 	
 	@Override
@@ -108,7 +114,7 @@ public final class OffsetIO implements RandomIO{
 	
 	@Override
 	public RandomIO ensureCapacity(long capacity) throws IOException{
-		return parent.ensureCapacity(capacity+offset);
+		return parent.ensureCapacity(capacity + offset);
 	}
 	@Override
 	public long remaining() throws IOException{
@@ -131,8 +137,8 @@ public final class OffsetIO implements RandomIO{
 		return parent.readRemaining();
 	}
 	@Override
-	public long transferTo(ContentWriter out, int buffSize) throws IOException{
-		return parent.transferTo(out, buffSize);
+	public long transferTo(ContentWriter out, int batchSize) throws IOException{
+		return parent.transferTo(out, batchSize);
 	}
 	@Override
 	public ContentReader.BufferTicket readTicket(long amount){
@@ -156,14 +162,15 @@ public final class OffsetIO implements RandomIO{
 	}
 	@Override
 	public String toString(){
-		return "OffsetIO{"+
-		       "parent="+parent+
-		       ", offset="+offset+
+		return "OffsetIO{" +
+		       "parent=" + parent +
+		       ", offset=" + offset +
 		       '}';
 	}
 	
+	@Override
 	public String toShortString(){
-		return "{"+parent+" +"+offset+'}';
+		return "{" + parent + " +" + offset + '}';
 	}
 	
 }

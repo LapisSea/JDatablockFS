@@ -11,7 +11,7 @@ import java.io.IOException;
 public class RunCaseTests{
 	
 	@Test
-	void sparseImage() throws IOException{
+	void sparseImage() throws Exception{
 		SparseImage.main(ZeroArrays.ZERO_STRING);
 	}
 	

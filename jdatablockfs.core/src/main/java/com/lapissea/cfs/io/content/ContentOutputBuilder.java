@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,17 +16,21 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 		out.write(buf, 0, count);
 	}
 	
+	public void writeTo(ContentOutputBuilder out){
+		out.write(buf, 0, count);
+	}
+	
 	@Override
 	public void writeWord(long v, int len) throws IOException{
 		
-		int oldCapacity=buf.length;
-		int minGrowth  =count+len-oldCapacity;
+		int oldCapacity = buf.length;
+		int minGrowth   = count + len - oldCapacity;
 		if(minGrowth>0){
 			ContentWriter.super.writeWord(v, len);
 			return;
 		}
-		Utils.write8(v, buf, count, len);
-		count+=len;
+		MemPrimitive.setWord(v, buf, count, len);
+		count += len;
 	}
 	
 	@Override
@@ -36,7 +40,7 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 	
 	@Override
 	public void writeBoolean(boolean v){
-		writeInt1(v?1:0);
+		writeInt1(v? 1 : 0);
 	}
 	
 	@Override

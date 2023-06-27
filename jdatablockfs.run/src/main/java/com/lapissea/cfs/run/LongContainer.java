@@ -8,8 +8,8 @@ public class LongContainer extends IOInstance.Managed<LongContainer>{
 	@IOValue
 	public long value;
 	
-	public LongContainer(){}
+	public LongContainer(){ }
 	public LongContainer(long value){
-		this.value=value;
+		this.value = value;
 	}
 }

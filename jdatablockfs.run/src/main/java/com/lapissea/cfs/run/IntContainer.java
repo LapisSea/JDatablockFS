@@ -8,8 +8,8 @@ public class IntContainer extends IOInstance.Managed<IntContainer>{
 	@IOValue
 	public int value;
 	
-	public IntContainer(){}
+	public IntContainer(){ }
 	public IntContainer(int value){
-		this.value=value;
+		this.value = value;
 	}
 }

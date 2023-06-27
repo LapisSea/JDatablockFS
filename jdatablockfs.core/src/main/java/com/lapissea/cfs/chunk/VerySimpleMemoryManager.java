@@ -10,7 +10,7 @@ import java.util.List;
 
 public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>());
+	private final IOList<ChunkPointer> freeChunks = IOList.wrap(new ArrayList<>());
 	private       boolean              defragmentMode;
 	
 	public VerySimpleMemoryManager(DataProvider context){
@@ -20,7 +20,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(context1, ticket)->{
+			(context1, ticket) -> {
 				if(defragmentMode) return null;
 				return MemoryOperations.allocateReuseFreeChunk(context1, ticket);
 			},
@@ -31,18 +31,18 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocToStrategy> createAllocTos(){
 		return List.of(
-			(first, target, toAllocate)->MemoryOperations.growFileAlloc(target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.growFreeAlloc(this, target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
+			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
 	
 	@Override
 	public DefragSes openDefragmentMode(){
-		boolean oldDefrag=defragmentMode;
-		defragmentMode=true;
-		return ()->defragmentMode=oldDefrag;
+		boolean oldDefrag = defragmentMode;
+		defragmentMode = true;
+		return () -> defragmentMode = oldDefrag;
 	}
 	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
@@ -52,7 +52,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
-		List<Chunk> toAdd=MemoryOperations.mergeChunks(toFree);
+		List<Chunk> toAdd = MemoryOperations.mergeChunks(toFree);
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
 }

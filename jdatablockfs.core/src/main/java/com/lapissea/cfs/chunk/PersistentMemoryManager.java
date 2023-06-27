@@ -12,8 +12,8 @@ import java.util.List;
 
 public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private final List<ChunkPointer>   queuedFreeChunks  =new ArrayList<>();
-	private final IOList<ChunkPointer> queuedFreeChunksIO=IOList.wrap(queuedFreeChunks);
+	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
+	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
 	
 	private final IOList<ChunkPointer> freeChunks;
 	private       boolean              defragmentMode;
@@ -22,13 +22,13 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	public PersistentMemoryManager(DataProvider context, IOList<ChunkPointer> freeChunks){
 		super(context);
-		this.freeChunks=freeChunks;
+		this.freeChunks = freeChunks;
 	}
 	
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(ctx, ticket)->{
+			(ctx, ticket) -> {
 				if(defragmentMode) return null;
 				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket);
 			},
@@ -39,22 +39,22 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocToStrategy> createAllocTos(){
 		return List.of(
-			(first, target, toAllocate)->MemoryOperations.growFileAlloc(target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.growFreeAlloc(this, target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
-			(first, target, toAllocate)->MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
+			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
 	
 	@Override
 	public DefragSes openDefragmentMode(){
-		boolean oldDefrag=defragmentMode;
-		defragmentMode=true;
-		return ()->defragmentMode=oldDefrag;
+		boolean oldDefrag = defragmentMode;
+		defragmentMode = true;
+		return () -> defragmentMode = oldDefrag;
 	}
 	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
-		return adding?queuedFreeChunksIO:freeChunks;
+		return adding? queuedFreeChunksIO : freeChunks;
 	}
 	
 	private void addQueue(Collection<Chunk> ptrs){
@@ -73,10 +73,10 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	}
 	private List<Chunk> popQueue() throws IOException{
 		synchronized(queuedFreeChunksIO){
-			var chs=new ArrayList<Chunk>(queuedFreeChunks.size());
+			var chs = new ArrayList<Chunk>(queuedFreeChunks.size());
 			while(!queuedFreeChunks.isEmpty()){
-				var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
-				var ch =context.getChunk(ptr);
+				var ptr = queuedFreeChunks.remove(queuedFreeChunks.size() - 1);
+				var ch  = context.getChunk(ptr);
 				chs.add(ch);
 			}
 			return chs;
@@ -87,84 +87,90 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
 		
-		var popped=popFile(toFree);
+		var popped = popFile(toFree);
 		if(popped.isEmpty()){
-			popLast();
+			tryPopFree();
 			return;
 		}
 		
-		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped);
+		List<Chunk> toAdd = MemoryOperations.mergeChunks(popped);
 		
 		if(adding){
 			addQueue(toAdd);
 			return;
 		}
 		
-		adding=true;
+		adding = true;
 		try{
 			addQueue(toAdd);
 			do{
-				var capacity       =freeChunks.getCapacity();
-				var optimalCapacity=freeChunks.size()+queuedFreeChunks.size();
+				var capacity        = freeChunks.getCapacity();
+				var optimalCapacity = freeChunks.size() + queuedFreeChunks.size();
 				if(capacity<optimalCapacity){
-					var cap=optimalCapacity+1;
+					var cap = optimalCapacity + 1;
 					synchronized(freeChunks){
 						freeChunks.requestCapacity(cap);
 					}
 				}
 				
-				var chs=popQueue();
+				var chs = popQueue();
 				synchronized(freeChunks){
 					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
 				}
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{
-			adding=false;
+			adding = false;
 		}
 		
-		popLast();
+		tryPopFree();
 	}
 	
-	private void popLast() throws IOException{
+	private void tryPopFree() throws IOException{
 		if(adding) return;
-		while(true){
-			var last=freeChunks.peekLast();
-			if(last.isEmpty()) break;
-			var lastCh=last.orElseThrow().dereference(context);
-			if(lastCh.checkLastPhysical()){
+		boolean anyPopped;
+		do{
+			anyPopped = false;
+			var lastChO = freeChunks.peekLast().map(p -> p.dereference(context)).filter(Chunk::checkLastPhysical);
+			if(lastChO.isPresent()){
+				var lastCh = lastChO.get();
+				
 				freeChunks.popLast();
-				try(var io=context.getSource().io()){
-					io.setCapacity(lastCh.getPtr().getValue());
+				if(lastCh.checkLastPhysical()){
+					try(var io = context.getSource().io()){
+						io.setCapacity(lastCh.getPtr().getValue());
+					}
+					context.getChunkCache().notifyDestroyed(lastCh);
+					anyPopped = true;
+				}else{
+					free(lastCh);
+					break;
 				}
-				context.getChunkCache().notifyDestroyed(lastCh);
-			}else{
-				break;
 			}
-		}
+		}while(anyPopped);
 	}
 	
 	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{
-		Collection<Chunk> result=toFree;
-		boolean           dirty =true;
+		Collection<Chunk> result = toFree;
+		boolean           dirty  = true;
 		
 		if(toFree.isEmpty()) return toFree;
-		var end=toFree.iterator().next().getDataProvider().getSource().getIOSize();
+		var end = toFree.iterator().next().getDataProvider().getSource().getIOSize();
 		
-		List<Chunk> toNotify=new ArrayList<>();
+		List<Chunk> toNotify = new ArrayList<>();
 		
 		wh:
 		while(true){
-			for(var i=result.iterator();i.hasNext();){
-				Chunk chunk=i.next();
+			for(var i = result.iterator(); i.hasNext(); ){
+				Chunk chunk = i.next();
 				if(chunk.dataEnd()<end) continue;
 				
 				if(dirty){
-					dirty=false;
-					result=new ArrayList<>(result);
+					dirty = false;
+					result = new ArrayList<>(result);
 					continue wh;
 				}
-				end=chunk.getPtr().getValue();
-				var ptr=chunk.getPtr();
+				end = chunk.getPtr().getValue();
+				var ptr = chunk.getPtr();
 				
 				i.remove();
 				toNotify.add(chunk);
@@ -177,7 +183,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				continue wh;
 			}
 			if(!dirty){
-				try(var io=context.getSource().io()){
+				try(var io = context.getSource().io()){
 					io.setCapacity(end);
 				}
 				for(Chunk chunk : toNotify){

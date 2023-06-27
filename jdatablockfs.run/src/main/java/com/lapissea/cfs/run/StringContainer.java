@@ -8,8 +8,8 @@ public class StringContainer extends IOInstance.Managed<StringContainer>{
 	@IOValue
 	public String value;
 	
-	public StringContainer(){}
+	public StringContainer(){ }
 	public StringContainer(String value){
-		this.value=value;
+		this.value = value;
 	}
 }

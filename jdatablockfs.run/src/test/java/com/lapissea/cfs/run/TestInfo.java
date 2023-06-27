@@ -9,13 +9,13 @@ import java.util.stream.Collectors;
 public class TestInfo{
 	
 	public static TestInfo of(Object... args){
-		var           f =Utils.getFrame(1);
-		StringBuilder sb=new StringBuilder();
+		var           f  = Utils.getFrame(1);
+		StringBuilder sb = new StringBuilder();
 		Utils.frameToStr(sb, f, false);
 		if(args.length>0){
 			sb.append('(');
-			for(int i=0;i<args.length;i++){
-				if(args[i] instanceof Class<?> c) args[i]=c.getSimpleName()+".class";
+			for(int i = 0; i<args.length; i++){
+				if(args[i] instanceof Class<?> c) args[i] = c.getSimpleName() + ".class";
 			}
 			sb.append(Arrays.stream(args).map(TextUtil::toString).collect(Collectors.joining(", ")));
 			sb.append(')');
@@ -30,7 +30,7 @@ public class TestInfo{
 	private final String name;
 	
 	public TestInfo(String name){
-		this.name=name;
+		this.name = name;
 	}
 	public String getName(){
 		return name;

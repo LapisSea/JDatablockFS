@@ -7,9 +7,9 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 
-public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
+public final class ChunkPointer implements Comparable<ChunkPointer>{
 	
-	public static final ChunkPointer NULL=new ChunkPointer(0);
+	public static final ChunkPointer NULL = new ChunkPointer(0);
 	
 	@NotNull
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
@@ -18,32 +18,14 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	@NotNull
 	public static ChunkPointer of(long value){
-		return value==0?NULL:new ChunkPointer(value);
-	}
-	
-	@Deprecated
-	public static ChunkPointer of(ChunkPointer value){
-		return value;
-	}
-	
-	public static ChunkPointer of(INumber value){
-		return of(value.getValue());
-	}
-	
-	public static long getValueNullable(ChunkPointer ptr){
-		return ptr==null?0:ptr.getValue();
+		return value == 0? NULL : new ChunkPointer(value);
 	}
 	
 	private final long value;
 	
 	private ChunkPointer(long value){
 		if(value<0) throw new IllegalArgumentException();
-		this.value=value;
-	}
-	
-	@Override
-	public long getValue(){
-		return value;
+		this.value = value;
 	}
 	
 	public Chunk dereference(DataProvider provider) throws IOException{
@@ -56,36 +38,36 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		if(isNull()) return "NULL";
 		
 		if(getValue()>9999){
-			var h=Long.toHexString(getValue()).toUpperCase();
-			return "x"+h;
+			var h = Long.toHexString(getValue()).toUpperCase();
+			return "x" + h;
 		}
-		return "*"+getValue();
+		return "*" + getValue();
 	}
 	
-	public ChunkPointer addPtr(INumber value){
+	public ChunkPointer addPtr(ChunkPointer value){
 		requireNonNull();
 		return addPtr(value.getValue());
 	}
 	
 	public ChunkPointer addPtr(long value){
 		requireNonNull();
-		return new ChunkPointer(getValue()+value);
+		return new ChunkPointer(getValue() + value);
 	}
 	
-	public long add(INumber value){
+	public long add(ChunkPointer value){
 		requireNonNull();
 		return add(value.getValue());
 	}
 	
 	public long add(long value){
 		requireNonNull();
-		return getValue()+value;
+		return getValue() + value;
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		return o==this||
-		       o instanceof INumber num&&
+		return o == this ||
+		       o instanceof ChunkPointer num &&
 		       equals(num.getValue());
 	}
 	
@@ -106,11 +88,27 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		if(isNull()) throw new NullPointerException("Pointer is null");
 	}
 	public boolean isNull(){
-		return getValue()==0;
+		return getValue() == 0;
 	}
 	
 	@Override
 	public int compareTo(ChunkPointer o){
 		return compareTo(o.getValue());
+	}
+	
+	public long getValue(){
+		return value;
+	}
+	
+	public int getValueInt(){
+		return Math.toIntExact(getValue());
+	}
+	
+	public boolean equals(long value){
+		return getValue() == value;
+	}
+	
+	public int compareTo(long o){
+		return Long.compare(getValue(), o);
 	}
 }

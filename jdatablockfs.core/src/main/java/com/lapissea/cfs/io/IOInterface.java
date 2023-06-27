@@ -1,10 +1,10 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.function.UnsafeRunnable;
 import com.lapissea.util.function.UnsafeSupplier;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 
@@ -13,30 +13,15 @@ import java.io.IOException;
  */
 public interface IOInterface extends RandomIO.Creator{
 	
-	interface IOTransaction extends Closeable{
-		/**
-		 * Optional information used for profiling or debugging.
-		 *
-		 * @return number of separate ranges of bytes that may contain data that has changed
-		 */
-		int getChunkCount();
-		/**
-		 * Optional information used for profiling or debugging.
-		 *
-		 * @return number of bytes that may have been overwritten
-		 */
-		long getTotalBytes();
-	}
-	
 	default void setIOSize(long requestedSize) throws IOException{
-		try(var io=io()){
+		try(var io = io()){
 			io.ensureCapacity(requestedSize);
 			io.setSize(requestedSize);
 		}
 	}
 	
 	default long getIOSize() throws IOException{
-		try(var io=io()){
+		try(var io = io()){
 			return io.getSize();
 		}
 	}
@@ -66,31 +51,30 @@ public interface IOInterface extends RandomIO.Creator{
 	IOTransaction openIOTransaction();
 	
 	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
-		try(var ignored=openIOTransaction()){
+		try(var ignored = openIOTransaction()){
 			session.run();
 		}
 	}
 	default <T, E extends Throwable> T openIOTransaction(UnsafeSupplier<T, E> session) throws E, IOException{
-		try(var ignored=openIOTransaction()){
+		try(var ignored = openIOTransaction()){
 			return session.get();
 		}
 	}
 	
 	default IOInterface asReadOnly(){
 		if(isReadOnly()) return this;
-		var that=this;
-		return new IOInterface(){
+		class ReadOnly implements IOInterface, Stringify{
 			@Override
 			public boolean isReadOnly(){
 				return true;
 			}
 			@Override
 			public IOTransaction openIOTransaction(){
-				return that.openIOTransaction();
+				return IOInterface.this.openIOTransaction();
 			}
 			@Override
 			public RandomIO io() throws IOException{
-				var io=that.readOnlyIO();
+				var io = IOInterface.this.readOnlyIO();
 				if(!io.isReadOnly()){
 					throw new IllegalStateException();
 				}
@@ -98,11 +82,13 @@ public interface IOInterface extends RandomIO.Creator{
 			}
 			@Override
 			public String toString(){
-				return that.toString();
+				return IOInterface.this.toString();
 			}
+			@Override
 			public String toShortString(){
-				return Utils.toShortString(that);
+				return Utils.toShortString(IOInterface.this);
 			}
-		};
+		}
+		return new ReadOnly();
 	}
 }

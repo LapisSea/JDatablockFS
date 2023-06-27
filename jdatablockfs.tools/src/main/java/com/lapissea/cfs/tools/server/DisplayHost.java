@@ -10,7 +10,12 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeRunnable;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -29,7 +34,7 @@ import static com.lapissea.cfs.logging.Log.nonFatal;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.async;
 
 public class DisplayHost{
 	public static void main(String[] args) throws IOException{
@@ -44,16 +49,16 @@ public class DisplayHost{
 		private final Socket client;
 		
 		
-		private final Map<Long, UnsafeRunnable<IOException>> readyTasks=Collections.synchronizedMap(new HashMap<>());
+		private final Map<Long, UnsafeRunnable<IOException>> readyTasks = Collections.synchronizedMap(new HashMap<>());
 		
 		private long doneCounter;
 		private long taskCounter;
 		
-		private boolean running=true;
+		private boolean running = true;
 		
 		private Sess(String name, Socket client){
-			this.name=name;
-			this.client=client;
+			this.name = name;
+			this.client = client;
 		}
 		
 		private boolean hasNext(){
@@ -64,8 +69,8 @@ public class DisplayHost{
 		}
 		private void doTasks() throws IOException{
 			while(hasNext()){
-				var task=readyTasks.get(doneCounter);
-				if(task==null) continue;
+				var task = readyTasks.get(doneCounter);
+				if(task == null) continue;
 				readyTasks.remove(doneCounter++);
 				task.run();
 			}
@@ -74,12 +79,12 @@ public class DisplayHost{
 		private void run() throws IOException{
 			info("connected {} {}", name, client);
 			
-			var objInput=new DataInputStream(new BufferedInputStream(client.getInputStream()));
-			var io      =ServerCommons.makeIO();
+			var objInput = new DataInputStream(new BufferedInputStream(client.getInputStream()));
+			var io       = ServerCommons.makeIO();
 			
-			var out=client.getOutputStream();
+			var out = client.getOutputStream();
 			
-			var runner=async(()->{
+			var runner = async(() -> {
 				try{
 					while(running){
 						if(readyTasks.isEmpty()){
@@ -90,7 +95,7 @@ public class DisplayHost{
 						doTasks();
 					}
 					
-					while(doneCounter!=taskCounter){
+					while(doneCounter != taskCounter){
 						info("finishing up {} / {}", doneCounter, taskCounter);
 						while(!hasNext()) UtilL.sleep(1);
 						doTasks();
@@ -101,70 +106,70 @@ public class DisplayHost{
 				}catch(Throwable e){
 					e.printStackTrace();
 				}
-			}, e->Thread.ofVirtual().start(e));
+			}, Thread::startVirtualThread);
 			
-			var workerPool=Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
+			var workerPool = Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
 			
-			MemFrame[] lastFrame={null};
+			MemFrame[] lastFrame = {null};
 			while(running){
 				try{
 					
 					Action action;
 					byte[] data;
 					try{
-						action=Action.values()[objInput.readByte()];
-						data=ServerCommons.readSafe(objInput);
+						action = Action.values()[objInput.readByte()];
+						data = ServerCommons.readSafe(objInput);
 					}catch(EOFException e1){
 						doTasks();
 						continue;
 					}
 					
-					while(doneCounter+1<<12<taskCounter){
+					while(doneCounter + 1<<12<taskCounter){
 						UtilL.sleep(1);
 					}
 					
-					var id=taskCounter++;
+					var id = taskCounter++;
 					
-					workerPool.submit(()->{
-						UnsafeRunnable<IOException> readyTask=switch(action){
+					workerPool.submit(() -> {
+						UnsafeRunnable<IOException> readyTask = switch(action){
 							case LOG -> {
 								MemFrame frame;
 								try{
-									frame=io.readFrame(new DataInputStream(new ByteArrayInputStream(data)));
+									frame = io.readFrame(new DataInputStream(new ByteArrayInputStream(data)));
 								}catch(IOException e){
 									throw new RuntimeException(e);
 								}
-								var s=getSession();
-								yield ()->{
-									var l   =lastFrame[0];
-									var diff=MemFrame.diff(l, frame);
-									if(diff!=null) s.log(diff);
+								var s = getSession();
+								yield () -> {
+									var l    = lastFrame[0];
+									var diff = MemFrame.diff(l, frame);
+									if(diff != null) s.log(diff);
 									else{
-										lastFrame[0]=frame;
+										lastFrame[0] = frame;
 										s.log(frame);
 									}
 								};
 							}
-							case RESET -> ()->{
+							case RESET -> () -> {
 								getSession().reset();
 								System.gc();
 							};
-							case FINISH -> ()->{
+							case FINISH -> () -> {
 								try{
 									out.write(2);
 									out.flush();
-								}catch(SocketException ignored){}
+								}catch(SocketException ignored){ }
 								getSession().finish();
-								running=false;
+								running = false;
 							};
-							case PING -> ()->{
+							case PING -> () -> {
 								out.write(2);
 								out.flush();
 							};
-							case DELETE -> ()->{
+							case DELETE -> () -> {
 //								Log.debug("DELETE ORDER {}", name);
 								getSession().delete();
-								running=false;
+								running = false;
 							};
 						};
 						readyTasks.put(id, readyTask);
@@ -175,6 +180,9 @@ public class DisplayHost{
 						break;
 					}
 					if("Socket closed".equals(e.getMessage())){
+						break;
+					}
+					if(e.getMessage().contains("connection was aborted")){
 						break;
 					}
 					e.printStackTrace();
@@ -196,13 +204,13 @@ public class DisplayHost{
 	
 	private record NegotiatedSession(ServerSocket sessionServer, String sessionName) implements AutoCloseable{
 		static NegotiatedSession negotiate(ServerSocket source) throws IOException{
-			try(Socket client=source.accept()){
-				var sessionServer=new ServerSocket(0);
-				var out          =new DataOutputStream(client.getOutputStream());
+			try(Socket client = source.accept()){
+				var sessionServer = new ServerSocket(0);
+				var out           = new DataOutputStream(client.getOutputStream());
 				out.writeInt(sessionServer.getLocalPort());
 				out.flush();
-				var in         =new DataInputStream(client.getInputStream());
-				var sessionName=in.readUTF();
+				var in          = new DataInputStream(client.getInputStream());
+				var sessionName = in.readUTF();
 				return new NegotiatedSession(sessionServer, sessionName);
 			}
 		}
@@ -213,51 +221,50 @@ public class DisplayHost{
 		
 		@Override
 		public void close(){
-			UtilL.closeSilenty(sessionServer);
+			UtilL.closeSilently(sessionServer);
 		}
 	}
 	
 	public void start(boolean lazyStart) throws IOException{
-		var config=LoggedMemoryUtils.readConfig();
-		int port  =((Number)config.getOrDefault("port", 6666)).intValue();
-		
-		ServerSocket server=new ServerSocket(port);
-		info("Started on port {}", port);
-		
 		if(!lazyStart) getDisplay();
 		
-		var initialData=System.getProperty("initialData");
-		if(initialData!=null){
+		var config = LoggedMemoryUtils.readConfig();
+		
+		ServerSocket server = new ServerSocket(config.negotiationPort);
+		info("Started on port {}", config.negotiationPort);
+		
+		var initialData = System.getProperty("initialData");
+		if(initialData != null){
 			info("Loading initialData...");
 			try{
-				var data=Files.readAllBytes(Path.of(initialData));
-				async(()->{//dry run cluster to load and compile classes while display is loading
+				var data = Files.readAllBytes(Path.of(initialData));
+				async(() -> {//dry run cluster to load and compile classes while display is loading
 					try{
-						var cl=new Cluster(MemoryData.builder().withRaw(data).asReadOnly().build());
+						var cl = new Cluster(MemoryData.builder().withRaw(data).asReadOnly().build());
 						cl.rootWalker(MemoryWalker.PointerRecord.NOOP, true).walk();
 					}catch(IOException e){
 						e.printStackTrace();
 					}
 				});
-				var ses=getDisplay().join().getSession("default");
-				ses.log(new MemFrame(0, data, new long[0], ""));
+				var ses = getDisplay().join().getSession("default");
+				ses.log(new MemFrame(0, System.nanoTime(), data, new long[0], ""));
 				info("Loaded initialData.");
 			}catch(Throwable e){
 				nonFatal(e, "Failed to load initialData");
 			}
 		}
 		
-		int sesCounter=1;
+		int sesCounter = 1;
 		while(true){
 			NegotiatedSession ses;
 			try{
-				ses=NegotiatedSession.negotiate(server);
+				ses = NegotiatedSession.negotiate(server);
 			}catch(Throwable e){
 				e.printStackTrace();
 				continue;
 			}
-			Thread.ofVirtual().name("Session: "+sesCounter+"/"+ses.sessionName).start(()->{
-				try(ses;var client=ses.open()){
+			Thread.ofVirtual().name("Session: " + sesCounter + "/" + ses.sessionName).start(() -> {
+				try(ses; var client = ses.open()){
 					new Sess(ses.sessionName, client).run();
 				}catch(Exception e){
 					e.printStackTrace();
@@ -268,10 +275,10 @@ public class DisplayHost{
 	}
 	
 	public CompletableFuture<DataLogger> getDisplay(){
-		if(display==null){
+		if(display == null){
 			synchronized(this){
-				if(display==null){
-					display=async(ServerCommons::getLocalLoggerImpl);
+				if(display == null){
+					display = async(() -> ServerCommons.getLocalLoggerImpl(false));
 				}
 			}
 		}

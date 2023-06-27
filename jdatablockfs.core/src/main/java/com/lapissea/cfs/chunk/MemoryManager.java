@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.UnknownAllocationMethodException;
+import com.lapissea.cfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;
@@ -11,7 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 /**
  * This interface handles the management of memory (duh). This includes allocation of new independent {@link Chunk}s or
@@ -45,8 +45,9 @@ public interface MemoryManager extends DataProvider.Holder{
 			/**
 			 * @param firstChunk is the chunk that is at the start of the chain.
 			 * @param target     is the last chunk in the chain. It is the chunk that will be modified to achieve extra capacity in the chain.
-			 * @param toAllocate is the number of bytes that would need to be allocated. This is only a suggestion but should be taken seriously.
-			 * @return amount of bytes that has been newly allocated to target. (directly or indirectly) Returning 0 indicates a failure
+			 * @param toAllocate is the number of bytes that would need to be allocated. (should be greater than 0)
+			 *                   This is only a suggestion but should be taken seriously.
+			 * @return the number of bytes that have been newly allocated to target (directly or indirectly). Returning 0 indicates a failure
 			 * of the strategy. Returning any other positive number signifies a success. The amount of bytes allocates should try to be as close
 			 * as possible to toAllocate. If it is less than, another pass of strategy executing will be done. If greater or equal, then the
 			 * allocation sequence will end.
@@ -59,9 +60,9 @@ public interface MemoryManager extends DataProvider.Holder{
 		private final   List<AllocToStrategy> allocTos;
 		
 		public StrategyImpl(DataProvider context){
-			this.context=context;
-			this.allocs=List.copyOf(createAllocs());
-			this.allocTos=List.copyOf(createAllocTos());
+			this.context = context;
+			this.allocs = List.copyOf(createAllocs());
+			this.allocTos = List.copyOf(createAllocTos());
 		}
 		
 		protected abstract List<AllocStrategy> createAllocs();
@@ -82,55 +83,55 @@ public interface MemoryManager extends DataProvider.Holder{
 			
 			if(DEBUG_VALIDATION) MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			
-			var last=target;
+			var last = target;
 			
-			long remaining=toAllocate;
+			long remaining = toAllocate;
 			strategyLoop:
 			while(remaining>0){
-				last=last.last();
+				last = last.last();
 				
 				for(AllocToStrategy allocTo : allocTos){
-					long allocated=allocTo.allocTo(firstChunk, last, remaining);
+					long allocated = allocTo.allocTo(firstChunk, last, remaining);
 					
 					if(DEBUG_VALIDATION){
 						checkChainData(firstChunk);
 						
-						if(last.dirty()) throw new RuntimeException(last+" is dirty");
+						if(last.dirty()) throw new RuntimeException(last + " is dirty");
 						if(allocated<0){
 							throw new IllegalStateException();
 						}
 					}
-					if(allocated==0) continue;
+					if(allocated == 0) continue;
 					
-					remaining-=allocated;
+					remaining -= allocated;
 					if(allocated>0){
 						continue strategyLoop;
 					}
 				}
 				
-				throw new UnknownAllocationMethodException("Tried to allocate "+toAllocate+" bytes to "+last.getPtr()+" but there is no known way to do that");
+				throw new UnknownAllocationMethod("Tried to allocate " + toAllocate + " bytes to " + last.getPtr() + " but there is no known way to do that");
 			}
 			
 		}
 		
 		private void checkChainData(Chunk firstChunk) throws IOException{
-			var ch=firstChunk;
-			while(ch!=null){
-				var n=ch.next();
-				if(n!=null&&n.getSize()>0){
-					if(ch.getCapacity()!=ch.getSize()){
-						throw new IllegalStateException(ch+" is not full but has next with data");
+			var ch = firstChunk;
+			while(ch != null){
+				var n = ch.next();
+				if(n != null && n.getSize()>0){
+					if(ch.getCapacity() != ch.getSize()){
+						throw new IllegalStateException(ch + " is not full but has next with data");
 					}
 				}
-				ch=n;
+				ch = n;
 			}
 		}
 		
 		@Override
 		public Chunk alloc(AllocateTicket ticket) throws IOException{
-			long minSize=minAllocationCapacity();
+			long minSize = minAllocationCapacity();
 			if(ticket.bytes()<minSize){
-				ticket=ticket.withBytes(minSize);
+				ticket = ticket.withBytes(minSize);
 			}
 			
 			Chunk chunk;
@@ -138,8 +139,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			tryStrategies:
 			{
 				for(var alloc : allocs){
-					chunk=alloc.alloc(context, ticket);
-					if(chunk!=null){
+					chunk = alloc.alloc(context, ticket);
+					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
 					}
@@ -148,8 +149,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 			
 			
-			var initial=ticket.dataPopulator();
-			if(initial!=null){
+			var initial = ticket.dataPopulator();
+			if(initial != null){
 				initial.accept(chunk);
 			}
 			
@@ -158,12 +159,12 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		private static void postAllocValidate(AllocateTicket ticket, Chunk chunk) throws IOException{
 			chunk.requireReal();
-			var nsizO=ticket.explicitNextSize();
+			var nsizO = ticket.explicitNextSize();
 			if(nsizO.isPresent()){
-				var nsiz =nsizO.get();
-				var chSiz=chunk.getNextSize();
+				var nsiz  = nsizO.get();
+				var chSiz = chunk.getNextSize();
 				if(nsiz.greaterThan(chSiz)){
-					throw new IllegalStateException("Allocation did not respect explicit next size since "+nsiz+" > "+chSiz);
+					throw new IllegalStateException("Allocation did not respect explicit next size since " + nsiz + " > " + chSiz);
 				}
 			}
 		}
@@ -177,14 +178,16 @@ public interface MemoryManager extends DataProvider.Holder{
 	IOList<ChunkPointer> getFreeChunks();
 	
 	/**
-	 * Frees a set of chunks listed in the pointers parameter and all their next chunks
+	 * Takes any number of {@link ChunkPointer}s as input and collects all the next chunks
+	 * for each pointer in the collection. It then frees all the collected chunks
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
-		List<Chunk> chunks=new ArrayList<>(chainStarts.size());
+		if(chainStarts.isEmpty()) return;
+		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){
-				if(chunks.stream().anyMatch(c->c.getPtr().equals(ptr))){
-					throw new RuntimeException("Duplicate pointer passed "+ptr);
+				if(chunks.stream().anyMatch(c -> c.getPtr().equals(ptr))){
+					throw new RuntimeException("Duplicate pointer passed " + ptr);
 				}
 			}
 			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);
@@ -196,8 +199,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	/**
 	 * Explicitly frees a chunk.<br>
 	 * <br>
-	 * This may alter the chunks contents, properties or completely destroy it. Do not use this chunk or any object that could
-	 * use it after its freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * This may alter the chunk contents, properties or completely destroy it. Do not use this chunk or any object that could
+	 * use it after its freed! Any data that was, is assumed to be gone permanently and will never be accessible through normal means.
 	 * Usage of this chunk after it has been freed can cause crashes or serious data corruption.
 	 */
 	default void free(Chunk toFree) throws IOException{
@@ -207,8 +210,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Explicitly frees a collection of chunks.<br>
 	 * It is preferable (within reason) to free as many chunks at once. The manager can more efficiently handle them if they are presented at once.<br>
 	 * <br>
-	 * This may alter any/all of the chunks contents, properties or completely destroy them. Do not use this chunk or any object that could
-	 * use them after they are freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * This may alter any/all the chunk contents, properties or completely destroy them. Do not use this chunk or any object that could
+	 * use them after they are freed! Any data that was, is assumed to be gone permanently and will never be accessible through normal means.
 	 * Usage of any chunks after they have been freed can cause crashes or serious data corruption.
 	 */
 	void free(Collection<Chunk> toFree) throws IOException;
@@ -228,6 +231,6 @@ public interface MemoryManager extends DataProvider.Holder{
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 	
 	default long minAllocationCapacity(){
-		return 8;
+		return 1;
 	}
 }

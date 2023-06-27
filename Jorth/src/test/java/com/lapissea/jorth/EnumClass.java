@@ -9,8 +9,8 @@ public enum EnumClass{
 	private final String text;
 	
 	EnumClass(int number, String text){
-		this.number=number;
-		this.text=text;
+		this.number = number;
+		this.text = text;
 	}
 	
 	public int getNumber(){

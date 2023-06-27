@@ -9,6 +9,8 @@ public class Map extends IOInstance.Managed<Map>{
 	@IOValue
 	public IOList<Entity> entities;
 	
+	@IOValue
+	public IOList<Chunk> chunks;
 	
 	
 }

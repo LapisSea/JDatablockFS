@@ -1,5 +1,7 @@
 package com.lapissea.cfs.tools.utils;
 
+import com.lapissea.cfs.type.BlacklistClassLoader;
+
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Predicate;
@@ -10,18 +12,18 @@ public class ToolUtils{
 		try{
 			byte[] bb;
 			{
-				var clsl     =new BlacklistClassLoader(ToolUtils.class.getClassLoader(), List.of());
-				var makeClass=clsl.loadClass(make.getDeclaringClass().getName());
+				var clsl      = new BlacklistClassLoader(ToolUtils.class.getClassLoader(), List.of());
+				var makeClass = clsl.loadClass(make.getDeclaringClass().getName());
 				
-				var m=makeClass.getDeclaredMethod(make.getName());
+				var m = makeClass.getDeclaredMethod(make.getName());
 				m.setAccessible(true);
-				bb=(byte[])m.invoke(null);
+				bb = (byte[])m.invoke(null);
 			}
 			{
-				var clsl    =new BlacklistClassLoader(ToolUtils.class.getClassLoader(), blacklist);
-				var useClass=clsl.loadClass(use.getDeclaringClass().getName());
+				var clsl     = new BlacklistClassLoader(ToolUtils.class.getClassLoader(), blacklist);
+				var useClass = clsl.loadClass(use.getDeclaringClass().getName());
 				
-				var m=useClass.getDeclaredMethod(use.getName(), byte[].class);
+				var m = useClass.getDeclaredMethod(use.getName(), byte[].class);
 				m.setAccessible(true);
 				m.invoke(null, (Object)bb);
 			}

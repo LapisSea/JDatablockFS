@@ -1,8 +1,12 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -10,12 +14,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+@IOValue.OverrideType.DefaultImpl(HashIOMap.class)
 public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	interface IOEntry<K, V>{
 		
 		interface Modifiable<K, V> extends IOEntry<K, V>{
-			abstract class Abstract<K, V> extends IOEntry.Abstract<K, V> implements Modifiable<K, V>{}
+			abstract class Abstract<K, V> extends IOEntry.Abstract<K, V> implements Modifiable<K, V>{ }
 			
 			class Unsupported<K, V> extends Abstract<K, V>{
 				
@@ -23,8 +28,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 				private final V value;
 				
 				public Unsupported(K key, V value){
-					this.key=key;
-					this.value=value;
+					this.key = key;
+					this.value = value;
 				}
 				
 				@Override
@@ -45,29 +50,30 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 			void set(V value) throws IOException;
 		}
 		
-		abstract class Abstract<K, V> implements IOEntry<K, V>{
+		abstract class Abstract<K, V> implements IOEntry<K, V>, Stringify{
 			@Override
 			public String toString(){
-				return this.getClass().getSimpleName()+"{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
+				return this.getClass().getSimpleName() + "{" + Utils.toShortString(getKey()) + " = " + Utils.toShortString(getValue()) + "}";
 			}
+			@Override
 			public String toShortString(){
-				return "{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
+				return "{" + Utils.toShortString(getKey()) + " = " + Utils.toShortString(getValue()) + "}";
 			}
 			@Override
 			public boolean equals(Object obj){
-				return obj==this||
-				       obj instanceof IOEntry<?, ?> e&&
-				       Objects.equals(getKey(), e.getKey())&&
+				return obj == this ||
+				       obj instanceof IOEntry<?, ?> e &&
+				       Objects.equals(getKey(), e.getKey()) &&
 				       Objects.equals(getValue(), e.getValue());
 			}
 			@Override
 			public int hashCode(){
-				var k=getKey();
-				var v=getKey();
+				var k = getKey();
+				var v = getKey();
 				
-				int result=1;
-				result=31*result+(k==null?0:k.hashCode());
-				result=31*result+(v==null?0:v.hashCode());
+				int result = 1;
+				result = 31*result + (k == null? 0 : k.hashCode());
+				result = 31*result + (v == null? 0 : v.hashCode());
 				return result;
 			}
 		}
@@ -77,8 +83,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 			private final V value;
 			
 			public Simple(K key, V value){
-				this.key=key;
-				this.value=value;
+				this.key = key;
+				this.value = value;
 			}
 			
 			@Override
@@ -121,11 +127,12 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	long size();
 	
 	default boolean isEmpty(){
-		return size()==0;
+		return size() == 0;
 	}
 	
 	/**
-	 * Provides an entry that provides the key and value in this map. The entry may be modifiable. If it is its modification will reflect in the contents of the map.
+	 * Provides an entry that provides the key and value in this map. The entry may be modifiable.
+	 * If it is, its modification will reflect in the contents of the map.
 	 *
 	 * @return null if the entry with specified key does not exist.
 	 */
@@ -134,10 +141,10 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	/**
 	 * @param key key whose existence should be checked
-	 * @return true if map contains the key
+	 * @return true if the key is present in the map
 	 */
 	default boolean containsKey(K key) throws IOException{
-		return getEntry(key)!=null;
+		return getEntry(key) != null;
 	}
 	
 	/**
@@ -154,17 +161,37 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 		return stream().iterator();
 	}
 	
-	/**
-	 * Retrieves a value that matches the provided key
-	 */
-	default V get(K key) throws IOException{
-		var e=getEntry(key);
-		if(e==null) return null;
+	default V computeIfAbsent(K key, UnsafeSupplier<V, IOException> compute) throws IOException{
+		var e = getEntry(key);
+		if(e == null){
+			var def = compute.get();
+			put(key, def);
+			return def;
+		}
+		return e.getValue();
+	}
+	default V computeIfAbsent(K key, UnsafeFunction<K, V, IOException> compute) throws IOException{
+		var e = getEntry(key);
+		if(e == null){
+			var def = compute.apply(key);
+			put(key, def);
+			return def;
+		}
 		return e.getValue();
 	}
 	
 	/**
-	 * Adds a new entry to the map or overrides a value of an existing entry of the same key if it exists
+	 * Retrieves a value that matches the provided key
+	 */
+	default V get(K key) throws IOException{
+		var e = getEntry(key);
+		if(e == null) return null;
+		return e.getValue();
+	}
+	
+	/**
+	 * Adds a new key-value pair to the map. If the key already exists in the map,
+	 * the function updates the value associated with that key to the new value provided.
 	 *
 	 * @param key   the key of the entry
 	 * @param value the value of the entry
@@ -183,26 +210,28 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	 */
 	boolean remove(K key) throws IOException;
 	
+	void clear() throws IOException;
+	
 	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";
-		var i=map.iterator();
+		var i = map.iterator();
 		
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		sb.append('{');
-		long count=0;
+		long count = 0;
 		while(true){
-			var e=i.next();
+			var e = i.next();
 			count++;
 			
-			K key  =e.getKey();
-			V value=e.getValue();
+			K key   = e.getKey();
+			V value = e.getValue();
 			
 			sb.append(Utils.toShortString(key));
 			sb.append('=');
 			sb.append(Utils.toShortString(value));
 			if(!i.hasNext()) return sb.append('}').toString();
 			if(sb.length()>300){
-				return sb.append(" ... ").append(map.size()-count).append("more }").toString();
+				return sb.append(" ... ").append(map.size() - count).append("more }").toString();
 			}
 			sb.append(',').append(' ');
 		}

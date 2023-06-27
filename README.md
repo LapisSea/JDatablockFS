@@ -17,7 +17,7 @@ This library has at its core 2 tasks.
 
 ### Who is this for?
 
-If you need to store data but do not want to deal with complicated SQL servers or are annoyed with writing queries then this is a perfect alternative.
+If you need to store data but do not want to deal with complicated SQL servers or are annoyed with writing queries, then this is a perfect alternative.
 
 This library acts like a database, but it writes like regular objects/collections and there is no server at all. Everything can be simply stored in a single efficient self-contained file.
 
@@ -31,7 +31,7 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 ---
 
-### (Super simple) Examples:
+### (Super simple) Example(s):
 
 ### IPSet example:
 
@@ -43,7 +43,9 @@ _You can find the complete code of the example in `/jdatablockfs.run/src/main/ja
 //Setting up classes
 public static class IP extends IOInstance.Managed<IP>{
 	@IOValue
-	double latitude, longitude;
+	double latitude
+	@IOValue
+	double longitude;
 	
 	@IOValue
 	String v6;
@@ -56,40 +58,87 @@ public static class IP extends IOInstance.Managed<IP>{
 		this.v6=v6;
 	}
 }
-
-public static class IPSet extends IOInstance.Managed<IPSet>{
-	@IOValue
-	IOList<IP> ips;
-}
 ```
 
 Create database and add sample data:
 
 ```java
 //init and create new Cluster with in memory (byte[]) data
-Cluster cluster=Cluster.init(MemoryData.builder().build());
+Cluster cluster=Cluster.init(MemoryData.empty());
 
-//Ask root provider for an IPSet with the id of my ips
-IPSet set=cluster.getRootProvider().request(IPSet.class,"my ips");
+//Ask root provider for list of IPs with the id of "my ips"
+IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
 
 //Adding sample data to database:
-set.ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-set.ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
+ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
 ```
 
 Details:
 
 `cluster.getRootProvider().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
 
-`IPSet.ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically allocated by the rootProvider.
+`ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically created and allocated by the rootProvider.
 
-`set.ips.add` writes to the database immediately. This only happens with unmanaged instances. Setting a values on a regular instance changes no data on the actual database.
+`ips.add` writes to the database immediately. This only happens with unmanaged instances. Setting a values on a regular instance changes no data on the actual database.
+
+_Alternative IP type definition with an interface_
+
+```java
+@IOInstance.Def.Order({"latitude", "longitude", "v6"})
+@IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
+public interface IP extends IOInstance.Def<IP>{
+	
+	static IP of(double latitude, double longitude, String v6){
+		return IOInstance.Def.of(IP.class, latitude, longitude, v6);
+	}
+	
+	double latitude();
+	double longitude();
+	String v6();
+}
+```
+
+This is just an interface. It infers the fields from the contents of the interface. Every non static/default/private function is considered a getter/setter. Getters and setters can have multiple formats. (eg: `double getLatitude()` or `void setV6(String v6)`) A getter or setter is required for a field but not both of them.
+
+- `IOInstance.Def` is the base type of template type (or definition type)
+- `IOInstance.Def.Order` is an annotation that is required if the type needs a `void setAll(<all fields>)` or needs to be constructed with data. (aka `IOInstance.Def.of(<type>, <all field values in order>`)
+- `IOInstance.Def.ToString.Format` or `IOInstance.Def.ToString` are optional and just give the ability to customize the field in a friendly way. Alternatively a `static String toString(<type> instance){...}` can be added to write a custom toString
+- `static IP of(...)` is just a convenience function that is completely optional. It just makes it more pleasing to manually make an instance. It is a replacement for `new IP(...)`
+
+Note that this creates implementation(s) as needed. This may provide a performance increase and clarity in a context where only partial access to data is needed. (such as finding an object by a spesific field) This is because manually creating a perfect instance is annoying and clumsy. Simply defining what fields you need offloads the annoying bolierplate work to the code generation mechanism inside the library.
+
+NOTE: You *can* create your own implementation of an interface like this, but it is best for the internals of this library to do that for you.
 
 ---
 
 ### Maven:
 
-`//TODO: Will add a snapshot build soon I promise`
+Simply paste this in to your pom.xml
+
+```xml
+<dependencies>
+	<dependency>
+		<groupId>com.github.lapissea.jdatablockfs</groupId>
+		<artifactId>core</artifactId>
+		<version>1.0</version>
+	</dependency>
+</dependencies>
+<repositories>
+	<repository>
+		<id>lapissnap</id>
+		<url>https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/</url>
+		<releases>
+			<enabled>false</enabled>
+		</releases>
+		<snapshots>
+			<enabled>true</enabled>
+		</snapshots>
+	</repository>
+</repositories>
+```
+
+Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `com.github.lapissea.jdatablockfs` with the id `core` and the `1.0` version.
 
 ---
 

@@ -7,7 +7,7 @@ import java.io.IOException;
 public class ContentReaderOutputStream extends ContentOutputStream{
 	private final ContentWriter writer;
 	public ContentReaderOutputStream(ContentWriter writer){
-		this.writer=writer;
+		this.writer = writer;
 	}
 	@Override
 	public void write(int b) throws IOException{

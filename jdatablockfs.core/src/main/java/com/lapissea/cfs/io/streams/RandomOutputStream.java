@@ -13,8 +13,8 @@ public class RandomOutputStream extends ContentOutputStream{
 	private final boolean  trimOnClose;
 	
 	public RandomOutputStream(RandomIO io, boolean trimOnClose){
-		this.io=io;
-		this.trimOnClose=trimOnClose;
+		this.io = io;
+		this.trimOnClose = trimOnClose;
 	}
 	
 	@Override
@@ -46,6 +46,6 @@ public class RandomOutputStream extends ContentOutputStream{
 	
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+'{'+TextUtil.toString(io)+'}';
+		return this.getClass().getSimpleName() + '{' + TextUtil.toString(io) + '}';
 	}
 }

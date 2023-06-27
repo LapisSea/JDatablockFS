@@ -7,7 +7,7 @@ import java.io.IOException;
 public class ContentReaderInputStream extends ContentInputStream{
 	private final ContentReader reader;
 	public ContentReaderInputStream(ContentReader reader){
-		this.reader=reader;
+		this.reader = reader;
 	}
 	
 	@Override
@@ -29,7 +29,7 @@ public class ContentReaderInputStream extends ContentInputStream{
 	}
 	
 	@Override
-	public long getOffset() throws IOException{
+	public long getOffset(){
 //		if(reader instanceof RandomIO r) return r.getPos();
 		return -1;
 	}
