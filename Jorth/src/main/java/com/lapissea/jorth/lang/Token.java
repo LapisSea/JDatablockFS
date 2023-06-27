@@ -118,6 +118,22 @@ public sealed interface Token{
 		}
 	}
 	
+	record Wildcard(int line) implements Token{
+		
+		public enum BoundType{
+			SUPER, EXTENDS
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of((T)new Word(line, "?"));
+			}
+			return Token.super.as(type);
+		}
+	}
+	
 	record StrValue(int line, String value) implements Token{ }
 	
 	sealed interface NumToken extends Token{

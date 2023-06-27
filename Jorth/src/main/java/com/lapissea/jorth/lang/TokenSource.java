@@ -5,6 +5,7 @@ import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.ArrayList;
@@ -131,6 +132,9 @@ public interface TokenSource{
 	default boolean consumeTokenIfIsText(String text) throws MalformedJorth{
 		return consumeTokenIf(Token.Word.class, w -> w.is(text));
 	}
+	default <T extends Token> boolean consumeTokenIf(Class<T> type) throws MalformedJorth{
+		return consumeTokenIf(type, ignored -> true);
+	}
 	default <T extends Token> boolean consumeTokenIf(Class<T> type, Predicate<T> predicate) throws MalformedJorth{
 		return consumeTokenIf(t -> t.as(type).filter(predicate)).isPresent();
 	}
@@ -206,6 +210,24 @@ public interface TokenSource{
 		return readType(imports, true);
 	}
 	default GenericType readType(Function<ClassName, ClassName> imports, boolean allowArray) throws MalformedJorth{
+		if(consumeTokenIf(Token.Wildcard.class)){
+			var type   = readEnum(Token.Wildcard.BoundType.class);
+			var bounds = new ArrayList<GenericType>();
+			if(consumeTokenIfIsText('[')){
+				while(!consumeTokenIfIsText(']')){
+					bounds.add(readType(imports, allowArray));
+				}
+			}else{
+				bounds.add(readType(imports, allowArray));
+			}
+			List<GenericType> lower = List.of(), upper = List.of(GenericType.OBJECT);
+			switch(type){
+				case SUPER -> lower = bounds;
+				case EXTENDS -> upper = bounds;
+			}
+			throw new NotImplementedException("WILDCARD");//TODO
+		}
+		
 		var raw = readClassName(imports);
 		
 		var args = new ArrayList<GenericType>();

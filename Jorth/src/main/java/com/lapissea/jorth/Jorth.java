@@ -166,6 +166,7 @@ public final class Jorth extends CodeDestination{
 				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
 				case Token.BracketedSet bracketedSet -> throw new IllegalStateException();
+				case Token.Wildcard wildcard -> CYAN_BRIGHT + "?";
 			};
 			
 			if(toClassLevel){
