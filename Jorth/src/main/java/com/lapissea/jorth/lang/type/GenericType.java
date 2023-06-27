@@ -18,7 +18,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.joining;
 
-public record GenericType(ClassName raw, int dims, List<GenericType> args){
+public record GenericType(ClassName raw, int dims, List<GenericType> args) implements JType{
 	
 	public static final GenericType OBJECT = new GenericType(ClassName.of(Object.class));
 	public static final GenericType STRING = new GenericType(ClassName.of(String.class));

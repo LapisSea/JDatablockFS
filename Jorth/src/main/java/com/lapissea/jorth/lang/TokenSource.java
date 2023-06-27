@@ -4,6 +4,7 @@ import com.lapissea.jorth.BracketType;
 import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -206,21 +207,26 @@ public interface TokenSource{
 	// array: foo.Bar array
 	// generic: foo.Bar<ay.Lmao idk.Something>
 	// generic array: foo.Bar<ay.Lmao idk.Something> array
-	default GenericType readType(Function<ClassName, ClassName> imports) throws MalformedJorth{
-		return readType(imports, true);
+	default JType readType(Function<ClassName, ClassName> imports) throws MalformedJorth{
+		return readType(imports, true, true);
 	}
-	default GenericType readType(Function<ClassName, ClassName> imports, boolean allowArray) throws MalformedJorth{
-		if(consumeTokenIf(Token.Wildcard.class)){
+	
+	default GenericType readTypeSimple(Function<ClassName, ClassName> imports) throws MalformedJorth{
+		return (GenericType)readType(imports, false, false);
+	}
+	
+	default JType readType(Function<ClassName, ClassName> imports, boolean allowArray, boolean allowWildcard) throws MalformedJorth{
+		if(allowWildcard && consumeTokenIf(Token.Wildcard.class)){
 			var type   = readEnum(Token.Wildcard.BoundType.class);
-			var bounds = new ArrayList<GenericType>();
+			var bounds = new ArrayList<JType>();
 			if(consumeTokenIfIsText('[')){
 				while(!consumeTokenIfIsText(']')){
-					bounds.add(readType(imports, allowArray));
+					bounds.add(readType(imports, allowArray, allowWildcard));
 				}
 			}else{
-				bounds.add(readType(imports, allowArray));
+				bounds.add(readType(imports, allowArray, allowWildcard));
 			}
-			List<GenericType> lower = List.of(), upper = List.of(GenericType.OBJECT);
+			List<JType> lower = List.of(), upper = List.of(GenericType.OBJECT);
 			switch(type){
 				case SUPER -> lower = bounds;
 				case EXTENDS -> upper = bounds;
@@ -230,7 +236,7 @@ public interface TokenSource{
 		
 		var raw = readClassName(imports);
 		
-		var args = new ArrayList<GenericType>();
+		var args = new ArrayList<JType>();
 		if(consumeTokenIfIsText('<')){
 			do{
 				args.add(readType(imports));

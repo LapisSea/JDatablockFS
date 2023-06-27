@@ -16,6 +16,7 @@ import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.FunctionGen;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Operation;
 import com.lapissea.jorth.lang.type.TypeSource;
@@ -342,7 +343,7 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private GenericType readType(TokenSource source) throws MalformedJorth{
+	private JType readType(TokenSource source) throws MalformedJorth{
 		var type = source.readType(importsFun);
 		typeSource.validateType(type);
 		return type;
@@ -586,11 +587,11 @@ public final class Jorth extends CodeDestination{
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
-				extensionBuffer = source.readType(importsFun, false);
+				extensionBuffer = source.readTypeSimple(importsFun);
 				typeSource.validateType(extensionBuffer.raw());
 			}
 			case IMPLEMENTS -> {
-				var interf = source.readType(importsFun, false);
+				var interf = source.readTypeSimple(importsFun);
 				typeSource.validateType(interf.raw());
 				interfaces.add(interf);
 			}
