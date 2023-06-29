@@ -710,11 +710,11 @@ public class JorthTests{
 				"""
 					
 					function upper
-						arg arg #List<? extends #Typ>
+						arg arg #List<? extends #JorthTests.Typ>
 					start end
 					
 					function lower
-						arg arg #List<? super #Typ>
+						arg arg #List<? super #JorthTests.Typ>
 					start end
 					
 					function wild

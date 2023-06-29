@@ -6,7 +6,6 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.ArrayList;
@@ -194,6 +193,12 @@ public interface TokenSource{
 	default void requireKeyword(Keyword kw) throws MalformedJorth{
 		readToken().requireAs(Token.KWord.class).require(kw);
 	}
+	default <E extends Enum<E>> Optional<E> readEnumOptional(Class<E> enumType) throws MalformedJorth{
+		return consumeTokenIf(
+			t -> t.as(Token.Word.class).map(Token.Word::value)
+			      .map(w -> KeyedEnum.getOptional(enumType, w))
+		);
+	}
 	default <E extends Enum<E>> E readEnum(Class<E> enumType) throws MalformedJorth{
 		var t = readToken().requireAs(Token.Word.class);
 		return KeyedEnum.get(enumType, t.value());
@@ -217,7 +222,9 @@ public interface TokenSource{
 	
 	default JType readType(Function<ClassName, ClassName> imports, boolean allowArray, boolean allowWildcard) throws MalformedJorth{
 		if(allowWildcard && consumeTokenIf(Token.Wildcard.class)){
-			var type   = readEnum(Token.Wildcard.BoundType.class);
+			var typeO = readEnumOptional(Token.Wildcard.BoundType.class);
+			if(typeO.isEmpty()) return new JType.Wildcard(List.of(), List.of());
+			var type   = typeO.get();
 			var bounds = new ArrayList<JType>();
 			if(consumeTokenIfIsText('[')){
 				while(!consumeTokenIfIsText(']')){
@@ -231,7 +238,7 @@ public interface TokenSource{
 				case SUPER -> lower = bounds;
 				case EXTENDS -> upper = bounds;
 			}
-			throw new NotImplementedException("WILDCARD");//TODO
+			return new JType.Wildcard(lower, upper);
 		}
 		
 		var raw = readClassName(imports);

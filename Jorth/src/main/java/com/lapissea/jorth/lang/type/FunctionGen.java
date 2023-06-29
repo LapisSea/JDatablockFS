@@ -20,9 +20,9 @@ import static org.objectweb.asm.Opcodes.*;
 
 public final class FunctionGen implements Endable, FunctionInfo{
 	
-	public record ArgInfo(GenericType type, String name){ }
+	public record ArgInfo(JType type, String name){ }
 	
-	private record Arg(GenericType type, BaseType info, String name, int accessIndex){ }
+	private record Arg(JType type, BaseType info, String name, int accessIndex){ }
 	
 	private class CodePath{
 		private final TypeStack stack;
@@ -42,7 +42,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		public void getFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
-			var type  = field.type().withoutArgs();
+			var type  = field.type().asGeneric().withoutArgs();
 			
 			if(!field.isStatic()){
 				var stackOwnerType = stack.pop().raw();
@@ -57,7 +57,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		public void setFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
-			var type  = field.type().withoutArgs();
+			var type  = field.type().asGeneric().withoutArgs();
 			
 			stack.requireElements(field.isStatic()? 1 : 2);
 			
@@ -79,7 +79,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		public void loadArgumentIns(Arg arg){
 			writer.visitVarInsn(arg.info.loadOp, arg.accessIndex());
-			stack.push(arg.type);
+			stack.push(arg.type.asGeneric());
 		}
 		
 		public void end() throws MalformedJorth{
@@ -89,8 +89,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			BaseType type;
 			
 			if(returnType != null){
+				var ret    = returnType.asGeneric();
 				var popped = stack.pop();
-				if(!popped.instanceOf(owner.typeSource, returnType)) throw new MalformedJorth("Method returns " + returnType + " but " + popped + " is on stack");
+				if(!popped.instanceOf(owner.typeSource, ret)){
+					throw new MalformedJorth("Method returns " + ret + " but " + popped + " is on stack");
+				}
 				type = popped.getBaseType();
 			}else{
 				if(!stack.isEmpty()){
@@ -175,12 +178,12 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	private final MethodVisitor writer;
 	private final TypeSource    typeSource;
 	
-	private final GenericType                returnType;
+	private final JType                      returnType;
 	private final LinkedHashMap<String, Arg> args;
 	
 	private final ArrayDeque<CodePath> codeInfo = new ArrayDeque<>();
 	
-	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
+	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, JType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		this.owner = owner;
 		this.name = name;
 		this.access = access.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(access);
@@ -188,15 +191,21 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		this.typeSource = owner.typeSource;
 		this.visibility = visibility;
 		
-		if(returnType != null) typeSource.byType(returnType);
+		if(returnType != null) typeSource.byType(returnType.asGeneric());
 		for(ArgInfo value : args){
-			typeSource.byType(value.type);
+			GenericType typ;
+			try{
+				typ = value.type.asGeneric();
+			}catch(UnsupportedOperationException e){
+				continue;
+			}
+			typeSource.byType(typ);
 		}
 		
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
 		int counter = isStatic()? 0 : 1;
-		for(ArgInfo(GenericType type, String argName) : args){
+		for(ArgInfo(var type, var argName) : args){
 			var info = type.getBaseType();
 			this.args.put(argName, new Arg(type, info, argName, counter));
 			counter += info.slots;
@@ -214,7 +223,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			accessFlags |= acc.flag;
 		}
 		
-		var argTypes = new ArrayList<GenericType>(args.size());
+		var argTypes = new ArrayList<JType>(args.size());
 		for(ArgInfo value : args){
 			argTypes.add(value.type);
 		}
@@ -307,7 +316,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		code().setFieldIns(memberInfo);
 	}
 	
-	private static String makeFunSig(GenericType returnType, Collection<GenericType> args, boolean signature){
+	private static String makeFunSig(JType returnType, Collection<JType> args, boolean signature){
 		
 		int len = 2 + (returnType != null? returnType.jvmStringLen(signature) : 1);
 		for(var arg : args){
@@ -336,7 +345,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return code().stack;
 	}
 	
-	public void superOp(List<GenericType> args) throws MalformedJorth{
+	public void superOp(List<JType> args) throws MalformedJorth{
 		if(!name.equals("<init>")){
 			throw new NotImplementedException("Super on non constructor not implemented");
 		}
@@ -390,14 +399,14 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var ownerName = owner.name().slashed();
 		var ownerType = owner.type();
 		
-		GenericType       returnType = function.returnType();
-		List<GenericType> argTypes   = function.argumentTypes();
+		var returnType = function.returnType();
+		var argTypes   = function.argumentTypes();
 		
 		var stack = code().stack;
 		
 		for(int i = argTypes.size() - 1; i>=0; i--){
 			var popped = stack.pop();
-			var arg    = argTypes.get(i);
+			var arg    = argTypes.get(i).asGeneric();
 			if(popped.instanceOf(typeSource, arg)) continue;
 			
 			throw new MalformedJorth("Argument " + i + " in " + owner.name() + "#" + name + " is " + arg + " but got " + popped);
@@ -412,7 +421,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 		
 		if(returnType != null){
-			code().stack.push(returnType);
+			code().stack.push(returnType.asGeneric());
 		}
 		
 		var signature = makeFunSig(returnType, argTypes, false);
@@ -440,7 +449,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			var stack    = code().stack;
 			var argCount = stack.size() - mark;
 			if(argCount<0) throw new MalformedJorth("Negative stack delta inside arg block");
-			var args = new ArrayList<GenericType>(argCount);
+			var args = new ArrayList<JType>(argCount);
 			for(int i = 0; i<argCount; i++){
 				args.add(stack.peek(mark + i));
 			}
@@ -453,8 +462,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 					var argsF = f.argumentTypes();
 					if(argsF.size() != args.size()) return false;
 					for(int i = 0; i<argsF.size(); i++){
-						var a = argsF.get(i);
-						var b = args.get(i);
+						var a = argsF.get(i).asGeneric();
+						var b = args.get(i).asGeneric();
 						try{
 							if(!b.instanceOf(typeSource, a)){
 								return false;
@@ -598,11 +607,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return name;
 	}
 	@Override
-	public GenericType returnType(){
+	public JType returnType(){
 		return returnType;
 	}
 	@Override
-	public List<GenericType> argumentTypes(){
+	public List<JType> argumentTypes(){
 		return args.values().stream().map(a -> a.type).toList();
 	}
 	@Override

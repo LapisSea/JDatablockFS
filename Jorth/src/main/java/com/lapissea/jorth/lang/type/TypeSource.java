@@ -101,7 +101,7 @@ public interface TypeSource{
 		switch(jType){
 			case GenericType type -> {
 				byName(type.raw());
-				for(GenericType arg : type.args()){
+				for(var arg : type.args()){
 					validateType(arg);
 				}
 			}

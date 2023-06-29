@@ -30,7 +30,7 @@ public interface FieldInfo{
 			return owner;
 		}
 		@Override
-		public GenericType type(){
+		public JType type(){
 			return type;
 		}
 		@Override
@@ -46,6 +46,6 @@ public interface FieldInfo{
 	boolean isEnumConstant();
 	boolean isStatic();
 	ClassName owner();
-	GenericType type();
+	JType type();
 	String name();
 }

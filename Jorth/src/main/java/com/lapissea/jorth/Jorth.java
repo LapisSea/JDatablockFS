@@ -271,8 +271,8 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				tab++;
-				GenericType returnType = null;
-				var         args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
+				JType returnType = null;
+				var   args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
 				
 				var vis  = popVisibility();
 				var acc  = popAccessSet();
@@ -375,7 +375,7 @@ public final class Jorth extends CodeDestination{
 					if(m.name().equals("annotationType")) return false;
 					var n = m.owner().name();
 					return n.equals(annType);
-				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType(), f.defaultEnumValue())));
+				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType().asGeneric(), f.defaultEnumValue())));
 				
 				var hasStart = optionalStart(source);
 				
