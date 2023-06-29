@@ -437,7 +437,7 @@ public sealed interface IOTypeDB{
 				}
 			}catch(Throwable e){
 				e.printStackTrace();
-				throw new RuntimeException(e);
+				throw new RuntimeException("Failed to initialize built in type IDs", e);
 			}
 			FIRST_ID = db.maxID();
 			return db.bake();
