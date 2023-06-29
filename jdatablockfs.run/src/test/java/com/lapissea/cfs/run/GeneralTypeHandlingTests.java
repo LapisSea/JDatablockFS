@@ -192,7 +192,7 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test
-	void enumSerialization() throws NoSuchMethodException{
+	void enumSerialization() throws Throwable{
 		ToolUtils.simulateMissingClasses(
 			List.of(n -> List.of(RandomEnum.class.getName(), EnumContainer.class.getName()).contains(n)),
 			GeneralTypeHandlingTests.class.getMethod("make"),

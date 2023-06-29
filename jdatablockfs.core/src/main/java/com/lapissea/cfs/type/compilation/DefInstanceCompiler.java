@@ -622,9 +622,9 @@ public class DefInstanceCompiler{
 				Log.log(log.output());
 				BytecodeUtils.printClass(file);
 			}
+			
 			//noinspection unchecked
 			return (Class<T>)Access.privateLookupIn(interf).defineClass(file);
-			
 		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
 		}
