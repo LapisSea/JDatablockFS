@@ -162,7 +162,13 @@ public class DefInstanceCompiler{
 				return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
 			}
 			
-			Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
+			
+			Log.trace(
+				"Generating completion of {}#cyan - {} {}",
+				() -> List.of(interf.getSimpleName(),
+				              missingGetters.isEmpty()? "" : "missing getters: " + missingGetters,
+				              missingSetters.isEmpty()? "" : "missing setters: " + missingSetters
+				));
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
@@ -399,12 +405,14 @@ public class DefInstanceCompiler{
 		var inter = key.clazz;
 		var hash  = inter.getClassLoader().hashCode();
 		Log.trace(
-			"Generating implementation of: {}#cyan{}#cyanBright fields: {} - {}", () -> {
+			"Generating implementation of: {}#cyan{}#cyanBright {}classloader: {}", () -> {
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
 				return List.of(
 					inter.getName().substring(0, inter.getName().length() - inter.getSimpleName().length()),
 					inter.getSimpleName(),
-					node.key.includeNames.map(Object::toString).orElse("<ALL>"),
+					node.key.includeNames.map(Object::toString).map(s -> {
+						return "fields: " + s + " - ";
+					}).orElse(""),
 					cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + RESET
 				);
 			}
@@ -1277,7 +1285,8 @@ public class DefInstanceCompiler{
 			                     }
 		                     })).size()>1)
 		                     .map(gs -> "\t" + gs.name + ":\n" +
-		                                "\t\t" + gs.stubs().map(g -> (g.style() != Style.RAW? g.method().getName() + ":\t" : "") + g.type() + "")
+		                                "\t\t" + gs.stubs().map(g -> (g.style() != Style.RAW? g.method().getName() + ":\t" :
+		                                                              (g.isGetter()? "getter" : "setter") + ": ") + g.type())
 		                                           .collect(Collectors.joining("\n\t\t"))
 		                     )
 		                     .collect(Collectors.joining("\n"));

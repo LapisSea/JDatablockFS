@@ -42,9 +42,8 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		}
 	}
 	
-	public static boolean isCompatible(Type type){
-		var universe = Utils.getSealedUniverse(Utils.typeToRaw(type), false);
-		return universe.filter(u -> u.stream().allMatch(IOInstance::isInstance)).isPresent();
+	public static <T> boolean isCompatible(Type type){
+		return Utils.getSealedUniverse(Utils.typeToRaw(type), false).filter(IOInstance::isInstance).isPresent();
 	}
 	
 	private final Map<Class<ValueType>, StructPipe<ValueType>> typeToPipe;

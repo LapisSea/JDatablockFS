@@ -269,6 +269,10 @@ public class Utils{
 	}
 	
 	public static <T> Optional<Set<Class<T>>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
+		return computeSealedUniverse(type, allowUnbounded);
+	}
+	
+	private static <T> Optional<Set<Class<T>>> computeSealedUniverse(Class<T> type, boolean allowUnbounded){
 		if(!type.isSealed()){
 			return Optional.empty();
 		}
@@ -278,7 +282,7 @@ public class Utils{
 		}
 		for(var sub : (Class<T>[])type.getPermittedSubclasses()){
 			if(sub.isSealed()){
-				var uni = getSealedUniverse(sub, allowUnbounded);
+				var uni = computeSealedUniverse(sub, allowUnbounded);
 				if(uni.isEmpty()) return Optional.empty();
 				universe.addAll(uni.get());
 				continue;
