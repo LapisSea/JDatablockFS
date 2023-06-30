@@ -6,7 +6,6 @@ import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 
 import java.util.Arrays;
-import java.util.function.Supplier;
 
 import static com.lapissea.cfs.io.compress.Packer.readSiz;
 import static com.lapissea.cfs.io.compress.Packer.sizeBytes;
@@ -14,23 +13,13 @@ import static com.lapissea.cfs.io.compress.Packer.writeSiz;
 
 public abstract sealed class Lz4Packer implements Packer{
 	
-	public enum Provider{
-		ANY(LZ4Factory::fastestInstance),
-		JAVA_ONLY(LZ4Factory::fastestJavaInstance),
-		SAFE_ONLY(LZ4Factory::safeInstance);
-		
-		private final Supplier<LZ4Factory> factorySupplier;
-		
-		Provider(Supplier<LZ4Factory> factorySupplier){
-			this.factorySupplier = factorySupplier;
-		}
-		
-		private LZ4Factory get(){
-			return factorySupplier.get();
-		}
+	private static LZ4Factory getFactory(){
+		return switch(ConfigDefs.LZ4_COMPATIBILITY.resolve()){
+			case ANY -> LZ4Factory.fastestInstance();
+			case JAVA_ONLY -> LZ4Factory.fastestJavaInstance();
+			case SAFE_ONLY -> LZ4Factory.safeInstance();
+		};
 	}
-	
-	private static LZ4Factory getFactory(){ return ConfigDefs.LZ4_COMPATIBILITY.resolve().get(); }
 	
 	
 	public static final class High extends Lz4Packer{

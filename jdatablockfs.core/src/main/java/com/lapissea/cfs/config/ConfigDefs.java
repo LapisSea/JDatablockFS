@@ -1,6 +1,5 @@
 package com.lapissea.cfs.config;
 
-import com.lapissea.cfs.io.compress.Lz4Packer;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.compilation.FieldCompiler.AccessType;
 import com.lapissea.cfs.type.compilation.JorthLogger.CodeLog;
@@ -26,13 +25,13 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.Bool TYPE_VALIDATION = flagB("typeValidation", deb());
 	Flag.Int  BATCH_BYTES     = flagI("batchBytes", 1<<12).natural();
 	
-	Flag.Abc<Log.LogLevel> LOG_LEVEL         = flagEDyn("log.level", RELEASE_MODE.boolMap(WARN, INFO));
+	Flag.Abc<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
 	Flag.Bool              PRINT_COMPILATION = flagB("printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
 	Flag.Bool            LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
 	Flag.Int             LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
 	Flag.Bool            TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
-	Flag.Abc<AccessType> FIELD_ACCESS_TYPE         = flagEDyn("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
+	Flag.Abc<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
 	
 	Flag.Bool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
 	Flag.Bool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
@@ -58,7 +57,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.StrOptional  CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	
-	Flag.Abc<Lz4Packer.Provider> LZ4_COMPATIBILITY = flagE("lz4.compatibility", Lz4Packer.Provider.ANY);
+	Flag.Abc<LZ4Compatibility> LZ4_COMPATIBILITY = flagEV("lz4.compatibility", LZ4Compatibility.ANY);
 	
 	Flag.Int ROOT_PROVIDER_WARMUP_COUNT = flagI("rootProviderWarmupCount", 20).positive();
 	

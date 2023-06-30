@@ -68,6 +68,16 @@ public final class ConfigTools{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
+			@Override
+			public void setSys(Integer val){
+				if(validate != null){
+					var err = validate.apply(val);
+					if(err != null){
+						throw new IllegalArgumentException(name + " = " + val + " Reason: " + err);
+					}
+				}
+				Flag.super.setSys(val);
+			}
 			
 			@Override
 			public Integer resolve(){ return resolveVal(); }
@@ -162,6 +172,10 @@ public final class ConfigTools{
 		String name();
 		T resolve();
 		
+		default void setSys(T val){
+			System.setProperty(name(), Objects.toString(val));
+		}
+		
 		default <U> Supplier<U> map(Function<T, U> mapper){
 			return () -> mapper.apply(resolve());
 		}
@@ -188,9 +202,8 @@ public final class ConfigTools{
 	
 	public static <T extends Enum<T>> Flag.Abc<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.Abc<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
 	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Flag.Abc<T> defaultVal)       { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, T defaultVal)                 { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagEV(String name, T defaultVal)                { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
 	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
-	public static <T extends Enum<T>> Flag.Abc<T> flagEDyn(String name, Supplier<T> valueMaker)    { return flagE(name, valueMaker); }
 	
 	
 	public record ConfEntry(String name, String val){
