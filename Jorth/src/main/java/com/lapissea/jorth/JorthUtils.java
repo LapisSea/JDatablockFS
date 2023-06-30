@@ -26,18 +26,17 @@ public class JorthUtils{
 			case TypeVariable<?> c -> toJorthGeneric(extractFromVarType(c));
 			case GenericArrayType arr -> toJorthGeneric(arr.getGenericComponentType()) + " array";
 			case WildcardType wild -> {
-				Type[] bounds;
+				var    lower  = wild.getLowerBounds();
+				var    bounds = lower;
 				String typ;
 				
-				var lower = wild.getUpperBounds();
 				if(lower.length>0){
 					typ = "super";
-					bounds = lower;
 				}else{
 					var upper = wild.getUpperBounds();
 					if(upper.length>0 && !upper[0].equals(Object.class)){
 						bounds = upper;
-						typ = "? extends ";
+						typ = "extends";
 					}else yield "?";
 				}
 				
