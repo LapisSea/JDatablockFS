@@ -11,6 +11,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -198,10 +199,28 @@ public class Utils{
 		return name;
 	}
 	public static String typeToHuman(Type type, boolean doShort){
-		if(type instanceof Class<?> c){
-			return classNameToHuman(c.getName(), doShort);
-		}
-		return type.getTypeName();
+		return switch(type){
+			case Class<?> c -> classNameToHuman(c.getName(), doShort);
+			case ParameterizedType p -> typeToHuman(p.getRawType(), doShort) +
+			                            Arrays.stream(p.getActualTypeArguments()).map(t -> typeToHuman(t, doShort))
+			                                  .collect(Collectors.joining(", ", "<", ">"));
+			case WildcardType w -> {
+				var    lowerBounds = w.getLowerBounds();
+				var    bounds      = lowerBounds;
+				String ext         = "super";
+				if(lowerBounds.length == 0){
+					Type[] upperBounds = w.getUpperBounds();
+					if(upperBounds.length>0 && !upperBounds[0].equals(Object.class)){
+						bounds = upperBounds;
+						ext = "extends";
+					}else yield "?";
+				}
+				yield "? " + ext + " " + Arrays.stream(bounds).map(b -> typeToHuman(b, doShort))
+				                               .collect(Collectors.joining(" & "));
+			}
+			
+			default -> type.getTypeName();
+		};
 	}
 	
 	public static RuntimeException interceptClInit(Throwable e){
@@ -250,6 +269,10 @@ public class Utils{
 	}
 	
 	public static <T> Optional<Set<Class<T>>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
+		return computeSealedUniverse(type, allowUnbounded);
+	}
+	
+	private static <T> Optional<Set<Class<T>>> computeSealedUniverse(Class<T> type, boolean allowUnbounded){
 		if(!type.isSealed()){
 			return Optional.empty();
 		}
@@ -259,7 +282,7 @@ public class Utils{
 		}
 		for(var sub : (Class<T>[])type.getPermittedSubclasses()){
 			if(sub.isSealed()){
-				var uni = getSealedUniverse(sub, allowUnbounded);
+				var uni = computeSealedUniverse(sub, allowUnbounded);
 				if(uni.isEmpty()) return Optional.empty();
 				universe.addAll(uni.get());
 				continue;

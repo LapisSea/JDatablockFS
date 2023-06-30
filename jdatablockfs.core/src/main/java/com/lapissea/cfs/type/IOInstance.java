@@ -648,6 +648,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	@SuppressWarnings("unchecked")
 	private SELF self(){ return (SELF)this; }
 	
+	
+	static boolean isInstance(Set<? extends Class<?>> universe){
+		return universe.stream().allMatch(IOInstance::isInstance);
+	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);
 	}

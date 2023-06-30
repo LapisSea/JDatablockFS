@@ -21,7 +21,7 @@ public class CompilationTools{
 		Style(String humanPattern){ this.humanPattern = humanPattern; }
 	}
 	
-	record FieldStub(Method method, String varName, Type type, Style style){
+	record FieldStub(Method method, String varName, Type type, Style style, boolean isGetter){
 		@Override
 		public String toString(){
 			return varName + "(" + style + ")";
@@ -42,20 +42,20 @@ public class CompilationTools{
 			var type = m.getGenericReturnType();
 			if(type == void.class) return Optional.empty();
 			
-			return namePrefix(m, "get").map(name -> new FieldStub(m, name, type, Style.NAMED));
+			return namePrefix(m, "get").map(name -> new FieldStub(m, name, type, Style.NAMED, true));
 		},
 		m -> {// (b/B)oolean isName()
 			if(m.getParameterCount() != 0) return Optional.empty();
 			var type = m.getGenericReturnType();
 			if(SupportedPrimitive.get(type).orElse(null) != BOOLEAN) return Optional.empty();
 			
-			return namePrefix(m, "is").map(name -> new FieldStub(m, name, type, Style.NAMED));
+			return namePrefix(m, "is").map(name -> new FieldStub(m, name, type, Style.NAMED, true));
 		},
 		m -> {// FieldType name()
 			if(m.getParameterCount() != 0) return Optional.empty();
 			var name = m.getName();
 			var type = m.getGenericReturnType();
-			return Optional.of(new FieldStub(m, name, type, Style.RAW));
+			return Optional.of(new FieldStub(m, name, type, Style.RAW, true));
 		}
 	);
 	private static final List<Function<Method, Optional<FieldStub>>> SETTER_PATTERNS = List.of(
@@ -63,14 +63,14 @@ public class CompilationTools{
 			if(m.getParameterCount() != 1) return Optional.empty();
 			if(m.getReturnType() != void.class) return Optional.empty();
 			
-			return namePrefix(m, "set").map(name -> new FieldStub(m, name, m.getGenericParameterTypes()[0], Style.NAMED));
+			return namePrefix(m, "set").map(name -> new FieldStub(m, name, m.getGenericParameterTypes()[0], Style.NAMED, false));
 		},
 		m -> {// void name(FieldType newValue)
 			if(m.getParameterCount() != 1) return Optional.empty();
 			if(m.getReturnType() != void.class) return Optional.empty();
 			var name = m.getName();
 			var type = m.getGenericParameterTypes()[0];
-			return Optional.of(new FieldStub(m, name, type, Style.RAW));
+			return Optional.of(new FieldStub(m, name, type, Style.RAW, false));
 		}
 	);
 	

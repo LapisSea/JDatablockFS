@@ -8,6 +8,7 @@ import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -262,7 +263,11 @@ public class Log{
 			if(c1 == '{' && c2 == '}'){
 				if(formatted.length()>i + 2){
 					var c3 = formatted.charAt(i + 2);
-					if(c3 == '#'){
+					if(c3 == '~'){
+						var replace = arg instanceof Type typ? Utils.typeToHuman(typ, false) : Utils.toShortString(arg);
+						formatted.replace(i, i + 3, replace);
+						return i + replace.length();
+					}else if(c3 == '#'){
 						int hStart = i + 3;
 						var any    = findColor(formatted, hStart);
 						if(any.isPresent()){
