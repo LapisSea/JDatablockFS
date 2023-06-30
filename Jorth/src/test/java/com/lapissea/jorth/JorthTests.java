@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -672,5 +673,71 @@ public class JorthTests{
 		
 		assertEquals(Optional.class, generic.getRawType());
 		assertArrayEquals(new Type[]{String.class}, generic.getActualTypeArguments());
+	}
+	
+	static class Typ{ }
+	
+	void upper(List<? extends Typ> arg){ }
+	void lower(List<? super Typ> arg)  { }
+	void wild(List<?> arg)             { }
+	
+	@Test
+	void wildcardUpper() throws Exception{
+		
+		{
+			var fun = JorthTests.class.getDeclaredMethod("upper", List.class);
+			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
+			assertArrayEquals(typ.getLowerBounds(), new Type[]{});
+			assertArrayEquals(typ.getUpperBounds(), new Type[]{Typ.class});
+		}
+		{
+			var fun = JorthTests.class.getDeclaredMethod("lower", List.class);
+			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
+			assertArrayEquals(typ.getLowerBounds(), new Type[]{Typ.class});
+			assertArrayEquals(typ.getUpperBounds(), new Type[]{Object.class});
+		}
+		{
+			var fun = JorthTests.class.getDeclaredMethod("wild", List.class);
+			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
+			assertArrayEquals(typ.getLowerBounds(), new Type[]{});
+			assertArrayEquals(typ.getUpperBounds(), new Type[]{Object.class});
+		}
+		
+		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+			writer.addImport(List.class);
+			writer.addImport(Typ.class);
+			writer.write(
+				"""
+					
+					function upper
+						arg arg #List<? extends #JorthTests.Typ>
+					start end
+					
+					function lower
+						arg arg #List<? super #JorthTests.Typ>
+					start end
+					
+					function wild
+						arg arg #List<?>
+					start end
+					"""
+			);
+		});
+		
+		{
+			var funCtrl = JorthTests.class.getDeclaredMethod("upper", List.class);
+			var fun     = cls.getDeclaredMethod("upper", List.class);
+			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+		}
+		{
+			var funCtrl = JorthTests.class.getDeclaredMethod("lower", List.class);
+			var fun     = cls.getDeclaredMethod("lower", List.class);
+			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+		}
+		{
+			var funCtrl = JorthTests.class.getDeclaredMethod("wild", List.class);
+			var fun     = cls.getDeclaredMethod("wild", List.class);
+			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+		}
 	}
 }

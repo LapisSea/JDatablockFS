@@ -115,9 +115,13 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		}
 		if(type.isEnum()){
 			//noinspection unchecked,rawtypes
-			enumConstants = Arrays.stream(((Class<Enum>)type).getEnumConstants())
-			                      .map(EnumConstant::of)
-			                      .toArray(EnumConstant[]::new);
+			var consts = ((Class<Enum>)type).getEnumConstants();
+			var res    = new EnumConstant[consts.length];
+			for(int i = 0; i<consts.length; i++){
+				var cons = consts[i];
+				res[i] = EnumConstant.of(cons);
+			}
+			enumConstants = res;
 		}
 	}
 	

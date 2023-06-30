@@ -16,6 +16,7 @@ import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.FunctionGen;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Operation;
 import com.lapissea.jorth.lang.type.TypeSource;
@@ -166,6 +167,7 @@ public final class Jorth extends CodeDestination{
 				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
 				case Token.BracketedSet bracketedSet -> throw new IllegalStateException();
+				case Token.Wildcard wildcard -> CYAN_BRIGHT + "?";
 			};
 			
 			if(toClassLevel){
@@ -269,8 +271,8 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				tab++;
-				GenericType returnType = null;
-				var         args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
+				JType returnType = null;
+				var   args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
 				
 				var vis  = popVisibility();
 				var acc  = popAccessSet();
@@ -341,7 +343,7 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private GenericType readType(TokenSource source) throws MalformedJorth{
+	private JType readType(TokenSource source) throws MalformedJorth{
 		var type = source.readType(importsFun);
 		typeSource.validateType(type);
 		return type;
@@ -373,7 +375,7 @@ public final class Jorth extends CodeDestination{
 					if(m.name().equals("annotationType")) return false;
 					var n = m.owner().name();
 					return n.equals(annType);
-				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType(), f.defaultEnumValue())));
+				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType().asGeneric(), f.defaultEnumValue())));
 				
 				var hasStart = optionalStart(source);
 				
@@ -585,11 +587,11 @@ public final class Jorth extends CodeDestination{
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
-				extensionBuffer = source.readType(importsFun, false);
+				extensionBuffer = source.readTypeSimple(importsFun);
 				typeSource.validateType(extensionBuffer.raw());
 			}
 			case IMPLEMENTS -> {
-				var interf = source.readType(importsFun, false);
+				var interf = source.readTypeSimple(importsFun);
 				typeSource.validateType(interf.raw());
 				interfaces.add(interf);
 			}

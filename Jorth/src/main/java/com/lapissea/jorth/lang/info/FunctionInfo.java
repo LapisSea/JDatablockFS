@@ -3,7 +3,7 @@ package com.lapissea.jorth.lang.info;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassInfo;
-import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.Visibility;
 
@@ -17,16 +17,16 @@ import java.util.stream.Collectors;
 
 public interface FunctionInfo{
 	
-	record Signature(String name, List<GenericType> args){
+	record Signature(String name, List<JType> args){
 		public Signature(String name){
 			this(name, List.of());
 		}
-		public Signature(String name, List<GenericType> args){
+		public Signature(String name, List<JType> args){
 			this.name = name;
 			var argTmp = List.copyOf(args);
 			var copy   = false;
 			for(int i = 0; i<argTmp.size(); i++){
-				if(argTmp.get(i).args().isEmpty()) continue;
+				if(argTmp.get(i).hasArgs()) continue;
 				if(!copy) argTmp = new ArrayList<>(argTmp);
 				copy = true;
 				argTmp.set(i, argTmp.get(i).withoutArgs());
@@ -36,16 +36,16 @@ public interface FunctionInfo{
 		}
 		@Override
 		public String toString(){
-			return name + "(" + args.stream().map(GenericType::toString).collect(Collectors.joining(", ")) + ")";
+			return name + "(" + args.stream().map(Object::toString).collect(Collectors.joining(", ")) + ")";
 		}
 	}
 	
 	class OfMethod implements FunctionInfo{
 		
-		private final Method            method;
-		private final ClassInfo         owner;
-		private final GenericType       returnType;
-		private final List<GenericType> args;
+		private final Method      method;
+		private final ClassInfo   owner;
+		private final JType       returnType;
+		private final List<JType> args;
 		
 		public OfMethod(TypeSource source, Method method){
 			this.method = method;
@@ -54,12 +54,12 @@ public interface FunctionInfo{
 			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}
-			returnType = method.getGenericReturnType() == void.class? null : GenericType.of(method.getGenericReturnType());
+			returnType = method.getGenericReturnType() == void.class? null : JType.of(method.getGenericReturnType());
 			
 			var tArgs = method.getGenericParameterTypes();
-			var args  = new ArrayList<GenericType>(tArgs.length);
+			var args  = new ArrayList<JType>(tArgs.length);
 			for(Type tArg : tArgs){
-				args.add(GenericType.of(tArg));
+				args.add(JType.of(tArg));
 			}
 			this.args = args;
 		}
@@ -91,12 +91,12 @@ public interface FunctionInfo{
 			return method.getName();
 		}
 		@Override
-		public GenericType returnType(){
+		public JType returnType(){
 			return returnType;
 		}
 		
 		@Override
-		public List<GenericType> argumentTypes(){
+		public List<JType> argumentTypes(){
 			return args;
 		}
 		@Override
@@ -107,9 +107,9 @@ public interface FunctionInfo{
 	
 	class OfConstructor implements FunctionInfo{
 		
-		private final Constructor<?>    ctor;
-		private final ClassInfo         owner;
-		private final List<GenericType> args;
+		private final Constructor<?> ctor;
+		private final ClassInfo      owner;
+		private final List<JType>    args;
 		
 		public OfConstructor(TypeSource source, Constructor<?> ctor){
 			this.ctor = ctor;
@@ -120,9 +120,9 @@ public interface FunctionInfo{
 			}
 			
 			var tArgs = ctor.getGenericParameterTypes();
-			var args  = new ArrayList<GenericType>(tArgs.length);
+			var args  = new ArrayList<JType>(tArgs.length);
 			for(Type tArg : tArgs){
-				args.add(GenericType.of(tArg));
+				args.add(JType.of(tArg));
 			}
 			this.args = args;
 		}
@@ -154,12 +154,12 @@ public interface FunctionInfo{
 			return "<init>";
 		}
 		@Override
-		public GenericType returnType(){
+		public JType returnType(){
 			return null;
 		}
 		
 		@Override
-		public List<GenericType> argumentTypes(){
+		public List<JType> argumentTypes(){
 			return args;
 		}
 		@Override
@@ -181,8 +181,8 @@ public interface FunctionInfo{
 	
 	ClassInfo owner();
 	String name();
-	GenericType returnType();
-	List<GenericType> argumentTypes();
+	JType returnType();
+	List<JType> argumentTypes();
 	Object defaultEnumValue();
 	
 	default Signature makeSignature(){

@@ -2,14 +2,16 @@ package com.lapissea.cfs.tools.utils;
 
 import com.lapissea.cfs.type.BlacklistClassLoader;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Predicate;
 
 public class ToolUtils{
 	
-	public static void simulateMissingClasses(List<Predicate<String>> blacklist, Method make, Method use){
+	public static void simulateMissingClasses(List<Predicate<String>> blacklist, Method make, Method use) throws Throwable{
 		try{
+			
 			byte[] bb;
 			{
 				var clsl      = new BlacklistClassLoader(ToolUtils.class.getClassLoader(), List.of());
@@ -27,8 +29,11 @@ public class ToolUtils{
 				m.setAccessible(true);
 				m.invoke(null, (Object)bb);
 			}
-		}catch(Throwable e){
-			throw new RuntimeException(e);
+		}catch(InvocationTargetException underlying){
+			if(underlying.getCause() == null || underlying.getSuppressed().length>0){
+				throw underlying;
+			}
+			throw underlying.getCause();
 		}
 	}
 	

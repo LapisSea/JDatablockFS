@@ -25,7 +25,7 @@ import static org.objectweb.asm.Opcodes.*;
 
 public final class ClassGen implements ClassInfo, Endable{
 	
-	public record FieldGen(ClassName owner, Visibility visibility, String name, GenericType type, Set<Access> access) implements FieldInfo{
+	public record FieldGen(ClassName owner, Visibility visibility, String name, JType type, Set<Access> access) implements FieldInfo{
 		@Override
 		public boolean isStatic(){
 			return access.contains(Access.STATIC);
@@ -197,7 +197,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		}
 	}
 	
-	public void defineField(Visibility visibility, Set<Access> accesses, Collection<AnnGen> annotations, GenericType type, String name) throws MalformedJorth{
+	public void defineField(Visibility visibility, Set<Access> accesses, Collection<AnnGen> annotations, JType type, String name) throws MalformedJorth{
 		checkEnd();
 		if(fields.containsKey(name)) throw new MalformedJorth("Field " + name + " already exists");
 		fields.put(name, new FieldGen(this.name, visibility, name, type,
@@ -242,14 +242,14 @@ public final class ClassGen implements ClassInfo, Endable{
 		}
 	}
 	
-	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<FunctionGen.ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
+	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, JType returnType, Collection<FunctionGen.ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		checkEnd();
 		if(name.equals("<init>") && accessSet.contains(Access.STATIC)){
 			throw new MalformedJorth("Static class can not be instantiated");
 		}
 		var fun = new FunctionGen(this, name, visibility, access, returnType, args, anns);
 		
-		List<GenericType> argStr = new ArrayList<>(args.size());
+		var argStr = new ArrayList<JType>(args.size());
 		for(var value : args){
 			argStr.add(value.type());
 		}

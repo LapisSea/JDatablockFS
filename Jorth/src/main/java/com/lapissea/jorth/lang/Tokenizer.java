@@ -227,6 +227,13 @@ public class Tokenizer implements CodeStream, TokenSource{
 				}
 				
 				if(Character.isWhitespace(c1)) break;
+				if(c1 == '?'){
+					if(i == start){
+						pos++;
+						skipWhitespace();
+						return new Token.Wildcard(lastLine);
+					}
+				}
 				if(SPECIALS.get(c1)){
 					if(i == start){
 						pos++;

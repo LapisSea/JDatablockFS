@@ -135,8 +135,8 @@ public interface ClassInfo{
 						continue;
 					}
 					for(int i = 0; i<sargs.size(); i++){
-						var s = sargs.get(i);
-						var f = fargs.get(i);
+						var s = sargs.get(i).asGeneric();
+						var f = fargs.get(i).asGeneric();
 						if(!s.instanceOf(source, f)){
 							continue funs;
 						}
@@ -163,7 +163,7 @@ public interface ClassInfo{
 			
 			Arrays.stream(clazz.getDeclaredConstructors())
 			      .forEach(c -> functions.computeIfAbsent(
-				      new Signature("<init>", Arrays.stream(c.getGenericParameterTypes()).map(GenericType::of).toList()),
+				      new Signature("<init>", Arrays.stream(c.getGenericParameterTypes()).map(JType::of).toList()),
 				      m -> new FunctionInfo.OfConstructor(source, c)
 			      ));
 			
@@ -171,7 +171,7 @@ public interface ClassInfo{
 			while(c != null){
 				Arrays.stream(c.getDeclaredMethods())
 				      .forEach(f -> {
-					      var sig = new Signature(f.getName(), Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList());
+					      var sig = new Signature(f.getName(), Arrays.stream(f.getGenericParameterTypes()).map(JType::of).toList());
 					      functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
 				      });
 				c = c.getSuperclass();
@@ -195,7 +195,7 @@ public interface ClassInfo{
 				Arrays.stream(c.getDeclaredMethods())
 				      .filter(f -> f.getName().equals(name))
 				      .forEach(f -> {
-					      var sig  = new Signature(name, Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList());
+					      var sig  = new Signature(name, Arrays.stream(f.getGenericParameterTypes()).map(JType::of).toList());
 					      var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
 					      result.add(info);
 				      });
@@ -211,7 +211,7 @@ public interface ClassInfo{
 			if(loader == null) loader = this.getClass().getClassLoader();
 			return loader;
 		}
-		private Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, List<GenericType> args) throws ReflectiveOperationException{
+		private Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, List<JType> args) throws ReflectiveOperationException{
 			var method = searchMethods(type.getDeclaredMethods(), name, args);
 			if(method != null){
 				return method;
@@ -230,11 +230,11 @@ public interface ClassInfo{
 			return null;
 		}
 		
-		private static Method searchMethods(Method[] methods, String name, List<GenericType> parameterTypes){
+		private static Method searchMethods(Method[] methods, String name, List<JType> parameterTypes){
 			Method res = null;
 			for(Method m : methods){
 				if(m.getName().equals(name)
-				   && parameterTypes.equals(Arrays.stream(m.getParameterTypes()).map(GenericType::of).toList())
+				   && parameterTypes.equals(Arrays.stream(m.getParameterTypes()).map(JType::of).toList())
 				   && (res == null
 				       || (res.getReturnType() != m.getReturnType()
 				           && res.getReturnType().isAssignableFrom(m.getReturnType()))))
@@ -242,11 +242,11 @@ public interface ClassInfo{
 			}
 			return res;
 		}
-		private boolean checkArgs(Class<?>[] margs, List<GenericType> args, Throwable[] fail){
+		private boolean checkArgs(Class<?>[] margs, List<JType> args, Throwable[] fail){
 			if(margs.length != args.size()) return false;
 			for(int i = 0; i<margs.length; i++){
 				var argC = margs[i];
-				var argS = args.get(i);
+				var argS = args.get(i).asGeneric();
 				
 				if(argS.equals(GenericType.OBJECT)){
 					return argC == Object.class;
