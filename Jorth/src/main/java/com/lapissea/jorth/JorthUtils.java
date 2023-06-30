@@ -8,6 +8,8 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class JorthUtils{
 	
@@ -23,7 +25,29 @@ public class JorthUtils{
 		return switch(type){
 			case TypeVariable<?> c -> toJorthGeneric(extractFromVarType(c));
 			case GenericArrayType arr -> toJorthGeneric(arr.getGenericComponentType()) + " array";
-			case WildcardType wild -> throw new NotImplementedException("Implement wildcard handling");//TODO
+			case WildcardType wild -> {
+				Type[] bounds;
+				String typ;
+				
+				var lower = wild.getUpperBounds();
+				if(lower.length>0){
+					typ = "super";
+					bounds = lower;
+				}else{
+					var upper = wild.getUpperBounds();
+					if(upper.length>0 && !upper[0].equals(Object.class)){
+						bounds = upper;
+						typ = "? extends ";
+					}else yield "?";
+				}
+				
+				yield "? " + typ + " " + (
+					bounds.length == 1?
+					toJorthGeneric(bounds[0]) :
+					Arrays.stream(bounds).map(JorthUtils::toJorthGeneric)
+					      .collect(Collectors.joining(" ", "[", "]"))
+				);
+			}
 			case ParameterizedType t -> {
 				var sb   = new StringBuilder(toJorthGeneric(t.getRawType()));
 				var args = t.getActualTypeArguments();

@@ -96,13 +96,23 @@ public interface TypeSource{
 		return opt.get();
 	}
 	
-	default void validateType(ClassName type) throws MalformedJorth{
-		byName(type);
-	}
-	default void validateType(GenericType type) throws MalformedJorth{
-		byName(type.raw());
-		for(GenericType arg : type.args()){
-			validateType(arg);
+	default void validateType(ClassName type) throws MalformedJorth{ byName(type); }
+	default void validateType(JType jType) throws MalformedJorth{
+		switch(jType){
+			case GenericType type -> {
+				byName(type.raw());
+				for(var arg : type.args()){
+					validateType(arg);
+				}
+			}
+			case JType.Wildcard wild -> {
+				for(var type : wild.lower()){
+					validateType(type);
+				}
+				for(var type : wild.upper()){
+					validateType(type);
+				}
+			}
 		}
 	}
 }

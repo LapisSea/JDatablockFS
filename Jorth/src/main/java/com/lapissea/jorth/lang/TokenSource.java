@@ -4,6 +4,7 @@ import com.lapissea.jorth.BracketType;
 import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -131,6 +132,9 @@ public interface TokenSource{
 	default boolean consumeTokenIfIsText(String text) throws MalformedJorth{
 		return consumeTokenIf(Token.Word.class, w -> w.is(text));
 	}
+	default <T extends Token> boolean consumeTokenIf(Class<T> type) throws MalformedJorth{
+		return consumeTokenIf(type, ignored -> true);
+	}
 	default <T extends Token> boolean consumeTokenIf(Class<T> type, Predicate<T> predicate) throws MalformedJorth{
 		return consumeTokenIf(t -> t.as(type).filter(predicate)).isPresent();
 	}
@@ -189,6 +193,12 @@ public interface TokenSource{
 	default void requireKeyword(Keyword kw) throws MalformedJorth{
 		readToken().requireAs(Token.KWord.class).require(kw);
 	}
+	default <E extends Enum<E>> Optional<E> readEnumOptional(Class<E> enumType) throws MalformedJorth{
+		return consumeTokenIf(
+			t -> t.as(Token.Word.class).map(Token.Word::value)
+			      .map(w -> KeyedEnum.getOptional(enumType, w))
+		);
+	}
 	default <E extends Enum<E>> E readEnum(Class<E> enumType) throws MalformedJorth{
 		var t = readToken().requireAs(Token.Word.class);
 		return KeyedEnum.get(enumType, t.value());
@@ -202,13 +212,38 @@ public interface TokenSource{
 	// array: foo.Bar array
 	// generic: foo.Bar<ay.Lmao idk.Something>
 	// generic array: foo.Bar<ay.Lmao idk.Something> array
-	default GenericType readType(Function<ClassName, ClassName> imports) throws MalformedJorth{
-		return readType(imports, true);
+	default JType readType(Function<ClassName, ClassName> imports) throws MalformedJorth{
+		return readType(imports, true, true);
 	}
-	default GenericType readType(Function<ClassName, ClassName> imports, boolean allowArray) throws MalformedJorth{
+	
+	default GenericType readTypeSimple(Function<ClassName, ClassName> imports) throws MalformedJorth{
+		return (GenericType)readType(imports, false, false);
+	}
+	
+	default JType readType(Function<ClassName, ClassName> imports, boolean allowArray, boolean allowWildcard) throws MalformedJorth{
+		if(allowWildcard && consumeTokenIf(Token.Wildcard.class)){
+			var typeO = readEnumOptional(Token.Wildcard.BoundType.class);
+			if(typeO.isEmpty()) return new JType.Wildcard(List.of(), List.of());
+			var type   = typeO.get();
+			var bounds = new ArrayList<JType>();
+			if(consumeTokenIfIsText('[')){
+				while(!consumeTokenIfIsText(']')){
+					bounds.add(readType(imports, allowArray, allowWildcard));
+				}
+			}else{
+				bounds.add(readType(imports, allowArray, allowWildcard));
+			}
+			List<JType> lower = List.of(), upper = List.of(GenericType.OBJECT);
+			switch(type){
+				case SUPER -> lower = bounds;
+				case EXTENDS -> upper = bounds;
+			}
+			return new JType.Wildcard(lower, upper);
+		}
+		
 		var raw = readClassName(imports);
 		
-		var args = new ArrayList<GenericType>();
+		var args = new ArrayList<JType>();
 		if(consumeTokenIfIsText('<')){
 			do{
 				args.add(readType(imports));

@@ -445,8 +445,16 @@ public class DefInstanceCompiler{
 		checkModel(fieldInfo);
 		
 		try{
-			var impl = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName);
-			return new Result<>(impl, orderedFields);
+			for(int i = 0; ; i++){
+				try{
+					var cls = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName, i);
+					return new Result<>(cls, orderedFields);
+				}catch(LinkageError e){
+					if(!e.getMessage().contains("duplicate class definition")){
+						throw new RuntimeException(e);
+					}
+				}
+			}
 		}catch(Throwable e){
 			if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolve()){
 				new RuntimeException("failed to compile implementation for " + completeInter.getName(), e).printStackTrace();
@@ -496,11 +504,13 @@ public class DefInstanceCompiler{
 	private static <T extends IOInstance<T>> Class<T> generateImpl(
 		CompletionInfo<T> completion, Optional<Set<String>> includeNames, Specials specials,
 		List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields,
-		String humanName
+		String humanName, int numAddon
 	){
 		var interf = completion.completed;
 		
-		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + includeNames.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
+		var implName = interf.getName() +
+		               IOInstance.Def.IMPL_NAME_POSTFIX + (numAddon != 0? "~" + numAddon : "") +
+		               includeNames.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		var log = JorthLogger.make();
 		try{
