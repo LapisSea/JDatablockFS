@@ -49,17 +49,17 @@ final class FieldRegistry{
 		
 		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<IOField.FieldUsage>>>>> tasks){
 			if(type.getSimpleName().contains("NoIO")){
-				Log.trace("Ignoring \"NoIO\" {}#blackBright", type);
+				Log.trace("Ignoring \"NoIO\" {#blackBright{}~#}", type);
 				return;
 			}
 			if(type.isSealed()){
 				var usage = getFieldUsage(type);
 				if(usage.isPresent()){
-					Log.trace("Sealed {}#blackBright has usage, ignoring children", type);
+					Log.trace("Sealed {#blackBright{}~#} has usage, ignoring children", type);
 					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
 					return;
 				}
-				Log.trace("Scanning sealed {}#blackBright children", type);
+				Log.trace("Scanning sealed {#blackBright{}~#} children", type);
 				for(var sub : type.getPermittedSubclasses()){
 					tasks.add(Runner.async(() -> {
 						scan(sub, tasks);
@@ -77,16 +77,16 @@ final class FieldRegistry{
 					var typ = typ0;
 					var res = getFieldUsage(typ);
 					if(res.isPresent()){
-						Log.trace("{}#blackBright has usage", typ);
+						Log.trace("{#blackBright{}~#} has usage", typ);
 						return res;
 					}
 					
 					var up = typ.getEnclosingClass();
 					if(up == null || up.isSealed()){
-						Log.trace("{}#blackBright does not have usage", typ);
+						Log.trace("{#blackBright{}~#} does NOT have usage", typ);
 						return Optional.empty();
 					}
-					Log.trace("{}#blackBright does not have usage, scanning parent", typ);
+					Log.trace("{#blackBright{}~#} does NOT have usage, scanning parent", typ);
 					typ0 = up;
 				}
 			}));
