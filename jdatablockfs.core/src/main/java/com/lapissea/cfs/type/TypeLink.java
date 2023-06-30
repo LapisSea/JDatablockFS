@@ -32,7 +32,16 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 				
 				RawCheck PRIMITIVE        = of(SupportedPrimitive::isAny, "is not primitive");
 				RawCheck INSTANCE         = of(
-					type -> IOInstance.isInstance(type) && (!Modifier.isAbstract(type.getModifiers()) || IOInstance.Def.isDefinition(type)),
+					type -> {
+						if(!IOInstance.isInstance(type)){
+							return false;
+						}
+						if(!Modifier.isAbstract(type.getModifiers())){
+							return true;
+						}
+						if(Def.isDefinition(type)) return true;
+						return Utils.getSealedUniverse(type, false).isPresent();
+					},
 					type -> {
 						if(Modifier.isAbstract(type.getModifiers()) && !IOInstance.Def.isDefinition(type)){
 							return type.getSimpleName() + " is an IOInstance but is not an instantiable class";
@@ -144,6 +153,17 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		}
 	}
 	
+	private enum TypeWild{
+		NORMAL(null),
+		WILD_LOWER("super"),
+		WILD_UPPER("extends"),
+		;
+		private final String ext;
+		TypeWild(String ext){
+			this.ext = ext;
+		}
+	}
+	
 	private static final TypeLink[] NO_ARGS = new TypeLink[0];
 	
 	private static Type readType(Iterator<Class<?>> iter){
@@ -177,12 +197,17 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		var cleanGenericType = Utils.prottectFromVarType(genericType);
 		
 		if(cleanGenericType instanceof WildcardType wild){
-			if(wild.getLowerBounds().length == 0){
-				var up = wild.getUpperBounds();
-				if(up.length == 1 && up[0] == Object.class){
-					return null;
+			var lowerBounds = wild.getLowerBounds();
+			if(lowerBounds.length == 0){
+				var upperBounds = wild.getUpperBounds();
+				if(upperBounds.length == 0 || Object.class == upperBounds[0]){
+					return new TypeLink(false, null);
 				}
-				throw new NotImplementedException(wild.toString());
+				if(upperBounds.length != 1) throw new NotImplementedException("Multiple bounds not implemented");//TODO
+				return new TypeLink(false, of(upperBounds[0]));
+			}else{
+				if(lowerBounds.length != 1) throw new NotImplementedException("Multiple bounds not implemented");
+				return new TypeLink(true, of(lowerBounds[0]));
 			}
 		}
 		
@@ -236,6 +261,8 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	@IOValue
 	private String     typeName;
 	@IOValue
+	private TypeWild   typeWild;
+	@IOValue
 	@IONullability.Elements(NULLABLE)
 	private TypeLink[] args;
 	
@@ -244,12 +271,19 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	public TypeLink(){
 		typeName = "";
 		args = NO_ARGS;
+		typeWild = TypeWild.NORMAL;
 	}
 	
 	public TypeLink(Class<?> type, TypeLink... args){
 		setTypeName(type.getName());
 		this.args = safeArgs(args);
 		this.typeClass = type;
+		typeWild = TypeWild.NORMAL;
+	}
+	public TypeLink(boolean lowerBound, TypeLink bound){
+		setTypeName("");
+		this.args = bound == null? NO_ARGS : new TypeLink[]{bound};
+		typeWild = lowerBound? TypeWild.WILD_LOWER : TypeWild.WILD_UPPER;
 	}
 	
 	private static TypeLink[] safeArgs(TypeLink[] args){
@@ -268,6 +302,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	public Class<?> getTypeClass(IOTypeDB db){
+		if(typeWild != TypeWild.NORMAL){
+			return Object.class;
+		}
 		var c = typeClass;
 		if(c != null) return c;
 		
@@ -277,6 +314,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	private Class<?> loadClass(IOTypeDB db){
+		if(typeWild != TypeWild.NORMAL){
+			throw new UnsupportedOperationException();
+		}
 		if(isPrimitive()){
 			return PRIMITIVE_NAMES.get(typeName);
 		}
@@ -323,22 +363,39 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return res;
 	}
 	
+	public boolean isAnyWildcard(){
+		if(typeWild == TypeWild.NORMAL) return false;
+		return args.length == 0 || (typeWild == TypeWild.WILD_UPPER && args[0].getTypeName().equals(Object.class.getName()));
+	}
+	
 	@Override
 	public String toString(){
-		String argStr;
-		if(args.length == 0) argStr = "";
-		else argStr = Arrays.stream(args).map(Objects::toString).collect(Collectors.joining(", ", "<", ">"));
-		
-		return Utils.classNameToHuman(getTypeName(), false) + argStr;
+		if(typeWild == TypeWild.NORMAL){
+			String argStr;
+			if(args.length == 0) argStr = "";
+			else argStr = Arrays.stream(args).map(Objects::toString).collect(Collectors.joining(", ", "<", ">"));
+			
+			return Utils.classNameToHuman(getTypeName(), false) + argStr;
+		}
+		if(isAnyWildcard()){
+			return "?";
+		}
+		return "? " + typeWild.ext + " " + Arrays.stream(args).map(Objects::toString).collect(Collectors.joining(" & "));
 	}
 	
 	@Override
 	public String toShortString(){
-		String argStr;
-		if(args.length == 0) argStr = "";
-		else argStr = Arrays.stream(args).map(t -> t == null? "null" : t.toShortString()).collect(Collectors.joining(", ", "<", ">"));
-		
-		return Utils.classNameToHuman(getTypeName(), true) + argStr;
+		if(typeWild == TypeWild.NORMAL){
+			String argStr;
+			if(args.length == 0) argStr = "";
+			else argStr = Arrays.stream(args).map(Utils::toShortString).collect(Collectors.joining(", ", "<", ">"));
+			
+			return Utils.classNameToHuman(getTypeName(), true) + argStr;
+		}
+		if(isAnyWildcard()){
+			return "?";
+		}
+		return "? " + typeWild.ext.substring(0, 3) + " " + Arrays.stream(args).map(Utils::toShortString).collect(Collectors.joining("&"));
 	}
 	public Type generic(IOTypeDB db){
 		if(generic == null){
@@ -355,6 +412,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	public boolean equals(Object o){
 		return this == o ||
 		       o instanceof TypeLink that &&
+		       typeWild == that.typeWild &&
 		       getTypeName().equals(that.getTypeName()) &&
 		       argsEqual(args, that.args);
 	}
