@@ -43,23 +43,28 @@ final class FieldRegistry{
 			}
 			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
 			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
-			Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
+			if(Log.TRACE) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
+		}
+		
+		private static void log(String str, Class<?> typ){
+			if(!Log.TRACE) return;
+			Thread.startVirtualThread(() -> Log.trace(str, typ));
 		}
 		
 		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<IOField.FieldUsage>>>>> tasks){
 			if(type.getSimpleName().contains("NoIO")){
-				Log.trace("Ignoring \"NoIO\" {#blackBright{}~#}", type);
+				log("Ignoring \"NoIO\" {#blackBright{}~#}", type);
 				return;
 			}
 			if(type.isSealed()){
 				var usage = getFieldUsage(type);
 				if(usage.isPresent()){
-					Log.trace("Sealed {#blackBright{}~#} has usage, ignoring children", type);
+					log("Sealed {#blackBright{}~#} has usage, ignoring children", type);
 					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
 					return;
 				}
-				Log.trace("Scanning sealed {#blackBright{}~#} children", type);
+				log("Scanning sealed {#blackBright{}~#} children", type);
 				for(var sub : type.getPermittedSubclasses()){
 					tasks.add(Runner.async(() -> {
 						scan(sub, tasks);
@@ -77,16 +82,16 @@ final class FieldRegistry{
 					var typ = typ0;
 					var res = getFieldUsage(typ);
 					if(res.isPresent()){
-						Log.trace("{#blackBright{}~#} has usage", typ);
+						log("{#blackBright{}~#} has usage", typ);
 						return res;
 					}
 					
 					var up = typ.getEnclosingClass();
 					if(up == null || up.isSealed()){
-						Log.trace("{#blackBright{}~#} does NOT have usage", typ);
+						log("{#blackBright{}~#} does NOT have usage", typ);
 						return Optional.empty();
 					}
-					Log.trace("{#blackBright{}~#} does NOT have usage, scanning parent", typ);
+					log("{#blackBright{}~#} does NOT have usage, scanning parent", typ);
 					typ0 = up;
 				}
 			}));

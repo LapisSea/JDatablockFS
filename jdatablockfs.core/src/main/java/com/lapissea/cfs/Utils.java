@@ -1,7 +1,13 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -18,15 +24,18 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
+import static java.util.stream.Collectors.toUnmodifiableMap;
 
 @SuppressWarnings({"unchecked", "unused"})
 public class Utils{
@@ -268,11 +277,64 @@ public class Utils{
 		return OptionalLong.of(funct.applyAsLong(a.getAsLong(), b.getAsLong()));
 	}
 	
-	public static <T> Optional<Set<Class<T>>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
+	public record SealedInstanceUniverse<T extends IOInstance<T>>(
+		Class<T> root, Map<Class<T>, StructPipe<T>> pipeMap
+	){
+		public static <T extends IOInstance<T>> Optional<SealedInstanceUniverse<T>> of(SealedUniverse<T> universe){
+			if(IOInstance.isInstance(universe)){
+				return Optional.of(new SealedInstanceUniverse<>(universe));
+			}
+			return Optional.empty();
+		}
+		
+		public SealedInstanceUniverse(SealedUniverse<T> data){
+			this(data.root, data.universe.stream().collect(toUnmodifiableMap(t -> t, StandardStructPipe::of)));
+		}
+		
+		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(boolean nullable, BiFunction<VarPool<Inst>, Inst, T> get){
+			
+			var sizes     = pipeMap.values().stream().map(StructPipe::getSizeDescriptor).toList();
+			var wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
+			var fixed = sizes.stream().map(s -> s.getFixed(wordSpace))
+			                 .reduce((a, b) -> a.isPresent() && b.isPresent() && a.getAsLong() == b.getAsLong()?
+			                                   a : OptionalLong.empty())
+			                 .orElseThrow();
+			if(fixed.isPresent()){
+				return SizeDescriptor.Fixed.of(wordSpace, fixed.getAsLong());
+			}
+			
+			var minSize = nullable? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
+			var maxSize = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
+			
+			return SizeDescriptor.Unknown.of(
+				wordSpace, minSize, maxSize,
+				(ioPool, prov, inst) -> {
+					T val = get.apply(ioPool, inst);
+					if(val == null){
+						if(!nullable) throw new NullPointerException();
+						return 0;
+					}
+					StructPipe<T> instancePipe = pipeMap.get(val.getClass());
+					
+					return instancePipe.calcUnknownSize(prov, val, wordSpace);
+				}
+			);
+		}
+	}
+	
+	public record SealedUniverse<T>(Class<T> root, Set<Class<T>> universe){
+		public SealedUniverse{
+			Objects.requireNonNull(root);
+			assert root.isSealed();
+			universe = Set.copyOf(universe);
+		}
+	}
+	
+	public static <T> Optional<SealedUniverse<T>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
 		return computeSealedUniverse(type, allowUnbounded);
 	}
 	
-	private static <T> Optional<Set<Class<T>>> computeSealedUniverse(Class<T> type, boolean allowUnbounded){
+	private static <T> Optional<SealedUniverse<T>> computeSealedUniverse(Class<T> type, boolean allowUnbounded){
 		if(!type.isSealed()){
 			return Optional.empty();
 		}
@@ -284,7 +346,7 @@ public class Utils{
 			if(sub.isSealed()){
 				var uni = computeSealedUniverse(sub, allowUnbounded);
 				if(uni.isEmpty()) return Optional.empty();
-				universe.addAll(uni.get());
+				universe.addAll(uni.get().universe);
 				continue;
 			}
 			if(Modifier.isFinal(sub.getModifiers())){
@@ -295,7 +357,7 @@ public class Utils{
 			return Optional.empty();
 		}
 		if(universe.isEmpty()) throw new IllegalStateException();
-		return Optional.of(Set.copyOf(universe));
+		return Optional.of(new SealedUniverse<>(type, universe));
 	}
 	
 }

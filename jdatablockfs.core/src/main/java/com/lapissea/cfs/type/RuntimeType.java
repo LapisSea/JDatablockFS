@@ -27,20 +27,23 @@ public interface RuntimeType<T>{
 	
 	class Lambda<L> extends Abstract<L>{
 		
-		private final NewObj<L> sup;
+		private final boolean   canHavePointers;
+		private final NewObj<L> constr;
 		
-		Lambda(Class<L> typ, NewObj<L> sup){
+		public Lambda(boolean canHavePointers, Class<L> typ, NewObj<L> constr){
 			super(typ);
-			this.sup = sup;
+			this.canHavePointers = canHavePointers;
+			this.constr = constr;
 		}
 		
 		@Override
 		public boolean getCanHavePointers(){
-			return false;
+			return canHavePointers;
 		}
 		@Override
 		public NewObj<L> emptyConstructor(){
-			return sup;
+			if(constr == null) throw new UnsupportedOperationException();
+			return constr;
 		}
 	}
 	
