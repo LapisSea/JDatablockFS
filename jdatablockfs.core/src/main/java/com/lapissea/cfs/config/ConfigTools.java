@@ -69,14 +69,14 @@ public final class ConfigTools{
 				Objects.requireNonNull(defaultValue);
 			}
 			@Override
-			public void setSys(Integer val){
+			public void set(Integer val){
 				if(validate != null){
 					var err = validate.apply(val);
 					if(err != null){
 						throw new IllegalArgumentException(name + " = " + val + " Reason: " + err);
 					}
 				}
-				Flag.super.setSys(val);
+				Flag.super.set(val);
 			}
 			
 			@Override
@@ -172,7 +172,7 @@ public final class ConfigTools{
 		String name();
 		T resolve();
 		
-		default void setSys(T val){
+		default void set(T val){
 			System.setProperty(name(), Objects.toString(val));
 		}
 		

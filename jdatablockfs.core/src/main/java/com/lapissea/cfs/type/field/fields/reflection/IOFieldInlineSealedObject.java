@@ -4,7 +4,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -14,7 +13,6 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
@@ -23,7 +21,6 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
@@ -54,28 +51,10 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		super(accessor);
 		//noinspection unchecked
 		rootType = (Class<ValueType>)accessor.getType();
-		var universe = Utils.getSealedUniverse(rootType, false).orElseThrow();
-		typeToPipe = universe.stream().collect(Collectors.toUnmodifiableMap(t -> t, StandardStructPipe::of));
+		var universe = Utils.getSealedUniverse(rootType, false).flatMap(Utils.SealedInstanceUniverse::of).orElseThrow();
+		typeToPipe = universe.pipeMap();
 		
-		var sizes = typeToPipe.values().stream().map(StructPipe::getSizeDescriptor).toList();
-		
-		var wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
-		var minSize   = nullable()? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
-		var maxSize   = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
-		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(
-			wordSpace, minSize, maxSize,
-			(ioPool, prov, inst) -> {
-				var val = get(null, inst);
-				if(val == null){
-					if(!nullable()) throw new NullPointerException();
-					return 0;
-				}
-				var instancePipe = typeToPipe.get(val.getClass());
-				
-				return instancePipe.calcUnknownSize(prov, val, wordSpace);
-			}
-		));
+		initSizeDescriptor(universe.makeSizeDescriptor(nullable(), (p, inst) -> get(null, inst)));
 	}
 	
 	@Override

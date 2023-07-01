@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
@@ -649,8 +650,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	private SELF self(){ return (SELF)this; }
 	
 	
-	static boolean isInstance(Set<? extends Class<?>> universe){
-		return universe.stream().allMatch(IOInstance::isInstance);
+	static boolean isInstance(Utils.SealedUniverse<?> universe){
+		return universe.universe().stream().allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);

@@ -16,6 +16,11 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -98,7 +103,8 @@ public @interface IONullability{
 			if(typ.isPrimitive()) return false;
 			return IOFieldTools.isGeneric(field) || typ.isArray() ||
 			       Stream.concat(
-				       Stream.of(IOInstance.class, Enum.class, String.class),
+				       Stream.of(IOInstance.class, Enum.class, String.class,
+				                 Duration.class, Instant.class, LocalDate.class, LocalTime.class, LocalDateTime.class),
 				       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
 			       ).anyMatch(c -> UtilL.instanceOf(typ, c));
 		}
@@ -106,11 +112,14 @@ public @interface IONullability{
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
-			if(field.getType().isArray()) return true;
-			if(IOInstance.isInstance(field.getType())){
-				return IOInstance.isManaged(field.getType());
+			var typ = field.getType();
+			if(typ.isArray()) return true;
+			if(IOInstance.isInstance(typ)){
+				return IOInstance.isManaged(typ);
 			}
-			return UtilL.instanceOf(field.getType(), String.class) || IOFieldTools.isGeneric(field);
+			return IOFieldTools.isGeneric(field) || Stream.of(
+				String.class, Duration.class, Instant.class, LocalDate.class, LocalTime.class, LocalDateTime.class
+			).anyMatch(c -> UtilL.instanceOf(typ, c));
 		}
 		
 		@NotNull

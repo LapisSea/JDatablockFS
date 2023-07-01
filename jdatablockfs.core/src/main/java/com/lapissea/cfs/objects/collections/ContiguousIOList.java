@@ -130,12 +130,14 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return (StructPipe<VT>)switch(storage){
 			case ValueStorage.FixedInstance<?> fixedInstance -> fixedInstance.getPipe();
 			case ValueStorage.UnmanagedInstance<?> unmanagedInstance -> ((Unmanaged<?>)fieldValue).getPipe();
-			case ValueStorage.FixedReferencedInstance<?> fixedReferencedInstance -> Reference.fixedPipe();
+			case ValueStorage.FixedReferenceInstance<?> fixedReferencedInstance -> Reference.fixedPipe();
+			case ValueStorage.FixedReferenceSealedInstance<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.Instance<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.FixedReferenceString ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.InlineString ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.Primitive<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
+			case ValueStorage.SealedInstance<?> instance -> throw new NotImplementedException();
 		};
 	}
 	
@@ -324,7 +326,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
 			case ValueStorage.UnmanagedInstance<?> __ -> new CommandSet.RepeaterEnd(REFF_SET, size());
-			case ValueStorage.FixedReferencedInstance<?> __ -> new CommandSet.RepeaterEnd(REFF_SET, size());
+			case ValueStorage.FixedReferenceInstance<?> __ -> new CommandSet.RepeaterEnd(REFF_SET, size());
 			case ValueStorage.InlineString __ -> END_SET.reader();
 			case ValueStorage.Instance<?> stor -> {
 				var struct = stor.getPipe().getType();
@@ -333,6 +335,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			}
 			case ValueStorage.FixedReferenceString __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
 			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
+			case ValueStorage.SealedInstance<?> stor -> {
+				if(!stor.getCanHavePointers()) yield END_SET.reader();
+				yield new CommandSet.RepeaterEnd(PREF_SET, size());
+			}
+			case ValueStorage.FixedReferenceSealedInstance<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
 		};
 	}
 	

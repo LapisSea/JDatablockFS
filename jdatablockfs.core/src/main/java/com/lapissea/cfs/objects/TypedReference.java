@@ -1,0 +1,50 @@
+package com.lapissea.cfs.objects;
+
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
+
+import java.io.IOException;
+
+public final class TypedReference extends IOInstance.Managed<TypedReference>{
+	public static final Struct<TypedReference> STRUCT = Struct.of(TypedReference.class);
+	
+	@IOValue
+	private Reference ref;
+	@IOValue
+	@IODependency.VirtualNumSize
+	@IOValue.Unsigned
+	private int       id;
+	
+	public TypedReference(){
+		super(STRUCT);
+		ref = new Reference();
+	}
+	
+	public TypedReference(Reference ref, int id){
+		super(STRUCT);
+		this.ref = ref;
+		this.id = id;
+	}
+	
+	public int getId(){
+		return id;
+	}
+	public TypeLink getType(IOTypeDB db) throws IOException{
+		return db.fromID(id);
+	}
+	public <T> Class<T> getType(IOTypeDB db, Class<T> root) throws IOException{
+		return db.fromID(root, id);
+	}
+	
+	public Reference getRef(){
+		return ref;
+	}
+	
+	public boolean isNull(){
+		return ref.isNull();
+	}
+}
