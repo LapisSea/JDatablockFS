@@ -27,6 +27,18 @@ import java.util.stream.LongStream;
 
 public abstract sealed class SessionService implements Closeable{
 	
+	static{
+		Thread.startVirtualThread(() -> {
+			var a = new IOSnapshot.Full(0, Optional.empty(), new Throwable(), List.of(), new byte[]{1, 2, 3, 4});
+			var b = new IOSnapshot.Full(0, Optional.empty(), new Throwable(), List.of(), new byte[]{1, 4, 6, 1, 2});
+			try{
+				IOSnapshot.Diff.make(a, b);
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		});
+	}
+	
 	public abstract static class Writer implements Closeable, IOHook{
 		private final String name;
 		protected Writer(String name){ this.name = name; }
@@ -41,18 +53,17 @@ public abstract sealed class SessionService implements Closeable{
 		
 		@Override
 		public void writeEvent(IOInterface data, LongStream writeIdx) throws IOException{
-			
-			var p = computeRelation(data, writeIdx);
-			
+			var e = new Throwable();
+			var p = computeRelation(e, data, writeIdx);
 			syncSubmit(p);
 		}
 		
 		private final Lock relationLock = new ReentrantLock();
-		private FramePair computeRelation(IOInterface data, LongStream writeIdx) throws IOException{
+		private FramePair computeRelation(Throwable e, IOInterface data, LongStream writeIdx) throws IOException{
 			relationLock.lock();
 			try{
 				var now      = Instant.now();
-				var newFrame = IOSnapshot.Full.snap(frameId++, lastTime, now, data, writeIdx);
+				var newFrame = IOSnapshot.Full.snap(frameId++, e, lastTime, now, data, writeIdx);
 				var lastF    = lastFrame;
 				lastTime = Optional.of(now);
 				lastFrame = OptionalPP.of(newFrame);
@@ -63,7 +74,16 @@ public abstract sealed class SessionService implements Closeable{
 		}
 		
 		private void syncSubmit(FramePair pair) throws IOException{
-			write(pair.lastFrame.map(last -> IOSnapshot.Diff.make(last, pair.newFrame)).orElse(pair.newFrame));
+//			var t1 = new NanoTimer.Simple();
+//			t1.start();
+			var frame = pair.lastFrame.map(last -> IOSnapshot.Diff.make(last, pair.newFrame)).orElse(pair.newFrame);
+//			t1.end();
+//
+//			var t2 = new NanoTimer.Simple();
+//			t2.start();
+			write(frame);
+//			t2.end();
+//			LogUtil.println(t1.ms(), t2.ms());
 		}
 		
 		@Override
@@ -78,15 +98,18 @@ public abstract sealed class SessionService implements Closeable{
 		
 		private final class DWriter extends Writer{
 			
-			private final IOList<Frame<?>> frames;
+			private final IOList<Frame<?>>          frames;
+			private final IOStackTrace.StringsMaker stringsMaker;
 			
 			private DWriter(String name) throws IOException{
 				super(name);
-				frames = globalLock.sync(() -> info.sessions().computeIfAbsent(name, () -> {
+				var ses = globalLock.sync(() -> info.sessions().computeIfAbsent(name, () -> {
 					var frames = IOInstance.Def.of(SessionsInfo.Frames.class);
 					frames.allocateNulls(prov);
 					return frames;
-				})).frames();
+				}));
+				frames = ses.frames();
+				stringsMaker = new IOStackTrace.StringsMaker(ses.strings());
 			}
 			
 			@Override
@@ -95,11 +118,14 @@ public abstract sealed class SessionService implements Closeable{
 					case IOSnapshot.Full full -> {
 						var blob = globalLock.sync(() -> Blob.request(prov, full.buff.length));
 						blob.write(true, full.buff);
-						push(new Frame.Full(full.timeDelta, full.stacktrace, blob, List.copyOf(full.writeRanges)));
+						
+						var e = new IOStackTrace(stringsMaker, full.e);
+						push(new Frame.Full(full.timeDelta, e, blob, List.copyOf(full.writeRanges)));
 					}
 					case IOSnapshot.Diff diff -> {
 						var block = diff.changes.stream().map(r -> Frame.Incremental.IncBlock.of(r.off(), r.data())).toList();
-						push(new Frame.Incremental(diff.timeDelta, diff.stackTrace, diff.parentId, diff.size, block));
+						var e     = new IOStackTrace(stringsMaker, diff.e);
+						push(new Frame.Incremental(diff.timeDelta, e, diff.parentId, diff.size, block));
 					}
 				}
 				UtilL.sleep(50);//TODO: remove when done testing

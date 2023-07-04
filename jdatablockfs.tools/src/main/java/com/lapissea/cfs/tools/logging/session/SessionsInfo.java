@@ -10,6 +10,7 @@ interface SessionsInfo extends IOInstance.Def<SessionsInfo>{
 	
 	interface Frames extends IOInstance.Def<Frames>{
 		IOList<Frame<?>> frames();
+		IOList<String> strings();
 	}
 	
 	IOMap<String, Frames> sessions();
