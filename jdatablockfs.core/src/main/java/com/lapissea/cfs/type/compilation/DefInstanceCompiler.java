@@ -410,9 +410,7 @@ public class DefInstanceCompiler{
 				return List.of(
 					inter.getName().substring(0, inter.getName().length() - inter.getSimpleName().length()),
 					inter.getSimpleName(),
-					node.key.includeNames.map(Object::toString).map(s -> {
-						return "fields: " + s + " - ";
-					}).orElse(""),
+					node.key.includeNames.map(Object::toString).map(s -> "fields: " + s + " - ").orElse(""),
 					cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + RESET
 				);
 			}
@@ -900,55 +898,55 @@ public class DefInstanceCompiler{
 	}
 	
 	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorth{
-		
-		if(oOrderedFields.isPresent()){
-			var orderedFields = oOrderedFields.get();
-			
-			var part = writer.codePart();
-			writer.write("public function <init>");
-			for(int i = 0; i<orderedFields.size(); i++){
-				FieldInfo info    = orderedFields.get(i);
-				var       argName = "arg" + i;
-				writer.write("arg {!} {}", argName, info.type);
-			}
-			writer.write("start");
-			part.close();
-			
-			writer.write(
-				"""
-					super start
-						get #typ.impl $STRUCT
-					end
-					""");
-			
-			for(int i = 0; i<orderedFields.size(); i++){
-				FieldInfo info     = orderedFields.get(i);
-				boolean   included = includeNames.map(in -> in.contains(info.name)).orElse(true);
-				
-				boolean nullCheck;
-				if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
-				else nullCheck = info.type == ChunkPointer.class ||
-				                 info.annotations.stream()
-				                                 .filter(a -> a instanceof IONullability)
-				                                 .findAny()
-				                                 .map(a -> ((IONullability)a).value())
-				                                 .orElse(NOT_NULL) == NOT_NULL;
-				
-				if(!included){
-					if(nullCheck){
-						JorthUtils.nullCheck(writer, "get #arg arg" + i);
-					}
-					continue;
-				}
-				
-				writer.write("get #arg arg" + i);
-				if(nullCheck){
-					JorthUtils.nullCheck(writer);
-				}
-				writer.write("set this {!}", info.name);
-			}
-			writer.write("end");
+		if(oOrderedFields.filter(d -> !d.isEmpty()).isEmpty()){
+			return;
 		}
+		var orderedFields = oOrderedFields.get();
+		
+		var part = writer.codePart();
+		writer.write("public function <init>");
+		for(int i = 0; i<orderedFields.size(); i++){
+			FieldInfo info    = orderedFields.get(i);
+			var       argName = "arg" + i;
+			writer.write("arg {!} {}", argName, info.type);
+		}
+		writer.write("start");
+		part.close();
+		
+		writer.write(
+			"""
+				super start
+					get #typ.impl $STRUCT
+				end
+				""");
+		
+		for(int i = 0; i<orderedFields.size(); i++){
+			FieldInfo info     = orderedFields.get(i);
+			boolean   included = includeNames.map(in -> in.contains(info.name)).orElse(true);
+			
+			boolean nullCheck;
+			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
+			else nullCheck = info.type == ChunkPointer.class ||
+			                 info.annotations.stream()
+			                                 .filter(a -> a instanceof IONullability)
+			                                 .findAny()
+			                                 .map(a -> ((IONullability)a).value())
+			                                 .orElse(NOT_NULL) == NOT_NULL;
+			
+			if(!included){
+				if(nullCheck){
+					JorthUtils.nullCheck(writer, "get #arg arg" + i);
+				}
+				continue;
+			}
+			
+			writer.write("get #arg arg" + i);
+			if(nullCheck){
+				JorthUtils.nullCheck(writer);
+			}
+			writer.write("set this {!}", info.name);
+		}
+		writer.write("end");
 	}
 	
 	private static Set<String> collectNames(Class<?> its){
@@ -1231,7 +1229,9 @@ public class DefInstanceCompiler{
 	
 	private static Style checkStyles(List<FieldStub> getters, List<FieldStub> setters){
 		Map<Style, List<FieldStub>> styles = Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::style));
-		
+		if(styles.isEmpty()){
+			return Style.NAMED;
+		}
 		if(styles.size()>1){
 			var style = styles.entrySet().stream().reduce((a, b) -> a.getValue().size()>b.getValue().size()? a : b).map(Map.Entry::getKey).orElseThrow();
 			throw new MalformedTemplateStruct(

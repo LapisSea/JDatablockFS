@@ -1,5 +1,7 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
@@ -524,13 +526,20 @@ public sealed interface IOTypeDB{
 			
 			data.put(newID, type);
 			reverseDataCache = null;
+			recordType(List.of(type));
+			return new TypeID(newID, true);
+		}
+		
+		private void recordType(List<TypeLink> types) throws IOException{
+			var builtIn = BUILT_IN.get();
 			var newDefs = new HashMap<TypeName, TypeDef>();
-			recordType(builtIn, type, newDefs);
+			for(var type : types){
+				recordType(builtIn, type, newDefs);
+			}
 			
 			defs.putAll(newDefs);
 			
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
-			return new TypeID(newID, true);
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
@@ -606,6 +615,10 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
+			if(Utils.getSealedUniverse(typ, false).filter(IOInstance::isInstance).isPresent()){
+				return;
+			}
+			
 			var def = new TypeDef(typ);
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);
@@ -654,11 +667,19 @@ public sealed interface IOTypeDB{
 		}
 		
 		@IOValue
-		private IOMap<String, IOList<String>> sealedMultiverse;
+		private HashIOMap<String, IOList<String>> sealedMultiverse;
+		
+		private final Map<Class<?>, MemoryOnlyDB.Basic.MemUniverse<?>> sealedMultiverseTouch = new HashMap<>();
 		
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
 			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			
+			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
+			if(touched.isPresent()){
+				return touched.get();
+			}
+			
 			var universe = sealedMultiverse.get(rootType.getName());
 			if(universe == null || id<0 || id>=universe.size()){
 				return null;
@@ -669,20 +690,21 @@ public sealed interface IOTypeDB{
 			return (Class<T>)loadClass(name);
 		}
 		
-		private final Map<Class<?>, MemoryOnlyDB.Basic.MemUniverse<?>> sealedMultiverseTouch     = new HashMap<>();
-		private final ReadWriteClosableLock                            sealedMultiverseTouchLock = ReadWriteClosableLock.reentrant();
-		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
 			if(!rootType.isSealed()) throw new IllegalArgumentException();
 			
-			try(var ignored = sealedMultiverseTouchLock.read()){
-				var touched = getTouched(rootType, type);
-				if(touched.isPresent()) return touched.get();
+			var touched = getTouched(rootType, type);
+			if(touched.isPresent()){
+				if(record){
+					recordTouched(rootType);
+				}
+				return touched.get();
 			}
 			
+			
 			var typeName = type.getName();
-			var universe = sealedMultiverse.get(typeName);
+			var universe = record? requireIOUniverse(rootType.getName()) : sealedMultiverse.get(typeName);
 			if(universe == null){
 				return touch(rootType, type, 0);
 			}
@@ -695,23 +717,56 @@ public sealed interface IOTypeDB{
 				}
 			}
 			
+			if(record){
+				recordType(List.of(TypeLink.of(type)));
+				universe.add(typeName);
+				return max;
+			}
+			
 			return touch(rootType, type, max);
 		}
 		
-		private <T> int touch(Class<T> rootType, Class<T> type, int newId){
-			try(var ignored = sealedMultiverseTouchLock.write()){
-				var touched = getTouched(rootType, type);
-				if(touched.isPresent()) return touched.get();
-				@SuppressWarnings("unchecked")
-				var touchU =
-					(MemoryOnlyDB.Basic.MemUniverse<T>)
-						sealedMultiverseTouch.computeIfAbsent(rootType, t -> new MemoryOnlyDB.Basic.MemUniverse<>(newId));
-				return touchU.newId(type);
+		private <T> void recordTouched(Class<T> rootType) throws IOException{
+			//noinspection unchecked
+			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
+			if(universe != null){
+				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
+				recordType(universe.id2cl.values().stream().map(TypeLink::of).toList());
+				while(!universe.id2cl.isEmpty()){
+					var cls = universe.id2cl.remove((int)ioUniverse.size());
+					ioUniverse.add(cls.getName());
+				}
 			}
+		}
+		private IOList<String> requireIOUniverse(String rootTypeName) throws IOException{
+			var sm = this.sealedMultiverse;
+			return sm.computeIfAbsent(rootTypeName, () -> {
+				var ch = AllocateTicket.bytes(16)
+				                       .withPositionMagnet(sm.getReference().getPtr().getValue())
+				                       .submit(sm);
+				var type = TypeLink.of(ContiguousIOList.class, String.class);
+				return new ContiguousIOList<>(sm.getDataProvider(), ch.getPtr().makeReference(), type);
+			});
+		}
+		
+		private <T> int touch(Class<T> rootType, Class<T> type, int newId){
+			var touched = getTouched(rootType, type);
+			if(touched.isPresent()) return touched.get();
+			@SuppressWarnings("unchecked")
+			var touchU =
+				(MemoryOnlyDB.Basic.MemUniverse<T>)
+					sealedMultiverseTouch.computeIfAbsent(rootType, t -> new MemoryOnlyDB.Basic.MemUniverse<>(newId));
+			return touchU.newId(type);
+		}
+		
+		@SuppressWarnings("unchecked")
+		private <T> Optional<MemoryOnlyDB.Basic.MemUniverse<T>> getTouchedUniverse(Class<T> rootType){
+			return Optional.ofNullable((MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.get(rootType));
 		}
 		
 		private <T> Optional<Integer> getTouched(Class<T> rootType, Class<T> type){
-			return Optional.ofNullable(sealedMultiverseTouch.get(rootType)).map(u -> u.cl2id.get(type));
+			var un = getTouchedUniverse(rootType);
+			return un.map(u -> u.cl2id.get(type));
 		}
 		
 		@Override

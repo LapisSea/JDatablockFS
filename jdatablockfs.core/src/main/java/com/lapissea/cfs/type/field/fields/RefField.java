@@ -36,13 +36,26 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 	}
 	
 	public interface Inst<T extends IOInstance<T>, Type extends IOInstance<Type>>{
-		StructPipe<Type> getReferencedPipe(T instance);
+		StructPipe<Type> getReferencedPipe(T instance) throws IOException;
 	}
 	
 	public abstract static non-sealed class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>>
 		extends InstRef<T, ValueType> implements DisabledIO<T>{
 		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
+			super(accessor, sizeDescriptor);
+		}
+		
+		@Override
+		public void allocate(T instance, DataProvider provider, GenericContext genericContext){
+			throw new UnsupportedOperationException();
+		}
+	}
+	
+	public abstract static non-sealed class NoIOObj<T extends IOInstance<T>, ValueType>
+		extends RefField<T, ValueType> implements DisabledIO<T>{
+		
+		public NoIOObj(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
 			super(accessor, sizeDescriptor);
 		}
 		
@@ -148,7 +161,7 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 	}
 	
 	public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;
-	public abstract void setReference(T instance, Reference newRef);
-	public abstract Reference getReference(T instance);
-	public abstract ObjectPipe<Type, ?> getReferencedPipe(T instance);
+	public abstract void setReference(T instance, Reference newRef) throws IOException;
+	public abstract Reference getReference(T instance) throws IOException;
+	public abstract ObjectPipe<Type, ?> getReferencedPipe(T instance) throws IOException;
 }

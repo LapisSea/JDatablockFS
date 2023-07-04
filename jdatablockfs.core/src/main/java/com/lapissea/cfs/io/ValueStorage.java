@@ -12,6 +12,7 @@ import com.lapissea.cfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -37,6 +38,7 @@ import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -291,7 +293,7 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	final class FixedReferenceInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
+	final class FixedReferenceInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>, RefStorage<Reference>{
 		
 		private final GenericContext ctx;
 		private final DataProvider   provider;
@@ -311,7 +313,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref = refPipe.readNew(provider, src, null);
+			var ref = readInline(src);
 			if(ref.isNull()){
 				return null;
 			}
@@ -321,7 +323,7 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
 			var pos = dest.getPos();
-			var ref = dest.remaining() == 0? new Reference() : refPipe.readNew(provider, dest, null);
+			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
 			if(ref.isNull()){
 				dest.setPos(pos);
 				writeNew(dest, AllocateTicket.withData(pipe, provider, src), provider, refPipe);
@@ -332,7 +334,7 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var startPos = io.getPos();
-			var ref      = refPipe.readNew(provider, io, null);
+			var ref      = readInline(io);
 			if(ref.isNull()){
 				return List.of();
 			}
@@ -356,6 +358,15 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
+		public Reference readInline(ContentReader io) throws IOException{
+			return refPipe.readNew(provider, io, null);
+		}
+		
+		@Override
+		public void writeInline(RandomIO dest, Reference src) throws IOException{
+			refPipe.write(provider, dest, src);
+		}
+		@Override
 		public long inlineSize(){
 			return size;
 		}
@@ -366,18 +377,18 @@ public sealed interface ValueStorage<T>{
 				@Override
 				public void setReference(I instance, Reference newRef){
 					try(var io = ioAt.get()){
-						refPipe.write(provider, io, newRef);
+						writeInline(io, newRef);
 					}catch(IOException e){
-						throw new RuntimeException(e);
+						throw UtilL.uncheckedThrow(e);
 					}
 				}
 				
 				@Override
 				public Reference getReference(I instance){
 					try(var io = ioAt.get()){
-						return refPipe.readNew(provider, io, null);
+						return readInline(io);
 					}catch(IOException e){
-						throw new RuntimeException(e);
+						throw UtilL.uncheckedThrow(e);
 					}
 				}
 				
@@ -395,13 +406,13 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException{
-			var ref = refPipe.readNew(provider, src, null);
+			var ref = readInline(src);
 			ref.requireNonNull();
 			ref.io(provider, io -> pipe.readDeps(pipe.makeIOPool(), provider, io, depTicket, dest, ctx));
 		}
 		@Override
 		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket, boolean strictHolder) throws IOException{
-			var ref = refPipe.readNew(provider, src, null);
+			var ref = readInline(src);
 			ref.requireNonNull();
 			return ref.ioMap(provider, io -> pipe.readNewSelective(provider, io, depTicket, ctx, strictHolder));
 		}
@@ -420,7 +431,7 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	final class UnmanagedInstance<T extends IOInstance.Unmanaged<T>> implements ValueStorage<T>{
+	final class UnmanagedInstance<T extends IOInstance.Unmanaged<T>> implements ValueStorage<T>, RefStorage<Reference>{
 		
 		private final TypeLink            type;
 		private final DataProvider        provider;
@@ -444,7 +455,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref = refPipe.readNew(provider, src, null);
+			var ref = readInline(src);
 			if(ref.isNull()){
 				return null;
 			}
@@ -454,7 +465,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			refPipe.write(provider, dest, src == null? new Reference() : src.getReference());
+			writeInline(dest, src == null? new Reference() : src.getReference());
 		}
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
@@ -463,6 +474,14 @@ public sealed interface ValueStorage<T>{
 			return false;
 		}
 		
+		@Override
+		public Reference readInline(ContentReader src) throws IOException{
+			return refPipe.readNew(provider, src, null);
+		}
+		@Override
+		public void writeInline(RandomIO dest, Reference src) throws IOException{
+			refPipe.write(provider, dest, src);
+		}
 		@Override
 		public long inlineSize(){
 			return size;
@@ -583,8 +602,7 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	final class FixedReferenceString implements ValueStorage<String>{
-		
+	final class FixedReferenceString implements ValueStorage<String>, RefStorage<Reference>{
 		
 		private static final RuntimeType<String> TYPE = RuntimeType.of(String.class);
 		
@@ -601,7 +619,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public String readNew(ContentReader src) throws IOException{
-			var ref = refPipe.readNew(provider, src, null);
+			var ref = readInline(src);
 			if(ref.isNull()){
 				return null;
 			}
@@ -610,7 +628,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
-			var ref = dest.remaining() == 0? new Reference() : refPipe.readNew(provider, dest, null);
+			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
 			if(ref.isNull()){
 				writeNew(dest, AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)), provider, refPipe);
 			}else{
@@ -620,12 +638,12 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var startPos = io.getPos();
-			var ref      = refPipe.readNew(provider, io, null);
+			var ref      = readInline(io);
 			if(ref.isNull()){
 				return List.of();
 			}
 			if(dereferenceWrite){
-				refPipe.write(provider, io.setPos(startPos), new Reference());
+				this.writeInline(io.setPos(startPos), new Reference());
 			}
 			return List.of(ref.getPtr());
 		}
@@ -635,13 +653,37 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
+		public Reference readInline(ContentReader io) throws IOException{
+			return refPipe.readNew(provider, io, null);
+		}
+		@Override
+		public void writeInline(RandomIO io, Reference src) throws IOException{
+			refPipe.write(provider, io, src);
+		}
+		@Override
 		public long inlineSize(){
 			return size;
 		}
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new NoIOField<>(accessor, refPipe.getFixedDescriptor());
+			return new RefField.NoIOObj<>(accessor, refPipe.getFixedDescriptor()){
+				@Override
+				public void setReference(I instance, Reference newRef) throws IOException{
+					try(var io = ioAt.get()){
+						FixedReferenceString.this.writeInline(io, newRef);
+					}
+				}
+				
+				@Override
+				public Reference getReference(I instance) throws IOException{
+					try(var io = ioAt.get()){
+						return readInline(io);
+					}
+				}
+				@Override
+				public ObjectPipe<String, ?> getReferencedPipe(I instance){ return AutoText.STR_PIPE; }
+			};
 		}
 		
 		@Override
@@ -669,7 +711,7 @@ public sealed interface ValueStorage<T>{
 				try{
 					id = provider.getTypeDb().toID(src, false).val();
 				}catch(IOException e){
-					throw new RuntimeException(e);
+					throw UtilL.uncheckedThrow(e);
 				}
 				
 				long size = 1;
@@ -845,9 +887,7 @@ public sealed interface ValueStorage<T>{
 			this.provider = provider;
 			this.universe = universe;
 			sizeDescriptor = universe.makeSizeDescriptor(false, (pool, inst) -> inst);
-			canHavePointers = universe.pipeMap().values().stream()
-			                          .map(StructPipe::getType)
-			                          .anyMatch(Struct::getCanHavePointers);
+			canHavePointers = universe.calcCanHavePointers();
 			
 			type = new RuntimeType.Lambda<>(canHavePointers, universe.root(), null);
 		}
@@ -921,7 +961,7 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	final class FixedReferenceSealedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
+	final class FixedReferenceSealedInstance<T extends IOInstance<T>> implements ValueStorage<T>, RefStorage<TypedReference>{
 		
 		private final GenericContext ctx;
 		private final DataProvider   provider;
@@ -946,7 +986,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var refId = refPipe.readNew(provider, src, null);
+			var refId = readInline(src);
 			if(refId.isNull()){
 				return null;
 			}
@@ -956,6 +996,7 @@ public sealed interface ValueStorage<T>{
 			return ref.readNew(provider, pipe, ctx);
 		}
 		
+		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
 			//noinspection unchecked
@@ -964,7 +1005,7 @@ public sealed interface ValueStorage<T>{
 			var id   = provider.getTypeDb().toID(universe.root(), type, true);
 			
 			var orgPos = dest.getPos();
-			var refId  = dest.remaining() == 0? new TypedReference() : refPipe.readNew(provider, dest, null);
+			var refId  = dest.remaining() == 0? new TypedReference() : readInline(dest);
 			if(refId.isNull()){
 				var ticket = AllocateTicket.withData(pipe, provider, src);
 				if(dest instanceof ChunkChainIO io){
@@ -972,7 +1013,7 @@ public sealed interface ValueStorage<T>{
 				}
 				var ch = ticket.submit(provider);
 				try{
-					refPipe.write(provider, dest, new TypedReference(ch.getPtr().makeReference(), id));
+					writeInline(dest, new TypedReference(ch.getPtr().makeReference(), id));
 				}catch(Throwable e){
 					provider.getMemoryManager().free(ch);
 					throw e;
@@ -980,7 +1021,7 @@ public sealed interface ValueStorage<T>{
 			}else{
 				if(refId.getId() != id){
 					refId = new TypedReference(refId.getRef(), id);
-					refPipe.write(provider, dest.setPos(orgPos), refId);
+					writeInline(dest.setPos(orgPos), refId);
 				}
 				refId.getRef().write(provider, true, pipe, src);
 			}
@@ -988,12 +1029,12 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var startPos = io.getPos();
-			var refId    = refPipe.readNew(provider, io, null);
+			var refId    = readInline(io);
 			if(refId.isNull()){
 				return List.of();
 			}
 			if(dereferenceWrite){
-				refPipe.write(provider, io.setPos(startPos), new TypedReference());
+				writeInline(io.setPos(startPos), new TypedReference());
 			}
 			var type = refId.getType(provider.getTypeDb(), universe.root());
 			var pipe = universe.pipeMap().get(type);
@@ -1018,18 +1059,28 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new RefField.NoIO<I, T>(accessor, refPipe.getFixedDescriptor()){
+			return new RefField.NoIO<>(accessor, refPipe.getFixedDescriptor()){
 				@Override
-				public void setReference(I instance, Reference newRef){
-					throw NotImplementedException.infer();//TODO: implement .setReference()
+				public void setReference(I instance, Reference newRef) throws IOException{
+					try(var io = ioAt.get()){
+						var refId = readInline(io);
+						writeInline(io, new TypedReference(newRef, refId.getId()));
+					}
 				}
 				@Override
-				public Reference getReference(I instance){
-					throw NotImplementedException.infer();//TODO: implement .getReference()
+				public Reference getReference(I instance) throws IOException{
+					try(var io = ioAt.get()){
+						var ref = readInline(io);
+						return ref.getRef();
+					}
 				}
 				@Override
-				public StructPipe<T> getReferencedPipe(I instance){
-					throw NotImplementedException.infer();//TODO: implement .getReferencedPipe()
+				public StructPipe<T> getReferencedPipe(I instance) throws IOException{
+					try(var io = ioAt.get()){
+						var refId = readInline(io);
+						var type  = refId.getType(provider.getTypeDb(), universe.root());
+						return universe.pipeMap().get(type);
+					}
 				}
 			};
 		}
@@ -1037,6 +1088,15 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public RuntimeType<T> getType(){
 			return type;
+		}
+		
+		@Override
+		public TypedReference readInline(ContentReader src) throws IOException{
+			return refPipe.readNew(provider, src, null);
+		}
+		@Override
+		public void writeInline(RandomIO dest, TypedReference src) throws IOException{
+			refPipe.write(provider, dest, src);
 		}
 	}
 	
@@ -1116,6 +1176,33 @@ public sealed interface ValueStorage<T>{
 				}
 			};
 		}
+	}
+	
+	interface RefStorage<RefT>{
+		@SuppressWarnings("unchecked")
+		static <T, RefT> RefStorage<RefT> of(ValueStorage<T> storage){
+			if(storage instanceof ValueStorage.RefStorage<?> s){
+				return (RefStorage<RefT>)s;
+			}
+			return new RefStorage<>(){
+				@Override
+				public RefT readInline(ContentReader src) throws IOException{
+					return (RefT)storage.readNew(src);
+				}
+				@Override
+				public void writeInline(RandomIO dest, RefT src) throws IOException{
+					storage.write(dest, (T)src);
+				}
+				@Override
+				public long inlineSize(){
+					return storage.inlineSize();
+				}
+			};
+		}
+		
+		RefT readInline(ContentReader src) throws IOException;
+		void writeInline(RandomIO dest, RefT src) throws IOException;
+		long inlineSize();
 	}
 	
 	T readNew(ContentReader src) throws IOException;

@@ -16,9 +16,13 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.type.field.IOField.*;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
@@ -110,6 +114,8 @@ class FieldSupport{
 		return Objects.equals(o1, o2);
 	}
 	
+	private static String rem(int remaining){ return "... " + remaining + " more"; }
+	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val = field.get(ioPool, instance);
@@ -148,6 +154,58 @@ class FieldSupport{
 			return Optional.of(struct.instanceToString(inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
 		}
 		
+		if(val.getClass().isArray()){
+			var res    = new StringJoiner(", ", "[", "]");
+			int resLen = 0, len = Array.getLength(val), remaining = len;
+			for(int i = 0; i<len; i++){
+				var e = Utils.toShortString(Array.get(val, i));
+				resLen += 2 + e.length();
+				var lenNow = resLen + rem(remaining).length();
+				if(doShort && lenNow>=200){
+					var type = UtilL.findClosestCommonSuper(
+						IntStream.range(0, len)
+						         .mapToObj(j -> Array.get(val, j))
+						         .filter(Objects::nonNull)
+						         .map(Object::getClass));
+					return Optional.of(type.getSimpleName() + "[" + len + "]");
+				}
+				if(lenNow<(doShort? 100 : 200)){
+					res.add(e);
+					remaining--;
+				}
+			}
+			if(remaining>0) res.add(rem(remaining));
+			return Optional.of(res.toString());
+		}
+		if(val instanceof Collection<?> data){
+			var res    = new StringJoiner(", ", "[", "]");
+			int resLen = 0, remaining = data.size();
+			for(var o : data){
+				var e = Utils.toShortString(o);
+				resLen += 2 + e.length();
+				var lenNow = resLen + rem(remaining).length();
+				if(doShort && lenNow>=200){
+					var dataName = switch(data){
+						case List<?> ignored -> "List";
+						case Set<?> ignored -> "Set";
+						default -> data.getClass().getSimpleName();
+					};
+					var type = UtilL.findClosestCommonSuper(
+						data.stream()
+						    .filter(Objects::nonNull)
+						    .map(Object::getClass));
+					if(type == Object.class) return Optional.of(dataName + "<?>[" + data.size() + "]");
+					return Optional.of(dataName + "<" + type.getSimpleName() + ">[" + data.size() + "]");
+				}
+				if(lenNow<(doShort? 100 : 200)){
+					res.add(e);
+					remaining--;
+				}
+			}
+			if(remaining>0) res.add(rem(remaining));
+			return Optional.of(res.toString());
+		}
+		
 		return Optional.of(
 			doShort?
 			Utils.toShortString(val) :
@@ -164,7 +222,7 @@ class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor);
+			boolean isDynamic = IOFieldTools.isGeneric(accessor) || accessor.getType().isSealed();
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}

@@ -436,7 +436,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		private void setIdentity(Reference reference){
-			if(reference.getOffset() != 0) throw new IllegalStateException();
+			if(reference.getOffset() != 0){
+				throw new IllegalStateException();
+			}
 			try{
 				identity = provider.getChunk(reference.getPtr());
 			}catch(IOException e){

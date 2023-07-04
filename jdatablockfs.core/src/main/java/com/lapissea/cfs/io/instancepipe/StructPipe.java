@@ -10,6 +10,7 @@ import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
+import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -604,11 +605,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Override
 	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance = type.make();
-		return doRead(makeIOPool(), provider, src, instance, genericContext);
+		return read(provider, src, instance, genericContext);
 	}
 	
 	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		return doRead(makeIOPool(), provider, src, instance, genericContext);
+		try{
+			return doRead(makeIOPool(), provider, src, instance, genericContext);
+		}catch(IOException e){
+			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+		}
 	}
 	
 	protected abstract T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
@@ -854,22 +859,30 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(fixed.isPresent()){
 			long bytes = fixed.getAsLong();
 			
-			var buf = src.readTicket(bytes).requireExact().submit();
+			ContentInputStream buf;
+			try{
+				buf = src.readTicket(bytes).requireExact().submit();
+			}catch(Exception e){
+				throw fail(field, e, "failed to prepare raw data");
+			}
 			
 			try{
 				field.readReported(ioPool, provider, buf, instance, genericContext);
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field) + " failed to read!", e);
+				throw fail(field, e, "failed to read");
 			}
 			
 			try{
 				buf.close();
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field) + " did not read correctly", e);
+				throw fail(field, e, "did not read correctly");
 			}
 		}else{
 			field.readReported(ioPool, provider, src, instance, genericContext);
 		}
+	}
+	private static IOException fail(IOField<?, ?> field, Exception e, String msg) throws IOException{
+		return new IOException(field + " " + msg, e);
 	}
 	
 	@Override
@@ -911,6 +924,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
+		{
+			var clone = inst.clone();
+			if(inst == clone) throw new MalformedObject("Clone returns itself: " + getType().cleanFullName());
+			if(!inst.equals(clone)){
+				throw new MalformedObject("equals() or clone() are invalid. a.equals(b) returns false: " + getType().cleanFullName());
+			}
+		}
+		
 		T instRead;
 		try{
 			var ch = AllocateTicket.withData(this, man, inst).submit(man);
@@ -921,7 +942,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		if(!instRead.equals(inst)){
-			throw new MalformedObject(getType() + " has failed integrity check. Source/read:\n" + inst + "\n" + instRead);
+			throw new MalformedObject(
+				getType() + " has failed integrity check.\n" +
+				"Expected: " + inst + "\n" +
+				"Actual:   " + instRead
+			);
 		}
 	}
 	

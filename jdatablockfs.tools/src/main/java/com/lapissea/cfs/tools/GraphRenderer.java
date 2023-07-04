@@ -813,7 +813,12 @@ public class GraphRenderer implements DataRenderer{
 			
 			var val = refField.get(pool, inst);
 			if(val != null){
-				var    ref   = refField.getReference(inst).getPtr().getValue();
+				long ref;
+				try{
+					ref = refField.getReference(inst).getPtr().getValue();
+				}catch(IOException ex){
+					throw new RuntimeException(ex);
+				}
 				Bubble child = parent.child(undead, path + "." + refField.getName());
 				if(val instanceof IOInstance i) scan(child, provider, ref, i);
 				else{
@@ -862,7 +867,12 @@ public class GraphRenderer implements DataRenderer{
 			
 			var val = refField.get(pool, inst);
 			if(val != null){
-				var    ref   = refField.getReference(inst).getPtr().getValue();
+				long ref;
+				try{
+					ref = refField.getReference(inst).getPtr().getValue();
+				}catch(IOException ex){
+					throw new RuntimeException(ex);
+				}
 				Bubble child = bubble.child(undead, refField.getName());
 				if(val instanceof IOInstance i) scan(child, provider, ref, i);
 				else{

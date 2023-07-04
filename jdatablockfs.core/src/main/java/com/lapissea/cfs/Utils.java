@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -319,6 +320,12 @@ public class Utils{
 					return instancePipe.calcUnknownSize(prov, val, wordSpace);
 				}
 			);
+		}
+		
+		public boolean calcCanHavePointers(){
+			return pipeMap.values().stream()
+			              .map(StructPipe::getType)
+			              .anyMatch(Struct::getCanHavePointers);
 		}
 	}
 	
