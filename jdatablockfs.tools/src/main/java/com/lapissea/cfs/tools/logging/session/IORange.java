@@ -4,9 +4,9 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
+import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.stream.LongStream;
 
 @IOInstance.Def.Order({"from", "to"})
@@ -70,10 +70,13 @@ public interface IORange extends IOInstance.Def<IORange>{
 	
 	static IORange of(long from, long to){
 		class Ctor{
-			private static final BiFunction<Long, Long, IORange> VAL =
-				Def.constrRef(IORange.class, long.class, long.class);
+			private static final MethodHandle VAL = Def.dataConstructor(IORange.class);
 		}
-		return Ctor.VAL.apply(from, to);
+		try{
+			return (IORange)Ctor.VAL.invoke(from, to);
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	default LongStream idx(){

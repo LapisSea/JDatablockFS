@@ -44,8 +44,11 @@ abstract sealed class IOSnapshot{
 		
 		final byte[] buff;
 		
+		public final String stacktrace;
+		
 		Full(long frameId, Optional<Duration> timeDelta, String stacktrace, List<IORange> writeRanges, byte[] buff){
-			super(frameId, timeDelta, stacktrace, writeRanges);
+			super(frameId, timeDelta, writeRanges);
+			this.stacktrace = stacktrace;
 			this.buff = buff;
 		}
 	}
@@ -89,30 +92,40 @@ abstract sealed class IOSnapshot{
 				ranges.add(DiffRange.of(cb, lSiz, cSiz));
 			}
 			
-			return new Diff(current.frameId, current.timeDelta, current.stacktrace, current.writeRanges, ranges, cSiz, last.frameId);
+			int stackTraceStart = 0;
+			var stackMin        = Math.min(last.stacktrace.length(), current.stacktrace.length());
+			for(int i = 0; i<stackMin; i++){
+				if(last.stacktrace.charAt(i) == current.stacktrace.charAt(i)){
+					stackTraceStart++;
+				}else break;
+			}
+			var stacktrace = new Frame.StacktraceString(stackTraceStart, current.stacktrace.substring(stackTraceStart));
+			
+			return new Diff(current.frameId, current.timeDelta, stacktrace, current.writeRanges, ranges, cSiz, last.frameId);
 		}
 		
 		final List<DiffRange> changes;
 		final long            size;
 		final long            parentId;
 		
-		Diff(long frameId, Optional<Duration> timeDelta, String stacktrace, List<IORange> writeRanges, List<DiffRange> changes, long size, long parentId){
-			super(frameId, timeDelta, stacktrace, writeRanges);
+		Frame.StacktraceString stackTrace;
+		
+		Diff(long frameId, Optional<Duration> timeDelta, Frame.StacktraceString stackTrace, List<IORange> writeRanges, List<DiffRange> changes, long size, long parentId){
+			super(frameId, timeDelta, writeRanges);
 			this.changes = changes;
 			this.size = size;
 			this.parentId = parentId;
+			this.stackTrace = stackTrace;
 		}
 	}
 	
 	public final long               frameId;
 	public final Optional<Duration> timeDelta;
-	public final String             stacktrace;
 	public final List<IORange>      writeRanges;
 	
-	protected IOSnapshot(long frameId, Optional<Duration> timeDelta, String stacktrace, List<IORange> writeRanges){
+	protected IOSnapshot(long frameId, Optional<Duration> timeDelta, List<IORange> writeRanges){
 		this.frameId = frameId;
 		this.timeDelta = timeDelta;
-		this.stacktrace = stacktrace;
 		this.writeRanges = writeRanges;
 	}
 }

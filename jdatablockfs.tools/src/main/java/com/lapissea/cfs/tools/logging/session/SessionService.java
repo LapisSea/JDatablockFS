@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools.logging.session;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
@@ -10,6 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 
 import java.io.Closeable;
 import java.io.File;
@@ -32,13 +34,14 @@ public abstract sealed class SessionService implements Closeable{
 		abstract void write(IOSnapshot snap) throws IOException;
 		
 		private long                        frameId;
-		private Optional<Instant>           lastTime;
-		private OptionalPP<IOSnapshot.Full> lastFrame;
+		private Optional<Instant>           lastTime  = Optional.empty();
+		private OptionalPP<IOSnapshot.Full> lastFrame = OptionalPP.empty();
 		
 		private record FramePair(IOSnapshot.Full newFrame, OptionalPP<IOSnapshot.Full> lastFrame){ }
 		
 		@Override
 		public void writeEvent(IOInterface data, LongStream writeIdx) throws IOException{
+			
 			var p = computeRelation(data, writeIdx);
 			
 			syncSubmit(p);
@@ -60,7 +63,7 @@ public abstract sealed class SessionService implements Closeable{
 		}
 		
 		private void syncSubmit(FramePair pair) throws IOException{
-			write(lastFrame.map(last -> IOSnapshot.Diff.make(last, pair.newFrame)).orElse(pair.newFrame));
+			write(pair.lastFrame.map(last -> IOSnapshot.Diff.make(last, pair.newFrame)).orElse(pair.newFrame));
 		}
 		
 		@Override
@@ -96,11 +99,10 @@ public abstract sealed class SessionService implements Closeable{
 					}
 					case IOSnapshot.Diff diff -> {
 						var block = diff.changes.stream().map(r -> Frame.Incremental.IncBlock.of(r.off(), r.data())).toList();
-						push(new Frame.Incremental(diff.timeDelta, diff.stacktrace, diff.parentId, diff.size, block));
+						push(new Frame.Incremental(diff.timeDelta, diff.stackTrace, diff.parentId, diff.size, block));
 					}
 				}
-				
-				throw NotImplementedException.infer();//TODO: implement OnDisk.write()
+				UtilL.sleep(50);//TODO: remove when done testing
 			}
 			private void push(Frame<?> frame) throws IOException{
 				try(var ignore = globalLock.open()){
@@ -118,10 +120,20 @@ public abstract sealed class SessionService implements Closeable{
 		
 		public OnDisk(File file) throws IOException{
 			this.file = new IOFileData(file);
-			
 			prov = Cluster.init(this.file);
+//			prov = Cluster.init(LoggedMemoryUtils.newLoggedMemory("ay", LoggedMemoryUtils.createLoggerFromConfig()));
 			info = prov.getRootProvider()
 			           .request(SessionsInfo.ROOT_ID, SessionsInfo.class);
+			Thread.startVirtualThread(() -> {
+				var uni = Utils.getSealedUniverse(Frame.class, false).orElseThrow();
+				try(var ignore = globalLock.open()){
+					for(var cls : uni.universe()){
+						prov.getTypeDb().toID(uni.root(), cls, true);
+					}
+				}catch(IOException e){
+					e.printStackTrace();
+				}
+			});
 		}
 		
 		@Override
