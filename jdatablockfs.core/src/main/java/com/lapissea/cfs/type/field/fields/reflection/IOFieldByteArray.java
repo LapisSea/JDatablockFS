@@ -99,6 +99,9 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, 
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		if(compression != null){
+			return;
+		}
 		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}
