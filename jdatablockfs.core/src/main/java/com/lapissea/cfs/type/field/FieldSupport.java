@@ -222,7 +222,7 @@ class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor);
+			boolean isDynamic = IOFieldTools.isGeneric(accessor) || accessor.getType().isSealed();
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}

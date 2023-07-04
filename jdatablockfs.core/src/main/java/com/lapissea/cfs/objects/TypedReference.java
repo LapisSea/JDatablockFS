@@ -37,7 +37,11 @@ public final class TypedReference extends IOInstance.Managed<TypedReference>{
 		return db.fromID(id);
 	}
 	public <T> Class<T> getType(IOTypeDB db, Class<T> root) throws IOException{
-		return db.fromID(root, id);
+		var type = db.fromID(root, id);
+		if(type == null){
+			throw new IllegalStateException("Type of {id: " + id + ", root: " + root.getName() + "} does not exist");
+		}
+		return type;
 	}
 	
 	public Reference getRef(){

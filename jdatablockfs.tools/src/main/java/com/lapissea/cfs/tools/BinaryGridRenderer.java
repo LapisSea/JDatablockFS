@@ -64,6 +64,11 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -389,19 +394,24 @@ public class BinaryGridRenderer implements DataRenderer{
 		var textData = field.getType() == byte[].class && instance instanceof AutoText;
 		
 		Optional<String> str      = textData? Optional.of(((AutoText)instance).getData()) : field.instanceToString(ioPool, instance, false);
-		Optional<String> shortStr = Optional.empty();
+		Optional<String> shortStr = textData? str : Optional.empty();
 		String           both;
 		
 		var fStr = field.toShortString();
 		if(field instanceof RefField refField){
 			//noinspection unchecked
-			var ref = refField.getReference(instance);
+			Reference ref;
+			try{
+				ref = refField.getReference(instance);
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
 			if(ref != null && !ref.isNull()) fStr += " @ " + ref;
 		}
 		
 		var renderCtx = ctx.renderCtx;
 		both = fStr + (str.map(value -> ": " + value).orElse(""));
-		if(str.isPresent() && !textData && getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		if(!textData && str.isPresent() && getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			shortStr = field.instanceToString(ioPool, instance, true);
 			both = fStr + (shortStr.map(s -> ": " + s).orElse(""));
 		}
@@ -648,6 +658,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		drawBackgroundDots(ctx.renderer);
 	}
 	
+	private List<HoverMessage> lastActuallyHoveredMessages = List.of();
 	private List<HoverMessage> render(int frameIndex){
 		if(getFrameCount() == 0){
 			renderNoData(direct);
@@ -678,7 +689,12 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		if(!renderStatic){
 			var ctx = new RenderContext(null, bytes, getPixelsPerByte(), zoom, dis, null);
-			if(lastHoverMessages.stream().anyMatch(m -> m.ranges().stream().noneMatch(ctx::isRangeHovered))){
+			
+			var actuallyHoveredMessages =
+				lastHoverMessages.stream().filter(m -> m.ranges().stream().anyMatch(ctx::isRangeHovered)).toList();
+			
+			if(!actuallyHoveredMessages.equals(lastActuallyHoveredMessages)){
+				lastActuallyHoveredMessages = actuallyHoveredMessages;
 				markDirty();
 			}
 		}
@@ -1579,7 +1595,12 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 								if(!noPtr) ctx.recordPointer(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
 							}
-						}else if(SupportedPrimitive.isAny(acc.getType()) || Stream.of(ChunkPointer.class, Enum.class).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
+						}else if(SupportedPrimitive.isAny(acc.getType()) ||
+						         Stream.of(
+							         ChunkPointer.class, Enum.class,
+							         Duration.class, Instant.class,
+							         LocalDate.class, LocalTime.class, LocalDateTime.class
+						         ).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace() == WordSpace.BIT){
@@ -1814,7 +1835,6 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(typ == String.class){
 								if(annotate){
 									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true, noPtr);
-									
 								}
 								continue;
 							}

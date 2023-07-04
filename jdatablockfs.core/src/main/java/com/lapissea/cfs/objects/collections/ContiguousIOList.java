@@ -67,7 +67,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
 		ContiguousIOList.class,
-		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE)
+		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"))
 	);
 	
 	@IOValue
@@ -377,26 +377,28 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		}
 	}
 	
-	private void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
+	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
 		var newBuffer = new ArrayList<>(varyingBuffer);
 		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.getId(), s));
 		var newVarying = List.copyOf(newBuffer);
 		
-		var oldStorage = storage;
 		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), getTypeDef().arg(0));
+		
+		var oldVal = ValueStorage.RefStorage.<T, Inline>of(storage);
+		var newVal = ValueStorage.RefStorage.<T, Inline>of(newStorage);
 		
 		//fail on recurse
 		storage = null;
 		
-		var oldElemenSize = oldStorage.inlineSize();
-		var newElemenSize = newStorage.inlineSize();
+		var oldElemenSize = oldVal.inlineSize();
+		var newElemenSize = newVal.inlineSize();
 		var headSiz       = calcInstanceSize(WordSpace.BYTE);
 		
 		long newSize = headSiz + size()*newElemenSize;
 		
-		T            zeroSize       = null;
-		Map<Long, T> forwardBackup  = new HashMap<>();
-		long         forwardCounter = 0;
+		Inline            zeroSize       = null;
+		Map<Long, Inline> forwardBackup  = new HashMap<>();
+		long              forwardCounter = 0;
 		
 		selfIO(io -> io.ensureCapacity(newSize));
 		
@@ -414,20 +416,20 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					if(oldElemenSize == 0){
 						if(zeroSize == null){
 							io.setPos(0);
-							zeroSize = oldStorage.readNew(io);
+							zeroSize = oldVal.readInline(io);
 							forwardCounter++;
 						}
 					}else{
 						while(forwardCounter*oldElemenSize<newDataEnd && forwardCounter<size()){
 							io.setPos(forwardCounter*oldElemenSize);
-							forwardBackup.put(forwardCounter, oldStorage.readNew(io));
+							forwardBackup.put(forwardCounter, oldVal.readInline(io));
 							forwardCounter++;
 						}
 					}
 					
 					io.setPos(newDataStart);
 					var el = oldElemenSize == 0? zeroSize : forwardBackup.remove(i);
-					newStorage.write(io, el);
+					newVal.writeInline(io, el);
 				}
 			}
 		}

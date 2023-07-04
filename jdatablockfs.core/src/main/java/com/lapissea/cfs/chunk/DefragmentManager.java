@@ -455,7 +455,7 @@ public class DefragmentManager{
 		
 		var fin = cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 				if(valueReference.getPtr().equals(oldChunk)){
 					field.setReference(instance, new Reference(newChunk, valueReference.getOffset()));
 					return END|SAVE;
@@ -505,7 +505,7 @@ public class DefragmentManager{
 		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 				var ptr = oldRef.getPtr();
 				if(valueReference.getPtr().equals(ptr)){
 					

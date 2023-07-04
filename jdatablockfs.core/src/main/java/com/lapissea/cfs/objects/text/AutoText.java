@@ -1,14 +1,19 @@
 package com.lapissea.cfs.objects.text;
 
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
+import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.text.Encoding.CharEncoding;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -48,6 +53,33 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	}
 	
 	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
+	
+	
+	public static final ObjectPipe<String, Object> STR_PIPE = new ObjectPipe<>(){
+		@Override
+		public void write(DataProvider provider, ContentWriter dest, String instance) throws IOException{
+			AutoText.PIPE.write(provider, dest, new AutoText(instance));
+		}
+		@Override
+		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			AutoText.PIPE.skip(provider, src, null);
+		}
+		@Override
+		public String readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			return AutoText.PIPE.readNew(provider, src, null).getData();
+		}
+		@Override
+		public BasicSizeDescriptor<String, Object> getSizeDescriptor(){
+			var desc = AutoText.PIPE.getSizeDescriptor();
+			return BasicSizeDescriptor.Unknown.of(
+				desc.getWordSpace(), desc.getMin(), desc.getMax(),
+				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
+		}
+		@Override
+		public Object makeIOPool(){
+			return null;
+		}
+	};
 	
 	private String       data;
 	private byte[]       dataSrc;
