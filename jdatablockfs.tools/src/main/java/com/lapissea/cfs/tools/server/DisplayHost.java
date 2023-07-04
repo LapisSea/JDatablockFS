@@ -1,11 +1,9 @@
 package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
-import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -15,12 +13,12 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -235,23 +233,41 @@ public class DisplayHost{
 		
 		var initialData = System.getProperty("initialData");
 		if(initialData != null){
-			info("Loading initialData...");
-			try{
-				var data = Files.readAllBytes(Path.of(initialData));
-				async(() -> {//dry run cluster to load and compile classes while display is loading
+			Thread.startVirtualThread(() -> {
+				var file    = new File(initialData);
+				var modTime = Long.MIN_VALUE;
+				int count   = 0;
+				
+				byte[] start;
+				try{
+					start = Cluster.emptyMem().getSource().readAll();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+				while(true){
 					try{
-						var cl = new Cluster(MemoryData.builder().withRaw(data).asReadOnly().build());
-						cl.rootWalker(MemoryWalker.PointerRecord.NOOP, true).walk();
-					}catch(IOException e){
-						e.printStackTrace();
+						var tim = file.lastModified();
+						if(modTime<tim){
+							modTime = tim;
+						}else{
+							UtilL.sleep(10);
+							continue;
+						}
+						
+						info("Loading initialData... {}", count);
+						var data = Files.readAllBytes(file.toPath());
+						var ses  = getDisplay().join().getSession("initialData");
+						if(Arrays.equals(data, start)){
+							count = 0;
+							ses.reset();
+							info("Reset initialData");
+						}
+						ses.log(new MemFrame(count++, System.nanoTime(), data, new long[0], ""));
+					}catch(Throwable e){
+						nonFatal(e, "Failed to load initialData");
 					}
-				});
-				var ses = getDisplay().join().getSession("default");
-				ses.log(new MemFrame(0, System.nanoTime(), data, new long[0], ""));
-				info("Loaded initialData.");
-			}catch(Throwable e){
-				nonFatal(e, "Failed to load initialData");
-			}
+				}
+			});
 		}
 		
 		int sesCounter = 1;
