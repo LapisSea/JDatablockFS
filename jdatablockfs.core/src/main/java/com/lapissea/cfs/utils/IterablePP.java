@@ -1,7 +1,9 @@
 package com.lapissea.cfs.utils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -19,6 +21,14 @@ public interface IterablePP<T> extends Iterable<T>{
 		var iter = iterator();
 		if(iter.hasNext()) return OptionalPP.ofNullable(iter.next());
 		return OptionalPP.empty();
+	}
+	
+	default List<T> collectToList(){
+		var res = new ArrayList<T>();
+		for(T t : this){
+			res.add(t);
+		}
+		return res;
 	}
 	
 	default IterablePP<T> filtered(Predicate<T> filter){

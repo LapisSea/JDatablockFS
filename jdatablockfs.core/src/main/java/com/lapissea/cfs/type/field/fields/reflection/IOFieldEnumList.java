@@ -83,7 +83,7 @@ public final class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> e
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = arraySize.getValue(ioPool, instance);
-		src.skipExact(size);
+		src.skipExact(byteCount(size));
 	}
 	
 	private int byteCount(int len){
