@@ -31,10 +31,11 @@ public class SesRun{
 				var            cl   = Cluster.init(data);
 				IOList<String> uhhh = cl.getRootProvider().request("uhhh", IOList.class, String.class);
 				uhhh.add("hi!");
-				System.exit(0);
 				uhhh.add("how do?");
 				uhhh.set(0, "uwu");
-				uhhh.add("hiiiii");
+				for(int i = 0; i<10; i++){
+					uhhh.add("hiiiii");
+				}
 				uhhh.add("hiiiii2");
 			}
 		}
