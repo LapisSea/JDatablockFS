@@ -304,6 +304,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		VarPool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
+		if(bitSize<8 && ctx.renderCtx.pixelsPerByte<8) return;
 		var renderCtx = ctx.renderCtx;
 		Consumer<DrawUtils.Rect> doSegment = bitRect -> {
 			renderCtx.renderer.setColor(alpha(col, 0.8F).darker());
@@ -1412,13 +1413,13 @@ public class BinaryGridRenderer implements DataRenderer{
 					var virtuals = FieldSet.of(pipe.getSpecificFields().stream().filter(f -> f.isVirtual(IO)));
 					pipe.readDeps(ioPool, ctx.provider, io, pipe.getFieldDependency().getDeps(virtuals), instance, generics(instance, parentGenerics));
 				}catch(Throwable e){
-//					e.printStackTrace();
 					var size = 1L;
 					try{
 						size = pipe.calcUnknownSize(ctx.provider, instance, WordSpace.BYTE);
 					}catch(Throwable ignored){ }
 					drawByteRangesForced(ctx.renderCtx, List.of(Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
-					return;
+					
+					throw e;
 				}
 			}
 			while(true){
@@ -1564,13 +1565,15 @@ public class BinaryGridRenderer implements DataRenderer{
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset = 0;
 							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), col, false, true);
-							for(BitField<T, ?> bit : merger.fieldGroup()){
-								
-								var bCol = ColorUtils.makeCol(rand, typeHash, bit);
-								var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
-								
-								if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
-								bitOffset += siz;
+							if(rctx.pixelsPerByte>8){
+								for(BitField<T, ?> bit : merger.fieldGroup()){
+									
+									var bCol = ColorUtils.makeCol(rand, typeHash, bit);
+									var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
+									
+									if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+									bitOffset += siz;
+								}
 							}
 							continue;
 						}

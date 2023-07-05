@@ -37,6 +37,9 @@ public class OpenGLBackend extends RenderBackend{
 	}
 	
 	public static void glErrorPrint(){
+//		glErrorPrint0();
+	}
+	private static void glErrorPrint0(){
 		int errorCode = glGetError();
 		if(errorCode == GL_NO_ERROR) return;
 		
