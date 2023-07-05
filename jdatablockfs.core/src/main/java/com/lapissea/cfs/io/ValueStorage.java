@@ -630,7 +630,11 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, String src) throws IOException{
 			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
 			if(ref.isNull()){
-				writeNew(dest, AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)), provider, refPipe);
+				//TODO: create mechanism for assumed fixed field first, then if growth needed switch to explicit next size
+				var d = new AutoText(src);
+				var t = AllocateTicket.bytes(AutoText.PIPE.calcUnknownSize(provider, d, WordSpace.BYTE))
+				                      .withDataPopulated(AutoText.PIPE, d);
+				writeNew(dest, t, provider, refPipe);
 			}else{
 				ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 			}
