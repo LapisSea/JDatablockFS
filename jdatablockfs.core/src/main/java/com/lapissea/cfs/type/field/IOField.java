@@ -25,8 +25,7 @@ import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumArray;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumCollection;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
@@ -51,7 +50,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
 	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger,
-	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumArray, IOFieldEnumList,
+	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumCollection,
 	        IOFieldFloatArray, IOFieldPrimitive, IOFieldStringCollection{
 	
 	public interface FieldUsage{
