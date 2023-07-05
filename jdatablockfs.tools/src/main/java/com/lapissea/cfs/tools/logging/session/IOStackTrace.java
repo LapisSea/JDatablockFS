@@ -1,15 +1,23 @@
 package com.lapissea.cfs.tools.logging.session;
 
+import com.lapissea.cfs.io.content.ContentInputStream;
+import com.lapissea.cfs.io.content.ContentOutputBuilder;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.ClosableLock;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
@@ -43,6 +51,21 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		}
 	}
 	
+	enum IndexCmd{
+		PUSH,
+		SET_CLASS_LOADER_NAME,
+		SET_MODULE_NAME, SET_MODULE_VERSION,
+		SET_CLASS_NAME, SET_METHOD_NAME,
+		SET_FILE_NAME, SET_LINE_NUMBER;
+		
+		private static final IndexCmd[] CMD_SETS = {
+			SET_CLASS_LOADER_NAME,
+			SET_MODULE_NAME, SET_MODULE_VERSION,
+			SET_CLASS_NAME, SET_METHOD_NAME,
+			SET_FILE_NAME, SET_LINE_NUMBER
+		};
+	}
+	
 	@Def.ToString(name = false, fNames = false)
 	@Def.Order({"classLoaderNameId", "moduleNameId", "moduleVersionId", "classNameId", "methodNameId", "fileNameId", "lineNumber"})
 	interface Element extends IOInstance.Def<Element>{
@@ -68,21 +91,24 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		@IODependency.VirtualNumSize
 		int lineNumber();
 		
-		static Element of(StringsMaker maker, StackTraceElement e) throws IOException{
+		static Element of(int classLoaderNameId, int moduleNameId, int moduleVersionId, int classNameId, int methodNameId, int fileNameId, int lineNumber){
 			class Constr{
 				private static final MethodHandle VAL = IOInstance.Def.constrRef(Element.class, int.class, int.class, int.class, int.class, int.class, int.class, int.class);
 			}
 			
 			try{
-				return (Element)Constr.VAL.invoke(
-					maker.make(e.getClassLoaderName()),
-					maker.make(e.getModuleName()), maker.make(e.getModuleVersion()),
-					maker.make(e.getClassName()), maker.make(e.getMethodName()),
-					maker.make(e.getFileName()), e.getLineNumber()
-				);
+				return (Element)Constr.VAL.invoke(classLoaderNameId, moduleNameId, moduleVersionId, classNameId, methodNameId, fileNameId, lineNumber);
 			}catch(Throwable ex){
 				throw UtilL.uncheckedThrow(ex);
 			}
+		}
+		static Element of(StringsMaker maker, StackTraceElement e) throws IOException{
+			return of(
+				maker.make(e.getClassLoaderName()),
+				maker.make(e.getModuleName()), maker.make(e.getModuleVersion()),
+				maker.make(e.getClassName()), maker.make(e.getMethodName()),
+				maker.make(e.getFileName()), e.getLineNumber()
+			);
 		}
 		
 		default StackTraceElement unpack(IOList<String> strings) throws IOException{
@@ -96,26 +122,108 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	}
 	
 	@IOValue
-	private Element[] frames;
+	private List<IndexCmd>   commands;
+	@IOValue
+	private List<NumberSize> sizes;
+	@IOValue
+	private byte[]           numbers;
+	
 	@IOValue
 	@IODependency.VirtualNumSize
 	@IOValue.Unsigned
-	private int       head;
+	private int head;
 	
 	public IOStackTrace(){ }
-	public IOStackTrace(StringsMaker maker, Throwable e) throws IOException{
-		head = maker.make(e.toString());
-		var frames = e.getStackTrace();
-		this.frames = new Element[frames.length];
-		for(int i = 0; i<frames.length; i++){
-			this.frames[i] = Element.of(maker, frames[i]);
+	public IOStackTrace(StringsMaker maker, Throwable ex) throws IOException{
+		head = maker.make(ex.toString());
+		var frames = ex.getStackTrace();
+		
+		int[] interBuf = new int[IndexCmd.CMD_SETS.length];
+		
+		var commands = new ArrayList<IndexCmd>();
+		var sizes    = new ArrayList<NumberSize>();
+		var numbers  = new ContentOutputBuilder();
+		
+		for(var e : frames){
+			var strs = new String[]{
+				e.getClassLoaderName(),
+				e.getModuleName(), e.getModuleVersion(),
+				e.getClassName(), e.getMethodName(),
+				e.getFileName()
+			};
+			
+			for(int i = 0; i<IndexCmd.CMD_SETS.length; i++){
+				var cmd = IndexCmd.CMD_SETS[i];
+				var val = cmd == IndexCmd.SET_LINE_NUMBER?
+				          e.getLineNumber() :
+				          maker.make(strs[i]);
+				if(interBuf[i] != val){
+					interBuf[i] = val;
+					commands.add(cmd);
+					var siz = NumberSize.bySize(val);
+					sizes.add(siz);
+					siz.writeInt(numbers, val);
+				}
+			}
+			
+			commands.add(IndexCmd.PUSH);
 		}
+		
+		this.commands = commands;
+		this.sizes = sizes;
+		this.numbers = numbers.toByteArray();
+
+//		var els = frames().collectToList();
+//
+//		var actual = new ArrayList<Element>();
+//		for(var e : frames){
+//			actual.add(Element.of(maker, e));
+//		}
+//
+//		if(!els.equals(actual)){
+//			throw new RuntimeException("\n" + els + "\n" + actual);
+//		}
 	}
+	
+	private IterablePP<Element> frames(){
+		return () -> new Iterator<>(){
+			private static final int[] IDX_MAP = Arrays.stream(IndexCmd.values()).mapToInt(e -> Arrays.asList(IndexCmd.CMD_SETS).indexOf(e)).toArray();
+			
+			private final int[] interBuf = new int[IndexCmd.CMD_SETS.length];
+			
+			private final Iterator<IndexCmd> cmds = commands.iterator();
+			private final Iterator<NumberSize> sizs = sizes.iterator();
+			private final ContentInputStream.BA nums = new ContentInputStream.BA(numbers);
+			
+			@Override
+			public boolean hasNext(){
+				return cmds.hasNext();
+			}
+			@Override
+			public Element next(){
+				try{
+					IndexCmd cmd;
+					while(true){
+						cmd = cmds.next();
+						if(cmd == IndexCmd.PUSH) break;
+						int idx = IDX_MAP[cmd.ordinal()];
+						var siz = sizs.next();
+						interBuf[idx] = siz.readInt(nums);
+					}
+					
+					return Element.of(interBuf[0], interBuf[1], interBuf[2], interBuf[3], interBuf[4], interBuf[5], interBuf[6]);
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
+		};
+	}
+	
 	@Override
 	public String toString(){
 		var res = new StringBuilder();
 		res.append(head);
-		for(var frame : frames){
+		for(var frame : frames()){
 			res.append("\n\t").append(frame);
 		}
 		return res.toString();
@@ -123,7 +231,7 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	public String toString(IOList<String> strings) throws IOException{
 		var res = new StringBuilder();
 		res.append(StringsMaker.get(strings, head));
-		for(var frame : frames){
+		for(var frame : frames()){
 			res.append("\n\t").append(frame.unpack(strings));
 		}
 		return res.toString();
