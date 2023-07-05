@@ -252,7 +252,7 @@ public class OpenGLBackend extends RenderBackend{
 			window.show();
 		}else return;
 		
-		glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
+		glClearColor(0.25F, 0.25F, 0.25F, 1.0f);
 		
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(false);

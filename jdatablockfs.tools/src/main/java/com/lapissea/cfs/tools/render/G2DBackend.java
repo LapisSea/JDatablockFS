@@ -388,7 +388,7 @@ public class G2DBackend extends RenderBackend{
 	@Override
 	public void clearFrame(){
 		var col = readColor();
-		currentGraphics.setColor(Color.GRAY);
+		currentGraphics.setColor(Color.DARK_GRAY);
 		currentGraphics.fillRect(0, 0, getDisplay().getWidth(), getDisplay().getHeight());
 		currentGraphics.setColor(col);
 	}
