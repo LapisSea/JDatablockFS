@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
@@ -84,7 +85,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, TYPE_CHECK);
-		cache = readOnly? new HashMap<>() : null;
+		cache = readOnly? new ConcurrentHashMap<>() : null;
 		
 		//read data needed for proper function such as number of elements and varying sizes
 		if(!isSelfDataEmpty()){
