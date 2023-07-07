@@ -98,8 +98,8 @@ public abstract sealed class SessionService implements Closeable{
 		
 		private final class DWriter extends Writer{
 			
-			private final IOList<Frame<?>>          frames;
-			private final IOStackTrace.StringsMaker stringsMaker;
+			private final IOList<Frame<?>> frames;
+			private final StringsIndex     stringsIndex;
 			
 			private DWriter(String name) throws IOException{
 				super(name);
@@ -109,9 +109,10 @@ public abstract sealed class SessionService implements Closeable{
 					return frames;
 				}));
 				frames = ses.frames();
-				stringsMaker = new IOStackTrace.StringsMaker(ses.strings());
+				stringsIndex = new StringsIndex(ses.strings());
 			}
 			
+			private Instant lastTime = Instant.now();
 			@Override
 			protected void write(IOSnapshot snap) throws IOException{
 				switch(snap){
@@ -119,16 +120,22 @@ public abstract sealed class SessionService implements Closeable{
 						var blob = globalLock.sync(() -> Blob.request(prov, full.buff.length));
 						blob.write(true, full.buff);
 						
-						var e = new IOStackTrace(stringsMaker, full.e);
+						var e = new IOStackTrace(stringsIndex, full.e);
 						push(new Frame.Full(full.timeDelta, e, blob, List.copyOf(full.writeRanges)));
 					}
 					case IOSnapshot.Diff diff -> {
 						var block = diff.changes.stream().map(r -> Frame.Incremental.IncBlock.of(r.off(), r.data())).toList();
-						var e     = new IOStackTrace(stringsMaker, diff.e);
+						var e     = new IOStackTrace(stringsIndex, diff.e);
 						push(new Frame.Incremental(diff.timeDelta, e, diff.parentId, diff.size, block));
 					}
 				}
-				UtilL.sleep(50);//TODO: remove when done testing
+				
+				var now = Instant.now();
+				var dur = Duration.between(lastTime, now);
+				lastTime = now;
+				
+				var tim = Duration.ofMillis(50).minus(dur);
+				if(tim.isPositive()) UtilL.sleep(tim.toMillis());//TODO: remove when done testing
 			}
 			private void push(Frame<?> frame) throws IOException{
 				try(var ignore = globalLock.open()){
