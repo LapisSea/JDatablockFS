@@ -35,6 +35,16 @@ import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 import static com.lapissea.util.UtilL.async;
 
 public class DisplayHost{
+	static{
+		Thread.startVirtualThread(() -> {
+			UtilL.sleep(1000*5);
+			while(true){
+				System.gc();
+				UtilL.sleep(1000*60*2);
+			}
+		});
+	}
+	
 	public static void main(String[] args) throws IOException{
 		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		

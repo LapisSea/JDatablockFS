@@ -92,7 +92,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 			var col = get(ioPool, inst);
 			if(col == null) return 0;
 			long sum = 0;
-			for(String s : addapter.getAsCollection(col)){
+			for(String s : addapter.asListView(col)){
 				sum += StringIO.INSTANCE.calcByteSize(prov, s);
 			}
 			return sum;

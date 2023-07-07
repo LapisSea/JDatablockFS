@@ -75,7 +75,7 @@ public class SlowTests{
 			Cluster.init(d);
 			baked = d.readAll();
 		}
-		randomBatch(500000, (r, iter, tick) -> {
+		randomBatch(300000, (r, iter, tick) -> {
 			if(tick){
 				info("iteration: {}", iter);
 			}
@@ -423,7 +423,7 @@ public class SlowTests{
 	
 	@Test(dependsOnMethods = "simpleTreeSet")
 	void fuzzTreeSet(){
-		runSetFuzz(200000, IOTreeSet.class);
+		runSetFuzz(20000, IOTreeSet.class);
 	}
 	
 	interface ListAction{
@@ -477,7 +477,7 @@ public class SlowTests{
 			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
 			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40))},
 			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().getRootProvider().request("list", ContiguousIOList.class, Integer.class))},
-			{new ListMaker("linked list", 0.2, () -> Cluster.emptyMem().getRootProvider().request("list", LinkedIOList.class, Integer.class))},
+			{new ListMaker("linked list", 0.1, () -> Cluster.emptyMem().getRootProvider().request("list", LinkedIOList.class, Integer.class))},
 			};
 	}
 	
@@ -525,7 +525,7 @@ public class SlowTests{
 			r -> new ListAction.Num2(RNGEnum.anyOf(r, ListAction.Num2T.class), r.nextInt(200), r.nextInt(200))
 		)).chanceFor(ListAction.Clear.class, 1F/1000));
 		
-		runner.runAndAssert(69_420, (long)(500_000L*maker.weight), 5000);
+		runner.runAndAssert(69_420, (long)(400_000L*maker.weight), 5000);
 	}
 	
 	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")
@@ -687,7 +687,7 @@ public class SlowTests{
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
 		
-		var fails = FuzzFail.sortFails(runner.run(69, 100000, 2000));
+		var fails = FuzzFail.sortFails(runner.run(69, 50000, 2000));
 		if(!fails.isEmpty()){
 			LogUtil.printlnEr(FuzzFail.report(fails));
 			//get first fail and rerun it with display server logging

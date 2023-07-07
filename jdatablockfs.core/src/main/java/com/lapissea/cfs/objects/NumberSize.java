@@ -190,6 +190,14 @@ public enum NumberSize{
 		}
 	}
 	
+	public void writeInt(ContentWriter out, int value, boolean unsigned) throws IOException{
+		if(unsigned){
+			writeInt(out, value);
+		}else{
+			writeIntSigned(out, value);
+		}
+	}
+	
 	public void writeInt(ContentWriter out, int value) throws IOException{
 		if(DEBUG_VALIDATION) validateUnsigned(value);
 		

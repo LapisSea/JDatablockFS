@@ -21,7 +21,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.OptionalLong;
 
@@ -118,7 +117,11 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 		@Override
 		public E[] makeNew(int size){ return (E[])Array.newInstance(getElementIO().componentType(), size); }
 		@Override
-		public Collection<E> getAsCollection(E[] collection){ return Arrays.asList(collection); }
+		public E[] asCollection(E[] data){
+			return data;
+		}
+		@Override
+		public List<E> asListView(E[] collection){ return Arrays.asList(collection); }
 	}
 	
 	public static final class OfList<E> extends CollectionAddapter<E, List<E>>{
@@ -147,7 +150,11 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 			return l;
 		}
 		@Override
-		public Collection<E> getAsCollection(List<E> collection){ return collection; }
+		public List<E> asCollection(E[] data){
+			return new ArrayList<>(Arrays.asList(data));
+		}
+		@Override
+		public List<E> asListView(List<E> collection){ return collection; }
 	}
 	
 	@SuppressWarnings("rawtypes")
@@ -169,7 +176,7 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 	
 	public void write(CollectionType arr, DataProvider provider, ContentWriter dest) throws IOException{
 		
-		for(ElementType el : getAsCollection(arr)){
+		for(ElementType el : asListView(arr)){
 			if(DEBUG_VALIDATION){
 				var siz = elementIO.calcByteSize(provider, el);
 				
@@ -212,7 +219,8 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 	public abstract void setElement(CollectionType collection, int index, ElementType element);
 	
 	public abstract CollectionType makeNew(int size);
+	public abstract CollectionType asCollection(ElementType[] data);
 	
-	public abstract Collection<ElementType> getAsCollection(CollectionType collection);
+	public abstract List<ElementType> asListView(CollectionType collection);
 	
 }

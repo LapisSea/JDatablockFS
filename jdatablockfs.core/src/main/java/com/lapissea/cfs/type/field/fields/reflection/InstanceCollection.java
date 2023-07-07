@@ -101,7 +101,7 @@ public class InstanceCollection{
 				
 				var  elIo = dataAdapter.getElementIO();
 				long sum  = 0;
-				for(var instance : dataAdapter.getAsCollection(arr)){
+				for(var instance : dataAdapter.asListView(arr)){
 					sum += elIo.calcByteSize(prov, instance);
 				}
 				return sum;
@@ -219,7 +219,7 @@ public class InstanceCollection{
 								var fixed = io.getFixedByteSize();
 								if(fixed.isPresent()) elementsSize = size*fixed.getAsLong();
 								else{
-									for(ElementType e : dataAdapter.getAsCollection(instance)){
+									for(ElementType e : dataAdapter.asListView(instance)){
 										elementsSize += io.calcByteSize(provider, e);
 									}
 								}
