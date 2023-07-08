@@ -42,6 +42,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
@@ -115,7 +116,9 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				
 				var chs = popQueue();
 				synchronized(freeChunks){
-					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
+					try(var ignored = context.getSource().openIOTransaction()){
+						MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
+					}
 				}
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{

@@ -178,6 +178,11 @@ public interface DataProvider{
 			public String toString(){
 				return DataProvider.this.toString();
 			}
+			
+			@Override
+			public DataProvider withRouter(Function<AllocateTicket, AllocateTicket> router){
+				return DataProvider.this.withRouter(router);
+			}
 		}
 		
 		return new Routed();

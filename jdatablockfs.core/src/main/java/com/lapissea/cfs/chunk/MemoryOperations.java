@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -293,7 +294,7 @@ public class MemoryOperations{
 				var    size      = chunk.getHeaderSize();
 				byte[] headBytes = new byte[size];
 				chunk.writeHeader(new ContentOutputStream.BA(headBytes));
-				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes, size));
+				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
 			}
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(chunks);
@@ -311,27 +312,34 @@ public class MemoryOperations{
 			}
 		}
 		
-		ExecutorService service = null;
-		
-		for(Chunk chunk : oks){
-			
-			if(PURGE_ACCIDENTAL){
-				if(chunk.getCapacity()>3000){
-					if(service == null) service = Executors.newWorkStealingPool();
-					service.execute(() -> {
-						try{
-							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
-						}catch(IOException e){
-							throw new RuntimeException(e);
-						}
-					});
-				}else{
-					purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+		if(PURGE_ACCIDENTAL){
+			ExecutorService service     = null;
+			var             transaction = provider.getSource().openIOTransaction();
+			try{
+				for(Chunk chunk : oks){
+					if(chunk.getCapacity()>3000){
+						if(service == null) service = Executors.newWorkStealingPool();
+						service.execute(() -> {
+							try{
+								purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+							}catch(IOException e){
+								throw new RuntimeException(e);
+							}
+						});
+					}else{
+						purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+					}
+					if(service == null && (transaction.getTotalBytes() + transaction.getChunkCount()*20L)>GlobalConfig.BATCH_BYTES){
+						transaction.close();
+						transaction = provider.getSource().openIOTransaction();
+					}
 				}
+			}finally{
+				if(service != null){
+					service.close();
+				}
+				transaction.close();
 			}
-		}
-		if(service != null){
-			service.close();
 		}
 		
 		return oks;
@@ -391,6 +399,60 @@ public class MemoryOperations{
 			}
 		});
 		return toPin.getCapacity();
+	}
+	
+	
+	public static long allocateByChainWalkUpDefragment(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
+		if(target.hasNextPtr()) throw new IllegalArgumentException();
+		if(first == target){
+			return 0;
+		}
+		
+		var chain = first.collectNext();
+		var iter  = chain.listIterator(chain.size());
+		
+		long toCopy = 0;
+		
+		while(iter.hasPrevious()){
+			var ch = iter.previous();
+			
+			var allocated = AllocateTicket.bytes(toAllocate + toCopy)
+			                              .withPositionMagnet(ch)
+			                              .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
+			                              .withExplicitNextSize(explicitNextSize(manager, true))
+			                              .submit(manager);
+			if(allocated == null){
+				toCopy += ch.getCapacity();
+				continue;
+			}
+			
+			var strangler  = ch.requireNext();
+			var stranglers = strangler.collectNext();
+			var toMove     = 0;
+			for(var c : stranglers){
+				toMove += c.getCapacity();
+			}
+			if(toMove>0){
+				try(var src = strangler.io();
+				    var dst = allocated.io()){
+					src.transferTo(dst);
+				}
+			}
+			
+			ch.modifyAndSave(c -> {
+				try{
+					c.setNextPtr(allocated.getPtr());
+				}catch(OutOfBitDepth e){
+					throw new ShouldNeverHappenError();//Allocated ticket has approval of can fit
+				}
+			});
+			
+			manager.free(stranglers);
+			var cap = allocated.getCapacity();
+			return cap - toMove;
+		}
+		
+		return 0;
 	}
 	
 	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{

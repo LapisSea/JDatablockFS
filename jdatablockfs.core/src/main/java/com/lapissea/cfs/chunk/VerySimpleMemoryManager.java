@@ -34,6 +34,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}

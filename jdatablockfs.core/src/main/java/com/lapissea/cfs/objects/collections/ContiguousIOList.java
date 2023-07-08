@@ -636,7 +636,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				for(long i = 0; i<s; i++){
 					io.setPos(calcElementOffset(i));
 					toFree.addAll(storage.notifyRemoval(io, false));
-					if(toFree.size()>=256){
+					if(toFree.size()>=5000){
 						getDataProvider().getMemoryManager().freeChains(toFree);
 						toFree.clear();
 					}
@@ -828,8 +828,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
-		ch.writeHeader();
-		chRem.writeHeader();
+		
+		try(var ignored = prov.getSource().openIOTransaction()){
+			ch.writeHeader();
+			chRem.writeHeader();
+		}
 		
 		prov.getMemoryManager().free(prov.getChunk(ptr));
 	}

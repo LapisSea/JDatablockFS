@@ -108,6 +108,10 @@ public class DisplayIpc implements DataLogger{
 						try{
 							sendAction.accept(action, buff -> { });
 							info(YELLOW_BRIGHT + "Closing connection to: {}" + RESET, name);
+							
+							try{
+								socketIn.read();
+							}catch(IOException e){ }
 							socketOut.flush();
 							socket.close();
 						}catch(SocketException ignored){
