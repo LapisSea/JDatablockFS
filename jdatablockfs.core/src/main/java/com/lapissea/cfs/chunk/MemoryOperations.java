@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -293,7 +294,7 @@ public class MemoryOperations{
 				var    size      = chunk.getHeaderSize();
 				byte[] headBytes = new byte[size];
 				chunk.writeHeader(new ContentOutputStream.BA(headBytes));
-				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes, size));
+				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
 			}
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(chunks);
@@ -311,27 +312,34 @@ public class MemoryOperations{
 			}
 		}
 		
-		ExecutorService service = null;
-		
-		for(Chunk chunk : oks){
-			
-			if(PURGE_ACCIDENTAL){
-				if(chunk.getCapacity()>3000){
-					if(service == null) service = Executors.newWorkStealingPool();
-					service.execute(() -> {
-						try{
-							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
-						}catch(IOException e){
-							throw new RuntimeException(e);
-						}
-					});
-				}else{
-					purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+		if(PURGE_ACCIDENTAL){
+			ExecutorService service     = null;
+			var             transaction = provider.getSource().openIOTransaction();
+			try{
+				for(Chunk chunk : oks){
+					if(chunk.getCapacity()>3000){
+						if(service == null) service = Executors.newWorkStealingPool();
+						service.execute(() -> {
+							try{
+								purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+							}catch(IOException e){
+								throw new RuntimeException(e);
+							}
+						});
+					}else{
+						purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+					}
+					if(service == null && (transaction.getTotalBytes() + transaction.getChunkCount()*20L)>GlobalConfig.BATCH_BYTES){
+						transaction.close();
+						transaction = provider.getSource().openIOTransaction();
+					}
 				}
+			}finally{
+				if(service != null){
+					service.close();
+				}
+				transaction.close();
 			}
-		}
-		if(service != null){
-			service.close();
 		}
 		
 		return oks;

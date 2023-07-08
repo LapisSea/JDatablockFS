@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -352,7 +353,7 @@ public interface IOList<T> extends IterablePP<T>{
 		try{
 			return get(index);
 		}catch(IOException e){
-			throw new RuntimeException(e);
+			throw UtilL.uncheckedThrow(e);
 		}
 	}
 	

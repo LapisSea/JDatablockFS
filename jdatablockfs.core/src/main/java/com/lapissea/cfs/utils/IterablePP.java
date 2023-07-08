@@ -32,9 +32,8 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterablePP<T> filtered(Predicate<T> filter){
-		var that = this;
 		return () -> new Iterator<T>(){
-			final Iterator<T> src = that.iterator();
+			private final Iterator<T> src = IterablePP.this.iterator();
 			
 			T next;
 			boolean hasData;
@@ -78,14 +77,13 @@ public interface IterablePP<T> extends Iterable<T>{
 		return flatMap(e -> flatten.apply(e).iterator());
 	}
 	default <L> IterablePP<L> flatMap(Function<T, Iterator<L>> flatten){
-		var that = this;
 		return () -> new Iterator<L>(){
-			final Iterator<T> src = that.iterator();
+			private final Iterator<T> src = IterablePP.this.iterator();
 			
 			Iterator<L> flat;
 			
-			L next;
-			boolean hasData;
+			private L next;
+			private boolean hasData;
 			
 			void doNext(){
 				while(true){
@@ -122,9 +120,8 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default <L> IterablePP<L> map(Function<T, L> mapper){
-		var that = this;
 		return () -> new Iterator<>(){
-			final Iterator<T> src = that.iterator();
+			private final Iterator<T> src = IterablePP.this.iterator();
 			
 			@Override
 			public boolean hasNext(){
@@ -145,6 +142,23 @@ public interface IterablePP<T> extends Iterable<T>{
 				iter.next();
 			}
 			return iter;
+		};
+	}
+	
+	default IterablePP<T> limit(int maxLen){
+		return () -> new Iterator<>(){
+			private final Iterator<T> src = IterablePP.this.iterator();
+			private int count;
+			
+			@Override
+			public boolean hasNext(){
+				return maxLen>count && src.hasNext();
+			}
+			@Override
+			public T next(){
+				count++;
+				return src.next();
+			}
 		};
 	}
 	
