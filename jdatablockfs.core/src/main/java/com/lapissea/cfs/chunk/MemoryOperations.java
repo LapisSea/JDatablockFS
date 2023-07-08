@@ -401,6 +401,60 @@ public class MemoryOperations{
 		return toPin.getCapacity();
 	}
 	
+	
+	public static long allocateByChainWalkUpDefragment(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
+		if(target.hasNextPtr()) throw new IllegalArgumentException();
+		if(first == target){
+			return 0;
+		}
+		
+		var chain = first.collectNext();
+		var iter  = chain.listIterator(chain.size());
+		
+		long toCopy = 0;
+		
+		while(iter.hasPrevious()){
+			var ch = iter.previous();
+			
+			var allocated = AllocateTicket.bytes(toAllocate + toCopy)
+			                              .withPositionMagnet(ch)
+			                              .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
+			                              .withExplicitNextSize(explicitNextSize(manager, true))
+			                              .submit(manager);
+			if(allocated == null){
+				toCopy += ch.getCapacity();
+				continue;
+			}
+			
+			var strangler  = ch.requireNext();
+			var stranglers = strangler.collectNext();
+			var toMove     = 0;
+			for(var c : stranglers){
+				toMove += c.getCapacity();
+			}
+			if(toMove>0){
+				try(var src = strangler.io();
+				    var dst = allocated.io()){
+					src.transferTo(dst);
+				}
+			}
+			
+			ch.modifyAndSave(c -> {
+				try{
+					c.setNextPtr(allocated.getPtr());
+				}catch(OutOfBitDepth e){
+					throw new ShouldNeverHappenError();//Allocated ticket has approval of can fit
+				}
+			});
+			
+			manager.free(stranglers);
+			var cap = allocated.getCapacity();
+			return cap - toMove;
+		}
+		
+		return 0;
+	}
+	
 	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
 		if(target.hasNextPtr()) throw new IllegalArgumentException();
 		

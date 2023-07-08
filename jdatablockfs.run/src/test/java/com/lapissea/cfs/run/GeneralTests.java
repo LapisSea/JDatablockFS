@@ -4,6 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
@@ -28,6 +29,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -339,6 +341,32 @@ public class GeneralTests{
 			
 			LogUtil.println(dummies.toString());
 			
+		});
+	}
+	
+	@Test
+	void allocateByChainWalkUpDefragment() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), data -> {
+			var first = AllocateTicket.bytes(16).withExplicitNextSize(Optional.of(NumberSize.SHORT)).submit(data);
+			AllocateTicket.bytes(0).submit(data);
+			first.modifyAndSave(c -> {
+				try{
+					c.setNextPtr(AllocateTicket.bytes(0).submit(data).getPtr());
+				}catch(OutOfBitDepth e){
+					throw new RuntimeException(e);
+				}
+			});
+			AllocateTicket.bytes(220).submit(data);
+			
+			byte[] bb = new byte[18];
+			for(int i = 0; i<bb.length; i++) bb[i] = (byte)i;
+			
+			try(var io = first.io()){
+				io.write(bb);
+			}
+			
+			assertEquals(first.chainLength(69), 2);
+			assertEquals(first.readAll(), bb);
 		});
 	}
 }
