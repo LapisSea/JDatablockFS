@@ -6,6 +6,7 @@ import com.lapissea.cfs.utils.ClosableLock;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.UtilL.async;
@@ -28,8 +29,12 @@ public final class StringsIndex{
 			for(var late : IntStream.range(0, Math.toIntExact(data.size()))
 			                        .mapToObj(i -> async(() -> Map.entry(data.getUnsafe(i), i)))
 			                        .toList()){
-				var e = late.join();
-				reverseIndex.put(e.getKey(), e.getValue());
+				try{
+					var e = late.join();
+					reverseIndex.put(e.getKey(), e.getValue());
+				}catch(CompletionException e){
+					throw new RuntimeException(e.getCause());
+				}
 			}
 		}
 	}

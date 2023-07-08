@@ -85,16 +85,32 @@ abstract sealed class IOSnapshot{
 				ranges.add(DiffRange.of(cb, lSiz, cSiz));
 			}
 			
-			return new Diff(current.frameId, current.timeDelta, current.e, current.writeRanges, ranges, cSiz, last.frameId);
+			int eDiffBottomCount = 0;
+			
+			var e1 = last.e.getStackTrace();
+			var e2 = current.e.getStackTrace();
+			
+			var max = Math.min(e1.length, e2.length);
+			for(int off = 0; off<max; off++){
+				if(!e1[e1.length - off - 1].equals(e2[e2.length - off - 1])){
+					break;
+				}
+				eDiffBottomCount++;
+			}
+			
+			
+			return new Diff(current.frameId, current.timeDelta, current.e, current.writeRanges, eDiffBottomCount, ranges, cSiz, last.frameId);
 		}
 		
+		final int             eDiffBottomCount;
 		final List<DiffRange> changes;
 		final long            size;
 		final long            parentId;
 		
 		
-		Diff(long frameId, Optional<Duration> timeDelta, Throwable e, List<IORange> writeRanges, List<DiffRange> changes, long size, long parentId){
+		Diff(long frameId, Optional<Duration> timeDelta, Throwable e, List<IORange> writeRanges, int eDiffBottomCount, List<DiffRange> changes, long size, long parentId){
 			super(frameId, timeDelta, e, writeRanges);
+			this.eDiffBottomCount = eDiffBottomCount;
 			this.changes = changes;
 			this.size = size;
 			this.parentId = parentId;

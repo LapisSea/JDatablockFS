@@ -3,9 +3,11 @@ package com.lapissea.cfs.tools.logging.session;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.util.LogUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Random;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -14,7 +16,9 @@ public class SesRun{
 	
 	public static void main(String[] args) throws IOException{
 		try(var service = SessionService.of(new File("sessions.dfs"))){
-			try(var ses = service.openSession()){
+			var n = "ayy" + new Random().nextInt(3);
+			LogUtil.println(n);
+			try(var ses = service.openSession(n)){
 				var data = MemoryData.builder().withOnWrite(ses).build();
 				
 				data.write(true, "Hello world!".getBytes(UTF_8));

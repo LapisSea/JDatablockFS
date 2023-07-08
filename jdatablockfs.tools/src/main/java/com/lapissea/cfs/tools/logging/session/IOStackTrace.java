@@ -9,15 +9,16 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	
@@ -35,58 +36,72 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		IndexCmd(int idx){ this.idx = idx; }
 	}
 	
-	@Def.ToString(name = false, fNames = false)
-	@Def.Order({"classLoaderNameId", "moduleNameId", "moduleVersionId", "classNameId", "methodNameId", "fileNameId", "lineNumber"})
-	interface Element extends IOInstance.Def<Element>{
+	private sealed interface FileName{
+		record Raw(int id) implements FileName{ }
 		
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int classLoaderNameId();
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int moduleNameId();
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int moduleVersionId();
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int classNameId();
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int methodNameId();
-		@IOValue.Unsigned
-		@IODependency.VirtualNumSize
-		int fileNameId();
-		@IODependency.VirtualNumSize
-		int lineNumber();
+		record Ext(int id) implements FileName{ }
 		
-		static Element of(int classLoaderNameId, int moduleNameId, int moduleVersionId, int classNameId, int methodNameId, int fileNameId, int lineNumber){
-			class Constr{
-				private static final MethodHandle VAL = IOInstance.Def.constrRef(Element.class, int.class, int.class, int.class, int.class, int.class, int.class, int.class);
+		int id();
+		
+		static FileName make(StringsIndex maker, StackTraceElement e) throws IOException{
+			var fileName = e.getFileName();
+			var dotIdx   = fileName == null? -1 : fileName.indexOf('.');
+			if(dotIdx == -1) return new Raw(0);
+			
+			var justName  = fileName.substring(0, dotIdx);
+			var className = e.getClassName();
+			var cNameIdx  = className.lastIndexOf('.');
+			var fromCName = cNameIdx == -1? null : className.substring(cNameIdx + 1);
+			if(!justName.equals(fromCName)){
+				return new Raw(maker.make(fileName));
 			}
 			
-			try{
-				return (Element)Constr.VAL.invoke(classLoaderNameId, moduleNameId, moduleVersionId, classNameId, methodNameId, fileNameId, lineNumber);
-			}catch(Throwable ex){
-				throw UtilL.uncheckedThrow(ex);
-			}
+			var extension = fileName.substring(dotIdx + 1);
+			return new Ext(maker.make(extension));
 		}
-		static Element of(StringsIndex maker, StackTraceElement e) throws IOException{
-			return of(
+		default String toStr(String className, IOList<String> strings) throws IOException{
+			var base = strings.get(id());
+			return switch(this){
+				case Ext ignored -> {
+					var fromCName = className.substring(className.lastIndexOf('.') + 1);
+					yield fromCName + "." + base;
+				}
+				case Raw ignored -> base;
+			};
+		}
+	}
+	
+	private record StackElementIndexed(
+		int classLoaderNameId,
+		int moduleNameId, int moduleVersionId,
+		int classNameId, int methodNameId,
+		FileName fileName, int lineNumber
+	){
+		private StackElementIndexed(StringsIndex maker, StackTraceElement e) throws IOException{
+			this(
 				maker.make(e.getClassLoaderName()),
 				maker.make(e.getModuleName()), maker.make(e.getModuleVersion()),
 				maker.make(e.getClassName()), maker.make(e.getMethodName()),
-				maker.make(e.getFileName()), e.getLineNumber()
+				FileName.make(maker, e), e.getLineNumber()
 			);
 		}
-		
-		default StackTraceElement unpack(IOList<String> strings) throws IOException{
+		StackTraceElement unpack(IOList<String> strings) throws IOException{
+			var className = Objects.requireNonNull(StringsIndex.get(strings, classNameId));
 			return new StackTraceElement(
-				StringsIndex.get(strings, classLoaderNameId()),
-				StringsIndex.get(strings, moduleNameId()), StringsIndex.get(strings, moduleVersionId()),
-				StringsIndex.get(strings, classNameId()), StringsIndex.get(strings, methodNameId()),
-				StringsIndex.get(strings, fileNameId()), lineNumber()
+				StringsIndex.get(strings, classLoaderNameId),
+				StringsIndex.get(strings, moduleNameId), StringsIndex.get(strings, moduleVersionId),
+				className, StringsIndex.get(strings, methodNameId),
+				fileName.toStr(className, strings), lineNumber
 			);
+		}
+		@Override
+		public String toString(){
+			return "{" +
+			       classLoaderNameId + " " +
+			       moduleNameId + " " + moduleVersionId + " " +
+			       classNameId + " " + methodNameId + " " +
+			       fileName + " " + lineNumber +
+			       "}";
 		}
 	}
 	
@@ -100,11 +115,7 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	@IOValue
 	@IODependency.VirtualNumSize
 	@IOValue.Unsigned
-	private int head;
-	@IOValue
-	@IODependency.VirtualNumSize
-	@IOValue.Unsigned
-	private int ignoredFrames;
+	private int head, ignoredFrames, diffBottomCount;
 	
 	private static final class CmdSequenceBuilder{
 		
@@ -117,34 +128,25 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		
 		private CmdSequenceBuilder(StringsIndex maker, StackTraceElement[] frames) throws IOException{
 			this.maker = maker;
-			for(var e : frames){
-				diffString(IndexCmd.SET_CLASS_LOADER_NAME, e.getClassLoaderName());
-				diffString(IndexCmd.SET_MODULE_NAME, e.getModuleName());
-				diffString(IndexCmd.SET_MODULE_VERSION, e.getModuleVersion());
-				diffString(IndexCmd.SET_CLASS_NAME, e.getClassName());
-				diffString(IndexCmd.SET_METHOD_NAME, e.getMethodName());
+			for(var frame : frames){
+				var e = new StackElementIndexed(maker, frame);
 				
-				var fileName = e.getFileName();
-				var dotIdx   = fileName == null? -1 : fileName.indexOf('.');
-				if(dotIdx == -1){
-					diffString(IndexCmd.SET_FILE_NAME, null);
-				}else{
-					var justName      = fileName.substring(0, dotIdx);
-					var className     = e.getClassName();
-					var fromClassName = className.substring(className.lastIndexOf('.') + 1);
-					if(!justName.equals(fromClassName)){
-						diffString(IndexCmd.SET_FILE_NAME, fileName);
-					}else{
-						var extension = fileName.substring(dotIdx + 1);
-						diffString(IndexCmd.SET_FILE_EXTENSION, extension);
-					}
-				}
-				pushCmd(IndexCmd.PUSH, e.getLineNumber(), false);
+				diffIdx(IndexCmd.SET_CLASS_LOADER_NAME, e.classLoaderNameId);
+				diffIdx(IndexCmd.SET_MODULE_NAME, e.moduleNameId);
+				diffIdx(IndexCmd.SET_MODULE_VERSION, e.moduleVersionId);
+				diffIdx(IndexCmd.SET_CLASS_NAME, e.classNameId);
+				diffIdx(IndexCmd.SET_METHOD_NAME, e.methodNameId);
+				
+				diffIdx(switch(e.fileName){
+					case FileName.Ext ignored -> IndexCmd.SET_FILE_EXTENSION;
+					case FileName.Raw ignored -> IndexCmd.SET_FILE_NAME;
+				}, e.fileName.id());
+				
+				pushCmd(IndexCmd.PUSH, e.lineNumber, false);
 			}
 		}
 		
-		private void diffString(IndexCmd cmd, String val) throws IOException{
-			var idx = maker.make(val);
+		private void diffIdx(IndexCmd cmd, int idx) throws IOException{
 			if(interBuf[cmd.idx] != idx){
 				interBuf[cmd.idx] = idx;
 				pushCmd(cmd, idx, true);
@@ -165,50 +167,45 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	}
 	
 	public IOStackTrace(){ }
-	public IOStackTrace(StringsIndex maker, Throwable ex) throws IOException{
+	public IOStackTrace(StringsIndex maker, Throwable ex, int diffBottomCount) throws IOException{
 		head = maker.make(ex.toString());
+		this.diffBottomCount = diffBottomCount;
 		
 		var ignorePackages = Set.of(MemoryData.class.getPackageName(), IOStackTrace.class.getPackageName());
 		var rawFrames      = ex.getStackTrace();
-		var frames = Arrays.stream(rawFrames).dropWhile(f -> {
+		var frames = Arrays.stream(rawFrames, 0, rawFrames.length - diffBottomCount).dropWhile(f -> {
 			var pkg = f.getClassName().substring(0, f.getClassName().lastIndexOf('.'));
 			return ignorePackages.contains(pkg);
 		}).toArray(StackTraceElement[]::new);
 		ignoredFrames = rawFrames.length - frames.length;
-
-//		LogUtil.println(ignorePackages);
-//		for(int i = 0; i<frames.length; i++){
-//			var f   = frames[i];
-//			var pkg = f.getClassName().substring(0, f.getClassName().lastIndexOf('.'));
-//
-//			LogUtil.println(i, "\t", ignorePackages.contains(pkg), "\t", f);
-//		}
-//
-//		System.exit(0);
 		
 		var b = new CmdSequenceBuilder(maker, frames);
 		
 		this.commands = b.commands;
 		this.sizes = b.sizes;
 		this.numbers = b.numbers.toByteArray();
-
-//		var els = frames().collectToList();
-//
-//		var actual = new ArrayList<Element>();
-//		for(var e : frames){
-//			actual.add(Element.of(maker, e));
-//		}
-//
-//		if(!els.equals(actual)){
-//			throw new RuntimeException("\n" + els + "\n" + actual);
-//		}
+		
+		if(DEBUG_VALIDATION) validateCmds(maker, frames);
 	}
 	
-	private IterablePP<Element> frames(){
+	private void validateCmds(StringsIndex maker, StackTraceElement[] frames) throws IOException{
+		var actual   = frames().collectToList();
+		var expected = new ArrayList<StackElementIndexed>();
+		for(StackTraceElement frame : frames){
+			expected.add(new StackElementIndexed(maker, frame));
+		}
+		
+		if(!actual.equals(expected)){
+			throw new AssertionError("expected / actual\n" + expected + "\n" + actual);
+		}
+	}
+	
+	private IterablePP<StackElementIndexed> frames(){
 		return () -> new Iterator<>(){
-			private static final int[] IDX_MAP = IndexCmd.CMDS.stream().mapToInt(IndexCmd.CMDS::indexOf).toArray();
+			private static final int[] IDX_MAP = IndexCmd.CMDS.stream().mapToInt(c -> c.idx).toArray();
 			
 			private final int[] interBuf = new int[IndexCmd.BUF_SIZE];
+			private boolean isFileNameRaw = false;
 			
 			private final Iterator<IndexCmd> cmds = commands.iterator();
 			private final Iterator<NumberSize> sizs = sizes.iterator();
@@ -219,18 +216,28 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 				return cmds.hasNext();
 			}
 			@Override
-			public Element next(){
+			public StackElementIndexed next(){
 				try{
 					IndexCmd cmd;
+					int      lineNumber;
+					wh:
 					while(true){
 						cmd = cmds.next();
-						if(cmd == IndexCmd.PUSH) break;
+						switch(cmd){
+							case PUSH -> {
+								var siz = sizs.next();
+								lineNumber = siz.readIntSigned(nums);
+								break wh;
+							}
+							case SET_FILE_NAME -> isFileNameRaw = true;
+							case SET_FILE_EXTENSION -> isFileNameRaw = false;
+						}
 						int idx = IDX_MAP[cmd.ordinal()];
 						var siz = sizs.next();
 						interBuf[idx] = siz.readInt(nums);
 					}
-					
-					return Element.of(interBuf[0], interBuf[1], interBuf[2], interBuf[3], interBuf[4], interBuf[5], interBuf[6]);
+					var fn = isFileNameRaw? new FileName.Raw(interBuf[5]) : new FileName.Ext(interBuf[5]);
+					return new StackElementIndexed(interBuf[0], interBuf[1], interBuf[2], interBuf[3], interBuf[4], fn, lineNumber);
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}

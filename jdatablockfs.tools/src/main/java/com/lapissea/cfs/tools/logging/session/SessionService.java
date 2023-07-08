@@ -2,14 +2,17 @@ package com.lapissea.cfs.tools.logging.session;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.exceptions.InvalidMagicID;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.IOFileData;
 import com.lapissea.cfs.objects.Blob;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.cfs.utils.OptionalPP;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
@@ -101,13 +104,24 @@ public abstract sealed class SessionService implements Closeable{
 			private final IOList<Frame<?>> frames;
 			private final StringsIndex     stringsIndex;
 			
-			private DWriter(String name) throws IOException{
+			private DWriter(SessionsInfo info, String name, boolean clear) throws IOException{
 				super(name);
-				var ses = globalLock.sync(() -> info.sessions().computeIfAbsent(name, () -> {
-					var frames = IOInstance.Def.of(SessionsInfo.Frames.class);
-					frames.allocateNulls(prov);
-					return frames;
-				}));
+				var ses = globalLock.sync(() -> {
+					var sessions = info.sessions();
+					
+					var session = sessions.computeIfAbsent(name, () -> {
+						var frames = IOInstance.Def.of(SessionsInfo.Frames.class);
+						frames.allocateNulls(prov);
+						return frames;
+					});
+					if(clear && !session.frames().isEmpty() && !session.strings().isEmpty()){
+						session.frames().clear();
+						session.frames().trim();
+						session.strings().clear();
+						session.strings().trim();
+					}
+					return session;
+				});
 				frames = ses.frames();
 				stringsIndex = new StringsIndex(ses.strings());
 			}
@@ -120,22 +134,25 @@ public abstract sealed class SessionService implements Closeable{
 						var blob = globalLock.sync(() -> Blob.request(prov, full.buff.length));
 						blob.write(true, full.buff);
 						
-						var e = new IOStackTrace(stringsIndex, full.e);
+						var e = new IOStackTrace(stringsIndex, full.e, 0);
 						push(new Frame.Full(full.timeDelta, e, blob, List.copyOf(full.writeRanges)));
 					}
 					case IOSnapshot.Diff diff -> {
 						var block = diff.changes.stream().map(r -> Frame.Incremental.IncBlock.of(r.off(), r.data())).toList();
-						var e     = new IOStackTrace(stringsIndex, diff.e);
+						var e     = new IOStackTrace(stringsIndex, diff.e, diff.eDiffBottomCount);
 						push(new Frame.Incremental(diff.timeDelta, e, diff.parentId, diff.size, block));
 					}
 				}
 				
+				//throttle();//TODO: remove when done testing
+			}
+			private void throttle(){
 				var now = Instant.now();
 				var dur = Duration.between(lastTime, now);
 				lastTime = now;
 				
 				var tim = Duration.ofMillis(50).minus(dur);
-				if(tim.isPositive()) UtilL.sleep(tim.toMillis());//TODO: remove when done testing
+				if(tim.isPositive()) UtilL.sleep(tim.toMillis());
 			}
 			private void push(Frame<?> frame) throws IOException{
 				try(var ignore = globalLock.open()){
@@ -151,17 +168,42 @@ public abstract sealed class SessionService implements Closeable{
 		
 		private final ClosableLock globalLock = ClosableLock.reentrant();
 		
+		private static final boolean LOG_DEB = true;
+		
 		public OnDisk(File file) throws IOException{
 			this.file = new IOFileData(file);
-			prov = Cluster.init(this.file);
-//			prov = Cluster.init(LoggedMemoryUtils.newLoggedMemory("ay", LoggedMemoryUtils.createLoggerFromConfig()));
-			info = prov.getRootProvider()
-			           .request(SessionsInfo.ROOT_ID, SessionsInfo.class);
+			IOInterface src = this.file;
+			if(LOG_DEB){
+				src = LoggedMemoryUtils.newLoggedMemory("deb", LoggedMemoryUtils.createLoggerFromConfig());
+				this.file.transferTo(src, true);
+			}
+			
+			Cluster      prov;
+			SessionsInfo info;
+			try{
+				prov = new Cluster(src);
+				info = prov.getRootProvider().require(SessionsInfo.ROOT_ID, SessionsInfo.class);
+				for(var e : info.sessions()){
+					new DWriter(info, e.getKey(), false);
+					LogUtil.println(e.getKey(), "ok");
+				}
+			}catch(Throwable e){
+				LogUtil.println("Clearing/creating DB for " + file);
+				if(!(e instanceof InvalidMagicID)){
+					e.printStackTrace();
+				}
+				
+				prov = Cluster.init(src);
+				info = prov.getRootProvider().request(SessionsInfo.ROOT_ID, SessionsInfo.class);
+			}
+			this.prov = prov;
+			this.info = info;
+			
 			Thread.startVirtualThread(() -> {
 				var uni = Utils.getSealedUniverse(Frame.class, false).orElseThrow();
 				try(var ignore = globalLock.open()){
 					for(var cls : uni.universe()){
-						prov.getTypeDb().toID(uni.root(), cls, true);
+						this.prov.getTypeDb().toID(uni.root(), cls, true);
 					}
 				}catch(IOException e){
 					e.printStackTrace();
@@ -171,11 +213,14 @@ public abstract sealed class SessionService implements Closeable{
 		
 		@Override
 		public Writer openSession(String name) throws IOException{
-			return new DWriter(name);
+			return new DWriter(info, name, true);
 		}
 		
 		@Override
 		public void close() throws IOException{
+			if(LOG_DEB){
+				prov.getSource().transferTo(file, true);
+			}
 			file.close();
 		}
 	}
