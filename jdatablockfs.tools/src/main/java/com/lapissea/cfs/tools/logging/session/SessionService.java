@@ -20,6 +20,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -171,11 +172,19 @@ public abstract sealed class SessionService implements Closeable{
 		private static final boolean LOG_DEB = true;
 		
 		public OnDisk(File file) throws IOException{
+			if(file.exists()){
+				var old = new File(file.getPath() + ".old");
+				old.delete();
+				Files.copy(file.toPath(), old.toPath());
+			}
+			
 			this.file = new IOFileData(file);
 			IOInterface src = this.file;
 			if(LOG_DEB){
-				src = LoggedMemoryUtils.newLoggedMemory("deb", LoggedMemoryUtils.createLoggerFromConfig());
+				var logger = LoggedMemoryUtils.createLoggerFromConfig();
+				src = LoggedMemoryUtils.newLoggedMemory("deb", logger);
 				this.file.transferTo(src, true);
+				logger.get().getSession("deb").reset();
 			}
 			
 			Cluster      prov;
