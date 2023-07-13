@@ -21,45 +21,45 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
-	Flag.Bool RELEASE_MODE    = flagB("releaseMode", () -> !deb() && isInJar());
-	Flag.Bool TYPE_VALIDATION = flagB("typeValidation", deb());
-	Flag.Int  BATCH_BYTES     = flagI("batchBytes", 1<<12).natural();
+	Flag.FBool RELEASE_MODE    = flagB("releaseMode", () -> !deb() && isInJar());
+	Flag.FBool TYPE_VALIDATION = flagB("typeValidation", deb());
+	Flag.FInt  BATCH_BYTES     = flagI("batchBytes", 1<<12).natural();
 	
-	Flag.Abc<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
-	Flag.Bool              PRINT_COMPILATION = flagB("printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
+	Flag.FEnum<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
+	Flag.FBool               PRINT_COMPILATION = flagB("printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
-	Flag.Bool            LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
-	Flag.Int             LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
-	Flag.Bool            TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
-	Flag.Abc<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
+	Flag.FBool             LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
+	Flag.FInt              LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
+	Flag.FBool             TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
+	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
 	
-	Flag.Bool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
-	Flag.Bool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
-	Flag.Bool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
+	Flag.FBool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
+	Flag.FBool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
+	Flag.FBool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
 	
-	Flag.Bool PURGE_ACCIDENTAL_CHUNK_HEADERS = flagB("purgeAccidentalChunkHeaders", deb());
+	Flag.FBool PURGE_ACCIDENTAL_CHUNK_HEADERS = flagB("purgeAccidentalChunkHeaders", deb());
 	
-	Flag.Bool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
+	Flag.FBool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
 	
-	Flag.Bool DISABLE_TRANSACTIONS = flagB("io.disableTransactions", false);
-	Flag.Bool SYNCHRONOUS_FILE_IO  = flagB("io.synchronousFileIO", false);
+	Flag.FBool DISABLE_TRANSACTIONS = flagB("io.disableTransactions", false);
+	Flag.FBool SYNCHRONOUS_FILE_IO  = flagB("io.synchronousFileIO", false);
 	
-	Flag.Str  RUNNER_BASE_TASK_NAME       = flagS("runner.baseTaskName", "Task");
-	Flag.Bool RUNNER_ONLY_VIRTUAL_WORKERS = flagB("runner.onlyVirtual", false);
-	Flag.Bool RUNNER_MUTE_CHOKE_WARNING   = flagB("runner.muteWarning", false);
-	Flag.Int  RUNNER_TASK_CHOKE_TIME_MS   = flagI("runner.taskChokeTime", () -> 2000/cores()).natural();
-	Flag.Int  RUNNER_WATCHER_TIMEOUT_MS   = flagI("runner.watcherTimeout", 1000).natural();
+	Flag.FStr  RUNNER_BASE_TASK_NAME       = flagS("runner.baseTaskName", "Task");
+	Flag.FBool RUNNER_ONLY_VIRTUAL_WORKERS = flagB("runner.onlyVirtual", false);
+	Flag.FBool RUNNER_MUTE_CHOKE_WARNING   = flagB("runner.muteWarning", false);
+	Flag.FInt  RUNNER_TASK_CHOKE_TIME_MS   = flagI("runner.taskChokeTime", () -> 2000/cores()).natural();
+	Flag.FInt  RUNNER_WATCHER_TIMEOUT_MS   = flagI("runner.watcherTimeout", 1000).natural();
 	
-	Flag.Bool         CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
-	Flag.Bool         CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
-	Flag.Bool         CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
-	Flag.Abc<CodeLog> CLASSGEN_PRINT_BYTECODE        = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
-	Flag.StrOptional  CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
+	Flag.FBool          CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
+	Flag.FBool          CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
+	Flag.FBool          CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
+	Flag.FEnum<CodeLog> CLASSGEN_PRINT_BYTECODE        = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
+	Flag.FStrOptional   CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	
-	Flag.Abc<LZ4Compatibility> LZ4_COMPATIBILITY = flagEV("lz4.compatibility", LZ4Compatibility.ANY);
+	Flag.FEnum<LZ4Compatibility> LZ4_COMPATIBILITY = flagEV("lz4.compatibility", LZ4Compatibility.ANY);
 	
-	Flag.Int ROOT_PROVIDER_WARMUP_COUNT = flagI("rootProviderWarmupCount", 20).positive();
+	Flag.FInt ROOT_PROVIDER_WARMUP_COUNT = flagI("rootProviderWarmupCount", 20).positive();
 	
 	private static int cores(){
 		return Math.min(10, Runtime.getRuntime().availableProcessors());
