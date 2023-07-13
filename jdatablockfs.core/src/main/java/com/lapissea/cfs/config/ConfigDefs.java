@@ -26,6 +26,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FInt  BATCH_BYTES     = flagI("batchBytes", 1<<12).natural();
 	
 	Flag.FEnum<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
+	Flag.FBool               PRINT_FLAGS       = flagB("log.printFlags", () -> deb() && LOG_LEVEL.resolve().isWithin(INFO));
 	Flag.FBool               PRINT_COMPILATION = flagB("printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
 	Flag.FBool             LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
