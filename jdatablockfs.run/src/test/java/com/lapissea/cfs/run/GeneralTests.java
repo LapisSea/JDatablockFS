@@ -39,6 +39,7 @@ import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class GeneralTests{
 	
@@ -328,19 +329,26 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void checkMemoryWalk() throws IOException{
+	void lastChunkMoveOnFree() throws IOException{
 		TestUtils.testCluster(TestInfo.of(), cluster -> {
 			
-			var prov = cluster.getRootProvider();
-			
-			var dummies = prov.builder("dummy_array")
-			                  .withGenerator(() -> new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
-			                  .request();
-			
-			
-			
-			LogUtil.println(dummies.toString());
-			
+			var frees = List.of(AllocateTicket.bytes(1).submit(cluster),
+			                    AllocateTicket.bytes(1).submit(cluster),
+			                    AllocateTicket.bytes(1).submit(cluster),
+			                    AllocateTicket.bytes(1).submit(cluster),
+			                    AllocateTicket.bytes(1).submit(cluster));
+			AllocateTicket.bytes(1).submit(cluster);
+			var c1 = AllocateTicket.bytes(20).submit(cluster);
+			var mm = cluster.getMemoryManager();
+			assertEquals(mm.getFreeChunks().size(), 0);
+			mm.free(List.of(frees.get(0), frees.get(2), frees.get(4)));
+			assertEquals(mm.getFreeChunks().size(), 3);
+			mm.free(List.of(frees.get(1), frees.get(3)));
+			assertEquals(mm.getFreeChunks().size(), 1);
+			assertTrue(cluster.getSource().getIOSize()>c1.getPtr().getValue());
+			c1.freeChaining();
+			assertEquals(mm.getFreeChunks().size(), 1);
+			assertEquals(cluster.getSource().getIOSize(), c1.getPtr().getValue());
 		});
 	}
 	

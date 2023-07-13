@@ -196,8 +196,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	
-	private static final Struct<Chunk>     STRUCT;
-	public static final  StructPipe<Chunk> PIPE;
+	public static final Struct<Chunk>     STRUCT;
+	public static final StructPipe<Chunk> PIPE;
 	
 	static{
 		STRUCT = Struct.of(Chunk.class);

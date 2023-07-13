@@ -20,7 +20,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private boolean adding;
 	
-	public PersistentMemoryManager(DataProvider context, IOList<ChunkPointer> freeChunks){
+	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context);
 		this.freeChunks = freeChunks;
 	}
@@ -133,8 +133,8 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		boolean anyPopped;
 		do{
 			anyPopped = false;
-			var lastChO = freeChunks.peekLast().map(p -> p.dereference(context)).filter(Chunk::checkLastPhysical);
-			if(lastChO.isPresent()){
+			var lastChO = freeChunks.peekLast().map(p -> p.dereference(context));
+			if(lastChO.filter(Chunk::checkLastPhysical).isPresent()){
 				var lastCh = lastChO.get();
 				
 				freeChunks.popLast();
@@ -147,6 +147,18 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				}else{
 					free(lastCh);
 					break;
+				}
+			}else if(freeChunks.size()>1){
+				var nextO = lastChO.map(Chunk::nextPhysical);
+				if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
+					var lastFree = lastChO.get();
+					var next     = nextO.get();
+					
+					var moved = DefragmentManager.moveReference(
+						(Cluster)context, next.getPtr(),
+						t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0)
+					);
+					if(moved) anyPopped = true;
 				}
 			}
 		}while(anyPopped);
