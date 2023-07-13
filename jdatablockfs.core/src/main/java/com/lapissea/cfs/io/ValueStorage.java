@@ -1067,24 +1067,28 @@ public sealed interface ValueStorage<T>{
 				@Override
 				public void setReference(I instance, Reference newRef) throws IOException{
 					try(var io = ioAt.get()){
+						var pos   = io.getPos();
 						var refId = readInline(io);
-						writeInline(io, new TypedReference(newRef, refId.getId()));
+						io.setPos(pos);
+						writeInline(io, refId.withRef(newRef));
 					}
 				}
 				@Override
 				public Reference getReference(I instance) throws IOException{
-					try(var io = ioAt.get()){
-						var ref = readInline(io);
-						return ref.getRef();
-					}
+					return readRef().getRef();
 				}
 				@Override
 				public StructPipe<T> getReferencedPipe(I instance) throws IOException{
+					var refId = readRef();
+					var type  = refId.getType(provider.getTypeDb(), universe.root());
+					return universe.pipeMap().get(type);
+				}
+				private TypedReference readRef() throws IOException{
+					TypedReference refId;
 					try(var io = ioAt.get()){
-						var refId = readInline(io);
-						var type  = refId.getType(provider.getTypeDb(), universe.root());
-						return universe.pipeMap().get(type);
+						refId = readInline(io);
 					}
+					return refId;
 				}
 			};
 		}

@@ -47,12 +47,13 @@ public final class ConfigTools{
 	 */
 	public sealed interface Flag<T>{
 		
-		record Bool(String name, DefaultValue<Boolean> defaultValue) implements Flag<Boolean>{
-			public Bool{
+		record FBool(String name, DefaultValue<Boolean> defaultValue) implements Flag<Boolean>{
+			public FBool{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
 			@Override
+			@Deprecated
 			public Boolean resolve(){ return resolveVal(); }
 			public boolean resolveVal(){
 				return ConfigUtils.configBoolean(name, defaultValue.value());
@@ -63,8 +64,8 @@ public final class ConfigTools{
 			}
 		}
 		
-		record Int(String name, DefaultValue<Integer> defaultValue, IntFunction<String> validate) implements Flag<Integer>{
-			public Int{
+		record FInt(String name, DefaultValue<Integer> defaultValue, IntFunction<String> validate) implements Flag<Integer>{
+			public FInt{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
@@ -80,6 +81,7 @@ public final class ConfigTools{
 			}
 			
 			@Override
+			@Deprecated
 			public Integer resolve(){ return resolveVal(); }
 			public int resolveVal(){
 				int def = defaultValue.value();
@@ -93,25 +95,25 @@ public final class ConfigTools{
 				}
 				return val;
 			}
-			public Int natural(){
+			public FInt natural(){
 				return withValidation(val -> {
 					if(val<=0) return "Value must be greater than 0!";
 					return null;
 				});
 			}
-			public Int positiveOptional(){
+			public FInt positiveOptional(){
 				return withValidation(val -> {
 					if(val<0 && val != -1) return "Value must be positive or -1!";
 					return null;
 				});
 			}
-			public Int positive(){
+			public FInt positive(){
 				return withValidation(val -> {
 					if(val<0) return "Value must be positive!";
 					return null;
 				});
 			}
-			public Int withValidation(IntFunction<String> validate){
+			public FInt withValidation(IntFunction<String> validate){
 				if(this.validate != null){
 					var oldValidate = this.validate;
 					var newValidate = validate;
@@ -121,12 +123,12 @@ public final class ConfigTools{
 						return newValidate.apply(val);
 					};
 				}
-				return new Int(name, defaultValue, validate);
+				return new FInt(name, defaultValue, validate);
 			}
 		}
 		
-		record Str(String name, DefaultValue<String> defaultValue) implements Flag<String>{
-			public Str{
+		record FStr(String name, DefaultValue<String> defaultValue) implements Flag<String>{
+			public FStr{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
@@ -137,11 +139,11 @@ public final class ConfigTools{
 			}
 		}
 		
-		record StrOptional(String name) implements Flag<Optional<String>>{
+		record FStrOptional(String name) implements Flag<Optional<String>>{
 			
 			private static final DefaultValue<Optional<String>> DEFAULT_VALUE = new DefaultValue.Literal<>(Optional.empty());
 			
-			public StrOptional{
+			public FStrOptional{
 				Objects.requireNonNull(name);
 			}
 			
@@ -156,8 +158,8 @@ public final class ConfigTools{
 			}
 		}
 		
-		record Abc<E extends Enum<E>>(String name, DefaultValue<E> defaultValue) implements Flag<E>{
-			public Abc{
+		record FEnum<E extends Enum<E>>(String name, DefaultValue<E> defaultValue) implements Flag<E>{
+			public FEnum{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
@@ -181,29 +183,29 @@ public final class ConfigTools{
 		}
 	}
 	
-	public static Flag.Int flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.Int(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal, null); }
-	public static Flag.Int flagI(String name, Flag.Int defaultVal)                 { return flagInt(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static Flag.Int flagI(String name, int defaultVal)                      { return flagInt(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static Flag.Int flagI(String name, Supplier<Integer> valueMaker)        { return flagInt(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static Flag.FInt flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.FInt(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal, null); }
+	public static Flag.FInt flagI(String name, Flag.FInt defaultVal)                { return flagInt(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static Flag.FInt flagI(String name, int defaultVal)                      { return flagInt(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static Flag.FInt flagI(String name, Supplier<Integer> valueMaker)        { return flagInt(name, new DefaultValue.Lambda<>(valueMaker)); }
 	
-	public static Flag.Bool flagBool(String name, DefaultValue<Boolean> defaultVal){ return new Flag.Bool(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
-	public static Flag.Bool flagB(String name, Flag.Bool defaultVal)               { return flagBool(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static Flag.Bool flagB(String name, boolean defaultVal)                 { return flagBool(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static Flag.Bool flagB(String name, Supplier<Boolean> valueMaker)       { return flagBool(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static Flag.FBool flagBool(String name, DefaultValue<Boolean> defaultVal){ return new Flag.FBool(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
+	public static Flag.FBool flagB(String name, Flag.FBool defaultVal)              { return flagBool(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static Flag.FBool flagB(String name, boolean defaultVal)                 { return flagBool(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static Flag.FBool flagB(String name, Supplier<Boolean> valueMaker)       { return flagBool(name, new DefaultValue.Lambda<>(valueMaker)); }
 	
-	public static Flag.Str flagStr(String name, DefaultValue<String> defaultVal)   { return new Flag.Str(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
-	public static Flag.Str flagS(String name, Flag.Str defaultVal)                 { return flagStr(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static Flag.Str flagS(String name, String defaultVal)                   { return flagStr(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static Flag.Str flagS(String name, Supplier<String> valueMaker)         { return flagStr(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static Flag.FStr flagStr(String name, DefaultValue<String> defaultVal)   { return new Flag.FStr(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
+	public static Flag.FStr flagS(String name, Flag.FStr defaultVal)                { return flagStr(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static Flag.FStr flagS(String name, String defaultVal)                   { return flagStr(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static Flag.FStr flagS(String name, Supplier<String> valueMaker)         { return flagStr(name, new DefaultValue.Lambda<>(valueMaker)); }
 	
-	public static Flag.StrOptional flagS(String name)                              { return new Flag.StrOptional(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name)); }
+	public static Flag.FStrOptional flagS(String name)                              { return new Flag.FStrOptional(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name)); }
 	
 	///
 	
-	public static <T extends Enum<T>> Flag.Abc<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.Abc<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
-	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Flag.Abc<T> defaultVal)       { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.Abc<T> flagEV(String name, T defaultVal)                { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.FEnum<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Flag.FEnum<T> defaultVal)     { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagEV(String name, T defaultVal)                { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
 	
 	
 	public record ConfEntry(String name, String val){
@@ -277,15 +279,15 @@ public final class ConfigTools{
 					var val  = (ConfigTools.Flag<?>)field.get(null);
 					var name = val.name();
 					values.add(new ConfEntry(name, switch(val){
-						case ConfigTools.Flag.Abc<?> enumFlag -> {
+						case Flag.FEnum<?> enumFlag -> {
 							var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
 							var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
 							yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
 						}
-						case ConfigTools.Flag.Bool bool -> BLUE + bool.resolve() + RESET;
-						case ConfigTools.Flag.Int anInt -> YELLOW_BRIGHT + anInt.resolve() + RESET;
-						case ConfigTools.Flag.Str str -> PURPLE_BRIGHT + str.resolve() + RESET;
-						case ConfigTools.Flag.StrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
+						case Flag.FBool bool -> BLUE + bool.resolve() + RESET;
+						case Flag.FInt anInt -> YELLOW_BRIGHT + anInt.resolve() + RESET;
+						case Flag.FStr str -> PURPLE_BRIGHT + str.resolve() + RESET;
+						case Flag.FStrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
 					}));
 				}
 			}

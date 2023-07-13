@@ -284,37 +284,48 @@ public class MemoryOperations{
 			oks.add(chunk);
 		}
 		
-		{
-			oks.sort(Comparator.naturalOrder());
-			List<RandomIO.WriteChunk> chunks = new ArrayList<>(oks.size());
-			for(Chunk chunk : oks){
-				chunk.setSize(0);
-				chunk.clearAndCompressHeader();
-				
-				var    size      = chunk.getHeaderSize();
-				byte[] headBytes = new byte[size];
-				chunk.writeHeader(new ContentOutputStream.BA(headBytes));
-				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
-			}
-			try(var io = provider.getSource().io()){
-				io.writeAtOffsets(chunks);
-			}
+		var writeChunks = new ArrayList<RandomIO.WriteChunk>(oks.size());
+		
+		oks.sort(Comparator.naturalOrder());
+		for(Chunk chunk : oks){
+			chunk.setSize(0);
+			chunk.clearAndCompressHeader();
+			
+			var    size      = chunk.getHeaderSize();
+			byte[] headBytes = new byte[size];
+			chunk.writeHeader(new ContentOutputStream.BA(headBytes));
+			writeChunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
 		}
 		
+		var purgeTransaction = PURGE_ACCIDENTAL? provider.getSource().openIOTransaction() : null;
+		
 		if(!toDestroy.isEmpty()){
-			toDestroy.sort(Comparator.naturalOrder());
-			byte[] empty = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			try(var io = provider.getSource().io()){
-				io.writeAtOffsets(toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList());
+			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
+			var    destroyChunks = toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList();
+			
+			if(purgeTransaction != null){
+				try(var io = provider.getSource().io()){
+					io.writeAtOffsets(writeChunks);
+					io.writeAtOffsets(destroyChunks);
+				}
+			}else{
+				writeChunks.addAll(destroyChunks);
+				writeChunks.sort(Comparator.naturalOrder());
+				try(var io = provider.getSource().io()){
+					io.writeAtOffsets(writeChunks);
+				}
 			}
-			for(Chunk chunk : toDestroy){
-				provider.getChunkCache().notifyDestroyed(chunk);
+			
+			for(Chunk chunk : toDestroy){ provider.getChunkCache().notifyDestroyed(chunk); }
+		}else{
+			try(var io = provider.getSource().io()){
+				io.writeAtOffsets(writeChunks);
 			}
 		}
 		
 		if(PURGE_ACCIDENTAL){
-			ExecutorService service     = null;
-			var             transaction = provider.getSource().openIOTransaction();
+			assert purgeTransaction != null;
+			ExecutorService service = null;
 			try{
 				for(Chunk chunk : oks){
 					if(chunk.getCapacity()>3000){
@@ -329,16 +340,16 @@ public class MemoryOperations{
 					}else{
 						purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 					}
-					if(service == null && (transaction.getTotalBytes() + transaction.getChunkCount()*20L)>GlobalConfig.BATCH_BYTES){
-						transaction.close();
-						transaction = provider.getSource().openIOTransaction();
+					if(service == null && (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>GlobalConfig.BATCH_BYTES){
+						purgeTransaction.close();
+						purgeTransaction = provider.getSource().openIOTransaction();
 					}
 				}
 			}finally{
 				if(service != null){
 					service.close();
 				}
-				transaction.close();
+				purgeTransaction.close();
 			}
 		}
 		

@@ -266,8 +266,17 @@ public class MemoryWalker{
 										switch(getFlow(res)){
 											case CONTINUE -> { }
 											case END -> { return END; }
-											default -> throw new NotImplementedException(getFlow(res) + "");
+											default -> throw failFlow(res);
 										}
+									}
+								}
+								if(ref.getOffset() == 0){
+									var ch   = ref.getPtr().dereference(provider);
+									var flow = walkChunk(ch);
+									switch(flow){
+										case CONTINUE -> { }
+										case END -> { return END|(inlineDirtyButContinue? CONTINUE : 0); }
+										default -> throw failFlow(flow);
 									}
 								}
 								{
@@ -292,7 +301,7 @@ public class MemoryWalker{
 									switch(getFlow(res)){
 										case CONTINUE -> { }
 										case END -> { return END; }
-										default -> throw new NotImplementedException(getFlow(res) + "");
+										default -> throw failFlow(res);
 									}
 								}
 							}
@@ -319,7 +328,17 @@ public class MemoryWalker{
 											switch(getFlow(res)){
 												case CONTINUE -> { }
 												case END -> { return END; }
-												default -> throw new NotImplementedException(getFlow(res) + "");
+												default -> throw failFlow(res);
+											}
+										}
+										
+										if(ref.getOffset() == 0){
+											var ch   = ref.getPtr().dereference(provider);
+											var flow = walkChunk(ch);
+											switch(flow){
+												case CONTINUE -> { }
+												case END -> { return END; }
+												default -> throw failFlow(flow);
 											}
 										}
 									}
@@ -336,7 +355,7 @@ public class MemoryWalker{
 											continue;
 										}
 										case END -> { return END; }
-										default -> throw new NotImplementedException((res&FLOW_MASK) + "");
+										default -> throw new NotImplementedException(String.valueOf(res&FLOW_MASK));
 									}
 								}
 								
@@ -387,7 +406,7 @@ public class MemoryWalker{
 													switch(getFlow(res)){
 														case CONTINUE -> { }
 														case END -> { return END; }
-														default -> throw new NotImplementedException(getFlow(res) + "");
+														default -> throw failFlow(res);
 													}
 												}
 												fieldOffset += pip.calcUnknownSize(provider, inst, WordSpace.BYTE);
@@ -430,7 +449,7 @@ public class MemoryWalker{
 									throw new RuntimeException(TextUtil.toString("unmanaged walk type:", type.toString(), field.getAccessor()));
 								}
 							}
-							default -> throw new NotImplementedException(cmd + "");
+							default -> throw new NotImplementedException(String.valueOf(cmd));
 						}
 					}catch(IOException e){
 						String instStr = instanceErrStr(instance);
@@ -456,6 +475,31 @@ public class MemoryWalker{
 			return CONTINUE|SAVE;
 		}
 		return CONTINUE;
+	}
+	
+	private static final IOField<Chunk, ChunkPointer> CH_NEXT_PTR = Chunk.STRUCT.getFields().requireExact(ChunkPointer.class, "nextPtr");
+	
+	private int walkChunk(Chunk instance) throws IOException{
+		var ch = instance;
+		while(true){
+			var nextPtr = ch.getNextPtr();
+			if(nextPtr.isNull()) return CONTINUE;
+			
+			var res = pointerRecord.logChunkPointer(makeChunkRef(ch), ch, CH_NEXT_PTR, ch.getNextPtr());
+			if(shouldSave(res)){
+				ch.syncStruct();
+			}
+			switch(getFlow(res)){
+				case CONTINUE -> ch = nextPtr.dereference(provider);
+				case END -> { return END; }
+				default -> throw failFlow(res);
+			}
+		}
+	}
+	
+	private static IllegalStateException failFlow(int res){
+		var flow = getFlow(res);
+		return new IllegalStateException(flow + " is not a valid flow, please provide any of [CONTINUE, END]");
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
@@ -511,19 +555,22 @@ public class MemoryWalker{
 				switch(getFlow(res)){
 					case CONTINUE -> { }
 					case END -> { return END; }
-					default -> throw new NotImplementedException(getFlow(res) + "");
+					default -> throw failFlow(res);
 				}
 			}
 			{
-				var c   = ch.dereference(provider);
-				var res = walkStructFull(c, makeChunkRef(c), Chunk.PIPE, false);
-				if(shouldSave(res)){
-					throw new NotImplementedException();//TODO
-				}
-				switch(getFlow(res)){
-					case CONTINUE -> { }
-					case END -> { return END; }
-					default -> throw new NotImplementedException(getFlow(res) + "");
+				var c = ch.dereference(provider);
+				if(c.hasNextPtr()){
+					var res = walkStructFull(c, makeChunkRef(c), Chunk.PIPE, false);
+					
+					if(shouldSave(res)){
+						throw new NotImplementedException();//TODO
+					}
+					switch(getFlow(res)){
+						case CONTINUE -> { }
+						case END -> { return END; }
+						default -> throw failFlow(res);
+					}
 				}
 			}
 		}
@@ -555,7 +602,7 @@ public class MemoryWalker{
 		switch(getFlow(res)){
 			case CONTINUE -> { return NO_RESULT; }
 			case END -> { return END; }
-			default -> throw new NotImplementedException(getFlow(res) + "");
+			default -> throw failFlow(res);
 		}
 	}
 	
