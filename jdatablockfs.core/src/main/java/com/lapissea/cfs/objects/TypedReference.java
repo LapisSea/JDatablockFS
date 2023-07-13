@@ -51,4 +51,8 @@ public final class TypedReference extends IOInstance.Managed<TypedReference>{
 	public boolean isNull(){
 		return ref.isNull();
 	}
+	
+	public TypedReference withRef(Reference ref){
+		return new TypedReference(ref, id);
+	}
 }
