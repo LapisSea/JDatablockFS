@@ -7,6 +7,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
@@ -305,6 +306,14 @@ public class GeneralTests{
 			
 			assertEquals(text, read);
 		});
+	}
+	
+	@Test(dataProvider = "strings")
+	void ioUTF(String text) throws IOException{
+		var mem = MemoryData.empty();
+		mem.writeUTF(true, text);
+		var read = mem.readUTF(0);
+		assertEquals(text, read);
 	}
 	
 	@SuppressWarnings("unchecked")

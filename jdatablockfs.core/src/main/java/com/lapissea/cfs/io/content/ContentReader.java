@@ -439,47 +439,47 @@ public interface ContentReader extends AutoCloseable{
 	
 	//Code from DataInputStream#readUTF
 	default String readUTF() throws IOException{
-		var utflen  = readUnsignedInt2();
-		var bytearr = new byte[utflen];
-		var chararr = new char[utflen];
+		var utfLen  = readUnsignedInt4Dynamic();
+		var byteArr = new byte[utfLen];
+		var charArr = new char[utfLen];
 		
 		int c, char2, char3, count = 0, charArrCount = 0;
 		
-		readFully(bytearr, 0, utflen);
+		readFully(byteArr, 0, utfLen);
 		
-		while(count<utflen){
-			c = (int)bytearr[count]&0xff;
+		while(count<utfLen){
+			c = (int)byteArr[count]&0xff;
 			if(c>127) break;
 			count++;
-			chararr[charArrCount++] = (char)c;
+			charArr[charArrCount++] = (char)c;
 		}
 		
-		while(count<utflen){
-			c = (int)bytearr[count]&0xff;
+		while(count<utfLen){
+			c = (int)byteArr[count]&0xff;
 			switch(c>>4){
 				case 0, 1, 2, 3, 4, 5, 6, 7 -> {
 					count++;
-					chararr[charArrCount++] = (char)c;
+					charArr[charArrCount++] = (char)c;
 				}
 				case 12, 13 -> {
 					count += 2;
-					if(count>utflen) throw new UTFDataFormatException("malformed input: partial character at end");
-					char2 = bytearr[count - 1];
+					if(count>utfLen) throw new UTFDataFormatException("malformed input: partial character at end");
+					char2 = byteArr[count - 1];
 					if((char2&0xC0) != 0x80) throw new UTFDataFormatException("malformed input around byte " + count);
-					chararr[charArrCount++] = (char)(((c&0x1F)<<6)|(char2&0x3F));
+					charArr[charArrCount++] = (char)(((c&0x1F)<<6)|(char2&0x3F));
 				}
 				case 14 -> {
 					count += 3;
-					if(count>utflen) throw new UTFDataFormatException("malformed input: partial character at end");
-					char2 = bytearr[count - 2];
-					char3 = bytearr[count - 1];
+					if(count>utfLen) throw new UTFDataFormatException("malformed input: partial character at end");
+					char2 = byteArr[count - 2];
+					char3 = byteArr[count - 1];
 					if(((char2&0xC0) != 0x80) || ((char3&0xC0) != 0x80)) throw new UTFDataFormatException("malformed input around byte " + (count - 1));
-					chararr[charArrCount++] = (char)(((c&0x0F)<<12)|((char2&0x3F)<<6)|((char3&0x3F)<<0));
+					charArr[charArrCount++] = (char)(((c&0x0F)<<12)|((char2&0x3F)<<6)|((char3&0x3F)<<0));
 				}
 				default -> throw new UTFDataFormatException("malformed input around byte " + count);
 			}
 		}
-		return new String(chararr, 0, charArrCount);
+		return new String(charArr, 0, charArrCount);
 	}
 	
 	default ContentInputStream inStream(){ return new ContentReaderInputStream(this); }
