@@ -147,6 +147,20 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return new RandomIOReadOnly(io);
 		}
 		
+		default void writeUTF(boolean trimOnClose, CharSequence data) throws IOException{ writeUTF(0, trimOnClose, data); }
+		default void writeUTF(long offset, boolean trimOnClose, CharSequence data) throws IOException{
+			Objects.requireNonNull(data);
+			
+			try(var io = ioAt(offset)){
+				io.writeUTF(data);
+				if(trimOnClose) io.trim();
+			}
+		}
+		
+		default void set(ByteBuffer data) throws IOException                                { write(0, true, data); }
+		
+		default void set(byte[] data) throws IOException                                    { write(0, true, data); }
+		
 		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         { write(0, trimOnClose, data); }
 		
 		default void write(boolean trimOnClose, byte[] data) throws IOException             { write(0, trimOnClose, data); }
@@ -208,6 +222,11 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return ioAt(offset).outStream(trimOnClose);
 		}
 		
+		default String readUTF(long offset) throws IOException{
+			try(var io = ioAt(offset)){
+				return io.readUTF();
+			}
+		}
 		
 		@NotNull
 		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }

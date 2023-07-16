@@ -1,17 +1,20 @@
 package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.utils.IOUtils;
+import com.lapissea.util.MathUtil;
 import com.lapissea.util.NotNull;
 
 import java.io.Closeable;
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
@@ -301,6 +304,19 @@ public final class IOFileData implements IOInterface, Closeable{
 		@Override
 		public boolean isDirect(){
 			return !transactionOpen;
+		}
+	}
+	public static void readInto(String path, IOInterface dest) throws IOException{
+		readInto(new File(path), dest);
+	}
+	public static void readInto(File file, IOInterface dest) throws IOException{
+		try(var in = new FileInputStream(file); var out = dest.io()){
+			var buff = new byte[MathUtil.snap((int)file.length(), 16, GlobalConfig.BATCH_BYTES)];
+			int read;
+			while((read = in.read(buff))>=0){
+				out.write(buff, 0, read);
+			}
+			out.trim();
 		}
 	}
 	

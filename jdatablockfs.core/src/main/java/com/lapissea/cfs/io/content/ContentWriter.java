@@ -279,6 +279,48 @@ public interface ContentWriter extends AutoCloseable{
 		writeBuffer[off + 1] = (byte)((v >>> 0)&0xFF);
 	}
 	
+	//Code from DataOutputStream#writeUTF
+	default void writeUTF(CharSequence str) throws IOException{
+		int strLen = str.length(), utfLen = strLen;
+		
+		for(int i = 0; i<strLen; i++){
+			int c = str.charAt(i);
+			if(c>=0x80 || c == 0) utfLen += (c>=0x800)? 2 : 1;
+		}
+		
+		var sizSiz   = NumberSize.bySize(utfLen);
+		var sizBytes = 1 + sizSiz.bytes;
+		var byteArr  = new byte[utfLen + sizBytes];
+		
+		try(var buf = new ContentOutputStream.BA(byteArr)){
+			buf.writeUnsignedInt4Dynamic(utfLen);
+		}
+		
+		int count = sizBytes;
+		
+		int i;
+		for(i = 0; i<strLen; i++){ // optimized for initial run of ASCII
+			int c = str.charAt(i);
+			if(c>=0x80 || c == 0) break;
+			byteArr[count++] = (byte)c;
+		}
+		
+		for(; i<strLen; i++){
+			int c = str.charAt(i);
+			if(c<0x80 && c != 0){
+				byteArr[count++] = (byte)c;
+			}else if(c>=0x800){
+				byteArr[count++] = (byte)(0xE0|((c>>12)&0x0F));
+				byteArr[count++] = (byte)(0x80|((c>>6)&0x3F));
+				byteArr[count++] = (byte)(0x80|((c>>0)&0x3F));
+			}else{
+				byteArr[count++] = (byte)(0xC0|((c>>6)&0x1F));
+				byteArr[count++] = (byte)(0x80|((c>>0)&0x3F));
+			}
+		}
+		write(byteArr);
+	}
+	
 	default ContentOutputStream outStream(){ return new ContentReaderOutputStream(this); }
 	
 	@Override
