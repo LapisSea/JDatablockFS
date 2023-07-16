@@ -75,10 +75,12 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public MemRandomIO setCapacity(long newCapacity){
 			if(readOnly) throw new UnsupportedOperationException();
-			
-			MemoryData.this.setCapacity(newCapacity);
-			pos = (int)Math.min(pos, getSize());
+			setCapacity0(newCapacity, true);
 			return this;
+		}
+		private void setCapacity0(long newCapacity, boolean log){
+			MemoryData.this.setCapacity(newCapacity, log);
+			pos = (int)Math.min(pos, getSize());
 		}
 		
 		@Override
@@ -161,7 +163,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			}
 			
 			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity() + 1, getCapacity() + 1 - remaining)));
+			if(remaining<=0) setCapacity0(Math.max(4, Math.max(getCapacity() + 1, getCapacity() + 1 - remaining)), false);
 			write1(fileData, pos, (byte)b);
 			if(hook != null) logWriteEvent(pos);
 			pos++;
@@ -373,10 +375,10 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return used;
 	}
 	
-	private void setCapacity(long newCapacity){
-		setCapacity(Math.toIntExact(newCapacity));
+	private void setCapacity(long newCapacity, boolean log){
+		setCapacity(Math.toIntExact(newCapacity), log);
 	}
-	private void setCapacity(int newCapacity){
+	private void setCapacity(int newCapacity, boolean log){
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
 			var siz = transactionBuff.getCapacity(used);
@@ -393,7 +395,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		used = Math.min(used, newCapacity);
 		
-		if(hook != null) logWriteEvent(lastCapacity, newCapacity);
+		if(log && hook != null) logWriteEvent(lastCapacity, newCapacity);
 	}
 	
 	@Override
