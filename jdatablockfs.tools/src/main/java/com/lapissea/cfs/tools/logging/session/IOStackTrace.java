@@ -60,7 +60,7 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 			return new Ext(maker.make(extension));
 		}
 		default String toStr(String className, IOList<String> strings) throws IOException{
-			var base = strings.get(id());
+			var base = StringsIndex.get(strings, id());
 			return switch(this){
 				case Ext ignored -> {
 					var fromCName = className.substring(className.lastIndexOf('.') + 1);
@@ -77,14 +77,34 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		int classNameId, int methodNameId,
 		FileName fileName, int lineNumber
 	){
-		private StackElementIndexed(StringsIndex maker, StackTraceElement e) throws IOException{
-			this(
-				maker.make(e.getClassLoaderName()),
-				maker.make(e.getModuleName()), maker.make(e.getModuleVersion()),
-				maker.make(e.getClassName()), maker.make(e.getMethodName()),
+		private static boolean has(String str){
+			return str != null && !str.isEmpty();
+		}
+		
+		private static StackElementIndexed of(StringsIndex maker, StackTraceElement e) throws IOException{
+			var className       = e.getClassName();
+			var classLoaderName = e.getClassLoaderName();
+			var moduleName      = e.getModuleName();
+			var moduleVersion   = e.getModuleVersion();
+			
+			if(has(classLoaderName) || has(moduleName) || has(moduleVersion)){
+				var str = e.toString();
+				str = str.substring(0, str.indexOf(className));
+				var includedClassLoader   = has(classLoaderName) && str.startsWith(classLoaderName + "/");
+				var includedModuleVersion = has(moduleVersion) && str.contains("@" + moduleVersion);
+				
+				if(!includedClassLoader) classLoaderName = null;
+				if(!includedModuleVersion) moduleVersion = null;
+			}
+			
+			return new StackElementIndexed(
+				maker.make(classLoaderName),
+				maker.make(moduleName), maker.make(moduleVersion),
+				maker.make(className), maker.make(e.getMethodName()),
 				FileName.make(maker, e), e.getLineNumber()
 			);
 		}
+		
 		StackTraceElement unpack(IOList<String> strings) throws IOException{
 			var className = Objects.requireNonNull(StringsIndex.get(strings, classNameId));
 			return new StackTraceElement(
@@ -129,7 +149,7 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		private CmdSequenceBuilder(StringsIndex maker, StackTraceElement[] frames) throws IOException{
 			this.maker = maker;
 			for(var frame : frames){
-				var e = new StackElementIndexed(maker, frame);
+				var e = StackElementIndexed.of(maker, frame);
 				
 				diffIdx(IndexCmd.SET_CLASS_LOADER_NAME, e.classLoaderNameId);
 				diffIdx(IndexCmd.SET_MODULE_NAME, e.moduleNameId);
@@ -192,7 +212,7 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 		var actual   = frames().collectToList();
 		var expected = new ArrayList<StackElementIndexed>();
 		for(StackTraceElement frame : frames){
-			expected.add(new StackElementIndexed(maker, frame));
+			expected.add(StackElementIndexed.of(maker, frame));
 		}
 		
 		if(!actual.equals(expected)){
@@ -249,17 +269,34 @@ public class IOStackTrace extends IOInstance.Managed<IOStackTrace>{
 	public String toString(){
 		var res = new StringBuilder();
 		res.append(head);
+		if(ignoredFrames != 0){
+			res.append(" (top ").append(ignoredFrames).append(" ignored)");
+		}
 		for(var frame : frames()){
 			res.append("\n\t").append(frame);
 		}
-		return res.toString();
-	}
-	public String toString(IOList<String> strings) throws IOException{
-		var res = new StringBuilder();
-		res.append(StringsIndex.get(strings, head));
-		for(var frame : frames()){
-			res.append("\n\t").append(frame.unpack(strings));
+		if(diffBottomCount != 0){
+			res.append("\n(").append(diffBottomCount).append(" diffed)");
 		}
 		return res.toString();
+	}
+	
+	public int toString(StringBuilder res, boolean includeHead, int start, IOList<String> strings) throws IOException{
+		if(includeHead){
+			res.append(StringsIndex.get(strings, head));
+			if(ignoredFrames != 0){
+				res.append(" (top ").append(ignoredFrames).append(" ignored)");
+			}
+		}
+		int read = 0;
+		for(var frame : frames().skip(start)){
+			read++;
+			res.append("\n\t").append(frame.unpack(strings));
+		}
+		return read;
+	}
+	
+	public int getDiffBottomCount(){
+		return diffBottomCount;
 	}
 }

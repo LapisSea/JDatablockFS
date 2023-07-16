@@ -1,29 +1,33 @@
 package com.lapissea.cfs.tools.logging.session;
 
+import com.lapissea.cfs.io.impl.IOFileData;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LogUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Random;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class SesRun{
 	
-	
 	public static void main(String[] args) throws IOException{
-		try(var service = SessionService.of(new File("sessions.dfs"))){
+		var file = new File("sessions.dfs");
+		var mem  = LoggedMemoryUtils.newLoggedMemory("ses", LoggedMemoryUtils.createLoggerFromConfig());
+		IOFileData.readInto(file, mem);
+		
+		try(var service = SessionService.of(mem)){
 			var n = "ayy" + new Random().nextInt(3);
 			LogUtil.println(n);
 			try(var ses = service.openSession(n)){
 				var data = MemoryData.builder().withOnWrite(ses).build();
 				
-				data.write(true, "Hello world!".getBytes(UTF_8));
-				data.write(true, "Hello world!".getBytes(UTF_8));
-				data.write(true, "Hello, this is different.".getBytes(UTF_8));
-				data.write(true, "Hello, this is also longer than the others.".getBytes(UTF_8));
-				data.write(true, "This is shorter.".getBytes(UTF_8));
+				data.writeUTF(true, "Hello world!");
+				data.writeUTF(true, "Hello world!");
+				data.writeUTF(true, "Hello, this is different.");
+				data.writeUTF(true, "Hello, this is also longer than the others.");
+				data.writeUTF(true, "This is shorter.");
 
 //				data.write(true, "Hello world - num: 0!".getBytes(UTF_8));
 //				for(int i = 0; i<5; i++){
@@ -38,11 +42,9 @@ public class SesRun{
 //				for(int i = 0; i<10; i++){
 //					uhhh.add("hiiiii");
 //				}
-			}catch(Throwable e){
-				e.printStackTrace();
-				System.exit(1);
 			}
 		}
+		Files.write(file.toPath(), mem.readAll());
 	}
 	
 }

@@ -16,9 +16,9 @@ public final class StringsIndex{
 	private final Map<String, Integer> reverseIndex = new HashMap<>();
 	private final ClosableLock         lock         = ClosableLock.reentrant();
 	
-	public static String get(IOList<String> strings, int head) throws IOException{
-		if(head == 0) return null;
-		return strings.get(head - 1);
+	public static String get(IOList<String> strings, int id) throws IOException{
+		if(id == 0) return null;
+		return strings.get(id - 1);
 	}
 	
 	public StringsIndex(IOList<String> data){

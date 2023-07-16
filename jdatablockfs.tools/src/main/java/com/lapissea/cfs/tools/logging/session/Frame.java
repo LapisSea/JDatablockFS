@@ -27,6 +27,7 @@ public abstract sealed class Frame<Self extends Frame<Self>> extends IOInstance.
 			this.data = data;
 			this.writes = writes;
 		}
+		public Blob getData(){ return data; }
 	}
 	
 	static final class Incremental extends Frame<Incremental>{
@@ -62,6 +63,9 @@ public abstract sealed class Frame<Self extends Frame<Self>> extends IOInstance.
 			this.newSize = newSize;
 			this.data = data;
 		}
+		public long getParentFrame()   { return parentFrame; }
+		public long getNewSize()       { return newSize; }
+		public List<IncBlock> getData(){ return data; }
 	}
 	
 	@IOValue

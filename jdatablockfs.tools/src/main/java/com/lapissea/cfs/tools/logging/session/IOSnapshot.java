@@ -65,6 +65,7 @@ abstract sealed class IOSnapshot{
 			int start = -1, end = -1;
 			
 			for(int i = 0, j = Math.min(lSiz, cSiz); i<j; i++){
+//				print(end == -1? ranges : Stream.concat(ranges.stream(), Stream.of(DiffRange.of(cb, start, end))).toList(), lb, cb);
 				byte a = lb[i], b = cb[i];
 				if(a != b){
 					if(end == -1){
@@ -80,10 +81,30 @@ abstract sealed class IOSnapshot{
 					end = -1;
 				}
 			}
+			if(end != -1){
+				ranges.add(DiffRange.of(cb, start, end));
+//				print(ranges, lb, cb);
+			}
 			
+			add:
 			if(cSiz>lSiz){
+				if(!ranges.isEmpty()){
+					var lRange = ranges.get(ranges.size() - 1);
+					var ld     = lRange.data;
+					var lasPos = lRange.off + ld.length;
+					if(lSiz == lasPos){
+						var siz  = cSiz - lSiz;
+						var join = new byte[ld.length + siz];
+						System.arraycopy(ld, 0, join, 0, ld.length);
+						System.arraycopy(cb, lSiz, join, ld.length, siz);
+						ranges.set(ranges.size() - 1, new DiffRange(lRange.off, join));
+						break add;
+					}
+				}
 				ranges.add(DiffRange.of(cb, lSiz, cSiz));
 			}
+
+//			print(ranges, lb, cb);
 			
 			int eDiffBottomCount = 0;
 			
@@ -92,7 +113,9 @@ abstract sealed class IOSnapshot{
 			
 			var max = Math.min(e1.length, e2.length);
 			for(int off = 0; off<max; off++){
-				if(!e1[e1.length - off - 1].equals(e2[e2.length - off - 1])){
+				var a = e1[e1.length - off - 1];
+				var b = e2[e2.length - off - 1];
+				if(!a.equals(b)){
 					break;
 				}
 				eDiffBottomCount++;
@@ -101,6 +124,29 @@ abstract sealed class IOSnapshot{
 			
 			return new Diff(current.frameId, current.timeDelta, current.e, current.writeRanges, eDiffBottomCount, ranges, cSiz, last.frameId);
 		}
+
+//		private static void print(List<DiffRange> ranges, byte[] lb, byte[] cb){
+//			LogUtil.println("==============================");
+//			for(byte value : lb){
+//				LogUtil.print(getHexString(value) + " ");
+//			}
+//			LogUtil.println();
+//			for(byte value : cb){
+//				LogUtil.print(getHexString(value) + " ");
+//			}
+//			LogUtil.println();
+//			for(DiffRange(var off, var data) : ranges){
+//				LogUtil.print("   ".repeat((int)off));
+//				for(byte value : data){
+//					LogUtil.print(getHexString(value) + " ");
+//				}
+//				LogUtil.println();
+//			}
+//		}
+//		private static String getHexString(byte value){
+//			var str = Integer.toHexString(Byte.toUnsignedInt(value));
+//			return str.length() == 2? str : " " + str;
+//		}
 		
 		final int             eDiffBottomCount;
 		final List<DiffRange> changes;
