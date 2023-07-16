@@ -10,6 +10,7 @@ import com.lapissea.util.function.BiIntConsumer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UTFDataFormatException;
 import java.nio.ByteBuffer;
 
 import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
@@ -277,6 +278,57 @@ public interface ContentWriter extends AutoCloseable{
 	private void writeChar2(byte[] writeBuffer, int off, int v){
 		writeBuffer[off + 0] = (byte)((v >>> 8)&0xFF);
 		writeBuffer[off + 1] = (byte)((v >>> 0)&0xFF);
+	}
+	
+	private static String tooLongMsg(CharSequence s, int bits32){
+		int slen = s.length();
+		var head = s.subSequence(0, 8);
+		var tail = s.subSequence(slen - 8, slen);
+		// handle int overflow with max 3x expansion
+		long actualLength = (long)slen + Integer.toUnsignedLong(bits32 - slen);
+		return "encoded string (" + head + "..." + tail + ") too long: " + actualLength + " bytes";
+	}
+	
+	//Code from DataOutputStream#writeUTF
+	default void writeUTF(CharSequence str) throws IOException{
+		int strlen = str.length(), utflen = strlen;
+		
+		for(int i = 0; i<strlen; i++){
+			int c = str.charAt(i);
+			if(c>=0x80 || c == 0) utflen += (c>=0x800)? 2 : 1;
+		}
+		
+		if(utflen>65535 || utflen<strlen){
+			throw new UTFDataFormatException(tooLongMsg(str, utflen));
+		}
+		
+		var bytearr = new byte[utflen + 2];
+		
+		int count = 0;
+		bytearr[count++] = (byte)((utflen >>> 8)&0xFF);
+		bytearr[count++] = (byte)((utflen >>> 0)&0xFF);
+		
+		int i;
+		for(i = 0; i<strlen; i++){ // optimized for initial run of ASCII
+			int c = str.charAt(i);
+			if(c>=0x80 || c == 0) break;
+			bytearr[count++] = (byte)c;
+		}
+		
+		for(; i<strlen; i++){
+			int c = str.charAt(i);
+			if(c<0x80 && c != 0){
+				bytearr[count++] = (byte)c;
+			}else if(c>=0x800){
+				bytearr[count++] = (byte)(0xE0|((c>>12)&0x0F));
+				bytearr[count++] = (byte)(0x80|((c>>6)&0x3F));
+				bytearr[count++] = (byte)(0x80|((c>>0)&0x3F));
+			}else{
+				bytearr[count++] = (byte)(0xC0|((c>>6)&0x1F));
+				bytearr[count++] = (byte)(0x80|((c>>0)&0x3F));
+			}
+		}
+		write(bytearr, 0, utflen + 2);
 	}
 	
 	default ContentOutputStream outStream(){ return new ContentReaderOutputStream(this); }
