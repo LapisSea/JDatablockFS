@@ -6,10 +6,10 @@ public class GlobalConfig{
 	
 	public static final boolean DEBUG_VALIDATION = GlobalConfig.class.desiredAssertionStatus();
 	
-	public static final boolean RELEASE_MODE      = ConfigDefs.RELEASE_MODE.resolve();
-	public static final boolean TYPE_VALIDATION   = ConfigDefs.TYPE_VALIDATION.resolve();
-	public static       boolean PRINT_COMPILATION = ConfigDefs.PRINT_COMPILATION.resolve();
-	public static final int     BATCH_BYTES       = ConfigDefs.BATCH_BYTES.resolve();
+	public static final boolean RELEASE_MODE      = ConfigDefs.RELEASE_MODE.resolveVal();
+	public static final boolean TYPE_VALIDATION   = ConfigDefs.TYPE_VALIDATION.resolveVal();
+	public static       boolean PRINT_COMPILATION = ConfigDefs.PRINT_COMPILATION.resolveVal();
+	public static final int     BATCH_BYTES       = ConfigDefs.BATCH_BYTES.resolveVal();
 	
 	public static String propName(String name){
 		if(name.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX)) return name;
