@@ -12,7 +12,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
-public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
+public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
@@ -20,7 +20,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private final IOList<ChunkPointer> freeChunks;
 	private       boolean              defragmentMode;
 	
-	private boolean adding;
+	private boolean adding, allowFreeRemove = true;
 	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context);
@@ -32,7 +32,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		return List.of(
 			(ctx, ticket) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket);
+				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove);
 			},
 			MemoryOperations::allocateAppendToFile
 		);
@@ -42,7 +42,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	protected List<AllocToStrategy> createAllocTos(){
 		return List.of(
 			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
-			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove),
 			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
@@ -160,18 +160,22 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						var next     = nextO.get();
 						
 						{//do not move the last chunk if it's a part of freeChunks
-							var fch = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
-							var ch  = fch.getReference().getPtr();
-							if(ch.dereference(context).streamNext().anyMatch(c -> c == next)){
-								break;
+							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
+							var freeRef = fch.getReference().getPtr();
+							if(freeRef.dereference(context).streamNext().anyMatch(c -> c == next)){
+								allowFreeRemove = false;
 							}
 						}
 						
-						var moved = DefragmentManager.moveReference(
-							(Cluster)context, next.getPtr(),
-							t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
-							false);
-						if(moved) anyPopped = true;
+						try{
+							var moved = DefragmentManager.moveReference(
+								(Cluster)context, next.getPtr(),
+								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
+								false);
+							if(moved) anyPopped = true;
+						}finally{
+							allowFreeRemove = true;
+						}
 					}
 				}
 			}while(anyPopped);

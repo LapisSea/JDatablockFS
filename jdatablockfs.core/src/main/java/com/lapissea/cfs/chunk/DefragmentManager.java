@@ -179,6 +179,7 @@ public class DefragmentManager{
 				
 				field.set(null, instance, newCh.getPtr());
 				ch.streamNext().forEach(toFree::add);
+				moved = true;
 				
 				return END|SAVE;
 			}

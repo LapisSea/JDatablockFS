@@ -22,7 +22,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 		return List.of(
 			(context1, ticket) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(context1, ticket);
+				return MemoryOperations.allocateReuseFreeChunk(context1, ticket, true);
 			},
 			MemoryOperations::allocateAppendToFile
 		);
@@ -32,7 +32,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	protected List<AllocToStrategy> createAllocTos(){
 		return List.of(
 			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
-			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate),
+			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate, true),
 			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)

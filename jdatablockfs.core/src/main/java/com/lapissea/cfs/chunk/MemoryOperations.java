@@ -576,7 +576,7 @@ public class MemoryOperations{
 		};
 	}
 	
-	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
+	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket, boolean allowRemove) throws IOException{
 		for(var iterator = magnetisedFreeChunkIterator(context, ticket.positionMagnet()); iterator.hasNext(); ){
 			Chunk c = iterator.ioNext().dereference(context);
 			assert c.getNextSize() == NumberSize.VOID;
@@ -592,7 +592,7 @@ public class MemoryOperations{
 				if(reallocate != null) return reallocate;
 			}
 			
-			if(freeSpace<8){
+			if(allowRemove && freeSpace<8){
 				if(ticket.approve(c)){
 					iterator.ioRemove();
 					try{
@@ -685,7 +685,7 @@ public class MemoryOperations{
 		}
 	}
 	
-	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate, boolean allowRemove) throws IOException{
 		var end = target.dataEnd();
 		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
 			ChunkPointer freePtr = iter.ioNext();
@@ -696,7 +696,7 @@ public class MemoryOperations{
 			var size      = freeChunk.totalSize();
 			
 			var remaining = size - toAllocate;
-			if(remaining<16){
+			if(allowRemove && remaining<16){
 				var newCapacity = target.getCapacity() + size;
 				
 				if(!target.getBodyNumSize().canFit(newCapacity)){

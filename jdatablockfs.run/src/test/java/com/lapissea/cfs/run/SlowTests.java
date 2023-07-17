@@ -369,17 +369,19 @@ public class SlowTests{
 			@Override
 			public String toString(){ return type == Type.CLEAR? type.toString() : type + "-" + num; }
 		}
-		var allTypes = Arrays.stream(Type.values()).filter(t -> t != Type.CLEAR).toArray(Type[]::new);
 		
 		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
 			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 				return true;
+//				return sequence.index() == 4;
 			}
 			@Override
 			public State create(Random random, long sequenceIndex) throws IOException{
-				var cluster = Cluster.emptyMem();
-				return new State(cluster, cluster.getRootProvider().request("hi", type, Integer.class));
+				var data    = LoggedMemoryUtils.newLoggedMemory("hashthing", LoggedMemoryUtils.createLoggerFromConfig());
+				var cluster = Cluster.init(data);
+//				var cluster = Cluster.emptyMem();
+				return new State(cluster, new CheckSet<>(cluster.getRootProvider().request("hi", type, Integer.class)));
 			}
 			@Override
 			public void applyAction(State state, long id, Action action) throws IOException{
@@ -402,6 +404,21 @@ public class SlowTests{
 	}
 	
 	@Test
+	void simpleHashSet() throws IOException{
+		checkSet(IOHashSet.class, (d, set) -> {
+			set.add(2);
+			set.add(1);
+			set.add(3);
+			set.add(4);
+			set.remove(2);
+			set.contains(2);
+			set.contains(3);
+			set.add(5);
+			set.remove(5);
+		});
+	}
+	
+	@Test(dependsOnMethods = "simpleHashSet")
 	void fuzzIOSet(){
 		runSetFuzz(100000, IOHashSet.class);
 	}
