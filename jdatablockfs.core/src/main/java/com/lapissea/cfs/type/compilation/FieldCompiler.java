@@ -5,7 +5,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -48,14 +47,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
+import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.joining;
 
 public final class FieldCompiler{
@@ -312,7 +314,6 @@ public final class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
-				FieldRegistry.requireCanCreate(type, field::getAnnotation);
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
 					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
@@ -325,12 +326,15 @@ public final class FieldCompiler{
 		
 		var hangingMethods = ioMethods.stream().filter(method -> !usedFields.contains(method)).collect(Collectors.toList());
 		
-		Map<String, PairM<Method, Method>> transientFieldsMap = new HashMap<>();
+		Map<String, PairM<Method, Method>> functionFields = new HashMap<>();
+		BiConsumer<String, Method>         pushGetter     = (name, m) -> functionFields.computeIfAbsent(name, n -> new PairM<>()).obj1 = m;
+		BiConsumer<String, Method>         pushSetter     = (name, m) -> functionFields.computeIfAbsent(name, n -> new PairM<>()).obj2 = m;
 		
 		for(Method hangingMethod : hangingMethods){
-			calcGetPrefixes(hangingMethod).map(p -> getMethodFieldName(p, hangingMethod)).filter(Optional::isPresent).map(Optional::get)
-			                              .findFirst().ifPresent(s -> transientFieldsMap.computeIfAbsent(s, n -> new PairM<>()).obj1 = hangingMethod);
-			getMethodFieldName("set", hangingMethod).ifPresent(s -> transientFieldsMap.computeIfAbsent(s, n -> new PairM<>()).obj2 = hangingMethod);
+			calcGetPrefixes(hangingMethod).map(p -> getMethodFieldName(p, hangingMethod))
+			                              .filter(Optional::isPresent).map(Optional::get)
+			                              .findFirst().ifPresent(s -> pushGetter.accept(s, hangingMethod));
+			getMethodFieldName("set", hangingMethod).ifPresent(s -> pushSetter.accept(s, hangingMethod));
 		}
 		
 		hangingMethods.removeIf(hangingMethod -> {
@@ -338,42 +342,56 @@ public final class FieldCompiler{
 			if(f == null || f.name().isEmpty()) return false;
 			
 			if(CompilationTools.asGetterStub(hangingMethod).isPresent()){
-				transientFieldsMap.computeIfAbsent(f.name(), n -> new PairM<>()).obj1 = hangingMethod;
+				pushGetter.accept(f.name(), hangingMethod);
 				return true;
 			}
 			if(CompilationTools.asSetterStub(hangingMethod).isPresent()){
-				transientFieldsMap.computeIfAbsent(f.name(), n -> new PairM<>()).obj2 = hangingMethod;
+				pushSetter.accept(f.name(), hangingMethod);
 				return true;
 			}
 			
 			return false;
 		});
-		
-		var errors = transientFieldsMap.entrySet()
-		                               .stream()
-		                               .filter(e -> e.getValue().obj1 == null || e.getValue().obj2 == null)
-		                               .map(e -> Map.of("fieldName", e.getKey(), "getter", e.getValue().obj1 != null, "setter", e.getValue().obj2 != null))
-		                               .toList();
-		if(!errors.isEmpty()){
-			throw new IllegalField("Invalid transient (getter+setter, no value) IO field for " + cl.getName() + ":\n" + TextUtil.toTable(errors));
+		{
+			var errors = functionFields.entrySet()
+			                           .stream()
+			                           .filter(e -> e.getValue().stream().anyMatch(Objects::isNull))
+			                           .toList();
+			if(!errors.isEmpty()){
+				throw new IllegalField(
+					"Invalid transient (getter+setter, no value) " + TextUtil.plural("IOField", errors.size()) +
+					" for " + cl.getName() + ":\n" +
+					errors.stream()
+					      .map(e -> "\t" + e.getKey() + ": " + (e.getValue().obj1 == null? "getter" : "setter") + " missing")
+					      .collect(joining("\n"))
+				);
+			}
 		}
-		
-		var unusedWaning = hangingMethods.stream()
-		                                 .filter(m -> transientFieldsMap.values()
-		                                                                .stream()
-		                                                                .flatMap(PairM::<Method>stream)
-		                                                                .noneMatch(mt -> mt == m))
-		                                 .map(method -> method + "" + (fields.stream().anyMatch(f -> f.getName().equals(method.getName()))? (
-			                                 " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName())).collect(joining(" or ")) + "?"
-		                                 ) : ""))
-		                                 .collect(joining("\n"));
-		if(!unusedWaning.isEmpty()){
-			throw new MalformedStruct("There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" + unusedWaning);
+		{
+			Predicate<Method> isGetterOrSetter =
+				m -> functionFields.values().stream()
+				                   .flatMap(PairM::stream)
+				                   .anyMatch(mt -> mt == m);
+			var unusedWaning =
+				hangingMethods.stream()
+				              .filter(not(isGetterOrSetter))
+				              .map(method -> {
+					              String helpStr = "";
+					              if(fields.stream().anyMatch(f -> f.getName().equals(method.getName()))){
+						              helpStr = " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName()))
+						                                                                  .collect(joining(" or ")) + "?";
+					              }
+					              return method + helpStr;
+				              })
+				              .collect(joining("\n"));
+			if(!unusedWaning.isEmpty()){
+				throw new MalformedStruct("There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" + unusedWaning);
+			}
 		}
 		
 		fields.sort(Comparator.naturalOrder());
 		
-		for(var e : transientFieldsMap.entrySet()){
+		for(var e : functionFields.entrySet()){
 			String name = e.getKey();
 			var    p    = e.getValue();
 			
@@ -391,6 +409,20 @@ public final class FieldCompiler{
 			}
 			
 			UtilL.addRemainSorted(fields, FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
+		}
+		
+		{
+			var fails = fields.stream()
+			                  .filter(field -> {
+				                  return !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field));
+			                  })
+			                  .toList();
+			if(!fails.isEmpty()){
+				throw new IllegalField(
+					"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
+					(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
+				);
+			}
 		}
 		
 		return fields;
@@ -540,7 +572,8 @@ public final class FieldCompiler{
 		);
 	}
 	
-	public static void init(){
-		Runner.run(FieldRegistry::init);
+	public static void init(){ }
+	static{
+		Thread.startVirtualThread(FieldRegistry::init);
 	}
 }

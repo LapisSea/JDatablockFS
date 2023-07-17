@@ -6,7 +6,6 @@ import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -69,8 +68,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	static{
 		//Preload for faster first start
-		Runner.run(DefInstanceCompiler::init);
-		Runner.run(FieldCompiler::init);
+		Thread.startVirtualThread(DefInstanceCompiler::init);
+		Thread.startVirtualThread(FieldCompiler::init);
 	}
 	
 	

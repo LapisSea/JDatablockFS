@@ -63,7 +63,7 @@ import static com.lapissea.cfs.type.compilation.JorthUtils.writeAnnotations;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.*;
 
-public class DefInstanceCompiler{
+public final class DefInstanceCompiler{
 	
 	
 	//////////////////////////////// INIT /////////////////////////////////

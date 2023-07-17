@@ -49,9 +49,9 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger,
+	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger,
 	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumCollection,
-	        IOFieldFloatArray, IOFieldPrimitive, IOFieldStringCollection{
+	        IOFieldFloatArray, IOFieldStringCollection{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
