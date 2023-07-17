@@ -183,6 +183,10 @@ public interface MemoryManager extends DataProvider.Holder{
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
 		if(chainStarts.isEmpty()) return;
+		List<Chunk> chunks = chunksToChains(chainStarts);
+		free(chunks);
+	}
+	private List<Chunk> chunksToChains(Collection<ChunkPointer> chainStarts) throws IOException{
 		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){
@@ -192,7 +196,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);
 		}
-		free(chunks);
+		return chunks;
 	}
 	
 	

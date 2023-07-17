@@ -767,6 +767,12 @@ public class MemoryOperations{
 	}
 	
 	public static <U extends IOInstance.Unmanaged<U>> void freeSelfAndReferenced(U val) throws IOException{
+		var chunks = listSelfAndReferenced(val);
+		var man    = val.getDataProvider().getMemoryManager();
+		man.free(chunks);
+	}
+	
+	public static <U extends IOInstance.Unmanaged<U>> Set<Chunk> listSelfAndReferenced(U val) throws IOException{
 		Set<Chunk> chunks = new HashSet<>();
 		var        prov   = val.getDataProvider();
 		
@@ -779,7 +785,6 @@ public class MemoryOperations{
 		
 		rec.accept(val.getReference());
 		new MemoryWalker(val, false, MemoryWalker.PointerRecord.of(rec)).walk();
-		
-		prov.getMemoryManager().free(chunks);
+		return chunks;
 	}
 }

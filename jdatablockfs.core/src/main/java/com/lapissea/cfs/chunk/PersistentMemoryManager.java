@@ -1,7 +1,9 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -128,40 +130,54 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		tryPopFree();
 	}
 	
+	private boolean popping;
 	private void tryPopFree() throws IOException{
-		if(adding) return;
-		boolean anyPopped;
-		do{
-			anyPopped = false;
-			var lastChO = freeChunks.peekLast().map(p -> p.dereference(context));
-			if(lastChO.filter(Chunk::checkLastPhysical).isPresent()){
-				var lastCh = lastChO.get();
-				
-				freeChunks.popLast();
-				if(lastCh.checkLastPhysical()){
-					try(var io = context.getSource().io()){
-						io.setCapacity(lastCh.getPtr().getValue());
-					}
-					context.getChunkCache().notifyDestroyed(lastCh);
-					anyPopped = true;
-				}else{
-					free(lastCh);
-					break;
-				}
-			}else if(freeChunks.size()>1){
-				var nextO = lastChO.map(Chunk::nextPhysical);
-				if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
-					var lastFree = lastChO.get();
-					var next     = nextO.get();
+		if(adding || popping) return;
+		popping = true;
+		try{
+			boolean anyPopped;
+			do{
+				anyPopped = false;
+				var lastChO = freeChunks.peekLast().map(p -> p.dereference(context));
+				if(lastChO.filter(Chunk::checkLastPhysical).isPresent()){
+					var lastCh = lastChO.get();
 					
-					var moved = DefragmentManager.moveReference(
-						(Cluster)context, next.getPtr(),
-						t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0)
-					);
-					if(moved) anyPopped = true;
+					freeChunks.popLast();
+					if(lastCh.checkLastPhysical()){
+						try(var io = context.getSource().io()){
+							io.setCapacity(lastCh.getPtr().getValue());
+						}
+						context.getChunkCache().notifyDestroyed(lastCh);
+						anyPopped = true;
+					}else{
+						free(lastCh);
+						break;
+					}
+				}else if(freeChunks.size()>1){
+					var nextO = lastChO.map(Chunk::nextPhysical);
+					if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
+						var lastFree = lastChO.get();
+						var next     = nextO.get();
+						
+						{//do not move the last chunk if it's a part of freeChunks
+							var fch = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
+							var ch  = fch.getReference().getPtr();
+							if(ch.dereference(context).streamNext().anyMatch(c -> c == next)){
+								break;
+							}
+						}
+						
+						var moved = DefragmentManager.moveReference(
+							(Cluster)context, next.getPtr(),
+							t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
+							false);
+						if(moved) anyPopped = true;
+					}
 				}
-			}
-		}while(anyPopped);
+			}while(anyPopped);
+		}finally{
+			popping = false;
+		}
 	}
 	
 	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{

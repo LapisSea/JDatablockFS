@@ -68,7 +68,7 @@ public class DefragmentManager{
 			}
 			
 			var     siz   = cluster.getSource().getIOSize();
-			boolean found = moveReference(cluster, last.getPtr(), t -> t.withApproval(c -> c.getPtr().getValue()<siz));
+			boolean found = moveReference(cluster, last.getPtr(), t -> t.withApproval(c -> c.getPtr().getValue()<siz), true);
 			if(!found) break;
 		}
 	}
@@ -105,7 +105,7 @@ public class DefragmentManager{
 				var firstNext = freeFirst.nextPhysical();
 				var limit     = firstNext.getPtr().getValue();
 				
-				boolean found = moveReference(cluster, firstNext.getPtr(), t -> t.withPositionMagnet(0).withApproval(c -> c.getPtr().getValue()<limit));
+				boolean found = moveReference(cluster, firstNext.getPtr(), t -> t.withPositionMagnet(0).withApproval(c -> c.getPtr().getValue()<limit), true);
 				
 				if(found){
 					continue wh;
@@ -118,7 +118,8 @@ public class DefragmentManager{
 		cluster.getMemoryManager().getFreeChunks().trim();
 	}
 	
-	public static boolean moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn) throws IOException{
+	//TODO: remove allowUnmanaged and introduce concept of unmanaged instance tracking to enable proper notification of movement
+	public static boolean moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn, boolean allowUnmanaged) throws IOException{
 		List<Chunk> toFree = new ArrayList<>();
 		var record = new MemoryWalker.PointerRecord(){
 			boolean moved = false;
@@ -126,7 +127,8 @@ public class DefragmentManager{
 			@Override
 			public <T extends IOInstance<T>> int log(
 				Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
-				if(!valueReference.getPtr().equals(toMove)){
+				var ptr = valueReference.getPtr();
+				if(!ptr.equals(toMove) || valueReference.getOffset() != 0){
 					return CONTINUE;
 				}
 				
@@ -134,12 +136,12 @@ public class DefragmentManager{
 				var type = field.getType();
 				
 				if(IOInstance.isUnmanaged(type)){
-					var moved = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), ticketFn);
+					var moved = allowUnmanaged && reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), ticketFn);
 					if(moved) this.moved = true;
 					return END;
 				}
 				
-				var ch = valueReference.getPtr().dereference(cluster);
+				var ch = ptr.dereference(cluster);
 				
 				Chunk newCh = copyCh(instanceReference, ch);
 				if(newCh == null){
