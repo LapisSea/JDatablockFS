@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections.listtools;
 
+import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.utils.OptionalPP;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
 
-public abstract class MappedIOList<From, To> implements IOList<To>{
+public abstract class MappedIOList<From, To> implements IOList<To>, Wrapper<IOList<From>>{
 	private final IOList<From> data;
 	private final Class<To>    mappedType;
 	
@@ -287,5 +288,10 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public void free(long index) throws IOException{
 		data.free(index);
+	}
+	
+	@Override
+	public IOList<From> getWrappedObj(){
+		return data;
 	}
 }
