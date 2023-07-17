@@ -638,7 +638,8 @@ public class SlowTests{
 			
 			@Override
 			public void applyAction(MapState state, long actionIdx, MapAction action) throws IOException{
-				if(actionIdx == actionIndex){
+				var deb = actionIndex != -1? actionIdx == actionIndex : !sequenceIndexes.isEmpty();
+				if(deb){
 					LogUtil.println(action);
 					LogUtil.println(state.map);
 					int a = 0;//for breakpoint

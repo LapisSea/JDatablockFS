@@ -638,7 +638,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					toFree.addAll(storage.notifyRemoval(io, false));
 				}
 			}
-			getDataProvider().getMemoryManager().freeChains(toFree);
+			var man = getDataProvider().getMemoryManager();
+			man.freeChains(toFree);
 		}
 		try(var io = selfIO()){
 			io.setCapacity(calcElementOffset(0));

@@ -171,7 +171,6 @@ public class DisplayIpc implements DataLogger{
 								ex.printStackTrace();
 							}
 						});
-						t.start();
 					}
 					
 					
