@@ -27,7 +27,12 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 	}
 	
-	public record LogState(float progress, Duration estimatedTotalTime, Duration estimatedTimeRemaining, Duration elapsed, Duration durationPerOp){ }
+	public record LogState(
+		float progress,
+		Duration estimatedTotalTime, Duration estimatedTimeRemaining,
+		Duration elapsed, Duration durationPerOp,
+		boolean hasFail
+	){ }
 	
 	@SuppressWarnings("unused")
 	public record Config(
@@ -165,7 +170,10 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					if(progress.hasErr()) return;
 					run(sequence, progress).ifPresent(e -> {
 						if(millisDelay<=0) progress.err();
-						else DELAY.schedule(progress::err, millisDelay, TimeUnit.MILLISECONDS);
+						else{
+							progress.errLater();
+							DELAY.schedule(progress::err, millisDelay, TimeUnit.MILLISECONDS);
+						}
 						fails.add(e);
 					});
 				};
