@@ -375,7 +375,7 @@ public class MemoryWalker{
 								}
 							}
 							case CHPTR -> {
-								var result = handlePtr(instance, pipe, reference, ioPool, (IOField<T, ChunkPointer>)field);
+								var result = handlePtr(instance, pipe, reference, ioPool, (IOField<T, ChunkPointer>)field, inlinedParent);
 								if(hasResult(result)) return result;
 							}
 							case POTENTIAL_REF -> {
@@ -542,7 +542,9 @@ public class MemoryWalker{
 		return ((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
 	}
 	
-	private <T extends IOInstance<T>> int handlePtr(T instance, StructPipe<T> pipe, Reference reference, VarPool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
+	private <T extends IOInstance<T>> int handlePtr(
+		T instance, StructPipe<T> pipe, Reference reference, VarPool<T> ioPool, IOField<T, ChunkPointer> ptrField, boolean inlinedParent
+	) throws IOException{
 		var ch = ptrField.get(ioPool, instance);
 		
 		if(!ch.isNull()){
@@ -550,7 +552,8 @@ public class MemoryWalker{
 				var res = pointerRecord.logChunkPointer(reference, instance, ptrField, ch);
 				checkResult(res);
 				if(shouldSave(res)){
-					throw new NotImplementedException();//TODO
+					if(inlinedParent) return SAVE|END;
+					reference.write(provider, false, pipe, instance);
 				}
 				switch(getFlow(res)){
 					case CONTINUE -> { }
@@ -559,18 +562,11 @@ public class MemoryWalker{
 				}
 			}
 			{
-				var c = ch.dereference(provider);
-				if(c.hasNextPtr()){
-					var res = walkStructFull(c, makeChunkRef(c), Chunk.PIPE, false);
-					
-					if(shouldSave(res)){
-						throw new NotImplementedException();//TODO
-					}
-					switch(getFlow(res)){
-						case CONTINUE -> { }
-						case END -> { return END; }
-						default -> throw failFlow(res);
-					}
+				var flow = walkChunk(ch.dereference(provider));
+				switch(flow){
+					case CONTINUE -> { }
+					case END -> { return END; }
+					default -> throw failFlow(flow);
 				}
 			}
 		}
