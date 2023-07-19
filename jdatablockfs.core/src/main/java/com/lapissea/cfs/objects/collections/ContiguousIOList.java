@@ -78,9 +78,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@IOValue
 	private List<NumberSize> varyingBuffer;
 	
-	private       ValueStorage<T> storage;
-	private       int             headSize;
-	private final Map<Long, T>    cache;
+	private ValueStorage<T> storage;
+	private int             headSize;
+	
+	private final        Map<Long, T> cache;
+	private static final Object       NULL_VAL = new Object();
 	
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
@@ -476,10 +478,20 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private T getCached(long index) throws IOException{
 		if(cache.containsKey(index)){
-			return cache.get(index);
+			return cacheGet(index);
 		}
 		var val = readAt(index);
-		cache.put(index, val);
+		cachePut(index, val);
+		return val;
+	}
+	
+	private void cachePut(long index, T val){
+		cache.put(index, val == null? (T)NULL_VAL : val);
+	}
+	
+	private T cacheGet(long index){
+		var val = cache.get(index);
+		if(val == NULL_VAL) return null;
 		return val;
 	}
 	
