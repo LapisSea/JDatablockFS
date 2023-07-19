@@ -11,6 +11,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -19,13 +20,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
-	
-	public record Sequence(long startIndex, long index, long seed, int iterations){
-		@Override
-		public String toString(){
-			return String.valueOf(index);
-		}
-	}
 	
 	public record LogState(
 		float progress,
@@ -64,7 +58,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public interface StateEnv<State, Action, Err extends Throwable>{
-		boolean shouldRun(Sequence sequence);
+		boolean shouldRun(FuzzSequence sequence);
 		void applyAction(State state, long actionIdx, Action action) throws Err;
 		State create(Random random, long sequenceIndex) throws Err;
 	}
@@ -77,25 +71,25 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		this.actionFactory = actionFactory;
 	}
 	
-	public Optional<FuzzFail<Action, State>> run(Sequence sequence){ return run(sequence, null); }
-	public Optional<FuzzFail<Action, State>> run(Sequence sequence, FuzzProgress progress){
+	public Optional<FuzzFail<Action, State>> run(FuzzSequence sequence){ return run(sequence, null); }
+	public Optional<FuzzFail<Action, State>> run(FuzzSequence sequence, FuzzProgress progress){
 		
 		var start = Instant.now();
 		
-		var rand = new Random(sequence.seed);
+		var rand = new Random(sequence.seed());
 		
 		State state;
 		try{
-			state = stateEnv.create(rand, sequence.index);
+			state = stateEnv.create(rand, sequence.index());
 		}catch(Throwable e){
 			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, Instant.now())));
 		}
 		
-		for(var actionIndex = 0; actionIndex<sequence.iterations; actionIndex++){
+		for(var actionIndex = 0; actionIndex<sequence.iterations(); actionIndex++){
 			if(progress != null && progress.hasErr()) return Optional.empty();
 			
 			var action = actionFactory.apply(rand);
-			var idx    = sequence.startIndex + actionIndex;
+			var idx    = sequence.startIndex() + actionIndex;
 			try{
 				stateEnv.applyAction(state, idx, action);
 			}catch(Throwable e){
@@ -110,7 +104,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength, null); }
-	public void runAndAssert(Config config, long seed, long totalIterations, int sequenceLength, FuzzFail.FailOrder failOrder){
+	public void runAndAssert(Config config, long seed, long totalIterations, int sequenceLength, FailOrder failOrder){
 		var fails = run(config, seed, totalIterations, sequenceLength);
 		if(!fails.isEmpty()){
 			throw new AssertionError(FuzzFail.report(fails, failOrder) + "\nReport stacktrace:");
@@ -120,13 +114,13 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	private static final ScheduledExecutorService DELAY = Executors.newScheduledThreadPool(1, r -> Thread.ofPlatform().name("Error delay thread").daemon().unstarted(r));
 	
 	private record SequenceSource(long seed, long totalIterations, int sequenceLength){
-		private Stream<Sequence> all(){
+		private Stream<FuzzSequence> all(){
 			var sequenceEntropy   = new Random(seed);
 			var numberOfSequences = Math.toIntExact(Math.ceilDiv(totalIterations, sequenceLength));
 			return IntStream.range(0, numberOfSequences).mapToObj(seqIndex -> {
 				var from = seqIndex*sequenceLength;
 				var to   = Math.min((seqIndex + 1L)*sequenceLength, totalIterations);
-				return new Sequence(from, seqIndex, sequenceEntropy.nextLong(), (int)(to - from));
+				return new FuzzSequence(from, seqIndex, sequenceEntropy.nextLong(), (int)(to - from));
 			});
 		}
 	}
@@ -135,13 +129,13 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return run(null, seed, totalIterations, sequenceLength);
 	}
 	public List<FuzzFail<Action, State>> run(Config config, long seed, long totalIterations, int sequenceLength){
-		if(config == null) config = new Config();
+		final var conf = config == null? new Config() : config;
 		
 		var source = new SequenceSource(seed, totalIterations, sequenceLength);
 		
 		record Info(long sequencesToRun, long totalIterations){ }
 		var info = source.all().filter(stateEnv::shouldRun)
-		                 .map(s -> new Info(1, s.iterations))
+		                 .map(s -> new Info(1, s.iterations()))
 		                 .reduce(new Info(0, 0),
 		                         (a, b) -> new Info(a.sequencesToRun + b.sequencesToRun,
 		                                            a.totalIterations + b.totalIterations));
@@ -149,22 +143,15 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		if(info.sequencesToRun == 0) return List.of();
 		if(info.sequencesToRun == 1){
 			var sequence = source.all().filter(stateEnv::shouldRun).findAny().orElseThrow();
-			return run(sequence, new FuzzProgress(config, info.totalIterations)).stream().toList();
+			return run(sequence, new FuzzProgress(conf, info.totalIterations)).stream().toList();
 		}
 		
-		var name     = config.name.orElseGet(FuzzingRunner::getTaskName);
-		var thNum    = new int[1];
 		var fails    = Collections.synchronizedList(new ArrayList<FuzzFail<Action, State>>());
-		int nThreads = (int)Math.max(Math.min(config.maxWorkers, info.sequencesToRun) - 1, 1);
-		try(var worker = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
-			var l    = (nThreads + "").length();
-			var sNum = (thNum[0]++) + "";
-			return Thread.ofPlatform()
-			             .name("fuzzWorker(" + name + ")-" + "0".repeat(Math.max(0, l - sNum.length())) + sNum)
-			             .unstarted(r);
-		})){
-			var millisDelay = config.errorDelay.toMillis();
-			var progress    = new FuzzProgress(config, info.totalIterations);
+		int nThreads = (int)Math.max(Math.min(conf.maxWorkers, info.sequencesToRun) - 1, 1);
+		try(var worker = new ThreadPoolExecutor(nThreads, nThreads, 500, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
+		                                        new RunnerFactory(nThreads, conf.name.orElseGet(FuzzingRunner::getTaskName)))){
+			var millisDelay = conf.errorDelay.toMillis();
+			var progress    = new FuzzProgress(conf, info.totalIterations);
 			source.all().filter(stateEnv::shouldRun).forEach(sequence -> {
 				Runnable task = () -> {
 					if(progress.hasErr()) return;
@@ -204,4 +191,22 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		                              .getMethodName());
 	}
 	
+	private static final class RunnerFactory implements ThreadFactory{
+		private       int    threadIndex;
+		private final int    numLen;
+		private final String prefix;
+		
+		public RunnerFactory(int nThreads, String name){
+			numLen = String.valueOf(nThreads).length();
+			this.prefix = "fuzzWorker(" + name + ")-";
+		}
+		
+		@Override
+		public Thread newThread(Runnable r){
+			var indexStr = String.valueOf(threadIndex++);
+			return Thread.ofPlatform()
+			             .name(prefix + "0".repeat(Math.max(0, numLen - indexStr.length())) + indexStr)
+			             .unstarted(r);
+		}
+	}
 }
