@@ -18,21 +18,18 @@ public sealed interface FuzzFail<Act, State>{
 		return fails.stream().filter(a -> a instanceof Action).map(a -> (Action<Act, Stat>)a).filter(find).findFirst();
 	}
 	
-	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails){ return report(fails, null); }
-	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails, FailOrder order){
+	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails){
 		if(fails.isEmpty()) return "";
 		if(fails.size() == 1){
 			return fails.get(0).trace();
 		}
 		
-		var sorted = sortFails(fails, order);
-		
 		var sb = new StringBuilder("Multiple fails:\n");
-		for(FuzzFail<?, ?> fail : sorted){
+		for(FuzzFail<?, ?> fail : fails){
 			sb.append('\t').append(fail.note()).append('\n');
 		}
 		sb.append("\nFirst fail:\n");
-		sb.append(sorted.get(0).trace());
+		sb.append(fails.get(0).trace());
 		return sb.toString();
 	}
 	
@@ -64,6 +61,12 @@ public sealed interface FuzzFail<Act, State>{
 	}
 	
 	record Create<Action, State>(Throwable e, FuzzSequence sequence, Duration timeToFail) implements FuzzFail<Action, State>{
+		public Create{
+			Objects.requireNonNull(e);
+			Objects.requireNonNull(sequence);
+			Objects.requireNonNull(timeToFail);
+		}
+		
 		@Override
 		public String note(){
 			return "Failed create - sequence: " + sequence + "\t- " + e;
@@ -76,9 +79,24 @@ public sealed interface FuzzFail<Act, State>{
 			e.printStackTrace(pw);
 			return sw.toString();
 		}
+		@Override
+		public FuzzingRunner.Mark mark(){
+			return new FuzzingRunner.Mark(sequence.index(), -1);
+		}
+		@Override
+		public boolean equals(Object o){
+			if(this == o) return true;
+			if(!(o instanceof Create<?, ?> create)) return false;
+			
+			if(!permissiveThrowableEquals(e, create.e)) return false;
+			return sequence.equals(create.sequence) &&
+			       timeToFail.equals(create.timeToFail);
+		}
 	}
 	
-	record Action<Action, State>(Throwable e, FuzzSequence sequence, Action action, long actionIndex, Duration timeToFail, State badState) implements FuzzFail<Action, State>{
+	record Action<Actio, State>(
+		Throwable e, FuzzSequence sequence, Actio action, long actionIndex, Duration timeToFail, State badState
+	) implements FuzzFail<Actio, State>{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -98,12 +116,16 @@ public sealed interface FuzzFail<Act, State>{
 		public String trace(){
 			StringWriter sw = new StringWriter();
 			sw.append("Failed to apply action on sequence: ")
-			  .append(String.valueOf(sequence)).append(", actionIndex: (")
+			  .append(String.valueOf(sequence.index())).append(", actionIndex: (")
 			  .append(String.valueOf(actionIndex - sequence.startIndex())).append(")\t").append(String.valueOf(actionIndex))
 			  .append(" Action: ").append(String.valueOf(action)).append("\n");
 			PrintWriter pw = new PrintWriter(sw);
 			e.printStackTrace(pw);
 			return sw.toString();
+		}
+		@Override
+		public FuzzingRunner.Mark mark(){
+			return new FuzzingRunner.Mark(sequence.index(), actionIndex);
 		}
 		
 		@Override
@@ -124,34 +146,44 @@ public sealed interface FuzzFail<Act, State>{
 			       sequence.equals(sequence2) &&
 			       action.equals(action2);
 		}
+		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
+		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }
 		
-		private boolean permissiveThrowableEquals(Throwable e, Throwable e2){
-			if(e == null || e2 == null) return e == null && e2 == null;
-			
-			if(!Objects.equals(e.getClass(), e2.getClass())) return false;
-			if(!Objects.equals(e.getMessage(), e2.getMessage())) return false;
-			if(!Arrays.equals(e.getSuppressed(), e2.getSuppressed())) return false;
-			if(!permissiveThrowableEquals(e.getCause(), e2.getCause())) return false;
-			
-			var s1 = e.getStackTrace();
-			var s2 = e2.getStackTrace();
-			
-			for(int i = 0; i<Math.min(s1.length, s2.length); i++){
-				var el1 = s1[i];
-				var el2 = s2[i];
-				if(
-					el1.getClassName().startsWith(FuzzingRunner.class.getName()) ||
-					el2.getClassName().startsWith(FuzzingRunner.class.getName())
-				) break;
-				if(!el1.equals(el2)){
+	}
+	
+	private static boolean permissiveThrowableEquals(Throwable ex1, Throwable ex2){
+		if(ex1 == null || ex2 == null) return ex1 == null && ex2 == null;
+		
+		if(!Objects.equals(ex1.getClass(), ex2.getClass())) return false;
+		if(!Objects.equals(ex1.getMessage(), ex2.getMessage())) return false;
+		{
+			var s1 = ex1.getSuppressed();
+			var s2 = ex2.getSuppressed();
+			if(s1.length != s2.length) return false;
+			for(int i = 0; i<s1.length; i++){
+				if(!permissiveThrowableEquals(s1[i], s2[i])){
 					return false;
 				}
 			}
-			return true;
 		}
-		private int localIndex(){
-			return Math.toIntExact(actionIndex - sequence.startIndex());
+		if(!permissiveThrowableEquals(ex1.getCause(), ex2.getCause())) return false;
+		
+		var s1 = ex1.getStackTrace();
+		var s2 = ex2.getStackTrace();
+		
+		var fzName = FuzzingRunner.class.getName();
+		for(int i = 0; i<Math.min(s1.length, s2.length); i++){
+			var el1 = s1[i];
+			var el2 = s2[i];
+			if(
+				el1.getClassName().startsWith(fzName) ||
+				el2.getClassName().startsWith(fzName)
+			) break;
+			if(!el1.equals(el2)){
+				return false;
+			}
 		}
+		return true;
 	}
 	
 	Throwable e();
@@ -161,4 +193,6 @@ public sealed interface FuzzFail<Act, State>{
 	String trace();
 	
 	FuzzSequence sequence();
+	
+	FuzzingRunner.Mark mark();
 }

@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+import static com.lapissea.cfs.run.fuzzing.FuzzingRunner.LogState.stdTime;
+
 public final class FuzzProgress{
 	
 	private final AtomicLong executedCount = new AtomicLong();
@@ -21,8 +23,13 @@ public final class FuzzProgress{
 		this.totalIterations = totalIterations;
 	}
 	
-	void err(){
+	synchronized void err(){
+		var oldErr = hasErr;
 		hasErr = errMark = true;
+		if(!oldErr){
+			var count = executedCount.get();
+			logInc(count, calcProgressI(count));
+		}
 	}
 	synchronized void errLater(){
 		if(errMark || !config.shouldLog()) return;
@@ -71,21 +78,13 @@ public final class FuzzProgress{
 		System.out.println(
 			(state.hasFail()? red + "FAIL " : green + "OK | ") +
 			gray + "Progress: " + reset + (f.length()<4? " " + f : f) + "%" +
-			gray + ", ET: " + reset + tim(state.estimatedTotalTime()) +
-			gray + ", ETR: " + reset + tim(state.estimatedTimeRemaining()) +
-			gray + ", elapsed: " + reset + tim(state.elapsed()) +
+			gray + ", ET: " + reset + stdTime(state.estimatedTotalTime()) +
+			gray + ", ETR: " + reset + stdTime(state.estimatedTimeRemaining()) +
+			gray + ", elapsed: " + reset + stdTime(state.elapsed()) +
 			gray + ", ms/op: " + reset + (state.durationPerOp() == null? "--" :
 			                              "~" + String.format("%.3f", state.durationPerOp().toNanos()/1000_000D))
 		);
 	};
-	
-	private static String tim(Duration tim){
-		if(tim == null) return "-:--:--";
-		return String.format("%d:%02d:%02d",
-		                     tim.toHoursPart(),
-		                     tim.toMinutesPart(),
-		                     tim.toSecondsPart());
-	}
 	
 	private void log(long count, float progress){
 		var now = Instant.now();
