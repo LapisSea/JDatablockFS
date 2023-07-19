@@ -386,7 +386,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Creates a new {@link RandomIO} who's available data is provided from this and next chunks (if any).
 	 */
 	@Override
-	public RandomIO io() throws IOException{
+	public ChunkChainIO io() throws IOException{
 		return new ChunkChainIO(this);
 	}
 	

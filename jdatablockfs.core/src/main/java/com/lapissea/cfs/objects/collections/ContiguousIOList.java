@@ -7,6 +7,7 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkBuilder;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
@@ -357,7 +358,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	
-	private RandomIO ioAtElement(long index) throws IOException{
+	private ChunkChainIO ioAtElement(long index) throws IOException{
 		var io = selfIO();
 		try{
 			var pos = calcElementOffset(index);
@@ -764,6 +765,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
 				notifySingleFree(io, false);
+				io.revalidate();
 			}
 			
 			long sm1 = size - 1;
@@ -901,6 +903,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		try(var io = ioAtElement(index)){
 			notifySingleFree(io, true);
+			io.revalidate();
 		}
 	}
 	
