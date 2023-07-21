@@ -1,7 +1,6 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.config.ConfigDefs;
-import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -32,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
 
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 
@@ -340,7 +340,7 @@ public class MemoryOperations{
 					}else{
 						purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 					}
-					if(service == null && (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>GlobalConfig.BATCH_BYTES){
+					if(service == null && (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>BATCH_BYTES){
 						purgeTransaction.close();
 						purgeTransaction = provider.getSource().openIOTransaction();
 					}

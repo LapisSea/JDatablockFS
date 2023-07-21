@@ -9,7 +9,7 @@ import com.lapissea.cfs.chunk.ChunkSet;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.PhysicalChunkWalker;
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -87,6 +87,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.config.ConfigDefs.CONFIG_PROPERTY_PREFIX;
 import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
@@ -176,7 +177,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private boolean            renderStatic      = false;
 	private List<HoverMessage> lastHoverMessages = List.of();
 	
-	private final ErrorLogLevel errorLogLevel = GlobalConfig.configEnum("tools.renderer.errorLogLevel", ErrorLogLevel.NAMED_STACK);
+	private final ErrorLogLevel errorLogLevel = ConfigUtils.configEnum(CONFIG_PROPERTY_PREFIX + "tools.renderer.errorLogLevel", ErrorLogLevel.NAMED_STACK);
 	
 	
 	private float   zoom = 1;

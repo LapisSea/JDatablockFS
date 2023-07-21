@@ -1,7 +1,6 @@
 package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.config.ConfigDefs;
-import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.TextUtil;
@@ -18,6 +17,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+
+import static com.lapissea.cfs.config.GlobalConfig.RELEASE_MODE;
 
 public class Runner{
 	
@@ -93,7 +94,7 @@ public class Runner{
 			// debug wait prevents debugging sessions from often restarting the watcher by
 			// repeatedly sleeping for a short time and checking if it should still exit.
 			// When debugging, the short sleeps will extend when ever the code is paused
-			var debugWait    = GlobalConfig.RELEASE_MODE? 0 : 200;
+			var debugWait    = RELEASE_MODE? 0 : 200;
 			var debugCounter = 0;
 			
 			while(true){

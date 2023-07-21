@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.tools.DrawFont;
 
 import java.awt.Color;
@@ -9,9 +9,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static com.lapissea.cfs.config.ConfigDefs.CONFIG_PROPERTY_PREFIX;
+
 public abstract class RenderBackend{
 	
-	public static final boolean     DRAW_DEBUG = GlobalConfig.configFlag("tools.drawDebug", false);
+	public static final boolean     DRAW_DEBUG = ConfigUtils.configBoolean(CONFIG_PROPERTY_PREFIX + "tools.drawDebug", false);
 	public static final ThreadGroup UI_GROUP;
 	
 	static{
