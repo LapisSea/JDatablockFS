@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.ConsoleColors.*;
 
@@ -272,30 +273,33 @@ public final class ConfigTools{
 	}
 	
 	public static List<ConfEntry> collectConfigFlags(){
-		List<ConfEntry> values = new ArrayList<>();
-		try{
-			for(var field : ConfigDefs.class.getDeclaredFields()){
-				if(UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)){
-					var val  = (ConfigTools.Flag<?>)field.get(null);
-					var name = val.name();
-					values.add(new ConfEntry(name, switch(val){
-						case Flag.FEnum<?> enumFlag -> {
-							var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
-							var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
-							yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
-						}
-						case Flag.FBool bool -> BLUE + bool.resolve() + RESET;
-						case Flag.FInt anInt -> YELLOW_BRIGHT + anInt.resolve() + RESET;
-						case Flag.FStr str -> PURPLE_BRIGHT + str.resolve() + RESET;
-						case Flag.FStrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
-					}));
+		return configFlagFields().map(val -> {
+			var name = val.name();
+			return new ConfEntry(name, switch(val){
+				case Flag.FEnum<?> enumFlag -> {
+					var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
+					var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
+					yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
 				}
+				case Flag.FBool bool -> BLUE + bool.resolve() + RESET;
+				case Flag.FInt anInt -> YELLOW_BRIGHT + anInt.resolve() + RESET;
+				case Flag.FStr str -> PURPLE_BRIGHT + str.resolve() + RESET;
+				case Flag.FStrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
+			});
+		}).toList();
+	}
+	public static Stream<Flag<?>> configFlagFields(){
+		return Arrays.stream(ConfigDefs.class.getDeclaredFields()).filter(field -> UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)).map(field -> {
+			try{
+				var obj = (Flag<?>)field.get(null);
+				if(obj == null){
+					throw new NullPointerException(field + " is null");
+				}
+				return obj;
+			}catch(IllegalAccessException e){
+				throw new RuntimeException(e);
 			}
-			return values;
-		}catch(IllegalAccessException e){
-			throw new RuntimeException(e);
-		}
-		
+		});
 	}
 	
 }
