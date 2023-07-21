@@ -17,7 +17,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -69,6 +68,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public record Mark(long sequence, long action){
+		public static final Mark NONE = new Mark(-1, -1);
+		
 		public boolean hasSequence()                  { return sequence != -1; }
 		public boolean hasAction()                    { return action != -1; }
 		public boolean sequence(FuzzSequence sequence){ return this.sequence == sequence.index(); }
@@ -105,12 +106,22 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				Objects.requireNonNull(sequence);
 				Objects.requireNonNull(actionIndex);
 			}
+			@Override
+			public String makeReport(){
+				return "Sequence" + sequence + (actionIndex.isPresent()? " on index " + actionIndex.getAsLong() : "") + " is stable";
+			}
 		}
 		
 		record DidntFail(int expectedCount, int actualCount) implements Stability{
 			public DidntFail{
 				if(expectedCount<=0) throw new AssertionError();
 				if(expectedCount<=actualCount) throw new AssertionError();
+			}
+			@Override
+			public String makeReport(){
+				return
+					"Fail not stable had " + expectedCount +
+					" reruns but got " + actualCount + " fails";
 			}
 		}
 		
@@ -119,7 +130,18 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				Objects.requireNonNull(a);
 				Objects.requireNonNull(b);
 			}
+			@Override
+			public String makeReport(){
+				return
+					"Fail not stable:\n" +
+					a.note() + "\n" +
+					b.note() + "\n\n" +
+					a.trace() + "\n" +
+					b.trace() + "\n" +
+					"=========================================================";
+			}
 		}
+		String makeReport();
 	}
 	
 	public void runStable(Stability stability){
@@ -128,24 +150,10 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				var mark = new Mark(sequence.index(), actionIndex.orElse(-1));
 				runSequence(mark, sequence);
 			}
-			case Stability.DidntFail(int expected, int actual) -> {
-				throw new AssertionError(
-					"Fail not stable had " + expected +
-					" reruns but got " + actual + " fails"
-				);
-			}
-			case Stability.FailsNotSame(var a, var b) -> {
-				throw new AssertionError(
-					"Fail not stable:\n" +
-					a.note() + "\n" +
-					b.note() + "\n\n" +
-					a.trace() + "\n" +
-					b.trace()
-				);
-			}
+			default -> throw new AssertionError(stability.makeReport());
 		}
 	}
-	public Stability establishFailStability(FuzzFail<Action, State> fail, int reruns){
+	public Stability establishFailStability(FuzzFail<State, Action> fail, int reruns){
 		Objects.requireNonNull(fail);
 		if(reruns<1) throw new IllegalArgumentException("Rerun count must be at least 1");
 		
@@ -158,7 +166,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			new Config().withName("establishStableFail")
 			            .withErrorDelay(Duration.ofMillis(Long.MAX_VALUE))
 			            .dontLog(),
-			mark, () -> IntStream.range(0, reruns).mapToObj(i -> sequence)
+			Mark.NONE, () -> IntStream.range(0, reruns).mapToObj(i -> sequence)
 		);
 		if(fails.size() != reruns){
 			return new Stability.DidntFail(reruns, fails.size());
@@ -169,7 +177,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		            .findAny().orElse(new Stability.Ok(sequence, mark.hasAction()? OptionalLong.of(mark.action) : OptionalLong.empty()));
 	}
 	
-	private FuzzFail<Action, State> shortenFail(FuzzFail<Action, State> fail){
+	private FuzzFail<State, Action> shortenFail(FuzzFail<State, Action> fail){
 		if(!(fail instanceof FuzzFail.Action<Action, State> action)){
 			return fail;
 		}
@@ -179,9 +187,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return new FuzzFail.Action<>(action.e(), sequence, action.action(), action.actionIndex(), action.timeToFail(), action.badState());
 	}
 	
-	public Optional<FuzzFail<Action, State>> runSequence(FuzzSequence sequence)           { return runSequence(new Mark(-1, -1), sequence, null); }
-	public Optional<FuzzFail<Action, State>> runSequence(Mark mark, FuzzSequence sequence){ return runSequence(mark, sequence, null); }
-	public Optional<FuzzFail<Action, State>> runSequence(Mark mark, FuzzSequence sequence, FuzzProgress progress){
+	public Optional<FuzzFail<State, Action>> runSequence(FuzzSequence sequence)           { return runSequence(Mark.NONE, sequence, null); }
+	public Optional<FuzzFail<State, Action>> runSequence(Mark mark, FuzzSequence sequence){ return runSequence(mark, sequence, null); }
+	public Optional<FuzzFail<State, Action>> runSequence(Mark mark, FuzzSequence sequence, FuzzProgress progress){
 		if(progress != null && progress.hasErr()) return Optional.empty();
 		
 		var start = Instant.now();
@@ -191,6 +199,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		try{
 			state = stateEnv.create(rand, sequence.index(), mark);
 		}catch(Throwable e){
+			FuzzFail.trimErr(e);
 			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, Instant.now())));
 		}
 		
@@ -203,6 +212,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				stateEnv.applyAction(state, idx, action, mark);
 			}catch(Throwable e){
 				var duration = Duration.between(start, Instant.now());
+				FuzzFail.trimErr(e);
 				return Optional.of(new FuzzFail.Action<>(e, sequence, action, idx, duration, state));
 			}
 			
@@ -210,23 +220,6 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 		
 		return Optional.empty();
-	}
-	
-	private interface SequenceSource{
-		Stream<FuzzSequence> all();
-		
-		record SeedIter(long seed, long totalIterations, int sequenceLength) implements SequenceSource{
-			@Override
-			public Stream<FuzzSequence> all(){
-				var sequenceEntropy   = new Random(seed);
-				var numberOfSequences = Math.toIntExact(Math.ceilDiv(totalIterations, sequenceLength));
-				return IntStream.range(0, numberOfSequences).mapToObj(seqIndex -> {
-					var from = seqIndex*sequenceLength;
-					var to   = Math.min((seqIndex + 1L)*sequenceLength, totalIterations);
-					return new FuzzSequence(from, seqIndex, sequenceEntropy.nextLong(), (int)(to - from));
-				});
-			}
-		}
 	}
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
@@ -237,16 +230,16 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 	}
 	
-	public List<FuzzFail<Action, State>> run(long seed, long totalIterations, int sequenceLength){
+	public List<FuzzFail<State, Action>> run(long seed, long totalIterations, int sequenceLength){
 		return run(null, seed, totalIterations, sequenceLength);
 	}
-	public List<FuzzFail<Action, State>> run(Config config, long seed, long totalIterations, int sequenceLength){
-		return run(config, new Mark(-1, -1), new SequenceSource.SeedIter(seed, totalIterations, sequenceLength));
+	public List<FuzzFail<State, Action>> run(Config config, long seed, long totalIterations, int sequenceLength){
+		return run(config, new Mark(-1, -1), new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	public List<FuzzFail<Action, State>> run(Config config, Mark mark, long seed, long totalIterations, int sequenceLength){
-		return run(config, mark, new SequenceSource.SeedIter(seed, totalIterations, sequenceLength));
+	public List<FuzzFail<State, Action>> run(Config config, Mark mark, long seed, long totalIterations, int sequenceLength){
+		return run(config, mark, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	private List<FuzzFail<Action, State>> run(Config config, Mark mark, SequenceSource source){
+	public List<FuzzFail<State, Action>> run(Config config, Mark mark, FuzzSequenceSource source){
 		final var conf = config == null? new Config() : config;
 		
 		var runType = RunType.of(source, stateEnv, mark);
@@ -261,10 +254,10 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				int nThreads = (int)Math.max(Math.min(conf.maxWorkers, sequencesToRun) - 1, 1);
 				var progress = new FuzzProgress(conf, totalIterations);
 				
-				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<Action, State>>());
+				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>());
 				
 				ScheduledExecutorService          delayExec;
-				Consumer<FuzzFail<Action, State>> reportFail;
+				Consumer<FuzzFail<State, Action>> reportFail;
 				if(conf.errorDelay.isZero()){
 					delayExec = null;
 					reportFail = f -> {
@@ -315,7 +308,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	private sealed interface RunType{
 		static RunType of(FuzzSequence sequence){ return new Single(sequence); }
-		static RunType of(SequenceSource source, StateEnv<?, ?, ?> stateEnv, Mark mark){
+		static RunType of(FuzzSequenceSource source, StateEnv<?, ?, ?> stateEnv, Mark mark){
 			return source.all()
 			             .filter(sequence -> stateEnv.shouldRun(sequence, mark))
 			             .map(RunType::of)

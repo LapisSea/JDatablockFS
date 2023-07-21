@@ -3,6 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -23,6 +24,7 @@ import com.lapissea.cfs.run.checked.CheckSet;
 import com.lapissea.cfs.run.fuzzing.FuzzFail;
 import com.lapissea.cfs.run.fuzzing.FuzzSequence;
 import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
+import com.lapissea.cfs.run.fuzzing.Plan;
 import com.lapissea.cfs.run.fuzzing.RNGEnum;
 import com.lapissea.cfs.run.fuzzing.RNGType;
 import com.lapissea.cfs.tools.logging.DataLogger;
@@ -41,6 +43,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -362,13 +366,40 @@ public class SlowTests{
 	}
 	
 	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
+		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
+
+//		var ay = new FuzzSequenceSource.LenSeed(69, 100000, 1);
+//
+//		for(int i = 0; i<100000; i++){
+//			if(i%10000 == 0) LogUtil.println(i);
+//			ay.all().forEach(e -> { });
+//		}
+//
+//		if(true) return;
 		
-		record State(Cluster cluster, IOSet<Integer> set){ }
+		record State(Cluster cluster, IOSet<Integer> set) implements Serializable{
+			
+			record StateForm(byte[] data) implements Serializable{
+				@SuppressWarnings({"rawtypes", "unchecked"})
+				@Serial
+				private Object readResolve() throws IOException{
+					var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
+					return new State(cluster, new CheckSet<>(cluster.getRootProvider().require("hi", IOSet.class)));
+				}
+			}
+			
+			@Serial
+			private Object writeReplace() throws IOException{
+				return new StateForm(State.this.cluster.getSource().readAll());
+			}
+			
+		}
 		enum Type{ADD, REMOVE, CONTAINS, CLEAR}
-		record Action(Type type, int num){
+		record Action(Type type, int num) implements Serializable{
 			@Override
 			public String toString(){ return type == Type.CLEAR? type.toString() : type + "-" + num; }
 		}
+		
 		
 		var rnr = new FuzzingRunner.StateEnv.Marked<State, Action, IOException>(){
 			@Override
@@ -401,13 +432,16 @@ public class SlowTests{
 			       .map((e, rand) -> new Action(e, rand.nextInt(200)))
 		);
 		
-		var fails = runner.run(69, iterations, 2000);
-		if(fails.isEmpty()) return;
-		LogUtil.printlnEr(FuzzFail.report(fails));
-		
-		var stability = runner.establishFailStability(fails.get(0), 8);
-		runner.runStable(stability);
-		fail("There were fails!");
+		Plan.<State, Action>start(68, iterations, 2000)
+		    .loadFail(new File("runSetFuzzFail"))
+		    .ifHasFail(p -> p.stableFail(8).report().runMark().assertFail())
+		    .runAll()
+		    .report()
+		    .stableFail(8)
+		    .saveFail()
+		    .runMark()
+		    .assertFail()
+		    .execute(runner);
 	}
 	
 	@Test

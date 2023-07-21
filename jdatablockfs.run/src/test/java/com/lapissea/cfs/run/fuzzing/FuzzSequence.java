@@ -1,6 +1,8 @@
 package com.lapissea.cfs.run.fuzzing;
 
-public record FuzzSequence(long startIndex, long index, long seed, int iterations){
+import java.io.Serializable;
+
+public record FuzzSequence(long startIndex, long index, long seed, int iterations) implements Serializable{
 	
 	@Override
 	public String toString(){

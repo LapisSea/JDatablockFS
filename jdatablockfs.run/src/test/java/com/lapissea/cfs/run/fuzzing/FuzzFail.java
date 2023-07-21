@@ -1,24 +1,20 @@
 package com.lapissea.cfs.run.fuzzing;
 
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.io.StringWriter;
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public sealed interface FuzzFail<Act, State>{
+public sealed interface FuzzFail<State, Act>{
 	
-	static <Act, Stat> Optional<Action<Act, Stat>> findAction(List<? extends FuzzFail<Act, Stat>> fails, Predicate<Action<Act, Stat>> find){
-		return fails.stream().filter(a -> a instanceof Action).map(a -> (Action<Act, Stat>)a).filter(find).findFirst();
-	}
-	
-	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails){
+	static <Act, Stat> String report(List<? extends FuzzFail<Stat, Act>> fails){
 		if(fails.isEmpty()) return "";
 		if(fails.size() == 1){
 			return fails.get(0).trace();
@@ -33,8 +29,8 @@ public sealed interface FuzzFail<Act, State>{
 		return sb.toString();
 	}
 	
-	static <Act, Stat, F extends FuzzFail<Act, Stat>> List<F> sortFails(List<F> fails){ return sortFails(fails, null); }
-	static <Act, Stat, F extends FuzzFail<Act, Stat>> List<F> sortFails(List<F> fails, FailOrder order){
+	static <Act, Stat, F extends FuzzFail<Stat, Act>> List<F> sortFails(List<F> fails){ return sortFails(fails, null); }
+	static <Act, Stat, F extends FuzzFail<Stat, Act>> List<F> sortFails(List<F> fails, FailOrder order){
 		return switch(order == null? FailOrder.defaultOrder() : order){
 			case LEAST_ACTION -> fails.stream().sorted((a, b) -> {
 				if(a instanceof Create && b instanceof Create) return Long.compare(a.sequence().index(), b.sequence().index());
@@ -60,7 +56,7 @@ public sealed interface FuzzFail<Act, State>{
 		};
 	}
 	
-	record Create<Action, State>(Throwable e, FuzzSequence sequence, Duration timeToFail) implements FuzzFail<Action, State>{
+	record Create<Action, State>(Throwable e, FuzzSequence sequence, Duration timeToFail) implements FuzzFail<State, Action>, Serializable{
 		public Create{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -96,7 +92,7 @@ public sealed interface FuzzFail<Act, State>{
 	
 	record Action<Actio, State>(
 		Throwable e, FuzzSequence sequence, Actio action, long actionIndex, Duration timeToFail, State badState
-	) implements FuzzFail<Actio, State>{
+	) implements FuzzFail<State, Actio>, Serializable{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -149,6 +145,39 @@ public sealed interface FuzzFail<Act, State>{
 		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
 		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }
 		
+	}
+	
+	static void trimErr(Throwable e){
+		var stack  = e.getStackTrace();
+		var fzName = FuzzingRunner.class.getName();
+		int end    = 0;
+		for(; end<stack.length; end++){
+			var el = stack[end];
+			if(el.getClassName().startsWith(fzName)){
+				break;
+			}
+		}
+		
+		try{
+			var el  = stack[end - 1];
+			var typ = Class.forName(el.getClassName());
+			if(Arrays.stream(typ.getDeclaredMethods()).filter(Method::isSynthetic)
+			         .anyMatch(m -> m.getName().equals(el.getMethodName()))
+			){
+				end--;
+			}
+		}catch(ClassNotFoundException ex){ }
+		
+		stack = Arrays.copyOf(stack, end);
+		
+		e.setStackTrace(stack);
+		
+		for(var er : e.getSuppressed()){
+			trimErr(er);
+		}
+		
+		var c = e.getCause();
+		if(c != null) trimErr(c);
 	}
 	
 	private static boolean permissiveThrowableEquals(Throwable ex1, Throwable ex2){
