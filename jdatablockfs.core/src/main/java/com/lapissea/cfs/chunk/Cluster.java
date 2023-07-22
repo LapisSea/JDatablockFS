@@ -278,7 +278,7 @@ public class Cluster implements DataProvider{
 		
 		rootWalker(MemoryWalker.PointerRecord.of(ref -> {
 			if(ref.isNull()) return;
-			ref.getPtr().dereference(this).walkNext().map(Chunk::getPtr).forEach(referenced::add);
+			ref.getPtr().dereference(this).addChainToPtr(referenced);
 		}), true).walk();
 		
 		for(Chunk chunk : getFirstChunk().chunksAhead()){

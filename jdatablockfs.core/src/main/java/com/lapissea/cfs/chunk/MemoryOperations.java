@@ -780,7 +780,7 @@ public class MemoryOperations{
 			if(ref.isNull()){
 				return;
 			}
-			for(var c : ref.getPtr().dereference(prov).walkNext()) chunks.add(c);
+			ref.getPtr().dereference(prov).addChainTo(chunks);
 		};
 		
 		rec.accept(val.getReference());

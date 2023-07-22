@@ -195,7 +195,7 @@ public interface MemoryManager extends DataProvider.Holder{
 				}
 			}
 			
-			for(var c : ptr.dereference(getDataProvider()).walkNext()) chunks.add(c);
+			ptr.dereference(getDataProvider()).addChainTo(chunks);
 		}
 		return chunks;
 	}

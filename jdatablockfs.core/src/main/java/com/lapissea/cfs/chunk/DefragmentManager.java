@@ -225,7 +225,7 @@ public class DefragmentManager{
 						run[0] = true;
 						
 						var ch = valueReference.getPtr().dereference(cluster);
-						for(var c : ch.walkNext()) toFree.add(c);
+						ch.addChainTo(toFree);
 						
 						var newCh = AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
 						                          .withBytes(ch.getSize())

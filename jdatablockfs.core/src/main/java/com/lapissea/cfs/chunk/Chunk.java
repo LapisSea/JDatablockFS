@@ -37,6 +37,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -625,6 +626,16 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	public ChainWalker walkNext(){
 		return new ChainWalker(this);
+	}
+	public void addChainTo(Collection<Chunk> dest){
+		for(Chunk chunk : walkNext()){
+			dest.add(chunk);
+		}
+	}
+	public void addChainToPtr(Collection<ChunkPointer> dest){
+		for(Chunk chunk : walkNext()){
+			dest.add(chunk.getPtr());
+		}
 	}
 	
 	public int chainLength() throws IOException{
