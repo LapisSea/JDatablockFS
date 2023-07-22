@@ -4,6 +4,8 @@ import java.io.Serializable;
 
 public record FuzzSequence(long startIndex, long index, long seed, int iterations) implements Serializable{
 	
+	public long endIndex(){ return startIndex + iterations; }
+	
 	@Override
 	public String toString(){
 		
@@ -20,7 +22,7 @@ public record FuzzSequence(long startIndex, long index, long seed, int iteration
 			us = "k";
 		}
 		var start = startIndex/u;
-		var end   = (startIndex + iterations)/u;
+		var end   = endIndex()/u;
 		return seedStr + "->" + index + "(" + start + us + "-" + end + us + ")";
 	}
 	

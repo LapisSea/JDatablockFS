@@ -422,9 +422,11 @@ public class SlowTests{
 		);
 		
 		Plan.<State, Action>start(68, iterations, 2000)
-		    .loadFail(new File("runSetFuzzFail"))
-		    .stableFail(8).report().clearUnstable()
-		    .ifHasFail(p -> p.runMark().assertFail())
+		    .loadFail(new File("run" + type.getSimpleName() + "FuzzFail"))
+		    .ifHasFail(p -> p.stableFail(8).report()
+		                     .clearUnstable()
+		                     .runMark()
+		                     .assertFail())
 		    .runAll().report()
 		    .stableFail(8).saveFail().runMark()
 		    .assertFail()

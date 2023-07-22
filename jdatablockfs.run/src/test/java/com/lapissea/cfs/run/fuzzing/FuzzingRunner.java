@@ -234,7 +234,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return run(null, seed, totalIterations, sequenceLength);
 	}
 	public List<FuzzFail<State, Action>> run(Config config, long seed, long totalIterations, int sequenceLength){
-		return run(config, new Mark(-1, -1), new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
+		return run(config, Mark.NONE, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
 	public List<FuzzFail<State, Action>> run(Config config, Mark mark, long seed, long totalIterations, int sequenceLength){
 		return run(config, mark, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
