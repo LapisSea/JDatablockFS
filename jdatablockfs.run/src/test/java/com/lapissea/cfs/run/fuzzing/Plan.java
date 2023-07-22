@@ -23,11 +23,25 @@ public final class Plan<TState, TAction>{
 	
 	private record RunInfo(FuzzingRunner.Config config, long seed, long totalIterations, int sequenceLength){ }
 	
-	private record State<TState, TAction>(Fails<TState, TAction> fails, FuzzingRunner.Mark mark, java.util.Optional<java.io.File> saveFile){ }
+	private record State<TState, TAction>(Fails<TState, TAction> fails, FuzzingRunner.Mark mark, Optional<File> saveFile){
+		State<TState, TAction> withFails(List<FuzzFail<TState, TAction>> data){
+			return new State<>(new Fails.FailList<>(data), data.isEmpty()? FuzzingRunner.Mark.NONE : data.get(0).mark(), saveFile);
+		}
+		
+		State<TState, TAction> withFail(FuzzFail<TState, TAction> fail, FuzzingRunner.Stability stability){
+			return new State<>(new Fails.StableFail<>(fail, stability), fail.mark(), saveFile);
+		}
+		
+		State<TState, TAction> withFile(File saveFile){
+			return new State<>(fails, mark, Optional.of(saveFile));
+		}
+	}
 	
 	private sealed interface Fails<S, A>{
 		record FailList<S, A>(List<FuzzFail<S, A>> data) implements Fails<S, A>{
 			public FailList{ data = List.copyOf(data); }
+			@Override
+			public Stream<FuzzFail<S, A>> fails(){ return data.stream(); }
 		}
 		
 		record StableFail<S, A>(FuzzFail<S, A> fail, FuzzingRunner.Stability stability) implements Fails<S, A>{
@@ -35,7 +49,11 @@ public final class Plan<TState, TAction>{
 				Objects.requireNonNull(fail);
 				Objects.requireNonNull(stability);
 			}
+			@Override
+			public Stream<FuzzFail<S, A>> fails(){ return Stream.of(fail); }
 		}
+		Stream<FuzzFail<S, A>> fails();
+		default boolean hasAny(){ return fails().findAny().isPresent(); }
 	}
 	
 	private interface Step<TState, TAction>{
@@ -64,7 +82,7 @@ public final class Plan<TState, TAction>{
 	public Plan<TState, TAction> runAll(){
 		return new Plan<>(members, runInfo, (state, runner) -> {
 			var fails = runner.run(runInfo.config, runInfo.seed, runInfo.totalIterations, runInfo.sequenceLength);
-			return new State<>(new Fails.FailList<>(fails), FuzzingRunner.Mark.NONE, state.saveFile);
+			return state.withFails(fails);
 		});
 	}
 	
@@ -74,10 +92,7 @@ public final class Plan<TState, TAction>{
 			return state;
 		}
 		
-		var failO = switch(state.fails){
-			case Fails.FailList(var fs) -> fs.stream().filter(f -> state.mark.sequence(f.sequence())).findAny();
-			case Fails.StableFail(var f, var stability) -> Optional.of(f);
-		};
+		var failO = state.fails.fails().filter(f -> state.mark.sequence(f.sequence())).findAny();
 		
 		var sequence = failO.map(FuzzFail::sequence).orElseGet(() -> {
 			return new FuzzSequenceSource.LenSeed(runInfo.seed, runInfo.totalIterations, runInfo.sequenceLength)
@@ -87,16 +102,13 @@ public final class Plan<TState, TAction>{
 		
 		var fail = runner.runSequence(state.mark, sequence);
 		
-		var mark = fail.map(FuzzFail::mark).orElse(FuzzingRunner.Mark.NONE);
-		return new State<>(new Fails.FailList<>(fail.stream().toList()), mark, state.saveFile);
+		return state.withFails(fail.stream().toList());
 	}
 	
 	public Plan<TState, TAction> ifHasFail(Function<Plan<TState, TAction>, Plan<TState, TAction>> branch){
 		var ifPlan = branch.apply(new Plan<>(List.of(), runInfo));
 		return new Plan<>(members, runInfo, (state, runner) -> {
-			if(!(state.fails instanceof Fails.FailList<TState, TAction>(var fails)) || fails.isEmpty()){
-				return state;
-			}
+			if(!state.fails.hasAny()) return state;
 			var newState = ifPlan.execute(state, runner);
 			return new State<>(newState.fails, FuzzingRunner.Mark.NONE, state.saveFile);
 		});
@@ -112,7 +124,12 @@ public final class Plan<TState, TAction>{
 					}
 				}
 				case Fails.StableFail<TState, TAction>(var fail, var stability) -> {
-					(stability instanceof Ok? System.out : System.err).println(stability.makeReport());
+					if(stability instanceof Ok){
+						System.out.println(stability.makeReport());
+						System.err.println(fail.trace());
+					}else{
+						System.err.println(stability.makeReport());
+					}
 				}
 			}
 			return state;
@@ -120,28 +137,22 @@ public final class Plan<TState, TAction>{
 	}
 	public Plan<TState, TAction> clearUnstable(){
 		return new Plan<>(members, runInfo, (state, runner) -> {
-			if(state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof Ok)){
-				return new State<>(new Fails.FailList<>(List.of()), FuzzingRunner.Mark.NONE, state.saveFile);
-			}
-			return state;
+			return switch(state.fails){
+				case Fails.StableFail(var fail, var stability) when !(stability instanceof Ok) -> {
+					yield new State<>(new Fails.FailList<>(List.of()), FuzzingRunner.Mark.NONE, state.saveFile);
+				}
+				default -> state;
+			};
 		});
 	}
 	public Plan<TState, TAction> failWhere(Predicate<FuzzFail<TState, TAction>> filter){
 		return new Plan<>(members, runInfo, (state, runner) -> {
-			return switch(state.fails){
-				case Fails.FailList(var fails) -> {
-					var newFails = fails.stream().filter(filter).toList();
-					var mark     = state.mark;
-					if(mark.hasSequence()){
-						mark = newFails.isEmpty()? FuzzingRunner.Mark.NONE : newFails.get(0).mark();
-					}
-					yield new State<>(new Fails.FailList<>(newFails), mark, state.saveFile);
-				}
-				case Fails.StableFail(var fail, var stability) -> {
-					var newFails = Stream.of(fail).filter(filter).toList();
-					yield new State<>(new Fails.FailList<>(newFails), newFails.isEmpty()? FuzzingRunner.Mark.NONE : state.mark, state.saveFile);
-				}
-			};
+			var newFails = state.fails.fails().filter(filter).toList();
+			var mark     = state.mark;
+			if(mark.hasSequence()){
+				mark = newFails.isEmpty()? FuzzingRunner.Mark.NONE : newFails.get(0).mark();
+			}
+			return new State<>(new Fails.FailList<>(newFails), mark, state.saveFile);
 		});
 	}
 	
@@ -153,14 +164,14 @@ public final class Plan<TState, TAction>{
 					if(fails.isEmpty()) yield state;
 					var fail      = fails.get(0);
 					var stability = runner.establishFailStability(fail, reruns);
-					yield new State<>(new Fails.StableFail<>(fail, stability), fail.mark(), state.saveFile);
+					yield state.withFail(fail, stability);
 				}
 				case Fails.StableFail(var fail, var stability) -> {
 					if(!(stability instanceof Ok)){
 						throw new AssertionError(stability.makeReport());
 					}
 					var stab = runner.establishFailStability(fail, reruns);
-					yield new State<>(new Fails.StableFail<>(fail, stab), fail.mark(), state.saveFile);
+					yield state.withFail(fail, stab);
 				}
 			};
 		});
@@ -168,11 +179,7 @@ public final class Plan<TState, TAction>{
 	
 	public Plan<TState, TAction> assertFail(){
 		return new Plan<>(members, runInfo, (state, runner) -> {
-			var hasFail = switch(state.fails){
-				case Fails.FailList(var fails) -> !fails.isEmpty();
-				case Fails.StableFail<?, ?> ignored -> true;
-			};
-			if(hasFail) throw new AssertionError("There are fails");
+			if(state.fails.hasAny()) throw new AssertionError("There are fails");
 			return state;
 		});
 	}
@@ -219,7 +226,7 @@ public final class Plan<TState, TAction>{
 				fileInf.delete();
 			}
 			
-			return new State<>(state.fails, state.mark, Optional.of(fileInf));
+			return state.withFile(fileInf);
 		});
 	}
 	

@@ -348,7 +348,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	private static String getTaskName(){
 		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
 		                  .walk(s -> s.dropWhile(f -> !f.getMethodName().equals("run"))
-		                              .dropWhile(f -> f.getClassName().startsWith(FuzzingRunner.class.getName()))
+		                              .dropWhile(f -> f.getClassName().startsWith(FuzzingRunner.class.getPackageName() + "."))
 		                              .findAny()
 		                              .orElseThrow()
 		                              .getMethodName());
