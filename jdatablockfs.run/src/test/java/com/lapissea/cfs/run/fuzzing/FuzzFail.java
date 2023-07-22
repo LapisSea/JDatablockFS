@@ -50,7 +50,12 @@ public sealed interface FuzzFail<State, Act>{
 			                          .collect(Collectors.groupingBy(f -> Arrays.asList(f.e().getStackTrace())))
 			                          .values().stream()
 			                          .map(l -> sortFails(l, FailOrder.LEAST_ACTION))
-			                          .sorted(Comparator.comparingInt(f -> -f.size()))
+			                          .sorted(Comparator.<List<F>>comparingInt(f -> -f.size()).thenComparingInt(f -> {
+				                          return switch(f.get(0)){
+					                          case FuzzFail.Action<?, ?> a -> a.localIndex();
+					                          case FuzzFail.Create<?, ?> c -> -1;
+				                          };
+			                          }))
 			                          .flatMap(Collection::stream)
 			                          .toList();
 		};

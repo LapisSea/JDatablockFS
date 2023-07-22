@@ -14,10 +14,10 @@ public class CacheOutOfSync extends IOException{
 	private static <T> String makeMsg(T cached, T actual){
 		assert !Objects.equals(cached, actual);
 		if(cached == null){
-			return "cached missing";
+			return "cached missing, actual: " + actual;
 		}
 		if(actual == null){
-			return "actual missing";
+			return "actual missing, cached: " + cached;
 		}
 		return "\n" + TextUtil.toTable("cached/actual", cached, actual);
 	}

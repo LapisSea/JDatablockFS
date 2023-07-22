@@ -1,6 +1,7 @@
 package com.lapissea.cfs.run.fuzzing;
 
 import com.lapissea.cfs.run.fuzzing.FuzzingRunner.Stability.Ok;
+import com.lapissea.util.LogUtil;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -67,29 +68,29 @@ public final class Plan<TState, TAction>{
 		});
 	}
 	
-	public Plan<TState, TAction> runMark(){
-		return new Plan<>(members, runInfo, (state, runner) -> {
-			if(state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof Ok)){
-				return state;
-			}
-			
-			var failO = switch(state.fails){
-				case Fails.FailList(var fs) -> fs.stream().filter(f -> state.mark.sequence(f.sequence())).findAny();
-				case Fails.StableFail(var f, var stability) -> Optional.of(f);
-			};
-			
-			var sequence = failO.map(FuzzFail::sequence).orElseGet(() -> {
-				return new FuzzSequenceSource.LenSeed(runInfo.seed, runInfo.totalIterations, runInfo.sequenceLength)
-					       .all().filter(state.mark::sequence).findAny()
-					       .orElseThrow(() -> new IllegalStateException("Marked a non existent sequence"));
-			});
-			
-			var fail = runner.runSequence(state.mark, sequence);
-			
-			var mark = fail.map(FuzzFail::mark).orElse(FuzzingRunner.Mark.NONE);
-			return new State<>(new Fails.FailList<>(fail.stream().toList()), mark, state.saveFile);
+	public Plan<TState, TAction> runMark(){ return new Plan<>(members, runInfo, this::runMark); }
+	private State<TState, TAction> runMark(State<TState, TAction> state, FuzzingRunner<TState, TAction, ?> runner){
+		if(state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof Ok)){
+			return state;
+		}
+		
+		var failO = switch(state.fails){
+			case Fails.FailList(var fs) -> fs.stream().filter(f -> state.mark.sequence(f.sequence())).findAny();
+			case Fails.StableFail(var f, var stability) -> Optional.of(f);
+		};
+		
+		var sequence = failO.map(FuzzFail::sequence).orElseGet(() -> {
+			return new FuzzSequenceSource.LenSeed(runInfo.seed, runInfo.totalIterations, runInfo.sequenceLength)
+				       .all().filter(state.mark::sequence).findAny()
+				       .orElseThrow(() -> new IllegalStateException("Marked a non existent sequence"));
 		});
+		
+		var fail = runner.runSequence(state.mark, sequence);
+		
+		var mark = fail.map(FuzzFail::mark).orElse(FuzzingRunner.Mark.NONE);
+		return new State<>(new Fails.FailList<>(fail.stream().toList()), mark, state.saveFile);
 	}
+	
 	public Plan<TState, TAction> ifHasFail(Function<Plan<TState, TAction>, Plan<TState, TAction>> branch){
 		var ifPlan = branch.apply(new Plan<>(List.of(), runInfo));
 		return new Plan<>(members, runInfo, (state, runner) -> {
@@ -113,6 +114,14 @@ public final class Plan<TState, TAction>{
 				case Fails.StableFail<TState, TAction>(var fail, var stability) -> {
 					(stability instanceof Ok? System.out : System.err).println(stability.makeReport());
 				}
+			}
+			return state;
+		});
+	}
+	public Plan<TState, TAction> clearUnstable(){
+		return new Plan<>(members, runInfo, (state, runner) -> {
+			if(state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof Ok)){
+				return new State<>(new Fails.FailList<>(List.of()), FuzzingRunner.Mark.NONE, state.saveFile);
 			}
 			return state;
 		});
@@ -197,6 +206,7 @@ public final class Plan<TState, TAction>{
 				case Fails.FailList(var f) -> f.isEmpty()? null : f.get(0);
 				case Fails.StableFail(var f, var stability) -> stability instanceof Ok? f : null;
 			};
+			LogUtil.println("saving fail");
 			if(fail != null){
 				try(var out = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(fileInf)))){
 					out.writeObject(fail);
@@ -224,5 +234,4 @@ public final class Plan<TState, TAction>{
 		}
 		return state;
 	}
-	
 }

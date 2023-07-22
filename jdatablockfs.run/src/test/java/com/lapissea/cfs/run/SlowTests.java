@@ -366,17 +366,6 @@ public class SlowTests{
 	}
 	
 	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
-		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
-
-//		var ay = new FuzzSequenceSource.LenSeed(69, 100000, 1);
-//
-//		for(int i = 0; i<100000; i++){
-//			if(i%10000 == 0) LogUtil.println(i);
-//			ay.all().forEach(e -> { });
-//		}
-//
-//		if(true) return;
-		
 		record State(Cluster cluster, IOSet<Integer> set) implements Serializable{
 			
 			record StateForm(byte[] data) implements Serializable{
@@ -434,12 +423,10 @@ public class SlowTests{
 		
 		Plan.<State, Action>start(68, iterations, 2000)
 		    .loadFail(new File("runSetFuzzFail"))
-		    .ifHasFail(p -> p.stableFail(8).report().runMark().assertFail())
-		    .runAll()
-		    .report()
-		    .stableFail(8)
-		    .saveFail()
-		    .runMark()
+		    .stableFail(8).report().clearUnstable()
+		    .ifHasFail(p -> p.runMark().assertFail())
+		    .runAll().report()
+		    .stableFail(8).saveFail().runMark()
 		    .assertFail()
 		    .execute(runner);
 	}
@@ -466,6 +453,7 @@ public class SlowTests{
 	
 	@Test
 	void simpleTreeSet() throws IOException{
+		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
 		checkSet(IOTreeSet.class, (d, set) -> {
 			set.add(2);
 			set.add(1);
