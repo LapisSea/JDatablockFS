@@ -36,11 +36,11 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -608,24 +608,36 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return ch;
 	}
 	
-	public List<Chunk> collectNext(){
-		return streamNext().collect(Collectors.toList());
+	public List<Chunk> collectNext() throws IOException{
+		var len  = chainLength(Integer.MAX_VALUE);
+		var data = new ArrayList<Chunk>(len);
+		
+		var ch = this;
+		do{
+			data.add(ch);
+			ch = ch.next();
+		}while(ch != null);
+		
+		return data;
 	}
 	public Stream<Chunk> streamNext(){
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
+	public ChainWalker walkNext(){
+		return new ChainWalker(this);
+	}
 	
-	public long chainLength(long maxLen) throws IOException{
+	public int chainLength(int maxLen) throws IOException{
 		if(maxLen == 0) return 0;
 		if(maxLen<0) throw new IllegalArgumentException("maxLen must be positive");
 		
-		var  ch  = this;
-		long len = 0;
-		while(ch != null){
+		var ch  = this;
+		int len = 0;
+		do{
 			len++;
 			if(len>=maxLen) return len;
 			ch = ch.next();
-		}
+		}while(ch != null);
 		return len;
 	}
 	public long chainSize() throws IOException{

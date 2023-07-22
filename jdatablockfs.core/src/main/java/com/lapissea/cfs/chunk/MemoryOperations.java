@@ -680,7 +680,7 @@ public class MemoryOperations{
 			throw new IllegalArgumentException(firstChunk + " is not the first chunk! " + ch + " declares it as next.");
 		}
 		
-		if(firstChunk.streamNext().noneMatch(c -> c == target)){
+		if(firstChunk.walkNext().noneMatch(c -> c == target)){
 			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}
@@ -780,7 +780,7 @@ public class MemoryOperations{
 			if(ref.isNull()){
 				return;
 			}
-			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
+			for(var c : ref.getPtr().dereference(prov).walkNext()) chunks.add(c);
 		};
 		
 		rec.accept(val.getReference());

@@ -194,7 +194,8 @@ public interface MemoryManager extends DataProvider.Holder{
 					throw new RuntimeException("Duplicate pointer passed " + ptr);
 				}
 			}
-			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);
+			
+			for(var c : ptr.dereference(getDataProvider()).walkNext()) chunks.add(c);
 		}
 		return chunks;
 	}

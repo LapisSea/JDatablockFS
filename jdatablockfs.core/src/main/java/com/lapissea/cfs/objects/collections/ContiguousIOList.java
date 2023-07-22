@@ -693,7 +693,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private void defragData(long extraSlots) throws IOException{
 		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, 8);
 	}
-	private void defragData(Chunk ch, long extraSlots, long max) throws IOException{
+	private void defragData(Chunk ch, long extraSlots, int max) throws IOException{
 		if(max<=2) return;
 		var nextCount = ch.chainLength(max + 1);
 		if(nextCount<max) return;

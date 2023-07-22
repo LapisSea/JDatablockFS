@@ -162,7 +162,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						{//do not move the last chunk if it's a part of freeChunks
 							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 							var freeRef = fch.getReference().getPtr();
-							if(freeRef.dereference(context).streamNext().anyMatch(c -> c == next)){
+							if(freeRef.dereference(context).walkNext().anyMatch(c -> c == next)){
 								allowFreeRemove = false;
 							}
 						}

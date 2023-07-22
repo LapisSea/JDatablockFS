@@ -147,7 +147,7 @@ public class DefragmentManager{
 				if(newCh == null){
 					return END;
 				}
-				ch.streamNext().forEach(toFree::add);
+				for(var c : ch.walkNext()) toFree.add(c);
 				
 				field.setReference(instance, newCh.getPtr().makeReference());
 				moved = true;
@@ -178,7 +178,7 @@ public class DefragmentManager{
 				}
 				
 				field.set(null, instance, newCh.getPtr());
-				ch.streamNext().forEach(toFree::add);
+				for(var c : ch.walkNext()) toFree.add(c);
 				moved = true;
 				
 				return END|SAVE;
@@ -225,7 +225,7 @@ public class DefragmentManager{
 						run[0] = true;
 						
 						var ch = valueReference.getPtr().dereference(cluster);
-						ch.streamNext().forEach(toFree::add);
+						for(var c : ch.walkNext()) toFree.add(c);
 						
 						var newCh = AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
 						                          .withBytes(ch.getSize())

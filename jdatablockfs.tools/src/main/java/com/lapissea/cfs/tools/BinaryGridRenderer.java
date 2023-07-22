@@ -882,7 +882,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									               alpha(Color.BLUE, 0.1F), false, false);
 								}
 								if(done.add(chunk.getPtr())){
-									chunk.streamNext().map(Chunk::getPtr).forEach(done::add);
+									chunk.walkNext().map(Chunk::getPtr).forEach(done::add);
 									annotateChunk(annCtx, chunk);
 								}
 							}
