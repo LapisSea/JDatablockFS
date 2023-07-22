@@ -609,7 +609,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	public List<Chunk> collectNext() throws IOException{
-		var len  = chainLength(Integer.MAX_VALUE);
+		var len  = chainLength();
 		var data = new ArrayList<Chunk>(len);
 		
 		var ch = this;
@@ -627,6 +627,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return new ChainWalker(this);
 	}
 	
+	public int chainLength() throws IOException{
+		return chainLength(Integer.MAX_VALUE);
+	}
 	public int chainLength(int maxLen) throws IOException{
 		if(maxLen == 0) return 0;
 		if(maxLen<0) throw new IllegalArgumentException("maxLen must be positive");

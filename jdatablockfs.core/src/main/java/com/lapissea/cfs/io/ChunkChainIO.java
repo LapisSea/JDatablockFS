@@ -240,8 +240,11 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	@Override
 	public void close() throws IOException{
-		cursor.syncStruct();
-		source.close();
+		try{
+			cursor.syncStruct();
+		}finally{
+			source.close();
+		}
 	}
 	
 	@Override

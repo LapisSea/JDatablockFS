@@ -226,6 +226,11 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	}
 	
 	
+	public ChunkPointer asPtr(){
+		if(offset != 0) throw new UnsupportedOperationException();
+		return ptr;
+	}
+	
 	public ChunkPointer getPtr(){ return ptr; }
 	public long getOffset()     { return offset; }
 	
