@@ -159,7 +159,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						var lastFree = lastChO.get();
 						var next     = nextO.get();
 						
-						{//do not move the last chunk if it's a part of freeChunks
+						{//Disable modification of the list while it is being moved
 							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 							var freeRef = fch.getReference().getPtr();
 							if(freeRef.dereference(context).walkNext().anyMatch(c -> c == next)){
@@ -168,11 +168,11 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						}
 						
 						try{
-							var moved = DefragmentManager.moveReference(
+							var move = DefragmentManager.moveReference(
 								(Cluster)context, next.getPtr(),
 								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
 								false);
-							if(moved) anyPopped = true;
+							if(move.hasAny()) anyPopped = true;
 						}finally{
 							allowFreeRemove = true;
 						}
