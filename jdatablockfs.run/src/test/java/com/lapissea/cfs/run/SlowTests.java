@@ -421,16 +421,22 @@ public class SlowTests{
 			       .map((e, rand) -> new Action(e, rand.nextInt(200)))
 		);
 		
-		Plan.<State, Action>start(68, iterations, 2000)
-		    .loadFail(new File("run" + type.getSimpleName() + "FuzzFail"))
+		stableRunAndSave(
+			Plan.start(runner, 68, iterations, 2000),
+			"run" + type.getSimpleName()
+		);
+	}
+	
+	private static <State, Action> void stableRunAndSave(Plan<State, Action> plan, String name){
+		plan.loadFail(new File("FailCache/" + name))
+		    .configMod(c -> c.withName(name))
 		    .ifHasFail(p -> p.stableFail(8).report()
 		                     .clearUnstable()
 		                     .runMark()
 		                     .assertFail())
 		    .runAll().report()
 		    .stableFail(8).saveFail().runMark()
-		    .assertFail()
-		    .execute(runner);
+		    .assertFail();
 	}
 	
 	@Test
@@ -716,7 +722,6 @@ public class SlowTests{
 			r -> new MapAction.ContainsKey(10 + r.nextInt(range)),
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
-		
 		
 		var fails = runner.run(69, 50000, 2000);
 		if(fails.isEmpty()) return;

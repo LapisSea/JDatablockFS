@@ -224,10 +224,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
 	public void runAndAssert(Config config, long seed, long totalIterations, int sequenceLength){
-		var fails = run(config, seed, totalIterations, sequenceLength);
-		if(!fails.isEmpty()){
-			throw new AssertionError(FuzzFail.report(fails) + "\nReport stacktrace:");
-		}
+		Plan.start(this, config, seed, totalIterations, sequenceLength)
+		    .runAll()
+		    .assertFail();
 	}
 	
 	public List<FuzzFail<State, Action>> run(long seed, long totalIterations, int sequenceLength){
