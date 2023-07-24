@@ -14,11 +14,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 
-public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
+public final class PersistentMemoryManager extends MemoryManager.StrategyImpl implements MemoryManager.MoveInfo{
 	
 	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
@@ -31,8 +31,8 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private static final class Node extends AbstractList<ChunkChainIO>{
 		private       ChunkChainIO[] data = new ChunkChainIO[1];
 		private       int            size;
-		private final long           threadId;
-		private Node(){ this.threadId = Thread.currentThread().threadId(); }
+		private final Thread         thread;
+		private Node(Thread thread){ this.thread = thread; }
 		@Override
 		public boolean add(ChunkChainIO v){
 			var d = data;
@@ -54,41 +54,46 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		public int size(){ return size; }
 	}
 	
-	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
-	private final Map<Thread, Node> allStacks = new WeakHashMap<>();
 	
-	private Node last;
+	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
+	private final Map<Thread, Node> allStacks = new HashMap<>();
+	private       Node              last;
 	private Node getStack(){
-		var l  = last;
 		var th = Thread.currentThread();
-		if(l != null && l.threadId == th.threadId()){
+		var l  = last;
+		if(l != null && l.thread == th){
 			return l;
 		}
 		
 		var s = stacks.get();
 		if(s == null){
-			stacks.set(s = new Node());
+			stacks.set(s = new Node(th));
 			synchronized(allStacks){
+				if(!allStacks.isEmpty()) cleanStacks();
 				allStacks.put(th, s);
 			}
 		}
 		return last = s;
 	}
 	
-	private final MoveInfo moveInfo = new MoveInfo(){
-		@Override
-		public void start(ChunkChainIO chain){
-			getStack().add(chain);
+	private void cleanStacks(){
+		if(allStacks.size()>Runtime.getRuntime().availableProcessors()){
+			allStacks.keySet().removeIf(t -> !t.isAlive());
 		}
-		@Override
-		public void end(ChunkChainIO chain){
-			var s  = getStack();
-			var ch = s.pop();
-			if(ch != chain){
-				throw new IllegalStateException();
-			}
+	}
+	
+	@Override
+	public void start(ChunkChainIO chain){
+		getStack().add(chain);
+	}
+	@Override
+	public void end(ChunkChainIO chain){
+		var s  = getStack();
+		var ch = s.pop();
+		if(ch != chain){
+			throw new IllegalStateException();
 		}
-	};
+	}
 	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context);
@@ -118,7 +123,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	}
 	
 	@Override
-	public MoveInfo getMoveInfo(){ return moveInfo; }
+	public MoveInfo getMoveInfo(){ return this; }
 	
 	@Override
 	public DefragSes openDefragmentMode(){
@@ -258,6 +263,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 									}
 								}
 								synchronized(allStacks){
+									cleanStacks();
 									for(var s : allStacks.values()){
 										if(s == stack) continue;
 										for(var cha : s){
