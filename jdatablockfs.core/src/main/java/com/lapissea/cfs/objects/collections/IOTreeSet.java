@@ -384,8 +384,11 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				nodes.add(node);
 			}else updateNode(nodeIdx, node);
 			
-			if(valIdx == values.size()) values.add(new Val<>(value));
-			else values.set(valIdx, new Val<>(value));
+			if(valIdx == values.size()){
+				values.add(new Val<>(value));
+			}else{
+				values.set(valIdx, new Val<>(value));
+			}
 		}
 		return nodeIdx;
 	}

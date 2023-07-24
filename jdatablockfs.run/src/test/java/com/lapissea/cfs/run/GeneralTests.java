@@ -382,7 +382,7 @@ public class GeneralTests{
 				io.write(bb);
 			}
 			
-			assertEquals(first.chainLength(69), 2);
+			assertEquals(first.chainLength(), 2);
 			assertEquals(first.readAll(), bb);
 		});
 	}

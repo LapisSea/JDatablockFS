@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static com.lapissea.cfs.config.GlobalConfig.COSTLY_STACK_TRACE;
+
 public final class VaryingSize implements Stringify{
 	
 	public static <T extends IOInstance<T>> TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, TooSmall e){
@@ -300,7 +302,7 @@ public final class VaryingSize implements Stringify{
 		}
 		@Override
 		public Throwable fillInStackTrace(){
-//			return super.fillInStackTrace();
+			if(COSTLY_STACK_TRACE) return super.fillInStackTrace();
 			return this;
 		}
 		@Override

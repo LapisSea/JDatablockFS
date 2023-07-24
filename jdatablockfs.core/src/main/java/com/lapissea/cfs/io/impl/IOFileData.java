@@ -1,7 +1,6 @@
 package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.config.ConfigDefs;
-import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
@@ -20,6 +19,8 @@ import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Collection;
+
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 public final class IOFileData implements IOInterface, Closeable{
 	
@@ -311,7 +312,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	}
 	public static void readInto(File file, IOInterface dest) throws IOException{
 		try(var in = new FileInputStream(file); var out = dest.io()){
-			var buff = new byte[MathUtil.snap((int)file.length(), 16, GlobalConfig.BATCH_BYTES)];
+			var buff = new byte[MathUtil.snap((int)file.length(), 16, BATCH_BYTES)];
 			int read;
 			while((read = in.read(buff))>=0){
 				out.write(buff, 0, read);

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.G2DBackend;
@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.lapissea.cfs.config.ConfigDefs.CONFIG_PROPERTY_PREFIX;
 import static com.lapissea.cfs.logging.Log.log;
 import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.DOWN;
 import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.UP;
@@ -36,7 +37,7 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayManager implements DataLogger{
 	
-	private static final boolean DO_JIT_WARMUP = GlobalConfig.configFlag("tools.jitWarmup", true);
+	private static final boolean DO_JIT_WARMUP = ConfigUtils.configBoolean(CONFIG_PROPERTY_PREFIX + "tools.jitWarmup", true);
 	
 	static{
 		ImGuiUtils.load();

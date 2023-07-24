@@ -356,7 +356,7 @@ public class Utils{
 				universe.addAll(uni.get().universe);
 				continue;
 			}
-			if(Modifier.isFinal(sub.getModifiers())){
+			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())){
 				universe.add(sub);
 				continue;
 			}

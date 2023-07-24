@@ -31,6 +31,27 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
+	
+	default boolean noneMatch(Predicate<T> predicate){
+		return !anyMatch(predicate);
+	}
+	default boolean anyMatch(Predicate<T> predicate){
+		for(T t : this){
+			if(predicate.test(t)){
+				return true;
+			}
+		}
+		return false;
+	}
+	default boolean allMatch(Predicate<T> predicate){
+		for(T t : this){
+			if(!predicate.test(t)){
+				return false;
+			}
+		}
+		return true;
+	}
+	
 	default IterablePP<T> filtered(Predicate<T> filter){
 		return () -> new Iterator<T>(){
 			private final Iterator<T> src = IterablePP.this.iterator();

@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
@@ -39,8 +40,12 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 
 public class Cluster implements DataProvider{
 	
-	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	static{
+		Thread.startVirtualThread(FieldCompiler::init);
+	}
+	
 	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
+	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
 	
 	public static Cluster emptyMem() throws IOException{
 		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
@@ -227,7 +232,7 @@ public class Cluster implements DataProvider{
 	@Override
 	public IOInterface getSource(){ return source; }
 	@Override
-	public MemoryManager getMemoryManager(){ return Objects.requireNonNull(memoryManager); }
+	public MemoryManager getMemoryManager(){ return memoryManager; }
 	@Override
 	public ChunkCache getChunkCache(){ return chunkCache; }
 	
@@ -273,7 +278,7 @@ public class Cluster implements DataProvider{
 		
 		rootWalker(MemoryWalker.PointerRecord.of(ref -> {
 			if(ref.isNull()) return;
-			ref.getPtr().dereference(this).streamNext().map(Chunk::getPtr).forEach(referenced::add);
+			ref.getPtr().dereference(this).addChainToPtr(referenced);
 		}), true).walk();
 		
 		for(Chunk chunk : getFirstChunk().chunksAhead()){

@@ -154,7 +154,8 @@ public interface DataProvider{
 			public ChunkCache getChunkCache(){ return DataProvider.this.getChunkCache(); }
 			@Override
 			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
-			
+			@Override
+			public MoveInfo getMoveInfo(){ return src().getMoveInfo(); }
 			@Override
 			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override

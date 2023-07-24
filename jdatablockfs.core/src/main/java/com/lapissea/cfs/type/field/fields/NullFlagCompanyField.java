@@ -24,7 +24,8 @@ import java.util.List;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits IOFieldDynamicInlineObject, IOFieldInlineObject, IOFieldInlineSealedObject, InstanceCollection.InlineField, IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime{
+	permits IOFieldInlineObject, IOFieldDynamicInlineObject, IOFieldInlineSealedObject, InstanceCollection.InlineField,
+	        IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	

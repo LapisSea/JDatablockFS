@@ -36,11 +36,12 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -386,7 +387,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Creates a new {@link RandomIO} who's available data is provided from this and next chunks (if any).
 	 */
 	@Override
-	public RandomIO io() throws IOException{
+	public ChunkChainIO io() throws IOException{
 		return new ChunkChainIO(this);
 	}
 	
@@ -608,24 +609,49 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return ch;
 	}
 	
-	public List<Chunk> collectNext(){
-		return streamNext().collect(Collectors.toList());
+	public List<Chunk> collectNext() throws IOException{
+		var len  = chainLength();
+		var data = new ArrayList<Chunk>(len);
+		
+		var ch = this;
+		do{
+			data.add(ch);
+			ch = ch.next();
+		}while(ch != null);
+		
+		return data;
 	}
 	public Stream<Chunk> streamNext(){
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
+	public ChainWalker walkNext(){
+		return new ChainWalker(this);
+	}
+	public void addChainTo(Collection<Chunk> dest){
+		for(Chunk chunk : walkNext()){
+			dest.add(chunk);
+		}
+	}
+	public void addChainToPtr(Collection<ChunkPointer> dest){
+		for(Chunk chunk : walkNext()){
+			dest.add(chunk.getPtr());
+		}
+	}
 	
-	public long chainLength(long maxLen) throws IOException{
+	public int chainLength() throws IOException{
+		return chainLength(Integer.MAX_VALUE);
+	}
+	public int chainLength(int maxLen) throws IOException{
 		if(maxLen == 0) return 0;
 		if(maxLen<0) throw new IllegalArgumentException("maxLen must be positive");
 		
-		var  ch  = this;
-		long len = 0;
-		while(ch != null){
+		var ch  = this;
+		int len = 0;
+		do{
 			len++;
 			if(len>=maxLen) return len;
 			ch = ch.next();
-		}
+		}while(ch != null);
 		return len;
 	}
 	public long chainSize() throws IOException{

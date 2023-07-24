@@ -5,6 +5,8 @@ import com.lapissea.cfs.type.field.IOField;
 
 import java.util.function.Supplier;
 
+import static com.lapissea.cfs.config.GlobalConfig.COSTLY_STACK_TRACE;
+
 public class FieldIsNull extends NullPointerException{
 	
 	public static <T> T requireNonNull(IOField<?, ?> field, T obj){
@@ -33,6 +35,12 @@ public class FieldIsNull extends NullPointerException{
 	public FieldIsNull(IOField<?, ?> field, Supplier<String> msgMake){
 		this.msgMake = msgMake;
 		this.field = field;
+	}
+	
+	@Override
+	public Throwable fillInStackTrace(){
+		if(COSTLY_STACK_TRACE) return super.fillInStackTrace();
+		return this;
 	}
 	
 	@Override

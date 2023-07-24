@@ -432,9 +432,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default byte[] readRemaining() throws IOException{
-		try(var in = inStream()){
-			return in.readAllBytes();
-		}
+		return new ContentReaderInputStream(this).readAllBytes();
 	}
 	
 	//Code from DataInputStream#readUTF

@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections.listtools;
 
 import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -15,7 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 
-public class IOListCached<T> implements IOList<T>, Stringify{
+public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOList<T>>{
 	
 	private final IOList<T>              data;
 	private final int                    maxCacheSize;
@@ -317,5 +318,10 @@ public class IOListCached<T> implements IOList<T>, Stringify{
 	@Override
 	public IOList<T> cachedView(int maxCacheSize){
 		return new IOListCached<>(data, maxCacheSize);
+	}
+	
+	@Override
+	public IOList<T> getWrappedObj(){
+		return data;
 	}
 }

@@ -25,9 +25,8 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();
-			writeManagedFields();
-			
 			data.addMultipleNew(2);
+			writeManagedFields();
 		}
 		
 		readManagedFields();
@@ -203,15 +202,13 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 	@Override
 	public void clear() throws IOException{
 		if(isEmpty()) return;
-		for(IONode<T> datum : data){
-			if(datum != null){
-				datum.setValue(null);
-				datum.free();
-			}
-		}
-		data.clear();
-		data.addMultipleNew(2);
 		deltaSize(-size());
+		var oldData = data;
+		data = null;
+		allocateNulls();
+		data.addMultipleNew(2);
+		writeManagedFields();
+		oldData.free();
 	}
 	
 	@Override

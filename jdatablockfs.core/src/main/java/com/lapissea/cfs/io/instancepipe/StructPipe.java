@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.MalformedObject;
 import com.lapissea.cfs.exceptions.MalformedPipe;
@@ -69,7 +70,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.config.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
@@ -176,7 +176,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 			
-			if(PRINT_COMPILATION){
+			if(ConfigDefs.PRINT_COMPILATION.resolveVal()){
 				StagedInit.runBaseStageTask(() -> {
 					String s = "Compiled: " + struct.getFullName() + "\n" +
 					           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +

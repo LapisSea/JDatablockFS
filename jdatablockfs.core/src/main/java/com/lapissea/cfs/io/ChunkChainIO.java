@@ -36,7 +36,11 @@ public final class ChunkChainIO implements RandomIO{
 			head.requireReal();
 		}
 		restartCursor();
-		source = head.getDataProvider().getSource().io();
+		var prov = head.getDataProvider();
+		var mem  = prov.getMemoryManager();
+		if(mem != null) mem.getMoveInfo().start(this);
+		
+		source = prov.getSource().io();
 	}
 	
 	public void revalidate() throws IOException{
@@ -240,8 +244,14 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	@Override
 	public void close() throws IOException{
-		cursor.syncStruct();
-		source.close();
+		try{
+			cursor.syncStruct();
+		}finally{
+			source.close();
+		}
+		var prov = head.getDataProvider();
+		var mem  = prov.getMemoryManager();
+		if(mem != null) mem.getMoveInfo().end(this);
 	}
 	
 	@Override

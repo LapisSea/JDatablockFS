@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.UnknownAllocationMethod;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;
@@ -21,6 +22,11 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
  * bytes that can be interpreted as a valid chunk header.
  */
 public interface MemoryManager extends DataProvider.Holder{
+	
+	interface MoveInfo{
+		void start(ChunkChainIO chain);
+		void end(ChunkChainIO chain);
+	}
 	
 	interface DefragSes extends AutoCloseable{
 		@Override
@@ -170,6 +176,8 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 	}
 	
+	MoveInfo getMoveInfo();
+	
 	DefragSes openDefragmentMode();
 	
 	/**
@@ -183,6 +191,10 @@ public interface MemoryManager extends DataProvider.Holder{
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
 		if(chainStarts.isEmpty()) return;
+		List<Chunk> chunks = chunksToChains(chainStarts);
+		free(chunks);
+	}
+	private List<Chunk> chunksToChains(Collection<ChunkPointer> chainStarts) throws IOException{
 		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){
@@ -190,9 +202,10 @@ public interface MemoryManager extends DataProvider.Holder{
 					throw new RuntimeException("Duplicate pointer passed " + ptr);
 				}
 			}
-			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);
+			
+			ptr.dereference(getDataProvider()).addChainTo(chunks);
 		}
-		free(chunks);
+		return chunks;
 	}
 	
 	

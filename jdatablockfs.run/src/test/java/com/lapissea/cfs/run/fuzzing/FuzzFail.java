@@ -1,66 +1,36 @@
 package com.lapissea.cfs.run.fuzzing;
 
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.io.StringWriter;
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-public sealed interface FuzzFail<Act, State>{
+public sealed interface FuzzFail<State, Act>{
 	
-	enum FailOrder{
-		LEAST_ACTION,
-		ORIGINAL_ORDER,
-		FAIL_SPEED,
-		INDEX,
-		COMMON_STACK;
-		
-		private static String lastFail;
-		
-		private static FailOrder defaultOrder(){
-			var defaultVal = FailOrder.COMMON_STACK;
-			var propName   = "test.fuzzing.reportFailOrder";
-			return Optional.ofNullable(System.getProperty(propName))
-			               .map(String::trim)
-			               .map(name -> {
-				               var vals = FailOrder.values();
-				               return Arrays.stream(vals).filter(e -> e.name().equalsIgnoreCase(name)).findAny().orElseGet(() -> {
-					               if(!Objects.equals(lastFail, name)){
-						               lastFail = name;
-						               System.err.println(propName + " can only be one of " + Arrays.toString(vals) +
-						                                  " but is actually \"" + name + "\". Defaulting to " + defaultVal);
-					               }
-					               return defaultVal;
-				               });
-			               }).orElse(defaultVal);
-		}
-	}
-	
-	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails){ return report(fails, null); }
-	static <Act, Stat> String report(List<? extends FuzzFail<Act, Stat>> fails, FailOrder order){
+	static <Act, Stat> String report(List<? extends FuzzFail<Stat, Act>> fails){
 		if(fails.isEmpty()) return "";
 		if(fails.size() == 1){
 			return fails.get(0).trace();
 		}
 		
-		var sorted = sortFails(fails, order);
-		
 		var sb = new StringBuilder("Multiple fails:\n");
-		for(FuzzFail<?, ?> fail : sorted){
+		for(FuzzFail<?, ?> fail : fails){
 			sb.append('\t').append(fail.note()).append('\n');
 		}
 		sb.append("\nFirst fail:\n");
-		sb.append(sorted.get(0).trace());
+		sb.append(fails.get(0).trace());
 		return sb.toString();
 	}
 	
-	static <Act, Stat, F extends FuzzFail<Act, Stat>> List<F> sortFails(List<F> fails){ return sortFails(fails, null); }
-	static <Act, Stat, F extends FuzzFail<Act, Stat>> List<F> sortFails(List<F> fails, FailOrder order){
+	static <Act, Stat, F extends FuzzFail<Stat, Act>> List<F> sortFails(List<F> fails){ return sortFails(fails, null); }
+	static <Act, Stat, F extends FuzzFail<Stat, Act>> List<F> sortFails(List<F> fails, FailOrder order){
 		return switch(order == null? FailOrder.defaultOrder() : order){
 			case LEAST_ACTION -> fails.stream().sorted((a, b) -> {
 				if(a instanceof Create && b instanceof Create) return Long.compare(a.sequence().index(), b.sequence().index());
@@ -68,7 +38,7 @@ public sealed interface FuzzFail<Act, State>{
 				if(b instanceof Create) return 1;
 				
 				if(a instanceof Action<?, ?> ac && b instanceof Action<?, ?> bc){
-					var cmp = Long.compare(ac.actionIndex - ac.sequence.startIndex(), bc.actionIndex - bc.sequence.startIndex());
+					var cmp = Integer.compare(ac.localIndex(), bc.localIndex());
 					if(cmp != 0) return cmp;
 				}
 				return Long.compare(a.sequence().index(), b.sequence().index());
@@ -80,13 +50,24 @@ public sealed interface FuzzFail<Act, State>{
 			                          .collect(Collectors.groupingBy(f -> Arrays.asList(f.e().getStackTrace())))
 			                          .values().stream()
 			                          .map(l -> sortFails(l, FailOrder.LEAST_ACTION))
-			                          .sorted(Comparator.comparingInt(f -> -f.size()))
+			                          .sorted(Comparator.<List<F>>comparingInt(f -> -f.size()).thenComparingInt(f -> {
+				                          return switch(f.get(0)){
+					                          case FuzzFail.Action<?, ?> a -> a.localIndex();
+					                          case FuzzFail.Create<?, ?> c -> -1;
+				                          };
+			                          }))
 			                          .flatMap(Collection::stream)
 			                          .toList();
 		};
 	}
 	
-	record Create<Action, State>(Throwable e, FuzzingRunner.Sequence sequence, Duration timeToFail) implements FuzzFail<Action, State>{
+	record Create<Action, State>(Throwable e, FuzzSequence sequence, Duration timeToFail) implements FuzzFail<State, Action>, Serializable{
+		public Create{
+			Objects.requireNonNull(e);
+			Objects.requireNonNull(sequence);
+			Objects.requireNonNull(timeToFail);
+		}
+		
 		@Override
 		public String note(){
 			return "Failed create - sequence: " + sequence + "\t- " + e;
@@ -99,9 +80,24 @@ public sealed interface FuzzFail<Act, State>{
 			e.printStackTrace(pw);
 			return sw.toString();
 		}
+		@Override
+		public FuzzingRunner.Mark mark(){
+			return new FuzzingRunner.Mark(sequence.index(), -1);
+		}
+		@Override
+		public boolean equals(Object o){
+			if(this == o) return true;
+			if(!(o instanceof Create<?, ?> create)) return false;
+			
+			if(!permissiveThrowableEquals(e, create.e)) return false;
+			return sequence.equals(create.sequence) &&
+			       timeToFail.equals(create.timeToFail);
+		}
 	}
 	
-	record Action<Action, State>(Throwable e, FuzzingRunner.Sequence sequence, Action action, long actionIndex, Duration timeToFail, State badState) implements FuzzFail<Action, State>{
+	record Action<Actio, State>(
+		Throwable e, FuzzSequence sequence, Actio action, long actionIndex, Duration timeToFail, State badState
+	) implements FuzzFail<State, Actio>, Serializable{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -121,12 +117,16 @@ public sealed interface FuzzFail<Act, State>{
 		public String trace(){
 			StringWriter sw = new StringWriter();
 			sw.append("Failed to apply action on sequence: ")
-			  .append(String.valueOf(sequence)).append(", actionIndex: (")
+			  .append(String.valueOf(sequence.index())).append(", actionIndex: (")
 			  .append(String.valueOf(actionIndex - sequence.startIndex())).append(")\t").append(String.valueOf(actionIndex))
 			  .append(" Action: ").append(String.valueOf(action)).append("\n");
 			PrintWriter pw = new PrintWriter(sw);
 			e.printStackTrace(pw);
 			return sw.toString();
+		}
+		@Override
+		public FuzzingRunner.Mark mark(){
+			return new FuzzingRunner.Mark(sequence.index(), actionIndex);
 		}
 		
 		@Override
@@ -138,7 +138,7 @@ public sealed interface FuzzFail<Act, State>{
 		public boolean equals(Object o){
 			if(this == o) return true;
 			if(!(o instanceof FuzzFail.Action<?, ?>(
-				Throwable e2, FuzzingRunner.Sequence sequence2, Object action2,
+				Throwable e2, FuzzSequence sequence2, Object action2,
 				long actionIndex2, Duration timeToFail2, Object badState2
 			))) return false;
 			if(!permissiveThrowableEquals(e, e2)) return false;
@@ -147,31 +147,77 @@ public sealed interface FuzzFail<Act, State>{
 			       sequence.equals(sequence2) &&
 			       action.equals(action2);
 		}
+		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
+		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }
 		
-		private boolean permissiveThrowableEquals(Throwable e, Throwable e2){
-			if(e == null || e2 == null) return e == null && e2 == null;
-			
-			if(!Objects.equals(e.getClass(), e2.getClass())) return false;
-			if(!Objects.equals(e.getMessage(), e2.getMessage())) return false;
-			if(!Arrays.equals(e.getSuppressed(), e2.getSuppressed())) return false;
-			if(!permissiveThrowableEquals(e.getCause(), e2.getCause())) return false;
-			
-			var s1 = e.getStackTrace();
-			var s2 = e2.getStackTrace();
-			
-			for(int i = 0; i<Math.min(s1.length, s2.length); i++){
-				var el1 = s1[i];
-				var el2 = s2[i];
-				if(
-					el1.getClassName().startsWith(FuzzingRunner.class.getName()) ||
-					el2.getClassName().startsWith(FuzzingRunner.class.getName())
-				) break;
-				if(!el1.equals(el2)){
+	}
+	
+	static void trimErr(Throwable e){
+		var stack  = e.getStackTrace();
+		var fzName = FuzzingRunner.class.getName();
+		int end    = 0;
+		for(; end<stack.length; end++){
+			var el = stack[end];
+			if(el.getClassName().startsWith(fzName)){
+				break;
+			}
+		}
+		
+		try{
+			var el  = stack[end - 1];
+			var typ = Class.forName(el.getClassName());
+			if(Arrays.stream(typ.getDeclaredMethods()).filter(Method::isSynthetic)
+			         .anyMatch(m -> m.getName().equals(el.getMethodName()))
+			){
+				end--;
+			}
+		}catch(ClassNotFoundException ex){ }
+		
+		stack = Arrays.copyOf(stack, end);
+		
+		e.setStackTrace(stack);
+		
+		for(var er : e.getSuppressed()){
+			trimErr(er);
+		}
+		
+		var c = e.getCause();
+		if(c != null) trimErr(c);
+	}
+	
+	private static boolean permissiveThrowableEquals(Throwable ex1, Throwable ex2){
+		if(ex1 == null || ex2 == null) return ex1 == null && ex2 == null;
+		
+		if(!Objects.equals(ex1.getClass(), ex2.getClass())) return false;
+		if(!Objects.equals(ex1.getMessage(), ex2.getMessage())) return false;
+		{
+			var s1 = ex1.getSuppressed();
+			var s2 = ex2.getSuppressed();
+			if(s1.length != s2.length) return false;
+			for(int i = 0; i<s1.length; i++){
+				if(!permissiveThrowableEquals(s1[i], s2[i])){
 					return false;
 				}
 			}
-			return true;
 		}
+		if(!permissiveThrowableEquals(ex1.getCause(), ex2.getCause())) return false;
+		
+		var s1 = ex1.getStackTrace();
+		var s2 = ex2.getStackTrace();
+		
+		var fzName = FuzzingRunner.class.getName();
+		for(int i = 0; i<Math.min(s1.length, s2.length); i++){
+			var el1 = s1[i];
+			var el2 = s2[i];
+			if(
+				el1.getClassName().startsWith(fzName) ||
+				el2.getClassName().startsWith(fzName)
+			) break;
+			if(!el1.equals(el2)){
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	Throwable e();
@@ -180,5 +226,7 @@ public sealed interface FuzzFail<Act, State>{
 	String note();
 	String trace();
 	
-	FuzzingRunner.Sequence sequence();
+	FuzzSequence sequence();
+	
+	FuzzingRunner.Mark mark();
 }

@@ -65,11 +65,15 @@ final class FieldRegistry{
 					return;
 				}
 				log("Scanning sealed {#blackBright{}~#} children", type);
-				for(var sub : type.getPermittedSubclasses()){
-					tasks.add(Runner.async(() -> {
-						scan(sub, tasks);
-						return Optional.empty();
-					}));
+				var ch = new ConcurrentLinkedDeque<>(Arrays.asList(type.getPermittedSubclasses()));
+				tasks.add(Runner.async(() -> {
+					for(Class<?> c = ch.poll(); c != null; c = ch.poll()){
+						scan(c, tasks);
+					}
+					return Optional.empty();
+				}));
+				for(Class<?> c = ch.poll(); c != null; c = ch.poll()){
+					scan(c, tasks);
 				}
 				return;
 			}
@@ -140,6 +144,7 @@ final class FieldRegistry{
 		return getLogged();
 	}
 	private static List<IOField.FieldUsage> getLogged(){
+		Log.trace("Waiting for FieldRegistry...");
 		var start = System.nanoTime();
 		var data  = USAGES.get();
 		var end   = System.nanoTime();
@@ -151,11 +156,17 @@ final class FieldRegistry{
 	
 	private FieldRegistry()  { }
 	
-	static void requireCanCreate(Type type, GetAnnotation annotations){
+	static boolean canCreate(Type type, GetAnnotation annotations){
 		for(var usage : getData()){
 			if(usage.isCompatible(type, annotations)){
-				return;
+				return true;
 			}
+		}
+		return false;
+	}
+	static void requireCanCreate(Type type, GetAnnotation annotations){
+		if(canCreate(type, annotations)){
+			return;
 		}
 		throw fail(type.getTypeName());
 	}

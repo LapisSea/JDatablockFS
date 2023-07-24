@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections.listtools;
 
+import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.utils.OptionalPP;
@@ -14,7 +15,7 @@ import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
 
-public class IOListRangeView<T> implements IOList<T>{
+public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	
 	private final IOList<T> data;
 	private final long      from;
@@ -249,5 +250,10 @@ public class IOListRangeView<T> implements IOList<T>{
 		StringJoiner sj = new StringJoiner(", ", "{size: " + size() + "}" + "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
+	}
+	
+	@Override
+	public IOList<T> getWrappedObj(){
+		return data;
 	}
 }

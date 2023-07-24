@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.tools.AtlasFont;
 import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;
@@ -20,6 +20,7 @@ import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import static com.lapissea.cfs.config.ConfigDefs.CONFIG_PROPERTY_PREFIX;
 import static com.lapissea.glfw.GlfwWindow.Initializer.OpenGLSurfaceAPI.Profile.CORE;
 import static com.lapissea.util.UtilL.async;
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
@@ -218,7 +219,8 @@ public class OpenGLBackend extends RenderBackend{
 	
 	
 	private synchronized void initWindow(){
-		if(GlobalConfig.configFlag("tools.emulateNoGL", false)){
+		
+		if(ConfigUtils.configBoolean(CONFIG_PROPERTY_PREFIX + "tools.emulateNoGL", false)){
 			throw new RuntimeException("gl disabled");
 		}
 		

@@ -7,6 +7,7 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkBuilder;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
@@ -78,9 +79,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@IOValue
 	private List<NumberSize> varyingBuffer;
 	
-	private       ValueStorage<T> storage;
-	private       int             headSize;
-	private final Map<Long, T>    cache;
+	private ValueStorage<T> storage;
+	private int             headSize;
+	
+	private final        Map<Long, T> cache;
+	private static final Object       NULL_VAL = new Object();
 	
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
@@ -287,10 +290,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
 			private long index;
-			private RandomIO io;
 			@Override
 			public RandomIO get() throws IOException{
-				if(io == null) io = selfIO();
+				var io = selfIO();
 				io.setPos(calcElementOffset(index));
 				return io;
 			}
@@ -355,7 +357,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	
-	private RandomIO ioAtElement(long index) throws IOException{
+	private ChunkChainIO ioAtElement(long index) throws IOException{
 		var io = selfIO();
 		try{
 			var pos = calcElementOffset(index);
@@ -476,10 +478,20 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private T getCached(long index) throws IOException{
 		if(cache.containsKey(index)){
-			return cache.get(index);
+			return cacheGet(index);
 		}
 		var val = readAt(index);
-		cache.put(index, val);
+		cachePut(index, val);
+		return val;
+	}
+	
+	private void cachePut(long index, T val){
+		cache.put(index, val == null? (T)NULL_VAL : val);
+	}
+	
+	private T cacheGet(long index){
+		var val = cache.get(index);
+		if(val == NULL_VAL) return null;
 		return val;
 	}
 	
@@ -638,7 +650,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					toFree.addAll(storage.notifyRemoval(io, false));
 				}
 			}
-			getDataProvider().getMemoryManager().freeChains(toFree);
+			var man = getDataProvider().getMemoryManager();
+			man.freeChains(toFree);
 		}
 		try(var io = selfIO()){
 			io.setCapacity(calcElementOffset(0));
@@ -679,7 +692,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private void defragData(long extraSlots) throws IOException{
 		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, 8);
 	}
-	private void defragData(Chunk ch, long extraSlots, long max) throws IOException{
+	private void defragData(Chunk ch, long extraSlots, int max) throws IOException{
 		if(max<=2) return;
 		var nextCount = ch.chainLength(max + 1);
 		if(nextCount<max) return;
@@ -751,6 +764,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
 				notifySingleFree(io, false);
+				io.revalidate();
 			}
 			
 			long sm1 = size - 1;
@@ -884,7 +898,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	public void free(long index) throws IOException{
 		checkSize(index);
 		if(!storage.needsRemoval()) return;
-		
 		
 		try(var io = ioAtElement(index)){
 			notifySingleFree(io, true);
