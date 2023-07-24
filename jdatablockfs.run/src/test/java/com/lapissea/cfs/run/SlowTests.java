@@ -422,7 +422,7 @@ public class SlowTests{
 		);
 		
 		stableRunAndSave(
-			Plan.start(runner, 68, iterations, 2000),
+			Plan.start(runner, 69, iterations, 2000),
 			"run" + type.getSimpleName()
 		);
 	}

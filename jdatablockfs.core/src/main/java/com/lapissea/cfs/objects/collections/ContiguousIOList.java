@@ -290,10 +290,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
 			private long index;
-			private RandomIO io;
 			@Override
 			public RandomIO get() throws IOException{
-				if(io == null) io = selfIO();
+				var io = selfIO();
 				io.setPos(calcElementOffset(index));
 				return io;
 			}
@@ -900,10 +899,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		checkSize(index);
 		if(!storage.needsRemoval()) return;
 		
-		
 		try(var io = ioAtElement(index)){
 			notifySingleFree(io, true);
-			io.revalidate();
 		}
 	}
 	

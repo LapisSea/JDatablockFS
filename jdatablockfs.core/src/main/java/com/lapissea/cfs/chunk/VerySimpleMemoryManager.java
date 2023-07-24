@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 
@@ -12,6 +13,13 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private final IOList<ChunkPointer> freeChunks = IOList.wrap(new ArrayList<>());
 	private       boolean              defragmentMode;
+	
+	private final MoveInfo moveInfo = new MoveInfo(){
+		@Override
+		public void start(ChunkChainIO chain){ }
+		@Override
+		public void end(ChunkChainIO chain){ }
+	};
 	
 	public VerySimpleMemoryManager(DataProvider context){
 		super(context);
@@ -39,6 +47,10 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 		);
 	}
 	
+	@Override
+	public MoveInfo getMoveInfo(){
+		return moveInfo;
+	}
 	@Override
 	public DefragSes openDefragmentMode(){
 		boolean oldDefrag = defragmentMode;

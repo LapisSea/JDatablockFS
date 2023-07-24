@@ -232,7 +232,7 @@ public class Cluster implements DataProvider{
 	@Override
 	public IOInterface getSource(){ return source; }
 	@Override
-	public MemoryManager getMemoryManager(){ return Objects.requireNonNull(memoryManager); }
+	public MemoryManager getMemoryManager(){ return memoryManager; }
 	@Override
 	public ChunkCache getChunkCache(){ return chunkCache; }
 	
