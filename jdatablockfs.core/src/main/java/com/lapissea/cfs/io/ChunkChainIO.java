@@ -38,7 +38,7 @@ public final class ChunkChainIO implements RandomIO{
 		restartCursor();
 		var prov = head.getDataProvider();
 		var mem  = prov.getMemoryManager();
-		if(mem != null) mem.getMoveInfo().start(this);
+		if(mem != null) mem.notifyStart(this);
 		
 		source = prov.getSource().io();
 	}
@@ -251,7 +251,7 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		var prov = head.getDataProvider();
 		var mem  = prov.getMemoryManager();
-		if(mem != null) mem.getMoveInfo().end(this);
+		if(mem != null) mem.notifyEnd(this);
 	}
 	
 	@Override

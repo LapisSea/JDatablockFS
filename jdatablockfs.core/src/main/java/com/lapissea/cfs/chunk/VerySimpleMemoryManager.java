@@ -14,13 +14,6 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	private final IOList<ChunkPointer> freeChunks = IOList.wrap(new ArrayList<>());
 	private       boolean              defragmentMode;
 	
-	private final MoveInfo moveInfo = new MoveInfo(){
-		@Override
-		public void start(ChunkChainIO chain){ }
-		@Override
-		public void end(ChunkChainIO chain){ }
-	};
-	
 	public VerySimpleMemoryManager(DataProvider context){
 		super(context);
 	}
@@ -46,11 +39,6 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
-	
-	@Override
-	public MoveInfo getMoveInfo(){
-		return moveInfo;
-	}
 	@Override
 	public DefragSes openDefragmentMode(){
 		boolean oldDefrag = defragmentMode;
@@ -68,4 +56,9 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 		List<Chunk> toAdd = MemoryOperations.mergeChunks(toFree);
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
+	
+	@Override
+	public void notifyStart(ChunkChainIO chain){ }
+	@Override
+	public void notifyEnd(ChunkChainIO chain){ }
 }
