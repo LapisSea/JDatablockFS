@@ -5,16 +5,18 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
@@ -26,33 +28,64 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private boolean adding, allowFreeRemove = true;
 	
-	private final ThreadLocal<ArrayList<ChunkChainIO>> stacks    = new ThreadLocal<>();
-	private final Set<ArrayList<ChunkChainIO>>         allStacks = Collections.newSetFromMap(new IdentityHashMap<>());
+	private static final class Node extends AbstractList<ChunkChainIO>{
+		private       ChunkChainIO[] data = new ChunkChainIO[1];
+		private       int            size;
+		private final long           threadId;
+		private Node(){ this.threadId = Thread.currentThread().threadId(); }
+		@Override
+		public boolean add(ChunkChainIO v){
+			var d = data;
+			if(d.length == size){
+				data = d = Arrays.copyOf(d, d.length*2);
+			}
+			d[size++] = v;
+			return true;
+		}
+		@Override
+		public ChunkChainIO get(int index){ return data[index]; }
+		public ChunkChainIO pop(){
+			var old = data[--size];
+			data[size] = null;
+			return old;
+		}
+		
+		@Override
+		public int size(){ return size; }
+	}
+	
+	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
+	private final Map<Thread, Node> allStacks = new WeakHashMap<>();
+	
+	private Node last;
+	private Node getStack(){
+		var l  = last;
+		var th = Thread.currentThread();
+		if(l != null && l.threadId == th.threadId()){
+			return l;
+		}
+		
+		var s = stacks.get();
+		if(s == null){
+			stacks.set(s = new Node());
+			synchronized(allStacks){
+				allStacks.put(th, s);
+			}
+		}
+		return last = s;
+	}
 	
 	private final MoveInfo moveInfo = new MoveInfo(){
 		@Override
 		public void start(ChunkChainIO chain){
-			var s = stacks.get();
-			if(s == null){
-				stacks.set(s = new ArrayList<>(2));
-				synchronized(allStacks){
-					allStacks.add(s);
-				}
-			}
-			s.add(chain);
+			getStack().add(chain);
 		}
 		@Override
 		public void end(ChunkChainIO chain){
-			var s  = stacks.get();
-			var ch = s.remove(s.size() - 1);
+			var s  = getStack();
+			var ch = s.pop();
 			if(ch != chain){
 				throw new IllegalStateException();
-			}
-			if(s.isEmpty()){
-				stacks.remove();
-				synchronized(allStacks){
-					allStacks.remove(s);
-				}
 			}
 		}
 	};
@@ -189,7 +222,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						anyPopped = true;
 					}else{
 						free(lastCh);
-						break;
+						return;
 					}
 				}else if(freeChunks.size()>1){
 					var nextO = lastChO.map(Chunk::nextPhysical);
@@ -197,9 +230,10 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						var lastFree = lastChO.get();
 						var next     = nextO.get();
 						
-						synchronized(allStacks){
-							if(allStacks.stream().flatMap(Collection::stream).anyMatch(c -> c.head.equals(next))){
-								continue;
+						var stack = getStack();
+						for(var c : stack){
+							if(c.head.equals(next)){
+								return;
 							}
 						}
 						
@@ -218,11 +252,17 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								false);
 							if(move.hasAny()){
 								anyPopped = true;
+								for(var cha : stack){
+									if(move.chainAffected(cha.head)){
+										cha.revalidate();
+									}
+								}
 								synchronized(allStacks){
-									for(var stack : allStacks){
-										for(var ch : stack){
-											if(move.chainAffected(ch.head)){
-												ch.revalidate();//TODO: make thread safe
+									for(var s : allStacks.values()){
+										if(s == stack) continue;
+										for(var cha : s){
+											if(move.chainAffected(cha.head)){
+												throw new NotImplementedException();//TODO: make thread safe
 											}
 										}
 									}
