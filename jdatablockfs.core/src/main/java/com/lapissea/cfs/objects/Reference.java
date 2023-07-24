@@ -1,8 +1,8 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.config.ConfigDefs;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -269,10 +269,43 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		return new Reference(getPtr(), getOffset() + offset);
 	}
 	public long calcGlobalOffset(DataProvider provider) throws IOException{
-		try(var io = new ChunkChainIO(getPtr().dereference(provider))){
-			io.setPos(getOffset());
-			return io.calcGlobalPos();
+		Chunk cursor      = getPtr().dereference(provider);
+		long  cursorStart = 0, localPos;
+		setPos:
+		{
+			var pos = getOffset();
+			while(true){
+				var cursorEffectiveCapacity = cursor.hasNextPtr()? cursor.getCapacity() : cursor.getSize();
+				
+				long curserEnd = cursorStart + cursorEffectiveCapacity;
+				if(curserEnd>pos){
+					localPos = pos;
+					break setPos;
+				}
+				
+				boolean result;
+				tryAdvanceCursor:
+				{
+					var last = cursor;
+					var next = cursor.next();
+					if(next == null){
+						result = false;
+						break tryAdvanceCursor;
+					}
+					cursor = next;
+					cursorStart += last.getSize();
+					result = true;
+				}
+				
+				if(!result){//end reached
+					localPos = curserEnd;
+					break setPos;
+				}
+			}
 		}
+		
+		var cursorOffset = localPos - cursorStart;
+		return cursor.dataStart() + cursorOffset;
 	}
 	public String infoString(DataProvider provider) throws IOException{
 		return this + " / " + calcGlobalOffset(provider);
