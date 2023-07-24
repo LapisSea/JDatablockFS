@@ -219,7 +219,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(len == 0) return;
 			
 			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
+			if(remaining<len) setCapacity0(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)), false);
 			
 			writeN(b, off, fileData, pos, len);
 		}
