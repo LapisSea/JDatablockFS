@@ -51,7 +51,7 @@ public final class MoveBuffer{
 		var val = from.getValue();
 		var b   = buff;
 		for(int i = 0, s = size*2; i<s; i += 2){
-			if(b[i] == val){
+			if(b[i] == val || b[i + 1] == val){
 				return true;
 			}
 		}

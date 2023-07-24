@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOList;
@@ -9,8 +10,11 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
@@ -21,6 +25,37 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private       boolean              defragmentMode;
 	
 	private boolean adding, allowFreeRemove = true;
+	
+	private final ThreadLocal<ArrayList<ChunkChainIO>> stacks    = new ThreadLocal<>();
+	private final Set<ArrayList<ChunkChainIO>>         allStacks = Collections.newSetFromMap(new IdentityHashMap<>());
+	
+	private final MoveInfo moveInfo = new MoveInfo(){
+		@Override
+		public void start(ChunkChainIO chain){
+			var s = stacks.get();
+			if(s == null){
+				stacks.set(s = new ArrayList<>(2));
+				synchronized(allStacks){
+					allStacks.add(s);
+				}
+			}
+			s.add(chain);
+		}
+		@Override
+		public void end(ChunkChainIO chain){
+			var s  = stacks.get();
+			var ch = s.remove(s.size() - 1);
+			if(ch != chain){
+				throw new IllegalStateException();
+			}
+			if(s.isEmpty()){
+				stacks.remove();
+				synchronized(allStacks){
+					allStacks.remove(s);
+				}
+			}
+		}
+	};
 	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context);
@@ -48,6 +83,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
+	
+	@Override
+	public MoveInfo getMoveInfo(){ return moveInfo; }
 	
 	@Override
 	public DefragSes openDefragmentMode(){
@@ -159,6 +197,12 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						var lastFree = lastChO.get();
 						var next     = nextO.get();
 						
+						synchronized(allStacks){
+							if(allStacks.stream().flatMap(Collection::stream).anyMatch(c -> c.head.equals(next))){
+								continue;
+							}
+						}
+						
 						{//Disable modification of the list while it is being moved
 							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 							var freeRef = fch.getReference().getPtr();
@@ -172,7 +216,18 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								(Cluster)context, next.getPtr(),
 								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
 								false);
-							if(move.hasAny()) anyPopped = true;
+							if(move.hasAny()){
+								anyPopped = true;
+								synchronized(allStacks){
+									for(var stack : allStacks){
+										for(var ch : stack){
+											if(move.chainAffected(ch.head)){
+												ch.revalidate();//TODO: make thread safe
+											}
+										}
+									}
+								}
+							}
 						}finally{
 							allowFreeRemove = true;
 						}
