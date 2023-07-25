@@ -3,8 +3,8 @@ package com.lapissea.cfs.objects;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.config.ConfigDefs;
-import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.RangeIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
@@ -189,7 +189,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		return io(holder.getDataProvider());
 	}
 	public RandomIO io(DataProvider provider) throws IOException{
-		return OffsetIO.of(ptr.dereference(provider), offset);
+		return RangeIO.of(ptr.dereference(provider), offset, Long.MAX_VALUE);
 	}
 	
 	public void io(DataProvider provider, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
