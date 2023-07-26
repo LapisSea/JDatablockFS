@@ -615,10 +615,6 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			if(Utils.getSealedUniverse(typ, false).filter(IOInstance::isInstance).isPresent()){
-				return;
-			}
-			
 			var def = new TypeDef(typ);
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);

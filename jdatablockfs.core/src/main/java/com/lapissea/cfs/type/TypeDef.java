@@ -102,6 +102,10 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	@IONullability(NULLABLE)
 	private EnumConstant[] enumConstants;
 	
+	@IOValue
+	@IONullability(NULLABLE)
+	private String[] permits;
+	
 	public TypeDef(){ }
 	
 	public TypeDef(@NotNull Class<?> type){
@@ -123,11 +127,19 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			}
 			enumConstants = res;
 		}
+		if(type.isSealed()){
+			var src = type.getPermittedSubclasses();
+			permits = new String[src.length];
+			for(int i = 0; i<src.length; i++){
+				permits[i] = src[i].getName();
+			}
+		}
 	}
 	
 	public boolean isUnmanaged() { return unmanaged; }
 	public boolean isIoInstance(){ return ioInstance; }
 	public boolean isEnum()      { return enumConstants != null; }
+	public boolean isSealed()    { return permits != null; }
 	
 	public List<FieldDef> getFields(){
 		if(fields == null) return List.of();
@@ -147,6 +159,10 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		StringBuilder sb = new StringBuilder();
 		if(isIoInstance()) sb.append("IO");
 		if(isUnmanaged()) sb.append("U");
+		if(isSealed()){
+			sb.append(Arrays.stream(permits).map(s -> Utils.classNameToHuman(s, false))
+			                .collect(Collectors.joining(", ", "->[", "]")));
+		}
 		sb.append('{');
 		if(!getEnumConstants().isEmpty()){
 			sb.append(getEnumConstants().stream().map(Objects::toString).collect(Collectors.joining(", ")));
