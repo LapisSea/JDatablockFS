@@ -103,9 +103,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(ctx, ticket) -> {
+			(ctx, ticket, dryRun) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove);
+				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
 			},
 			MemoryOperations::allocateAppendToFile
 		);
