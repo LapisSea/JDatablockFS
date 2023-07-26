@@ -1727,7 +1727,8 @@ public class BinaryGridRenderer implements DataRenderer{
 									}
 								}
 								if(comp == String.class){
-									var inst   = (String[])field.get(ioPool, instance);
+									var inst = (String[])field.get(ioPool, instance);
+									if(inst == null) continue;
 									var arrSiz = inst.length;
 									
 									long  arrOffset = 0;

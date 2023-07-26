@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
@@ -46,7 +47,7 @@ public class DisplayHost{
 	}
 	
 	public static void main(String[] args) throws IOException{
-		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
+		if(Log.DEBUG) LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		new DisplayHost().start(Arrays.asList(args).contains("lazy"));
 	}
