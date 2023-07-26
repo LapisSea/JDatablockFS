@@ -32,16 +32,17 @@ public class SessionTests{
 		});
 		
 		var explorer = new Sessions.Explorer(res);
+		var session  = explorer.getSession(sesName);
 		
-		var ses = explorer.getSession(sesName);
-		
-		for(int i = 0, j = 0; i<ses.getFrameCount(); i++){
-			var f        = ses.getFrame(i);
-			var expected = strs.get(j);
+		for(int i = 0; i<strs.size(); i++){
+			var frame    = session.getFrame(i);
+			var expected = strs.get(i);
 			
-			if(f.getData().getIOSize() == 0) continue;
-			j++;
-			var actual = f.getData().readUTF(0);
+			String actual;
+			try(var io = frame.getData().io()){
+				actual = io.readUTF();
+				if(io.remaining() != 0) continue;
+			}
 			assertEquals(actual, expected, "Fail on " + i);
 		}
 	}
