@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
@@ -15,6 +14,7 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
@@ -57,7 +57,7 @@ public sealed interface IOTypeDB{
 		boolean hasID(int id);
 		
 		@Override
-		TypeDef getDefinitionFromClassName(String className);
+		OptionalPP<TypeDef> getDefinitionFromClassName(String className);
 		
 		sealed class Basic implements MemoryOnlyDB{
 			
@@ -200,9 +200,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			@Override
-			public TypeDef getDefinitionFromClassName(String className){
-				if(className == null || className.isEmpty()) return null;
-				return defs.get(className);
+			public OptionalPP<TypeDef> getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return OptionalPP.empty();
+				return OptionalPP.ofNullable(defs.get(className));
 			}
 			
 			public Fixed bake(){
@@ -372,9 +372,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			@Override
-			public TypeDef getDefinitionFromClassName(String className){
-				if(className == null || className.isEmpty()) return null;
-				return defs.get(className);
+			public OptionalPP<TypeDef> getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return OptionalPP.empty();
+				return OptionalPP.ofNullable(defs.get(className));
 			}
 		}
 	}
@@ -589,7 +589,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void recordType(MemoryOnlyDB.Fixed builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
-			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()) != null;
+			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()).isPresent();
 			if(isBuiltIn){
 				for(int i = 0; i<type.argCount(); i++){
 					recordType(builtIn, type.arg(i), newDefs);
@@ -770,15 +770,11 @@ public sealed interface IOTypeDB{
 		}
 		
 		@Override
-		public TypeDef getDefinitionFromClassName(String className) throws IOException{
-			var builtIn = BUILT_IN.get();
-			if(className == null || className.isEmpty()) return null;
-			{
-				var def = builtIn.getDefinitionFromClassName(className);
-				if(def != null) return def;
-			}
-			
-			return defs.get(new TypeName(className));
+		public OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException{
+			if(className == null || className.isEmpty()) return OptionalPP.empty();
+			return BUILT_IN.get().getDefinitionFromClassName(className).or(() -> {
+				return OptionalPP.ofNullable(defs.get(new TypeName(className)));
+			});
 		}
 		
 		public void init(DataProvider provider) throws IOException{
@@ -853,7 +849,7 @@ public sealed interface IOTypeDB{
 	<T> Class<T> fromID(Class<T> rootType, int id) throws IOException;
 	<T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException;
 	
-	TypeDef getDefinitionFromClassName(String className) throws IOException;
+	OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException;
 	
 	ClassLoader getTemplateLoader();
 	

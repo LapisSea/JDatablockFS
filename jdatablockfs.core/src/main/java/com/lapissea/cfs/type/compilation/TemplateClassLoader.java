@@ -170,15 +170,12 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private TypeDef getDef(String name) throws ClassNotFoundException{
-		TypeDef def;
 		try{
-			def = db.getDefinitionFromClassName(name);
+			return db.getDefinitionFromClassName(name).orElseThrow(() -> {
+				return new ClassNotFoundException(name + " is not defined in database");
+			});
 		}catch(IOException e){
 			throw new RuntimeException("Failed to fetch data from database", e);
 		}
-		if(def == null){
-			throw new ClassNotFoundException(name + " is not defined in database");
-		}
-		return def;
 	}
 }
