@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.PointerOutsideFile;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -155,8 +156,6 @@ public interface DataProvider{
 			@Override
 			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
 			@Override
-			public MoveInfo getMoveInfo(){ return src().getMoveInfo(); }
-			@Override
 			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override
 			public IOList<ChunkPointer> getFreeChunks(){ return src().getFreeChunks(); }
@@ -176,6 +175,9 @@ public interface DataProvider{
 				return src().alloc(router.apply(ticket));
 			}
 			@Override
+			public void notifyStart(ChunkChainIO chain){ src().notifyStart(chain); }
+			@Override
+			public void notifyEnd(ChunkChainIO chain){ src().notifyEnd(chain); }
 			public boolean canAlloc(AllocateTicket ticket) throws IOException{
 				return src().canAlloc(router.apply(ticket));
 			}

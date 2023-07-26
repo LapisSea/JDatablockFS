@@ -23,11 +23,6 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
  */
 public interface MemoryManager extends DataProvider.Holder{
 	
-	interface MoveInfo{
-		void start(ChunkChainIO chain);
-		void end(ChunkChainIO chain);
-	}
-	
 	interface DefragSes extends AutoCloseable{
 		@Override
 		void close();
@@ -192,8 +187,6 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 	}
 	
-	MoveInfo getMoveInfo();
-	
 	DefragSes openDefragmentMode();
 	
 	/**
@@ -264,4 +257,7 @@ public interface MemoryManager extends DataProvider.Holder{
 	default long minAllocationCapacity(){
 		return 1;
 	}
+	
+	void notifyStart(ChunkChainIO chain);
+	void notifyEnd(ChunkChainIO chain);
 }

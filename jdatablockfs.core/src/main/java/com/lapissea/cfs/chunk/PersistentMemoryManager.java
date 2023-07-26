@@ -5,7 +5,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Wrapper;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -18,7 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class PersistentMemoryManager extends MemoryManager.StrategyImpl implements MemoryManager.MoveInfo{
+public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
@@ -36,17 +35,21 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 		@Override
 		public boolean add(ChunkChainIO v){
 			var d = data;
-			if(d.length == size){
+			var s = size;
+			if(d.length == s){
 				data = d = Arrays.copyOf(d, d.length*2);
 			}
-			d[size++] = v;
+			d[s] = v;
+			size = s + 1;
 			return true;
 		}
 		@Override
 		public ChunkChainIO get(int index){ return data[index]; }
-		public ChunkChainIO pop(){
-			var old = data[--size];
-			data[size] = null;
+		private ChunkChainIO pop(){
+			var d   = data;
+			var s   = --size;
+			var old = d[s];
+			d[s] = null;
 			return old;
 		}
 		
@@ -58,6 +61,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
 	private final Map<Thread, Node> allStacks = new HashMap<>();
 	private       Node              last;
+	private       boolean           drainIO;
+	private       Thread            drainThread;
+	
 	private Node getStack(){
 		var th = Thread.currentThread();
 		var l  = last;
@@ -67,32 +73,42 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 		
 		var s = stacks.get();
 		if(s == null){
-			stacks.set(s = new Node(th));
-			synchronized(allStacks){
-				if(!allStacks.isEmpty()) cleanStacks();
-				allStacks.put(th, s);
-			}
+			s = new Node(th);
+			registerNode(th, s);
 		}
 		return last = s;
 	}
 	
-	private void cleanStacks(){
-		if(allStacks.size()>Runtime.getRuntime().availableProcessors()){
-			allStacks.keySet().removeIf(t -> !t.isAlive());
+	private void registerNode(Thread th, Node s){
+		stacks.set(s);
+		synchronized(allStacks){
+			allStacks.put(th, s);
 		}
+		Thread.startVirtualThread(() -> {
+			UtilL.sleepWhile(th::isAlive, 10);
+			synchronized(allStacks){
+				allStacks.remove(th);
+			}
+		});
 	}
 	
 	@Override
-	public void start(ChunkChainIO chain){
+	public void notifyStart(ChunkChainIO chain){
+		if(drainIO) block();
 		getStack().add(chain);
 	}
 	@Override
-	public void end(ChunkChainIO chain){
+	public void notifyEnd(ChunkChainIO chain){
 		var s  = getStack();
 		var ch = s.pop();
 		if(ch != chain){
 			throw new IllegalStateException();
 		}
+	}
+	
+	private void block(){
+		if(drainThread == Thread.currentThread()) return;
+		UtilL.sleepWhile(() -> drainIO, 0, 0.1F);
 	}
 	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
@@ -121,9 +137,6 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
-	
-	@Override
-	public MoveInfo getMoveInfo(){ return this; }
 	
 	@Override
 	public DefragSes openDefragmentMode(){
@@ -235,10 +248,6 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 						var lastFree = lastChO.get();
 						var toMove   = nextO.get();
 						
-						if(lastFree.totalSize()<toMove.totalSize()*2){
-							return;
-						}
-						
 						var stack = getStack();
 						for(var c : stack){
 							if(c.head.equals(toMove)){
@@ -246,15 +255,29 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 							}
 						}
 						
-						{//Disable modification of the list while it is being moved
-							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
-							var freeRef = fch.getReference().getPtr();
-							if(freeRef.dereference(context).walkNext().anyMatch(c -> c == toMove)){
-								allowFreeRemove = false;
-							}
-						}
-						
 						try{
+							drainThread = Thread.currentThread();
+							drainIO = true;
+							while(true){
+								synchronized(allStacks){
+									var anyActive =
+										allStacks.size()>1 &&
+										allStacks.entrySet().stream()
+										         .filter(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
+										         .anyMatch(l -> l != stack && !l.isEmpty());
+									if(!anyActive) break;
+								}
+								UtilL.sleep(0.1F);
+							}
+							
+							{//Disable modification of the list while it is being moved
+								var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
+								var freeRef = fch.getReference().getPtr();
+								if(freeRef.dereference(context).walkNext().anyMatch(c -> c == toMove)){
+									allowFreeRemove = false;
+								}
+							}
+							
 							var move = DefragmentManager.moveReference(
 								(Cluster)context, toMove.getPtr(),
 								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
@@ -266,20 +289,10 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 										cha.revalidate();
 									}
 								}
-								synchronized(allStacks){
-									cleanStacks();
-									for(var s : allStacks.values()){
-										if(s == stack) continue;
-										for(var cha : s){
-											if(move.chainAffected(cha.head)){
-												throw new NotImplementedException();//TODO: make thread safe
-											}
-										}
-									}
-								}
 							}
 						}finally{
 							allowFreeRemove = true;
+							drainIO = false;
 						}
 					}
 				}
