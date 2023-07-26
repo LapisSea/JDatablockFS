@@ -235,6 +235,10 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 						var lastFree = lastChO.get();
 						var next     = nextO.get();
 						
+						if(lastFree.totalSize()<next.totalSize()*2){
+							return;
+						}
+						
 						var stack = getStack();
 						for(var c : stack){
 							if(c.head.equals(next)){

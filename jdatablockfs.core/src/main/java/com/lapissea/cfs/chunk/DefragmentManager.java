@@ -119,6 +119,16 @@ public class DefragmentManager{
 	
 	//TODO: remove allowUnmanaged and introduce concept of unmanaged instance tracking to enable proper notification of movement
 	public static MoveBuffer moveReference(Cluster cluster, ChunkPointer toMove, Function<AllocateTicket, AllocateTicket> ticketFn, boolean allowUnmanaged) throws IOException{
+		{
+			var ch = toMove.dereference(cluster);
+			var ticket = AllocateTicket.bytes(ch.chainSize())
+			                           .withExplicitNextSize(Optional.of(ch.getNextSize()));
+			ticket = ticketFn.apply(ticket);
+			if(!ticket.canSubmit(cluster)){
+				return new MoveBuffer();
+			}
+		}
+		
 		List<Chunk> toFree = new ArrayList<>();
 		var record = new MemoryWalker.PointerRecord(){
 			MoveBuffer move = new MoveBuffer();
@@ -130,7 +140,6 @@ public class DefragmentManager{
 				if(!ptr.equals(toMove) || valueReference.getOffset() != 0){
 					return CONTINUE;
 				}
-				
 				
 				var type = field.getType();
 				
