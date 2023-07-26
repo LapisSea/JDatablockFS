@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.CollectionAddapter;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.io.IOException;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
 
-public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOField<T, CollectionType>{
+public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
@@ -116,10 +117,18 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		if(nullable() && getIsNull(ioPool, instance)) return;
 		addapter.write(get(ioPool, instance), provider, dest);
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		if(nullable()){
+			if(getIsNull(ioPool, instance)){
+				set(ioPool, instance, null);
+				return;
+			}
+		}
+		
 		int size = collectionSize.getValue(ioPool, instance);
 		set(ioPool, instance, addapter.read(size, provider, src, genericContext));
 	}

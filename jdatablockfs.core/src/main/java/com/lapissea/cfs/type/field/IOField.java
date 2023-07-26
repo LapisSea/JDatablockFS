@@ -28,7 +28,6 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumCollection;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -51,7 +50,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
 	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger,
 	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumCollection,
-	        IOFieldFloatArray, IOFieldStringCollection{
+	        IOFieldFloatArray{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
