@@ -23,11 +23,6 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
  */
 public interface MemoryManager extends DataProvider.Holder{
 	
-	interface MoveInfo{
-		void start(ChunkChainIO chain);
-		void end(ChunkChainIO chain);
-	}
-	
 	interface DefragSes extends AutoCloseable{
 		@Override
 		void close();
@@ -44,7 +39,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine) If
 			 * null, the strategy signals that it has failed.
 			 */
-			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket) throws IOException;
+			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket, boolean dryRun) throws IOException;
 		}
 		
 		public interface AllocToStrategy{
@@ -145,7 +140,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			tryStrategies:
 			{
 				for(var alloc : allocs){
-					chunk = alloc.alloc(context, ticket);
+					chunk = alloc.alloc(context, ticket, false);
 					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
@@ -163,6 +158,22 @@ public interface MemoryManager extends DataProvider.Holder{
 			return chunk;
 		}
 		
+		@Override
+		public boolean canAlloc(AllocateTicket ticket) throws IOException{
+			long minSize = minAllocationCapacity();
+			if(ticket.bytes()<minSize){
+				ticket = ticket.withBytes(minSize);
+			}
+			
+			for(var alloc : allocs){
+				var chunk = alloc.alloc(context, ticket, true);
+				if(chunk != null){
+					return true;
+				}
+			}
+			return false;
+		}
+		
 		private static void postAllocValidate(AllocateTicket ticket, Chunk chunk) throws IOException{
 			chunk.requireReal();
 			var nsizO = ticket.explicitNextSize();
@@ -175,8 +186,6 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 		}
 	}
-	
-	MoveInfo getMoveInfo();
 	
 	DefragSes openDefragmentMode();
 	
@@ -243,7 +252,12 @@ public interface MemoryManager extends DataProvider.Holder{
 	 */
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 	
+	boolean canAlloc(AllocateTicket ticket) throws IOException;
+	
 	default long minAllocationCapacity(){
 		return 1;
 	}
+	
+	void notifyStart(ChunkChainIO chain);
+	void notifyEnd(ChunkChainIO chain);
 }

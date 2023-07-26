@@ -576,7 +576,7 @@ public class MemoryOperations{
 		};
 	}
 	
-	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket, boolean allowRemove) throws IOException{
+	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket, boolean allowRemove, boolean dryRun) throws IOException{
 		for(var iterator = magnetisedFreeChunkIterator(context, ticket.positionMagnet()); iterator.hasNext(); ){
 			Chunk c = iterator.ioNext().dereference(context);
 			assert c.getNextSize() == NumberSize.VOID;
@@ -588,12 +588,13 @@ public class MemoryOperations{
 			
 			var potentialChunk = chBuilderFromTicket(context, c.getPtr(), ticket).create();
 			if(freeSpace>c.getHeaderSize() + potentialChunk.getHeaderSize()){
-				Chunk reallocate = chipEndProbe(context, ticket, c);
+				Chunk reallocate = chipEndProbe(context, ticket, c, dryRun);
 				if(reallocate != null) return reallocate;
 			}
 			
 			if(allowRemove && freeSpace<8){
 				if(ticket.approve(c)){
+					if(dryRun) return c;
 					iterator.ioRemove();
 					try{
 						var oldHSiz = c.getHeaderSize();
@@ -601,10 +602,10 @@ public class MemoryOperations{
 						c.setNextPtr(ticket.next());
 						var newHSiz = c.getHeaderSize();
 						c.setCapacity(c.getCapacity() + oldHSiz - newHSiz);
-						c.syncStruct();
 					}catch(OutOfBitDepth e){
 						throw new ShouldNeverHappenError(e);
 					}
+					c.syncStruct();
 					return c;
 				}
 			}
@@ -612,7 +613,7 @@ public class MemoryOperations{
 		return null;
 	}
 	
-	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
+	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch, boolean dryRun) throws IOException{
 		var ptr     = ch.getPtr();
 		var builder = chBuilderFromTicket(context, ptr, ticket);
 		
@@ -628,6 +629,7 @@ public class MemoryOperations{
 		if(!ticket.approve(reallocate)){
 			return null;
 		}
+		if(dryRun) return reallocate;
 		
 		reallocate.writeHeader();
 		
@@ -643,7 +645,7 @@ public class MemoryOperations{
 			       .withNext(ticket.next());
 	}
 	
-	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
+	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException{
 		
 		var src   = context.getSource();
 		var ioSiz = src.getIOSize();
@@ -652,6 +654,8 @@ public class MemoryOperations{
 		
 		var chunk = builder.create();
 		if(!ticket.approve(chunk)) return null;
+		
+		if(dryRun) return chunk;
 		
 		try(var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);

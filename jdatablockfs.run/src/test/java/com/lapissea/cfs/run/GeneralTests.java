@@ -347,7 +347,7 @@ public class GeneralTests{
 			                    AllocateTicket.bytes(1).submit(cluster),
 			                    AllocateTicket.bytes(1).submit(cluster));
 			AllocateTicket.bytes(1).submit(cluster);
-			var c1 = AllocateTicket.bytes(20).submit(cluster);
+			var c1 = AllocateTicket.bytes(40).submit(cluster);
 			var mm = cluster.getMemoryManager();
 			assertEquals(mm.getFreeChunks().size(), 0);
 			mm.free(List.of(frees.get(0), frees.get(2), frees.get(4)));

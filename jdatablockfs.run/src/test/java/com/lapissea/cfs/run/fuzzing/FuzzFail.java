@@ -154,7 +154,7 @@ public sealed interface FuzzFail<State, Act>{
 	
 	static void trimErr(Throwable e){
 		var stack  = e.getStackTrace();
-		var fzName = FuzzingRunner.class.getName();
+		var fzName = FuzzingRunner.class.getPackageName() + ".";
 		int end    = 0;
 		for(; end<stack.length; end++){
 			var el = stack[end];
@@ -186,13 +186,17 @@ public sealed interface FuzzFail<State, Act>{
 	}
 	
 	private static boolean permissiveThrowableEquals(Throwable ex1, Throwable ex2){
-		if(ex1 == null || ex2 == null) return ex1 == null && ex2 == null;
+		if(ex1 == null || ex2 == null){
+			return ex1 == null && ex2 == null;
+		}
 		
 		if(!Objects.equals(ex1.getClass(), ex2.getClass())) return false;
-		if(!Objects.equals(ex1.getMessage(), ex2.getMessage())) return false;
+		String m1 = ex1.getMessage(), m2 = ex2.getMessage();
+		if(!Objects.equals(m1, m2)){
+			return false;
+		}
 		{
-			var s1 = ex1.getSuppressed();
-			var s2 = ex2.getSuppressed();
+			Throwable[] s1 = ex1.getSuppressed(), s2 = ex2.getSuppressed();
 			if(s1.length != s2.length) return false;
 			for(int i = 0; i<s1.length; i++){
 				if(!permissiveThrowableEquals(s1[i], s2[i])){
@@ -200,12 +204,15 @@ public sealed interface FuzzFail<State, Act>{
 				}
 			}
 		}
-		if(!permissiveThrowableEquals(ex1.getCause(), ex2.getCause())) return false;
+		Throwable c1 = ex1.getCause(), c2 = ex2.getCause();
+		if(!permissiveThrowableEquals(c1, c2)){
+			return false;
+		}
 		
 		var s1 = ex1.getStackTrace();
 		var s2 = ex2.getStackTrace();
 		
-		var fzName = FuzzingRunner.class.getName();
+		var fzName = FuzzingRunner.class.getPackageName() + ".";
 		for(int i = 0; i<Math.min(s1.length, s2.length); i++){
 			var el1 = s1[i];
 			var el2 = s2[i];

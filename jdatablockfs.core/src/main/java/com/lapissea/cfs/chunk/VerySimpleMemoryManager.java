@@ -14,13 +14,6 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	private final IOList<ChunkPointer> freeChunks = IOList.wrap(new ArrayList<>());
 	private       boolean              defragmentMode;
 	
-	private final MoveInfo moveInfo = new MoveInfo(){
-		@Override
-		public void start(ChunkChainIO chain){ }
-		@Override
-		public void end(ChunkChainIO chain){ }
-	};
-	
 	public VerySimpleMemoryManager(DataProvider context){
 		super(context);
 	}
@@ -28,9 +21,9 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(context1, ticket) -> {
+			(ctx, ticket, dryRun) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(context1, ticket, true);
+				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, true, dryRun);
 			},
 			MemoryOperations::allocateAppendToFile
 		);
@@ -45,11 +38,6 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
 			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
-	}
-	
-	@Override
-	public MoveInfo getMoveInfo(){
-		return moveInfo;
 	}
 	@Override
 	public DefragSes openDefragmentMode(){
@@ -68,4 +56,9 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 		List<Chunk> toAdd = MemoryOperations.mergeChunks(toFree);
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
+	
+	@Override
+	public void notifyStart(ChunkChainIO chain){ }
+	@Override
+	public void notifyEnd(ChunkChainIO chain){ }
 }
