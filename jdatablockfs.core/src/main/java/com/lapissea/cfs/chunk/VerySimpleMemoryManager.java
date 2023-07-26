@@ -21,9 +21,9 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(context1, ticket) -> {
+			(ctx, ticket, dryRun) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(context1, ticket, true);
+				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, true, dryRun);
 			},
 			MemoryOperations::allocateAppendToFile
 		);

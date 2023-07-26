@@ -48,7 +48,8 @@ public class RandomActions{
 				l.stream().map(Method::getName).collect(Collectors.joining(", "))
 			);
 		}
-		var meth  = l.get(0);
+		var meth = l.get(0);
+		LogUtil.println(meth);
 		var start = Instant.now();
 		meth.invoke(null);
 		var end = Instant.now();
@@ -70,9 +71,9 @@ public class RandomActions{
 		var r        = new Random(420);
 		
 		
-		var iter = 5000_0000;
+		var iter = 50_000_000;
 		for(int i = 0; i<iter; i++){
-			if(i%200000 == 0) LogUtil.println(i/(float)iter);
+			if(i%(iter/200) == 0) LogUtil.println(i/(float)iter);
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){

@@ -3,7 +3,6 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -435,7 +434,8 @@ public class SlowTests{
 		                     .runMark()
 		                     .assertFail())
 		    .runAll().report()
-		    .stableFail(8).saveFail().runMark()
+		    .stableFail(8)
+		    .saveFail().runMark()
 		    .assertFail();
 	}
 	
@@ -461,7 +461,6 @@ public class SlowTests{
 	
 	@Test
 	void simpleTreeSet() throws IOException{
-		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
 		checkSet(IOTreeSet.class, (d, set) -> {
 			set.add(2);
 			set.add(1);

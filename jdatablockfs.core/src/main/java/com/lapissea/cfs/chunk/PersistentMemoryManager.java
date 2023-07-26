@@ -119,9 +119,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			(ctx, ticket) -> {
+			(ctx, ticket, dryRun) -> {
 				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove);
+				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
 			},
 			MemoryOperations::allocateAppendToFile
 		);
@@ -253,20 +253,6 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 							if(c.head.equals(toMove)){
 								return;
 							}
-						}
-						
-						
-						var     toMovePtr  = toMove.getPtr();
-						var     toMoveSize = toMove.chainSize();
-						boolean anyOk      = false;
-						for(var ptr : freeChunks){
-							if(toMovePtr.equals(ptr) && ptr.dereference(context).getSize()>=toMoveSize + 8){
-								anyOk = true;
-								break;
-							}
-						}
-						if(!anyOk){
-							return;
 						}
 						
 						try{

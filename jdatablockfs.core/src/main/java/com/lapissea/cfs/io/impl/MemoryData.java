@@ -219,7 +219,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(len == 0) return;
 			
 			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
+			if(remaining<len) setCapacity0(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)), false);
 			
 			writeN(b, off, fileData, pos, len);
 		}
@@ -429,7 +429,20 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	public String toString(){
-		return MemoryData.class.getSimpleName() + "#" + Integer.toHexString(hashCode()) + "{" + getIOSize() + " bytes}";
+		int h;
+		try{
+			var used = this.used;
+			var siz  = Math.min(used, 128);
+			h = Arrays.hashCode(read(0, siz));
+			
+			var start = Math.max(used - siz, siz);
+			if(start != used){
+				h ^= Arrays.hashCode(read(start, used - start));
+			}
+		}catch(IOException e){
+			h = 0;
+		}
+		return MemoryData.class.getSimpleName() + "#" + Integer.toHexString(h) + "{" + getIOSize() + " bytes}";
 	}
 	
 	@Override

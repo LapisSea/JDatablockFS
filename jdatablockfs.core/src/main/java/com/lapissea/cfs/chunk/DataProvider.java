@@ -178,6 +178,9 @@ public interface DataProvider{
 			public void notifyStart(ChunkChainIO chain){ src().notifyStart(chain); }
 			@Override
 			public void notifyEnd(ChunkChainIO chain){ src().notifyEnd(chain); }
+			public boolean canAlloc(AllocateTicket ticket) throws IOException{
+				return src().canAlloc(router.apply(ticket));
+			}
 			@Override
 			public String toString(){
 				return DataProvider.this.toString();

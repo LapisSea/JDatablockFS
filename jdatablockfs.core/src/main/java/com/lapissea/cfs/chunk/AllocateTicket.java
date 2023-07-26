@@ -115,26 +115,37 @@ public record AllocateTicket(
 	
 	public Chunk submit(DataProvider provider) throws IOException{
 		var mngr = provider.getMemoryManager();
-		try{
-			return mngr.alloc(this);
-		}catch(FieldIsNull e){
-			throw e;
-		}catch(Throwable e){
-			throw new IOException("Failed to submit " + this, e);
-		}
+		return submit(mngr);
 	}
 	public Chunk submit(DataProvider.Holder provider) throws IOException{
 		var mngr = provider.getDataProvider().getMemoryManager();
+		return submit(mngr);
+	}
+	public Chunk submit(MemoryManager manager) throws IOException{
 		try{
-			return mngr.alloc(this);
+			return manager.alloc(this);
 		}catch(FieldIsNull e){
 			throw e;
 		}catch(Throwable e){
 			throw new IOException("Failed to submit " + this, e);
 		}
 	}
-	public Chunk submit(MemoryManager manager) throws IOException{
-		return manager.alloc(this);
+	public boolean canSubmit(DataProvider provider) throws IOException{
+		var mngr = provider.getMemoryManager();
+		return canSubmit(mngr);
+	}
+	public boolean canSubmit(DataProvider.Holder provider) throws IOException{
+		var mngr = provider.getDataProvider().getMemoryManager();
+		return canSubmit(mngr);
+	}
+	public boolean canSubmit(MemoryManager manager) throws IOException{
+		try{
+			return manager.canAlloc(this);
+		}catch(FieldIsNull e){
+			throw e;
+		}catch(Throwable e){
+			throw new IOException("Failed to dry run " + this, e);
+		}
 	}
 	
 	public boolean approve(Chunk chunk){

@@ -39,7 +39,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine) If
 			 * null, the strategy signals that it has failed.
 			 */
-			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket) throws IOException;
+			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket, boolean dryRun) throws IOException;
 		}
 		
 		public interface AllocToStrategy{
@@ -140,7 +140,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			tryStrategies:
 			{
 				for(var alloc : allocs){
-					chunk = alloc.alloc(context, ticket);
+					chunk = alloc.alloc(context, ticket, false);
 					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
@@ -156,6 +156,22 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 			
 			return chunk;
+		}
+		
+		@Override
+		public boolean canAlloc(AllocateTicket ticket) throws IOException{
+			long minSize = minAllocationCapacity();
+			if(ticket.bytes()<minSize){
+				ticket = ticket.withBytes(minSize);
+			}
+			
+			for(var alloc : allocs){
+				var chunk = alloc.alloc(context, ticket, true);
+				if(chunk != null){
+					return true;
+				}
+			}
+			return false;
 		}
 		
 		private static void postAllocValidate(AllocateTicket ticket, Chunk chunk) throws IOException{
@@ -235,6 +251,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Allocates a new independent chunk, unreferenced by anything. All instructions on what and how to allocate it are provided in the ticket.
 	 */
 	Chunk alloc(AllocateTicket ticket) throws IOException;
+	
+	boolean canAlloc(AllocateTicket ticket) throws IOException;
 	
 	default long minAllocationCapacity(){
 		return 1;
