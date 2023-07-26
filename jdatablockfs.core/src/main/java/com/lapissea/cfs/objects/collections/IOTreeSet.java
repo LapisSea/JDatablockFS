@@ -567,12 +567,14 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	@Override
 	public void clear() throws IOException{
 		if(isEmpty()) return;
-		nodes.clear();
-		values.clear();
+		
 		nodeCache.clear();
 		blankNodeIds.clear();
 		blankValueIds.clear();
-		deltaSize(-size());
+		
+		zeroSize();
+		nodes.clear();
+		values.clear();
 	}
 	
 	@Override

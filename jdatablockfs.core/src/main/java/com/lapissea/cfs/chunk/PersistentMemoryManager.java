@@ -233,15 +233,15 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 					var nextO = lastChO.map(Chunk::nextPhysical);
 					if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
 						var lastFree = lastChO.get();
-						var next     = nextO.get();
+						var toMove   = nextO.get();
 						
-						if(lastFree.totalSize()<next.totalSize()*2){
+						if(lastFree.totalSize()<toMove.totalSize()*2){
 							return;
 						}
 						
 						var stack = getStack();
 						for(var c : stack){
-							if(c.head.equals(next)){
+							if(c.head.equals(toMove)){
 								return;
 							}
 						}
@@ -249,14 +249,14 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl im
 						{//Disable modification of the list while it is being moved
 							var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 							var freeRef = fch.getReference().getPtr();
-							if(freeRef.dereference(context).walkNext().anyMatch(c -> c == next)){
+							if(freeRef.dereference(context).walkNext().anyMatch(c -> c == toMove)){
 								allowFreeRemove = false;
 							}
 						}
 						
 						try{
 							var move = DefragmentManager.moveReference(
-								(Cluster)context, next.getPtr(),
+								(Cluster)context, toMove.getPtr(),
 								t -> t.withApproval(ch -> ch.getPtr().compareTo(lastFree.getPtr())<0),
 								false);
 							if(move.hasAny()){
