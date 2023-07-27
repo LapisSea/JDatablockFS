@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -106,6 +107,10 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	@IONullability(NULLABLE)
 	private String[] permits;
 	
+	@IOValue
+	@IONullability(NULLABLE)
+	private String sealedParent;
+	
 	public TypeDef(){ }
 	
 	public TypeDef(@NotNull Class<?> type){
@@ -134,6 +139,21 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 				permits[i] = src[i].getName();
 			}
 		}
+		LogUtil.println(type.getSuperclass());
+		for(Class<?> anInterface : type.getInterfaces()){
+			LogUtil.println(anInterface);
+		}
+
+//		if (isInterface()) {
+//			for (Class<?> i : c.getInterfaces(/* cloneArray */ false)) {
+//				if (i == this) {
+//					return true;
+//				}
+//			}
+//		} else {
+//			return c.getSuperclass() == this;
+//		}
+//		return false;
 	}
 	
 	public boolean isUnmanaged() { return unmanaged; }
@@ -144,6 +164,10 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public List<String> getPermittedSubclasses(){
 		if(permits == null) return List.of();
 		return ArrayViewList.create(permits, null);
+	}
+	
+	public String getSealedParent(){
+		return sealedParent;
 	}
 	
 	public List<FieldDef> getFields(){

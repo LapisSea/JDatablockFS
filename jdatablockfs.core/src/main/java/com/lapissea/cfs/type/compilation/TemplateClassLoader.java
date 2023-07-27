@@ -14,6 +14,7 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
 
@@ -120,17 +121,21 @@ public final class TemplateClassLoader extends ClassLoader{
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
 		
-		for(var subclass : classType.def.getPermittedSubclasses()){
-			writer.write("permits {!}", subclass);
+		if(classType.def.isSealed()){
+			int i = 0;
+			for(var subclass : classType.def.getPermittedSubclasses()){
+				writer.write("permits {!}", subclass);
+			}
 		}
 		
-		writer.write(
-			"""
-				implements {}<#genClassName>
-				public interface #genClassName start
-				""",
-			IOInstance.Def.class
-		);
+		var parent = classType.def.getSealedParent();
+		if(parent != null){
+			throw new NotImplementedException();
+		}else{
+			writer.write("implements {}<#genClassName>", IOInstance.Def.class);
+		}
+		
+		writer.write("public interface #genClassName start");
 		
 		for(var field : classType.def.getFields()){
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
