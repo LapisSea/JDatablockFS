@@ -349,7 +349,8 @@ public class Utils{
 		if(!type.isInterface() && !Modifier.isAbstract(type.getModifiers())){
 			universe.add(type);
 		}
-		for(var sub : (Class<T>[])type.getPermittedSubclasses()){
+		var psbc = type.getPermittedSubclasses();
+		for(var sub : (Class<T>[])psbc){
 			if(sub.isSealed()){
 				var uni = computeSealedUniverse(sub, allowUnbounded);
 				if(uni.isEmpty()) return Optional.empty();

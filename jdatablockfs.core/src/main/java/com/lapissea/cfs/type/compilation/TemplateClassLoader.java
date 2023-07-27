@@ -120,6 +120,10 @@ public final class TemplateClassLoader extends ClassLoader{
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
 		
+		for(var subclass : classType.def.getPermittedSubclasses()){
+			writer.write("permits {!}", subclass);
+		}
+		
 		writer.write(
 			"""
 				implements {}<#genClassName>

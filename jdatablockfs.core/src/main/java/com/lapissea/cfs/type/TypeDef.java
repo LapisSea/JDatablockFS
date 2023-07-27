@@ -141,6 +141,11 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public boolean isEnum()      { return enumConstants != null; }
 	public boolean isSealed()    { return permits != null; }
 	
+	public List<String> getPermittedSubclasses(){
+		if(permits == null) return List.of();
+		return ArrayViewList.create(permits, null);
+	}
+	
 	public List<FieldDef> getFields(){
 		if(fields == null) return List.of();
 		return ArrayViewList.create(fields, null);
