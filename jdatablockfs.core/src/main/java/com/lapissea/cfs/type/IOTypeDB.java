@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
@@ -12,6 +13,7 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
@@ -423,10 +425,12 @@ public sealed interface IOTypeDB{
 					Float.class,
 					Double.class,
 					
-					String.class,
 					Reference.class,
 					}){
 					db.newID(TypeLink.of(c), true);
+				}
+				for(Class<?> wrapperType : FieldCompiler.getWrapperTypes()){
+					db.newID(TypeLink.of(wrapperType), true);
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
