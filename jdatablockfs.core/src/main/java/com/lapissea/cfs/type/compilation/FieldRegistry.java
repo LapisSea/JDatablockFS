@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
@@ -8,11 +9,13 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
@@ -137,6 +140,29 @@ final class FieldRegistry{
 		}
 	});
 	
+	private static List<Class<?>> WRAPPERS;
+	
+	static synchronized List<Class<?>> getWrappers(){
+		if(WRAPPERS != null) return WRAPPERS;
+		return WRAPPERS = calcWrappers();
+	}
+	private static List<Class<?>> calcWrappers(){
+		return Utils.getSealedUniverse(NullFlagCompanyField.class, true).orElseThrow()
+		            .universe().stream().map(FieldRegistry::fieldToType)
+		            .filter(Optional::isPresent).<Class<?>>map(Optional::get)
+		            .sorted(Comparator.comparing(Class::getName)).toList();
+	}
+	private static Optional<Class<?>> fieldToType(Class<?> fieldType){
+		var superC = (ParameterizedType)fieldType.getGenericSuperclass();
+		if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+			return Optional.empty();
+		}
+		var args = superC.getActualTypeArguments();
+		if(!(args[1] instanceof Class<?> valueType)){
+			return Optional.empty();
+		}
+		return Optional.of(valueType);
+	}
 	private static List<IOField.FieldUsage> getData(){
 		if(USAGES.isInitialized() || !Log.TRACE){
 			return USAGES.get();

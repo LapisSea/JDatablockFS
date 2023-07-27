@@ -19,6 +19,7 @@ import com.lapissea.cfs.tools.utils.ToolUtils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -36,6 +37,7 @@ import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.LongFunction;
 import java.util.stream.Stream;
 
@@ -451,6 +453,17 @@ public class GeneralTypeHandlingTests{
 			}
 		}
 		
+	}
+	
+	@Test
+	void wrapperListing(){
+		var actual = Set.copyOf(FieldCompiler.getWrapperTypes());
+		var expected = Set.of(
+			String.class, Duration.class, Instant.class,
+			LocalDate.class, LocalTime.class, LocalDateTime.class
+		);
+		
+		assertEquals(expected, actual);
 	}
 	
 	@Test

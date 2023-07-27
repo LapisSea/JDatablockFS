@@ -576,4 +576,8 @@ public final class FieldCompiler{
 	static{
 		Thread.startVirtualThread(FieldRegistry::init);
 	}
+	
+	public static List<Class<?>> getWrapperTypes(){
+		return FieldRegistry.getWrappers();
+	}
 }
