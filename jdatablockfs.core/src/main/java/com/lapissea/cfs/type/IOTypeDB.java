@@ -17,12 +17,14 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -131,7 +133,7 @@ public sealed interface IOTypeDB{
 				if(!defs.containsKey(type.getTypeName())){
 					var def = new TypeDef(type.getTypeClass(null));
 					if(!def.isUnmanaged()){
-						defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
+						defs.putIfAbsent(type.getTypeName(), def);
 					}else{
 						defs.put(type.getTypeName(), null);
 					}
@@ -564,6 +566,7 @@ public sealed interface IOTypeDB{
 			RuntimeException e = null;
 			
 			for(var name : names){
+				Log.trace("Checking validity of {}#blueBright", name);
 				try{
 					var cls = Class.forName(
 						name, true,
@@ -572,7 +575,16 @@ public sealed interface IOTypeDB{
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
-								List.of(name::equals)
+								List.of(names::contains, n -> {
+									boolean contains;
+									try{
+										LogUtil.println(n);
+										contains = defs.containsKey(new TypeName(n));
+									}catch(IOException ex){
+										throw new RuntimeException(ex);
+									}
+									return contains;
+								})
 							)
 						));
 					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
@@ -615,7 +627,17 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			var def = new TypeDef(typ);
+			var def    = new TypeDef(typ);
+			var parent = def.getSealedParent();
+			if(parent != null){
+				recordType(builtIn, new TypeLink(switch(parent.type()){
+					case EXTEND -> typ.getSuperclass();
+					case JUST_INTERFACE -> Arrays.stream(typ.getInterfaces())
+					                             .filter(i -> i.getName().equals(parent.name()))
+					                             .findAny().orElseThrow();
+				}), newDefs);
+			}
+			
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);
 			}

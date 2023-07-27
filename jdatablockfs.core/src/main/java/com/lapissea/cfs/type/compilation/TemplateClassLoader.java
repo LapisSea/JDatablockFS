@@ -53,8 +53,8 @@ public final class TemplateClassLoader extends ClassLoader{
 			throw new UnsupportedOperationException(className + " is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
 		}
 		
-		if(!def.isIoInstance() && !def.isEnum()){
-			throw new UnsupportedOperationException("Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() + " or Enum");
+		if(!def.isIoInstance() && !def.isEnum() && !def.isJustInterface()){
+			throw new UnsupportedOperationException("Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() + " or Enum or just an interface");
 		}
 		
 		var classData = CLASS_DATA_CACHE.get(new TypeNamed(className, def));
@@ -70,7 +70,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			try{
 				classData = jorthGenerate(typ);
 			}catch(Throwable e){
-				if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolve()){
+				if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolveVal()){
 					e.printStackTrace();
 					System.exit(-1);
 				}
@@ -91,8 +91,10 @@ public final class TemplateClassLoader extends ClassLoader{
 		try(var writer = jorth.writer()){
 			if(classType.def.isIoInstance()){
 				generateIOInstance(classType, writer);
-			}else{
+			}else if(classType.def.isEnum()){
 				generateEnum(classType, writer);
+			}else if(classType.def.isJustInterface()){
+				generateJustAnInterface(classType, writer);
 			}
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
@@ -121,19 +123,20 @@ public final class TemplateClassLoader extends ClassLoader{
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
 		
-		if(classType.def.isSealed()){
-			int i = 0;
-			for(var subclass : classType.def.getPermittedSubclasses()){
-				writer.write("permits {!}", subclass);
-			}
-		}
+		writePermits(classType, writer);
 		
 		var parent = classType.def.getSealedParent();
 		if(parent != null){
-			throw new NotImplementedException();
-		}else{
-			writer.write("implements {}<#genClassName>", IOInstance.Def.class);
+			ensureLoadedSealParent(parent.name());
+			switch(parent.type()){
+				case EXTEND -> {
+					//Need to rework ioinstance generation to be a full class first
+					throw new NotImplementedException("A sealed parent as a class is not implemented yet");
+				}
+				case JUST_INTERFACE -> writer.write("implements {!}", parent.name());
+			}
 		}
+		writer.write("implements {}<#genClassName>", IOInstance.Def.class);
 		
 		writer.write("public interface #genClassName start");
 		
@@ -176,6 +179,38 @@ public final class TemplateClassLoader extends ClassLoader{
 				field.getType().generic(db));
 		}
 		writer.write("end");
+	}
+	
+	private void generateJustAnInterface(TypeNamed classType, CodeStream writer) throws MalformedJorth{
+		writePermits(classType, writer);
+		
+		var parent = classType.def.getSealedParent();
+		if(parent != null){
+			ensureLoadedSealParent(parent.name());
+			switch(parent.type()){
+				case EXTEND -> {
+					throw new IllegalStateException("Interface can not have an extends");
+				}
+				case JUST_INTERFACE -> writer.write("implements {!}", parent.name());
+			}
+		}
+		writer.write("public interface {!} start end", classType.name);
+	}
+	
+	private void ensureLoadedSealParent(String pName){
+		try{
+			getDef(pName);
+		}catch(ClassNotFoundException e){
+			throw new IllegalStateException("Sealed parent must be registered before a child", e);
+		}
+	}
+	
+	private static void writePermits(TypeNamed classType, CodeStream writer) throws MalformedJorth{
+		if(classType.def.isSealed()){
+			for(var subclass : classType.def.getPermittedSubclasses()){
+				writer.write("permits {!}", subclass);
+			}
+		}
 	}
 	
 	private TypeDef getDef(String name) throws ClassNotFoundException{
