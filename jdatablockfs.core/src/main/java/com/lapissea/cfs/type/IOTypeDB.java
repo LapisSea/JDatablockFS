@@ -892,7 +892,6 @@ public sealed interface IOTypeDB{
 		try{
 			return Class.forName(name);
 		}catch(ClassNotFoundException e){
-			Log.trace("Loading template: {}#yellow", name);
 			try{
 				return Class.forName(name, true, getTemplateLoader());
 			}catch(ClassNotFoundException ex){

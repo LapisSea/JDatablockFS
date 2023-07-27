@@ -357,7 +357,9 @@ public class Utils{
 				universe.addAll(uni.get().universe);
 				continue;
 			}
-			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())){
+			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())
+			   || UtilL.instanceOf(sub, IOInstance.Def.class)//TODO: remove when template generates io classes
+			){
 				universe.add(sub);
 				continue;
 			}
