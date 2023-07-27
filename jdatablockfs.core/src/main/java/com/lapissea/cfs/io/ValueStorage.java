@@ -1136,6 +1136,26 @@ public sealed interface ValueStorage<T>{
 			};
 		}
 		
+		if(clazz.isSealed()){
+			//noinspection rawtypes,unchecked
+			Optional<Utils.SealedInstanceUniverse> oUniverse =
+				Utils.getSealedUniverse(clazz, false).flatMap(u -> Utils.SealedInstanceUniverse.of((Utils.SealedUniverse)u));
+			if(oUniverse.isPresent()){
+				Utils.SealedInstanceUniverse<?> universe = oUniverse.get();
+				return switch(rule){
+					case StorageRule.Default ignored -> new SealedInstance<>(generics, provider, universe);
+					case StorageRule.FixedOnly ignored -> {
+						var pipe = FixedStructPipe.of(TypedReference.STRUCT);
+						yield new FixedReferenceSealedInstance<>(generics, provider, pipe, universe);
+					}
+					case StorageRule.VariableFixed conf -> {
+						var pipe = FixedVaryingStructPipe.tryVarying(TypedReference.STRUCT, conf.provider);
+						yield new FixedReferenceSealedInstance<>(generics, provider, pipe, universe);
+					}
+				};
+			}
+		}
+		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
 				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());
@@ -1143,26 +1163,6 @@ public sealed interface ValueStorage<T>{
 				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
 			};
 		}else{
-			if(clazz.isSealed()){
-				//noinspection rawtypes,unchecked
-				Optional<Utils.SealedInstanceUniverse> oUniverse =
-					Utils.getSealedUniverse(clazz, false).flatMap(u -> Utils.SealedInstanceUniverse.of((Utils.SealedUniverse)u));
-				if(oUniverse.isPresent()){
-					Utils.SealedInstanceUniverse<?> universe = oUniverse.get();
-					return switch(rule){
-						case StorageRule.Default ignored -> new SealedInstance<>(generics, provider, universe);
-						case StorageRule.FixedOnly ignored -> {
-							var pipe = FixedStructPipe.of(TypedReference.STRUCT);
-							yield new FixedReferenceSealedInstance<>(generics, provider, pipe, universe);
-						}
-						case StorageRule.VariableFixed conf -> {
-							var pipe = FixedVaryingStructPipe.tryVarying(TypedReference.STRUCT, conf.provider);
-							yield new FixedReferenceSealedInstance<>(generics, provider, pipe, universe);
-						}
-					};
-				}
-			}
-			
 			var struct = Struct.ofUnknown(clazz);
 			return switch(rule){
 				case StorageRule.Default ignored -> new Instance<>(generics, provider, StandardStructPipe.of(struct));

@@ -24,28 +24,26 @@ public class TestUtils{
 	
 	static Class<?> generateAndLoadInstance(String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws ReflectiveOperationException{
 		
+		StringJoiner tokenStr = new StringJoiner(" ");
+		var          jorth    = new Jorth(null, tokenStr::add);
+		try{
+			try(var writer = jorth.writer()){
+				generator.accept(writer);
+			}finally{
+				LogUtil.println(tokenStr.toString());
+			}
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to generate class " + className, e);
+		}
+		var classes = jorth.listClassFiles();
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				
-				if(name.equals(className)){
-					StringJoiner tokenStr = new StringJoiner(" ");
-					var          jorth    = new Jorth(null, tokenStr::add);
-					try{
-						
-						try(var writer = jorth.writer()){
-							generator.accept(writer);
-						}finally{
-							LogUtil.println(tokenStr.toString());
-						}
-						
-						var byt = jorth.getClassFile(className);
-						BytecodeUtils.printClass(byt);
-						
-						return defineClass(name, ByteBuffer.wrap(byt), null);
-					}catch(MalformedJorth e){
-						throw new RuntimeException("Failed to generate class " + className, e);
-					}
+				if(classes.contains(name)){
+					var byt = jorth.getClassFile(name);
+					BytecodeUtils.printClass(byt);
+					
+					return defineClass(name, ByteBuffer.wrap(byt), null);
 				}
 				return super.findClass(name);
 			}

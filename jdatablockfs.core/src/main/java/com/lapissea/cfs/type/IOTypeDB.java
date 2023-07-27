@@ -19,12 +19,14 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -133,7 +135,7 @@ public sealed interface IOTypeDB{
 				if(!defs.containsKey(type.getTypeName())){
 					var def = new TypeDef(type.getTypeClass(null));
 					if(!def.isUnmanaged()){
-						defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
+						defs.putIfAbsent(type.getTypeName(), def);
 					}else{
 						defs.put(type.getTypeName(), null);
 					}
@@ -568,6 +570,7 @@ public sealed interface IOTypeDB{
 			RuntimeException e = null;
 			
 			for(var name : names){
+				Log.trace("Checking validity of {}#blueBright", name);
 				try{
 					var cls = Class.forName(
 						name, true,
@@ -576,7 +579,16 @@ public sealed interface IOTypeDB{
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
-								List.of(name::equals)
+								List.of(names::contains, n -> {
+									boolean contains;
+									try{
+										LogUtil.println(n);
+										contains = defs.containsKey(new TypeName(n));
+									}catch(IOException ex){
+										throw new RuntimeException(ex);
+									}
+									return contains;
+								})
 							)
 						));
 					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
@@ -619,11 +631,17 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			if(Utils.getSealedUniverse(typ, false).filter(IOInstance::isInstance).isPresent()){
-				return;
+			var def    = new TypeDef(typ);
+			var parent = def.getSealedParent();
+			if(parent != null){
+				recordType(builtIn, new TypeLink(switch(parent.type()){
+					case EXTEND -> typ.getSuperclass();
+					case JUST_INTERFACE -> Arrays.stream(typ.getInterfaces())
+					                             .filter(i -> i.getName().equals(parent.name()))
+					                             .findAny().orElseThrow();
+				}), newDefs);
 			}
 			
-			var def = new TypeDef(typ);
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);
 			}
@@ -707,8 +725,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			
-			var typeName = type.getName();
-			var universe = record? requireIOUniverse(rootType.getName()) : sealedMultiverse.get(typeName);
+			var typeName     = type.getName();
+			var rootTypeName = rootType.getName();
+			var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
 			if(universe == null){
 				return touch(rootType, type, 0);
 			}
@@ -734,14 +753,29 @@ public sealed interface IOTypeDB{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				recordType(universe.id2cl.values().stream().map(TypeLink::of).toList());
-				while(!universe.id2cl.isEmpty()){
-					var cls = universe.id2cl.remove((int)ioUniverse.size());
-					ioUniverse.add(cls.getName());
+				
+				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
+				for(var e : universe.id2cl.entrySet()){
+					int idx = e.getKey();
+					var cls = e.getValue().getName();
+					
+					if(ioUniverse.size()>idx){
+						failRegister(cls, idx, ioUniverse);
+					}else{
+						ioUniverse.add(cls);
+					}
 				}
 			}
 		}
+		private static void failRegister(String cls, int idx, IOList<String> ioUniverse) throws IOException{
+			var sb = new StringBuilder("Tried to register " + cls + " on " + idx + " but there is:\n");
+			for(long i = 0; i<ioUniverse.size(); i++){
+				sb.append(i).append("\t-> ").append(ioUniverse.get(i)).append('\n');
+			}
+			throw new IllegalStateException(sb.toString());
+		}
+		
 		private IOList<String> requireIOUniverse(String rootTypeName) throws IOException{
 			var sm = this.sealedMultiverse;
 			return sm.computeIfAbsent(rootTypeName, () -> {
@@ -862,7 +896,6 @@ public sealed interface IOTypeDB{
 		try{
 			return Class.forName(name);
 		}catch(ClassNotFoundException e){
-			Log.trace("Loading template: {}#yellow", name);
 			try{
 				return Class.forName(name, true, getTemplateLoader());
 			}catch(ClassNotFoundException ex){

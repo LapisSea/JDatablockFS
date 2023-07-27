@@ -349,14 +349,17 @@ public class Utils{
 		if(!type.isInterface() && !Modifier.isAbstract(type.getModifiers())){
 			universe.add(type);
 		}
-		for(var sub : (Class<T>[])type.getPermittedSubclasses()){
+		var psbc = type.getPermittedSubclasses();
+		for(var sub : (Class<T>[])psbc){
 			if(sub.isSealed()){
 				var uni = computeSealedUniverse(sub, allowUnbounded);
 				if(uni.isEmpty()) return Optional.empty();
 				universe.addAll(uni.get().universe);
 				continue;
 			}
-			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())){
+			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())
+			   || UtilL.instanceOf(sub, IOInstance.Def.class)//TODO: remove when template generates io classes
+			){
 				universe.add(sub);
 				continue;
 			}
