@@ -33,14 +33,17 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 				RawCheck PRIMITIVE        = of(SupportedPrimitive::isAny, "is not primitive");
 				RawCheck INSTANCE         = of(
 					type -> {
+						if(Utils.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent()){
+							return true;
+						}
+						
 						if(!IOInstance.isInstance(type)){
 							return false;
 						}
 						if(!Modifier.isAbstract(type.getModifiers())){
 							return true;
 						}
-						if(Def.isDefinition(type)) return true;
-						return Utils.getSealedUniverse(type, false).isPresent();
+						return Def.isDefinition(type);
 					},
 					type -> {
 						if(Modifier.isAbstract(type.getModifiers()) && !IOInstance.Def.isDefinition(type)){

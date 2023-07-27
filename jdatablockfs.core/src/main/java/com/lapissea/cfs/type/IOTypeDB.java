@@ -699,8 +699,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			
-			var typeName = type.getName();
-			var universe = record? requireIOUniverse(rootType.getName()) : sealedMultiverse.get(typeName);
+			var typeName     = type.getName();
+			var rootTypeName = rootType.getName();
+			var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
 			if(universe == null){
 				return touch(rootType, type, 0);
 			}
@@ -726,14 +727,29 @@ public sealed interface IOTypeDB{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				recordType(universe.id2cl.values().stream().map(TypeLink::of).toList());
-				while(!universe.id2cl.isEmpty()){
-					var cls = universe.id2cl.remove((int)ioUniverse.size());
-					ioUniverse.add(cls.getName());
+				
+				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
+				for(var e : universe.id2cl.entrySet()){
+					int idx = e.getKey();
+					var cls = e.getValue().getName();
+					
+					if(ioUniverse.size()>idx){
+						failRegister(cls, idx, ioUniverse);
+					}else{
+						ioUniverse.add(cls);
+					}
 				}
 			}
 		}
+		private static void failRegister(String cls, int idx, IOList<String> ioUniverse) throws IOException{
+			var sb = new StringBuilder("Tried to register " + cls + " on " + idx + " but there is:\n");
+			for(long i = 0; i<ioUniverse.size(); i++){
+				sb.append(i).append("\t-> ").append(ioUniverse.get(i)).append('\n');
+			}
+			throw new IllegalStateException(sb.toString());
+		}
+		
 		private IOList<String> requireIOUniverse(String rootTypeName) throws IOException{
 			var sm = this.sealedMultiverse;
 			return sm.computeIfAbsent(rootTypeName, () -> {

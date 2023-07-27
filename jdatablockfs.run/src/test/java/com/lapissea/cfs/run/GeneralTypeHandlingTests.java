@@ -455,7 +455,7 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void testSealedType() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+		TestUtils.testCluster(TestInfo.of(), provider -> {
 			@IOInstance.Def.Order({"seal1", "seal2"})
 			interface Container extends IOInstance.Def<Container>{
 				Seal seal1();
@@ -480,6 +480,12 @@ public class GeneralTypeHandlingTests{
 				
 				assertEquals(read, val);
 			}
+			chunk.freeChaining();
+			
+			IOList<Seal> list = provider.getRootProvider().request("list", IOList.class, Seal.class);
+			list.add(new Seal.A(69));
+			list.add(new Seal.B(Instant.now()));
+			list.add(new Seal.C(4, 2, 0));
 		});
 	}
 }
