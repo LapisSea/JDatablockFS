@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.lapissea.util.ConsoleColors.*;
 
@@ -58,7 +59,8 @@ public final class Jorth extends CodeDestination{
 	private       Visibility             visibilityBuffer;
 	private       GenericType            extensionBuffer;
 	private final List<GenericType>      interfaces  = new ArrayList<>();
-	private final Set<Access>            accessSet   = EnumSet.noneOf(Access.class);
+	private final List<ClassName>        permits     = new ArrayList<>();
+	private final EnumSet<Access>        accessSet   = EnumSet.noneOf(Access.class);
 	private final Map<ClassName, AnnGen> annotations = new HashMap<>();
 	
 	private final Map<String, ClassName>   imports = new HashMap<>();
@@ -78,21 +80,32 @@ public final class Jorth extends CodeDestination{
 	}
 	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
-		if(currentClass == null) return Optional.empty();
 		var name = type.raw();
 		name = importsFun.apply(name);
 		
+		var jorthClass = classes.get(name);
+		if(jorthClass != null){
+			if(type.dims()>0){
+				return makeArr(type);
+			}
+			return Optional.of(jorthClass);
+		}
+		
+		if(currentClass == null) return Optional.empty();
 		if(!currentClass.name.equals(name)){
 			return Optional.empty();
 		}
 		if(type.dims()>0){
-			try{
-				return Optional.of(new ClassInfo.OfArray(typeSource, type.withDims(type.dims() - 1)));
-			}catch(MalformedJorth e){
-				throw new RuntimeException(e);
-			}
+			return makeArr(type);
 		}
 		return Optional.of(currentClass);
+	}
+	private Optional<ClassInfo> makeArr(GenericType type){
+		try{
+			return Optional.of(new ClassInfo.OfArray(typeSource, type.withDims(type.dims() - 1)));
+		}catch(MalformedJorth e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	public CodeStream writer(){
@@ -567,16 +580,21 @@ public final class Jorth extends CodeDestination{
 				var visibility = popVisibility();
 				var extension  = popExtension();
 				var interfaces = popInterfaces();
+				var permits    = popPermits();
 				var anns       = popAnnotations();
+				var accessSet  = popAccessSet();
 				
 				if(keyword == Keyword.ENUM){
 					if(!extension.equals(GenericType.OBJECT)){
 						throw new MalformedJorth("Can not extend enum");
 					}
+					if(!permits.isEmpty()){
+						throw new MalformedJorth("Enum can not be sealed");
+					}
 					extension = new GenericType(ClassName.of(Enum.class), 0, List.of(new GenericType(className)));
 				}
 				
-				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet, anns);
+				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, permits, accessSet, anns);
 				classes.put(className, currentClass);
 				
 				typeSource.validateType(extension);
@@ -594,6 +612,11 @@ public final class Jorth extends CodeDestination{
 				var interf = source.readTypeSimple(importsFun);
 				typeSource.validateType(interf.raw());
 				interfaces.add(interf);
+			}
+			case PERMITS -> {
+				var permit = source.readClassName(importsFun);
+//				typeSource.validateType(permit);
+				permits.add(permit);
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 		}
@@ -633,6 +656,11 @@ public final class Jorth extends CodeDestination{
 		interfaces.clear();
 		return tmp;
 	}
+	private List<ClassName> popPermits(){
+		var tmp = List.copyOf(permits);
+		permits.clear();
+		return tmp;
+	}
 	private EnumSet<Access> popAccessSet(){
 		var tmp = EnumSet.copyOf(accessSet);
 		accessSet.clear();
@@ -644,6 +672,9 @@ public final class Jorth extends CodeDestination{
 		return tmp;
 	}
 	
+	public Set<String> listClassFiles(){
+		return classes.keySet().stream().map(ClassName::dotted).collect(Collectors.toSet());
+	}
 	public byte[] getClassFile(String name){
 		var cls = classes.get(ClassName.dotted(name));
 		if(cls == null){

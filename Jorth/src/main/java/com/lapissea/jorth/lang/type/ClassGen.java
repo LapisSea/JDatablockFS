@@ -44,6 +44,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	public final  GenericType       extension;
 	private final List<GenericType> interfaces;
+	private final List<ClassName>   permits;
 	
 	final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 	
@@ -57,7 +58,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	public ClassGen(
 		TypeSource typeSource,
 		ClassName name, ClassType type, Visibility visibility,
-		GenericType extension, List<GenericType> interfaces,
+		GenericType extension, List<GenericType> interfaces, List<ClassName> permits,
 		Set<Access> accessSet,
 		List<AnnGen> anns){
 		this.typeSource = typeSource;
@@ -66,10 +67,11 @@ public final class ClassGen implements ClassInfo, Endable{
 		this.visibility = visibility;
 		this.extension = extension;
 		this.interfaces = List.copyOf(interfaces);
+		this.permits = List.copyOf(permits);
 		this.accessSet = accessSet.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(accessSet);
 		
 		int accessFlags = visibility.flag|switch(type){
-			case CLASS -> ACC_SUPER|ACC_FINAL;
+			case CLASS -> ACC_SUPER|(this.permits.isEmpty()? ACC_FINAL : 0);
 			case INTERFACE, ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
@@ -96,6 +98,9 @@ public final class ClassGen implements ClassInfo, Endable{
 		}
 		
 		writer.visit(V19, accessFlags, name.slashed(), signature.toString(), extension.raw().slashed(), interfaceStrings);
+		for(var permit : this.permits){
+			writer.visitPermittedSubclass(permit.slashed());
+		}
 		writeAnnotations(anns, writer::visitAnnotation);
 	}
 	

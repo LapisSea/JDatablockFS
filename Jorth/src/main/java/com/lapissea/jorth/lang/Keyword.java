@@ -16,6 +16,7 @@ public enum Keyword implements KeyedEnum{
 	SET,
 	EXTENDS,
 	IMPLEMENTS,
+	PERMITS,
 	SUPER,
 	NEW,
 	CALL,
