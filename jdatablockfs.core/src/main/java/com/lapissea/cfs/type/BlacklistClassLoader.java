@@ -19,8 +19,10 @@ public final class BlacklistClassLoader extends ClassLoader{
 	}
 	@Override
 	protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
-		if(blacklist.stream().anyMatch(b -> b.test(name))){
-			throw new ClassNotFoundException("Blacklisted: " + name);
+		for(var b : blacklist){
+			if(b.test(name)){
+				throw new ClassNotFoundException("Blacklisted: " + name);
+			}
 		}
 		
 		if(name.startsWith("java.lang")) return getParent().loadClass(name);

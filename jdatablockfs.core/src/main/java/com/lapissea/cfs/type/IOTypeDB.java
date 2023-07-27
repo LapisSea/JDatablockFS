@@ -13,16 +13,20 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +61,7 @@ public sealed interface IOTypeDB{
 		boolean hasID(int id);
 		
 		@Override
-		TypeDef getDefinitionFromClassName(String className);
+		OptionalPP<TypeDef> getDefinitionFromClassName(String className);
 		
 		sealed class Basic implements MemoryOnlyDB{
 			
@@ -131,7 +135,7 @@ public sealed interface IOTypeDB{
 				if(!defs.containsKey(type.getTypeName())){
 					var def = new TypeDef(type.getTypeClass(null));
 					if(!def.isUnmanaged()){
-						defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
+						defs.putIfAbsent(type.getTypeName(), def);
 					}else{
 						defs.put(type.getTypeName(), null);
 					}
@@ -200,9 +204,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			@Override
-			public TypeDef getDefinitionFromClassName(String className){
-				if(className == null || className.isEmpty()) return null;
-				return defs.get(className);
+			public OptionalPP<TypeDef> getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return OptionalPP.empty();
+				return OptionalPP.ofNullable(defs.get(className));
 			}
 			
 			public Fixed bake(){
@@ -372,9 +376,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			@Override
-			public TypeDef getDefinitionFromClassName(String className){
-				if(className == null || className.isEmpty()) return null;
-				return defs.get(className);
+			public OptionalPP<TypeDef> getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return OptionalPP.empty();
+				return OptionalPP.ofNullable(defs.get(className));
 			}
 		}
 	}
@@ -421,10 +425,12 @@ public sealed interface IOTypeDB{
 					Float.class,
 					Double.class,
 					
-					String.class,
 					Reference.class,
 					}){
 					db.newID(TypeLink.of(c), true);
+				}
+				for(Class<?> wrapperType : FieldCompiler.getWrapperTypes()){
+					db.newID(TypeLink.of(wrapperType), true);
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
@@ -564,6 +570,7 @@ public sealed interface IOTypeDB{
 			RuntimeException e = null;
 			
 			for(var name : names){
+				Log.trace("Checking validity of {}#blueBright", name);
 				try{
 					var cls = Class.forName(
 						name, true,
@@ -572,7 +579,16 @@ public sealed interface IOTypeDB{
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
-								List.of(name::equals)
+								List.of(names::contains, n -> {
+									boolean contains;
+									try{
+										LogUtil.println(n);
+										contains = defs.containsKey(new TypeName(n));
+									}catch(IOException ex){
+										throw new RuntimeException(ex);
+									}
+									return contains;
+								})
 							)
 						));
 					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
@@ -589,7 +605,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void recordType(MemoryOnlyDB.Fixed builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
-			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()) != null;
+			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()).isPresent();
 			if(isBuiltIn){
 				for(int i = 0; i<type.argCount(); i++){
 					recordType(builtIn, type.arg(i), newDefs);
@@ -615,11 +631,17 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			if(Utils.getSealedUniverse(typ, false).filter(IOInstance::isInstance).isPresent()){
-				return;
+			var def    = new TypeDef(typ);
+			var parent = def.getSealedParent();
+			if(parent != null){
+				recordType(builtIn, new TypeLink(switch(parent.type()){
+					case EXTEND -> typ.getSuperclass();
+					case JUST_INTERFACE -> Arrays.stream(typ.getInterfaces())
+					                             .filter(i -> i.getName().equals(parent.name()))
+					                             .findAny().orElseThrow();
+				}), newDefs);
 			}
 			
-			var def = new TypeDef(typ);
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);
 			}
@@ -703,8 +725,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			
-			var typeName = type.getName();
-			var universe = record? requireIOUniverse(rootType.getName()) : sealedMultiverse.get(typeName);
+			var typeName     = type.getName();
+			var rootTypeName = rootType.getName();
+			var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
 			if(universe == null){
 				return touch(rootType, type, 0);
 			}
@@ -730,14 +753,29 @@ public sealed interface IOTypeDB{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				recordType(universe.id2cl.values().stream().map(TypeLink::of).toList());
-				while(!universe.id2cl.isEmpty()){
-					var cls = universe.id2cl.remove((int)ioUniverse.size());
-					ioUniverse.add(cls.getName());
+				
+				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
+				for(var e : universe.id2cl.entrySet()){
+					int idx = e.getKey();
+					var cls = e.getValue().getName();
+					
+					if(ioUniverse.size()>idx){
+						failRegister(cls, idx, ioUniverse);
+					}else{
+						ioUniverse.add(cls);
+					}
 				}
 			}
 		}
+		private static void failRegister(String cls, int idx, IOList<String> ioUniverse) throws IOException{
+			var sb = new StringBuilder("Tried to register " + cls + " on " + idx + " but there is:\n");
+			for(long i = 0; i<ioUniverse.size(); i++){
+				sb.append(i).append("\t-> ").append(ioUniverse.get(i)).append('\n');
+			}
+			throw new IllegalStateException(sb.toString());
+		}
+		
 		private IOList<String> requireIOUniverse(String rootTypeName) throws IOException{
 			var sm = this.sealedMultiverse;
 			return sm.computeIfAbsent(rootTypeName, () -> {
@@ -770,15 +808,11 @@ public sealed interface IOTypeDB{
 		}
 		
 		@Override
-		public TypeDef getDefinitionFromClassName(String className) throws IOException{
-			var builtIn = BUILT_IN.get();
-			if(className == null || className.isEmpty()) return null;
-			{
-				var def = builtIn.getDefinitionFromClassName(className);
-				if(def != null) return def;
-			}
-			
-			return defs.get(new TypeName(className));
+		public OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException{
+			if(className == null || className.isEmpty()) return OptionalPP.empty();
+			return BUILT_IN.get().getDefinitionFromClassName(className).or(() -> {
+				return OptionalPP.ofNullable(defs.get(new TypeName(className)));
+			});
 		}
 		
 		public void init(DataProvider provider) throws IOException{
@@ -853,7 +887,7 @@ public sealed interface IOTypeDB{
 	<T> Class<T> fromID(Class<T> rootType, int id) throws IOException;
 	<T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException;
 	
-	TypeDef getDefinitionFromClassName(String className) throws IOException;
+	OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException;
 	
 	ClassLoader getTemplateLoader();
 	
@@ -862,7 +896,6 @@ public sealed interface IOTypeDB{
 		try{
 			return Class.forName(name);
 		}catch(ClassNotFoundException e){
-			Log.trace("Loading template: {}#yellow", name);
 			try{
 				return Class.forName(name, true, getTemplateLoader());
 			}catch(ClassNotFoundException ex){

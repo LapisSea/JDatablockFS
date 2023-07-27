@@ -4,6 +4,7 @@ import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
@@ -117,9 +118,7 @@ public @interface IONullability{
 			if(IOInstance.isInstance(typ)){
 				return IOInstance.isManaged(typ);
 			}
-			return IOFieldTools.isGeneric(field) || Stream.of(
-				String.class, Duration.class, Instant.class, LocalDate.class, LocalTime.class, LocalDateTime.class
-			).anyMatch(c -> UtilL.instanceOf(typ, c));
+			return IOFieldTools.isGeneric(field) || FieldCompiler.getWrapperTypes().stream().anyMatch(c -> UtilL.instanceOf(typ, c));
 		}
 		
 		@NotNull

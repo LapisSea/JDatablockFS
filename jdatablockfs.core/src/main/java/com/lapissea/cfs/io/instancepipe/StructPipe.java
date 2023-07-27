@@ -26,6 +26,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -50,11 +51,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -357,10 +353,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				builder.chptr();
 				continue;
 			}
-			if(List.of(
-				String.class, Duration.class, Instant.class,
-				LocalDate.class, LocalTime.class, LocalDateTime.class
-			).contains(type)){
+			
+			if(FieldCompiler.getWrapperTypes().contains(type)){
 				builder.skipField(field);
 				continue;
 			}

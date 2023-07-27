@@ -89,11 +89,26 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String getName();
 	}
 	
+	@IOInstance.Def.ToString(name = false, fNames = false)
+	@IOInstance.Def.Order({"name", "type"})
+	public interface SealedParent extends IOInstance.Def<SealedParent>{
+		enum Type{
+			EXTEND,
+			JUST_INTERFACE
+			
+		}
+		
+		private static SealedParent of(String name, Type type){
+			return IOInstance.Def.of(SealedParent.class, name, type);
+		}
+		
+		String name();
+		Type type();
+	}
+	
 	
 	@IOValue
-	private boolean ioInstance;
-	@IOValue
-	private boolean unmanaged;
+	private boolean ioInstance, unmanaged, justInterface;
 	
 	@IOValue
 	private FieldDef[] fields = new FieldDef[0];
@@ -101,6 +116,14 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	@IOValue
 	@IONullability(NULLABLE)
 	private EnumConstant[] enumConstants;
+	
+	@IOValue
+	@IONullability(NULLABLE)
+	private String[] permits;
+	
+	@IOValue
+	@IONullability(NULLABLE)
+	private SealedParent sealedParent;
 	
 	public TypeDef(){ }
 	
@@ -123,11 +146,50 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			}
 			enumConstants = res;
 		}
+		if(type.isSealed()){
+			var src = type.getPermittedSubclasses();
+			permits = new String[src.length];
+			for(int i = 0; i<src.length; i++){
+				permits[i] = src[i].getName();
+			}
+		}
+		if(ioInstance){
+			var s = type.getSuperclass();
+			if(s != null && s.isSealed()){
+				setSealedParent(SealedParent.of(s.getName(), SealedParent.Type.EXTEND));
+			}
+			for(var inf : type.getInterfaces()){
+				if(inf.isSealed()){
+					setSealedParent(SealedParent.of(inf.getName(), SealedParent.Type.JUST_INTERFACE));
+				}
+			}
+		}
+		if(!isIoInstance() && !isEnum() && type.isInterface()){
+			justInterface = true;
+		}
 	}
 	
-	public boolean isUnmanaged() { return unmanaged; }
-	public boolean isIoInstance(){ return ioInstance; }
-	public boolean isEnum()      { return enumConstants != null; }
+	private void setSealedParent(SealedParent sealedParent){
+		if(this.sealedParent != null){
+			throw new IllegalStateException("multiple sealed parents not supported:\n" + this.sealedParent + "\n" + sealedParent);
+		}
+		this.sealedParent = sealedParent;
+	}
+	
+	public boolean isUnmanaged()    { return unmanaged; }
+	public boolean isIoInstance()   { return ioInstance; }
+	public boolean isEnum()         { return enumConstants != null; }
+	public boolean isSealed()       { return permits != null; }
+	public boolean isJustInterface(){ return justInterface; }
+	
+	public List<String> getPermittedSubclasses(){
+		if(permits == null) return List.of();
+		return ArrayViewList.create(permits, null);
+	}
+	
+	public SealedParent getSealedParent(){
+		return sealedParent;
+	}
 	
 	public List<FieldDef> getFields(){
 		if(fields == null) return List.of();
@@ -147,6 +209,29 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		StringBuilder sb = new StringBuilder();
 		if(isIoInstance()) sb.append("IO");
 		if(isUnmanaged()) sb.append("U");
+		if(isJustInterface()) sb.append("I");
+		if(isSealed()){
+			var permits = this.permits.clone();
+			if(permits.length>0){
+				int startsPos = Arrays.stream(permits).mapToInt(String::length).min().orElse(0) - 1;
+				while(startsPos>0){
+					var start = permits[0].substring(0, startsPos);
+					var c     = start.charAt(start.length() - 1);
+					if(c == '.'){
+						startsPos = 0;
+						break;
+					}
+					if(c == '$' && Arrays.stream(permits).allMatch(s -> s.startsWith(start))){
+						break;
+					}
+					startsPos--;
+				}
+				for(int i = 0; i<permits.length; i++){
+					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i], false);
+				}
+			}
+			sb.append(Arrays.stream(permits).collect(Collectors.joining(", ", "->[", "]")));
+		}
 		sb.append('{');
 		if(!getEnumConstants().isEmpty()){
 			sb.append(getEnumConstants().stream().map(Objects::toString).collect(Collectors.joining(", ")));

@@ -833,20 +833,26 @@ public class BinaryGridRenderer implements DataRenderer{
 				var       annCtx = new AnnotateCtx(ctx, provider, new LinkedList<>(), pointerRecord, strings, stringOutlines);
 				
 				try{
+					boolean[] logged = {false};
+					Consumer<Throwable> log = e -> {
+						if(logged[0]) return;
+						logged[0] = true;
+						e.printStackTrace();
+					};
 					try{
 						cluster.rootWalker(MemoryWalker.PointerRecord.of(ref -> {
 							if(!ref.isNull()){
 								try{
-									for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
+									for(Chunk chunk : ref.getPtr().dereference(cl).walkNext()){
 										referenced.add(chunk.getPtr());
 									}
-								}catch(IOException e){
-									throw UtilL.uncheckedThrow(e);
+								}catch(Throwable e){
+									log.accept(e);
 								}
 							}
 						}), true).walk();
 					}catch(IOException e){
-						throw new RuntimeException(e);
+						log.accept(e);
 					}
 					
 					annotateStruct(annCtx, root,
@@ -1721,7 +1727,8 @@ public class BinaryGridRenderer implements DataRenderer{
 									}
 								}
 								if(comp == String.class){
-									var inst   = (String[])field.get(ioPool, instance);
+									var inst = (String[])field.get(ioPool, instance);
+									if(inst == null) continue;
 									var arrSiz = inst.length;
 									
 									long  arrOffset = 0;

@@ -1,6 +1,7 @@
 package com.lapissea.jorth;
 
 import com.lapissea.util.LogUtil;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
@@ -10,9 +11,12 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
@@ -739,5 +743,29 @@ public class JorthTests{
 			var fun     = cls.getDeclaredMethod("wild", List.class);
 			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
 		}
+	}
+	
+	
+	@Test
+	void sealedClass() throws Exception{
+		var cls = generateAndLoadInstance("SealedClass", writer -> {
+			writer.write(
+				"""
+					permits child1
+					permits child2
+					public class SealedClass start end
+					
+					extends SealedClass
+					final class child1 start end
+					extends SealedClass
+					final class child2 start end
+					"""
+			);
+		});
+		
+		var permits = cls.getPermittedSubclasses();
+		Assert.assertNotNull(permits);
+		var names = Arrays.stream(permits).map(Class::getName).collect(Collectors.toSet());
+		Assert.assertEquals(names, Set.of("child1", "child2"));
 	}
 }
