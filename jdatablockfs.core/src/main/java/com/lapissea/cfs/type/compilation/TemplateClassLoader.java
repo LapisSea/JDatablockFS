@@ -4,6 +4,7 @@ import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDef;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
@@ -14,8 +15,8 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
@@ -70,16 +71,24 @@ public final class TemplateClassLoader extends ClassLoader{
 			try{
 				classData = jorthGenerate(typ);
 			}catch(Throwable e){
-				if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolveVal()){
-					e.printStackTrace();
-					System.exit(-1);
-				}
-				throw e;
+				throw handleClassgenFail(e);
 			}
 			CLASS_DATA_CACHE.put(typ, classData);
 		}
 		
-		return defineClass(className, ByteBuffer.wrap(classData), null);
+		try{
+			return defineClass(className, ByteBuffer.wrap(classData), null);
+		}catch(Throwable e){
+			throw handleClassgenFail(e);
+		}
+	}
+	private static RuntimeException handleClassgenFail(Throwable e){
+		e.printStackTrace();
+		if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolveVal()){
+			e.printStackTrace();
+			throw UtilL.sysExit(1);
+		}
+		throw UtilL.uncheckedThrow(e);
 	}
 	
 	private byte[] jorthGenerate(TypeNamed classType){
@@ -125,22 +134,48 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		writePermits(classType, writer);
 		
+		boolean extend = true;
+		
 		var parent = classType.def.getSealedParent();
 		if(parent != null){
 			ensureLoadedSealParent(parent.name());
 			switch(parent.type()){
 				case EXTEND -> {
-					//Need to rework ioinstance generation to be a full class first
-					throw new NotImplementedException("A sealed parent as a class is not implemented yet");
+					writer.write("extends {!}", parent.name());
+					extend = false;
 				}
 				case JUST_INTERFACE -> writer.write("implements {!}", parent.name());
 			}
 		}
-		writer.write("implements {}<#genClassName>", IOInstance.Def.class);
+		if(extend) writer.write("extends {}<#genClassName>", IOInstance.Managed.class);
 		
-		writer.write("public interface #genClassName start");
+		writer.addImport(Struct.class);
+		writer.write("public class #genClassName start");
+		if(extend && !classType.def.isSealed()){
+			writer.write(
+				"""
+					private static final field $STRUCT #Struct
+					
+					function <clinit> start
+						static call #Struct of start
+							class #genClassName
+						end
+						set #genClassName $STRUCT
+					end
+					
+					
+					public function <init>
+					start
+						super start
+							get #genClassName $STRUCT
+						end
+					end
+					""");
+		}
 		
 		for(var field : classType.def.getFields()){
+			writer.write("@{}", IOValue.class);
+			
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
 				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
@@ -166,17 +201,7 @@ public final class TemplateClassLoader extends ClassLoader{
 				}
 			}
 			
-			writer.write(
-				"""
-					function {!0}
-						returns {1}
-					end
-					function {!0}
-						arg {!0} {1}
-					end
-					""",
-				field.getName(),
-				field.getType().generic(db));
+			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));
 		}
 		writer.write("end");
 	}
