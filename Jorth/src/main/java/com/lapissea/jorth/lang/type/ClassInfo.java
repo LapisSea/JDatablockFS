@@ -113,7 +113,8 @@ public interface ClassInfo{
 			
 			RuntimeException[] fail = {null};
 			if(signature.name().equals("<init>")){
-				for(var ctor : clazz.getDeclaredConstructors()){
+				var ctors = clazz.getDeclaredConstructors();
+				for(var ctor : ctors){
 					var argsC = ctor.getParameterTypes();
 					if(checkArgs(argsC, signature.args(), fail)){
 						return FunctionInfo.of(source, ctor);

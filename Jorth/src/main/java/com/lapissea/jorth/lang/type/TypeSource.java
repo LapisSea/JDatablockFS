@@ -27,16 +27,22 @@ public interface TypeSource{
 	}
 	
 	class OfClassLoader implements TypeSource{
+		private final TypeSource  parent;
 		private final ClassLoader classLoader;
 		
 		private final Map<String, Optional<ClassInfo>> cache = new HashMap<>();
 		
-		public OfClassLoader(ClassLoader classLoader){
+		public OfClassLoader(TypeSource parent, ClassLoader classLoader){
+			this.parent = parent;
 			this.classLoader = classLoader;
 		}
 		
 		@Override
 		public Optional<ClassInfo> maybeByType(GenericType type){
+			if(parent != null){
+				var res = parent.maybeByType(type);
+				if(res.isPresent()) return res;
+			}
 			var name   = type.raw().dotted();
 			var cached = cache.get(name);
 			if(cached != null) return cached;
@@ -71,12 +77,8 @@ public interface TypeSource{
 		}
 	}
 	
-	static TypeSource concat(TypeSource a, TypeSource b){
-		return new Of2(a, b);
-	}
-	
-	static TypeSource of(ClassLoader classLoader){
-		return new OfClassLoader(classLoader);
+	static TypeSource of(TypeSource parent, ClassLoader classLoader){
+		return new OfClassLoader(parent, classLoader);
 	}
 	
 	Optional<ClassInfo> maybeByType(GenericType type);
