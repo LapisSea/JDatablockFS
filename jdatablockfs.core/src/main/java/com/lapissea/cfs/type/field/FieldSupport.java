@@ -13,7 +13,6 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
 import java.util.Collection;
@@ -128,26 +127,7 @@ class FieldSupport{
 		
 		if(val instanceof IOInstance inst){
 			if("{".equals(start) && "}".equals(end) && "=".equals(fieldValueSeparator) && ", ".equals(fieldSeparator)){
-				defaultStr:
-				try{
-					var    t = inst.getClass();
-					Method strMethod;
-					if(doShort){
-						try{
-							strMethod = t.getMethod("toShortString");
-						}catch(ReflectiveOperationException e){
-							strMethod = t.getMethod("toString");
-						}
-					}else{
-						strMethod = t.getMethod("toString");
-					}
-					var declaring = strMethod.getDeclaringClass();
-					if(declaring == IOInstance.class){
-						break defaultStr;
-					}
-					
-					return Optional.ofNullable((String)strMethod.invoke(inst));
-				}catch(ReflectiveOperationException ignored){ }
+				return Optional.ofNullable(doShort? inst.toShortString() : inst.toString());
 			}
 			
 			var struct = inst.getThisStruct();
