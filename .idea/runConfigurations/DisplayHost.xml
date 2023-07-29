@@ -3,7 +3,7 @@
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.tools.server.DisplayHost" />
     <module name="jdatablockfs.tools" />
     <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Ddfs.tools.renderer.errorLogLevel=STACK -Ddfs.tools.jitWarmup=true -Ddfs.tools.drawDebug=false -DinitialData=sessions.dfs" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/main" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="com.lapissea.cfs.tools.logging.*" />
