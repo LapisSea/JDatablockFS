@@ -209,6 +209,11 @@ public final class FieldCompiler{
 				for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : annotations){
 					for(var s : logic.injectPerInstanceValue(field.getAccessor(), annotation)){
 						var existing = virtualData.get(s.name);
+						if(existing == null){
+							existing = parsed.stream().map(a -> a.field.getAccessor())
+							                 .filter(a -> a.getName().equals(s.name))
+							                 .findAny().orElse(null);
+						}
 						if(existing != null){
 							var gTyp = existing.getGenericType(null);
 							if(!gTyp.equals(s.type)){
