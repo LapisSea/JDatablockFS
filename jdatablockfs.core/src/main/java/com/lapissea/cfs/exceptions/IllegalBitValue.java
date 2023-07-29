@@ -1,6 +1,8 @@
 package com.lapissea.cfs.exceptions;
 
-public class IllegalBitValue extends RuntimeException{
+import java.io.IOException;
+
+public class IllegalBitValue extends IOException{
 	
 	public final long bit;
 	

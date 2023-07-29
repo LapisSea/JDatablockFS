@@ -17,7 +17,7 @@ public class FlagReader implements BitReader, AutoCloseable{
 		if((b|1) != 255) failBool(b);
 		return (b&1) == 1;
 	}
-	private static void failBool(int b){
+	private static void failBool(int b) throws IllegalBitValue{
 		for(int i = 1; i<8; i++){
 			if(((b>>i)&1) == 0) throw new IllegalBitValue(i);
 		}

@@ -105,7 +105,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					try{
 						return instance.getValue();
 					}catch(IOException e){
-						throw new RuntimeException(e);
+						throw UtilL.uncheckedThrow(e);
 					}
 				}
 				@Override
