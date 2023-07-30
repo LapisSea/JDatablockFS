@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -501,4 +502,53 @@ public class GeneralTypeHandlingTests{
 			list.add(new Seal.C(4, 2, 0));
 		});
 	}
+	
+	private static class OrderTestType extends IOInstance.Managed<OrderTestType>{
+		
+		private enum EnumThing{
+			PUSH,
+			SET_CLASS_LOADER_NAME,
+			SET_MODULE_NAME, SET_MODULE_VERSION,
+			SET_CLASS_NAME, SET_METHOD_NAME,
+			SET_FILE_NAME, SET_FILE_EXTENSION
+		}
+		
+		private sealed interface FileName{
+			record Raw(int id) implements FileName{ }
+			
+			record Ext(int id) implements FileName{ }
+		}
+		
+		@IOValue
+		private List<EnumThing>  commands;
+		@IOValue
+		private List<NumberSize> sizes;
+		@IOValue
+		private byte[]           numbers;
+		
+		@IOValue
+		@IODependency.VirtualNumSize
+		@IOValue.Unsigned
+		private int head, ignoredFrames, diffBottomCount;
+		
+		public OrderTestType(){ }
+	}
+	
+	@Test
+	void orderTestType() throws IOException{
+		
+		var cluster = Cluster.emptyMem();
+		var roots   = cluster.getRootProvider();
+		
+		var typ = new OrderTestType();
+		typ.commands = List.of(OrderTestType.EnumThing.SET_CLASS_NAME, OrderTestType.EnumThing.SET_METHOD_NAME);
+		typ.sizes = List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.VOID);
+		typ.numbers = new byte[]{1, 2, 3};
+		typ.head = 3;
+		typ.ignoredFrames = 0;
+		typ.diffBottomCount = 10_000;
+		
+		roots.provide("foo", typ);
+	}
+	
 }

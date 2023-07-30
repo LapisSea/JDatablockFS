@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.type.DataOrder;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.Struct;
@@ -147,6 +148,20 @@ public final class TemplateClassLoader extends ClassLoader{
 				case JUST_INTERFACE -> writer.write("implements {!}", parent.name());
 			}
 		}
+		
+		var fields = classType.def.getFields();
+		
+		if(!fields.isEmpty()){
+			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).toList();
+			try(var ignored = writer.codePart()){
+				writer.write(" @{} start value [", DataOrder.class);
+				for(String dependency : order){
+					writer.write("'{}'", dependency);
+				}
+				writer.write("] end");
+			}
+		}
+		
 		if(extend) writer.write("extends {}<#genClassName>", IOInstance.Managed.class);
 		
 		writer.addImport(Struct.class);
@@ -173,7 +188,7 @@ public final class TemplateClassLoader extends ClassLoader{
 					""");
 		}
 		
-		for(var field : classType.def.getFields()){
+		for(var field : fields){
 			writer.write("@{}", IOValue.class);
 			
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(

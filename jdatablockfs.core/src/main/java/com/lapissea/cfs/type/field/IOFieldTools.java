@@ -1,13 +1,16 @@
 package com.lapissea.cfs.type.field;
 
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.DataOrder;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
 import com.lapissea.cfs.type.compilation.Index;
+import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -100,6 +103,44 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
+		if(fields.isEmpty()) return new Index(new int[0]);
+		{
+			var struct       = fields.stream().map(IOField::getAccessor).filter(Objects::nonNull).findAny().orElseThrow().getDeclaringStruct();
+			var structType   = struct.getType();
+			var dataOrderAnn = structType.getAnnotation(DataOrder.class);
+			if(dataOrderAnn != null){
+				if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
+					throw new MalformedStruct(DataOrder.class.getName() + " is for internal use only. " +
+					                          "To be used only by " + TemplateClassLoader.class.getName());
+				}
+				var dataOrder    = dataOrderAnn.value();
+				var actualNames  = fields.stream().map(IOField::getName).collect(Collectors.toSet());
+				var dataOrderSet = Set.of(dataOrder);
+				if(!dataOrderSet.equals(actualNames)){
+					throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);
+				}
+				
+				var index = new int[dataOrder.length];
+				
+				for(int i = 0; i<dataOrder.length; i++){
+					var name = dataOrder[i];
+					index[i] = IntStream.range(0, fields.size())
+					                    .filter(idx -> fields.get(idx).getName().equals(name))
+					                    .findFirst().orElseThrow();
+				}
+				
+				var res = new Index(index);
+				if(GlobalConfig.DEBUG_VALIDATION){
+					var testNames = res.mapData(fields).stream().map(IOField::getName).toArray(String[]::new);
+					if(!Arrays.equals(testNames, dataOrder)){
+						throw new AssertionError("\n" +
+						                         Arrays.toString(testNames) + "\n" +
+						                         Arrays.toString(dataOrder));
+					}
+				}
+				return res;
+			}
+		}
 		try{
 			return new DepSort<>(fields, f -> f.dependencyStream()
 			                                   .mapToInt(o -> IntStream.range(0, fields.size())
