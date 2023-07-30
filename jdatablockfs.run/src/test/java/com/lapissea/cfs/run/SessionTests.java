@@ -1,10 +1,14 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.cfs.tools.logging.session.IOStackTrace;
 import com.lapissea.cfs.tools.logging.session.SessionService;
 import com.lapissea.cfs.tools.logging.session.Sessions;
+import com.lapissea.cfs.tools.logging.session.StringsIndex;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
@@ -14,6 +18,18 @@ import java.util.List;
 import static org.testng.Assert.assertEquals;
 
 public class SessionTests{
+	
+	@Test
+	void simpleIOStackTrace() throws IOException{
+		var cl = Cluster.emptyMem();
+		
+		IOList<String> strs = cl.getRootProvider().request("strs", IOList.class, String.class);
+		
+		StringsIndex maker = new StringsIndex(strs);
+		var          stack = new IOStackTrace(maker, new Throwable(), 0);
+		
+		cl.getRootProvider().provide("stack", stack);
+	}
 	
 	@Test
 	void smallSimple() throws IOException{
