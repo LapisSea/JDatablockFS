@@ -53,7 +53,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public class IOFieldTools{
+public final class IOFieldTools{
 	
 	public static final char GENERATED_FIELD_SEPARATOR = ':';
 	

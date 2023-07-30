@@ -1837,7 +1837,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 								
-								if(comp == byte.class){
+								if(SupportedPrimitive.isAny(comp)){
 									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 									continue;
 								}
