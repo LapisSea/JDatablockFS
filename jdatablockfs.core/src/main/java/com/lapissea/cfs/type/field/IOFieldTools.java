@@ -25,6 +25,7 @@ import com.lapissea.util.WeakValueHashMap;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -485,5 +486,9 @@ public final class IOFieldTools{
 		
 		if(acum == null) return;
 		throw new IllegalStateException(messageBuilder.finisher().apply(acum));
+	}
+	
+	public static Map<Class<? extends Annotation>, Annotation> computeAnnotations(Field field){
+		return Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a -> a));
 	}
 }

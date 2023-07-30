@@ -402,11 +402,12 @@ public final class FieldCompiler{
 			
 			Method getter = p.obj1, setter = p.obj2;
 			
-			var annotations = GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
-			                                           .flatMap(Arrays::stream)
-			                                           .distinct()
-			                                           .collect(Collectors.toMap(Annotation::annotationType, identity())));
-			Type type = getType(getter.getGenericReturnType(), annotations);
+			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
+				Stream.of(getter.getAnnotations(), setter.getAnnotations())
+				      .flatMap(Arrays::stream)
+				      .distinct()
+				      .collect(Collectors.toUnmodifiableMap(Annotation::annotationType, identity()));
+			Type type = getType(getter.getGenericReturnType(), GetAnnotation.from(annotations));
 			
 			Type setType = setter.getGenericParameterTypes()[0];
 			if(!Utils.genericInstanceOf(type, setType)){

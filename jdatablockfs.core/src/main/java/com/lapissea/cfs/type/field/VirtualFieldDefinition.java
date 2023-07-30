@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -11,6 +10,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -45,7 +46,8 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	public final String              name;
 	public final Type                type;
 	public final GetterFilter<IO, T> getFilter;
-	public final GetAnnotation       annotations;
+	
+	public final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	public VirtualFieldDefinition(StoragePool storagePool, String name, Type type){
 		this(storagePool, name, type, null, List.of());
@@ -66,7 +68,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		if(annotations.stream().noneMatch(an -> an instanceof IOValue)){
 			annotations = Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
 		}
-		this.annotations = GetAnnotation.from(annotations);
+		this.annotations = annotations.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, a -> a));
 	}
 	
 	@Override

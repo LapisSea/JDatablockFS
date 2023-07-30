@@ -5,20 +5,15 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.UtilL;
 
-import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.Arrays;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
@@ -205,23 +200,9 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	
 	private final VarHandle handle;
 	
-	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
-	
 	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, name, genericType);
+		super(struct, name, genericType, IOFieldTools.computeAnnotations(field));
 		handle = Access.makeVarHandle(field);
-		annotations = Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a -> a));
-	}
-	
-	@NotNull
-	@Nullable
-	@Override
-	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return (Optional<T>)Optional.ofNullable(annotations.get(annotationClass));
-	}
-	@Override
-	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return annotations.containsKey(annotationClass);
 	}
 	
 	@Override

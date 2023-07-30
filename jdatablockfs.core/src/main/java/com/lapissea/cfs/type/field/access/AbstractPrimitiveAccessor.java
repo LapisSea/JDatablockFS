@@ -7,8 +7,10 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.util.ShouldNeverHappenError;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.util.Map;
 
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 
@@ -36,8 +38,8 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final Class<?> rawType;
 	private final int      typeID;
 	
-	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType){
-		super(struct, name);
+	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
+		super(struct, name, annotations);
 		
 		Class<?> type = Utils.typeToRaw(genericType);
 		
