@@ -5,7 +5,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.cfs.io.IO;
-import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
@@ -252,23 +251,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}catch(IOException e){
 			e.addSuppressed(new IOException("Failed to write " + this));
 			throw e;
-		}
-	}
-	
-	public final void readReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		try{
-			read(ioPool, provider, src, instance, genericContext);
-		}catch(IOException e){
-			e.addSuppressed(new IOException("Failed to read " + this));
-			throw e;
-		}
-	}
-	
-	public final void skipReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		try{
-			skip(ioPool, provider, src, instance, genericContext);
-		}catch(IOException e){
-			throw new IOException("Failed to skip read " + this, e);
 		}
 	}
 	

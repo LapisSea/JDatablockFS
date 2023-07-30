@@ -66,7 +66,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	@Override
 	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
+		FieldSet<T> fields = getSpecificFields();
+		for(IOField<T, ?> field : fields){
+			readField(ioPool, provider, src, instance, genericContext, field);
+		}
 		return instance;
 	}
 	

@@ -283,7 +283,8 @@ public abstract class DynamicSupport{
 		}
 		if(IOInstance.isInstance(typ)){
 			var struct = Struct.ofUnknown(typ);
-			return readStruct(provider, src, genericContext, struct);
+			var pipe   = StandardStructPipe.of(struct);
+			return pipe.readNew(provider, src, genericContext);
 		}
 		if(typ.isEnum()){
 			var universe = EnumUniverse.ofUnknown(typ);
@@ -353,10 +354,6 @@ public abstract class DynamicSupport{
 		}
 		
 		throw new NotImplementedException(typ + "");
-	}
-	private static <T extends IOInstance<T>> T readStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
-		var pipe = StandardStructPipe.of(struct);
-		return pipe.readNew(provider, src, genericContext);
 	}
 	private static void skipStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
 		var pipe = StandardStructPipe.of(struct);

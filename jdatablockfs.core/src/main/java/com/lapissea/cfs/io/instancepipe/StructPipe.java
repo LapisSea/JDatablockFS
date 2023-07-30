@@ -600,7 +600,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Override
 	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance = type.make();
-		return read(provider, src, instance, genericContext);
+		try{
+			return doRead(makeIOPool(), provider, src, instance, genericContext);
+		}catch(IOException e){
+			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+		}
 	}
 	
 	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -836,44 +840,48 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
-			field.skipReported(ioPool, provider, src, instance, genericContext);
+			try{
+				field.skip(ioPool, provider, src, instance, genericContext);
+			}catch(IOException e){
+				throw fail(field, e, "Failed to skip");
+			}
 		}
 	}
 	
-	private void readField(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
-		if(DEBUG_VALIDATION){
+	protected void readField(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
+		if(DEBUG_VALIDATION && field.getSizeDescriptor().hasFixed()){
 			readFieldSafe(ioPool, provider, src, instance, genericContext, field);
 		}else{
-			field.readReported(ioPool, provider, src, instance, genericContext);
+			try{
+				field.read(ioPool, provider, src, instance, genericContext);
+			}catch(IOException e){
+				e.addSuppressed(new IOException("Failed to read " + field));
+				throw e;
+			}
 		}
 	}
 	
 	private void readFieldSafe(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
 		var desc  = field.getSizeDescriptor();
-		var fixed = desc.getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			long bytes = fixed.getAsLong();
-			
-			ContentInputStream buf;
-			try{
-				buf = src.readTicket(bytes).requireExact().submit();
-			}catch(Exception e){
-				throw fail(field, e, "failed to prepare raw data");
-			}
-			
-			try{
-				field.readReported(ioPool, provider, buf, instance, genericContext);
-			}catch(Exception e){
-				throw fail(field, e, "failed to read");
-			}
-			
-			try{
-				buf.close();
-			}catch(Exception e){
-				throw fail(field, e, "did not read correctly");
-			}
-		}else{
-			field.readReported(ioPool, provider, src, instance, genericContext);
+		var bytes = desc.requireFixed(WordSpace.BYTE);
+		
+		ContentInputStream buf;
+		try{
+			buf = src.readTicket(bytes).requireExact().submit();
+		}catch(Exception e){
+			throw fail(field, e, "failed to prepare raw data");
+		}
+		
+		try{
+			field.read(ioPool, provider, buf, instance, genericContext);
+		}catch(Exception e){
+			throw fail(field, e, "failed to read");
+		}
+		
+		try{
+			buf.close();
+		}catch(Exception e){
+			throw fail(field, e, "did not read correctly");
 		}
 	}
 	private static IOException fail(IOField<?, ?> field, Exception e, String msg) throws IOException{
