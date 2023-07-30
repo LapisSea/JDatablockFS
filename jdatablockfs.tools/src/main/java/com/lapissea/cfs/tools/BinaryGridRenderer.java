@@ -1292,7 +1292,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		
 		for(CRange(Color col, Range rang) : flatRanges){
-			DrawUtils.fillByteRange(alpha(col, 0.3F), ctx, rang);
+			DrawUtils.fillByteRange(alpha(col, 0.2F), ctx, rang);
 		}
 		
 		for(int i = ctx.hoverMessages.size() - 1; i>=0; i--){
