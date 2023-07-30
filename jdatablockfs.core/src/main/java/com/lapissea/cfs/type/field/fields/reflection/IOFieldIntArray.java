@@ -35,7 +35,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends IOField<T, i
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = getArrSize(ioPool, inst);
-			if(siz>0) return siz;
+			if(siz == 0) return 0;
 			var arr  = get(ioPool, inst);
 			var nSiz = getNumSize(ioPool, inst);
 			return arr.length*(long)nSiz.bytes;

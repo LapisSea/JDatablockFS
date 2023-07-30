@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -579,14 +580,22 @@ public sealed interface IOTypeDB{
 				newDefs.entrySet()
 				       .stream()
 				       .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
-				       .collect(Collectors.toMap(e -> e.getKey().typeName, e -> {
-					       Class<?> c;
+				       .map(e -> {
+					       Struct<?> typ;
 					       try{
-						       c = Class.forName(e.getKey().typeName);
+						       var cls = Class.forName(e.getKey().typeName);
+						       typ = Struct.ofUnknown(cls);
 					       }catch(ClassNotFoundException ex){
 						       throw new RuntimeException(ex);
+					       }catch(IllegalArgumentException ex){
+						       return null;
 					       }
-					       var pipe = StandardStructPipe.of(Struct.ofUnknown(c));
+					       return Map.entry(e.getKey(), typ);
+				       })
+				       .filter(Objects::nonNull)
+				       .collect(Collectors.toMap(e -> e.getKey().typeName, e -> {
+					       var typ  = e.getValue();
+					       var pipe = StandardStructPipe.of(typ);
 					       return toNames.apply(pipe);
 				       }));
 			
@@ -613,7 +622,7 @@ public sealed interface IOTypeDB{
 								})
 							)
 						));
-					if(IOInstance.isManaged(cls)){
+					if(fieldMap.containsKey(name) && IOInstance.isManaged(cls)){
 						var pipe               = StandardStructPipe.of(Struct.ofUnknown(cls));
 						var actualFieldNames   = toNames.apply(pipe);
 						var expectedFieldNames = fieldMap.get(name);
