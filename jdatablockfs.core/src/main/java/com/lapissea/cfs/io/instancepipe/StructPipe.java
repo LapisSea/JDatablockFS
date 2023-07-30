@@ -462,6 +462,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
+		type.waitForState(Struct.STATE_INIT_FIELDS);
 		var wordSpace = IOFieldTools.minWordSpace(fields);
 		
 		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
