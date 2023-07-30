@@ -77,7 +77,7 @@ public class Preload{
 		});
 		Thread.startVirtualThread(() -> {
 			try{
-				var cg = new ClassGen(TypeSource.of(Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), List.of(), Set.of(), List.of());
+				var cg = new ClassGen(TypeSource.of(null, Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), List.of(), Set.of(), List.of());
 				cg.defineField(Visibility.PUBLIC, Set.of(), Set.of(), GenericType.OBJECT, "");
 				var fun = new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, List.of(), List.of());
 				fun.getThisOp("");

@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
@@ -95,7 +96,6 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		enum Type{
 			EXTEND,
 			JUST_INTERFACE
-			
 		}
 		
 		private static SealedParent of(String name, Type type){
@@ -112,6 +112,9 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	
 	@IOValue
 	private FieldDef[] fields = new FieldDef[0];
+	
+	@IOValue
+	private int[] fieldOrder = new int[0];
 	
 	@IOValue
 	@IONullability(NULLABLE)
@@ -133,7 +136,9 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		unmanaged = IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
-				fields = Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);
+				var structFields = Struct.ofUnknown(type).getFields();
+				fields = structFields.stream().map(FieldDef::new).toArray(FieldDef[]::new);
+				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
 			}
 		}
 		if(type.isEnum()){
@@ -182,6 +187,9 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public boolean isSealed()       { return permits != null; }
 	public boolean isJustInterface(){ return justInterface; }
 	
+	public IntStream getFieldOrder(){
+		return Arrays.stream(fieldOrder);
+	}
 	public List<String> getPermittedSubclasses(){
 		if(permits == null) return List.of();
 		return ArrayViewList.create(permits, null);

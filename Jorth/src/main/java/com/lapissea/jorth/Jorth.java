@@ -76,7 +76,7 @@ public final class Jorth extends CodeDestination{
 	public Jorth(ClassLoader classLoader, Consumer<CharSequence> printBack){
 		this.printBack = printBack;
 		classLoader = classLoader == null? this.getClass().getClassLoader() : classLoader;
-		typeSource = TypeSource.concat(this::generatedClassInfo, TypeSource.of(classLoader));
+		typeSource = TypeSource.of(this::generatedClassInfo, classLoader);
 	}
 	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
