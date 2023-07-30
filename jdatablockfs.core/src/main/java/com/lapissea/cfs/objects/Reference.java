@@ -139,20 +139,11 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		STANDARD_PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
-	private static final class IOContext implements RandomIO.Creator{
-		private final Reference    ref;
-		private final DataProvider provider;
-		
-		public IOContext(Reference ref, DataProvider provider){
-			this.ref = ref;
-			this.provider = provider;
-		}
-		
+	private record IOContext(Reference ref, DataProvider provider) implements RandomIO.Creator{
 		@Override
 		public RandomIO io() throws IOException{
 			return ref.io(provider);
 		}
-		
 		@Override
 		public String toString(){
 			return "{" + provider + " @ " + ref + "}";
