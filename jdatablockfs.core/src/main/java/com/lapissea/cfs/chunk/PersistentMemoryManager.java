@@ -82,14 +82,13 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private void registerNode(Thread th, Node s){
 		stacks.set(s);
 		synchronized(allStacks){
+			cleanupStacks();
 			allStacks.put(th, s);
 		}
-		Thread.startVirtualThread(() -> {
-			UtilL.sleepWhile(th::isAlive, 10);
-			synchronized(allStacks){
-				allStacks.remove(th);
-			}
-		});
+	}
+	private void cleanupStacks(){
+		if(allStacks.isEmpty()) return;
+		allStacks.keySet().removeIf(e -> !e.isAlive());
 	}
 	
 	@Override
@@ -260,6 +259,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 							drainIO = true;
 							while(true){
 								synchronized(allStacks){
+									cleanupStacks();
 									var anyActive =
 										allStacks.size()>1 &&
 										allStacks.entrySet().stream()
