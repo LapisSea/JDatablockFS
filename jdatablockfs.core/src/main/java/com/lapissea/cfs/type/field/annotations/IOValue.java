@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.annotations;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -66,7 +67,9 @@ public @interface IOValue{
 			                               .map(IODependency.ArrayLenSize::name)
 			                               .orElseGet(() -> IOFieldTools.makeNumberSizeName(IOFieldTools.makeCollectionLenName(field)));
 			
-			return Stream.of(new VirtualFieldDefinition<>(
+			boolean needsNumSize = type == int[].class;
+			
+			var lenField = new VirtualFieldDefinition<>(
 				IO, IOFieldTools.makeCollectionLenName(field), int.class,
 				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value) -> {
 					if(value>0) return value;
@@ -80,7 +83,14 @@ public @interface IOValue{
 				List.of(
 					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
 					Unsigned.INSTANCE
-				)));
+				));
+			
+			if(needsNumSize){
+				var numSizField = new VirtualFieldDefinition<T, NumberSize>(IO, IOFieldTools.makeNumberSizeName(field), NumberSize.class);
+				return Stream.of(lenField, numSizField);
+			}
+			
+			return Stream.of(lenField);
 		}
 		@NotNull
 		@Override
@@ -89,6 +99,8 @@ public @interface IOValue{
 			var type = field.getType();
 			if(type.isArray() || UtilL.instanceOf(type, Collection.class)){
 				set.add(IOFieldTools.makeCollectionLenName(field));
+				boolean needsNumSize = type == int[].class;
+				if(needsNumSize) set.add(IOFieldTools.makeNumberSizeName(field));
 			}
 			if(IOFieldInlineSealedObject.isCompatible(field.getType())){
 				set.add(IOFieldTools.makeUniverseIDFieldName(field));

@@ -49,6 +49,10 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	public E get(VarPool<T> ioPool, T instance){
 		return getNullable(ioPool, instance, createDefaultIfNull);
 	}
+	@Override
+	public boolean isNull(VarPool<T> ioPool, T instance){
+		return getNullability() != DEFAULT_IF_NULL && rawGet(ioPool, instance) == null;
+	}
 	
 	@Override
 	public void set(VarPool<T> ioPool, T instance, E value){
