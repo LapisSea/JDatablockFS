@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="IOWalkBench.walkAcc" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.cfs.benchmark.IOWalkBench.walkAcc" working-dir="$ProjectFileDir$\run\main" benchmark-type="METHOD" benchmark-class="com.lapissea.cfs.benchmark.IOWalkBench" isAlternativeJrePathEnabled="false">
+  <configuration default="false" name="IOWalkBench.walkAcc" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.cfs.benchmark.IOWalkBench.walkAcc" working-dir="$PROJECT_DIR$\run\main" benchmark-type="METHOD" benchmark-class="com.lapissea.cfs.benchmark.IOWalkBench" isAlternativeJrePathEnabled="false">
     <module name="jdatablockfs.run" />
     <method v="2">
       <option name="Make" enabled="true" />

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -116,6 +117,18 @@ public class Cluster implements DataProvider{
 		@IOValue
 		@IONullability(NULLABLE)
 		private IOList<IOChunkPointer> freeChunks;
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName() + toShortString();
+		}
+		@Override
+		public String toShortString(){
+			return "{db: " + db.toShortString() + ", " +
+			       freeChunks.size() + " freeChunks, " +
+			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
+			                                    .collect(Collectors.joining(", ", "[", "]"))
+			       + "}";
+		}
 	}
 	
 	private final ChunkCache chunkCache = ChunkCache.strong();

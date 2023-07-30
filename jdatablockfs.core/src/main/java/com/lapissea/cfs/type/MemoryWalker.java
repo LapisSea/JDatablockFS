@@ -16,8 +16,10 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -25,6 +27,28 @@ import static com.lapissea.cfs.type.CommandSet.*;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class MemoryWalker{
+	
+	private static class MemoryWalkIOFail extends IOException{
+		
+		private List<String> stack = new ArrayList<>();
+		private String       msg;
+		
+		public MemoryWalkIOFail(Throwable cause){
+			super(cause);
+		}
+		
+		@Override
+		public String getMessage(){
+			if(msg == null) msg = "IO problem while walking on:\n" + String.join("\n", stack);
+			return msg;
+		}
+		
+		private void add(Object obj){
+			stack.add(instanceErrStr(obj));
+			msg = null;
+		}
+	}
+	
 	
 	private static final class Timer{
 		private long localTime = System.nanoTime();
@@ -451,9 +475,13 @@ public class MemoryWalker{
 							}
 							default -> throw new NotImplementedException(String.valueOf(cmd));
 						}
+					}catch(MemoryWalkIOFail e){
+						e.add(instance);
+						throw e;
 					}catch(IOException e){
-						String instStr = instanceErrStr(instance);
-						throw new IOException("IO problem on " + field + " in " + instStr, e);
+						var er = new MemoryWalkIOFail(e);
+						er.add(instance);
+						throw er;
 					}catch(Throwable e){
 						String instStr = instanceErrStr(instance);
 						throw new RuntimeException("failed to walk on " + field + " in " + instStr, e);
@@ -617,7 +645,7 @@ public class MemoryWalker{
 		}
 	}
 	
-	private <T extends IOInstance<T>> String instanceErrStr(T instance){
+	private static String instanceErrStr(Object instance){
 		String instStr;
 		try{
 			instStr = instance.toString();

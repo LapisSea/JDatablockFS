@@ -10,7 +10,7 @@
     <option name="TEST_OBJECT" value="PACKAGE" />
     <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Ddfs.test.standardInit=true -Ddfs.printCompilation=false -Ddfs.log.level=TRACE -Ddfs.classGen.printBytecode=false" />
     <option name="PARAMETERS" value="" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/test" />
     <option name="OUTPUT_DIRECTORY" value="" />
     <option name="PROPERTIES_FILE" value="" />
     <properties />

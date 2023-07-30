@@ -2,7 +2,7 @@
   <configuration default="false" name="Example: IPs" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.examples.IPs" />
     <module name="jdatablockfs.run" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/main" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

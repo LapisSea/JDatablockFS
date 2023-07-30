@@ -1,10 +1,10 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -15,24 +15,27 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
@@ -567,6 +570,26 @@ public sealed interface IOTypeDB{
 			                   .map(e -> e.getKey().typeName)
 			                   .collect(Collectors.toSet());
 			
+			Function<StructPipe<?>, List<String>> toNames =
+				pipe -> pipe.getSpecificFields().stream()
+				            .map(IOField::getName)
+				            .toList();
+			
+			var fieldMap =
+				newDefs.entrySet()
+				       .stream()
+				       .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
+				       .collect(Collectors.toMap(e -> e.getKey().typeName, e -> {
+					       Class<?> c;
+					       try{
+						       c = Class.forName(e.getKey().typeName);
+					       }catch(ClassNotFoundException ex){
+						       throw new RuntimeException(ex);
+					       }
+					       var pipe = StandardStructPipe.of(Struct.ofUnknown(c));
+					       return toNames.apply(pipe);
+				       }));
+			
 			RuntimeException e = null;
 			
 			for(var name : names){
@@ -582,7 +605,6 @@ public sealed interface IOTypeDB{
 								List.of(names::contains, n -> {
 									boolean contains;
 									try{
-										LogUtil.println(n);
 										contains = defs.containsKey(new TypeName(n));
 									}catch(IOException ex){
 										throw new RuntimeException(ex);
@@ -591,7 +613,29 @@ public sealed interface IOTypeDB{
 								})
 							)
 						));
-					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
+					if(IOInstance.isManaged(cls)){
+						var pipe               = StandardStructPipe.of(Struct.ofUnknown(cls));
+						var actualFieldNames   = toNames.apply(pipe);
+						var expectedFieldNames = fieldMap.get(name);
+						if(!actualFieldNames.equals(expectedFieldNames)){
+							var table = new ArrayList<Map<String, String>>();
+							for(int i = 0; i<Math.max(actualFieldNames.size(), expectedFieldNames.size()); i++){
+								var map = LinkedHashMap.<String, String>newLinkedHashMap(2);
+								if(actualFieldNames.size()>i){
+									map.put("Actual", actualFieldNames.get(i));
+								}
+								if(expectedFieldNames.size()>i){
+									map.put("Expected", expectedFieldNames.get(i));
+								}
+								table.add(map);
+							}
+							
+							throw new RuntimeException(
+								"Field order not preserved:\n" +
+								TextUtil.toTable(table)
+							);
+						}
+					}
 				}catch(Throwable ex){
 					synchronized(Validated.VALS){
 						Validated.VALS.remove(name);

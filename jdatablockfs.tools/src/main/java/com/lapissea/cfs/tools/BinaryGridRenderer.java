@@ -851,7 +851,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 							}
 						}), true).walk();
-					}catch(IOException e){
+					}catch(Throwable e){
 						log.accept(e);
 					}
 					
