@@ -21,11 +21,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
@@ -93,21 +90,6 @@ public @interface IOValue{
 			
 			return Stream.of(lenField);
 		}
-		@NotNull
-		@Override
-		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOValue annotation){
-			var set  = HashSet.<String>newHashSet(2);
-			var type = field.getType();
-			if(type.isArray() || UtilL.instanceOf(type, Collection.class)){
-				set.add(IOFieldTools.makeCollectionLenName(field));
-				boolean needsNumSize = type == int[].class;
-				if(needsNumSize) set.add(IOFieldTools.makeNumberSizeName(field));
-			}
-			if(IOFieldInlineSealedObject.isCompatible(field.getType())){
-				set.add(IOFieldTools.makeUniverseIDFieldName(field));
-			}
-			return Set.copyOf(set);
-		}
 		@Override
 		public void validate(FieldAccessor<?> field, IOValue annotation){
 			try{
@@ -156,11 +138,6 @@ public @interface IOValue{
 					com.lapissea.cfs.objects.Reference.class,
 					List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.DEFAULT_IF_NULL))
 				));
-			}
-			@NotNull
-			@Override
-			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Reference annotation){
-				return Set.of(IOFieldTools.makeRefName(field));
 			}
 		};
 		
@@ -271,7 +248,6 @@ public @interface IOValue{
 	@interface Generic{
 		
 		AnnotationLogic<Generic> LOGIC = new AnnotationLogic<>(){
-			
 			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Generic annotation){
@@ -281,11 +257,6 @@ public @interface IOValue{
 					int.class,
 					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class), Unsigned.INSTANCE)
 				));
-			}
-			@NotNull
-			@Override
-			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Generic annotation){
-				return Set.of(IOFieldTools.makeGenericIDFieldName(field));
 			}
 		};
 		

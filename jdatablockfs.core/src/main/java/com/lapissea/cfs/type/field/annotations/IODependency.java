@@ -122,12 +122,6 @@ public @interface IODependency{
 		}
 		
 		class Logic implements AnnotationLogic<VirtualNumSize>{
-			@NotNull
-			@Override
-			public Set<String> getDependencyValueNames(FieldAccessor<?> field, VirtualNumSize annotation){
-				return Set.of(getName(field, annotation));
-			}
-			
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam = size.name();
 				if(nam.isEmpty()){

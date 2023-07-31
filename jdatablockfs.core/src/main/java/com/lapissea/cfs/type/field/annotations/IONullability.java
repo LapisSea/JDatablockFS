@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -73,16 +72,6 @@ public @interface IONullability{
 					List.of(IOFieldTools.makeNullabilityAnn(IOFieldTools.getNullability(field)))
 				));
 			}
-			
-			@NotNull
-			@Override
-			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Elements annotation){
-				if(annotation.value() != Mode.NULLABLE) return Set.of();
-				
-				return Set.of(IOFieldTools.makeNullElementsFlagName(field));
-			}
-			
-			
 		};
 		
 		Mode value() default Mode.NOT_NULL;
@@ -124,23 +113,13 @@ public @interface IONullability{
 		@NotNull
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IONullability annotation){
-			if(!canHaveNullabilityField(field)) return List.of();
-			if(!IOFieldTools.isNullable(field)) return List.of();
+			if(!IOFieldTools.isNullable(field) || !canHaveNullabilityField(field)) return List.of();
 			
 			return List.of(new VirtualFieldDefinition<T, Boolean>(
 				StoragePool.IO,
 				IOFieldTools.makeNullFlagName(field),
 				boolean.class
 			));
-		}
-		
-		@NotNull
-		@Override
-		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IONullability annotation){
-			if(!canHaveNullabilityField(field)) return Set.of();
-			if(!IOFieldTools.isNullable(field)) return Set.of();
-			
-			return Set.of(IOFieldTools.makeNullFlagName(field));
 		}
 	}
 	

@@ -19,7 +19,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -88,11 +87,6 @@ public @interface IOCompression{
 				IOFieldTools.makePackName(field),
 				byte[].class
 			));
-		}
-		@NotNull
-		@Override
-		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOCompression annotation){
-			return Set.of(IOFieldTools.makePackName(field));
 		}
 	};
 }
