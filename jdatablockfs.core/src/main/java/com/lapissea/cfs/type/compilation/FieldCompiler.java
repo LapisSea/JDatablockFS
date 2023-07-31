@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -130,6 +131,8 @@ public final class FieldCompiler{
 	 * @return a {@link FieldSet} containing all {@link IOValue} fields
 	 */
 	public static <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
+		validateClassAnnotations(struct.getType());
+		
 		List<FieldAccessor<T>> accessor = scanFields(struct);
 		
 		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
@@ -145,6 +148,13 @@ public final class FieldCompiler{
 		initLateData(fields);
 		
 		return FieldSet.of(fields.stream().map(AnnotatedField::field));
+	}
+	
+	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
+		var cVal = type.getAnnotation(IOValue.class);
+		if(cVal != null && !cVal.name().isEmpty()){
+			throw new MalformedStruct(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
+		}
 	}
 	
 	private static <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
@@ -278,11 +288,6 @@ public final class FieldCompiler{
 			}
 		});
 	}
-	private static IterablePP<Field> deepIOValueFields(Class<?> clazz){
-		return deepClasses(clazz)
-			       .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
-			       .filtered(f -> f.isAnnotationPresent(IOValue.class));
-	}
 	
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
@@ -290,9 +295,13 @@ public final class FieldCompiler{
 		List<FieldAccessor<T>> fields     = new ArrayList<>();
 		Set<Method>            usedFields = new HashSet<>();
 		
-		var ioMethods = allMethods(cl).filter(m -> m.isAnnotationPresent(IOValue.class)).toList();
+		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).toList();
 		
-		for(Field field : deepIOValueFields(cl)){
+		var iter = deepClasses(cl)
+			           .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
+			           .filtered(IOFieldTools::isIOField);
+		
+		for(Field field : iter){
 			try{
 				Type type = getType(field);
 				
@@ -458,8 +467,7 @@ public final class FieldCompiler{
 		}
 	}
 	private static boolean checkMethod(String fieldName, String prefix, Method m){
-		if(Modifier.isStatic(m.getModifiers())) return false;
-		if(!m.isAnnotationPresent(IOValue.class)) return false;
+		if(!IOFieldTools.isIOField(m)) return false;
 		var name = getMethodFieldName(prefix, m);
 		return name.isPresent() && name.get().equals(fieldName);
 	}
@@ -467,7 +475,7 @@ public final class FieldCompiler{
 		String fieldName;
 		{
 			var ann = field.getAnnotation(IOValue.class);
-			fieldName = ann.name().isEmpty()? field.getName() : ann.name();
+			fieldName = ann == null || ann.name().isEmpty()? field.getName() : ann.name();
 		}
 		return fieldName;
 	}
@@ -543,7 +551,7 @@ public final class FieldCompiler{
 	}
 	
 	@SuppressWarnings("unchecked")
-	static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
+	public static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
 		activeAnnotations()
 			.stream()
 			.flatMap(ann -> Stream.concat(

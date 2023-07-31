@@ -32,11 +32,12 @@ import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 /**
- * This annotation is a basic marker that a field should be saved.
+ * This annotation is a basic marker that a field should be saved.<br/>
+ * It can be put on a class to signify that every field inside should be an io value
  */
 @SuppressWarnings("unused")
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.TYPE})
 public @interface IOValue{
 	
 	AnnotationLogic<IOValue> LOGIC = new AnnotationLogic<>(){

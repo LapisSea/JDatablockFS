@@ -9,12 +9,11 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 
+@IOValue
 public final class TypedReference extends IOInstance.Managed<TypedReference>{
 	public static final Struct<TypedReference> STRUCT = Struct.of(TypedReference.class);
 	
-	@IOValue
 	private Reference ref;
-	@IOValue
 	@IODependency.VirtualNumSize
 	@IOValue.Unsigned
 	private int       id;

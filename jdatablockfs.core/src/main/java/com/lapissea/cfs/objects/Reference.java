@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 
 @StructPipe.Special
+@IOValue
 public final class Reference extends IOInstance.Managed<Reference>{
 	
 	public static final Struct<Reference> STRUCT = Struct.of(Reference.class);
@@ -150,10 +151,8 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		}
 	}
 	
-	@IOValue
 	@IODependency.VirtualNumSize(name = "ptrSize")
 	private ChunkPointer ptr;
-	@IOValue
 	@IODependency.VirtualNumSize(name = "offsetSize")
 	@IOValue.Unsigned
 	private long         offset;

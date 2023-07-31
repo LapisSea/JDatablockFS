@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.Index;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
@@ -28,6 +29,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -489,6 +491,30 @@ public final class IOFieldTools{
 	}
 	
 	public static Map<Class<? extends Annotation>, Annotation> computeAnnotations(Field field){
-		return Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a -> a));
+		var ann   = field.getAnnotations();
+		var types = Arrays.stream(ann).map(Annotation::annotationType).collect(Collectors.toSet());
+		return Stream.concat(
+			Arrays.stream(ann),
+			FieldCompiler.ANNOTATION_TYPES.stream()
+			                              .filter(typ -> !types.contains(typ))
+			                              .map(at -> field.getDeclaringClass().getAnnotation(at)).filter(Objects::nonNull)
+		).collect(Collectors.toMap(Annotation::annotationType, a -> a));
+	}
+	
+	public static boolean isIOField(Method m){
+		if(Modifier.isStatic(m.getModifiers())){
+			return false;
+		}
+		return m.isAnnotationPresent(IOValue.class);
+	}
+	
+	public static boolean isIOField(Field f){
+		if(Modifier.isStatic(f.getModifiers())){
+			return false;
+		}
+		if(f.isAnnotationPresent(IOValue.class)){
+			return true;
+		}
+		return f.getDeclaringClass().isAnnotationPresent(IOValue.class);
 	}
 }

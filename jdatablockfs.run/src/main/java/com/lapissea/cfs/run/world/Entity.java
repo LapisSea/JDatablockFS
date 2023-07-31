@@ -6,13 +6,8 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import java.util.ArrayList;
 import java.util.List;
 
+@IOValue
 public class Entity extends IOInstance.Managed<Entity>{
-	
-	@IOValue
-	public Vec2d pos = new Vec2d();
-	
-	@IOValue
-//	@IOValue.Reference
+	public Vec2d               pos       = new Vec2d();
 	public List<InventorySlot> inventory = new ArrayList<>();
-	
 }

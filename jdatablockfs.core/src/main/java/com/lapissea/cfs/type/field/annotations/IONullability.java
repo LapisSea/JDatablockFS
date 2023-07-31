@@ -28,7 +28,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.TYPE})
 public @interface IONullability{
 	
 	@Target({ElementType.FIELD, ElementType.METHOD})
