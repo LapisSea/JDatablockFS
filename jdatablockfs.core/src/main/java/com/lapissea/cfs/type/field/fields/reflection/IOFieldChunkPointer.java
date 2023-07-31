@@ -28,7 +28,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	private static final class Usage extends FieldUsage.InstanceOf<ChunkPointer>{
 		public Usage(){ super(ChunkPointer.class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field){
 			return new IOFieldChunkPointer<>(field);
 		}
 	}

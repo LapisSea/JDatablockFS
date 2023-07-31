@@ -29,7 +29,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
 		public Usage(){ super(IOInstance.class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			Class<?> raw       = field.getType();
 			var      unmanaged = !IOInstance.isManaged(raw);
 			

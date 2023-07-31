@@ -26,7 +26,7 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends NullF
 	private static final class Usage extends FieldUsage.InstanceOf<LocalDate>{
 		public Usage(){ super(LocalDate.class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field){
 			return new IOFieldLocalDate<>(field);
 		}
 	}

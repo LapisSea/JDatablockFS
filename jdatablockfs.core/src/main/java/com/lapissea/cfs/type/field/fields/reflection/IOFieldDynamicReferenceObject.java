@@ -43,7 +43,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			return IOFieldTools.isGeneric(annotations) && annotations.isPresent(IOValue.Reference.class);
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldDynamicReferenceObject<>(field);
 		}
 	}

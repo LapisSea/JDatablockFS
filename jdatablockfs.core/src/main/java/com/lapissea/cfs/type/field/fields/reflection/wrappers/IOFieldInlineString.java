@@ -21,7 +21,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
 		public Usage(){ super(String.class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field){
 			return new IOFieldInlineString<>(field);
 		}
 	}

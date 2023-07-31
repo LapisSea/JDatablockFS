@@ -4,7 +4,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
-import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
@@ -197,9 +196,9 @@ final class FieldRegistry{
 		throw fail(type.getTypeName());
 	}
 	
-	static <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+	static <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 		var ann  = GetAnnotation.from(field);
-		var type = field.getGenericType(genericContext);
+		var type = field.getGenericType(null);
 		
 		IOField.FieldUsage compatible;
 		find:
@@ -213,7 +212,7 @@ final class FieldRegistry{
 			throw fail(type.getTypeName());
 		}
 		
-		return compatible.create(field, genericContext);
+		return compatible.create(field);
 	}
 	
 	private static IllegalField fail(String typeName){

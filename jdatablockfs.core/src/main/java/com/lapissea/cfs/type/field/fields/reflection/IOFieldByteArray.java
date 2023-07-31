@@ -22,7 +22,7 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, 
 	private static final class Usage extends FieldUsage.InstanceOf<byte[]>{
 		public Usage(){ super(byte[].class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field){
 			return new IOFieldByteArray<>(field);
 		}
 	}

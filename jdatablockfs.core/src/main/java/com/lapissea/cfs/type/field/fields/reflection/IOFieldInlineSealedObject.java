@@ -34,7 +34,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		}
 		
 		@Override
-		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			return new IOFieldInlineSealedObject<>(field);
 		}
 	}

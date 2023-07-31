@@ -137,7 +137,7 @@ public final class FieldCompiler{
 		
 		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
 		for(var a : accessor){
-			var f = FieldRegistry.create(a, null);
+			var f = FieldRegistry.create(a);
 			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
 		}
 		
@@ -261,7 +261,7 @@ public final class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field     = FieldRegistry.create(virtual, null);
+				var field     = FieldRegistry.create(virtual);
 				var annotated = new AnnotatedField<>(field, scanAnnotations(field));
 				toRun.add(annotated);
 				UtilL.addRemainSorted(parsed, annotated);

@@ -20,7 +20,7 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T,
 	private static final class Usage extends FieldUsage.InstanceOf<float[]>{
 		public Usage(){ super(float[].class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field){
 			return new IOFieldFloatArray<>(field);
 		}
 	}

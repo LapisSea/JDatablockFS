@@ -40,7 +40,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return SupportedPrimitive.isAny(type);
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return IOFieldPrimitive.make(field);
 		}
 	}

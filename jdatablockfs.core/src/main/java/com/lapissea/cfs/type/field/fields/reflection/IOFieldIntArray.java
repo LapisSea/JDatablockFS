@@ -22,7 +22,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends IOField<T, i
 	private static final class Usage extends FieldUsage.InstanceOf<int[]>{
 		public Usage(){ super(int[].class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, int[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, int[]> create(FieldAccessor<T> field){
 			return new IOFieldIntArray<>(field);
 		}
 	}

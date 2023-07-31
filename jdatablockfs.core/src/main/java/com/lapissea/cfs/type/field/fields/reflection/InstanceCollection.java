@@ -50,7 +50,7 @@ public class InstanceCollection{
 			return IOInstance.isManaged(raw.componentType());
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
 				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
 			}
@@ -68,7 +68,7 @@ public class InstanceCollection{
 			return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
 				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
 			}

@@ -38,7 +38,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			return Utils.typeToRaw(args[0]).isEnum();
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfList.class);
 		}
 	}
@@ -52,7 +52,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			return raw.componentType().isEnum();
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfArray.class);
 		}
 	}

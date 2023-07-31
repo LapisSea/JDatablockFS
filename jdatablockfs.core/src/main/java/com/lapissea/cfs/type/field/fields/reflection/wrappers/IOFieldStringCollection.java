@@ -32,7 +32,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
 		public UsageArr(){ super(String[].class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
 		}
 	}
@@ -47,7 +47,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 			return Utils.typeToRaw(args[0]) == String.class;
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
 		}
 	}

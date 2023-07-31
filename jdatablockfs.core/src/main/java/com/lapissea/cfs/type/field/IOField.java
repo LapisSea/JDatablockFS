@@ -68,11 +68,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 			}
 			@Override
-			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field, GenericContext genericContext);
+			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);
 		}
 		
 		boolean isCompatible(Type type, GetAnnotation annotations);
-		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext);
+		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field);
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

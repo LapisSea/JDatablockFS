@@ -23,7 +23,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<
 	private static final class Usage extends FieldUsage.InstanceOf<boolean[]>{
 		public Usage(){ super(boolean[].class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field){
 			return new IOFieldBooleanArray<>(field);
 		}
 	}
