@@ -1,8 +1,6 @@
 package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
-import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.content.ContentInputStream;
@@ -11,8 +9,6 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.objects.ObjectID;
-import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
@@ -20,60 +16,21 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDef;
 import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
-import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
-import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
-import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 public class GeneralTests{
-	
-	@BeforeSuite
-	void init() throws IOException{
-		LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
-		
-		List<Struct<?>> tasks = new ArrayList<>();
-		
-		try{
-			for(var typ : List.of(
-				Chunk.class, Reference.class, AutoText.class, ContiguousIOList.class,
-				LinkedIOList.class, HashIOMap.class, TypeDef.class, TypeLink.class, ObjectID.class
-			)){
-				tasks.add(Struct.ofUnknown(typ));
-			}
-			
-			tasks.forEach(t -> {
-				LogUtil.println("waiting for", t);
-				t.waitForStateDone();
-			});
-			
-			for(var prov : List.of(DataProvider.newVerySimpleProvider(), Cluster.emptyMem())){
-				try(var dummy = AllocateTicket.bytes(10).submit(prov).io()){
-					dummy.write(1);
-					dummy.writeInt4(69);
-					dummy.write(new byte[5]);
-				}
-			}
-		}catch(Throwable e){
-			e.printStackTrace();
-		}
-	}
 	
 	@Test
 	void signedIO() throws IOException{
