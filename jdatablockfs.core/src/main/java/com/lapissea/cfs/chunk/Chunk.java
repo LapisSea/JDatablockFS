@@ -202,7 +202,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	static{
 		STRUCT = Struct.of(Chunk.class);
-		if(ConfigDefs.OPTIMIZED_PIPE_USE_CHUNK.resolve()){
+		if(ConfigDefs.OPTIMIZED_PIPE_USE_CHUNK.resolveVal()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
 		}
 		PIPE = StandardStructPipe.of(STRUCT);

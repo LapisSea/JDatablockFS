@@ -51,6 +51,9 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
 		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldStringCollection.class); }
 	}
 	
 	
