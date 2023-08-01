@@ -21,6 +21,7 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
@@ -36,6 +37,11 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		@Override
 		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			return new IOFieldInlineSealedObject<>(field);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(IOFieldInlineSealedObject.class);
 		}
 	}
 	

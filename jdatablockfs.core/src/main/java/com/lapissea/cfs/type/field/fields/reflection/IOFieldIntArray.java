@@ -15,12 +15,13 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public final class IOFieldIntArray<T extends IOInstance<T>> extends IOField<T, int[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<int[]>{
-		public Usage(){ super(int[].class); }
+		public Usage(){ super(int[].class, Set.of(IOFieldIntArray.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, int[]> create(FieldAccessor<T> field){
 			return new IOFieldIntArray<>(field);

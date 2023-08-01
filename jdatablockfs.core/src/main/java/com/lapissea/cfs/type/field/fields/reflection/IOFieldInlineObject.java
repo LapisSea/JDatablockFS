@@ -21,13 +21,14 @@ import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
 	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
-		public Usage(){ super(IOInstance.class); }
+		public Usage(){ super(IOInstance.class, Set.of(IOFieldUnmanagedObjectReference.class, IOFieldObjectReference.class, IOFieldInlineObject.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			Class<?> raw       = field.getType();

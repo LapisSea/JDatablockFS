@@ -25,6 +25,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 
 public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum<E>, ColType> extends IOField<T, ColType>{
 	
@@ -41,6 +42,9 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfList.class);
 		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldEnumCollection.class); }
 	}
 	
 	@SuppressWarnings("unused")
@@ -55,6 +59,9 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfArray.class);
 		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldEnumCollection.class); }
 	}
 	
 	private static final class EnumIO<E extends Enum<E>> implements CollectionAddapter.ElementIOImpl<E>{

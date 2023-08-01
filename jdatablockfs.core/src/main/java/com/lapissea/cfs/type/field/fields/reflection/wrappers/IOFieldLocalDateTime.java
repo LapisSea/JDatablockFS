@@ -24,12 +24,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
+import java.util.Set;
 
 public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDateTime>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<LocalDateTime>{
-		public Usage(){ super(LocalDateTime.class); }
+		public Usage(){ super(LocalDateTime.class, Set.of(IOFieldLocalDateTime.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, LocalDateTime> create(FieldAccessor<T> field){
 			return new IOFieldLocalDateTime<>(field);

@@ -15,12 +15,13 @@ import com.lapissea.cfs.type.field.annotations.IOCompression;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<byte[]>{
-		public Usage(){ super(byte[].class); }
+		public Usage(){ super(byte[].class, Set.of(IOFieldByteArray.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field){
 			return new IOFieldByteArray<>(field);

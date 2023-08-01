@@ -13,12 +13,13 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.util.Set;
 
 public final class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<float[]>{
-		public Usage(){ super(float[].class); }
+		public Usage(){ super(float[].class, Set.of(IOFieldFloatArray.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field){
 			return new IOFieldFloatArray<>(field);

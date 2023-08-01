@@ -42,6 +42,9 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -54,9 +57,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
-			private final Class<Typ> typ;
-			public InstanceOf(Class<Typ> typ){
+			private final Class<Typ>                    typ;
+			@SuppressWarnings("rawtypes")
+			private final Set<Class<? extends IOField>> fieldTypes;
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> typ, Set<Class<? extends IOField>> fieldTypes){
 				this.typ = typ;
+				this.fieldTypes = Set.copyOf(fieldTypes);
 			}
 			
 			public Class<Typ> getType(){
@@ -69,10 +76,16 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			}
 			@Override
 			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);
+			@Override
+			@SuppressWarnings("rawtypes")
+			public final Set<Class<? extends IOField>> listFieldTypes(){ return fieldTypes; }
 		}
 		
 		boolean isCompatible(Type type, GetAnnotation annotations);
 		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field);
+		@SuppressWarnings("rawtypes")
+		Set<Class<? extends IOField>> listFieldTypes();
+		
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

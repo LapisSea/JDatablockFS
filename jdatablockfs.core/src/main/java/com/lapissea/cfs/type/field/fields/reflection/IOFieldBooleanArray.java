@@ -16,12 +16,13 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.util.Set;
 
 public final class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boolean[]>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<boolean[]>{
-		public Usage(){ super(boolean[].class); }
+		public Usage(){ super(boolean[].class, Set.of(IOFieldBooleanArray.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field){
 			return new IOFieldBooleanArray<>(field);

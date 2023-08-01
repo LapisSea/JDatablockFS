@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
@@ -46,6 +47,9 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldDynamicReferenceObject<>(field);
 		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDynamicReferenceObject.class); }
 	}
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;

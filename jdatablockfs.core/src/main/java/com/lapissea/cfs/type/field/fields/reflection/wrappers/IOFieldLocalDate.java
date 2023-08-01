@@ -19,12 +19,13 @@ import com.lapissea.cfs.utils.IOUtils;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Set;
 
 public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDate>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<LocalDate>{
-		public Usage(){ super(LocalDate.class); }
+		public Usage(){ super(LocalDate.class, Set.of(IOFieldLocalDate.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field){
 			return new IOFieldLocalDate<>(field);

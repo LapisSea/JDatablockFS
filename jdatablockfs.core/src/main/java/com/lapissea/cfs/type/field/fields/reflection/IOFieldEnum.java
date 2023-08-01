@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -22,7 +23,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage extends FieldUsage.InstanceOf<Enum>{
-		public Usage(){ super(Enum.class); }
+		public Usage(){ super(Enum.class, Set.of(IOFieldEnum.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field){
 			return new IOFieldEnum<>(field);

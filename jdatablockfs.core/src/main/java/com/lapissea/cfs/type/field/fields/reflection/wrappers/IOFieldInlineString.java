@@ -14,12 +14,13 @@ import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 
 public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
-		public Usage(){ super(String.class); }
+		public Usage(){ super(String.class, Set.of(IOFieldInlineString.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field){
 			return new IOFieldInlineString<>(field);

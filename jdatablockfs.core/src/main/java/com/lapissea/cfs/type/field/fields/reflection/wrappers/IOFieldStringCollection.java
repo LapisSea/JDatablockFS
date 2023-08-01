@@ -25,12 +25,13 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 
 public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
-		public UsageArr(){ super(String[].class); }
+		public UsageArr(){ super(String[].class, Set.of(IOFieldStringCollection.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);

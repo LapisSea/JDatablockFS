@@ -24,12 +24,13 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 
 public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<Instant>{
-		public Usage(){ super(Instant.class); }
+		public Usage(){ super(Instant.class, Set.of(IOFieldInstant.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field){
 			return new IOFieldInstant<>(field);

@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 import static com.lapissea.cfs.objects.NumberSize.LARGEST;
@@ -26,7 +27,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<ChunkPointer>{
-		public Usage(){ super(ChunkPointer.class); }
+		public Usage(){ super(ChunkPointer.class, Set.of(IOFieldChunkPointer.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field){
 			return new IOFieldChunkPointer<>(field);

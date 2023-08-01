@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 
 public class InstanceCollection{
 	
@@ -56,6 +57,11 @@ public class InstanceCollection{
 			}
 			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
 		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
+		}
 	}
 	
 	@SuppressWarnings("unused")
@@ -73,6 +79,11 @@ public class InstanceCollection{
 				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
 			}
 			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
 		}
 	}
 	

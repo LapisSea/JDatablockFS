@@ -215,48 +215,49 @@ public final class FieldCompiler{
 		List<AnnotatedField<T>> toRun = new ArrayList<>(parsed);
 		
 		do{
-			for(AnnotatedField(IOField<T, ?> field, List<LogicalAnnotation<Annotation>> annotations) : toRun){
-				for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : annotations){
-					for(var s : logic.injectPerInstanceValue(field.getAccessor(), annotation)){
-						var existing = virtualData.get(s.name);
-						if(existing == null){
-							existing = parsed.stream().map(a -> a.field.getAccessor())
-							                 .filter(a -> a.getName().equals(s.name))
-							                 .findAny().orElse(null);
-						}
-						if(existing != null){
-							var gTyp = existing.getGenericType(null);
-							if(!gTyp.equals(s.type)){
-								throw new IllegalField("Virtual field " + existing.getName() + " already defined but has a type conflict of " + gTyp + " and " + s.type);
-							}
-							continue;
-						}
-						
-						int primitiveSize, off, ptrIndex;
-						
-						if(!(s.type instanceof Class<?> c) || !c.isPrimitive()){
-							primitiveSize = off = -1;
-							ptrIndex = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
-						}else{
-							if(List.of(long.class, double.class).contains(s.type)){
-								primitiveSize = 8;
-							}else if(List.of(byte.class, boolean.class).contains(s.type)){
-								primitiveSize = 1;
-							}else{
-								primitiveSize = 4;
-							}
-							off = primitiveOffset.getOrDefault(s.storagePool, 0);
-							int offEnd = off + primitiveSize;
-							primitiveOffset.put(s.storagePool, offEnd);
-							
-							ptrIndex = -1;
-						}
-						
-						//noinspection unchecked
-						FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
-						virtualData.put(s.name, accessor);
-						newVirtualData.put(s.name, accessor);
+			for(AnnotatedField(var field, List<LogicalAnnotation<Annotation>> annotations) : toRun){
+				
+				var toInject = annotations.stream().flatMap(a -> a.logic.injectPerInstanceValue(field.getAccessor(), a.annotation).stream()).toList();
+				
+				for(var s : toInject){
+					var existing = virtualData.get(s.name);
+					if(existing == null){
+						existing = parsed.stream().map(a -> a.field.getAccessor())
+						                 .filter(a -> a.getName().equals(s.name))
+						                 .findAny().orElse(null);
 					}
+					if(existing != null){
+						var gTyp = existing.getGenericType(null);
+						if(!gTyp.equals(s.type)){
+							throw new IllegalField("Virtual field " + existing.getName() + " already defined but has a type conflict of " + gTyp + " and " + s.type);
+						}
+						continue;
+					}
+					
+					int primitiveSize, off, ptrIndex;
+					
+					if(!(s.type instanceof Class<?> c) || !c.isPrimitive()){
+						primitiveSize = off = -1;
+						ptrIndex = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
+					}else{
+						if(List.of(long.class, double.class).contains(s.type)){
+							primitiveSize = 8;
+						}else if(List.of(byte.class, boolean.class).contains(s.type)){
+							primitiveSize = 1;
+						}else{
+							primitiveSize = 4;
+						}
+						off = primitiveOffset.getOrDefault(s.storagePool, 0);
+						int offEnd = off + primitiveSize;
+						primitiveOffset.put(s.storagePool, offEnd);
+						
+						ptrIndex = -1;
+					}
+					
+					//noinspection unchecked
+					FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
+					virtualData.put(s.name, accessor);
+					newVirtualData.put(s.name, accessor);
 				}
 			}
 			toRun.clear();
