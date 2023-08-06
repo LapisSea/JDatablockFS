@@ -8,14 +8,17 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -31,6 +34,13 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field){
 			return new IOFieldChunkPointer<>(field);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())),
+				Behaviour.of(IODependency.VirtualNumSize.class, BehaviourSupport::virtualNumSize)
+			);
 		}
 	}
 	

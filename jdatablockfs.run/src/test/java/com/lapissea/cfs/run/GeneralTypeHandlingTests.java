@@ -458,6 +458,7 @@ public class GeneralTypeHandlingTests{
 	void wrapperListing(){
 		var actual = Set.copyOf(FieldCompiler.getWrapperTypes());
 		var expected = Set.of(
+			byte[].class, int[].class, float[].class, boolean[].class,
 			String.class, Duration.class, Instant.class,
 			LocalDate.class, LocalTime.class, LocalDateTime.class
 		);

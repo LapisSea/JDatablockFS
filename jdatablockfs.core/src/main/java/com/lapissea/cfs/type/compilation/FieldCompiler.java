@@ -25,6 +25,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -162,20 +163,41 @@ public final class FieldCompiler{
 		
 		for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : depAn){
 			logic.validate(field.getAccessor(), annotation);
-			
-			var depNames = logic.getDependencyValueNames(field.getAccessor(), annotation);
-			if(depNames.isEmpty()) continue;
-			
-			var missingNames = depNames.stream()
-			                           .filter(name -> fields.stream().noneMatch(f -> f.field.getName().equals(name)))
-			                           .collect(joining(", "));
-			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies " + missingNames + " on field " + field.getAccessor());
-			
-			for(String nam : depNames){
-				AnnotatedField<T> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow();
-				dependencies.add(e.field);
-			}
 		}
+		
+		Set<String> depNames = new HashSet<>();
+		
+		for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : depAn){
+			logic.validate(field.getAccessor(), annotation);
+			
+			
+			depNames.addAll(logic.getDependencyValueNames(field.getAccessor(), annotation));
+		}
+		
+		var newDepsNames = FieldRegistry.getDependencyValueNames(field);
+		if(!depNames.equals(newDepsNames)){
+			LogUtil.println(
+				field, field.getClass(), "\n",
+				depNames.stream().sorted(), "\n",
+				newDepsNames.stream().sorted()
+			);
+			LogUtil.println(FieldRegistry.getDependencyValueNames(field));
+			throw new RuntimeException();
+		}
+		
+		if(depNames.isEmpty()) return dependencies;
+		
+		
+		var missingNames = depNames.stream()
+		                           .filter(name -> fields.stream().noneMatch(f -> f.field.getName().equals(name)))
+		                           .collect(joining(", "));
+		if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies " + missingNames + " on field " + field.getAccessor());
+		
+		for(String nam : depNames){
+			AnnotatedField<T> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow();
+			dependencies.add(e.field);
+		}
+		
 		return dependencies;
 	}
 	
@@ -217,7 +239,15 @@ public final class FieldCompiler{
 		do{
 			for(AnnotatedField(var field, List<LogicalAnnotation<Annotation>> annotations) : toRun){
 				
-				var toInject = annotations.stream().flatMap(a -> a.logic.injectPerInstanceValue(field.getAccessor(), a.annotation).stream()).toList();
+				var toInject = annotations.stream().flatMap(a -> a.logic.injectPerInstanceValue(field.getAccessor(), a.annotation).stream())
+				                          .sorted(Comparator.comparing(VirtualFieldDefinition::name)).toList();
+				
+				var newToInject = FieldRegistry.injectPerInstanceValue(field);
+				if(!toInject.equals(newToInject)){
+					LogUtil.println(field.getClass().getName(), field, "\n", annotations.stream().map(a -> a.annotation), "\n", toInject, "\n", newToInject);
+					throw new RuntimeException();
+				}
+				
 				
 				for(var s : toInject){
 					var existing = virtualData.get(s.name);

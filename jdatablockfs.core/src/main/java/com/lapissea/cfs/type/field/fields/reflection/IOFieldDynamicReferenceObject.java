@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -50,6 +51,14 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDynamicReferenceObject.class); }
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
+				Behaviour.of(IOValue.Generic.class, BehaviourSupport::genericID),
+				Behaviour.of(IOValue.Reference.class, BehaviourSupport::referenceCompanion)
+			);
+		}
 	}
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;

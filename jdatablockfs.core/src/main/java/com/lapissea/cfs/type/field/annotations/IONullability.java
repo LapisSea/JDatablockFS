@@ -17,13 +17,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -92,11 +88,11 @@ public @interface IONullability{
 			var typ = field.getType();
 			if(typ.isPrimitive()) return false;
 			return IOFieldTools.isGeneric(field) || typ.isArray() ||
-			       Stream.concat(
-				       Stream.of(IOInstance.class, Enum.class, String.class,
-				                 Duration.class, Instant.class, LocalDate.class, LocalTime.class, LocalDateTime.class),
+			       Stream.of(
+				       Stream.of(IOInstance.class, Enum.class),
+				       FieldCompiler.getWrapperTypes().stream(),
 				       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
-			       ).anyMatch(c -> UtilL.instanceOf(typ, c));
+			       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));
 		}
 		
 		

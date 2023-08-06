@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -11,19 +12,24 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -43,6 +49,20 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return IOFieldPrimitive.make(field);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			var res = new ArrayList<Behaviour<?, T>>(3);
+			
+			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)) res.add(Behaviour.noop(IOValue.Unsigned.class));
+			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)) res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
+			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
+				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
+					throw new MalformedStruct(VirtualNumSize.class.getName() + " is not allowed on " + fieldType.getName());
+				}
+				return BehaviourSupport.virtualNumSize(field, ann);
+			}));
+			return res;
 		}
 		@Override
 		@SuppressWarnings("rawtypes")

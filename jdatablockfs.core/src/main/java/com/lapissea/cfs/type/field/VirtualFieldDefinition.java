@@ -80,7 +80,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		if(storagePool != that.storagePool) return false;
 		if(!name.equals(that.name)) return false;
 		if(!type.equals(that.type)) return false;
-		if((getFilter == null) == (that.getFilter == null)) return false;
+		if((getFilter == null) != (that.getFilter == null)) return false;
 		return annotations.equals(that.annotations);
 	}
 	@Override
@@ -91,4 +91,6 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	public String toString(){
 		return name + ": " + Utils.typeToHuman(type, false);
 	}
+	
+	public String name(){ return name; }
 }

@@ -14,7 +14,7 @@ public interface AnnotationLogic<Ann extends Annotation>{
 	
 	@NotNull
 	default Set<String> getDependencyValueNames(FieldAccessor<?> field, Ann annotation){
-		return injectPerInstanceValue(field, annotation).stream().map(f -> f.name).collect(Collectors.toSet());
+		return injectPerInstanceValue(field, annotation).stream().map(VirtualFieldDefinition::name).collect(Collectors.toSet());
 	}
 	
 	default void validate(FieldAccessor<?> field, Ann annotation){ }
