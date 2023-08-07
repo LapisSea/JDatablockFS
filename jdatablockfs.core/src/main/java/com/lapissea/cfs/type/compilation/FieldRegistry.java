@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOField.FieldUsage;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.AnnotationUsage;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
@@ -277,7 +278,11 @@ final class FieldRegistry{
 		if(!activeAnns.isEmpty()){
 			throw new IllegalAnnotation(
 				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
-				activeAnns.stream().map(t -> "\t" + t.getName()).collect(Collectors.joining("\n"))
+				activeAnns.stream().map(t -> {
+					          return "\t" + t.getName() +
+					                 Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
+				          })
+				          .collect(Collectors.joining("\n"))
 			);
 		}
 		

@@ -14,6 +14,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -368,4 +369,7 @@ public class Utils{
 		return Optional.of(new SealedUniverse<>(type, universe));
 	}
 	
+	public static <T extends Annotation> Optional<T> getAnnotation(Class<?> clazz, Class<T> type){
+		return Optional.ofNullable(clazz.getAnnotation(type));
+	}
 }

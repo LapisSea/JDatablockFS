@@ -14,6 +14,7 @@ import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSiz
  * This annotation can specify that another field or fields are dependent on it. This is needed when
  * a custom getter is used and is accessing another IO field.
  */
+@AnnotationUsage("Defines field(s) as a dependency. To be used if custom getters/setters are used and another field is referenced")
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IODependency{
