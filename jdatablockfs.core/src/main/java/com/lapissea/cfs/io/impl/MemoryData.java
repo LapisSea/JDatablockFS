@@ -225,7 +225,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		public void writeWord(long v, int len) throws IOException{
+		public void writeWord(long v, int len){
 			if(transactionOpen){
 				transactionBuff.writeWord(pos, v, len);
 				pos += len;
@@ -363,7 +363,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return new MemRandomIO();
 	}
 	@Override
-	public RandomIO ioAt(long offset) throws IOException{
+	public RandomIO ioAt(long offset){
 		return new MemRandomIO((int)offset);
 	}
 	

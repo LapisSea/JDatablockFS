@@ -66,15 +66,15 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	private final ObjectPipe<ValueType, ?> valuePipe = new ObjectPipe<>(){
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, ValueType instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, ValueType instance){
 			throw NotImplementedException.infer();//TODO: implement .write()
 		}
 		@Override
-		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext){
 			throw NotImplementedException.infer();//TODO: implement .skip()
 		}
 		@Override
-		public ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		public ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext){
 			throw NotImplementedException.infer();//TODO: implement .readNew()
 		}
 		@Override

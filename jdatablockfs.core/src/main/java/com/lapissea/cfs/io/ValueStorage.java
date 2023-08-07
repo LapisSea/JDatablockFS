@@ -224,7 +224,7 @@ public sealed interface ValueStorage<T>{
 					return MemoryWalker.CONTINUE;
 				}
 				@Override
-				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value) throws IOException{
+				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value){
 					return MemoryWalker.CONTINUE;
 				}
 			};

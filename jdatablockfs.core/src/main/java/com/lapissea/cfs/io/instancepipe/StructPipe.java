@@ -607,9 +607,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			return doRead(makeIOPool(), provider, src, instance, genericContext);
+			doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
 			throw new IOException("Failed reading " + getType().cleanFullName(), e);
 		}
@@ -884,7 +884,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw fail(field, e, "did not read correctly");
 		}
 	}
-	private static IOException fail(IOField<?, ?> field, Exception e, String msg) throws IOException{
+	private static IOException fail(IOField<?, ?> field, Exception e, String msg){
 		return new IOException(field + " " + msg, e);
 	}
 	

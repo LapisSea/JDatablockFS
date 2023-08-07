@@ -13,9 +13,12 @@ public class FieldIsNull extends NullPointerException{
 		if(obj == null){
 			throw new FieldIsNull(
 				field,
-				() -> (field.declaringStruct() != null? Utils.typeToHuman(field.declaringStruct().getType(), false) + "." : "") +
-				      field.toShortString() +
-				      " should not be null"
+				() -> {
+					var struct = field.declaringStruct();
+					return (struct != null? Utils.typeToHuman(struct.getType(), false) + "." : "") +
+					       field.toShortString() +
+					       " should not be null";
+				}
 			);
 		}
 		return obj;

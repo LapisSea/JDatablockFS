@@ -145,12 +145,11 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public void runStable(Stability stability){
-		switch(stability){
-			case Stability.Ok(var sequence, var actionIndex) -> {
-				var mark = new Mark(sequence.index(), actionIndex.orElse(-1));
-				runSequence(mark, sequence);
-			}
-			default -> throw new AssertionError(stability.makeReport());
+		if(Objects.requireNonNull(stability) instanceof Stability.Ok(var sequence, var actionIndex)){
+			var mark = new Mark(sequence.index(), actionIndex.orElse(-1));
+			runSequence(mark, sequence);
+		}else{
+			throw new AssertionError(stability.makeReport());
 		}
 	}
 	public Stability establishFailStability(FuzzFail<State, Action> fail, int reruns){
@@ -243,7 +242,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		
 		var runType = RunType.of(source, stateEnv, mark);
 		return switch(runType){
-			case RunType.Noop ignored -> { yield List.of(); }
+			case RunType.Noop ignored -> List.of();
 			case RunType.Single(var sequence) -> {
 				var fail = runSequence(mark, sequence, new FuzzProgress(conf, sequence.iterations()));
 				yield fail.stream().toList();

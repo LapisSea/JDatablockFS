@@ -69,7 +69,7 @@ class Encoding{
 			
 			
 			int optimizedBlockCount;
-			if(ConfigDefs.TEXT_DISABLE_BLOCK_CODING.resolve()){
+			if(ConfigDefs.TEXT_DISABLE_BLOCK_CODING.resolveVal()){
 				optimizedBlockCount = -1;
 			}else{
 				optimizedBlockCount = 1;

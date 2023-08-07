@@ -49,7 +49,7 @@ public class Runner{
 	private static final List<Task> TASKS = new ArrayList<>();
 	
 	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolve();
-	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolve();
+	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveVal();
 	
 	private static int             virtualChoke = 0;
 	private static boolean         cherry       = true;
@@ -87,8 +87,8 @@ public class Runner{
 		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
 			
-			int timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.resolve();
-			int watcherTimeout = ConfigDefs.RUNNER_WATCHER_TIMEOUT_MS.resolve();
+			int timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.resolveVal();
+			int watcherTimeout = ConfigDefs.RUNNER_WATCHER_TIMEOUT_MS.resolveVal();
 			var toRestart      = new ArrayList<Task>();
 			
 			// debug wait prevents debugging sessions from often restarting the watcher by
@@ -171,7 +171,7 @@ public class Runner{
 	private static void pop(){
 		if(cherry){
 			cherry = false;
-			if(!ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.resolve()){
+			if(!ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.resolveVal()){
 				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
 				         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
 				         ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.name(), ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.name());

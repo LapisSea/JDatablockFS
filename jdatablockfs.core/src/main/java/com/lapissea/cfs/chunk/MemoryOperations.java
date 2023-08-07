@@ -256,7 +256,7 @@ public class MemoryOperations{
 	}
 	
 	
-	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
+	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolveVal();
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();

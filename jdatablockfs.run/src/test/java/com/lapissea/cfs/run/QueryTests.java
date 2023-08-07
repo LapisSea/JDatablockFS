@@ -6,7 +6,6 @@ import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;

@@ -34,9 +34,9 @@ import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
 
 @SuppressWarnings("unchecked")
-public class Access{
+public final class Access{
 	
-	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolve();
+	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveVal();
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")

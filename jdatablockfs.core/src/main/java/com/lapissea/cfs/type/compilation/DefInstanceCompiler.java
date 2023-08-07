@@ -462,7 +462,7 @@ public final class DefInstanceCompiler{
 				}
 			}
 		}catch(Throwable e){
-			if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolve()){
+			if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolveVal()){
 				new RuntimeException("failed to compile implementation for " + completeInter.getName(), e).printStackTrace();
 				System.exit(1);
 			}
@@ -1211,7 +1211,7 @@ public final class DefInstanceCompiler{
 			             while(iter.hasNext()){
 				             var ann = iter.next();
 				             if(ann instanceof IOValue val){
-					             if(val.name().equals("")){
+					             if(val.name().isEmpty()){
 						             valBack = val;
 						             iter.remove();
 						             continue;

@@ -215,7 +215,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			public Fixed bake(){
-				return new Fixed(defs, idToTyp);
+				return new Fixed(defs, idToTyp, sealedMultiverse);
 			}
 		}
 		
@@ -288,14 +288,15 @@ public sealed interface IOTypeDB{
 				}
 			}
 			
-			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse = new HashMap<>();
+			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse;
 			
-			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp){
+			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
 				var maxID = idToTyp.keySet().stream().mapToInt(i -> i).max().orElse(0);
 				this.idToTyp = new TypeLink[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
 				typToID = idToTyp.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+				this.sealedMultiverse = sealedMultiverse.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id)));
 			}
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);

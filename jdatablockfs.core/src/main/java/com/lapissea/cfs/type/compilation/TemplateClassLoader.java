@@ -39,7 +39,7 @@ public final class TemplateClassLoader extends ClassLoader{
 	
 	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
-	private static final boolean PRINT_GENERATING_INFO = ConfigDefs.CLASSGEN_PRINT_GENERATING_INFO.resolve();
+	private static final boolean PRINT_GENERATING_INFO = ConfigDefs.CLASSGEN_PRINT_GENERATING_INFO.resolveVal();
 	
 	private final IOTypeDB db;
 	

@@ -21,7 +21,7 @@ public class RunCaseTests{
 	}
 	
 	@Test
-	void randomLists() throws IOException{
+	void randomLists(){
 		RandomLists.main(ZeroArrays.ZERO_STRING);
 	}
 	

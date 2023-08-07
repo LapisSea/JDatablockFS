@@ -230,7 +230,7 @@ public class DefragmentManager{
 						
 						if(IOInstance.isUnmanaged(type)){
 							var move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
-							if(move != null) run[0] = true;
+							if(move.hasAny()) run[0] = true;
 							return END;
 						}
 						
@@ -470,9 +470,8 @@ public class DefragmentManager{
 				warn("found unknown free chunks: {}", unreferencedChunks);
 				
 				List<Chunk> unreferenced = new ArrayList<>(MathUtil.snap((int)unreferencedChunks.trueSize(), 1, 50));
-				var         iter         = unreferencedChunks.iterator();
-				while(iter.hasNext()){
-					unreferenced.add(iter.next().dereference(cluster));
+				for(var unreferencedChunk : unreferencedChunks){
+					unreferenced.add(unreferencedChunk.dereference(cluster));
 					
 					if(unreferenced.size()>=64){
 						cluster.getMemoryManager().free(unreferenced);

@@ -31,8 +31,8 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
 	
-	private static final boolean DO_ASYNC            = ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolve();
-	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolve();
+	private static final boolean DO_ASYNC            = ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolveVal();
+	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){

@@ -123,7 +123,7 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 		return a;
 	}
 	@Override
-	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
+	public IOEntry.Modifiable<K, V> getEntry(K key){
 		throw NotImplementedException.infer();//TODO: implement CheckMap.getEntry()
 	}
 	@Override

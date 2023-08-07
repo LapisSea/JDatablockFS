@@ -30,8 +30,8 @@ public class MemoryWalker{
 	
 	private static class MemoryWalkIOFail extends IOException{
 		
-		private List<String> stack = new ArrayList<>();
-		private String       msg;
+		private final List<String> stack = new ArrayList<>();
+		private       String       msg;
 		
 		public MemoryWalkIOFail(Throwable cause){
 			super(cause);

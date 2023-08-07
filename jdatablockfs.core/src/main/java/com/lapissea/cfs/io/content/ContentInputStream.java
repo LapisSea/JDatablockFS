@@ -128,7 +128,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public int read(){
 			int rem = available();
 			if(rem == 0) return -1;
-			return bb.get();
+			return bb.get()&0xFF;
 		}
 		
 		@Override

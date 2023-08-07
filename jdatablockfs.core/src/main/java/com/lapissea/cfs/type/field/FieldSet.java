@@ -466,7 +466,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	@Override
 	public boolean contains(Object o){
 		if(!(o instanceof IOField<?, ?> f)) return false;
-		return contains(o);
+		return contains(f);
 	}
 	public boolean contains(IOField<?, ?> f){
 		if(size() == 1){

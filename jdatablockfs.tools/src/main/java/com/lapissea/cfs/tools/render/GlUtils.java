@@ -49,10 +49,10 @@ public class GlUtils{
 		int    len  = glGetProgrami(program, GL_INFO_LOG_LENGTH);
 		String err  = glGetProgramInfoLog(program, len);
 		String log  = "";
-		if(err.length() != 0) log = err + "\n" + log;
+		if(!err.isEmpty()) log = err + "\n" + log;
 		log = log.trim();
 		if(comp == GL11.GL_FALSE){
-			throw new RuntimeException(log.length() != 0? log : "Could not link program");
+			throw new RuntimeException(!log.isEmpty()? log : "Could not link program");
 		}
 		return program;
 	}
@@ -69,10 +69,10 @@ public class GlUtils{
 		String t    = shaderTypeString(type);
 		String err  = glGetShaderInfoLog(shader, len);
 		String log  = "";
-		if(err.length() != 0)
+		if(!err.isEmpty())
 			log += t + " compile log:\n" + err + "\n";
 		if(comp == GL11.GL_FALSE)
-			throw new RuntimeException(log.length() != 0? log : "Could not compile " + shaderTypeString(type));
+			throw new RuntimeException(!log.isEmpty()? log : "Could not compile " + shaderTypeString(type));
 		return shader;
 	}
 	private static String shaderTypeString(int type){

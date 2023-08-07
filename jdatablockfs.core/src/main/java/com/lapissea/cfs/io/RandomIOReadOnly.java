@@ -30,7 +30,7 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public void setSize(long targetSize) throws IOException{
+	public void setSize(long targetSize){
 		throw new UnsupportedOperationException();
 	}
 	
@@ -40,7 +40,7 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public RandomIO setCapacity(long newCapacity) throws IOException{
+	public RandomIO setCapacity(long newCapacity){
 		throw new UnsupportedOperationException();
 	}
 	
@@ -60,12 +60,12 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public void write(int b) throws IOException{
+	public void write(int b){
 		throw new UnsupportedOperationException();
 	}
 	
 	@Override
-	public void fillZero(long requestedMemory) throws IOException{
+	public void fillZero(long requestedMemory){
 		throw new UnsupportedOperationException();
 	}
 	
@@ -86,7 +86,7 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public void trim() throws IOException{
+	public void trim(){
 		throw new UnsupportedOperationException();
 	}
 	
@@ -106,11 +106,11 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public void write(byte[] b, int off, int len) throws IOException{
+	public void write(byte[] b, int off, int len){
 		throw new UnsupportedOperationException();
 	}
 	@Override
-	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+	public void writeAtOffsets(Collection<WriteChunk> data){
 		throw new UnsupportedOperationException();
 	}
 	

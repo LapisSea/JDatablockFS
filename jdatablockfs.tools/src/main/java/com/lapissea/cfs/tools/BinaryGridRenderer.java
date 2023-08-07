@@ -1513,7 +1513,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(IOFieldTools.makeRefName(acc)) : Optional.<IOField<T, ?>>empty();
 								if(refContainer.isPresent()){
 									var refF      = refContainer.get();
-									var refOffset = 0;
+									var refOffset = 0L;
 									for(var sf : pipe.getSpecificFields()){
 										if(sf == refF) break;
 										refOffset += sf.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
@@ -1613,10 +1613,10 @@ public class BinaryGridRenderer implements DataRenderer{
 						         ).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
-								if(sizeDesc.getWordSpace() == WordSpace.BIT){
+								if(sizeDesc.getWordSpace() == WordSpace.BIT && size<8){
 									annotateBitField(ctx, ioPool, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, sizeDesc.mapSize(WordSpace.BYTE, size)));
 								}
 							}
 						}else{

@@ -350,7 +350,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			else index = new Index.Bitmap32();
 		}
 		size++;
-		if(ptr>Integer.MAX_VALUE && index instanceof Index.Bitmap32 b32){
+		if(ptr>Integer.MAX_VALUE && index instanceof Index.Bitmap32){
 			index = to64(index);
 		}
 		index.add(ptr);

@@ -217,7 +217,7 @@ class FieldSupport{
 				}
 				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
 					typeGen = switch(typeGen){
-						case Class<?> c -> typeGen = Object.class;
+						case Class<?> c -> Object.class;
 						case ParameterizedType t -> t.getActualTypeArguments()[0];
 						default -> throw new NotImplementedException(typeGen.getClass() + "");
 					};

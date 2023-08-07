@@ -33,7 +33,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 				}
 				
 				@Override
-				public void set(V value) throws IOException{
+				public void set(V value){
 					throw new UnsupportedOperationException();
 				}
 				

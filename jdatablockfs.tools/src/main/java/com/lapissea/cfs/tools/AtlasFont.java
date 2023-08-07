@@ -127,8 +127,6 @@ public class AtlasFont extends DrawFont{
 				}
 				
 				"""
-				           .replace("$texelSizeX", (1F/atlasInfo.getWidth()) + "")
-				           .replace("$texelSizeY", (1F/atlasInfo.getHeight()) + "")
 				           .replace("$distanceRange", atlasInfo.getDistanceRange() + "")
 				           .replace("$size", atlasInfo.getSize() + "");
 			
@@ -141,14 +139,9 @@ public class AtlasFont extends DrawFont{
 			});
 		}
 		async(() -> {
-			var img = atlas.getImage();
-			if(isMask()){
-				ByteBuffer bb = convertImageA(img);
-				openglTask.accept(() -> texture = GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_ALPHA, bb));
-			}else{
-				ByteBuffer bb = convertImageRGB(img);
-				openglTask.accept(() -> texture = GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_RGB, bb));
-			}
+			var        img = atlas.getImage();
+			ByteBuffer bb  = isMask()? convertImageA(img) : convertImageRGB(img);
+			openglTask.accept(() -> texture = GlUtils.uploadTexture(img.getWidth(), img.getHeight(), isMask()? GL11.GL_ALPHA : GL11.GL_RGB, bb));
 			renderRequest.run();
 		});
 	}
