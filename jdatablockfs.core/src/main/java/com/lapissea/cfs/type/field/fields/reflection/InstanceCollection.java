@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -62,6 +63,13 @@ public class InstanceCollection{
 		public Set<Class<? extends IOField>> listFieldTypes(){
 			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
 		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
+		}
 	}
 	
 	@SuppressWarnings("unused")
@@ -84,6 +92,13 @@ public class InstanceCollection{
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
 			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	

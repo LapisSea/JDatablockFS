@@ -9,15 +9,18 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -29,6 +32,10 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends NullF
 		@Override
 		public <T extends IOInstance<T>> IOField<T, LocalTime> create(FieldAccessor<T> field){
 			return new IOFieldLocalTime<>(field);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
 		}
 	}
 	

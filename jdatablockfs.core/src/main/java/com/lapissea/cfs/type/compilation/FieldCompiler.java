@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.compilation;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -34,11 +35,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -70,18 +69,6 @@ public final class FieldCompiler{
 	}
 	
 	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
-	
-	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
-	
-	private record AnnotatedField<T extends IOInstance<T>>(
-		IOField<T, ?> field,
-		List<LogicalAnnotation<Annotation>> annotations
-	) implements Comparable<AnnotatedField<T>>{
-		@Override
-		public int compareTo(AnnotatedField<T> o){
-			return field.getAccessor().compareTo(o.field.getAccessor());
-		}
-	}
 	
 	/**
 	 * Scans an unmanaged struct for
@@ -133,96 +120,71 @@ public final class FieldCompiler{
 	public static <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		validateClassAnnotations(struct.getType());
 		
-		List<FieldAccessor<T>> accessor = scanFields(struct);
+		var accessors = scanFields(struct);
 		
-		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
-		for(var a : accessor){
-			var f = FieldRegistry.create(a);
-			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
+		var fields = new ArrayList<IOField<T, ?>>(Math.max(accessors.size()*2, accessors.size() + 5));//Give extra capacity for virtual fields
+		for(var a : accessors){
+			fields.add(FieldRegistry.create(a));
 		}
 		
 		generateVirtualFields(fields, struct);
 		
-		validate(fields);
-		
 		initLateData(fields);
 		
-		return FieldSet.of(fields.stream().map(AnnotatedField::field));
+		return FieldSet.of(fields);
 	}
 	
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
 		var cVal = type.getAnnotation(IOValue.class);
 		if(cVal != null && !cVal.name().isEmpty()){
-			throw new MalformedStruct(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
+			throw new IllegalAnnotation(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
-		Collection<IOField<T, ?>> dependencies = new HashSet<>();
+	private static <T extends IOInstance<T>> FieldSet<T> generateDependencies(Map<String, IOField<T, ?>> fields, IOField<T, ?> field){
+		var depNames = FieldRegistry.getDependencyValueNames(field);
+		if(depNames.isEmpty()) return FieldSet.of();
 		
-		for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : depAn){
-			logic.validate(field.getAccessor(), annotation);
-			
-			var depNames = logic.getDependencyValueNames(field.getAccessor(), annotation);
-			if(depNames.isEmpty()) continue;
-			
-			var missingNames = depNames.stream()
-			                           .filter(name -> fields.stream().noneMatch(f -> f.field.getName().equals(name)))
-			                           .collect(joining(", "));
-			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies " + missingNames + " on field " + field.getAccessor());
-			
-			for(String nam : depNames){
-				AnnotatedField<T> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow();
-				dependencies.add(e.field);
+		var dependencies = HashSet.<IOField<T, ?>>newHashSet(depNames.size());
+		for(String nam : depNames){
+			var dep = fields.get(nam);
+			if(dep == null){
+				throw new IllegalField("Could not find dependencies " +
+				                       depNames.stream()
+				                               .filter(name -> !fields.containsKey(name))
+				                               .collect(joining(", ")) +
+				                       " on field " + field.getAccessor());
 			}
+			dependencies.add(dep);
 		}
-		return dependencies;
+		return FieldSet.of(dependencies);
 	}
 	
-	private static <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
-		for(AnnotatedField(IOField<T, ?> annField, List<LogicalAnnotation<Annotation>> annotations) : parsed){
-			var nam = annField.getName();
-			for(char c : new char[]{'.', '/', '\\', ' '}){
-				if(nam.indexOf(c) != -1){
-					throw new IllegalField("Character '" + c + "' is not allowed in field name \"" + nam + "\"! ");
-				}
-			}
-			
-			var field = annField.getAccessor();
-			for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : annotations){
-				logic.validate(field, annotation);
-			}
-		}
-	}
-	
-	private static <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
+	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
+		var mapFields = fields.stream().collect(Collectors.toMap(IOField::getName, identity()));
 		for(int i = 0; i<fields.size(); i++){
-			var pair  = fields.get(i);
-			var depAn = pair.annotations;
-			var field = pair.field;
-			
-			field.initLateData(i, FieldSet.of(generateDependencies(fields, depAn, field)));
+			var field = fields.get(i);
+			field.initLateData(i, generateDependencies(mapFields, field));
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
+	private static <T extends IOInstance<T>> void generateVirtualFields(List<IOField<T, ?>> parsed, Struct<T> struct){
 		
 		var accessIndex     = new EnumMap<StoragePool, Integer>(StoragePool.class);
 		var primitiveOffset = new EnumMap<StoragePool, Integer>(StoragePool.class);
 		var virtualData     = new HashMap<String, FieldAccessor<T>>();
 		var newVirtualData  = new HashMap<String, FieldAccessor<T>>();
 		
-		List<AnnotatedField<T>> toRun = new ArrayList<>(parsed);
+		List<IOField<T, ?>> toRun = new ArrayList<>(parsed);
 		
 		do{
-			for(AnnotatedField(var field, List<LogicalAnnotation<Annotation>> annotations) : toRun){
-				
-				var toInject = annotations.stream().flatMap(a -> a.logic.injectPerInstanceValue(field.getAccessor(), a.annotation).stream()).toList();
+			for(IOField<T, ?> field : toRun){
+				var toInject = FieldRegistry.injectPerInstanceValue(field);
 				
 				for(var s : toInject){
 					var existing = virtualData.get(s.name);
 					if(existing == null){
-						existing = parsed.stream().map(a -> a.field.getAccessor())
+						existing = parsed.stream().map(IOField::getAccessor)
 						                 .filter(a -> a.getName().equals(s.name))
 						                 .findAny().orElse(null);
 					}
@@ -262,11 +224,11 @@ public final class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field     = FieldRegistry.create(virtual);
-				var annotated = new AnnotatedField<>(field, scanAnnotations(field));
-				toRun.add(annotated);
-				UtilL.addRemainSorted(parsed, annotated);
+				var field = FieldRegistry.create(virtual);
+				toRun.add(field);
+				parsed.add(field);
 			}
+			parsed.sort(Comparator.comparing(IOField::getAccessor));
 			newVirtualData.clear();
 		}while(!toRun.isEmpty());
 	}
@@ -293,16 +255,12 @@ public final class FieldCompiler{
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
 		
-		List<FieldAccessor<T>> fields     = new ArrayList<>();
-		Set<Method>            usedFields = new HashSet<>();
+		var fields     = new ArrayList<FieldAccessor<T>>();
+		var usedFields = new HashSet<Method>();
 		
 		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).toList();
 		
-		var iter = deepClasses(cl)
-			           .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
-			           .filtered(IOFieldTools::isIOField);
-		
-		for(Field field : iter){
+		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
 			try{
 				Type type = getType(field);
 				
@@ -310,8 +268,7 @@ public final class FieldCompiler{
 				
 				String fieldName = getFieldName(field);
 				
-				Optional<Method> getter;
-				Optional<Method> setter;
+				Optional<Method> getter, setter;
 				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
 					IntFunction<Optional<Method>> getMethod = count -> ioMethods.stream().filter(
 						m -> m.getParameterCount() == count &&
@@ -518,39 +475,6 @@ public final class FieldCompiler{
 		             .flatMap(c -> Arrays.stream(c.getDeclaredMethods()));
 	}
 	
-	static final class LogicalAnnType{
-		private final Class<Annotation>           type;
-		private       AnnotationLogic<Annotation> logic;
-		
-		@SuppressWarnings("unchecked")
-		private LogicalAnnType(Class<?> type){
-			this.type = (Class<Annotation>)type;
-		}
-		
-		public AnnotationLogic<Annotation> logic(){
-			if(logic == null) logic = getAnnotationLogic(type);
-			return logic;
-		}
-		
-		@SuppressWarnings("unchecked")
-		private AnnotationLogic<Annotation> getAnnotationLogic(Class<?> t){
-			try{
-				Field logic = t.getField("LOGIC");
-				
-				if(!(logic.getGenericType() instanceof ParameterizedType parmType &&
-				     AnnotationLogic.class.equals(parmType.getRawType()) &&
-				     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
-					
-					throw new ClassCastException(logic + " is not a type of " + AnnotationLogic.class.getName() + "<" + t.getName() + ">");
-				}
-				
-				return (AnnotationLogic<Annotation>)logic.get(null);
-			}catch(NoSuchFieldException|IllegalAccessException e){
-				throw new RuntimeException("Class " + t.getName() + " does not contain an AnnotationLogic LOGIC field", e);
-			}
-		}
-	}
-	
 	@SuppressWarnings("unchecked")
 	public static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
 		activeAnnotations()
@@ -562,21 +486,6 @@ public final class FieldCompiler{
 				      .map(c -> (Class<? extends Annotation>)c)
 			))
 			.toList();
-	
-	private static final List<LogicalAnnType> LOGICAL_ANN_TYPES =
-		ANNOTATION_TYPES.stream()
-		                .map(LogicalAnnType::new)
-		                .toList();
-	
-	private static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
-		return LOGICAL_ANN_TYPES.stream()
-		                        .map(logTyp -> field.getAccessor()
-		                                            .getAnnotation(logTyp.type)
-		                                            .map(ann -> new LogicalAnnotation<>(ann, logTyp.logic())))
-		                        .filter(Optional::isPresent)
-		                        .map(Optional::get)
-		                        .toList();
-	}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

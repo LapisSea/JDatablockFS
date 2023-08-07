@@ -12,12 +12,16 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.CollectionAddapter;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -27,7 +31,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 
-public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum<E>, ColType> extends IOField<T, ColType>{
+public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum<E>, ColType> extends NullFlagCompanyField<T, ColType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageList implements FieldUsage{
@@ -45,6 +49,14 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldEnumCollection.class); }
+		
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
+		}
 	}
 	
 	@SuppressWarnings("unused")
@@ -62,6 +74,13 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldEnumCollection.class); }
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
+		}
 	}
 	
 	private static final class EnumIO<E extends Enum<E>> implements CollectionAddapter.ElementIOImpl<E>{
@@ -89,7 +108,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 	
 	private final EnumUniverse<E>                universe;
 	private final CollectionAddapter<E, ColType> addapter;
-	private       IOFieldPrimitive.FInt<T>       collectionSize;
+	private       IOFieldPrimitive.FInt<T>       collectionLength;
 	
 	public IOFieldEnumCollection(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> addapterType){
 		super(accessor);
@@ -99,9 +118,10 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		universe = EnumUniverse.of((Class<E>)etyp);
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
-			var siz = collectionSize.getValue(ioPool, inst);
+			var siz = collectionLength.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var col = get(ioPool, inst);
+			if(col == null) return 0;
 			return byteCount(addapter.getSize(col));
 		}));
 	}
@@ -117,29 +137,33 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
-		collectionSize = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		collectionLength = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var enums = get(ioPool, instance);
+		if(enums == null) return;
 		new BitOutputStream(dest).writeEnums(universe, addapter.asListView(enums)).close();
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size = collectionSize.getValue(ioPool, instance);
-		E[] tmp;
-		try(var s = new BitInputStream(src, (long)universe.bitSize*size)){
-			tmp = s.readEnums(universe, size);
+		ColType enums;
+		if(nullable() && getIsNull(ioPool, instance)) enums = null;
+		else{
+			int size = collectionLength.getValue(ioPool, instance);
+			E[] tmp;
+			try(var s = new BitInputStream(src, (long)universe.bitSize*size)){
+				tmp = s.readEnums(universe, size);
+			}
+			enums = addapter.asCollection(tmp);
 		}
-		ColType enums = addapter.asCollection(tmp);
-		
 		set(ioPool, instance, enums);
 	}
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size = collectionSize.getValue(ioPool, instance);
+		int size = collectionLength.getValue(ioPool, instance);
 		src.skipExact(byteCount(size));
 	}
 	

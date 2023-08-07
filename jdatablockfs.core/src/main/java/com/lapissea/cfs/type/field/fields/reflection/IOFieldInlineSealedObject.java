@@ -10,10 +10,15 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
@@ -24,11 +29,22 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.field.StoragePool.IO;
+
 public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage implements FieldUsage{
 		
+		private static <T extends IOInstance<T>> BehaviourRes<T> idBehaviour(FieldAccessor<T> field){
+			return new BehaviourRes<T>(new VirtualFieldDefinition<>(
+				IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
+				List.of(
+					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
+					IOValue.Unsigned.INSTANCE
+				)
+			));
+		}
 		@Override
 		public boolean isCompatible(Type type, GetAnnotation annotations){
 			return IOFieldInlineSealedObject.isCompatible(type);
@@ -42,6 +58,13 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
 			return Set.of(IOFieldInlineSealedObject.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, Usage::idBehaviour),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	

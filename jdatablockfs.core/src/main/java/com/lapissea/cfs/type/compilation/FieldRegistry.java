@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
@@ -8,11 +9,17 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOField.FieldUsage;
+import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.AnnotationUsage;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -234,6 +241,71 @@ final class FieldRegistry{
 			}
 		}
 		return res;
+	}
+	
+	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS
+		= FieldCompiler.ANNOTATION_TYPES.stream().filter(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
+		                                .collect(Collectors.toUnmodifiableSet());
+	
+	private static <T extends IOInstance<T>> Set<FieldUsage> findUsages(IOField<T, ?> field){
+		var             producers = getProducers();
+		Set<FieldUsage> usages    = producers.get(field.getClass());
+		if(usages == null) usages = producers.entrySet().stream()
+		                                     .filter(e -> UtilL.instanceOf(field.getClass(), e.getKey()))
+		                                     .findFirst().map(Map.Entry::getValue).orElse(null);
+		return usages;
+	}
+	
+	static <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IOField<T, ?> field){
+		var usages = findUsages(field);
+		if(usages == null) return List.of();
+		//noinspection unchecked
+		var type = (Class<IOField<T, ?>>)field.getClass();
+		var acc  = field.getAccessor();
+		
+		Set<VirtualFieldDefinition<T, ?>> result     = new HashSet<>();
+		Set<Class<? extends Annotation>>  activeAnns = CONSUMABLE_ANNOTATIONS.stream().filter(acc::hasAnnotation).collect(Collectors.toSet());
+		for(FieldUsage u : usages){
+			for(var behaviour : u.annotationBehaviour(type)){
+				behaviour.generateFields(acc).ifPresent(res -> {
+					result.addAll(res.fields());
+					activeAnns.remove(behaviour.annotationType());
+					activeAnns.removeAll(res.touchedAnnotations());
+				});
+			}
+		}
+		
+		if(!activeAnns.isEmpty()){
+			throw new IllegalAnnotation(
+				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
+				activeAnns.stream().map(t -> {
+					          return "\t" + t.getName() +
+					                 Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
+				          })
+				          .collect(Collectors.joining("\n"))
+			);
+		}
+		
+		return result.stream().sorted(Comparator.comparing(VirtualFieldDefinition::name)).toList();
+	}
+	
+	static <T extends IOInstance<T>> Set<String> getDependencyValueNames(IOField<T, ?> field){
+		var usages = findUsages(field);
+		if(usages == null) return Set.of();
+		
+		//noinspection unchecked
+		var type = (Class<IOField<T, ?>>)field.getClass();
+		var acc  = field.getAccessor();
+		
+		var deps = new HashSet<String>();
+		acc.getAnnotation(IODependency.class).ifPresent(ann -> deps.addAll(Arrays.asList(ann.value())));
+		
+		for(FieldUsage u : usages){
+			for(var behaviour : u.annotationBehaviour(type)){
+				behaviour.getDependencyNames(acc).ifPresent(deps::addAll);
+			}
+		}
+		return deps;
 	}
 	
 	private static IllegalField fail(String typeName){
