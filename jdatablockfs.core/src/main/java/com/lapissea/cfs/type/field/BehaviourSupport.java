@@ -67,7 +67,7 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){
-		if(!IONullability.NullLogic.canHave(field)){
+		if(!IOFieldTools.canHaveNullAnnotation(field)){
 			throw new MalformedStruct(field + " is not a supported field");
 		}
 		if(SupportedPrimitive.get(field.getType()).isPresent() && ann.value() == DEFAULT_IF_NULL){
@@ -91,7 +91,7 @@ public final class BehaviourSupport{
 		
 		var vf = new VirtualFieldDefinition<>(
 			retention == GHOST? IO : INSTANCE,
-			IODependency.VirtualNumSize.Logic.getName(field, ann),
+			IOFieldTools.getNumSizeName(field, ann),
 			NumberSize.class,
 			new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 				private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){

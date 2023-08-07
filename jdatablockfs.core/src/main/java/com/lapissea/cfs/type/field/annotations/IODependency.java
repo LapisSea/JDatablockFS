@@ -1,28 +1,14 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.VarPool;
-import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.util.NotNull;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.List;
-import java.util.Set;
 
-import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
-import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GROW_ONLY;
 
 /**
  * This annotation can specify that another field or fields are dependent on it. This is needed when
@@ -31,15 +17,6 @@ import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSiz
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IODependency{
-	
-	AnnotationLogic<IODependency> LOGIC = new AnnotationLogic<>(){
-		@NotNull
-		@Override
-		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IODependency annotation){
-			return Set.of(annotation.value());
-		}
-	};
-	
 	String[] value();
 	
 	/**
@@ -52,15 +29,6 @@ public @interface IODependency{
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface NumSize{
-		
-		AnnotationLogic<NumSize> LOGIC = new AnnotationLogic<>(){
-			@NotNull
-			@Override
-			public Set<String> getDependencyValueNames(FieldAccessor<?> field, NumSize annotation){
-				return Set.of(annotation.value());
-			}
-		};
-		
 		String value();
 	}
 	
@@ -74,16 +42,6 @@ public @interface IODependency{
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface ArrayLenSize{
-		
-		AnnotationLogic<ArrayLenSize> LOGIC = new AnnotationLogic<>(){
-			@Override
-			public void validate(FieldAccessor<?> field, ArrayLenSize annotation){
-				if(!field.getType().isArray()){
-					throw new MalformedStruct(ArrayLenSize.class.getSimpleName() + " can be used only on arrays");
-				}
-			}
-		};
-		
 		String name();
 	}
 	
@@ -120,79 +78,6 @@ public @interface IODependency{
 			 */
 			RIGID_INITIAL
 		}
-		
-		class Logic implements AnnotationLogic<VirtualNumSize>{
-			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
-				var nam = size.name();
-				if(nam.isEmpty()){
-					return IOFieldTools.makeNumberSizeName(field);
-				}
-				return nam;
-			}
-			
-			@NotNull
-			@Override
-			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
-				var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
-				
-				var retention = ann.retention();
-				var min       = ann.min();
-				var max       = ann.max();
-				
-				return List.of(new VirtualFieldDefinition<>(
-					retention == GHOST? IO : INSTANCE,
-					getName(field, ann),
-					NumberSize.class,
-					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
-						private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-							var len = calcMaxVal(ioPool, inst, deps);
-							return NumberSize.bySize(len, unsigned);
-						}
-						private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-							return switch(deps.size()){
-								case 1 -> deps.get(0).getLong(ioPool, inst);
-								case 2 -> {
-									long a = deps.get(0).getLong(ioPool, inst);
-									long b = deps.get(1).getLong(ioPool, inst);
-									yield Math.max(a, b);
-								}
-								default -> {
-									long best = Long.MIN_VALUE;
-									for(var d : deps){
-										long newVal = d.getLong(ioPool, inst);
-										if(newVal>best){
-											best = newVal;
-										}
-									}
-									yield best;
-								}
-							};
-						}
-						@Override
-						public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-							NumberSize raw;
-							
-							if(retention == GROW_ONLY){
-								if(val == max) raw = max;
-								else raw = calcMax(ioPool, inst, deps).max(val == null? NumberSize.VOID : val);
-							}else{
-								raw = val == null? calcMax(ioPool, inst, deps) : val;
-							}
-							
-							var size = raw.max(min);
-							
-							if(size.greaterThan(max)){
-								throw new RuntimeException(size + " can't fit in to " + max);
-							}
-							
-							return size;
-						}
-					}));
-			}
-		}
-		
-		AnnotationLogic<VirtualNumSize> LOGIC = new Logic();
-		
 		
 		String name() default "";
 		

@@ -191,7 +191,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		for(var field : fields){
 			writer.write("@{}", IOValue.class);
 			
-			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
+			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
 				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
