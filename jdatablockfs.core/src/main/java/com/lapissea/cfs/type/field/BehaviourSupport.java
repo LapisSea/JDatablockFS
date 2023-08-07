@@ -38,6 +38,7 @@ public final class BehaviourSupport{
 			byte[].class
 		));
 	}
+	
 	public static <T extends IOInstance<T>> BehaviourRes<T> referenceCompanion(FieldAccessor<T> field){
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Reference>(
 			INSTANCE,
@@ -82,6 +83,7 @@ public final class BehaviourSupport{
 			boolean.class
 		));
 	}
+	
 	public static <T extends IOInstance<T>> BehaviourRes<T> virtualNumSize(FieldAccessor<T> field, IODependency.VirtualNumSize ann){
 		var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
 		
@@ -151,6 +153,7 @@ public final class BehaviourSupport{
 			List.of(IOFieldTools.makeNullabilityAnn(DEFAULT_IF_NULL))
 		));
 	}
+	
 	public static <T extends IOInstance<T>> BehaviourRes<T> collectionLength(FieldAccessor<T> field){
 		if(field.hasAnnotation(IOValue.Reference.class)) return BehaviourRes.non();
 		var type   = field.getType();

@@ -36,6 +36,15 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage implements FieldUsage{
 		
+		private static <T extends IOInstance<T>> BehaviourRes<T> idBehaviour(FieldAccessor<T> field){
+			return new BehaviourRes<T>(new VirtualFieldDefinition<>(
+				IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
+				List.of(
+					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
+					IOValue.Unsigned.INSTANCE
+				)
+			));
+		}
 		@Override
 		public boolean isCompatible(Type type, GetAnnotation annotations){
 			return IOFieldInlineSealedObject.isCompatible(type);
@@ -53,15 +62,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IOValue.class, (field, ann) -> {
-					return new BehaviourRes<T>(new VirtualFieldDefinition<>(
-						IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
-						List.of(
-							IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
-							IOValue.Unsigned.INSTANCE
-						)
-					));
-				}),
+				Behaviour.of(IOValue.class, Usage::idBehaviour),
 				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
 			);
 		}
