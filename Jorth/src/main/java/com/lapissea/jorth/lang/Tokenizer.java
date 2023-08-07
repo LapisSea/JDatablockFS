@@ -330,6 +330,6 @@ public class Tokenizer implements CodeStream, TokenSource{
 		dad.addImportAs(className, name);
 	}
 	@Override
-	public void close() throws MalformedJorth{
+	public void close(){
 	}
 }

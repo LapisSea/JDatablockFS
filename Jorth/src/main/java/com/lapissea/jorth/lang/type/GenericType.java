@@ -93,7 +93,7 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 	}
 	@Override
 	public boolean hasArgs(){
-		return args.size()>0;
+		return !args.isEmpty();
 	}
 	
 	@Override

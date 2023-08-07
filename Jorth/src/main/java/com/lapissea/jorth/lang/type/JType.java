@@ -72,7 +72,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		public String toString(){
 			String      ext;
 			List<JType> bounds;
-			if(lower.size() == 0){
+			if(lower.isEmpty()){
 				if(noUpper()){
 					return "?";
 				}
@@ -88,7 +88,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		}
 		
 		private boolean noUpper(){
-			return upper.size() == 0 || upper.get(0).equals(GenericType.OBJECT);
+			return upper.isEmpty() || upper.get(0).equals(GenericType.OBJECT);
 		}
 	}
 	

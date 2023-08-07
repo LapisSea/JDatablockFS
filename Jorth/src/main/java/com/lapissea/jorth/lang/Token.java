@@ -24,6 +24,7 @@ public sealed interface Token{
 			}
 			return Token.super.as(type);
 		}
+		@SuppressWarnings("unchecked")
 		@Override
 		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
 			return Optional.ofNullable(clazz == Keyword.class? (E)keyword : KeyedEnum.getOptional(clazz, keyword.key()));
@@ -34,12 +35,13 @@ public sealed interface Token{
 		public EWord(int line, Class<E> type, String word) throws MalformedJorth{
 			this(line, KeyedEnum.get(type, word));
 		}
+		@SuppressWarnings("unchecked")
 		@Override
-		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+		public <E1 extends Enum<E1>> Optional<E1> asEnum(Class<E1> clazz){
 			
 			return Optional.ofNullable(
 				clazz == value.getClass()?
-				(E)value :
+				(E1)value :
 				KeyedEnum.getOptional(
 					clazz,
 					value instanceof KeyedEnum e?
