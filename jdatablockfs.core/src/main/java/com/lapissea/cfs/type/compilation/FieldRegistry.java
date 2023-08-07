@@ -1,8 +1,8 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
-import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -275,7 +275,7 @@ final class FieldRegistry{
 		}
 		
 		if(!activeAnns.isEmpty()){
-			throw new MalformedStruct(
+			throw new IllegalAnnotation(
 				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
 				activeAnns.stream().map(t -> "\t" + t.getName()).collect(Collectors.joining("\n"))
 			);

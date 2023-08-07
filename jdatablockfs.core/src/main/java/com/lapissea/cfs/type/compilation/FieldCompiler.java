@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.compilation;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -136,7 +137,7 @@ public final class FieldCompiler{
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
 		var cVal = type.getAnnotation(IOValue.class);
 		if(cVal != null && !cVal.name().isEmpty()){
-			throw new MalformedStruct(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
+			throw new IllegalAnnotation(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
 		}
 	}
 	
