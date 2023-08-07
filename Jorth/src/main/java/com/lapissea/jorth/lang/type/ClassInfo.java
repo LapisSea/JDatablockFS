@@ -33,11 +33,11 @@ public interface ClassInfo{
 		}
 		
 		@Override
-		public FieldInfo getField(String name) throws MalformedJorth{
+		public FieldInfo getField(String name){
 			throw NotImplementedException.infer();//TODO: implement OfArray.getField()
 		}
 		@Override
-		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
+		public FunctionInfo getFunction(Signature signature){
 			try{
 				return base.getFunction(signature);
 			}catch(MalformedJorth e){ }
@@ -57,7 +57,7 @@ public interface ClassInfo{
 			return component.raw();
 		}
 		@Override
-		public ClassInfo superType() throws MalformedJorth{
+		public ClassInfo superType(){
 			throw NotImplementedException.infer();//TODO: implement OfArray.superType()
 		}
 		@Override

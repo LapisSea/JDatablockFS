@@ -103,7 +103,7 @@ public class JorthTmp{
 		}
 	}
 	
-	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
+	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth{
 		var file = makeFile(name, write);
 		try{
 			return Class.forName(name, true, new ClassLoader(JorthTmp.class.getClassLoader()){
@@ -120,7 +120,7 @@ public class JorthTmp{
 		}
 	}
 	
-	static byte[] makeFile(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
+	static byte[] makeFile(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth{
 		long    t     = System.currentTimeMillis();
 		boolean print = true;
 		var     jorth = new Jorth(null, null);

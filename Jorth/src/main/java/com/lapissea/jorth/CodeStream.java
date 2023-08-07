@@ -108,5 +108,5 @@ public interface CodeStream extends AutoCloseable{
 	CodePart codePart();
 	
 	@Override
-	void close() throws MalformedJorth;
+	void close();
 }
