@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -11,6 +10,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -45,7 +47,8 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	public final String              name;
 	public final Type                type;
 	public final GetterFilter<IO, T> getFilter;
-	public final GetAnnotation       annotations;
+	
+	public final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	public VirtualFieldDefinition(StoragePool storagePool, String name, Type type){
 		this(storagePool, name, type, null, List.of());
@@ -58,19 +61,36 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this(storagePool, name, type, getFilter, List.of());
 	}
 	public VirtualFieldDefinition(StoragePool storagePool, String name, Type type, GetterFilter<IO, T> getFilter, Collection<Annotation> annotations){
-		this.storagePool = storagePool;
-		this.name = name;
-		this.type = type;
+		this.storagePool = Objects.requireNonNull(storagePool);
+		this.name = Objects.requireNonNull(name);
+		this.type = Objects.requireNonNull(type);
 		this.getFilter = getFilter;
 		
 		if(annotations.stream().noneMatch(an -> an instanceof IOValue)){
 			annotations = Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
 		}
-		this.annotations = GetAnnotation.from(annotations);
+		this.annotations = annotations.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, a -> a));
 	}
 	
+	@Override
+	public boolean equals(Object o){
+		if(this == o) return true;
+		if(!(o instanceof VirtualFieldDefinition<?, ?> that)) return false;
+		
+		if(storagePool != that.storagePool) return false;
+		if(!name.equals(that.name)) return false;
+		if(!type.equals(that.type)) return false;
+		if((getFilter == null) != (that.getFilter == null)) return false;
+		return annotations.equals(that.annotations);
+	}
+	@Override
+	public int hashCode(){
+		return name.hashCode();
+	}
 	@Override
 	public String toString(){
 		return name + ": " + Utils.typeToHuman(type, false);
 	}
+	
+	public String name(){ return name; }
 }

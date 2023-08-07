@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
@@ -43,8 +45,19 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			return IOFieldTools.isGeneric(annotations) && annotations.isPresent(IOValue.Reference.class);
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			return new IOFieldDynamicReferenceObject<>(field);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDynamicReferenceObject.class); }
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
+				Behaviour.of(IOValue.Generic.class, BehaviourSupport::genericID),
+				Behaviour.of(IOValue.Reference.class, BehaviourSupport::referenceCompanion)
+			);
 		}
 	}
 	

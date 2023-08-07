@@ -25,7 +25,7 @@ public interface GetAnnotation{
 	static GetAnnotation from(Collection<? extends Annotation> data){
 		return from(data.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, an -> an)));
 	}
-	static GetAnnotation from(Map<Class<? extends Annotation>, Annotation> data){
+	static GetAnnotation from(Map<Class<? extends Annotation>, ? extends Annotation> data){
 		if(data.isEmpty()) return new GetAnnotation(){
 			@Override
 			public <T extends Annotation> T get(Class<T> annotationClass){

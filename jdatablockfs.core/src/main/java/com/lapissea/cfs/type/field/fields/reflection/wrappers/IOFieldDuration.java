@@ -11,11 +11,13 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
@@ -23,16 +25,22 @@ import com.lapissea.cfs.utils.IOUtils;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Duration>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<Duration>{
-		public Usage(){ super(Duration.class); }
+		public Usage(){ super(Duration.class, Set.of(IOFieldDuration.class)); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, Duration> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, Duration> create(FieldAccessor<T> field){
 			return new IOFieldDuration<>(field);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
 		}
 	}
 	

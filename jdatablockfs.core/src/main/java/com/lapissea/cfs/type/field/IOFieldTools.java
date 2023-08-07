@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.Index;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
@@ -21,12 +22,15 @@ import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -171,7 +175,7 @@ public final class IOFieldTools{
 	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
 		Optional<String> dynSiz = Stream.of(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
-			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> IODependency.VirtualNumSize.Logic.getName(field, e)),
+			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
 			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(makeNumberSizeName(field))).findAny()
 		).filter(Optional::isPresent).map(Optional::get).findAny();
@@ -485,5 +489,51 @@ public final class IOFieldTools{
 		
 		if(acum == null) return;
 		throw new IllegalStateException(messageBuilder.finisher().apply(acum));
+	}
+	
+	public static Map<Class<? extends Annotation>, Annotation> computeAnnotations(Field field){
+		var ann   = field.getAnnotations();
+		var types = Arrays.stream(ann).map(Annotation::annotationType).collect(Collectors.toSet());
+		return Stream.concat(
+			Arrays.stream(ann),
+			FieldCompiler.ANNOTATION_TYPES.stream()
+			                              .filter(typ -> !types.contains(typ))
+			                              .map(at -> field.getDeclaringClass().getAnnotation(at)).filter(Objects::nonNull)
+		).collect(Collectors.toMap(Annotation::annotationType, a -> a));
+	}
+	
+	public static boolean isIOField(Method m){
+		if(Modifier.isStatic(m.getModifiers())){
+			return false;
+		}
+		return m.isAnnotationPresent(IOValue.class);
+	}
+	
+	public static boolean isIOField(Field f){
+		if(Modifier.isStatic(f.getModifiers())){
+			return false;
+		}
+		if(f.isAnnotationPresent(IOValue.class)){
+			return true;
+		}
+		return f.getDeclaringClass().isAnnotationPresent(IOValue.class);
+	}
+	
+	public static boolean canHaveNullAnnotation(AnnotatedType field){
+		var typ = field.getType();
+		if(typ.isPrimitive()) return false;
+		return isGeneric(field) || typ.isArray() ||
+		       Stream.of(
+			       Stream.of(IOInstance.class, Enum.class),
+			       FieldCompiler.getWrapperTypes().stream(),
+			       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
+		       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));
+	}
+	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
+		var nam = size.name();
+		if(nam.isEmpty()){
+			return makeNumberSizeName(field);
+		}
+		return nam;
 	}
 }

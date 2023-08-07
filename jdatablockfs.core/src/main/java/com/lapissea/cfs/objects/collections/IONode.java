@@ -34,17 +34,14 @@ import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
@@ -77,21 +74,14 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
-	private static final List<Annotation> ANNOTATIONS = List.of(
-		IOFieldTools.makeAnnotation(IOValue.Generic.class),
-		IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)
-	);
-	
 	@IOUnmanagedValueInfo
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private static <T> IOUnmanagedValueInfo.Data<IONode<T>> info(){
 		return () -> {
-			var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value"){
-				@NotNull
-				@Override
-				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-					return ANNOTATIONS.stream().filter(a -> UtilL.instanceOfObj(a, annotationClass)).map(a -> (T1)a).findAny();
-				}
+			var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value", List.of(
+				IOFieldTools.makeAnnotation(IOValue.Generic.class),
+				IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)
+			)){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return Object.class;
@@ -137,13 +127,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return siz;
 			});
 			
-			var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next"){
-				@NotNull
-				@Override
-				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-					if(annotationClass != IONullability.class) return Optional.empty();
-					return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
-				}
+			var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next",
+			                                                        List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE))){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					if(genericContext == null) return IONode.class;

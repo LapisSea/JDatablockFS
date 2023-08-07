@@ -18,30 +18,20 @@ import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
+@IOValue
 public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	
+	@IOValue
 	public static final class FieldDef extends IOInstance.Managed<FieldDef>{
-		@IOValue
 		private TypeLink type;
-		
-		@IOValue
-		private String name;
-		
-		@IOValue
-		private boolean isDynamic;
-		
-		@IOValue
-		private boolean unsigned;
-		
-		@IOValue
+		private String   name;
+		private boolean  isDynamic;
+		private boolean  unsigned;
 		private String[] dependencies;
 		
-		@IOValue
-		private IONullability.Mode nullability;
-		
-		@IOValue
 		@IONullability(NULLABLE)
 		private IOValue.Reference.PipeType referenceType;
+		private IONullability.Mode         nullability;
 		
 		public FieldDef(){ }
 		
@@ -107,26 +97,17 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	}
 	
 	
-	@IOValue
-	private boolean ioInstance, unmanaged, justInterface;
-	
-	@IOValue
-	private FieldDef[] fields = new FieldDef[0];
-	
-	@IOValue
-	private int[] fieldOrder = new int[0];
-	
-	@IOValue
+	private boolean        ioInstance;
+	private boolean        unmanaged;
+	private boolean        justInterface;
+	private FieldDef[]     fields     = new FieldDef[0];
+	private int[]          fieldOrder = new int[0];
 	@IONullability(NULLABLE)
 	private EnumConstant[] enumConstants;
-	
-	@IOValue
 	@IONullability(NULLABLE)
-	private String[] permits;
-	
-	@IOValue
+	private String[]       permits;
 	@IONullability(NULLABLE)
-	private SealedParent sealedParent;
+	private SealedParent   sealedParent;
 	
 	public TypeDef(){ }
 	

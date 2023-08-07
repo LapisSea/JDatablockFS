@@ -300,6 +300,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					}
 				}
 				
+				Thread.startVirtualThread(System::gc);
+				
 				yield FuzzFail.sortFails(fails, conf.failOrder.orElse(null));
 			}
 		};

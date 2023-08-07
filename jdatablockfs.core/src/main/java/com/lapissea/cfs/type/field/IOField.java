@@ -21,12 +21,7 @@ import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumCollection;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldIntArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -42,21 +37,27 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger,
-	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumCollection,
-	        IOFieldFloatArray, IOFieldIntArray{
+	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger, IOFieldChunkPointer{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
-			private final Class<Typ> typ;
-			public InstanceOf(Class<Typ> typ){
+			private final Class<Typ>                    typ;
+			@SuppressWarnings("rawtypes")
+			private final Set<Class<? extends IOField>> fieldTypes;
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> typ, Set<Class<? extends IOField>> fieldTypes){
 				this.typ = typ;
+				this.fieldTypes = Set.copyOf(fieldTypes);
 			}
 			
 			public Class<Typ> getType(){
@@ -68,11 +69,77 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 			}
 			@Override
-			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field, GenericContext genericContext);
+			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);
+			@Override
+			@SuppressWarnings("rawtypes")
+			public final Set<Class<? extends IOField>> listFieldTypes(){ return fieldTypes; }
 		}
 		
 		boolean isCompatible(Type type, GetAnnotation annotations);
-		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext);
+		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field);
+		@SuppressWarnings("rawtypes")
+		Set<Class<? extends IOField>> listFieldTypes();
+		
+		record BehaviourRes<T extends IOInstance<T>>(List<VirtualFieldDefinition<T, ?>> fields, Set<Class<? extends Annotation>> touchedAnnotations){
+			public BehaviourRes(VirtualFieldDefinition<T, ?> field)       { this(List.of(field)); }
+			public BehaviourRes(List<VirtualFieldDefinition<T, ?>> fields){ this(fields, Set.of()); }
+			public BehaviourRes(List<VirtualFieldDefinition<T, ?>> fields, Set<Class<? extends Annotation>> touchedAnnotations){
+				this.fields = List.copyOf(fields);
+				this.touchedAnnotations = Set.copyOf(touchedAnnotations);
+			}
+			
+			private static final BehaviourRes<?> NON = new BehaviourRes<>(List.of(), Set.of());
+			@SuppressWarnings("unchecked")
+			public static <T extends IOInstance<T>> BehaviourRes<T> non(){ return (BehaviourRes<T>)NON; }
+		}
+		
+		record Behaviour<A extends Annotation, T extends IOInstance<T>>(
+			Class<A> annotationType,
+			BiFunction<FieldAccessor<T>, A, BehaviourRes<T>> generateFields,
+			Optional<BiFunction<FieldAccessor<T>, A, Set<String>>> dependencyNames
+		){
+			public static <A extends Annotation, T extends IOInstance<T>> Behaviour<A, T> noop(Class<A> annotationType){
+				return new Behaviour<>(annotationType, (f, a) -> BehaviourRes.non(), Optional.empty());
+			}
+			
+			public static <A extends Annotation, T extends IOInstance<T>>
+			Behaviour<A, T> of(Class<A> annotationType, Function<FieldAccessor<T>, BehaviourRes<T>> generateFields){
+				return new Behaviour<>(annotationType, (f, a) -> generateFields.apply(f), Optional.empty());
+			}
+			public static <A extends Annotation, T extends IOInstance<T>>
+			Behaviour<A, T> of(Class<A> annotationType, BiFunction<FieldAccessor<T>, A, BehaviourRes<T>> generateFields){
+				return new Behaviour<>(annotationType, generateFields, Optional.empty());
+			}
+			
+			public static <A extends Annotation, T extends IOInstance<T>>
+			Behaviour<A, T> justDeps(Class<A> annotationType, BiFunction<FieldAccessor<T>, A, Set<String>> dependencyNames){
+				return Behaviour.<A, T>noop(annotationType).withDeps(dependencyNames);
+			}
+			
+			public static <A extends Annotation, T extends IOInstance<T>>
+			Behaviour<A, T> justDeps(Class<A> annotationType, Function<A, Set<String>> dependencyNames){
+				return Behaviour.<A, T>noop(annotationType).withDeps((f, a) -> dependencyNames.apply(a));
+			}
+			
+			public Behaviour<A, T> withDeps(BiFunction<FieldAccessor<T>, A, Set<String>> dependencyNames){
+				return new Behaviour<>(annotationType, generateFields, Optional.of(dependencyNames));
+			}
+			
+			public Optional<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){
+				return accessor.getAnnotation(annotationType).map(a -> generateFields.apply(accessor, a));
+			}
+			public Optional<Set<String>> getDependencyNames(FieldAccessor<T> accessor){
+				return accessor.getAnnotation(annotationType).map(ann -> {
+					if(dependencyNames.isPresent()){
+						return dependencyNames.get().apply(accessor, ann);
+					}
+					var fields = generateFields.apply(accessor, ann).fields;
+					return fields.stream().map(VirtualFieldDefinition::name).collect(Collectors.toSet());
+				});
+			}
+		}
+		
+		<T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType);
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

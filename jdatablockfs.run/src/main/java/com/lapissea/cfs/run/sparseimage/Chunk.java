@@ -4,15 +4,12 @@ package com.lapissea.cfs.run.sparseimage;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
+@IOValue
 public class Chunk extends IOInstance.Managed<Chunk>{
 	
-	@IOValue
-	private int x;
-	@IOValue
-	private int y;
-	
-	@IOValue
-	public Image.Pixel[] pixels;
+	private int           x;
+	private int           y;
+	public  Image.Pixel[] pixels;
 	
 	public Chunk(){
 	

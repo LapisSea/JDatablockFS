@@ -5,25 +5,22 @@ import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.Optional;
+import java.util.Map;
 
 public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
 	public static class Ptr<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
 		
-		public Ptr(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name){
+		public Ptr(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Method getter, Method setter, String name){
 			super(struct, annotations, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
@@ -40,7 +37,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, GetAnnotation annotations, Type type){
+	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Type type){
 		if(type == ChunkPointer.class){
 			return new Ptr<>(struct, annotations, getter, setter, name);
 		}else{
@@ -55,11 +52,8 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	private final MethodHandle getter;
 	private final MethodHandle setter;
 	
-	private final GetAnnotation annotations;
-	
-	public FunctionalReflectionAccessor(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
-		super(struct, name);
-		this.annotations = annotations;
+	public FunctionalReflectionAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Method getter, Method setter, String name, Type genericType){
+		super(struct, name, annotations);
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(genericType);
 		typeID = TypeFlag.getId(rawType);
@@ -84,14 +78,6 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		this.getter = Access.makeMethodHandle(getter);
 		this.setter = Access.makeMethodHandle(setter);
 	}
-	
-	@NotNull
-	@Nullable
-	@Override
-	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.ofNullable(annotations.get(annotationClass));
-	}
-	
 	
 	@Override
 	public Class<?> getType(){

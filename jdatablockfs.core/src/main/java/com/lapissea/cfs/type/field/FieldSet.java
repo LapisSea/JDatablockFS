@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
@@ -506,7 +507,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return byName(name).filter(type::isInstance).map(type::cast);
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
-		return exactFieldType(type, name).orElseThrow();
+		var res = exactFieldType(type, name);
+		if(res.isEmpty()){
+			throw new NoSuchElementException("Field \"" + name + "\" of type " + type.getName() + " is not present");
+		}
+		return res.get();
 	}
 	public <E extends IOInstance<E>> IOFieldPrimitive.FLong<E> requireExactLong(String name){
 		//noinspection unchecked

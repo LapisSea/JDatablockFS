@@ -7,11 +7,9 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.UtilL;
 
-import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -56,7 +54,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	private final MethodHandle setter;
 	
 	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		super(struct, name);
+		super(struct, name, IOFieldTools.computeAnnotations(field));
 		this.field = field;
 		this.genericType = Utils.prottectFromVarType(genericType);
 		this.rawType = Utils.typeToRaw(this.genericType);
@@ -67,17 +65,6 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 		
 		this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 		this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-	}
-	
-	@NotNull
-	@Nullable
-	@Override
-	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.ofNullable(field.getAnnotation(annotationClass));
-	}
-	@Override
-	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return field.isAnnotationPresent(annotationClass);
 	}
 	
 	@Override

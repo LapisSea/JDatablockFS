@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
@@ -37,15 +38,11 @@ public class QueryTests{
 		byte[] someData();
 	}
 	
+	@IOValue
 	static class StringyBoi extends IOInstance.Managed<StringyBoi>{
-		@IOValue
-		String str;
-		
-		@IOValue
+		String       str;
 		List<String> strs;
-		
-		@IOValue
-		byte[] someData;
+		byte[]       someData;
 		
 		public StringyBoi(){ }
 		public StringyBoi(String str, List<String> strs){

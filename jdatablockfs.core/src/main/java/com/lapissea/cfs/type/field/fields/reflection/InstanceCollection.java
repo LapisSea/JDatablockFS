@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 
 public class InstanceCollection{
 	
@@ -50,11 +52,23 @@ public class InstanceCollection{
 			return IOInstance.isManaged(raw.componentType());
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
 				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
 			}
 			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	
@@ -68,11 +82,23 @@ public class InstanceCollection{
 			return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
 				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
 			}
 			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(InstanceCollection.ReferenceField.class, InstanceCollection.InlineField.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	

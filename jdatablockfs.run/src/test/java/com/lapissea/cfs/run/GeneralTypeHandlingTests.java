@@ -2,6 +2,8 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
+import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -24,6 +26,7 @@ import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
 import org.testng.annotations.DataProvider;
@@ -44,25 +47,24 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.cfs.type.field.annotations.IOCompression.Type.RLE;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class GeneralTypeHandlingTests{
 	
+	@IOValue
 	public static class Deps extends IOInstance.Managed<Deps>{
 		
-		@IOValue
 		@IODependency("b")
 		public int a;
 		
-		@IOValue
 		@IODependency("c")
 		public int b;
 		
-		@IOValue
 		public int c;
 		
-		@IOValue
 		@IODependency({"c", "b"})
 		public int d;
 	}
@@ -460,6 +462,7 @@ public class GeneralTypeHandlingTests{
 	void wrapperListing(){
 		var actual = Set.copyOf(FieldCompiler.getWrapperTypes());
 		var expected = Set.of(
+			byte[].class, int[].class, float[].class, boolean[].class,
 			String.class, Duration.class, Instant.class,
 			LocalDate.class, LocalTime.class, LocalDateTime.class
 		);
@@ -549,6 +552,73 @@ public class GeneralTypeHandlingTests{
 		typ.diffBottomCount = 10_000;
 		
 		roots.provide("foo", typ);
+	}
+	
+	
+	public static class ValuesAnn extends IOInstance.Managed<ValuesAnn>{
+		@IOValue
+		TypeLink     link;
+		@IOValue
+		String       str;
+		@IOValue
+		List<String> list;
+		@IOValue
+		int[]        ints;
+	}
+	
+	@IOValue
+	public static class ClassAnn extends IOInstance.Managed<ClassAnn>{
+		TypeLink     link;
+		String       str;
+		List<String> list;
+		int[]        ints;
+	}
+	
+	@Test
+	void annotationLocation() throws IOException{
+		var aPipe = StandardStructPipe.of(ValuesAnn.class);
+		var bPipe = StandardStructPipe.of(ClassAnn.class);
+		{
+			var an = aPipe.getSpecificFields().stream().map(IOField::getName).toList();
+			var bn = bPipe.getSpecificFields().stream().map(IOField::getName).toList();
+			assertEquals(an, bn);
+		}
+		
+		var a = new ValuesAnn();
+		a.link = new TypeLink(List.class, new TypeLink(String.class));
+		a.str = "test";
+		a.list = List.of("idk");
+		a.ints = new int[1];
+		
+		var prov = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		var val  = AllocateTicket.bytes(128).submit(prov);
+		aPipe.write(val, a);
+		
+		ClassAnn b = bPipe.readNew(val, null);
+		
+		assertEquals(a.link, b.link);
+		assertEquals(a.str, b.str);
+		assertEquals(a.list, b.list);
+		assertArrayEquals(a.ints, b.ints);
+	}
+	
+	@Test(expectedExceptions = IllegalField.class)
+	void badField(){
+		@IOValue
+		class Foo extends IOInstance.Managed<Foo>{
+			ClassLoader bad;
+		}
+		Struct.of(Foo.class, STATE_DONE);
+	}
+	
+	@Test(expectedExceptions = IllegalAnnotation.class)
+	void badNullability(){
+		@IOValue
+		class Foo extends IOInstance.Managed<Foo>{
+			@IONullability(NULLABLE)
+			int bad;
+		}
+		Struct.of(Foo.class, STATE_DONE);
 	}
 	
 }

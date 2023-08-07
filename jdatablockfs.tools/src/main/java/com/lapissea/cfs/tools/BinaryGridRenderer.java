@@ -1907,12 +1907,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		var arrayLenName     = IOFieldTools.makeCollectionLenName(field.getAccessor());
 		var arrayLenSizeName = IOFieldTools.makeNumberSizeName(arrayLenName);
 		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName){
-			@NotNull
-			@Override
-			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				return Optional.empty();
-			}
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName, List.of()){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return NumberSize.class;
@@ -1931,12 +1926,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}, SizeDescriptor.Fixed.of(1)), col, reference, Range.fromSize(fieldOffset, 1));
 		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenName){
-			@NotNull
-			@Override
-			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				return Optional.empty();
-			}
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenName, List.of()){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return int.class;

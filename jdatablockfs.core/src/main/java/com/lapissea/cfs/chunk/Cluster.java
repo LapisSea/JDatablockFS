@@ -103,20 +103,18 @@ public class Cluster implements DataProvider{
 		ChunkPointer getVal();
 	}
 	
+	@IOValue
+	@IONullability(NULLABLE)
+	@SuppressWarnings("unused")
 	private static class Metadata extends IOInstance.Managed<Metadata>{
 		
-		@IOValue
-		@IONullability(NULLABLE)
 		@IOValue.OverrideType(value = HashIOMap.class)
 		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
 		
-		@IOValue
-		@IONullability(NULLABLE)
 		private IOTypeDB.PersistentDB db;
 		
-		@IOValue
-		@IONullability(NULLABLE)
 		private IOList<IOChunkPointer> freeChunks;
+		
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + toShortString();

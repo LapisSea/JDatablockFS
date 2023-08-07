@@ -7,10 +7,18 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static java.util.function.Function.identity;
 
 public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
 	
@@ -46,9 +54,28 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	private final Struct<CTyp> declaringStruct;
 	private final String       name;
 	
-	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name){
+	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
+	
+	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
+		this(declaringStruct, name, annotations.isEmpty()? Map.of() : annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity())));
+	}
+	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name,
+	                                Map<Class<? extends Annotation>, ? extends Annotation> annotations){
 		this.declaringStruct = declaringStruct;
 		this.name = Objects.requireNonNull(name);
+		this.annotations = Map.copyOf(annotations);
+	}
+	
+	@NotNull
+	@Nullable
+	@Override
+	@SuppressWarnings("unchecked")
+	public final <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+		return (Optional<T>)Optional.ofNullable(annotations.get(annotationClass));
+	}
+	@Override
+	public final boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+		return annotations.containsKey(annotationClass);
 	}
 	
 	@Override

@@ -1,18 +1,25 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
-import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOField.FieldUsage;
+import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.AnnotationUsage;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -22,23 +29,28 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 final class FieldRegistry{
 	
-	private static final LateInit.Safe<List<IOField.FieldUsage>> USAGES = Runner.async(new Supplier<>(){
+	private static final LateInit.Safe<List<FieldUsage>> USAGES = Runner.async(new Supplier<>(){
 		@Override
-		public List<IOField.FieldUsage> get(){
+		public List<FieldUsage> get(){
 			Log.trace("{#yellowBrightDiscovering IOFields#}");
 			
-			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<IOField.FieldUsage>>>>>();
+			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
 			scan(IOField.class, tasks);
 			
-			var scanned = new HashMap<Class<?>, List<IOField.FieldUsage>>();
+			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
 			while(!tasks.isEmpty()){
 				tasks.pop().get().ifPresent(
 					e -> scanned.put(e.getKey(), e.getValue())
@@ -55,7 +67,7 @@ final class FieldRegistry{
 			Thread.startVirtualThread(() -> Log.trace(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<IOField.FieldUsage>>>>> tasks){
+		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks){
 			if(type.getSimpleName().contains("NoIO")){
 				log("Ignoring \"NoIO\" {#blackBright{}~#}", type);
 				return;
@@ -104,16 +116,16 @@ final class FieldRegistry{
 			}));
 		}
 		
-		private static Optional<Map.Entry<Class<?>, List<IOField.FieldUsage>>> getFieldUsage(Class<?> type){
+		private static Optional<Map.Entry<Class<?>, List<FieldUsage>>> getFieldUsage(Class<?> type){
 			if(type == IOField.class) return Optional.empty();
 			var usageClasses =
 				Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
 				        .map(IOField.FieldUsageRef::value).filter(a -> a.length>0).map(List::of)
 				        .orElseGet(() -> Arrays.stream(type.getDeclaredClasses())
-				                               .filter(c -> UtilL.instanceOf(c, IOField.FieldUsage.class))
+				                               .filter(c -> UtilL.instanceOf(c, FieldUsage.class))
 				                               .map(c -> {
 					                               //noinspection unchecked
-					                               return (Class<IOField.FieldUsage>)c;
+					                               return (Class<FieldUsage>)c;
 				                               })
 				                               .toList());
 			
@@ -124,8 +136,8 @@ final class FieldRegistry{
 			return Optional.of(Map.entry(type, usageClasses.stream().map(u -> make(u)).toList()));
 		}
 		
-		private static IOField.FieldUsage make(Class<IOField.FieldUsage> usageClass){
-			Constructor<IOField.FieldUsage> constr;
+		private static FieldUsage make(Class<FieldUsage> usageClass){
+			Constructor<FieldUsage> constr;
 			try{
 				constr = usageClass.getDeclaredConstructor();
 			}catch(NoSuchMethodException e){
@@ -140,36 +152,42 @@ final class FieldRegistry{
 		}
 	});
 	
-	private static List<Class<?>> WRAPPERS;
+	private static Map<Class<?>, Set<FieldUsage>> PRODUCERS;
+	private static List<Class<?>>                 WRAPPERS;
 	
-	static synchronized List<Class<?>> getWrappers(){
-		if(WRAPPERS != null) return WRAPPERS;
-		return WRAPPERS = calcWrappers();
+	
+	private static List<FieldUsage> getData()                   { return USAGES.isInitialized() || !Log.TRACE? USAGES.get() : getDataLogged(); }
+	private static Map<Class<?>, Set<FieldUsage>> getProducers(){ return PRODUCERS != null? PRODUCERS : (PRODUCERS = calcProducers()); }
+	static List<Class<?>> getWrappers()                         { return WRAPPERS != null? WRAPPERS : (WRAPPERS = calcWrappers()); }
+	
+	private static Map<Class<?>, Set<FieldUsage>> calcProducers(){
+		Map<Class<?>, Set<FieldUsage>> map = new HashMap<>();
+		for(var f : getData()){
+			for(var typ : f.listFieldTypes()){
+				map.computeIfAbsent(typ, t -> new HashSet<>()).add(f);
+			}
+		}
+		map.replaceAll((k, v) -> Set.copyOf(v));
+		return Map.copyOf(map);
 	}
 	private static List<Class<?>> calcWrappers(){
 		return Utils.getSealedUniverse(NullFlagCompanyField.class, true).orElseThrow()
-		            .universe().stream().map(FieldRegistry::fieldToType)
+		            .universe().stream()
+		            .<Optional<Class<?>>>map((Class<NullFlagCompanyField> fieldType) -> {
+			            var superC = (ParameterizedType)fieldType.getGenericSuperclass();
+			            if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+				            return Optional.empty();
+			            }
+			            var args = superC.getActualTypeArguments();
+			            if(!(args[1] instanceof Class<?> valueType)){
+				            return Optional.empty();
+			            }
+			            return Optional.of(valueType);
+		            })
 		            .filter(Optional::isPresent).<Class<?>>map(Optional::get)
 		            .sorted(Comparator.comparing(Class::getName)).toList();
 	}
-	private static Optional<Class<?>> fieldToType(Class<?> fieldType){
-		var superC = (ParameterizedType)fieldType.getGenericSuperclass();
-		if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
-			return Optional.empty();
-		}
-		var args = superC.getActualTypeArguments();
-		if(!(args[1] instanceof Class<?> valueType)){
-			return Optional.empty();
-		}
-		return Optional.of(valueType);
-	}
-	private static List<IOField.FieldUsage> getData(){
-		if(USAGES.isInitialized() || !Log.TRACE){
-			return USAGES.get();
-		}
-		return getLogged();
-	}
-	private static List<IOField.FieldUsage> getLogged(){
+	private static List<FieldUsage> getDataLogged(){
 		Log.trace("Waiting for FieldRegistry...");
 		var start = System.nanoTime();
 		var data  = USAGES.get();
@@ -197,11 +215,11 @@ final class FieldRegistry{
 		throw fail(type.getTypeName());
 	}
 	
-	static <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+	static <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 		var ann  = GetAnnotation.from(field);
-		var type = field.getGenericType(genericContext);
+		var type = field.getGenericType(null);
 		
-		IOField.FieldUsage compatible;
+		FieldUsage compatible;
 		find:
 		{
 			for(var usage : getData()){
@@ -212,8 +230,82 @@ final class FieldRegistry{
 			}
 			throw fail(type.getTypeName());
 		}
+		var res = compatible.create(field);
+		if(DEBUG_VALIDATION){
+			var typs = compatible.listFieldTypes();
+			if(!typs.contains(res.getClass())){
+				throw new RuntimeException(
+					"Type " + res.getClass().getName() + "\nAllowed:\n" +
+					typs.stream().map(Class::getName).collect(Collectors.joining("\n"))
+				);
+			}
+		}
+		return res;
+	}
+	
+	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS
+		= FieldCompiler.ANNOTATION_TYPES.stream().filter(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
+		                                .collect(Collectors.toUnmodifiableSet());
+	
+	private static <T extends IOInstance<T>> Set<FieldUsage> findUsages(IOField<T, ?> field){
+		var             producers = getProducers();
+		Set<FieldUsage> usages    = producers.get(field.getClass());
+		if(usages == null) usages = producers.entrySet().stream()
+		                                     .filter(e -> UtilL.instanceOf(field.getClass(), e.getKey()))
+		                                     .findFirst().map(Map.Entry::getValue).orElse(null);
+		return usages;
+	}
+	
+	static <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IOField<T, ?> field){
+		var usages = findUsages(field);
+		if(usages == null) return List.of();
+		//noinspection unchecked
+		var type = (Class<IOField<T, ?>>)field.getClass();
+		var acc  = field.getAccessor();
 		
-		return compatible.create(field, genericContext);
+		Set<VirtualFieldDefinition<T, ?>> result     = new HashSet<>();
+		Set<Class<? extends Annotation>>  activeAnns = CONSUMABLE_ANNOTATIONS.stream().filter(acc::hasAnnotation).collect(Collectors.toSet());
+		for(FieldUsage u : usages){
+			for(var behaviour : u.annotationBehaviour(type)){
+				behaviour.generateFields(acc).ifPresent(res -> {
+					result.addAll(res.fields());
+					activeAnns.remove(behaviour.annotationType());
+					activeAnns.removeAll(res.touchedAnnotations());
+				});
+			}
+		}
+		
+		if(!activeAnns.isEmpty()){
+			throw new IllegalAnnotation(
+				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
+				activeAnns.stream().map(t -> {
+					          return "\t" + t.getName() +
+					                 Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
+				          })
+				          .collect(Collectors.joining("\n"))
+			);
+		}
+		
+		return result.stream().sorted(Comparator.comparing(VirtualFieldDefinition::name)).toList();
+	}
+	
+	static <T extends IOInstance<T>> Set<String> getDependencyValueNames(IOField<T, ?> field){
+		var usages = findUsages(field);
+		if(usages == null) return Set.of();
+		
+		//noinspection unchecked
+		var type = (Class<IOField<T, ?>>)field.getClass();
+		var acc  = field.getAccessor();
+		
+		var deps = new HashSet<String>();
+		acc.getAnnotation(IODependency.class).ifPresent(ann -> deps.addAll(Arrays.asList(ann.value())));
+		
+		for(FieldUsage u : usages){
+			for(var behaviour : u.annotationBehaviour(type)){
+				behaviour.getDependencyNames(acc).ifPresent(deps::addAll);
+			}
+		}
+		return deps;
 	}
 	
 	private static IllegalField fail(String typeName){

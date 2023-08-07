@@ -1,9 +1,6 @@
 package com.lapissea.cfs.run;
 
-import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NanoTimer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -22,12 +19,7 @@ public class CompressionTests{
 	
 	@Test(dataProvider = "comps")
 	void compressionIntegrity(IOCompression.Type type){
-		Log.warn("Compression integrity known to be good. I think...");
-		if(true) return;
-		
-		NanoTimer t = new NanoTimer.Simple();
-		t.start();
-		randomBatch(20000, (r, iter, tick) -> {
+		randomBatch(500, (r, iter, tick) -> {
 			if(tick){
 				info("iteration: {}", iter);
 			}
@@ -63,7 +55,5 @@ public class CompressionTests{
 				throw new RuntimeException(iter + "", e);
 			}
 		});
-		t.end();
-		LogUtil.println("time: ", t.ms());
 	}
 }

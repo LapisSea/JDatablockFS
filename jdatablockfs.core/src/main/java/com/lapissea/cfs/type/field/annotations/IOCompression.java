@@ -1,25 +1,15 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.compress.BruteBestPacker;
 import com.lapissea.cfs.io.compress.GzipPacker;
 import com.lapissea.cfs.io.compress.Lz4Packer;
 import com.lapissea.cfs.io.compress.Packer;
 import com.lapissea.cfs.io.compress.RlePacker;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.compilation.AnnotationLogic;
-import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.StoragePool;
-import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.util.NotNull;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -73,26 +63,4 @@ public @interface IOCompression{
 	}
 	
 	Type value() default Type.LZ4;
-	
-	AnnotationLogic<IOCompression> LOGIC = new AnnotationLogic<>(){
-		@Override
-		public void validate(FieldAccessor<?> field, IOCompression annotation){
-			if(field.getType() != byte[].class) throw new MalformedStruct("IOCompression only on byte[] for now");
-		}
-		
-		@NotNull
-		@Override
-		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IOCompression annotation){
-			return List.of(new VirtualFieldDefinition<>(
-				StoragePool.IO,
-				IOFieldTools.makePackName(field),
-				byte[].class
-			));
-		}
-		@NotNull
-		@Override
-		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOCompression annotation){
-			return Set.of(IOFieldTools.makePackName(field));
-		}
-	};
 }

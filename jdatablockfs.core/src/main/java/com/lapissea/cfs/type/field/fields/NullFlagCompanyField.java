@@ -7,9 +7,14 @@ import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumCollection;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldIntArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
@@ -25,9 +30,7 @@ import java.util.List;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits IOFieldInlineObject, IOFieldDynamicInlineObject, IOFieldInlineSealedObject, InstanceCollection.InlineField,
-	        IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime,
-	        IOFieldStringCollection{
+	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, InstanceCollection.InlineField, IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime, IOFieldStringCollection{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	
@@ -46,7 +49,7 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		
-		if(!nullable()) return null;
+		if(!nullable()) return List.of();
 		
 		return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
 			@Override

@@ -10,11 +10,14 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.CollectionAddapter;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
@@ -25,15 +28,23 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 
 public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
-		public UsageArr(){ super(String[].class); }
+		public UsageArr(){ super(String[].class, Set.of(IOFieldStringCollection.class)); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	
@@ -47,8 +58,18 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 			return Utils.typeToRaw(args[0]) == String.class;
 		}
 		@Override
-		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
 			return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldStringCollection.class); }
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.class, BehaviourSupport::collectionLength),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	

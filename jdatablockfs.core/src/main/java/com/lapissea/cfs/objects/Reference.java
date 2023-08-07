@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 
 @StructPipe.Special
+@IOValue
 public final class Reference extends IOInstance.Managed<Reference>{
 	
 	public static final Struct<Reference> STRUCT = Struct.of(Reference.class);
@@ -139,30 +140,19 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		STANDARD_PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
-	private static final class IOContext implements RandomIO.Creator{
-		private final Reference    ref;
-		private final DataProvider provider;
-		
-		public IOContext(Reference ref, DataProvider provider){
-			this.ref = ref;
-			this.provider = provider;
-		}
-		
+	private record IOContext(Reference ref, DataProvider provider) implements RandomIO.Creator{
 		@Override
 		public RandomIO io() throws IOException{
 			return ref.io(provider);
 		}
-		
 		@Override
 		public String toString(){
 			return "{" + provider + " @ " + ref + "}";
 		}
 	}
 	
-	@IOValue
 	@IODependency.VirtualNumSize(name = "ptrSize")
 	private ChunkPointer ptr;
-	@IOValue
 	@IODependency.VirtualNumSize(name = "offsetSize")
 	@IOValue.Unsigned
 	private long         offset;

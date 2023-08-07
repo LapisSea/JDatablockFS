@@ -11,25 +11,29 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.BehaviourSupport;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
 	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
-		public Usage(){ super(IOInstance.class); }
+		public Usage(){ super(IOInstance.class, Set.of(IOFieldUnmanagedObjectReference.class, IOFieldObjectReference.class, IOFieldInlineObject.class)); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			Class<?> raw       = field.getType();
 			var      unmanaged = !IOInstance.isManaged(raw);
 			
@@ -40,6 +44,13 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				return new IOFieldObjectReference<>(field);
 			}
 			return new IOFieldInlineObject<>(field);
+		}
+		@Override
+		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
+			return List.of(
+				Behaviour.of(IOValue.Reference.class, BehaviourSupport::reference),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+			);
 		}
 	}
 	

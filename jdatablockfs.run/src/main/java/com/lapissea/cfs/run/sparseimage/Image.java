@@ -10,12 +10,10 @@ import java.io.IOException;
 
 public class Image extends IOInstance.Managed<Image>{
 	
+	@IOValue
 	public static class Pixel extends IOInstance.Managed<Pixel>{
-		@IOValue
 		private float r;
-		@IOValue
 		private float g;
-		@IOValue
 		private float b;
 		
 		public Pixel(){ }

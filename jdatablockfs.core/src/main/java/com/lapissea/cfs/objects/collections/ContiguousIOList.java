@@ -147,20 +147,18 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static class IndexAccessor<T> extends AbstractFieldAccessor<ContiguousIOList<T>>{
 		
-		private static final IONullability NULLABLE = IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE);
+		private static final List<Annotation> NULLABLE_ANNS = List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE));
 		
 		private final Type     elementType;
 		private final Class<?> rawelementType;
 		private       long     index;
-		private final boolean  nullable;
 		private final int      typeID;
 		
 		protected IndexAccessor(Type elementType, boolean nullable){
-			super(null, "");
+			super(null, "", nullable? NULLABLE_ANNS : List.of());
 			this.elementType = elementType;
 			rawelementType = Utils.typeToRaw(elementType);
 			this.index = -1;
-			this.nullable = nullable;
 			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
 		}
 		
@@ -168,14 +166,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		@Override
 		public String getName(){
 			return elementName(index);
-		}
-		@NotNull
-		@Override
-		public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
-			if(nullable && annotationClass == IONullability.class){
-				return Optional.of((F)NULLABLE);
-			}
-			return Optional.empty();
 		}
 		
 		@Override

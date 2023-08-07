@@ -16,6 +16,7 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
@@ -466,7 +467,7 @@ public sealed interface IOTypeDB{
 			while(cl != null && cl != Object.class){
 				
 				for(var field : cl.getDeclaredFields()){
-					if(field.isAnnotationPresent(IOValue.class) && IOInstance.isInstance(field.getType())){
+					if(IOFieldTools.isIOField(field) && IOInstance.isInstance(field.getType())){
 						registerBuiltIn(builtIn, field.getType());
 					}
 				}
