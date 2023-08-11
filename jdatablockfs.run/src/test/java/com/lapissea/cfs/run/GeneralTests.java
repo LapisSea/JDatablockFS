@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -342,5 +343,45 @@ public class GeneralTests{
 			assertEquals(first.chainLength(), 2);
 			assertEquals(first.readAll(), bb);
 		});
+	}
+	
+	@Test
+	void bySizeSignedInt(){
+		NumberSize.FLAG_INFO
+			.stream().flatMapToLong(
+			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
+			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.filter(l -> Integer.MAX_VALUE>=l && l>=Integer.MIN_VALUE)
+			.mapToInt(Math::toIntExact)
+			.forEach(e -> {
+				var v = NumberSize.bySizeSigned(e);
+				
+				if(v.signedMinValue>e || e>v.signedMaxValue){
+					throw new RuntimeException(e + " " + v);
+				}
+				var p = v.prev();
+				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+					throw new RuntimeException(e + " prev " + v);
+				}
+			});
+	}
+	
+	@Test
+	void bySizeSignedLong(){
+		NumberSize.FLAG_INFO
+			.stream().flatMapToLong(
+			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
+			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.forEach(e -> {
+				var v = NumberSize.bySizeSigned(e);
+				
+				if(v.signedMinValue>e || e>v.signedMaxValue){
+					throw new RuntimeException(e + " " + v);
+				}
+				var p = v.prev();
+				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+					throw new RuntimeException(e + " prev " + v);
+				}
+			});
 	}
 }
