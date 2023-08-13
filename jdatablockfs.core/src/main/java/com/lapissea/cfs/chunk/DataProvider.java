@@ -29,6 +29,7 @@ public interface DataProvider{
 		private final ChunkCache    cache         = ChunkCache.strong();
 		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
+		private final DataPool      dataPool      = new DataPool();
 		
 		public VerySimple(IOInterface data){
 			this.data = data;
@@ -50,6 +51,8 @@ public interface DataProvider{
 		public ChunkCache getChunkCache(){
 			return cache;
 		}
+		@Override
+		public DataPool getDataPool(){ return dataPool; }
 		@Override
 		public Chunk getFirstChunk() throws IOException{
 			return getChunk(ChunkPointer.of(MagicID.size()));
@@ -81,6 +84,7 @@ public interface DataProvider{
 	IOInterface getSource();
 	MemoryManager getMemoryManager();
 	ChunkCache getChunkCache();
+	DataPool getDataPool();
 	
 	Chunk getFirstChunk() throws IOException;
 	
@@ -153,6 +157,8 @@ public interface DataProvider{
 			public MemoryManager getMemoryManager(){ return this; }
 			@Override
 			public ChunkCache getChunkCache(){ return DataProvider.this.getChunkCache(); }
+			@Override
+			public DataPool getDataPool(){ return DataProvider.this.getDataPool(); }
 			@Override
 			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
 			@Override

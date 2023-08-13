@@ -134,6 +134,7 @@ public class Cluster implements DataProvider{
 	private final IOInterface       source;
 	private final MemoryManager     memoryManager;
 	private final DefragmentManager defragmentManager = new DefragmentManager(this);
+	private final DataPool          dataPool          = new DataPool();
 	
 	private final RootRef  root;
 	private final Metadata metadata;
@@ -246,6 +247,8 @@ public class Cluster implements DataProvider{
 	public MemoryManager getMemoryManager(){ return memoryManager; }
 	@Override
 	public ChunkCache getChunkCache(){ return chunkCache; }
+	@Override
+	public DataPool getDataPool(){ return dataPool; }
 	
 	public RootProvider getRootProvider(){ return rootProvider; }
 	

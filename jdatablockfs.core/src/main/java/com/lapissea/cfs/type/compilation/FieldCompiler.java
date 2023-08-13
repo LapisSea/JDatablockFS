@@ -22,6 +22,7 @@ import com.lapissea.cfs.type.field.access.VarHandleAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOIndexed;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -492,7 +493,8 @@ public final class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IOCompression.class
+			IOCompression.class,
+			IOIndexed.class
 		);
 	}
 	
