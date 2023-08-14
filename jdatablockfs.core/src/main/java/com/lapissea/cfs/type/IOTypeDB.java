@@ -126,11 +126,15 @@ public sealed interface IOTypeDB{
 			}
 			
 			protected TypeID newID(TypeLink type, boolean recordNew){
+				if(typToID.containsKey(type)){
+					throw new IllegalArgumentException(type + " is already registered");
+				}
 				var newID = maxID() + 1;
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
 				typToID.put(type, newID);
 				maxID = newID;
+				
 				
 				recordType(type);
 				return new TypeID(newID, true);

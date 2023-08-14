@@ -185,6 +185,7 @@ final class FieldRegistry{
 			            return Optional.of(valueType);
 		            })
 		            .filter(Optional::isPresent).<Class<?>>map(Optional::get)
+		            .distinct()
 		            .sorted(Comparator.comparing(Class::getName)).toList();
 	}
 	private static List<FieldUsage> getDataLogged(){

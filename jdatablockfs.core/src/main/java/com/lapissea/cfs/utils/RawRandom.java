@@ -33,8 +33,8 @@ public final class RawRandom implements RandomGenerator{
 	private long seed;
 	
 	private int next(int bits){
-		seed = (seed*MULTIPLIER + ADDEND)&MASK;
-		return (int)(seed >>> (48 - bits));
+		var s = seed = (seed*MULTIPLIER + ADDEND)&MASK;
+		return (int)(s >>> (48 - bits));
 	}
 	
 	@Override
