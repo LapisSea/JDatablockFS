@@ -234,8 +234,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
+		Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 		try(var ignored = provider.getSource().openIOTransaction()){
-			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}

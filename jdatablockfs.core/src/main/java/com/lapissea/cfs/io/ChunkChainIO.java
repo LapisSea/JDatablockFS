@@ -515,7 +515,11 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
-		var requiredCapacity = data.stream().mapToLong(WriteChunk::ioEnd).max().orElse(0);
+		long requiredCapacity = 0;
+		for(var d : data){
+			var ioEnd = d.ioEnd();
+			if(requiredCapacity<ioEnd) requiredCapacity = ioEnd;
+		}
 		if(requiredCapacity == 0) return;
 		ensureCapacity(requiredCapacity);
 		

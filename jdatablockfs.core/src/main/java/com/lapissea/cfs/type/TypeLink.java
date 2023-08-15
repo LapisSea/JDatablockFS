@@ -255,10 +255,14 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		PRIMITIVE_MARKER + "V", void.class
 	);
 	
+	private static final int PRIMITIVE_NAMES_MAX_LEN = PRIMITIVE_NAMES.values().stream()
+	                                                                  .map(Class::getName).mapToInt(String::length)
+	                                                                  .max().orElseThrow();
+	
 	private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
 		PRIMITIVE_NAMES.entrySet()
 		               .stream()
-		               .collect(Collectors.toMap(e -> e.getValue().getName(), Map.Entry::getKey));
+		               .collect(Collectors.toUnmodifiableMap(e -> e.getValue().getName(), Map.Entry::getKey));
 	
 	private Class<?> typeClass;
 	
@@ -295,7 +299,13 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	private void setTypeName(String typeName){
-		this.typeName = PRIMITIVE_CLASS_NAMES_TO_SHORT.getOrDefault(typeName, typeName);
+		String n;
+		if(typeName.length()>PRIMITIVE_NAMES_MAX_LEN) n = typeName;
+		else{
+			n = PRIMITIVE_CLASS_NAMES_TO_SHORT.get(typeName);
+			if(n == null) n = typeName;
+		}
+		this.typeName = n;
 	}
 	
 	public String getTypeName(){
@@ -417,7 +427,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return this == o ||
 		       o instanceof TypeLink that &&
 		       typeWild == that.typeWild &&
-		       getTypeName().equals(that.getTypeName()) &&
+		       typeName.equals(that.typeName) &&
 		       argsEqual(args, that.args);
 	}
 	
