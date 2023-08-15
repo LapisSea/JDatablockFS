@@ -3,7 +3,6 @@ package com.lapissea.cfs.io;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.exceptions.MalformedClusterData;
-import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
@@ -457,12 +456,7 @@ public final class ChunkChainIO implements RandomIO{
 	
 	private void writeHeadToBuf(List<WriteChunk> dest, Chunk chunk) throws IOException{
 		if(!chunk.dirty()) return;
-		dest.add(writeHeadToBuf(chunk));
-	}
-	private WriteChunk writeHeadToBuf(Chunk chunk) throws IOException{
-		byte[] headBuf = new byte[chunk.getHeaderSize()];
-		chunk.writeHeader(new ContentOutputStream.BA(headBuf));
-		return new WriteChunk(chunk.getPtr().getValue(), headBuf);
+		dest.add(chunk.writeHeaderToBuf());
 	}
 	
 	@Override
@@ -585,11 +579,8 @@ public final class ChunkChainIO implements RandomIO{
 		
 		for(Chunk chunk : chunks){
 			if(!chunk.dirty()) continue;
-			byte[] d = new byte[chunk.getHeaderSize()];
-			try(var out = new ContentOutputStream.BA(d)){
-				chunk.writeHeader(out);
-			}
-			UtilL.addRemainSorted(mappedChunks, new WriteChunk(chunk.getPtr().getValue(), d));
+			var d = chunk.writeHeaderToBuf();
+			UtilL.addRemainSorted(mappedChunks, d);
 		}
 		
 		source.writeAtOffsets(mappedChunks);

@@ -4,7 +4,6 @@ import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
-import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -290,11 +289,7 @@ public class MemoryOperations{
 		for(Chunk chunk : oks){
 			chunk.setSize(0);
 			chunk.clearAndCompressHeader();
-			
-			var    size      = chunk.getHeaderSize();
-			byte[] headBytes = new byte[size];
-			chunk.writeHeader(new ContentOutputStream.BA(headBytes));
-			writeChunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
+			writeChunks.add(chunk.writeHeaderToBuf());
 		}
 		
 		var purgeTransaction = PURGE_ACCIDENTAL? provider.getSource().openIOTransaction() : null;

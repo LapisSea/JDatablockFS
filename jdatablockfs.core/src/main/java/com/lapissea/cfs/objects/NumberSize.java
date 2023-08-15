@@ -4,6 +4,7 @@ import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentSupport;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.utils.IOUtils;
 
@@ -195,6 +196,26 @@ public enum NumberSize{
 			case BIG_INT -> out.writeInt5(value);
 			case SMALL_LONG -> out.writeInt6(value);
 			case LONG -> out.writeInt8(value);
+			case null -> { }
+		}
+	}
+	
+	public void write(byte[] out, int off, ChunkPointer value) throws IOException{
+		write(out, off, value == null? 0 : value.getValue());
+	}
+	
+	public void write(byte[] out, int off, long value) throws IOException{
+		if(DEBUG_VALIDATION) validateUnsigned(value);
+		
+		switch(this){
+			case VOID -> { }
+			case BYTE -> ContentSupport.writeInt1(out, off, (byte)value);
+			case SHORT -> ContentSupport.writeInt2(out, off, (int)value);
+			case SMALL_INT -> ContentSupport.writeInt3(out, off, (int)value);
+			case INT -> ContentSupport.writeInt4(out, off, (int)value);
+			case BIG_INT -> ContentSupport.writeInt5(out, off, value);
+			case SMALL_LONG -> ContentSupport.writeInt6(out, off, value);
+			case LONG -> ContentSupport.writeInt8(out, off, value);
 			case null -> { }
 		}
 	}
