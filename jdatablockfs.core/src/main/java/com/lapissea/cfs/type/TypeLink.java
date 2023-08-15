@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.logging.Log;
@@ -33,7 +34,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 				RawCheck PRIMITIVE        = of(SupportedPrimitive::isAny, "is not primitive");
 				RawCheck INSTANCE         = of(
 					type -> {
-						if(Utils.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent()){
+						if(SealedUtil.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent()){
 							return true;
 						}
 						

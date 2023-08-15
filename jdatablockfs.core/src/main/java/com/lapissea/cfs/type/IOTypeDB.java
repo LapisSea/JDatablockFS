@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 
 
@@ -174,14 +175,14 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				return universe.id2cl.get(id);
 			}
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				var id       = universe.cl2id.get(type);
 				if(id == null){
@@ -349,7 +350,7 @@ public sealed interface IOTypeDB{
 			}
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				if(universe == null) return null;
 				if(id>=universe.id2cl.length || id<0) return null;
@@ -358,7 +359,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				return universe.cl2id.get(type);
 			}
@@ -754,7 +755,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
-			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
 			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
 			if(touched.isPresent()){
@@ -773,7 +774,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
-			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
 			var touched = getTouched(rootType, type);
 			if(touched.isPresent()){

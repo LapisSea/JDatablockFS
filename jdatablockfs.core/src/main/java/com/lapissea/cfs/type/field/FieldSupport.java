@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.type.field.IOField.*;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -202,7 +203,7 @@ class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor) || accessor.getType().isSealed();
+			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(accessor.getType());
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}

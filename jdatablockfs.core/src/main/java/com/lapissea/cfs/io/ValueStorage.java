@@ -1,6 +1,8 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.SealedUtil;
+import com.lapissea.cfs.SealedUtil.SealedInstanceUniverse;
+import com.lapissea.cfs.SealedUtil.SealedUniverse;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
@@ -48,6 +50,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
@@ -879,14 +882,14 @@ public sealed interface ValueStorage<T>{
 	
 	final class SealedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
-		private final GenericContext                  ctx;
-		private final DataProvider                    provider;
-		private final Utils.SealedInstanceUniverse<T> universe;
-		private final boolean                         canHavePointers;
-		private final SizeDescriptor<T>               sizeDescriptor;
-		private final RuntimeType<T>                  type;
+		private final GenericContext            ctx;
+		private final DataProvider              provider;
+		private final SealedInstanceUniverse<T> universe;
+		private final boolean                   canHavePointers;
+		private final SizeDescriptor<T>         sizeDescriptor;
+		private final RuntimeType<T>            type;
 		
-		public SealedInstance(GenericContext ctx, DataProvider provider, Utils.SealedInstanceUniverse<T> universe){
+		public SealedInstance(GenericContext ctx, DataProvider provider, SealedInstanceUniverse<T> universe){
 			this.ctx = ctx;
 			this.provider = provider;
 			this.universe = universe;
@@ -972,12 +975,12 @@ public sealed interface ValueStorage<T>{
 		
 		private final BaseFixedStructPipe<TypedReference> refPipe;
 		private final long                                size;
-		private final Utils.SealedInstanceUniverse<T>     universe;
+		private final SealedInstanceUniverse<T>           universe;
 		private final RuntimeType<T>                      type;
 		
 		public FixedReferenceSealedInstance(
 			GenericContext ctx, DataProvider provider,
-			BaseFixedStructPipe<TypedReference> refPipe, Utils.SealedInstanceUniverse<T> universe
+			BaseFixedStructPipe<TypedReference> refPipe, SealedInstanceUniverse<T> universe
 		){
 			this.ctx = ctx;
 			this.provider = provider;
@@ -1136,12 +1139,12 @@ public sealed interface ValueStorage<T>{
 			};
 		}
 		
-		if(clazz.isSealed()){
+		if(isSealedCached(clazz)){
 			//noinspection rawtypes,unchecked
-			Optional<Utils.SealedInstanceUniverse> oUniverse =
-				Utils.getSealedUniverse(clazz, false).flatMap(u -> Utils.SealedInstanceUniverse.of((Utils.SealedUniverse)u));
+			Optional<SealedInstanceUniverse> oUniverse =
+				SealedUtil.getSealedUniverse(clazz, false).flatMap(u -> SealedInstanceUniverse.of((SealedUniverse)u));
 			if(oUniverse.isPresent()){
-				Utils.SealedInstanceUniverse<?> universe = oUniverse.get();
+				SealedInstanceUniverse<?> universe = oUniverse.get();
 				return switch(rule){
 					case StorageRule.Default ignored -> new SealedInstance<>(generics, provider, universe);
 					case StorageRule.FixedOnly ignored -> {

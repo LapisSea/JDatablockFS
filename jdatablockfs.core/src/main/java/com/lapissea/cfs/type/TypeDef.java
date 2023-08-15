@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -16,6 +17,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 @IOValue
@@ -132,20 +134,20 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			}
 			enumConstants = res;
 		}
-		if(type.isSealed()){
-			var src = type.getPermittedSubclasses();
-			permits = new String[src.length];
-			for(int i = 0; i<src.length; i++){
-				permits[i] = src[i].getName();
+		if(isSealedCached(type)){
+			var src = SealedUtil.getPermittedSubclasses(type);
+			permits = new String[src.size()];
+			for(int i = 0; i<src.size(); i++){
+				permits[i] = src.get(i).getName();
 			}
 		}
 		if(ioInstance){
 			var s = type.getSuperclass();
-			if(s != null && s.isSealed()){
+			if(s != null && isSealedCached(s)){
 				setSealedParent(SealedParent.of(s.getName(), SealedParent.Type.EXTEND));
 			}
 			for(var inf : type.getInterfaces()){
-				if(inf.isSealed()){
+				if(isSealedCached(inf)){
 					setSealedParent(SealedParent.of(inf.getName(), SealedParent.Type.JUST_INTERFACE));
 				}
 			}
