@@ -543,7 +543,11 @@ public sealed interface IOTypeDB{
 			
 			data.put(newID, type);
 			reverseDataCache = null;
-			recordType(List.of(type));
+			try{
+				recordType(List.of(type));
+			}catch(Throwable e){
+				throw new RuntimeException("Failed to record " + type, e);
+			}
 			return new TypeID(newID, true);
 		}
 		
@@ -608,6 +612,14 @@ public sealed interface IOTypeDB{
 			
 			RuntimeException e = null;
 			
+			
+			Set<String> containedKeys;
+			try{
+				containedKeys = defs.stream().map(IOMap.IOEntry::getKey).map(t -> t.typeName).collect(Collectors.toUnmodifiableSet());
+			}catch(Throwable e1){
+				throw new IOException("Failed to read def keys", e1);
+			}
+			
 			for(var name : names){
 				Log.trace("Checking validity of {}#blueBright", name);
 				try{
@@ -618,15 +630,7 @@ public sealed interface IOTypeDB{
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
-								List.of(names::contains, n -> {
-									boolean contains;
-									try{
-										contains = defs.containsKey(new TypeName(n));
-									}catch(IOException ex){
-										throw new RuntimeException(ex);
-									}
-									return contains;
-								})
+								List.of(names::contains, containedKeys::contains)
 							)
 						));
 					if(fieldMap.containsKey(name) && IOInstance.isManaged(cls)){
