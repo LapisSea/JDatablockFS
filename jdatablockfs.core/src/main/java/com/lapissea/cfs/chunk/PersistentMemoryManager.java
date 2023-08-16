@@ -218,7 +218,10 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		tryPopFree();
 	}
 	
-	private boolean popping;
+	private record MoveState(Chunk free, Chunk toMove){ }
+	
+	private boolean   popping;
+	private MoveState badMoveState;
 	private void tryPopFree() throws IOException{
 		if(adding || popping) return;
 		popping = true;
@@ -226,9 +229,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			boolean anyPopped;
 			do{
 				anyPopped = false;
-				var lastChO = freeChunks.peekLast().map(p -> p.dereference(context));
-				if(lastChO.filter(Chunk::checkLastPhysical).isPresent()){
-					var lastCh = lastChO.get();
+				var lastFreeO = freeChunks.peekLast().map(p -> p.dereference(context));
+				if(lastFreeO.filter(Chunk::checkLastPhysical).isPresent()){
+					var lastCh = lastFreeO.get();
 					
 					freeChunks.popLast();
 					if(lastCh.checkLastPhysical()){
@@ -242,12 +245,16 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						return;
 					}
 				}else if(freeChunks.size()>1){
-					var nextO = lastChO.map(Chunk::nextPhysical);
+					var nextO = lastFreeO.filter(c -> c.getCapacity()>=32).map(Chunk::nextPhysical);
 					if(nextO.filter(Chunk::checkLastPhysical).isPresent()){
-						var lastFree = lastChO.get();
+						var lastFree = lastFreeO.get();
 						var toMove   = nextO.get();
 						
-						if(lastFree.getSize()<toMove.getSize()*2){
+						if(lastFree.getCapacity()<toMove.getSize()*2){
+							return;
+						}
+						
+						if(badMoveState != null && badMoveState.equals(new MoveState(lastFree, toMove))){
 							return;
 						}
 						
@@ -293,7 +300,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 										cha.revalidate();
 									}
 								}
-							}
+							}else badMoveState = new MoveState(lastFree.clone(), toMove.clone());
 						}finally{
 							allowFreeRemove = true;
 							drainIO = false;
