@@ -4,6 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.TypeIOFail;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.bit.BitOutputStream;
@@ -400,6 +401,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return null;
 			}
 			return valueStorage.readNew(io);
+		}catch(TypeIOFail e){
+			throw new TypeIOFail("Failed reading " + getTypeDef().toShortString(), null, e);
 		}catch(IOException e){
 			throw readFail(e);
 		}
