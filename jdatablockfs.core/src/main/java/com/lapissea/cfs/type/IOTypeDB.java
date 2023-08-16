@@ -563,7 +563,7 @@ public sealed interface IOTypeDB{
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 		}
 		
-		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
+		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
 			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
 			if(newDefs.isEmpty()) return;
 			

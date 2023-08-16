@@ -9,7 +9,6 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
@@ -343,12 +342,13 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		var bns = getBodyNumSize();
 		var nns = getNextSize();
-		
-		new FlagWriter(NumberSize.BYTE)
-			.writeBits(bns.ordinal(), 3)
-			.writeBits(nns.ordinal(), 3)
-			.fillRestAllOne()
-			.export(destBuff, 0);
+
+//		new FlagWriter(NumberSize.BYTE)
+//			.writeBits(bns.ordinal(), 3)
+//			.writeBits(nns.ordinal(), 3)
+//			.fillRestAllOne()
+//			.export(destBuff, 0);
+		destBuff[0] = (byte)(bns.ordinal()|(nns.ordinal()<<3)|(0b11<<6));
 		
 		bns.write(destBuff, 1, getCapacity());
 		bns.write(destBuff, 1 + bns.bytes, getSize());
