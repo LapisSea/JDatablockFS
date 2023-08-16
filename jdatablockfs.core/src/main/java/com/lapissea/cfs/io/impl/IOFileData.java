@@ -192,8 +192,8 @@ public final class IOFileData implements IOInterface, Closeable{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-					transactionBuff.write(ioOffset, data, dataOffset, dataLength);
+				for(var e : writeData){
+					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}
 				return;
 			}
@@ -203,8 +203,8 @@ public final class IOFileData implements IOInterface, Closeable{
 			
 			used = Math.max(used, Math.toIntExact(required));
 			
-			for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-				writeN(data, dataOffset, Math.toIntExact(ioOffset), dataLength);
+			for(var e : writeData){
+				writeN(e.data(), e.dataOffset(), e.ioOffset(), e.dataLength());
 			}
 		}
 		
