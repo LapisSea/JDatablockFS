@@ -1,8 +1,7 @@
-package com.lapissea.cfs.io;
+package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.chunk.ChainWalker;
-import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.exceptions.MalformedClusterData;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;

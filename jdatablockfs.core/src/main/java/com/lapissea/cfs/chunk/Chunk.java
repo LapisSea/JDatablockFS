@@ -4,7 +4,6 @@ import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -317,7 +316,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Writes the current Chunk header data at header area.
 	 */
 	public void writeHeader() throws IOException{
-		try(var io = clusterIoAtHead()){
+		try(var io = sourceIoAtHead()){
 			writeHeader(io);
 		}
 	}
@@ -362,7 +361,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Reads the data from the file in to this chunk.
 	 */
 	public void readHeader() throws IOException{
-		try(var io = clusterIoAtHead()){
+		try(var io = sourceIoAtHead()){
 			readHeader(io);
 		}
 	}
@@ -392,7 +391,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return start + cap;
 	}
 	
-	private RandomIO clusterIoAtHead() throws IOException{
+	private RandomIO sourceIoAtHead() throws IOException{
 		return getSource().ioAt(getPtr().getValue());
 	}
 	

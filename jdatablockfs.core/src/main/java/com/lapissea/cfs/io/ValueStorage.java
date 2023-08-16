@@ -4,6 +4,7 @@ import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SealedUtil.SealedInstanceUniverse;
 import com.lapissea.cfs.SealedUtil.SealedUniverse;
 import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.bit.EnumUniverse;
