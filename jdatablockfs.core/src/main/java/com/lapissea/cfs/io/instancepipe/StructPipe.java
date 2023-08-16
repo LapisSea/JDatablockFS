@@ -144,11 +144,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var typ = struct.getType();
 				//Special types must be statically initialized as they may add new special implementations.
 				if(typ.isAnnotationPresent(Special.class)){
-					try{
-						Class.forName(typ.getName(), true, typ.getClassLoader());
-					}catch(ClassNotFoundException e){
-						throw new ShouldNeverHappenError(e);
-					}
+					Utils.ensureClassLoaded(typ);
 				}
 				
 				var special = specials.get(struct);

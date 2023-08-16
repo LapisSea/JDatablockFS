@@ -50,7 +50,7 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
 	
-	private static class LinkedValueIterator<T> implements IOIterator.Iter<T>{
+	private static final class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
 		private final Iter<IONode<T>> nodes;
 		

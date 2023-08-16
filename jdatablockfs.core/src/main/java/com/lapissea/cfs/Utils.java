@@ -2,8 +2,8 @@ package com.lapissea.cfs;
 
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -225,7 +225,7 @@ public class Utils{
 	
 	public static RuntimeException interceptClInit(Throwable e){
 		if(StackWalker.getInstance().walk(s -> s.anyMatch(f -> f.getMethodName().equals("<clinit>")))){
-			LogUtil.printlnEr("CLINIT ERROR");
+			Log.warn("CLINIT ERROR: {}", e);
 			e.printStackTrace();
 		}
 		throw UtilL.uncheckedThrow(e);
@@ -270,5 +270,13 @@ public class Utils{
 	
 	public static <T extends Annotation> Optional<T> getAnnotation(Class<?> clazz, Class<T> type){
 		return Optional.ofNullable(clazz.getAnnotation(type));
+	}
+	
+	public static void ensureClassLoaded(Class<?> typ){
+		try{
+			Class.forName(typ.getName(), true, typ.getClassLoader());
+		}catch(ClassNotFoundException e){
+			throw new ShouldNeverHappenError(e);
+		}
 	}
 }

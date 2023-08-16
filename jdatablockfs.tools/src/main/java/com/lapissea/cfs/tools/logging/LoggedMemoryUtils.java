@@ -12,6 +12,7 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -33,6 +34,9 @@ public class LoggedMemoryUtils{
 		try(var r = new FileReader(f)){
 			data = new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class);
 			Log.info("Loaded config from {}", f);
+		}catch(FileNotFoundException e){
+			data = Map.of();
+			Log.trace("Config does not exist", e);
 		}catch(Exception e){
 			data = Map.of();
 			Log.warn("Unable to load config: {}", e);

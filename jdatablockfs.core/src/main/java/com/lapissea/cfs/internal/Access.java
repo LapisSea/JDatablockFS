@@ -78,7 +78,7 @@ public final class Access{
 			var lookup = getLookup(method.getDeclaringClass());
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda for " + method + " with " + functionalInterface, e);
+			throw new RuntimeException("failed to create lambda for method " + method + " with " + functionalInterface, e);
 		}
 	}
 	
@@ -88,7 +88,7 @@ public final class Access{
 			var lookup = getLookup(constructor.getDeclaringClass());
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda for " + constructor + " with " + functionalInterface, e);
+			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
 		}
 	}
 	
