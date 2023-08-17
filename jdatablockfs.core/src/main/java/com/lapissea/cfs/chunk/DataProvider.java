@@ -166,7 +166,8 @@ public interface DataProvider{
 			}
 			@Override
 			public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
-				src().allocTo(firstChunk, target, toAllocate);
+				var src = src();
+				src.allocTo(firstChunk, target, toAllocate);
 			}
 			
 			@Override

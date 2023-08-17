@@ -34,7 +34,7 @@ import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 
-public class MemoryOperations{
+public final class MemoryOperations{
 	
 	public static void purgePossibleChunkHeaders(DataProvider provider, long from, long size) throws IOException{
 		var maxHeaderSize = (int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
@@ -353,11 +353,11 @@ public class MemoryOperations{
 	
 	
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
-		smallTrace("growing {} by {} by growing file", target, toAllocate);
-		
 		DataProvider context = target.getDataProvider();
 		
 		if(context.isLastPhysical(target)){
+			smallTrace("growing {} by {} by growing file", target, toAllocate);
+			
 			var remaining = target.getBodyNumSize().remaining(target.getCapacity());
 			var toGrow    = Math.min(toAllocate, remaining);
 			if(toGrow>0){
@@ -422,11 +422,13 @@ public class MemoryOperations{
 		while(iter.hasPrevious()){
 			var ch = iter.previous();
 			
-			var allocated = AllocateTicket.bytes(toAllocate + toCopy)
-			                              .withPositionMagnet(ch)
-			                              .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
-			                              .withExplicitNextSize(explicitNextSize(manager, true))
-			                              .submit(manager);
+			Chunk allocated;
+			if(ch.getNextSize() == NumberSize.VOID) allocated = null;
+			else allocated = AllocateTicket.bytes(toAllocate + toCopy)
+			                               .withPositionMagnet(ch)
+			                               .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
+			                               .withExplicitNextSize(explicitNextSize(manager, true))
+			                               .submit(manager);
 			if(allocated == null){
 				toCopy += ch.getCapacity();
 				continue;
@@ -703,7 +705,10 @@ public class MemoryOperations{
 		var end = target.dataEnd();
 		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
 			ChunkPointer freePtr = iter.ioNext();
-			if(!freePtr.equals(end)) continue;
+			if(!freePtr.equals(end)){
+				if(freePtr.compareTo(end)>0) return 0;
+				continue;
+			}
 			
 			var provider  = manager.getDataProvider();
 			var freeChunk = freePtr.dereference(provider);

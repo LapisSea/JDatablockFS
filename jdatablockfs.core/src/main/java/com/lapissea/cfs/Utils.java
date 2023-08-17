@@ -1,12 +1,15 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -15,6 +18,7 @@ import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -278,5 +282,21 @@ public class Utils{
 		}catch(ClassNotFoundException e){
 			throw new ShouldNeverHappenError(e);
 		}
+	}
+	
+	/**
+	 * To be used only for debugging
+	 */
+	public static String packDataToBase64(IOInterface data) throws IOException{
+		var compressed = IOCompression.Type.GZIP.pack(data.readAll());
+		return Base64.getEncoder().encodeToString(compressed);
+	}
+	
+	/**
+	 * To be used only for debugging
+	 */
+	public static byte[] dataFromBase64(String base64) throws IOException{
+		var compressed = Base64.getDecoder().decode(base64);
+		return IOCompression.Type.GZIP.unpack(compressed);
 	}
 }
