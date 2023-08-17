@@ -818,4 +818,17 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	public int compareTo(Chunk o){
 		return getPtr().compareTo(o.getPtr());
 	}
+	
+	public Chunk findPrev(Chunk first) throws IOException{
+		if(first == this) return null;
+		
+		var last = first;
+		for(Chunk chunk : first.requireNext().walkNext()){
+			if(chunk == this){
+				return last;
+			}
+			last = chunk;
+		}
+		return null;
+	}
 }

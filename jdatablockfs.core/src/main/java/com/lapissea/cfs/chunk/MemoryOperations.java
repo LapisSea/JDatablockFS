@@ -471,24 +471,31 @@ public class MemoryOperations{
 		var ticket = AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
 		                                   .withPositionMagnet(target);
 		
-		Chunk toPin;
 		int   growth;
-		do{
-			if(siz == NumberSize.LARGEST){
-				throw new OutOfMemoryError();
-			}
+		Chunk toPin = null;
+		while(true){
+			do{
+				if(siz == NumberSize.LARGEST){
+					throw new OutOfMemoryError();
+				}
+				
+				siz = siz.next();
+				growth = siz.bytes - target.getNextSize().bytes;
+				
+				if(target.getCapacity()<growth){
+					break;
+				}
+				
+				toPin = ticket.withBytes(toAllocate + growth)
+				              .withApproval(Chunk.sizeFitsPointer(siz))
+				              .submit(manager);
+			}while(toPin == null);
+			if(toPin != null) break;
 			
-			siz = siz.next();
-			growth = siz.bytes - target.getNextSize().bytes;
-			
-			if(target.getCapacity()<growth){
-				return 0;
-			}
-			
-			toPin = ticket.withBytes(toAllocate + growth)
-			              .withApproval(Chunk.sizeFitsPointer(siz))
-			              .submit(manager);
-		}while(toPin == null);
+			toAllocate += target.getSize();
+			target = target.findPrev(first);
+			if(target == null) return 0;
+		}
 		
 		IOInterface source = target.getDataProvider().getSource();
 		
@@ -506,6 +513,8 @@ public class MemoryOperations{
 		
 		var oldCapacity = target.getCapacity();
 		
+		var toFree = target.next();
+		
 		target.requireReal();
 		try{
 			target.setNextSize(siz);
@@ -520,7 +529,13 @@ public class MemoryOperations{
 			source.write(target.dataStart(), false, toShift);
 		}
 		
-		return (target.getCapacity() + toPin.getCapacity()) - oldCapacity;
+		var moved = 0L;
+		if(toFree != null){
+			moved = toFree.chainLength();
+			toFree.freeChaining();
+		}
+		
+		return target.getCapacity() + toPin.getCapacity() - moved - oldCapacity;
 	}
 	
 	
