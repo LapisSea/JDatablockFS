@@ -8,6 +8,7 @@ import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.MalformedObject;
 import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
+import com.lapissea.cfs.exceptions.TypeIOFail;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -41,10 +42,10 @@ import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -144,11 +145,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var typ = struct.getType();
 				//Special types must be statically initialized as they may add new special implementations.
 				if(typ.isAnnotationPresent(Special.class)){
-					try{
-						Class.forName(typ.getName(), true, typ.getClassLoader());
-					}catch(ClassNotFoundException e){
-						throw new ShouldNeverHappenError(e);
-					}
+					Utils.ensureClassLoaded(typ);
 				}
 				
 				var special = specials.get(struct);
@@ -603,7 +600,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		try{
 			return doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
-			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
 	}
 	
@@ -611,7 +608,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		try{
 			doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
-			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
 	}
 	
@@ -854,6 +851,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}else{
 			try{
 				field.read(ioPool, provider, src, instance, genericContext);
+			}catch(TypeIOFail|EOFException e){
+				var typ = field.getAccessor() == null? null : field.getAccessor().getType();
+				throw new TypeIOFail("Failed reading " + field + "", typ, e);
 			}catch(IOException e){
 				e.addSuppressed(new IOException("Failed to read " + field));
 				throw e;
@@ -885,7 +885,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	private static IOException fail(IOField<?, ?> field, Exception e, String msg){
-		return new IOException(field + " " + msg, e);
+		var typ = field.getAccessor() == null? null : field.getAccessor().getType();
+		return new TypeIOFail(field + " " + msg, typ, e);
 	}
 	
 	@Override

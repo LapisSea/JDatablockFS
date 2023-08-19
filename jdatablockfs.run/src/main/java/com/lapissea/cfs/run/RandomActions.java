@@ -3,8 +3,11 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
+import com.lapissea.cfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
@@ -19,10 +22,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class RandomActions{
+@SuppressWarnings("unused")
+public final class RandomActions{
 	
 	public static void main(String[] args) throws Throwable{
 		var methods = Arrays.stream(RandomActions.class.getDeclaredMethods())
@@ -156,7 +161,7 @@ public class RandomActions{
 		var r    = new Random(69);
 		var iter = 50000000;
 		for(int i = 0; i<iter; i++){
-			if(i%200000 == 0) LogUtil.println(i/((double)iter));
+			if(i%(iter/100) == 0) LogUtil.println(i/((double)iter));
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){
@@ -209,4 +214,71 @@ public class RandomActions{
 		
 	}
 	
+	private static void numberIO(){
+		record Err(Throwable e, int th, int iter, long l){ }
+		
+		Err[] err = {new Err(null, 0, 0, Long.MAX_VALUE)};
+		
+		var count = new AtomicLong();
+		var th    = Runtime.getRuntime().availableProcessors() + 1;
+		var iter  = 500_000_000;
+		var total = iter*(long)th;
+		IntStream.range(0, th).mapToObj(ti -> Thread.ofPlatform().start(() -> {
+			var r = new RawRandom(69L*ti);
+			try(var io = MemoryData.builder().withCapacity(8).withUsedLength(8).build().io()){
+				for(int i = 0; i<iter; i++){
+					if(i%100 == 0){
+						var c = count.incrementAndGet()*100;
+						if(c%(total/100) == 0){
+							LogUtil.println(c/(double)total);
+						}
+					}
+					{
+						var l = i == 0? -6 : r.nextInt();
+						try{
+							var size = NumberSize.bySizeSigned(l);
+							size.writeIntSigned(io.setPos(0), l);
+							var lr = size.readIntSigned(io.setPos(0));
+							if(l != lr){
+								throw new AssertionError(l + "!=" + lr);
+							}
+						}catch(Throwable e){
+							synchronized(NumberSize.class){
+								e.printStackTrace();
+								if(Math.abs(err[0].l)>Math.abs(l)){
+									err[0] = new Err(e, ti, i, l);
+								}
+							}
+						}
+					}
+					
+					var l = i == 0? -6 : r.nextLong();
+					try{
+						var size = NumberSize.bySizeSigned(l);
+						size.writeSigned(io.setPos(0), l);
+						var lr = size.readSigned(io.setPos(0));
+						if(l != lr){
+							throw new AssertionError(l + "!=" + lr);
+						}
+					}catch(Throwable e){
+						synchronized(NumberSize.class){
+							if(Math.abs(err[0].l)>Math.abs(l)){
+								err[0] = new Err(e, ti, i, l);
+							}
+						}
+					}
+				}
+			}
+		})).toList().forEach(thread -> {
+			try{
+				thread.join();
+			}catch(InterruptedException e){
+				throw new RuntimeException(e);
+			}
+		});
+		if(err[0].e != null){
+			LogUtil.println(err[0]);
+			err[0].e.printStackTrace();
+		}
+	}
 }

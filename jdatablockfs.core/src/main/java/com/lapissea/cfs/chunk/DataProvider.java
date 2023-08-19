@@ -3,7 +3,6 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.PointerOutsideFile;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -173,7 +172,8 @@ public interface DataProvider{
 			}
 			@Override
 			public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
-				src().allocTo(firstChunk, target, toAllocate);
+				var src = src();
+				src.allocTo(firstChunk, target, toAllocate);
 			}
 			
 			@Override

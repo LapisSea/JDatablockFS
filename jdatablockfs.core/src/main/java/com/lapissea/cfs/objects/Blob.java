@@ -169,8 +169,8 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] bb) : writeData){
-					transactionBuff.write(ioOffset, bb, dataOffset, dataLength);
+				for(var e : writeData){
+					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}
 				return;
 			}

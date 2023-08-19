@@ -128,7 +128,7 @@ public interface ContentReader extends AutoCloseable{
 			readFully(buff, 0, readElements*bytesPerElement);
 			
 			for(int i = 0; i<readElements; i++){
-				result[read + i] = readChar2(buff, i*bytesPerElement);
+				result[read + i] = ContentSupport.readChar2(buff, i*bytesPerElement);
 			}
 			
 			remaining -= readElements;
@@ -139,11 +139,6 @@ public interface ContentReader extends AutoCloseable{
 	
 	default char readChar2() throws IOException{
 		return (char)readWord(2);
-	}
-	
-	private char readChar2(byte[] readBuffer, int offset){
-		return (char)((readBuffer[offset + 0]<<8) +
-		              (readBuffer[offset + 1]<<0));
 	}
 	
 	
@@ -185,7 +180,7 @@ public interface ContentReader extends AutoCloseable{
 			readFully(buff, 0, readElements*bytesPerElement);
 			
 			for(int i = 0; i<readElements; i++){
-				result[read + i] = readInt2(buff, i*bytesPerElement);
+				result[read + i] = ContentSupport.readInt2(buff, i*bytesPerElement);
 			}
 			
 			remaining -= readElements;
@@ -197,36 +192,23 @@ public interface ContentReader extends AutoCloseable{
 	default short readInt2() throws IOException{
 		return (short)readWord(2);
 	}
-	private short readInt2(byte[] readBuffer, int offset){
-		return (short)(((readBuffer[offset + 0]&255)<<8) +
-		               ((readBuffer[offset + 1]&255)<<0));
-	}
 	
 	
 	default int[] readUnsignedInts2(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 2, this::readUnsignedInt2);
+		return readInts(elementsToRead, 2, ContentSupport::readUnsignedInt2);
 	}
 	
 	default int readUnsignedInt2() throws IOException{
 		return (int)readWord(2);
 	}
-	private int readUnsignedInt2(byte[] readBuffer, int offset){
-		return ((readBuffer[offset + 0]&255)<<8) +
-		       ((readBuffer[offset + 1]&255)<<0);
-	}
 	
 	
 	default int[] readUnsignedInts3(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 3, this::readUnsignedInt3);
+		return readInts(elementsToRead, 3, ContentSupport::readUnsignedInt3);
 	}
 	
 	default int readUnsignedInt3() throws IOException{
 		return (int)readWord(3);
-	}
-	private int readUnsignedInt3(byte[] readBuffer, int offset){
-		return (((readBuffer[offset + 0]&255)<<16) +
-		        ((readBuffer[offset + 1]&255)<<8) +
-		        ((readBuffer[offset + 2]&255)<<0));
 	}
 	
 	
@@ -247,59 +229,38 @@ public interface ContentReader extends AutoCloseable{
 		return readWord(4);
 	}
 	default long readUnsignedInt4(byte[] readBuffer, int offset){
-		return readInt4(readBuffer, offset)&0xFFFFFFFFL;
+		return ContentSupport.readInt4(readBuffer, offset)&0xFFFFFFFFL;
 	}
 	
 	
 	default int[] readInts4(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 4, this::readInt4);
+		return readInts(elementsToRead, 4, ContentSupport::readInt4);
 	}
 	
 	default int readInt4() throws IOException{
 		return (int)readWord(4);
 	}
-	private int readInt4(byte[] readBuffer, int offset){
-		return (((readBuffer[offset + 0]&255)<<24) +
-		        ((readBuffer[offset + 1]&255)<<16) +
-		        ((readBuffer[offset + 2]&255)<<8) +
-		        ((readBuffer[offset + 3]&255)<<0));
-	}
 	
 	
 	default long[] readUnsignedInts5(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 5, this::readUnsignedInt5);
+		return readLongs(elementsToRead, 5, ContentSupport::readUnsignedInt5);
 	}
 	
 	default long readUnsignedInt5() throws IOException{
 		return readWord(5);
 	}
-	private long readUnsignedInt5(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset + 0]&255)<<32) +
-		        ((long)(readBuffer[offset + 1]&255)<<24) +
-		        ((readBuffer[offset + 2]&255)<<16) +
-		        ((readBuffer[offset + 3]&255)<<8) +
-		        ((readBuffer[offset + 4]&255)<<0));
-	}
 	
 	
 	default long[] readUnsignedInt6(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 6, this::readUnsignedInt6);
+		return readLongs(elementsToRead, 6, ContentSupport::readUnsignedInt6);
 	}
 	
 	default long readUnsignedInt6() throws IOException{
 		return readWord(6);
 	}
-	private long readUnsignedInt6(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset + 0]&255)<<40) +
-		        ((long)(readBuffer[offset + 1]&255)<<32) +
-		        ((long)(readBuffer[offset + 2]&255)<<24) +
-		        ((readBuffer[offset + 3]&255)<<16) +
-		        ((readBuffer[offset + 4]&255)<<8) +
-		        ((readBuffer[offset + 5]&255)<<0));
-	}
 	
 	default long[] readInts8(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 8, this::readInt8);
+		return readLongs(elementsToRead, 8, ContentSupport::readInt8);
 	}
 	
 	default long readUnsignedInt8Dynamic() throws IOException{
@@ -313,16 +274,6 @@ public interface ContentReader extends AutoCloseable{
 	
 	default long readInt8() throws IOException{
 		return readWord(8);
-	}
-	private long readInt8(byte[] readBuffer, int offset){
-		return (((long)readBuffer[offset + 0]<<56) +
-		        ((long)(readBuffer[offset + 1]&255)<<48) +
-		        ((long)(readBuffer[offset + 2]&255)<<40) +
-		        ((long)(readBuffer[offset + 3]&255)<<32) +
-		        ((long)(readBuffer[offset + 4]&255)<<24) +
-		        ((readBuffer[offset + 5]&255)<<16) +
-		        ((readBuffer[offset + 6]&255)<<8) +
-		        ((readBuffer[offset + 7]&255)<<0));
 	}
 	
 	
@@ -384,12 +335,8 @@ public interface ContentReader extends AutoCloseable{
 		int    numSize = 4;
 		byte[] bb      = readInts1(f.length*numSize);
 		for(int i = 0; i<f.length; i++){
-			f[i] = readFloat4(bb, i*numSize);
+			f[i] = ContentSupport.readFloat4(bb, i*numSize);
 		}
-	}
-	
-	private float readFloat4(byte[] srcBuffer, int off){
-		return Float.intBitsToFloat(readInt4(srcBuffer, off));
 	}
 	
 	default double readFloat8() throws IOException{
@@ -404,12 +351,8 @@ public interface ContentReader extends AutoCloseable{
 		int    numSize = 8;
 		byte[] bb      = readInts1(f.length*numSize);
 		for(int i = 0; i<f.length; i++){
-			f[i] = readFloat8(bb, i*numSize);
+			f[i] = ContentSupport.readFloat8(bb, i*numSize);
 		}
-	}
-	
-	private double readFloat8(byte[] srcBuffer, int off){
-		return Double.longBitsToDouble(readInt8(srcBuffer, off));
 	}
 	
 	default byte[] readFully(byte[] b) throws IOException{

@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFile;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -146,7 +147,7 @@ public class DefragmentManager{
 				if(IOInstance.isUnmanaged(type)){
 					if(allowUnmanaged){
 						move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), ticketFn);
-					}
+					}else Log.trace("Disallowed move of unmanaged");
 					return END;
 				}
 				

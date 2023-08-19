@@ -1,11 +1,11 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -645,7 +645,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	private SELF self(){ return (SELF)this; }
 	
 	
-	static boolean isInstance(Utils.SealedUniverse<?> universe){
+	static boolean isInstance(SealedUtil.SealedUniverse<?> universe){
 		return universe.universe().stream().allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){

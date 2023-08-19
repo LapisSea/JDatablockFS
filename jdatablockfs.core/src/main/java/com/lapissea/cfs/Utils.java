@@ -1,21 +1,16 @@
 package com.lapissea.cfs;
 
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.VarPool;
-import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.util.LogUtil;
+import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -23,21 +18,19 @@ import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongBinaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
-import static java.util.stream.Collectors.toUnmodifiableMap;
 
 @SuppressWarnings({"unchecked", "unused"})
 public class Utils{
@@ -236,7 +229,7 @@ public class Utils{
 	
 	public static RuntimeException interceptClInit(Throwable e){
 		if(StackWalker.getInstance().walk(s -> s.anyMatch(f -> f.getMethodName().equals("<clinit>")))){
-			LogUtil.printlnEr("CLINIT ERROR");
+			Log.warn("CLINIT ERROR: {}", e);
 			e.printStackTrace();
 		}
 		throw UtilL.uncheckedThrow(e);
@@ -279,97 +272,31 @@ public class Utils{
 		return OptionalLong.of(funct.applyAsLong(a.getAsLong(), b.getAsLong()));
 	}
 	
-	public record SealedInstanceUniverse<T extends IOInstance<T>>(
-		Class<T> root, Map<Class<T>, StructPipe<T>> pipeMap
-	){
-		public static <T extends IOInstance<T>> Optional<SealedInstanceUniverse<T>> of(SealedUniverse<T> universe){
-			if(IOInstance.isInstance(universe)){
-				return Optional.of(new SealedInstanceUniverse<>(universe));
-			}
-			return Optional.empty();
-		}
-		
-		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, data.universe.stream().collect(toUnmodifiableMap(t -> t, StandardStructPipe::of)));
-		}
-		
-		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(boolean nullable, BiFunction<VarPool<Inst>, Inst, T> get){
-			
-			var sizes     = pipeMap.values().stream().map(StructPipe::getSizeDescriptor).toList();
-			var wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
-			var fixed = sizes.stream().map(s -> s.getFixed(wordSpace))
-			                 .reduce((a, b) -> a.isPresent() && b.isPresent() && a.getAsLong() == b.getAsLong()?
-			                                   a : OptionalLong.empty())
-			                 .orElseThrow();
-			if(fixed.isPresent()){
-				return SizeDescriptor.Fixed.of(wordSpace, fixed.getAsLong());
-			}
-			
-			var minSize = nullable? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
-			var maxSize = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
-			
-			return SizeDescriptor.Unknown.of(
-				wordSpace, minSize, maxSize,
-				(ioPool, prov, inst) -> {
-					T val = get.apply(ioPool, inst);
-					if(val == null){
-						if(!nullable) throw new NullPointerException();
-						return 0;
-					}
-					StructPipe<T> instancePipe = pipeMap.get(val.getClass());
-					
-					return instancePipe.calcUnknownSize(prov, val, wordSpace);
-				}
-			);
-		}
-		
-		public boolean calcCanHavePointers(){
-			return pipeMap.values().stream()
-			              .map(StructPipe::getType)
-			              .anyMatch(Struct::getCanHavePointers);
-		}
-	}
-	
-	public record SealedUniverse<T>(Class<T> root, Set<Class<T>> universe){
-		public SealedUniverse{
-			Objects.requireNonNull(root);
-			assert root.isSealed();
-			universe = Set.copyOf(universe);
-		}
-	}
-	
-	public static <T> Optional<SealedUniverse<T>> getSealedUniverse(Class<T> type, boolean allowUnbounded){
-		return computeSealedUniverse(type, allowUnbounded);
-	}
-	
-	private static <T> Optional<SealedUniverse<T>> computeSealedUniverse(Class<T> type, boolean allowUnbounded){
-		if(!type.isSealed()){
-			return Optional.empty();
-		}
-		var universe = new HashSet<Class<T>>();
-		if(!type.isInterface() && !Modifier.isAbstract(type.getModifiers())){
-			universe.add(type);
-		}
-		var psbc = type.getPermittedSubclasses();
-		for(var sub : (Class<T>[])psbc){
-			if(sub.isSealed()){
-				var uni = computeSealedUniverse(sub, allowUnbounded);
-				if(uni.isEmpty()) return Optional.empty();
-				universe.addAll(uni.get().universe);
-				continue;
-			}
-			if(allowUnbounded || Modifier.isFinal(sub.getModifiers())){
-				universe.add(sub);
-				continue;
-			}
-			//Non sealed make for an unbounded universe
-			return Optional.empty();
-		}
-		if(universe.isEmpty()) throw new IllegalStateException();
-		return Optional.of(new SealedUniverse<>(type, universe));
-	}
-	
 	public static <T extends Annotation> Optional<T> getAnnotation(Class<?> clazz, Class<T> type){
 		return Optional.ofNullable(clazz.getAnnotation(type));
+	}
+	
+	public static void ensureClassLoaded(Class<?> typ){
+		try{
+			Class.forName(typ.getName(), true, typ.getClassLoader());
+		}catch(ClassNotFoundException e){
+			throw new ShouldNeverHappenError(e);
+		}
+	}
+	
+	/**
+	 * To be used only for debugging
+	 */
+	public static String packDataToBase64(IOInterface data) throws IOException{
+		var compressed = IOCompression.Type.GZIP.pack(data.readAll());
+		return Base64.getEncoder().encodeToString(compressed);
+	}
+	
+	/**
+	 * To be used only for debugging
+	 */
+	public static byte[] dataFromBase64(String base64) throws IOException{
+		var compressed = Base64.getDecoder().decode(base64);
+		return IOCompression.Type.GZIP.unpack(compressed);
 	}
 }

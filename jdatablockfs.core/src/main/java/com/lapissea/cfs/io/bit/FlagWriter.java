@@ -103,6 +103,10 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		numberSize.write(dest, buffer);
 	}
 	
+	public void export(byte[] dest, int off) throws IOException{
+		numberSize.write(dest, off, buffer);
+	}
+	
 	@Override
 	public String toString(){
 		var  bits = numberSize.bits();

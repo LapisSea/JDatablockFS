@@ -3,7 +3,9 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.TypeIOFail;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.bit.BitOutputStream;
@@ -50,7 +52,7 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
 	
-	private static class LinkedValueIterator<T> implements IOIterator.Iter<T>{
+	private static final class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
 		private final Iter<IONode<T>> nodes;
 		
@@ -203,8 +205,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		(type, db) -> { }
 	);
 	
-	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD          = Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
-	private static final int                    NEXT_SIZE_FIELD_MIN_SIZE = Math.toIntExact(getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE));
+	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD      = STRUCT.getFields().requireExact(NumberSize.class, "nextSize");
+	private static final int                    NEXT_SIZE_FIELD_SIZE = (int)getNextSizeField().getSizeDescriptor().requireMax(WordSpace.BYTE);
 	
 	private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 		return NumberSize.bySize(provider.getSource().getIOSize()).next();
@@ -234,8 +236,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
+		Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 		try(var ignored = provider.getSource().openIOTransaction()){
-			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}
@@ -363,13 +365,13 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		try{
 			var s = io.getSize();
 			if(s == 0) return null;
-			if(s<NEXT_SIZE_FIELD_MIN_SIZE) return null;
+			if(s<NEXT_SIZE_FIELD_SIZE) return null;
 			if(DEBUG_VALIDATION){
 				if(!getPipe().getSpecificFields().get(0).equals(getNextSizeField())){
 					throw new ShouldNeverHappenError();
 				}
 			}
-			nextSize = FlagReader.readSingle(io, NumberSize.FLAG_INFO);
+			updateNextSize(io);
 
 //			if(DEBUG_VALIDATION){
 //				requireNonFreed();
@@ -400,6 +402,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return null;
 			}
 			return valueStorage.readNew(io);
+		}catch(TypeIOFail e){
+			throw new TypeIOFail("Failed reading " + getTypeDef().toShortString(), null, e);
 		}catch(IOException e){
 			throw readFail(e);
 		}
@@ -430,12 +434,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	boolean hasValue() throws IOException{
-		var nextStart = nextStart();
 		try(var io = selfIO()){
-			if(io.remaining()<nextStart){
+			if(io.remaining()<NEXT_SIZE_FIELD_SIZE){
 				return false;
 			}
-			io.skipExact(nextStart);
+			io.skipExact(NEXT_SIZE_FIELD_SIZE);
 			if(io.remaining()<nextSize.bytes){
 				return false;
 			}
@@ -474,17 +477,24 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return readNextPtr();
 	}
 	private ChunkPointer readNextPtr() throws IOException{
-		readManagedFields();
-		ChunkPointer chunk;
 		try(var io = selfIO()){
-			var start = nextStart();
-			if(io.remaining()<=start){
+			updateNextSize(io);
+			if(io.remaining() == 0){
 				return ChunkPointer.NULL;
 			}
-			io.skipExact(start);
-			chunk = ChunkPointer.read(nextSize, io);
+			return ChunkPointer.read(nextSize, io);
 		}
-		return chunk;
+	}
+	
+	private byte nextSizeRaw;
+	private void updateNextSize(ChunkChainIO io) throws IOException{
+		byte newData;
+		newData = io.readInt1();
+		if(nextSizeRaw == newData) return;
+		nextSizeRaw = newData;
+		try(var f = new FlagReader(nextSizeRaw&0xFF, NumberSize.BYTE)){
+			nextSize = f.readEnum(NumberSize.FLAG_INFO);
+		}
 	}
 	
 	private IONode<T> nextCache;
@@ -513,21 +523,13 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return new IONode<>(getDataProvider(), new Reference(ptr, 0), getTypeDef());
 	}
 	
-	private long nextStart(){
-		IOField<IONode<T>, NumberSize> f = getNextSizeField();
-		return switch(f.getSizeDescriptor()){
-			case SizeDescriptor.Unknown<IONode<T>> u -> u.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
-			case SizeDescriptor.Fixed<IONode<T>> fixed -> fixed.get(WordSpace.BYTE);
-		};
-	}
-	
 	@SuppressWarnings("unchecked")
 	private static <T> IOField<IONode<T>, NumberSize> getNextSizeField(){
 		return (IOField<IONode<T>, NumberSize>)NEXT_SIZE_FIELD;
 	}
 	
-	private long valueStart(){
-		return nextStart() + nextSize.bytes;
+	private int valueStart(){
+		return NEXT_SIZE_FIELD_SIZE + nextSize.bytes;
 	}
 	
 	public void setNext(IONode<T> next) throws IOException{
@@ -562,7 +564,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 		
 		try(var io = selfIO()){
-			io.skipExact(nextStart());
+			io.skipExact(NEXT_SIZE_FIELD_SIZE);
 			nextSize.write(io, ptr);
 		}
 	}
@@ -609,7 +611,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return this.getClass().getSimpleName() + toShortString();
 	}
 	
-	private static class NodeIterator<T> implements IOIterator.Iter<IONode<T>>{
+	private static final class NodeIterator<T> implements IOIterator.Iter<IONode<T>>{
 		
 		private IONode<T>   node;
 		private IOException e;

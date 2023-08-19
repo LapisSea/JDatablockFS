@@ -58,11 +58,17 @@ public class MemPrimitive{
 			}
 			return;
 		}
-		
-		if(!MyUnsafe.IS_BIG_ENDIAN && len == 8){
-			Objects.checkFromIndexSize(off, len, writeBuffer.length);
-			UNSAFE.putLong(writeBuffer, OFF_START + off, Long.reverseBytes(v));
-			return;
+		if(!MyUnsafe.IS_BIG_ENDIAN){
+			if(len == 8){
+				Objects.checkFromIndexSize(off, len, writeBuffer.length);
+				UNSAFE.putLong(writeBuffer, OFF_START + off, Long.reverseBytes(v));
+				return;
+			}
+			if(len == 4){
+				Objects.checkFromIndexSize(off, len, writeBuffer.length);
+				UNSAFE.putInt(writeBuffer, OFF_START + off, Integer.reverseBytes((int)v));
+				return;
+			}
 		}
 		
 		final var lm1 = len - 1;

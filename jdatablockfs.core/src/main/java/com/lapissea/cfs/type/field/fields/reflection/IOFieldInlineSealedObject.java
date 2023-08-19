@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -69,7 +70,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	}
 	
 	public static boolean isCompatible(Type type){
-		return Utils.getSealedUniverse(Utils.typeToRaw(type), false).filter(IOInstance::isInstance).isPresent();
+		return SealedUtil.getSealedUniverse(Utils.typeToRaw(type), false).filter(IOInstance::isInstance).isPresent();
 	}
 	
 	private final Map<Class<ValueType>, StructPipe<ValueType>> typeToPipe;
@@ -81,7 +82,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		super(accessor);
 		//noinspection unchecked
 		rootType = (Class<ValueType>)accessor.getType();
-		var universe = Utils.getSealedUniverse(rootType, false).flatMap(Utils.SealedInstanceUniverse::of).orElseThrow();
+		var universe = SealedUtil.getSealedUniverse(rootType, false).flatMap(SealedUtil.SealedInstanceUniverse::of).orElseThrow();
 		typeToPipe = universe.pipeMap();
 		canHavePointers = universe.calcCanHavePointers();
 		initSizeDescriptor(universe.makeSizeDescriptor(nullable(), (p, inst) -> get(null, inst)));
