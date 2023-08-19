@@ -161,7 +161,7 @@ public final class RandomActions{
 		var r    = new Random(69);
 		var iter = 50000000;
 		for(int i = 0; i<iter; i++){
-			if(i%200000 == 0) LogUtil.println(i/((double)iter));
+			if(i%(iter/100) == 0) LogUtil.println(i/((double)iter));
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){

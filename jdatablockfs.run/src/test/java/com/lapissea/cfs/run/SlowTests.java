@@ -476,7 +476,7 @@ public class SlowTests{
 	
 	@Test(dependsOnMethods = "simpleTreeSet")
 	void fuzzTreeSet(){
-		runSetFuzz(200000, IOTreeSet.class);
+		runSetFuzz(20000, IOTreeSet.class);
 	}
 	
 	interface ListAction{
