@@ -1160,6 +1160,10 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		
+		if(!IOInstance.isInstance(clazz)){
+			throw new IllegalArgumentException(clazz.getTypeName() + " is not an IOInstance");
+		}
+		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
 				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());

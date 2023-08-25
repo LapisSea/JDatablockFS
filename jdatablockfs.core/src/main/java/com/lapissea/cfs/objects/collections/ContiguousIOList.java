@@ -430,8 +430,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		calcHead();
 	}
 	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, TypeLink typeDef){
+		var g   = getGenerics();
+		var ctx = g.argAsContext("T");
 		return (ValueStorage<T>)ValueStorage.makeStorage(
-			makeMagnetProvider(), typeDef, getGenerics().argAsContext("T"),
+			makeMagnetProvider(), typeDef, ctx,
 			new StorageRule.VariableFixed(varying)
 		);
 	}

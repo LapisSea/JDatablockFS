@@ -38,6 +38,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -501,7 +502,7 @@ public final class FieldCompiler{
 		Thread.startVirtualThread(FieldRegistry::init);
 	}
 	
-	public static List<Class<?>> getWrapperTypes(){
+	public static Collection<Class<?>> getWrapperTypes(){
 		return FieldRegistry.getWrappers();
 	}
 }
