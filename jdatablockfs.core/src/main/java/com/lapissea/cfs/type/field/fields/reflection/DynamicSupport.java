@@ -69,14 +69,14 @@ public abstract class DynamicSupport{
 					
 					var lenSize = NumberSize.bySize(len).bytes + 1;
 					
-					var psiz = SupportedPrimitive.get(e).map(pTyp -> (switch(pTyp){
-						case DOUBLE, FLOAT -> pTyp.maxSize.get();
+					var psiz = SupportedPrimitive.get(e).map(pTyp -> (long)switch(pTyp){
+						case DOUBLE, FLOAT -> pTyp.maxSize.get()*len;
 						case BOOLEAN -> BitUtils.bitsToBytes(len);
-						case LONG -> NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes;
-						case INT -> NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes;
-						case SHORT, CHAR -> 2;
-						case BYTE -> 1;
-					})*len);
+						case LONG -> 1 + NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes*(long)len;
+						case INT -> 1 + NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes*(long)len;
+						case SHORT, CHAR -> 2L*len;
+						case BYTE -> len;
+					});
 					if(psiz.isPresent()) yield psiz.get() + lenSize;
 					
 					if(IOInstance.isInstance(e)){
