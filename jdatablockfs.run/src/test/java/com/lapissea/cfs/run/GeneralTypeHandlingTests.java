@@ -26,6 +26,7 @@ import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOIndexed;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
@@ -621,4 +622,30 @@ public class GeneralTypeHandlingTests{
 		Struct.of(Foo.class, STATE_DONE);
 	}
 	
+	@IOValue
+	public static class IndexStr extends IOInstance.Managed<IndexStr>{
+		@IOIndexed
+		String val;
+		public IndexStr(){ }
+		public IndexStr(String val){
+			this.val = val;
+		}
+	}
+	
+	@Test
+	void indexedString() throws IOException{
+		
+		var cl = Cluster.emptyMem();
+		
+		IOList<IndexStr> list = cl.getRootProvider().request("list", IOList.class, IndexStr.class);
+		
+		var strs = List.of("str1", "str2", "str1");
+		
+		for(String str : strs){
+			list.add(new IndexStr(str));
+		}
+		
+		var res = list.stream().map(v -> v.val).toList();
+		assertEquals(strs, res);
+	}
 }
