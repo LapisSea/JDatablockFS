@@ -123,19 +123,17 @@ public class JorthTmp{
 	static byte[] makeFile(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth{
 		long    t     = System.currentTimeMillis();
 		boolean print = true;
-		var     jorth = new Jorth(null, null);
 		
-		try(var writer = jorth.writer()){
+		var file = Jorth.generateClass(null, name, writer -> {
 			writer.write(
 				"""
 					public class {!} start
 					""", name);
 			write.accept(writer);
 			writer.write("end");
-		}
+		});
 		
-		var file = jorth.getClassFile(name);
-		var t2   = System.currentTimeMillis();
+		var t2 = System.currentTimeMillis();
 		if(print) LogUtil.println();
 		LogUtil.println("Time:", t2 - t);
 		if(print) BytecodeUtils.printClass(file);
