@@ -22,6 +22,7 @@ import com.lapissea.jorth.lang.type.Operation;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.reflect.Array;
 import java.util.ArrayDeque;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -41,6 +43,21 @@ import java.util.stream.Collectors;
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class Jorth extends CodeDestination{
+	
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws MalformedJorth{
+		return generateClass(classLoader, className, generator, null);
+	}
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator, Consumer<CharSequence> printBack) throws MalformedJorth{
+		Objects.requireNonNull(className);
+		Objects.requireNonNull(generator);
+		
+		var jorth = new Jorth(classLoader, printBack);
+		try(var writer = jorth.writer()){
+			generator.accept(writer);
+		}
+		
+		return jorth.getClassFile(className);
+	}
 	
 	static{
 		if(!Boolean.getBoolean("jorth.noPreload")){
