@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.FieldIsNull;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.exceptions.MalformedObject;
 import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
@@ -272,7 +273,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			if(inst != null){
 				try{
 					checkTypeIntegrity(inst, true);
-				}catch(FieldIsNull ignored){
+				}catch(FieldIsNull|InvalidGenericArgument ignored){
 				}catch(IOException e){
 					e.printStackTrace();
 					throw new RuntimeException(e);
@@ -924,7 +925,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			if(inst.getThisStruct().hasInvalidInitialNulls()){
-				inst.allocateNulls(man);
+				inst.allocateNulls(man, null);
 			}
 		}
 		

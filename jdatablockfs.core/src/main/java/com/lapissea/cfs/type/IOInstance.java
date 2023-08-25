@@ -328,8 +328,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
-		public void allocateNulls(DataProvider provider) throws IOException{
-			var ctx = this instanceof IOInstance.Unmanaged<?> u? u.getGenerics() : null;
+		public void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException{
+			var ctx = genericContext;
+			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
+			
 			for(var ref : getThisStruct().getRealFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
@@ -605,7 +607,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final void allocateNulls() throws IOException{
-			allocateNulls(getDataProvider());
+			allocateNulls(getDataProvider(), getGenerics());
 		}
 		
 		@Override
@@ -628,7 +630,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	Struct<SELF> getThisStruct();
 	
-	void allocateNulls(DataProvider provider) throws IOException;
+	void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException;
 	
 	@Override
 	default String toShortString(){
