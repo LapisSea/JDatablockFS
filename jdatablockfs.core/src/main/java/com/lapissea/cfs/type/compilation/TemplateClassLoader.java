@@ -95,26 +95,24 @@ public final class TemplateClassLoader extends ClassLoader{
 	private byte[] jorthGenerate(TypeNamed classType){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var log   = JorthLogger.make();
-		var jorth = new Jorth(this, log == null? null : log::log);
-		
-		try(var writer = jorth.writer()){
-			if(classType.def.isIoInstance()){
-				generateIOInstance(classType, writer);
-			}else if(classType.def.isEnum()){
-				generateEnum(classType, writer);
-			}else if(classType.def.isJustInterface()){
-				generateJustAnInterface(classType, writer);
-			}
+		var log = JorthLogger.make();
+		try{
+			var bytecode = Jorth.generateClass(this, classType.name, writer -> {
+				if(classType.def.isIoInstance()){
+					generateIOInstance(classType, writer);
+				}else if(classType.def.isEnum()){
+					generateEnum(classType, writer);
+				}else if(classType.def.isJustInterface()){
+					generateJustAnInterface(classType, writer);
+				}
+			}, log == null? null : log::log);
+			if(log != null) Log.log(log.output());
+			ClassGenerationCommons.dumpClassName(classType.name, bytecode);
+			
+			return bytecode;
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
-		if(log != null) Log.log(log.output());
-		
-		var bytecode = jorth.getClassFile(classType.name);
-		ClassGenerationCommons.dumpClassName(classType.name, bytecode);
-		
-		return bytecode;
 	}
 	
 	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorth{
