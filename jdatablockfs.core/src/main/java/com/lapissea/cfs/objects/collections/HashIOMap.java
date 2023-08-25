@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.RandomIO;
@@ -718,10 +719,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return PutAction.BUCKET_APPEND;
 	}
 	
-	private static final TypeLink BUCKET_NODE_TYPE = new TypeLink(
-		IONode.class,
-		TypeLink.of(BucketEntry.class)
-	);
+	private TypeLink buckedNodeType(){
+		return new TypeLink(
+			IONode.class,
+			getTypeDef().withRaw(BucketEntry.class)
+		);
+	}
 	
 	@SuppressWarnings("unchecked")
 	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, Reference magnet) throws IOException{
@@ -729,7 +732,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			newEntry,
 			null,
 			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
-			BUCKET_NODE_TYPE,
+			buckedNodeType(),
 			getDataProvider(),
 			OptionalLong.of(magnet.calcGlobalOffset(getDataProvider()))
 		);
@@ -739,7 +742,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			return IONode.allocValNode(
 				io,
 				null,
-				BUCKET_NODE_TYPE,
+				buckedNodeType(),
 				getDataProvider(),
 				OptionalLong.of(magnet.getReference().getPtr().getValue())
 			);

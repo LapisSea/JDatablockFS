@@ -416,7 +416,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		if(generic == null){
 			Type[] tArgs = new Type[args.length];
 			for(int i = 0; i<args.length; i++){
-				tArgs[i] = args[i].getTypeClass(db);
+				tArgs[i] = args[i].generic(db);
 			}
 			generic = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
 		}
