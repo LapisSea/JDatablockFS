@@ -68,7 +68,7 @@ public class Cluster implements DataProvider{
 		
 		ROOT_PIPE.modify(firstChunk, root -> {
 			root.metadata.db = db;
-			root.metadata.allocateNulls(provider);
+			root.metadata.allocateNulls(provider, null);
 		}, null);
 	}
 	

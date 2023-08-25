@@ -3,6 +3,7 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -152,7 +153,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 					throw err;
 				}
 			}catch(Throwable e){
-				throw new IllegalArgumentException(type.toShortString() + " is not valid!", e);
+				throw new InvalidGenericArgument(type.toShortString() + " is not valid!", e);
 			}
 		}
 	}
@@ -415,7 +416,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		if(generic == null){
 			Type[] tArgs = new Type[args.length];
 			for(int i = 0; i<args.length; i++){
-				tArgs[i] = args[i].getTypeClass(db);
+				tArgs[i] = args[i].generic(db);
 			}
 			generic = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
 		}
@@ -460,5 +461,8 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		l.args = safeArgs(args);
 		
 		return l;
+	}
+	public TypeLink withRaw(Class<?> raw){
+		return new TypeLink(raw, args);
 	}
 }

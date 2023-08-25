@@ -31,7 +31,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 /**
  * Stores bulk code for basic operations and information for {@link IOField}. Also provides emotional support
  */
-class FieldSupport{
+final class FieldSupport{
 	static <T extends IOInstance<T>> int hash(IOField<T, ?> field, VarPool<T> ioPool, T instance){
 		var acc = field.getAccessor();
 		var id  = acc.getTypeID();

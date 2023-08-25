@@ -26,10 +26,12 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -155,43 +157,55 @@ final class FieldRegistry{
 		}
 	});
 	
-	private static Map<Class<?>, Set<FieldUsage>> PRODUCERS;
-	private static List<Class<?>>                 WRAPPERS;
+	private static List<FieldUsage> getData(){ return USAGES.isInitialized() || !Log.TRACE? USAGES.get() : getDataLogged(); }
 	
-	
-	private static List<FieldUsage> getData()                   { return USAGES.isInitialized() || !Log.TRACE? USAGES.get() : getDataLogged(); }
-	private static Map<Class<?>, Set<FieldUsage>> getProducers(){ return PRODUCERS != null? PRODUCERS : (PRODUCERS = calcProducers()); }
-	static List<Class<?>> getWrappers()                         { return WRAPPERS != null? WRAPPERS : (WRAPPERS = calcWrappers()); }
-	
-	private static Map<Class<?>, Set<FieldUsage>> calcProducers(){
-		Map<Class<?>, Set<FieldUsage>> map = new HashMap<>();
-		for(var f : getData()){
-			for(var typ : f.listFieldTypes()){
-				map.computeIfAbsent(typ, t -> new HashSet<>()).add(f);
+	private static Map<Class<?>, Set<FieldUsage>> getProducers(){
+		class Cache{
+			private static final Map<Class<?>, Set<FieldUsage>> VAL;
+			
+			static{
+				Map<Class<?>, Set<FieldUsage>> map = new HashMap<>();
+				for(var f : getData()){
+					for(var typ : f.listFieldTypes()){
+						map.computeIfAbsent(typ, t -> new HashSet<>()).add(f);
+					}
+				}
+				map.replaceAll((k, v) -> Set.copyOf(v));
+				VAL = Map.copyOf(map);
 			}
 		}
-		map.replaceAll((k, v) -> Set.copyOf(v));
-		return Map.copyOf(map);
+		return Cache.VAL;
 	}
-	private static List<Class<?>> calcWrappers(){
-		return getSealedUniverse(NullFlagCompanyField.class, true)
-			       .orElseThrow()
-			       .universe().stream()
-			       .<Optional<Class<?>>>map((Class<NullFlagCompanyField> fieldType) -> {
-				       var superC = (ParameterizedType)fieldType.getGenericSuperclass();
-				       if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
-					       return Optional.empty();
-				       }
-				       var args = superC.getActualTypeArguments();
-				       if(!(args[1] instanceof Class<?> valueType)){
-					       return Optional.empty();
-				       }
-				       return Optional.of(valueType);
-			       })
-			       .filter(Optional::isPresent).<Class<?>>map(Optional::get)
-			       .distinct()
-			       .sorted(Comparator.comparing(Class::getName)).toList();
+	
+	static Collection<Class<?>> getWrappers(){
+		class Cache{
+			private static final Collection<Class<?>> VAL;
+			
+			static{
+				VAL = Collections.unmodifiableSet(new LinkedHashSet<>(
+					getSealedUniverse(NullFlagCompanyField.class, true)
+						.orElseThrow()
+						.universe().stream()
+						.<Optional<Class<?>>>map((Class<NullFlagCompanyField> fieldType) -> {
+							var superC = (ParameterizedType)fieldType.getGenericSuperclass();
+							if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+								return Optional.empty();
+							}
+							var args = superC.getActualTypeArguments();
+							if(!(args[1] instanceof Class<?> valueType)){
+								return Optional.empty();
+							}
+							return Optional.of(valueType);
+						})
+						.filter(Optional::isPresent).<Class<?>>map(Optional::get)
+						.distinct()
+						.sorted(Comparator.comparing(Class::getName)).toList()
+				));
+			}
+		}
+		return Cache.VAL;
 	}
+	
 	private static List<FieldUsage> getDataLogged(){
 		Log.trace("Waiting for FieldRegistry...");
 		var start = System.nanoTime();

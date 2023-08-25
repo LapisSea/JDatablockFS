@@ -31,6 +31,8 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
+import com.lapissea.cfs.type.compilation.WrapperStructs;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
@@ -50,6 +52,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
@@ -1112,6 +1115,59 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class InlineWrapped<T> implements ValueStorage<T>{
+		
+		private final RuntimeType<T> type;
+		
+		private final DataProvider provider;
+		
+		private final StandardStructPipe<WrapperStructs.Wrapper<T>> pipe;
+		private final Function<T, WrapperStructs.Wrapper<T>>        ctor;
+		
+		public InlineWrapped(DataProvider provider, Class<T> type){
+			this.provider = provider;
+			this.type = RuntimeType.of(type);
+			var res = WrapperStructs.getWrapperStruct(type);
+			pipe = StandardStructPipe.of(res.struct());
+			ctor = res.constructor();
+		}
+		
+		@Override
+		public T readNew(ContentReader src) throws IOException{
+			return pipe.readNew(provider, src, null).get();
+		}
+		@Override
+		public void write(RandomIO dest, T src) throws IOException{
+			pipe.write(provider, dest, ctor.apply(src));
+		}
+		@Override
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
+		
+		@Override
+		public boolean needsRemoval(){
+			return false;
+		}
+		
+		@Override
+		public long inlineSize(){
+			return -1;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			var d = pipe.getSizeDescriptor();
+			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value) -> {
+				var str = type.getType().cast(accessor.get(ioPool, value));
+				if(str == null) return 0;
+				return pipe.getSizeDescriptor().calcUnknown(null, prov, ctor.apply(str), d.getWordSpace());
+			}));
+		}
+		@Override
+		public RuntimeType<T> getType(){
+			return type;
+		}
+	}
+	
 	sealed interface StorageRule{
 		record Default() implements StorageRule{ }
 		
@@ -1140,6 +1196,14 @@ public sealed interface ValueStorage<T>{
 			};
 		}
 		
+		if(FieldCompiler.getWrapperTypes().contains(clazz)){
+			return switch(rule){
+				case StorageRule.Default ignored -> new InlineWrapped<>(provider, clazz);
+				case StorageRule.FixedOnly ignored -> throw new NotImplementedException();//TODO
+				case StorageRule.VariableFixed conf -> throw new NotImplementedException();//TODO
+			};
+		}
+		
 		if(isSealedCached(clazz)){
 			//noinspection rawtypes,unchecked
 			Optional<SealedInstanceUniverse> oUniverse =
@@ -1158,6 +1222,10 @@ public sealed interface ValueStorage<T>{
 					}
 				};
 			}
+		}
+		
+		if(!IOInstance.isInstance(clazz)){
+			throw new IllegalArgumentException(clazz.getTypeName() + " is not an IOInstance");
 		}
 		
 		if(!IOInstance.isManaged(clazz)){

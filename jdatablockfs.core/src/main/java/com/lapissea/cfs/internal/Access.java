@@ -92,6 +92,18 @@ public final class Access{
 		}
 	}
 	
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, MethodHandles.Lookup lookup, Class<FInter> functionalInterface){
+		if(lookup.lookupClass() != constructor.getDeclaringClass()){
+			throw new IllegalArgumentException(lookup.lookupClass().getName() + " != " + constructor.getDeclaringClass().getName());
+		}
+		try{
+			constructor.setAccessible(true);
+			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
+		}catch(Throwable e){
+			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
+		}
+	}
+	
 	private static <FInter, T extends FInter> T createFromCallSite(Class<FInter> functionalInterface, MethodHandles.Lookup lookup, MethodHandle handle) throws Throwable{
 		var site = createCallSite(functionalInterface, lookup, handle);
 		return Objects.requireNonNull((T)site.getTarget().invoke());

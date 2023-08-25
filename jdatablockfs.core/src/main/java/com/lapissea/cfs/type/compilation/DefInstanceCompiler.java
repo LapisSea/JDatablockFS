@@ -74,24 +74,25 @@ public final class DefInstanceCompiler{
 	static{
 		if(!Boolean.getBoolean("jorth.noPreload")){
 			Thread.startVirtualThread(() -> {
-				var jorth = new Jorth(null, null);
-				try(var writer = jorth.writer()){
-					writer.codePart().close();
-					writer.write(
-						"""
-							class A start
-								
-								field a #String
-								
-								function a
-									arg a int
-									returns int
-								start
-									get #arg a
-								end
-							end
+				try{
+					Jorth.generateClass(null, "A", writer -> {
+						writer.codePart().close();
+						writer.write(
 							"""
-					);
+								class A start
+									
+									field a #String
+									
+									function a
+										arg a int
+										returns int
+									start
+										get #arg a
+									end
+								end
+								"""
+						);
+					});
 				}catch(MalformedJorth e){
 					e.printStackTrace();
 				}

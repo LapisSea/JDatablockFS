@@ -822,7 +822,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){
-		return new GenericContext.Deferred(() -> new GenericContext.TypeArgs(getType(), def.generic(null)));
+		return new GenericContext.Deferred(() -> {
+			return new GenericContext.TypeArgs(getType(), def.generic(null));
+		});
 	}
 	
 	@Override

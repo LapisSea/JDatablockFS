@@ -880,7 +880,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		public void init(DataProvider provider) throws IOException{
-			allocateNulls(provider);
+			allocateNulls(provider, null);
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){

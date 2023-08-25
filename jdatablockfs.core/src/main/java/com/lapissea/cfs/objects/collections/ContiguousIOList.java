@@ -142,6 +142,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			case ValueStorage.Primitive<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
 			case ValueStorage.SealedInstance<?> instance -> throw new NotImplementedException();
+			case ValueStorage.InlineWrapped<?> inlineWrapped -> throw new NotImplementedException();
 		};
 	}
 	
@@ -333,6 +334,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
 			case ValueStorage.FixedReferenceSealedInstance<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.InlineWrapped<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
 		};
 	}
 	
@@ -430,8 +432,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		calcHead();
 	}
 	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, TypeLink typeDef){
+		var g   = getGenerics();
+		var ctx = g.argAsContext("T");
 		return (ValueStorage<T>)ValueStorage.makeStorage(
-			makeMagnetProvider(), typeDef, getGenerics().argAsContext("T"),
+			makeMagnetProvider(), typeDef, ctx,
 			new StorageRule.VariableFixed(varying)
 		);
 	}
