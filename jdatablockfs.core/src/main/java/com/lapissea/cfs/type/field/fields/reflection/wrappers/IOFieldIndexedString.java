@@ -104,7 +104,7 @@ public final class IOFieldIndexedString<CTyp extends IOInstance<CTyp>> extends N
 		if(val == null && !nullable()){
 			throw new NullPointerException();
 		}
-		var id   = provider.getDataPool().toId(String.class, val, false);
+		var id   = provider.getDataPool().toId(String.class, val, true);
 		var size = getSafeSize(ioPool, instance, NumberSize.bySize(id));
 		size.writeInt(dest, id);
 	}

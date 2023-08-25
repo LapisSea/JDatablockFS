@@ -115,6 +115,8 @@ public class Cluster implements DataProvider{
 		
 		private IOList<IOChunkPointer> freeChunks;
 		
+		private HashIOMap<String, DataPool.Persistent.TypeData<?>> dataTypeMap;
+		
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + toShortString();
@@ -134,7 +136,7 @@ public class Cluster implements DataProvider{
 	private final IOInterface       source;
 	private final MemoryManager     memoryManager;
 	private final DefragmentManager defragmentManager = new DefragmentManager(this);
-	private final DataPool          dataPool          = new DataPool();
+	private       DataPool          dataPool;
 	
 	private final RootRef  root;
 	private final Metadata metadata;
@@ -222,6 +224,8 @@ public class Cluster implements DataProvider{
 		root = ROOT_PIPE.readNew(this, ch, null);
 		metadata = root.metadata;
 		
+		dataPool = new DataPool.Persistent(metadata.dataTypeMap);
+		
 		memoryManager = new PersistentMemoryManager(
 			this,
 			metadata.freeChunks
@@ -248,7 +252,7 @@ public class Cluster implements DataProvider{
 	@Override
 	public ChunkCache getChunkCache(){ return chunkCache; }
 	@Override
-	public DataPool getDataPool(){ return dataPool; }
+	public DataPool getDataPool(){ return Objects.requireNonNull(dataPool); }
 	
 	public RootProvider getRootProvider(){ return rootProvider; }
 	

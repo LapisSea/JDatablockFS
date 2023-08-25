@@ -28,7 +28,7 @@ public interface DataProvider{
 		private final ChunkCache    cache         = ChunkCache.strong();
 		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
-		private final DataPool      dataPool      = new DataPool();
+		private final DataPool      dataPool      = new DataPool.InMemory();
 		
 		public VerySimple(IOInterface data){
 			this.data = data;
