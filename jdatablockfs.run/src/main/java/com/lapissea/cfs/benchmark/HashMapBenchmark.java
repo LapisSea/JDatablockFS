@@ -3,6 +3,7 @@ package com.lapissea.cfs.benchmark;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
@@ -16,13 +17,12 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@Warmup(iterations = 7, time = 500, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 10, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
-@Fork(3)
+@Warmup(iterations = 15, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 20, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
+@Fork(5)
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class HashMapBenchmark{
@@ -42,7 +42,7 @@ public class HashMapBenchmark{
 		}
 	}
 	
-	private final Random rand = new Random();
+	private final RawRandom rand = new RawRandom();
 	
 	@Param({"5", "50", "500"})
 	public int initSize;
@@ -60,7 +60,7 @@ public class HashMapBenchmark{
 		var provider = Cluster.emptyMem();
 		map = provider.getRootProvider().request("hi", HashIOMap.class, Integer.class, Integer.class);
 		
-		var rand = new Random();
+		var rand = new RawRandom();
 		map.putAll(
 			rand.ints(0, range).distinct().limit(initSize).boxed()
 			    .collect(Collectors.toMap(i -> i, i -> rand.nextInt(range)))
@@ -68,14 +68,22 @@ public class HashMapBenchmark{
 	}
 	
 	@Benchmark
-	@Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 	public void get() throws IOException{
 		map.get(rand.nextInt(range));
 	}
 	
 	@Benchmark
-	@Warmup(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 	public void put() throws IOException{
 		map.put(rand.nextInt(range), rand.nextInt(range));
+	}
+	
+	@Benchmark
+	public void remove() throws IOException{
+		map.remove(rand.nextInt(range));
+	}
+	
+	@Benchmark
+	public void contains() throws IOException{
+		map.containsKey(rand.nextInt(range));
 	}
 }
