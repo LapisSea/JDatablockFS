@@ -171,10 +171,29 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		}
 	}
 	
-	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor.Funct<CTyp>{
+	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor.Funct<CTyp>{
 		
-		public Ptr(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
+		public PtrFunc(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
 			super(struct, field, getter, setter, name, ChunkPointer.class);
+		}
+		@Override
+		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
+			var num = (ChunkPointer)get(ioPool, instance);
+			if(num == null){
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
+			}
+			return num.getValue();
+		}
+		@Override
+		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
+			set(ioPool, instance, ChunkPointer.of(value));
+		}
+	}
+	
+	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
+		
+		public Ptr(Struct<CTyp> struct, Field field, String name){
+			super(struct, field, name, ChunkPointer.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
@@ -192,7 +211,10 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 		if(genericType == ChunkPointer.class){
-			return new Ptr<>(struct, field, getter, setter, name);
+			if(getter.isEmpty() && setter.isEmpty()){
+				return new Ptr<>(struct, field, name);
+			}
+			return new PtrFunc<>(struct, field, getter, setter, name);
 		}else{
 			if(getter.isEmpty() && setter.isEmpty()){
 				return new UnsafeAccessor<>(struct, field, name, genericType);
