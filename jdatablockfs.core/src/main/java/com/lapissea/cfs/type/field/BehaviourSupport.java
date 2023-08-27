@@ -97,7 +97,7 @@ public final class BehaviourSupport{
 			NumberSize.class,
 			new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 				private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					var len = calcMaxVal(ioPool, inst, deps);
+					var len = unsigned? calcMaxVal(ioPool, inst, deps) : calcMinMaxVal(ioPool, inst, deps);
 					return NumberSize.bySize(len, unsigned);
 				}
 				private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
@@ -109,7 +109,7 @@ public final class BehaviourSupport{
 							yield Math.max(a, b);
 						}
 						default -> {
-							long best = Long.MIN_VALUE;
+							long best = 0;
 							for(var d : deps){
 								long newVal = d.getLong(ioPool, inst);
 								if(newVal>best){
@@ -120,6 +120,29 @@ public final class BehaviourSupport{
 						}
 					};
 				}
+				private long calcMinMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
+					return switch(deps.size()){
+						case 1 -> deps.get(0).getLong(ioPool, inst);
+						case 2 -> {
+							long a   = deps.get(0).getLong(ioPool, inst);
+							long b   = deps.get(1).getLong(ioPool, inst);
+							var  min = Math.min(a, b);
+							var  max = Math.max(a, b);
+							yield Math.abs(min)>Math.abs(max)? min : max;
+						}
+						default -> {
+							long min = Long.MAX_VALUE;
+							long max = Long.MIN_VALUE;
+							for(var d : deps){
+								long newVal = d.getLong(ioPool, inst);
+								min = Math.min(min, newVal);
+								max = Math.max(max, newVal);
+							}
+							yield Math.abs(min)>Math.abs(max)? min : max;
+						}
+					};
+				}
+				
 				@Override
 				public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
 					NumberSize raw;
