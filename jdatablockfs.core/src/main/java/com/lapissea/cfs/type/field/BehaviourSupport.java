@@ -25,8 +25,6 @@ import java.util.Set;
 
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GROW_ONLY;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public final class BehaviourSupport{
@@ -87,12 +85,11 @@ public final class BehaviourSupport{
 	public static <T extends IOInstance<T>> BehaviourRes<T> virtualNumSize(FieldAccessor<T> field, IODependency.VirtualNumSize ann){
 		var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
 		
-		var retention = ann.retention();
-		var min       = ann.min();
-		var max       = ann.max();
+		var min = ann.min();
+		var max = ann.max();
 		
 		var vf = new VirtualFieldDefinition<>(
-			retention == GHOST? IO : INSTANCE,
+			IO,
 			IOFieldTools.getNumSizeName(field, ann),
 			NumberSize.class,
 			new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
@@ -145,21 +142,12 @@ public final class BehaviourSupport{
 				
 				@Override
 				public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-					NumberSize raw;
-					
-					if(retention == GROW_ONLY){
-						if(val == max) raw = max;
-						else raw = calcMax(ioPool, inst, deps).max(val == null? NumberSize.VOID : val);
-					}else{
-						raw = val == null? calcMax(ioPool, inst, deps) : val;
-					}
-					
+					var raw  = val == null? calcMax(ioPool, inst, deps) : val;
 					var size = raw.max(min);
 					
 					if(size.greaterThan(max)){
 						throw new RuntimeException(size + " can't fit in to " + max);
 					}
-					
 					return size;
 				}
 			});
