@@ -6,21 +6,21 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.util.UtilL;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
 	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
 		
-		private final MethodHandle getter;
-		private final MethodHandle setter;
+		private final Function<CTyp, ?>        getter;
+		private final BiConsumer<CTyp, Object> setter;
 		
 		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, name, genericType);
@@ -28,142 +28,106 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 			getter.ifPresent(get -> validateGetter(genericType, get));
 			setter.ifPresent(set -> validateSetter(genericType, set));
 			
-			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(this::makeGetter).orElse(null);
+			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(this::makeSetter).orElse(null);
 		}
 		
 		@Override
 		protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactShort(ioPool, instance, value);
 		}
 		@Override
 		protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (short)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (short)getter.apply(instance);
 			return super.getExactShort(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactChar(ioPool, instance, value);
 		}
 		@Override
 		protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (char)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (char)getter.apply(instance);
 			return super.getExactChar(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactLong(ioPool, instance, value);
 		}
 		@Override
 		protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (long)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (long)getter.apply(instance);
 			return super.getExactLong(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactByte(ioPool, instance, value);
 		}
 		@Override
 		protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (byte)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (byte)getter.apply(instance);
 			return super.getExactByte(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactInt(ioPool, instance, value);
 		}
 		@Override
 		protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (int)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (int)getter.apply(instance);
 			return super.getExactInt(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactDouble(ioPool, instance, value);
 		}
 		@Override
 		protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (double)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (double)getter.apply(instance);
 			return super.getExactDouble(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactFloat(ioPool, instance, value);
 		}
 		@Override
 		protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (float)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (float)getter.apply(instance);
 			return super.getExactFloat(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactBoolean(ioPool, instance, value);
 		}
 		@Override
 		protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return (boolean)getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return (boolean)getter.apply(instance);
 			return super.getExactBoolean(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
-			if(setter != null) try{
-				setter.invoke(instance, value);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(setter != null) setter.accept(instance, value);
 			super.setExactObject(ioPool, instance, value);
 		}
 		@Override
 		protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) try{
-				return getter.invoke(instance);
-			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			if(getter != null) return getter.apply(instance);
 			return super.getExactObject(ioPool, instance);
 		}
 	}
