@@ -42,6 +42,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.utils.ClosableLock;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -59,7 +60,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -298,8 +298,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		                 .filter(RefField.class::isInstance)
 		                 .map(RefField.class::cast)
 		                 .map(ref -> fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f -> Map.entry(f, ref)))
-		                 .filter(Optional::isPresent)
-		                 .map(Optional::get)
+		                 .filter(OptionalPP::isPresent)
+		                 .map(OptionalPP::get)
 		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		
 		for(var field : fields){
@@ -909,7 +909,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				
 				field.getAccessor().getAnnotation(IODependency.class)
 				     .map(IODependency::value).stream().flatMap(Arrays::stream)
-				     .map(fields::byName).map(Optional::orElseThrow)
+				     .map(fields::byName).map(OptionalPP::orElseThrow)
 				     .filter(n -> n.getType() == NumberSize.class)
 				     .findAny()//dependency that is a numsize
 				     .filter(not(IOField::isVirtual))
