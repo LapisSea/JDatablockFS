@@ -82,7 +82,10 @@ public final class RandomActions{
 				if(i == 0) LogUtil.println("First");
 				else if(i%(period/10) == 0) LogUtil.println(i/(double)period);
 			}else if(i%period == 0){
-				if(start == null) start = Instant.now();
+				if(start == null){
+					start = Instant.now();
+					continue;
+				}
 				var i0      = i - period;
 				var percent = i0/((double)iter);
 				var pass    = Duration.between(start, Instant.now()).toMillis();

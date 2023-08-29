@@ -303,7 +303,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	@Nullable
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return null;
+		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){

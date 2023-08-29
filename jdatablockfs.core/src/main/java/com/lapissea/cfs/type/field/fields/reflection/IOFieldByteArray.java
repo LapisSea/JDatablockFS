@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -74,9 +75,9 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		if(compression == null){
-			return null;
+			return super.getGenerators();
 		}
-		return List.of(new ValueGeneratorInfo<>(compressed, new ValueGenerator<T, byte[]>(){
+		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(compressed, new ValueGenerator<T, byte[]>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 				return compressed.isNull(ioPool, instance);

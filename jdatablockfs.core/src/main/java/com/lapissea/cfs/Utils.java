@@ -17,10 +17,12 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -295,8 +297,21 @@ public class Utils{
 	/**
 	 * To be used only for debugging
 	 */
-	public static byte[] dataFromBase64(String base64) throws IOException{
+	public static byte[] dataFromBase64(String base64){
 		var compressed = Base64.getDecoder().decode(base64);
 		return IOCompression.Type.GZIP.unpack(compressed);
+	}
+	
+	public static <T> List<T> concat(List<T> a, List<T> b){
+		var l = new ArrayList<T>(a.size() + b.size());
+		l.addAll(a);
+		l.addAll(b);
+		return List.copyOf(l);
+	}
+	public static <T> List<T> concat(List<T> a, T b){
+		var l = new ArrayList<T>(a.size() + 1);
+		l.addAll(a);
+		l.add(b);
+		return List.copyOf(l);
 	}
 }

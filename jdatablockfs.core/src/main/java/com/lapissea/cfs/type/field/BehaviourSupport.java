@@ -184,7 +184,7 @@ public final class BehaviourSupport{
 		
 		var lenField = new VirtualFieldDefinition<>(
 			IO, IOFieldTools.makeCollectionLenName(field), int.class,
-			(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value) -> {
+			(VirtualFieldDefinition.GetterFilter<T, Integer>)(ioPool, instance, dependencies, value) -> {
 				if(value>0) return value;
 				var collection = instance == null? null : field.get(ioPool, instance);
 				if(collection != null){

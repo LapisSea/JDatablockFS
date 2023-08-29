@@ -94,7 +94,7 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	@Override
 	public String toString(){
 		var struct = getDeclaringStruct();
-		return getType().getName() + " " + (struct == null? "" : struct.cleanName()) + "#" + strName();
+		return getType().getTypeName() + " " + (struct == null? "" : struct.cleanName()) + "#" + strName();
 	}
 	@Override
 	public String toShortString(){

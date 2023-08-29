@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -21,7 +22,6 @@ import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
@@ -81,7 +81,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		ValueGeneratorInfo<T, NumberSize> numSizeGene = new ValueGeneratorInfo<>(numSize, new ValueGenerator<T, NumberSize>(){
+		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(numSize, new ValueGenerator<>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 				if(numSize.isNull(ioPool, instance)){
@@ -109,9 +109,7 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 				var maxSiz = NumberSize.bySizeSigned(max);
 				return minSiz.max(maxSiz);
 			}
-		});
-		
-		return Stream.concat(Stream.of(numSizeGene), super.getGenerators().stream()).toList();
+		}));
 	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
