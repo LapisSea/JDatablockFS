@@ -10,10 +10,8 @@ import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static java.util.Comparator.comparingInt;
@@ -32,20 +30,29 @@ public enum NumberSize{
 	LONG      ('L', 8);
 	// @formatter:on
 	
-	private static final NumberSize[] BYTE_MAP =
-		IntStream.range(0, Arrays.stream(values()).mapToInt(NumberSize::bytes).max().orElseThrow() + 1)
-		         .mapToObj(b -> Arrays.stream(values()).filter(f -> f.bytes>=b).reduce(NumberSize::min).orElseThrow())
-		         .toArray(NumberSize[]::new);
+	private static final NumberSize[] BYTE_MAP;
+	
+	static{
+		var len  = 0;
+		var vals = values();
+		for(var n : vals) len = Math.max(len, n.bytes);
+		var res = new NumberSize[len + 1];
+		for(var n : vals){
+			for(int i = 0; i<n.bytes + 1; i++){
+				res[i] = res[i] == null? n : n.min(res[i]);
+			}
+		}
+		BYTE_MAP = res;
+	}
 	
 	public static final EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
 	
-	public static final NumberSize SMALEST_REAL = BYTE;
-	public static final NumberSize LARGEST      = LONG;
+	public static final NumberSize LARGEST = LONG;
 	
 	static{
 		for(NumberSize ns : values()){
-			ns.prev = FLAG_INFO.stream().filter(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
-			ns.next = FLAG_INFO.stream().filter(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.next = FLAG_INFO.filtered(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
 		}
 	}
 	

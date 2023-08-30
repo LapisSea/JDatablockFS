@@ -801,7 +801,11 @@ public class SlowTests{
 			r -> new BlobAction.Trim(r.nextInt(500))
 		)).chanceFor(BlobAction.Trim.class, 1F/20));
 		
-		runner.runAndAssert(69, 2000000, 10000);
+		
+		stableRunAndSave(
+			Plan.start(runner, 69, 2000000, 10000),
+			"runFuzzBlobIO"
+		);
 	}
 	
 	private static Cluster optionallyLogged(boolean logged, String name) throws IOException{
