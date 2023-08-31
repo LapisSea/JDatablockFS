@@ -786,7 +786,7 @@ public class SlowTests{
 				var initial = new byte[random.nextInt(0, 100)];
 				random.nextBytes(initial);
 				
-				var cl   = Cluster.emptyMem();
+				var cl   = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "fuzzBlobIO");
 				var blob = cl.getRootProvider().request("blob", Blob.class);
 				blob.write(true, initial);
 				

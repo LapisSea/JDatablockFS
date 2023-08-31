@@ -799,18 +799,16 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Override
 	public String toString(){
-		StringBuilder sb = new StringBuilder().append("Chunk{").append(getPtr()).append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
-		if(hasNextPtr()){
-			sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
-		}
+		var sb = new StringBuilder().append("Chunk{").append(getPtr());
+		if(bodyNumSize != NumberSize.VOID) sb.append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
+		if(hasNextPtr()) sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
 		return sb.append("}").toString();
 	}
 	@Override
 	public String toShortString(){
-		StringBuilder sb = new StringBuilder().append("{").append(getPtr()).append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
-		if(hasNextPtr()){
-			sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
-		}
+		var sb = new StringBuilder().append("{").append(getPtr());
+		if(bodyNumSize != NumberSize.VOID) sb.append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
+		if(hasNextPtr()) sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
 		return sb.append("}").toString();
 	}
 	
