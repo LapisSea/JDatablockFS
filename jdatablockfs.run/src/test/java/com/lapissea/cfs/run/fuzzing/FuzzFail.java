@@ -90,8 +90,7 @@ public sealed interface FuzzFail<State, Act>{
 			if(!(o instanceof Create<?, ?> create)) return false;
 			
 			if(!permissiveThrowableEquals(e, create.e)) return false;
-			return sequence.equals(create.sequence) &&
-			       timeToFail.equals(create.timeToFail);
+			return sequence.equals(create.sequence);
 		}
 	}
 	

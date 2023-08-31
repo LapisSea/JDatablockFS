@@ -9,6 +9,7 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.cfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -70,15 +71,49 @@ public final class RandomActions{
 	}
 	
 	
+	private static <E extends Throwable> void runIter(int iter, int period, UnsafeRunnable<E> run) throws E{
+		Instant start = null;
+		int     pLen  = 0;
+		for(int i = 0; i<iter; i++){
+			
+			run.run();
+			
+			if(i<period){
+				if(i == 0) LogUtil.println("First");
+				else if(i%(period/10) == 0) LogUtil.println(i/(double)period);
+			}else if(i%period == 0){
+				if(start == null){
+					start = Instant.now();
+					continue;
+				}
+				var i0      = i - period;
+				var percent = i0/((double)iter);
+				var pass    = Duration.between(start, Instant.now()).toMillis();
+				var etr     = Duration.ofMillis((long)(pass/percent - pass));
+				var ps      = percent + "";
+				pLen = Math.max(pLen, ps.length());
+				LogUtil.println(
+					percent + "%, " + " ".repeat(pLen - ps.length()) +
+					String.format("ETR: %d:%02d:%02d:%03d",
+					              etr.toHoursPart(),
+					              etr.toMinutesPart(),
+					              etr.toSecondsPart(),
+					              etr.toMillisPart()
+					) + ", " +
+					String.format("ops/ms: %.2f", (i0/(double)pass))
+				);
+			}
+		}
+	}
+	
 	private static void treeSet() throws IOException{
 		var provider = Cluster.emptyMem();
 		var set      = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
-		var r        = new Random(420);
 		
 		
+		var r    = new RawRandom(420);
 		var iter = 50_000_000;
-		for(int i = 0; i<iter; i++){
-			if(i%(iter/200) == 0) LogUtil.println(i/(float)iter);
+		runIter(iter, iter/200, () -> {
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){
@@ -86,11 +121,10 @@ public final class RandomActions{
 				case 1 -> set.remove(num);
 				case 2 -> set.contains(num);
 			}
-		}
+		});
 	}
 	
-	
-	private static int idx(Random r, List<Chunk> ch){
+	private static int idx(RawRandom r, List<Chunk> ch){
 		int index = r.nextInt(ch.size());
 		for(int i = 0; i<ch.size(); i++){
 			var j = (i + index)%ch.size();
@@ -105,10 +139,9 @@ public final class RandomActions{
 		var provider = Cluster.emptyMem();
 		
 		List<Chunk> chs = new ArrayList<>();
-		var         r   = new Random(69);
-		a:
-		for(int i = 0; i<5000000; i++){
-			if(i%100000 == 0) LogUtil.println(i/5000000D, chs.size(), provider.getMemoryManager().getFreeChunks().size());
+		
+		var r = new RawRandom(69);
+		runIter(5000000, 100000, () -> {
 			if(chs.isEmpty() || r.nextBoolean()){
 				var t = AllocateTicket.bytes(r.nextInt(50));
 				if(r.nextBoolean()){
@@ -117,7 +150,7 @@ public final class RandomActions{
 				for(int i1 = 0; i1<chs.size(); i1++){
 					if(chs.get(i1) == null){
 						chs.set(i1, t.submit(provider));
-						continue a;
+						return;
 					}
 				}
 				chs.add(t.submit(provider));
@@ -131,7 +164,7 @@ public final class RandomActions{
 				
 				provider.getMemoryManager().free(ch);
 			}
-		}
+		});
 	}
 	
 	private static void hashSet() throws IOException{
@@ -139,18 +172,15 @@ public final class RandomActions{
 		
 		var set = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
 		
-		var r    = new Random(69);
-		var iter = 50000000;
-		for(int i = 0; i<iter; i++){
-			if(i%200000 == 0) LogUtil.println(i/((double)iter));
+		var r = new RawRandom(69);
+		runIter(50000000, 200000, () -> {
 			Integer num = r.nextInt(400);
-			
 			switch(r.nextInt(3)){
 				case 0 -> set.add(num);
 				case 1 -> set.remove(num);
 				case 2 -> set.contains(num);
 			}
-		}
+		});
 	}
 	
 	private static void hashMap() throws IOException{
@@ -158,18 +188,16 @@ public final class RandomActions{
 		
 		var map = provider.getRootProvider().<HashIOMap<Integer, Integer>>request("hi", HashIOMap.class, Integer.class, Integer.class);
 		
-		var r    = new Random(69);
-		var iter = 50000000;
-		for(int i = 0; i<iter; i++){
-			if(i%(iter/100) == 0) LogUtil.println(i/((double)iter));
+		var r = new RawRandom(69);
+		runIter(200000000, 1000000, () -> {
 			Integer num = r.nextInt(400);
-			
-			switch(r.nextInt(3)){
+			switch(r.nextInt(4)){
 				case 0 -> map.put(num, r.nextInt(400));
 				case 1 -> map.remove(num);
 				case 2 -> map.containsKey(num);
+				case 3 -> map.get(num);
 			}
-		}
+		});
 	}
 	
 	private static void hashMapThreadGet() throws IOException{

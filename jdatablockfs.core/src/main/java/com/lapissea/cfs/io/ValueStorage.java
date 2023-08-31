@@ -195,6 +195,8 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			pipe.write(provider, dest, src);
 		}
+		
+		private static final Reference DUMMY = new Reference(ChunkPointer.of(Long.MAX_VALUE), 420);
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var ptrs = new ArrayList<ChunkPointer>();
@@ -202,8 +204,7 @@ public sealed interface ValueStorage<T>{
 			var startPos = io.getPos();
 			var root     = readNew(io);
 			
-			var rootRef = new Reference(ChunkPointer.of(69), 420);
-			var dirty   = structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
+			var dirty = structWalk(provider, ptrs, dereferenceWrite, pipe, root, DUMMY);
 			if(dirty){
 				write(io.setPos(startPos), root);
 			}

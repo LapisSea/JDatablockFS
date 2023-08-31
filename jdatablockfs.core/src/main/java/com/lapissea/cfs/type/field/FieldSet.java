@@ -20,7 +20,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
@@ -446,8 +445,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return data.length;
 	}
 	
-	public Optional<IOField<T, ?>> byName(String name){
-		return Optional.ofNullable(getNameLookup().get(name)).map(this::get);
+	public OptionalPP<IOField<T, ?>> byName(String name){
+		return OptionalPP.ofNullable(getNameLookup().get(name)).map(this::get);
 	}
 	
 	private Map<String, Integer> getNameLookup(){
@@ -503,7 +502,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return byType(type).filtered(f -> f.getName().equals(name)).first();
 	}
 	
-	public <E extends IOField<T, ?>> Optional<? extends E> exactFieldType(Class<E> type, String name){
+	public <E extends IOField<T, ?>> OptionalPP<? extends E> exactFieldType(Class<E> type, String name){
 		return byName(name).filter(type::isInstance).map(type::cast);
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){

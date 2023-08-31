@@ -330,14 +330,13 @@ public final class ChunkChainIO implements RandomIO{
 			checkCursorInChain();
 		}
 		
-		Chunk last  = cursor;
-		Chunk chunk = last.next();
+		Chunk last = cursor;
 		
-		if(chunk != null){
-			for(Chunk c : new ChainWalker(chunk)){
-				remaining += chunk.getCapacity();
+		if(last.hasNextPtr()){
+			for(var ch : last.requireNext().walkNext()){
+				remaining += ch.getCapacity();
 				if(amount<=remaining) return;
-				last = c;
+				last = ch;
 			}
 		}
 		

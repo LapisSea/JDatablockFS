@@ -196,11 +196,10 @@ public final class IOFieldTools{
 		}
 		return OptionalLong.of(sum);
 	}
-	public static <T extends IOInstance<T>> long sumVars(Collection<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
-		//return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
+	public static <T extends IOInstance<T>> long sumVars(List<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
 		long sum = 0L;
-		for(IOField<T, ?> field : fields){
-			sum += mapper.applyAsLong(field.getSizeDescriptor());
+		for(int i = 0; i<fields.size(); i++){
+			sum += mapper.applyAsLong(fields.get(i).getSizeDescriptor());
 		}
 		return sum;
 	}

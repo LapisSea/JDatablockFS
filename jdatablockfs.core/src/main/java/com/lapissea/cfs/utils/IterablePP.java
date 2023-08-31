@@ -2,9 +2,11 @@ package com.lapissea.cfs.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -181,6 +183,25 @@ public interface IterablePP<T> extends Iterable<T>{
 				return src.next();
 			}
 		};
+	}
+	
+	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
+		final Iterator<T> src = IterablePP.this.iterator();
+		if(!src.hasNext()) return OptionalPP.empty();
+		var result = src.next();
+		while(src.hasNext()){
+			var next = src.next();
+			result = reducer.apply(result, next);
+		}
+		return OptionalPP.of(result);
+	}
+	
+	default OptionalPP<T> min(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.minBy(comparator));
+	}
+	
+	default OptionalPP<T> max(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.maxBy(comparator));
 	}
 	
 	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){

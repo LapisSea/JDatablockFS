@@ -8,8 +8,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
-
 /**
  * This annotation can specify that another field or fields are dependent on it. This is needed when
  * a custom getter is used and is accessing another IO field.
@@ -54,39 +52,10 @@ public @interface IODependency{
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface VirtualNumSize{
-		
-		/**
-		 * This enum specifies the logic that determines the behaviour of the automatic computation of the virtual field value.
-		 */
-		enum RetentionPolicy{
-			/**
-			 * This policy states that a field should simply conform to the minimum valid size of the number. This value may grow
-			 * or shrink without any restriction. This is the default and preferred mode.
-			 */
-			GHOST,
-			/**
-			 * This policy states that the field should only grow.
-			 * If the value has been saved with a size that requires 8 bytes and on the
-			 * subsequent writing, it requires only 1, it will still be written as if it needs 8 bytes.
-			 * This can increase the predictability of where data is and may decrease fragmentation
-			 * at the cost of space efficiency.
-			 */
-			GROW_ONLY,
-			/**
-			 * Rigid initial states that once a value has been written, its size is locked in. It may not grow or shrink.
-			 * A field will fail to write and cause an exception if its size can not be stored due to insufficient bytes
-			 * allocated to it.
-			 */
-			RIGID_INITIAL
-		}
-		
 		String name() default "";
 		
 		NumberSize min() default NumberSize.VOID;
 		NumberSize max() default NumberSize.LONG;
-		
-		RetentionPolicy retention() default GHOST;
-		
 	}
 	
 }

@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -18,8 +19,9 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
+import java.util.stream.Stream;
 
-public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
+public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP<T>{
 	
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
 	
@@ -290,5 +292,9 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	@Override
 	public Spliterator<T> spliterator(){
 		return Arrays.spliterator(universe);
+	}
+	@Override
+	public Stream<T> stream(){
+		return super.stream();
 	}
 }

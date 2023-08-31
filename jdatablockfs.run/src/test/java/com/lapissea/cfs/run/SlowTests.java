@@ -426,6 +426,13 @@ public class SlowTests{
 		);
 	}
 	
+	private static <State, Action> void stableRun(Plan<State, Action> plan, String name){
+		plan.configMod(c -> c.withName(name))
+		    .runAll().report()
+		    .stableFail(8)
+		    .runMark()
+		    .assertFail();
+	}
 	private static <State, Action> void stableRunAndSave(Plan<State, Action> plan, String name){
 		plan.loadFail(new File("FailCache/" + name))
 		    .configMod(c -> c.withName(name))
@@ -758,6 +765,10 @@ public class SlowTests{
 			
 			@Override
 			public void applyAction(BlobState state, long actionIndex, BlobAction action, FuzzingRunner.Mark mark) throws IOException{
+				if(mark.action(actionIndex)){
+					LogUtil.println(action);
+					int a = 0;//for breakpoint
+				}
 				switch(action){
 					case BlobAction.Write(var off, var data) -> {
 						var siz = state.mem.getIOSize();
@@ -786,7 +797,7 @@ public class SlowTests{
 				var initial = new byte[random.nextInt(0, 100)];
 				random.nextBytes(initial);
 				
-				var cl   = Cluster.emptyMem();
+				var cl   = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "fuzzBlobIO");
 				var blob = cl.getRootProvider().request("blob", Blob.class);
 				blob.write(true, initial);
 				
@@ -801,7 +812,11 @@ public class SlowTests{
 			r -> new BlobAction.Trim(r.nextInt(500))
 		)).chanceFor(BlobAction.Trim.class, 1F/20));
 		
-		runner.runAndAssert(69, 2000000, 10000);
+		
+		stableRun(
+			Plan.start(runner, 69, 2000000, 10000),
+			"runFuzzBlobIO"
+		);
 	}
 	
 	private static Cluster optionallyLogged(boolean logged, String name) throws IOException{

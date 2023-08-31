@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
@@ -49,10 +50,9 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+		if(!nullable()) return super.getGenerators();
 		
-		if(!nullable()) return List.of();
-		
-		return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
+		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 				var isNullRec     = get(ioPool, instance) == null;
