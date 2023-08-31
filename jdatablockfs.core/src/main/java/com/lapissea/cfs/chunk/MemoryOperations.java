@@ -394,7 +394,7 @@ public final class MemoryOperations{
 		var toPin = AllocateTicket.bytes(toAllocate)
 		                          .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
 		                          .withPositionMagnet(target)
-		                          .withExplicitNextSize(explicitNextSize(manager, isChain))
+		                          .withExplicitNextSize(calcExplicitNextSize(manager, isChain))
 		                          .submit(manager);
 		if(toPin == null) return 0;
 		target.modifyAndSave(c -> {
@@ -427,7 +427,7 @@ public final class MemoryOperations{
 			else allocated = AllocateTicket.bytes(toAllocate + toCopy)
 			                               .withPositionMagnet(ch)
 			                               .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
-			                               .withExplicitNextSize(explicitNextSize(manager, true))
+			                               .withExplicitNextSize(calcExplicitNextSize(manager, true))
 			                               .submit(manager);
 			if(allocated == null){
 				toCopy += ch.getCapacity();
@@ -468,35 +468,61 @@ public final class MemoryOperations{
 		
 		boolean isChain = first != target;
 		
-		var siz = target.getNextSize();
+		NumberSize nextSiz;
+		NumberSize bodyNum;
+		int        growth, bodyShrink;
+		Chunk      toPin = null;
 		
-		var ticket = AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
-		                                   .withPositionMagnet(target);
+		var baseTicket = AllocateTicket.explicitNextSize(calcExplicitNextSize(manager, isChain));
 		
-		int   growth;
-		Chunk toPin = null;
 		while(true){
+			nextSiz = target.getNextSize();
+			bodyNum = target.getBodyNumSize();
+			bodyShrink = 0;
+			baseTicket = baseTicket.withPositionMagnet(target);
 			do{
-				if(siz == NumberSize.LARGEST){
+				if(nextSiz == NumberSize.LARGEST){
 					throw new OutOfMemoryError();
 				}
 				
-				siz = siz.next();
-				growth = siz.bytes - target.getNextSize().bytes;
+				nextSiz = nextSiz.next();
+				growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
 				
+				overflow:
 				if(target.getCapacity()<growth){
+					var prevBodyNum = bodyNum.prev();
+					bodyShrink = (bodyNum.bytes - prevBodyNum.bytes)*2;
+					growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
+					while(true){
+						var newCap = target.getCapacity() - growth;
+						if(newCap<0) break;
+						
+						if(prevBodyNum.canFit(newCap)){
+							bodyNum = prevBodyNum;
+							break overflow;
+						}
+						
+						nextSiz = nextSiz.next();
+						growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
+						
+						if(nextSiz == NumberSize.LARGEST){
+							break;
+						}
+					}
+					
 					break;
 				}
 				
-				toPin = ticket.withBytes(toAllocate + growth)
-				              .withApproval(Chunk.sizeFitsPointer(siz))
-				              .submit(manager);
+				toPin = baseTicket.withBytes(toAllocate + growth)
+				                  .withApproval(Chunk.sizeFitsPointer(nextSiz))
+				                  .submit(manager);
 			}while(toPin == null);
 			if(toPin != null) break;
 			
 			toAllocate += target.getSize();
 			target = target.findPrev(first);
 			if(target == null) return 0;
+			nextSiz = target.getNextSize();
 		}
 		
 		IOInterface source = target.getDataProvider().getSource();
@@ -514,18 +540,24 @@ public final class MemoryOperations{
 		}
 		
 		var oldCapacity = target.getCapacity();
+		var dataEnd     = target.dataEnd();
 		
 		var toFree = target.next();
 		
 		target.requireReal();
+		
 		try{
-			target.setNextSize(siz);
+			target.setNextSize(nextSiz);
 			target.setNextPtr(toPin.getPtr());
 			target.setSize(shiftSize);
 			target.setCapacity(oldCapacity - growth);
+			target.setBodyNumSize(bodyNum);
 		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
+		
+		assert dataEnd == target.dataEnd() : target + ": " + dataEnd + "!=" + target.dataEnd();
+		
 		try(var ignored = source.openIOTransaction()){
 			target.syncStruct();
 			source.write(target.dataStart(), false, toShift);
@@ -778,7 +810,7 @@ public final class MemoryOperations{
 		return 0;
 	}
 	
-	private static Optional<NumberSize> explicitNextSize(MemoryManager manager, boolean isChain) throws IOException{
+	private static Optional<NumberSize> calcExplicitNextSize(MemoryManager manager, boolean isChain) throws IOException{
 		if(!isChain){
 			return Optional.empty();
 		}
