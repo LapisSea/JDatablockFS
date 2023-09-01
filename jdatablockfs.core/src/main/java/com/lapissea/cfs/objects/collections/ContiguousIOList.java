@@ -69,7 +69,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
 		ContiguousIOList.class,
-		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"))
+		TypeLink.Check.ArgCheck.rawAny(
+			PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"),
+			TypeLink.Check.ArgCheck.RawCheck.of(c -> c == Object.class, "is not an Object")
+		)
 	);
 	
 	@IOValue
@@ -143,6 +146,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
 			case ValueStorage.SealedInstance<?> instance -> throw new NotImplementedException();
 			case ValueStorage.InlineWrapped<?> inlineWrapped -> throw new NotImplementedException();
+			case ValueStorage.UnknownIDReference<?> inlineWrapped -> throw new NotImplementedException();
 		};
 	}
 	
@@ -335,6 +339,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			}
 			case ValueStorage.FixedReferenceSealedInstance<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
 			case ValueStorage.InlineWrapped<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.UnknownIDReference<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
 		};
 	}
 	

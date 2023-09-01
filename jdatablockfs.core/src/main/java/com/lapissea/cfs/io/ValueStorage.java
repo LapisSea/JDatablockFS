@@ -41,6 +41,7 @@ import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.DynamicSupport;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -885,6 +886,159 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class UnknownIDReference<T> implements ValueStorage<T>, RefStorage<TypedReference>{
+		
+		private final DataProvider               provider;
+		private final GenericContext             generics;
+		private final StructPipe<TypedReference> refPipe;
+		
+		private final long inlineSize;
+		
+		public UnknownIDReference(DataProvider provider, GenericContext generics, StructPipe<TypedReference> refPipe){
+			this.provider = provider;
+			this.generics = generics;
+			this.refPipe = refPipe;
+			inlineSize = refPipe.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(-1);
+		}
+		
+		@Override
+		public T readNew(ContentReader src) throws IOException{
+			var ref  = readInline(src);
+			var type = ref.getType(provider.getTypeDb());
+			try(var io = ref.getRef().io(provider)){
+				//noinspection unchecked
+				return (T)DynamicSupport.readTyp(type, provider, io, generics);
+			}
+		}
+		
+		@Override
+		public void write(RandomIO dest, T src) throws IOException{
+			var id     = provider.getTypeDb().toID(src);
+			var orgPos = dest.getPos();
+			var refId  = dest.remaining() == 0? new TypedReference() : readInline(dest);
+			if(refId.isNull()){
+				var size = DynamicSupport.calcSize(provider, src);
+				
+				var ticket = AllocateTicket.bytes(size)
+				                           .withDataPopulated((u, io) -> DynamicSupport.writeValue(provider, io, src));
+				if(dest instanceof ChunkChainIO io){
+					ticket = ticket.withPositionMagnet(io.calcGlobalPos());
+				}
+				var ch = ticket.submit(provider);
+				try{
+					writeInline(dest.setPos(orgPos), new TypedReference(ch.getPtr().makeReference(), id));
+				}catch(Throwable e){
+					provider.getMemoryManager().free(ch);
+					throw e;
+				}
+			}else{
+				if(refId.getId() != id){
+					refId = new TypedReference(refId.getRef(), id);
+					writeInline(dest.setPos(orgPos), refId);
+				}
+				try(var io = refId.getRef().io(provider)){
+					DynamicSupport.writeValue(provider, io, src);
+				}
+			}
+		}
+		
+		@Override
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var startPos = io.getPos();
+			var refId    = readInline(io);
+			if(refId.isNull()){
+				return List.of();
+			}
+			if(dereferenceWrite){
+				writeInline(io.setPos(startPos), new TypedReference());
+			}
+			
+			var type = refId.getType(provider.getTypeDb());
+			var raw  = type.getTypeClass(provider.getTypeDb());
+			
+			if(IOInstance.isInstance(raw)){
+				var struct = Struct.ofUnknown(raw);
+				if(struct.getCanHavePointers()){
+					var ref  = refId.getRef();
+					var ptrs = new ArrayList<ChunkPointer>(4);
+					ptrs.add(ref.getPtr());
+					IOInstance val;
+					try(var refIo = ref.io(provider)){
+						val = (IOInstance)DynamicSupport.readTyp(type, provider, refIo, generics);
+					}
+					FixedInstance.structWalk(provider, ptrs, false, (StructPipe)StandardStructPipe.of(struct), val, ref);
+					return ptrs;
+				}
+			}
+			return List.of(refId.getRef().getPtr());
+		}
+		@Override
+		public boolean needsRemoval(){
+			return true;
+		}
+		
+		@Override
+		public TypedReference readInline(ContentReader src) throws IOException{
+			return refPipe.readNew(provider, src, null);
+		}
+		@Override
+		public void writeInline(RandomIO dest, TypedReference src) throws IOException{
+			refPipe.write(provider, dest, src);
+		}
+		
+		@Override
+		public long inlineSize(){
+			return inlineSize;
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			return new RefField.NoIOObj<>(accessor, (SizeDescriptor<I>)refPipe.getSizeDescriptor()){
+				@Override
+				public void setReference(I instance, Reference newRef) throws IOException{
+					try(var io = ioAt.get()){
+						var pos   = io.getPos();
+						var refId = readInline(io);
+						io.setPos(pos);
+						writeInline(io, refId.withRef(newRef));
+					}
+				}
+				@Override
+				public Reference getReference(I instance) throws IOException{
+					return readRef().getRef();
+				}
+				@SuppressWarnings("unchecked")
+				@Override
+				public ObjectPipe<T, ?> getReferencedPipe(I instance) throws IOException{
+					var refId = readRef();
+					var type  = refId.getType(provider.getTypeDb());
+					var raw   = type.getTypeClass(provider.getTypeDb());
+					if(IOInstance.isInstance(raw)){
+						return (ObjectPipe<T, ?>)StandardStructPipe.of(Struct.ofUnknown(raw));
+					}
+					if(raw == String.class){
+						return (ObjectPipe<T, ?>)AutoText.STR_PIPE;
+					}
+					throw new NotImplementedException();//TODO: What to do with the rest?
+				}
+				private TypedReference readRef() throws IOException{
+					TypedReference refId;
+					try(var io = ioAt.get()){
+						refId = readInline(io);
+					}
+					return refId;
+				}
+			};
+		}
+		
+		@Override
+		public RuntimeType<T> getType(){
+			//noinspection unchecked
+			return new RuntimeType.Lambda<>(true, (Class<T>)Object.class, null);
+		}
+	}
+	
 	final class SealedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
 		private final GenericContext            ctx;
@@ -1180,7 +1334,14 @@ public sealed interface ValueStorage<T>{
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
 		if(clazz == Object.class){
-			return new UnknownIDObject(provider, generics);
+			return switch(rule){
+				case StorageRule.Default ignored -> new UnknownIDObject(provider, generics);
+				case StorageRule.FixedOnly ignored -> new UnknownIDReference<>(provider, generics, FixedStructPipe.of(TypedReference.class));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(TypedReference.class), conf.provider);
+					yield new UnknownIDReference<>(provider, generics, pipe);
+				}
+			};
 		}
 		{
 			var primitive = SupportedPrimitive.get(clazz);
@@ -1193,7 +1354,10 @@ public sealed interface ValueStorage<T>{
 			return switch(rule){
 				case StorageRule.Default ignored -> new InlineString(provider);
 				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider, Reference.fixedPipe());
-				case StorageRule.VariableFixed conf -> new FixedReferenceString(provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+					yield new FixedReferenceString(provider, pipe);
+				}
 			};
 		}
 		
@@ -1233,7 +1397,10 @@ public sealed interface ValueStorage<T>{
 			return switch(rule){
 				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());
 				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());
-				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+					yield new UnmanagedInstance<>(typeDef, provider, pipe);
+				}
 			};
 		}else{
 			var struct = Struct.ofUnknown(clazz);
@@ -1252,7 +1419,9 @@ public sealed interface ValueStorage<T>{
 						yield new FixedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(struct, conf.provider));
 					}catch(UnsupportedStructLayout ignored){
 						conf.provider.reset(id);
-						yield new FixedReferenceInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider), StandardStructPipe.of(struct));
+						var valPipe = StandardStructPipe.of(struct);
+						var refPipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+						yield new FixedReferenceInstance<>(generics, provider, refPipe, valPipe);
 					}
 				}
 			};
