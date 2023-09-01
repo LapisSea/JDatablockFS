@@ -133,7 +133,9 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		set(ioPool, instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
+		var ref = referencePipe.readNew(provider, src, null);
+		var val = makeValueObject(provider, ref, genericContext);
+		set(ioPool, instance, val);
 	}
 	
 	@Override

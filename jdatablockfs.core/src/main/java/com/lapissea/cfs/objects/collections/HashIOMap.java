@@ -90,10 +90,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		public BucketEntry<K, V> entry(K key) throws IOException{
 			if(node == null) return null;
-			for(IONode<BucketEntry<K, V>> entry : node){
-				var value = entry.getValue();
-				if(value != null && Objects.equals(value.key(), key)){
-					return value;
+			for(IONode<BucketEntry<K, V>> n : node){
+				var entry = n.getValue();
+				if(entry != null && Objects.equals(entry.key(), key)){
+					return entry;
 				}
 			}
 			

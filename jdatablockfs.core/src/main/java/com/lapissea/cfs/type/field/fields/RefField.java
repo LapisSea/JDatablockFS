@@ -42,8 +42,8 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 	public abstract static non-sealed class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>>
 		extends InstRef<T, ValueType> implements DisabledIO<T>{
 		
-		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
-			super(accessor, sizeDescriptor);
+		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> inlineSizeDescriptor){
+			super(accessor, inlineSizeDescriptor);
 		}
 		
 		@Override
@@ -55,8 +55,8 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 	public abstract static non-sealed class NoIOObj<T extends IOInstance<T>, ValueType>
 		extends RefField<T, ValueType> implements DisabledIO<T>{
 		
-		public NoIOObj(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
-			super(accessor, sizeDescriptor);
+		public NoIOObj(FieldAccessor<T> accessor, SizeDescriptor<T> inlineSizeDescriptor){
+			super(accessor, inlineSizeDescriptor);
 		}
 		
 		@Override
@@ -151,8 +151,8 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 	public RefField(FieldAccessor<T> accessor){
 		super(accessor);
 	}
-	protected RefField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
-		super(accessor, descriptor);
+	protected RefField(FieldAccessor<T> accessor, SizeDescriptor<T> inlineSizeDescriptor){
+		super(accessor, inlineSizeDescriptor);
 	}
 	
 	public void allocateUnmanaged(T instance) throws IOException{
