@@ -52,7 +52,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
+			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
 			stack.push(type);
 		}
 		
@@ -75,7 +75,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
+			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
 		}
 		
 		public void loadArgumentIns(Arg arg){
