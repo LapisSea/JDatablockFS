@@ -621,4 +621,24 @@ public class GeneralTypeHandlingTests{
 		Struct.of(Foo.class, STATE_DONE);
 	}
 	
+	public interface GenericChild<A> extends IOInstance.Def<GenericChild<A>>{
+		IOList<A> list();
+	}
+	
+	
+	public interface GenericArg extends IOInstance.Def<GenericArg>{
+		GenericChild<String> strings();
+//		GenericChild<ObjectID> ids();
+//		GenericChild<T> generic();
+	}
+	
+	@Test
+	void genericPropagation() throws IOException{
+		var d = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		//"com/lapissea/jorth/WTFIsMyBytecode",                         "Ljava/lang/Object;Ljava/lang/Comparable<Ljava/lang/Object;>;", "java/lang/Object", new String[]{"java/lang/Comparable"});
+		//"com/lapissea/jorth/WTFIsMyBytecode", "<ARG:Ljava/lang/Object;>Ljava/lang/Object;Ljava/lang/Comparable<TARG;>;",              "java/lang/Object", new String[]{"java/lang/Comparable"});
+		var g = IOInstance.Def.of(GenericArg.class);
+		g.allocateNulls(d, null);
+	}
+	
 }

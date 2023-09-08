@@ -37,11 +37,14 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,8 +56,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -122,17 +127,15 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){
+	record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){
 		
 		private static final Map<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new HashMap<>();
 		private static final ReadWriteClosableLock            COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
-			try(var ignored = COMPLETION_LOCK.read()){
-				var cached = COMPLETION_CACHE.get(interf);
-				if(cached != null) return (CompletionInfo<T>)cached;
-			}
+			var c = getCached(interf);
+			if(c != null) return c;
 			
 			try(var ignored = COMPLETION_LOCK.write()){
 				var cached = COMPLETION_CACHE.get(interf);
@@ -142,6 +145,15 @@ public final class DefInstanceCompiler{
 				COMPLETION_CACHE.put(interf, complete);
 				return (CompletionInfo<T>)complete;
 			}
+		}
+		
+		@SuppressWarnings("unchecked")
+		private static <T extends IOInstance<T>> CompletionInfo<T> getCached(Class<T> interf){
+			try(var ignored = COMPLETION_LOCK.read()){
+				var cached = COMPLETION_CACHE.get(interf);
+				if(cached != null) return (CompletionInfo<T>)cached;
+			}
+			return null;
 		}
 		
 		private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf){
@@ -171,6 +183,9 @@ public final class DefInstanceCompiler{
 				              missingSetters.isEmpty()? "" : "missing setters: " + missingSetters
 				));
 			
+			var getterMap = getters.stream().collect(Collectors.toMap(FieldStub::varName, Function.identity()));
+			var setterMap = setters.stream().collect(Collectors.toMap(FieldStub::varName, Function.identity()));
+			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
 			var log   = JorthLogger.make();
@@ -180,44 +195,44 @@ public final class DefInstanceCompiler{
 				try(var writer = jorth.writer()){
 					writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
 					writer.addImportAs(completionName, "typ.impl");
-					writer.write(
-						"""
-							implements {!}
-							interface #typ.impl start
-							""",
-						interf.getName());
+					
+					var parms = interf.getTypeParameters();
+					for(var parm : parms){
+						var bounds = parm.getBounds();
+						if(bounds.length != 1){
+							throw new NotImplementedException("Implement multi bound type variable");
+						}
+						writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+					}
+					
+					String parmsStr;
+					if(parms.length == 0) parmsStr = "";
+					else parmsStr = Arrays.stream(parms).map(TypeVariable::getName)
+					                      .collect(Collectors.joining(" ", "<", ">"));
+					
+					writer.write("implements {!}{}", interf.getName(), parmsStr);
+					writer.write("interface #typ.impl start");
 					
 					for(String name : missingSetters){
-						var setterName = switch(style){
-							case NAMED -> "set" + TextUtil.firstToUpperCase(name);
-							case RAW -> name;
-						};
-						var type = getters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
-						
 						writer.write(
 							"""
-								function {!}
-									arg arg1 {}
+								function {!0}
+									arg arg1 {1}
 								end
 								""",
-							setterName,
-							type
+							style.mapSetter(name),
+							getterMap.get(name).type()
 						);
 					}
 					for(String name : missingGetters){
-						var getterName = switch(style){
-							case NAMED -> "get" + TextUtil.firstToUpperCase(name);
-							case RAW -> name;
-						};
-						var type = setters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
 						writer.write(
 							"""
-								function {!}
-									{} returns
+								function {!0}
+									{1} returns
 								end
 								""",
-							type,
-							getterName
+							style.mapGetter(name),
+							setterMap.get(name).type()
 						);
 					}
 					writer.write("end");
@@ -418,7 +433,8 @@ public final class DefInstanceCompiler{
 		);
 		
 		var humanName = inter.getSimpleName();
-		var compiled  = compile(key.complete(), key.includeNames, humanName);
+		var completed = key.complete();
+		var compiled  = compile(completed, key.includeNames, humanName);
 		
 		node.init(compiled);
 		
@@ -533,12 +549,27 @@ public final class DefInstanceCompiler{
 			
 			try(var writer = jorth.writer()){
 				
+				
+				var parms    = interf.getTypeParameters();
+				var parmsStr = "";
+				if(parms.length>0) parmsStr = Arrays.stream(parms).map(TypeVariable::getName)
+				                                    .collect(Collectors.joining(" ", "<", ">"));
+				
+				for(var parm : parms){
+					var bounds = parm.getBounds();
+					if(bounds.length != 1){
+						throw new NotImplementedException("Implement multi bound type variable");
+					}
+					writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+				}
+				
+				writer.write("implements #typ.interf" + parmsStr);
+				
 				writer.write(
 					"""
-						implements #typ.interf
-						extends #IOInstance.Managed <#typ.impl>
+						extends #IOInstance.Managed <#typ.impl{}>
 						public class #typ.impl start
-						""");
+						""", parmsStr);
 				
 				for(var info : fieldInfo){
 					if(isFieldIncluded(includeNames, info.name)){
@@ -643,7 +674,7 @@ public final class DefInstanceCompiler{
 			//noinspection unchecked
 			return (Class<T>)Access.privateLookupIn(interf).defineClass(file);
 		}catch(IllegalAccessException|MalformedJorth e){
-			throw new RuntimeException(e);
+			throw new RuntimeException("Failed to generate implementation for: " + interf.getName(), e);
 		}
 	}
 	
@@ -1274,26 +1305,74 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
+	private static boolean typeEquals(Type aT, Type bT){
+		if(aT == null || bT == null) return aT == bT;
+		return switch(aT){
+			case Class<?> a -> a.equals(bT);
+			case ParameterizedType a -> {
+				yield bT instanceof ParameterizedType b &&
+				      typeEquals(a.getRawType(), b.getRawType()) &&
+				      typeEquals(a.getOwnerType(), b.getOwnerType()) &&
+				      typesEqual(a.getActualTypeArguments(), b.getActualTypeArguments());
+			}
+			case TypeVariable<?> a -> {
+				if(!(bT instanceof TypeVariable<?> b)) yield false;
+				GenericDeclaration aDec = a.getGenericDeclaration(), bDec = b.getGenericDeclaration();
+				//noinspection rawtypes
+				if(aDec instanceof Class aTyp && bDec instanceof Class bTyp){
+					var aComp = CompletionInfo.getCached(aTyp);
+					if(aComp != null) aDec = aComp.completed;
+					var bComp = CompletionInfo.getCached(bTyp);
+					if(bComp != null) bDec = bComp.completed;
+				}
+				
+				yield Objects.equals(aDec, bDec) &&
+				      Objects.equals(a.getName(), b.getName());
+			}
+			case WildcardType a -> {
+				yield bT instanceof WildcardType b &&
+				      typesEqual(a.getLowerBounds(), b.getLowerBounds()) &&
+				      typesEqual(a.getUpperBounds(), b.getUpperBounds());
+			}
+			case GenericArrayType a -> {
+				yield bT instanceof GenericArrayType b &&
+				      typeEquals(a.getGenericComponentType(), b.getGenericComponentType());
+			}
+			default -> aT.equals(bT);
+		};
+	}
+	private static boolean typesEqual(Type[] a, Type[] b){
+		if(a == null || b == null) return a == b;
+		if(a.length != b.length) return true;
+		for(int i = 0; i<a.length; i++){
+			if(!typeEquals(a[i], b[i])){
+				return false;
+			}
+		}
+		return true;
+	}
 	private static void checkTypes(List<FieldInfo> fields){
-		var problems = fields.stream()
-		                     .filter(gs -> gs.stubs().collect(Collectors.groupingBy((FieldStub f) -> switch(f.type()){
-			                     case Class<?> c -> c;
-			                     case ParameterizedType p -> p;
-			                     case TypeVariable<?> t -> Utils.extractFromVarType(t);
-			                     default -> {
-				                     var t = f.type();
-				                     throw new NotImplementedException(t.getClass().getName());
-			                     }
-		                     })).size()>1)
-		                     .map(gs -> "\t" + gs.name + ":\n" +
-		                                "\t\t" + gs.stubs().map(g -> (g.style() != Style.RAW? g.method().getName() + ":\t" :
-		                                                              (g.isGetter()? "getter" : "setter") + ": ") + g.type())
-		                                           .collect(Collectors.joining("\n\t\t"))
-		                     )
-		                     .collect(Collectors.joining("\n"));
+		var result = new StringJoiner("\n");
 		
-		if(!problems.isEmpty()){
-			throw new MalformedTemplateStruct("Mismatched types:\n" + problems);
+		for(var field : fields){
+			if(field.getter.isEmpty() || field.setter.isEmpty()) continue;
+			
+			FieldStub getter     = field.getter.get(), setter = field.setter.get();
+			Type      getterType = getter.type(), setterType = setter.type();
+			if(typeEquals(getterType, setterType)){
+				continue;
+			}
+			
+			result.add(
+				"\t" + field.name + ":\n" +
+				"\t\t" + (getter.style() != Style.RAW? getter.method().getName() + ":\t" : "getter: ") + getter.type() + "\n" +
+				"\t\t" + (setter.style() != Style.RAW? setter.method().getName() + ":\t" : "setter: ") + setter.type()
+			);
+		}
+		
+		if(result.length()>0){
+			throw new MalformedTemplateStruct("Mismatched types:\n" + result);
 		}
 	}
 	
