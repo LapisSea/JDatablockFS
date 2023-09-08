@@ -47,7 +47,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 			referencePipe = pip;
 			initSizeDescriptor(pip.getFixedDescriptor());
 		}else{
-			referencePipe = StandardStructPipe.of(Reference.class);
+			referencePipe = Reference.standardPipe();
 			initSizeDescriptor(referencePipe.getSizeDescriptor().map(this::getReference));
 		}
 		

@@ -26,11 +26,11 @@ public class Runner{
 		
 		private static final AtomicLong ID_COUNTER = new AtomicLong();
 		
-		private final long     id    = ID_COUNTER.getAndIncrement();
-		private final Runnable task;
-		private       boolean  started;
-		private final long     start = System.nanoTime();
-		private       int      counter;
+		private final    long     id    = ID_COUNTER.getAndIncrement();
+		private final    Runnable task;
+		private volatile boolean  started;
+		private final    long     start = System.nanoTime();
+		private          int      counter;
 		
 		private Task(Runnable task){
 			this.task = task;
@@ -125,7 +125,10 @@ public class Runner{
 					
 					for(int i = TASKS.size() - 1; i>=0; i--){
 						var t = TASKS.get(i);
-						if(t.started){
+						
+						boolean started;
+						synchronized(t){ started = t.started; }
+						if(started){
 							TASKS.remove(i);
 							continue;
 						}
