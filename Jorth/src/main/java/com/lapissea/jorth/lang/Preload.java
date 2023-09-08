@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 import static org.objectweb.asm.Opcodes.V19;
 
-public class Preload{
+public final class Preload{
 	
 	private static void preload(MethodHandles.Lookup l, Class<?> cls, Set<Class<?>> added){
 		if(cls.isArray()){
