@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
@@ -59,7 +60,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		ClassName name, ClassType type, Visibility visibility,
 		GenericType extension, List<GenericType> interfaces, List<ClassName> permits,
 		Set<Access> accessSet,
-		List<AnnGen> anns){
+		List<AnnGen> anns, Map<ClassName, GenericType> typeArgs){
 		this.typeSource = typeSource;
 		this.name = name;
 		this.type = type;
@@ -75,16 +76,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		};
 		
 		
-		int len = extension.jvmSignatureLen();
-		for(var interf : interfaces){
-			len += interf.jvmSignatureLen();
-		}
-		var signature = new StringBuilder(len);
-		extension.jvmSignature(signature);
-		for(var interf : interfaces){
-			interf.jvmSignature(signature);
-		}
-		assert signature.length() == len : signature.length() + " " + len;
+		var signature = makeSignature(extension, interfaces, typeArgs);
 		
 		String[] interfaceStrings;
 		if(interfaces.isEmpty()) interfaceStrings = null;
@@ -95,11 +87,42 @@ public final class ClassGen implements ClassInfo, Endable{
 			}
 		}
 		
-		writer.visit(V19, accessFlags, name.slashed(), signature.toString(), extension.raw().slashed(), interfaceStrings);
+		writer.visit(V19, accessFlags, name.slashed(), signature, extension.raw().slashed(), interfaceStrings);
 		for(var permit : permits){
 			writer.visitPermittedSubclass(permit.slashed());
 		}
 		writeAnnotations(anns, writer::visitAnnotation);
+	}
+	
+	private static String makeSignature(GenericType extension, List<GenericType> interfaces, Map<ClassName, GenericType> typeArgs){
+		int len = extension.jvmSignatureLen();
+		if(!typeArgs.isEmpty()){
+			len += 2;
+			for(var e : typeArgs.entrySet()){
+				len += e.getKey().any().length() + 1 + e.getValue().jvmSignatureLen();
+			}
+		}
+		for(var interf : interfaces){
+			len += interf.jvmSignatureLen();
+		}
+		
+		var signature = new StringBuilder(len);
+		
+		if(!typeArgs.isEmpty()){
+			signature.append('<');
+			for(var e : typeArgs.entrySet()){
+				signature.append(e.getKey()).append(':');
+				e.getValue().jvmSignature(signature);
+			}
+			signature.append('>');
+		}
+		extension.jvmSignature(signature);
+		for(var interf : interfaces){
+			interf.jvmSignature(signature);
+		}
+		
+		assert signature.length() == len : signature.length() + " " + len;
+		return signature.toString();
 	}
 	
 	@Override
@@ -140,7 +163,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	private void generateEnumBoilerplate() throws MalformedJorth{
-		var arrType = new GenericType(name, 1, List.of());
+		var arrType = new GenericType(name, Optional.empty(), 1, List.of());
 		defineField(
 			Visibility.PRIVATE,
 			EnumSet.of(Access.STATIC, Access.FINAL),
@@ -209,11 +232,11 @@ public final class ClassGen implements ClassInfo, Endable{
 		                                                          EnumSet.copyOf(accesses))));
 		
 		
-		var descriptor = type.jvmDescriptor();
-		var signature  = type.jvmSignature();
+		var descriptor = type.jvmDescriptorStr();
+		var signature  = type.jvmSignatureStr();
 		
 		var access       = visibility.flag|accesses.stream().mapToInt(f -> f.flag).reduce((a, b) -> a|b).orElse(0);
-		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature.toString(), null);
+		var fieldVisitor = writer.visitField(access, name, descriptor, signature, null);
 		
 		writeAnnotations(annotations, fieldVisitor::visitAnnotation);
 		
@@ -222,7 +245,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	public static void writeAnnotations(Collection<AnnGen> annotations, BiFunction<String, Boolean, AnnotationVisitor> visitor){
 		for(AnnGen(ClassName annType, Map<String, Object> args) : annotations){
-			var annWriter = visitor.apply(new GenericType(annType).jvmDescriptor().toString(), true);
+			var annWriter = visitor.apply(new GenericType(annType).jvmDescriptorStr(), true);
 			for(var e : args.entrySet()){
 				var argName  = e.getKey();
 				var argValue = e.getValue();

@@ -3,9 +3,16 @@ package com.lapissea.jorth;
 import java.io.Writer;
 import java.util.List;
 
-public class WTFIsMyBytecode{
+/**
+ * Purely used for generating "known good" ASM code
+ */
+public class WTFIsMyBytecode<ARG>{
+	
+	byte[] bArr;
 	
 	List<String> strs;
+	
+	ARG arg;
 	
 	static{
 		int a = 0;
@@ -31,4 +38,8 @@ public class WTFIsMyBytecode{
 	void upper(List<? extends Writer> arg){ }
 	void lower(List<? super Writer> arg)  { }
 	void wild(List<?> arg)                { }
+	
+	public int compareTo(ARG o){
+		return 0;
+	}
 }
