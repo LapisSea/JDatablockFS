@@ -25,6 +25,7 @@ public enum Keyword implements KeyedEnum{
 	THROW,
 	DUP, POP,
 	AT("@"),
+	TYPE_ARG("type-arg"),
 	WHAT_THE_STACK("???");
 	
 	public static final Lookup<Keyword> LOOKUP = KeyedEnum.getLookup(Keyword.class);

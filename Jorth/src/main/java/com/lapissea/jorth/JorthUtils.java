@@ -1,5 +1,6 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.lang.Tokenizer;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
@@ -23,7 +24,7 @@ public class JorthUtils{
 	
 	public static String toJorthGeneric(Type type){
 		return switch(type){
-			case TypeVariable<?> c -> toJorthGeneric(extractFromVarType(c));
+			case TypeVariable<?> c -> Tokenizer.escape(c.getName());
 			case GenericArrayType arr -> toJorthGeneric(arr.getGenericComponentType()) + " array";
 			case WildcardType wild -> {
 				var    lower  = wild.getLowerBounds();

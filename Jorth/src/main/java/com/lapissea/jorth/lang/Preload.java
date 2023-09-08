@@ -19,13 +19,14 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.objectweb.asm.Opcodes.V19;
 
-public class Preload{
+public final class Preload{
 	
 	private static void preload(MethodHandles.Lookup l, Class<?> cls, Set<Class<?>> added){
 		if(cls.isArray()){
@@ -77,7 +78,7 @@ public class Preload{
 		});
 		Thread.startVirtualThread(() -> {
 			try{
-				var cg = new ClassGen(TypeSource.of(null, Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), List.of(), Set.of(), List.of());
+				var cg = new ClassGen(TypeSource.of(null, Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), List.of(), Set.of(), List.of(), Map.of());
 				cg.defineField(Visibility.PUBLIC, Set.of(), Set.of(), GenericType.OBJECT, "");
 				var fun = new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, List.of(), List.of());
 				fun.getThisOp("");
