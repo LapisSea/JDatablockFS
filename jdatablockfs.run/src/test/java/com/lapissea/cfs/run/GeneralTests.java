@@ -122,7 +122,7 @@ public class GeneralTests{
 		return new Object[][]{{ContiguousIOList.class}, {LinkedIOList.class}};
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<L extends IOInstance.Unmanaged<L> & IOList<Integer>> void listTestIntAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Integer.class, list -> {
 			list.add(69);
@@ -130,7 +130,7 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listTestSimpleAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
@@ -138,14 +138,14 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<L extends IOInstance.Unmanaged<L> & IOList<BooleanContainer>> void listBitValue(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, BooleanContainer.class, list -> {
 			var rand = new Random(1);
@@ -156,7 +156,7 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listInsert(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy('1'));
@@ -168,7 +168,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listIndexRemove(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
@@ -179,7 +179,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listComplexIndexRemove(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
@@ -196,7 +196,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test
+	@Test(groups = {"hashMap", "rootProvider"})
 	void testHashIOMap() throws IOException{
 		TestUtils.ioMapComplianceSequence(
 			TestInfo.of(),
