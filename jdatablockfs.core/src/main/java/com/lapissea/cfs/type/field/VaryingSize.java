@@ -95,9 +95,9 @@ public final class VaryingSize implements Stringify{
 					@Override
 					public void write(int b){ }
 					@Override
-					public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{ }
+					public void writeAtOffsets(Collection<WriteChunk> data){ }
 					@Override
-					public void fillZero(long requestedMemory) throws IOException{ }
+					public void fillZero(long requestedMemory){ }
 					@Override
 					public boolean isReadOnly(){ return false; }
 				};

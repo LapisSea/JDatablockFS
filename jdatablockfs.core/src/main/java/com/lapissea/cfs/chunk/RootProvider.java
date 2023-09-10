@@ -89,7 +89,7 @@ public interface RootProvider extends DataProvider.Holder{
 					return withGenerator(() -> {
 						var inst = struct.make();
 						if(struct.hasInvalidInitialNulls()){
-							inst.allocateNulls(provider);
+							inst.allocateNulls(provider, struct.describeGenerics(genericType));
 						}
 						return (T)inst;
 					});
@@ -103,7 +103,7 @@ public interface RootProvider extends DataProvider.Holder{
 			
 			if(rawType.isEnum()){
 				var universe = EnumUniverse.ofUnknown(rawType);
-				if(universe.size() == 0) throw new IllegalArgumentException();
+				if(universe.isEmpty()) throw new IllegalArgumentException();
 				return withGenerator(() -> (T)universe.get(0));
 			}
 			

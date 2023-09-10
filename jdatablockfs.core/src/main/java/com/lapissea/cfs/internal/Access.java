@@ -34,9 +34,9 @@ import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
 
 @SuppressWarnings("unchecked")
-public class Access{
+public final class Access{
 	
-	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolve();
+	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveVal();
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")
@@ -78,7 +78,7 @@ public class Access{
 			var lookup = getLookup(method.getDeclaringClass());
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda for " + method + " with " + functionalInterface, e);
+			throw new RuntimeException("failed to create lambda for method " + method + " with " + functionalInterface, e);
 		}
 	}
 	
@@ -88,7 +88,19 @@ public class Access{
 			var lookup = getLookup(constructor.getDeclaringClass());
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda for " + constructor + " with " + functionalInterface, e);
+			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
+		}
+	}
+	
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, MethodHandles.Lookup lookup, Class<FInter> functionalInterface){
+		if(lookup.lookupClass() != constructor.getDeclaringClass()){
+			throw new IllegalArgumentException(lookup.lookupClass().getName() + " != " + constructor.getDeclaringClass().getName());
+		}
+		try{
+			constructor.setAccessible(true);
+			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
+		}catch(Throwable e){
+			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
 		}
 	}
 	

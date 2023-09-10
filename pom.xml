@@ -1,37 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-
+	
 	<properties>
 		<java.version>20</java.version>
 		<maven.compiler.release>${java.version}</maven.compiler.release>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
-
+		
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
+		
 		<maven-compiler-plugin-version>3.11.0</maven-compiler-plugin-version>
+		<maven-surefire-plugin-version>3.1.2</maven-surefire-plugin-version>
+		<maven-assembly-plugin-version>3.6.0</maven-assembly-plugin-version>
 		<maven-gpg-plugin-version>3.0.1</maven-gpg-plugin-version>
 		<maven-source-plugin-version>3.2.1</maven-source-plugin-version>
-
+		
 		<child-build-dir>../target</child-build-dir>
 	</properties>
-
+	
 	<groupId>com.github.lapissea.jdatablockfs</groupId>
 	<artifactId>JDatablockFS</artifactId>
 	<packaging>pom</packaging>
-
+	
 	<version>1.0</version>
-
+	
 	<modules>
 		<module>jdatablockfs.core</module>
 		<module>jdatablockfs.run</module>
 		<module>jdatablockfs.tools</module>
 		<module>Jorth</module>
 	</modules>
-
+	
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -42,12 +44,12 @@
 			<dependency>
 				<groupId>org.testng</groupId>
 				<artifactId>testng</artifactId>
-				<version>7.7.1</version>
+				<version>7.8.0</version>
 				<scope>test</scope>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
+	
 	<!--	<repositories>-->
 	<!--		<repository>-->
 	<!--			<name>git snap</name>-->

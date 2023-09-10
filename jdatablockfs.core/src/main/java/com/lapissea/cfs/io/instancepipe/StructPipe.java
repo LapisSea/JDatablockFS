@@ -5,9 +5,11 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.FieldIsNull;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.exceptions.MalformedObject;
 import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
+import com.lapissea.cfs.exceptions.TypeIOFail;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -40,11 +42,12 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.cfs.utils.ClosableLock;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -57,7 +60,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -144,11 +146,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var typ = struct.getType();
 				//Special types must be statically initialized as they may add new special implementations.
 				if(typ.isAnnotationPresent(Special.class)){
-					try{
-						Class.forName(typ.getName(), true, typ.getClassLoader());
-					}catch(ClassNotFoundException e){
-						throw new ShouldNeverHappenError(e);
-					}
+					Utils.ensureClassLoaded(typ);
 				}
 				
 				var special = specials.get(struct);
@@ -275,7 +273,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			if(inst != null){
 				try{
 					checkTypeIntegrity(inst, true);
-				}catch(FieldIsNull ignored){
+				}catch(FieldIsNull|InvalidGenericArgument ignored){
 				}catch(IOException e){
 					e.printStackTrace();
 					throw new RuntimeException(e);
@@ -300,8 +298,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		                 .filter(RefField.class::isInstance)
 		                 .map(RefField.class::cast)
 		                 .map(ref -> fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f -> Map.entry(f, ref)))
-		                 .filter(Optional::isPresent)
-		                 .map(Optional::get)
+		                 .filter(OptionalPP::isPresent)
+		                 .map(OptionalPP::get)
 		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		
 		for(var field : fields){
@@ -603,15 +601,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		try{
 			return doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
-			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
 	}
 	
-	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			return doRead(makeIOPool(), provider, src, instance, genericContext);
+			doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
-			throw new IOException("Failed reading " + getType().cleanFullName(), e);
+			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
 	}
 	
@@ -854,6 +852,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}else{
 			try{
 				field.read(ioPool, provider, src, instance, genericContext);
+			}catch(TypeIOFail|EOFException e){
+				var typ = field.getAccessor() == null? null : field.getAccessor().getType();
+				throw new TypeIOFail("Failed reading " + field + "", typ, e);
 			}catch(IOException e){
 				e.addSuppressed(new IOException("Failed to read " + field));
 				throw e;
@@ -884,8 +885,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw fail(field, e, "did not read correctly");
 		}
 	}
-	private static IOException fail(IOField<?, ?> field, Exception e, String msg) throws IOException{
-		return new IOException(field + " " + msg, e);
+	private static IOException fail(IOField<?, ?> field, Exception e, String msg){
+		var typ = field.getAccessor() == null? null : field.getAccessor().getType();
+		return new TypeIOFail(field + " " + msg, typ, e);
 	}
 	
 	@Override
@@ -907,7 +909,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				
 				field.getAccessor().getAnnotation(IODependency.class)
 				     .map(IODependency::value).stream().flatMap(Arrays::stream)
-				     .map(fields::byName).map(Optional::orElseThrow)
+				     .map(fields::byName).map(OptionalPP::orElseThrow)
 				     .filter(n -> n.getType() == NumberSize.class)
 				     .findAny()//dependency that is a numsize
 				     .filter(not(IOField::isVirtual))
@@ -923,7 +925,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			if(inst.getThisStruct().hasInvalidInitialNulls()){
-				inst.allocateNulls(man);
+				inst.allocateNulls(man, null);
 			}
 		}
 		
@@ -958,7 +960,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return shortPipeName(getClass()) + "(" + type.cleanName() + ")";
 	}
 	
-	private static String shortPipeName(Class<?> cls){
+	protected static String shortPipeName(Class<?> cls){
 		var pipName = cls.getSimpleName();
 		var end     = "StructPipe";
 		if(pipName.endsWith(end)){

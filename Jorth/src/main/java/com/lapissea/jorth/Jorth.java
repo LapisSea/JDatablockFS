@@ -22,6 +22,7 @@ import com.lapissea.jorth.lang.type.Operation;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.reflect.Array;
 import java.util.ArrayDeque;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -41,6 +43,21 @@ import java.util.stream.Collectors;
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class Jorth extends CodeDestination{
+	
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws MalformedJorth{
+		return generateClass(classLoader, className, generator, null);
+	}
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator, Consumer<CharSequence> printBack) throws MalformedJorth{
+		Objects.requireNonNull(className);
+		Objects.requireNonNull(generator);
+		
+		var jorth = new Jorth(classLoader, printBack);
+		try(var writer = jorth.writer()){
+			generator.accept(writer);
+		}
+		
+		return jorth.getClassFile(className);
+	}
 	
 	static{
 		if(!Boolean.getBoolean("jorth.noPreload")){
@@ -62,6 +79,8 @@ public final class Jorth extends CodeDestination{
 	private final List<ClassName>        permits     = new ArrayList<>();
 	private final EnumSet<Access>        accessSet   = EnumSet.noneOf(Access.class);
 	private final Map<ClassName, AnnGen> annotations = new HashMap<>();
+	
+	private final Map<ClassName, GenericType> typeArgs = new HashMap<>();
 	
 	private final Map<String, ClassName>   imports = new HashMap<>();
 	private final Map<ClassName, ClassGen> classes = new HashMap<>();
@@ -89,6 +108,11 @@ public final class Jorth extends CodeDestination{
 				return makeArr(type);
 			}
 			return Optional.of(jorthClass);
+		}
+		
+		var argType = typeArgs.get(name.dotted());
+		if(argType != null){
+			return typeSource.maybeByType(argType);
 		}
 		
 		if(currentClass == null) return Optional.empty();
@@ -150,7 +174,6 @@ public final class Jorth extends CodeDestination{
 	protected TokenSource transform(TokenSource src){
 		if(printBack == null) return src;
 		return TokenSource.listen(src, tok -> {
-			var t0 = tab;
 			if(tok instanceof Token.KWord k){
 				switch(k.keyword()){
 					case START -> tab++;
@@ -272,7 +295,7 @@ public final class Jorth extends CodeDestination{
 		switch(keyword){
 			case FIELD -> {
 				var name = source.readWord();
-				var type = readType(source);
+				var type = readType(source, typeArgs);
 				currentClass.defineField(popVisibility(), popAccessSet(), popAnnotations(), type, name);
 				memberFlag = true;
 			}
@@ -313,7 +336,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case ARG -> {
 							var name = source.readWord();
-							var type = readType(source);
+							var type = readType(source, typeArgs);
 							
 							var access = popAccessSet();
 							if(!access.isEmpty()){
@@ -326,7 +349,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case RETURNS -> {
 							if(returnType != null) throw new MalformedJorth("Duplicate returns statement");
-							returnType = readType(source);
+							returnType = readType(source, typeArgs);
 						}
 						default -> throw new MalformedJorth("Unexpected keyword " + k.key);
 					}
@@ -356,8 +379,8 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private JType readType(TokenSource source) throws MalformedJorth{
-		var type = source.readType(importsFun);
+	private JType readType(TokenSource source, Map<ClassName, GenericType> typeArgs) throws MalformedJorth{
+		var type = source.readType(importsFun, typeArgs);
 		typeSource.validateType(type);
 		return type;
 	}
@@ -591,10 +614,10 @@ public final class Jorth extends CodeDestination{
 					if(!permits.isEmpty()){
 						throw new MalformedJorth("Enum can not be sealed");
 					}
-					extension = new GenericType(ClassName.of(Enum.class), 0, List.of(new GenericType(className)));
+					extension = new GenericType(ClassName.of(Enum.class), Optional.empty(), 0, List.of(new GenericType(className)));
 				}
 				
-				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, permits, accessSet, anns);
+				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, permits, accessSet, anns, typeArgs);
 				classes.put(className, currentClass);
 				
 				typeSource.validateType(extension);
@@ -605,11 +628,11 @@ public final class Jorth extends CodeDestination{
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
-				extensionBuffer = source.readTypeSimple(importsFun);
+				extensionBuffer = source.readTypeSimple(importsFun, typeArgs);
 				typeSource.validateType(extensionBuffer.raw());
 			}
 			case IMPLEMENTS -> {
-				var interf = source.readTypeSimple(importsFun);
+				var interf = source.readTypeSimple(importsFun, typeArgs);
 				typeSource.validateType(interf.raw());
 				interfaces.add(interf);
 			}
@@ -617,6 +640,14 @@ public final class Jorth extends CodeDestination{
 				var permit = source.readClassName(importsFun);
 //				typeSource.validateType(permit);
 				permits.add(permit);
+			}
+			case TYPE_ARG -> {
+				var name = ClassName.dotted(source.readWord());
+				if(typeArgs.containsKey(name)){
+					throw new MalformedJorth(name + " is already a defined type argument");
+				}
+				var type = source.readTypeSimple(importsFun, Map.of());
+				typeArgs.put(name, type);
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 		}
@@ -630,6 +661,7 @@ public final class Jorth extends CodeDestination{
 	
 	private void endClass() throws MalformedJorth{
 		currentClass.end();
+		typeArgs.clear();
 		currentClass = null;
 		memberFlag = true;
 	}

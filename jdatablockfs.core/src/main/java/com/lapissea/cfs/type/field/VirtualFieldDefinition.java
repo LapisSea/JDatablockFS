@@ -22,24 +22,6 @@ import java.util.stream.Stream;
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
-		interface I<IO extends IOInstance<IO>> extends GetterFilter<IO, Integer>{
-			int filterPrimitive(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, int value);
-			@Override
-			@Deprecated
-			default Integer filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Integer value){
-				return filterPrimitive(ioPool, instance, dependencies, value);
-			}
-		}
-		
-		interface L<IO extends IOInstance<IO>> extends GetterFilter<IO, Long>{
-			long filterPrimitive(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, long value);
-			@Override
-			@Deprecated
-			default Long filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Long value){
-				return filterPrimitive(ioPool, instance, dependencies, value);
-			}
-		}
-		
 		T filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	

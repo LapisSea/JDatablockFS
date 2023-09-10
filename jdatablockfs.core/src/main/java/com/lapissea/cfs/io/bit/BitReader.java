@@ -4,7 +4,6 @@ import com.lapissea.cfs.exceptions.IllegalBitValue;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.io.bit.BitUtils.binaryRangeFindZero;
 
 public interface BitReader{
 	
@@ -51,7 +50,7 @@ public interface BitReader{
 			
 			long chunk = readBits(toRead);
 			
-			int zeroIndex = binaryRangeFindZero(chunk, toRead, read);
+			int zeroIndex = BitUtils.findBinaryZero(chunk, toRead);
 			if(zeroIndex != -1) return read + zeroIndex;
 			read += toRead;
 		}

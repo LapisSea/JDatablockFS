@@ -5,12 +5,12 @@ import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.ChunkSet;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.PhysicalChunkWalker;
 import com.lapissea.cfs.config.ConfigUtils;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
@@ -46,6 +46,7 @@ import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.NotImplementedException;
@@ -1417,7 +1418,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ioPool = instance.getThisStruct().allocVirtualVarPool(IO);
 			if(ioPool != null){
 				try(var io = reference.io(ctx.provider)){
-					var virtuals = FieldSet.of(pipe.getSpecificFields().stream().filter(f -> f.isVirtual(IO)));
+					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.isVirtual(IO)));
 					pipe.readDeps(ioPool, ctx.provider, io, pipe.getFieldDependency().getDeps(virtuals), instance, generics(instance, parentGenerics));
 				}catch(Throwable e){
 					var size = 1L;
@@ -1510,10 +1511,10 @@ public class BinaryGridRenderer implements DataRenderer{
 							
 							if(!ref.isNull() && !noPtr){
 								long from, ptrSize = bSize;
-								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(IOFieldTools.makeRefName(acc)) : Optional.<IOField<T, ?>>empty();
+								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(IOFieldTools.makeRefName(acc)) : OptionalPP.<IOField<T, ?>>empty();
 								if(refContainer.isPresent()){
 									var refF      = refContainer.get();
-									var refOffset = 0;
+									var refOffset = 0L;
 									for(var sf : pipe.getSpecificFields()){
 										if(sf == refF) break;
 										refOffset += sf.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
@@ -1613,10 +1614,10 @@ public class BinaryGridRenderer implements DataRenderer{
 						         ).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
-								if(sizeDesc.getWordSpace() == WordSpace.BIT){
+								if(sizeDesc.getWordSpace() == WordSpace.BIT && size<8){
 									annotateBitField(ctx, ioPool, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, sizeDesc.mapSize(WordSpace.BYTE, size)));
 								}
 							}
 						}else{
@@ -1693,6 +1694,8 @@ public class BinaryGridRenderer implements DataRenderer{
 												return TypeFlag.ID_OBJECT;
 											}
 											@Override
+											public boolean genericTypeHasArgs(){ return false; }
+											@Override
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
 											}
@@ -1747,6 +1750,8 @@ public class BinaryGridRenderer implements DataRenderer{
 										public int getTypeID(){
 											return TypeFlag.ID_OBJECT;
 										}
+										@Override
+										public boolean genericTypeHasArgs(){ return false; }
 										@NotNull
 										@Override
 										public String getName(){
@@ -1803,6 +1808,8 @@ public class BinaryGridRenderer implements DataRenderer{
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
 											}
+											@Override
+											public boolean genericTypeHasArgs(){ return false; }
 											@NotNull
 											@Override
 											public String getName(){
@@ -1917,6 +1924,8 @@ public class BinaryGridRenderer implements DataRenderer{
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
+			public boolean genericTypeHasArgs(){ return false; }
+			@Override
 			public Object get(VarPool<T> ioPool, T instance){
 				return arrayLenSiz;
 			}
@@ -1935,6 +1944,8 @@ public class BinaryGridRenderer implements DataRenderer{
 			public int getTypeID(){
 				return TypeFlag.ID_OBJECT;
 			}
+			@Override
+			public boolean genericTypeHasArgs(){ return false; }
 			@Override
 			public Object get(VarPool<T> ioPool, T instance){
 				return arr.length;

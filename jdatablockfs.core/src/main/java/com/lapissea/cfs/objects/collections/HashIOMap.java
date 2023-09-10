@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.RandomIO;
@@ -8,6 +9,7 @@ import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -88,10 +90,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		public BucketEntry<K, V> entry(K key) throws IOException{
 			if(node == null) return null;
-			for(IONode<BucketEntry<K, V>> entry : node){
-				var value = entry.getValue();
-				if(value != null && Objects.equals(value.key(), key)){
-					return value;
+			for(IONode<BucketEntry<K, V>> n : node){
+				var entry = n.getValue();
+				if(entry != null && Objects.equals(entry.key(), key)){
+					return entry;
 				}
 			}
 			
@@ -560,10 +562,14 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private void checkValue(V value){
 		if(!(value instanceof IOInstance.Unmanaged)){
 			try{
-				var d = MemoryData.empty();
-				var v = ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics().argAsContext("V"), new ValueStorage.StorageRule.Default());
+				var d    = MemoryData.empty();
+				var link = TypeLink.of(value.getClass());
+				var vCtx = getGenerics().argAsContext("V");
+				var v    = ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), link, vCtx, new ValueStorage.StorageRule.Default());
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
+			}catch(InvalidGenericArgument e){
+				Log.smallTrace("Ignored illegal generic argument for {}", value);
 			}catch(Throwable e){
 				String valStr;
 				try{
@@ -687,7 +693,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			var bucket = getBucket(hotBuckets, buckets, smallHash);
 			
 			if(bucket.node == null){
-				bucket.node = allocNewNode(newEntry, (Unmanaged<?>)buckets);
+				bucket.node = allocNewNode(newEntry, ((Unmanaged<?>)buckets).getReference());
 				setBucket(buckets, smallHash, bucket);
 				return PutAction.OVERWRITE_EMPTY;
 			}
@@ -708,25 +714,27 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			last = node;
 		}
 		
-		last.setNext(allocNewNode(newEntry, last));
+		last.setNext(allocNewNode(newEntry, last.getReference()));
 		
 		return PutAction.BUCKET_APPEND;
 	}
 	
-	private static final TypeLink BUCKET_NODE_TYPE = new TypeLink(
-		IONode.class,
-		TypeLink.of(BucketEntry.class)
-	);
+	private TypeLink buckedNodeType(){
+		return new TypeLink(
+			IONode.class,
+			getTypeDef().withRaw(BucketEntry.class)
+		);
+	}
 	
 	@SuppressWarnings("unchecked")
-	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, IOInstance.Unmanaged<?> magnet) throws IOException{
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, Reference magnet) throws IOException{
 		return IONode.allocValNode(
 			newEntry,
 			null,
 			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
-			BUCKET_NODE_TYPE,
+			buckedNodeType(),
 			getDataProvider(),
-			OptionalLong.of(magnet.getReference().getPtr().getValue())
+			OptionalLong.of(magnet.calcGlobalOffset(getDataProvider()))
 		);
 	}
 	private IONode<BucketEntry<K, V>> allocNewNode(RandomIO.Creator entryBytes, IOInstance.Unmanaged<?> magnet) throws IOException{
@@ -734,7 +742,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			return IONode.allocValNode(
 				io,
 				null,
-				BUCKET_NODE_TYPE,
+				buckedNodeType(),
 				getDataProvider(),
 				OptionalLong.of(magnet.getReference().getPtr().getValue())
 			);
@@ -780,7 +788,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		buckets.set(smallHash, bucket);
 		if(DEBUG_VALIDATION){
 			var read = buckets.get(smallHash);
-			if(!read.equals(bucket)) throw new IllegalStateException("Bucket integrity failed:\n" + bucket + "\n" + read);
+			if(!read.equals(bucket)){
+				throw new IllegalStateException("Bucket integrity failed:\n" + bucket + "\n" + read);
+			}
 		}
 	}
 	

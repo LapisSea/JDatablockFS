@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -48,6 +49,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	private final Type     genericType;
 	private final Class<?> rawType;
 	private final int      typeID;
+	private final boolean  genericTypeHasArgs;
 	
 	private final MethodHandle getter;
 	private final MethodHandle setter;
@@ -57,6 +59,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(genericType);
 		typeID = TypeFlag.getId(rawType);
+		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
 			throw new MalformedStruct("getter returns " + getter.getReturnType() + " but " + genericType + " is required\n" + getter);
@@ -86,6 +89,10 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	@Override
 	public int getTypeID(){
 		return typeID;
+	}
+	@Override
+	public boolean genericTypeHasArgs(){
+		return genericTypeHasArgs;
 	}
 	
 	@Override

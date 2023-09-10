@@ -34,7 +34,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	public static final Struct<Reference> STRUCT = Struct.of(Reference.class);
 	
 	static{
-		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolve()){
+		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolveVal()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(

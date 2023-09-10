@@ -52,7 +52,7 @@ public class ToStringFormat{
 		
 		StringBuilder buff = new StringBuilder();
 		Runnable flushBuff = () -> {
-			if(buff.length() == 0) return;
+			if(buff.isEmpty()) return;
 			roots.add(new ToStringFragment.Literal(buff.toString()));
 			buff.setLength(0);
 		};
@@ -60,7 +60,7 @@ public class ToStringFormat{
 		for(int i = 0; i<format.length(); i++){
 			char c = format.charAt(i);
 			
-			if(c == '!' && buff.length()>=1){
+			if(c == '!' && !buff.isEmpty()){
 				var last = buff.charAt(buff.length() - 1);
 				if(last == '!'){
 					buff.setLength(buff.length() - 1);

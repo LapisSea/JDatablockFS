@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -31,6 +32,10 @@ public class JorthTests{
 		new JorthTests().simpleEnum();
 	}
 	
+	
+	static{
+		Thread.startVirtualThread(() -> new Jorth(null, null));
+	}
 	
 	public static class TestCls{
 		boolean flag = false;
@@ -767,5 +772,82 @@ public class JorthTests{
 		Assert.assertNotNull(permits);
 		var names = Arrays.stream(permits).map(Class::getName).collect(Collectors.toSet());
 		Assert.assertEquals(names, Set.of("child1", "child2"));
+	}
+	
+	@Test
+	void parmClass() throws Exception{
+		var cls = generateAndLoadInstance("ParmClass", writer -> {
+			writer.addImport(CharSequence.class);
+			writer.addImport(List.class);
+			writer.write(
+				"""
+					type-arg T #CharSequence
+					public class ParmClass start
+					
+					end
+					"""
+			);
+		});
+		
+		var parms = cls.getTypeParameters();
+		assertEquals(1, parms.length);
+		var parm = parms[0];
+		assertEquals("T", parm.getName());
+		assertArrayEquals(new Type[]{CharSequence.class}, parm.getBounds());
+	}
+	
+	@Test(dependsOnMethods = "parmClass")
+	void parmClassFun() throws Exception{
+		var cls = generateAndLoadInstance("ParmClass", writer -> {
+			writer.addImport(CharSequence.class);
+			writer.addImport(List.class);
+			writer.write(
+				"""
+					type-arg T #CharSequence
+					public class ParmClass start
+						
+						function takeArg
+							arg tList #List<T>
+						start
+						end
+						
+					end
+					"""
+			);
+		});
+		
+		var meth  = cls.getMethod("takeArg", List.class);
+		var parms = meth.getGenericParameterTypes();
+		assertEquals(1, parms.length);
+		assertTrue("Parameter is not a ParameterizedType", parms[0] instanceof ParameterizedType);
+		var arg1 = ((ParameterizedType)parms[0]).getActualTypeArguments()[0];
+		assertTrue("T is not a TypeVariable", arg1 instanceof TypeVariable);
+		var targ = (TypeVariable<?>)arg1;
+		assertEquals("T", targ.getName());
+		assertArrayEquals(new Type[]{CharSequence.class}, targ.getBounds());
+	}
+	
+	@Test(dependsOnMethods = "parmClass")
+	void parmClassField() throws Exception{
+		var cls = generateAndLoadInstance("ParmClass", writer -> {
+			writer.addImport(CharSequence.class);
+			writer.write(
+				"""
+					type-arg T #CharSequence
+					public class ParmClass start
+						
+						field arg T
+						
+					end
+					"""
+			);
+		});
+		
+		var field = cls.getField("arg");
+		var type  = field.getGenericType();
+		assertTrue("Type is not a TypeVariable", type instanceof TypeVariable);
+		var ttyp = (TypeVariable<?>)type;
+		assertEquals("T", ttyp.getName());
+		assertArrayEquals(new Type[]{CharSequence.class}, ttyp.getBounds());
 	}
 }

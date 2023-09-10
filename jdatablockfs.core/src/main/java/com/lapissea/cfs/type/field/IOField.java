@@ -303,7 +303,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	@Nullable
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return null;
+		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
@@ -367,6 +367,17 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return getAccessor() instanceof VirtualAccessor<T> acc &&
 		       (pool == null || acc.getStoragePool() == pool)
 		       ? acc : null;
+	}
+	
+	public GenericContext makeContext(GenericContext parent){
+		var acc = getAccessor();
+		if(parent == null && acc.genericTypeHasArgs()){
+			return null;
+		}
+		var raw = acc.getType();
+		if(raw == Object.class) return null;
+		var type = acc.getGenericType(parent);
+		return GenericContext.of(raw, type);
 	}
 	
 	private void requireLateData(){

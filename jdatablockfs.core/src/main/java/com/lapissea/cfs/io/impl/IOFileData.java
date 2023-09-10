@@ -192,8 +192,8 @@ public final class IOFileData implements IOInterface, Closeable{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-					transactionBuff.write(ioOffset, data, dataOffset, dataLength);
+				for(var e : writeData){
+					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}
 				return;
 			}
@@ -203,8 +203,8 @@ public final class IOFileData implements IOInterface, Closeable{
 			
 			used = Math.max(used, Math.toIntExact(required));
 			
-			for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-				writeN(data, dataOffset, Math.toIntExact(ioOffset), dataLength);
+			for(var e : writeData){
+				writeN(e.data(), e.dataOffset(), e.ioOffset(), e.dataLength());
 			}
 		}
 		
@@ -339,7 +339,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		
 		Mode mode;
 		if(readOnly) mode = Mode.READ_ONLY;
-		else mode = ConfigDefs.SYNCHRONOUS_FILE_IO.resolve()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE;
+		else mode = ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE;
 		fileData = new RandomAccessFile(file, mode.str);
 		
 		this.used = getLength();
@@ -356,7 +356,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		return new FileRandomIO();
 	}
 	@Override
-	public RandomIO ioAt(long offset) throws IOException{
+	public RandomIO ioAt(long offset){
 		return new FileRandomIO((int)offset);
 	}
 	

@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
-import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -40,6 +39,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 
 
@@ -126,11 +126,15 @@ public sealed interface IOTypeDB{
 			}
 			
 			protected TypeID newID(TypeLink type, boolean recordNew){
+				if(typToID.containsKey(type)){
+					throw new IllegalArgumentException(type + " is already registered");
+				}
 				var newID = maxID() + 1;
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
 				typToID.put(type, newID);
 				maxID = newID;
+				
 				
 				recordType(type);
 				return new TypeID(newID, true);
@@ -170,14 +174,14 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				return universe.id2cl.get(id);
 			}
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				var id       = universe.cl2id.get(type);
 				if(id == null){
@@ -215,56 +219,54 @@ public sealed interface IOTypeDB{
 			}
 			
 			public Fixed bake(){
-				return new Fixed(defs, idToTyp);
+				return new Fixed(defs, idToTyp, sealedMultiverse);
 			}
 		}
 		
 		final class Synchronized extends Basic{
 			
-			private final ReadWriteClosableLock rwLock = ReadWriteClosableLock.reentrant();
-			
 			@Override
 			public int toID(TypeLink type){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.toID(type);
 				}
 			}
 			
 			@Override
 			protected TypeID newID(TypeLink type, boolean recordNew){
-				try(var ignored = rwLock.write()){
+				synchronized(this){
 					return super.newID(type, recordNew);
 				}
 			}
 			
 			@Override
 			public TypeLink fromID(int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.fromID(id);
 				}
 			}
 			
 			@Override
 			public boolean hasType(TypeLink type){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.hasType(type);
 				}
 			}
 			@Override
 			public boolean hasID(int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.hasID(id);
 				}
 			}
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.fromID(rootType, id);
 				}
 			}
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.toID(rootType, type, record);
 				}
 			}
@@ -277,7 +279,7 @@ public sealed interface IOTypeDB{
 			private final TypeLink[]             idToTyp;
 			private final Map<TypeLink, Integer> typToID;
 			
-			private static class MemUniverse<T>{
+			private static final class MemUniverse<T>{
 				private final Class<T>[]             id2cl;
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
@@ -288,14 +290,15 @@ public sealed interface IOTypeDB{
 				}
 			}
 			
-			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse = new HashMap<>();
+			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse;
 			
-			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp){
+			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
 				var maxID = idToTyp.keySet().stream().mapToInt(i -> i).max().orElse(0);
 				this.idToTyp = new TypeLink[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
 				typToID = idToTyp.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+				this.sealedMultiverse = sealedMultiverse.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id)));
 			}
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
@@ -344,7 +347,7 @@ public sealed interface IOTypeDB{
 			}
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				if(universe == null) return null;
 				if(id>=universe.id2cl.length || id<0) return null;
@@ -353,7 +356,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				if(!rootType.isSealed()) throw new IllegalArgumentException();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				return universe.cl2id.get(type);
 			}
@@ -537,7 +540,11 @@ public sealed interface IOTypeDB{
 			
 			data.put(newID, type);
 			reverseDataCache = null;
-			recordType(List.of(type));
+			try{
+				recordType(List.of(type));
+			}catch(Throwable e){
+				throw new RuntimeException("Failed to record " + type, e);
+			}
 			return new TypeID(newID, true);
 		}
 		
@@ -553,7 +560,7 @@ public sealed interface IOTypeDB{
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 		}
 		
-		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
+		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
 			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
 			if(newDefs.isEmpty()) return;
 			
@@ -602,6 +609,14 @@ public sealed interface IOTypeDB{
 			
 			RuntimeException e = null;
 			
+			
+			Set<String> containedKeys;
+			try{
+				containedKeys = defs.stream().map(IOMap.IOEntry::getKey).map(t -> t.typeName).collect(Collectors.toUnmodifiableSet());
+			}catch(Throwable e1){
+				throw new IOException("Failed to read def keys", e1);
+			}
+			
 			for(var name : names){
 				Log.trace("Checking validity of {}#blueBright", name);
 				try{
@@ -612,15 +627,7 @@ public sealed interface IOTypeDB{
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
-								List.of(names::contains, n -> {
-									boolean contains;
-									try{
-										contains = defs.containsKey(new TypeName(n));
-									}catch(IOException ex){
-										throw new RuntimeException(ex);
-									}
-									return contains;
-								})
+								List.of(names::contains, containedKeys::contains)
 							)
 						));
 					if(fieldMap.containsKey(name) && IOInstance.isManaged(cls)){
@@ -749,7 +756,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
-			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
 			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
 			if(touched.isPresent()){
@@ -768,7 +775,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
-			if(!rootType.isSealed()) throw new IllegalArgumentException();
+			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
 			var touched = getTouched(rootType, type);
 			if(touched.isPresent()){
@@ -870,7 +877,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		public void init(DataProvider provider) throws IOException{
-			allocateNulls(provider);
+			allocateNulls(provider, null);
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){

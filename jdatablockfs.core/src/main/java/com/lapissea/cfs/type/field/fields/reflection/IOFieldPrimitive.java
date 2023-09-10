@@ -181,13 +181,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val  = getValue(ioPool, instance);
 			var size = getSafeSize(ioPool, instance, true, val);
-			size.writeFloating(dest, val);
+			size.writeInt(dest, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size = getSize(ioPool, instance);
-			setValue(ioPool, instance, (char)size.read(src));
+			setValue(ioPool, instance, (char)size.readInt(src));
 		}
 		
 		@Override
@@ -386,9 +386,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var val  = getValue(ioPool, instance);
 			var size = getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
-				size.write(dest, val);
+				size.writeInt(dest, val);
 			}else{
-				size.writeSigned(dest, val);
+				size.writeIntSigned(dest, val);
 			}
 		}
 		
@@ -397,9 +397,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var size = getSize(ioPool, instance);
 			int val;
 			if(unsigned){
-				val = (int)size.read(src);
+				val = size.readInt(src);
 			}else{
-				val = (int)size.readSigned(src);
+				val = size.readIntSigned(src);
 			}
 			setValue(ioPool, instance, val);
 		}
@@ -464,9 +464,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var val  = getValue(ioPool, instance);
 			var size = getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
-				size.write(dest, val);
+				size.writeInt(dest, val);
 			}else{
-				size.writeSigned(dest, val);
+				size.writeIntSigned(dest, val);
 			}
 		}
 		
@@ -475,9 +475,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var   size = getSize(ioPool, instance);
 			short val;
 			if(unsigned){
-				val = (short)size.read(src);
+				val = (short)size.readInt(src);
 			}else{
-				val = (short)size.readSigned(src);
+				val = (short)size.readIntSigned(src);
 			}
 			setValue(ioPool, instance, val);
 		}
@@ -663,14 +663,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
 	}
 	
-	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){
+	protected final NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){
 		return getSafeSize(ioPool, instance, NumberSize.bySize(num, unsigned));
 	}
-	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, NumberSize neededNum){
+	protected final NumberSize getSafeSize(VarPool<T> ioPool, T instance, NumberSize neededNum){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.safeSize(neededNum);
 	}
-	protected NumberSize getSize(VarPool<T> ioPool, T instance){
+	protected final NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.size;
 	}

@@ -4,15 +4,14 @@ import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentSupport;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static java.util.Comparator.comparingInt;
@@ -31,20 +30,29 @@ public enum NumberSize{
 	LONG      ('L', 8);
 	// @formatter:on
 	
-	private static final NumberSize[] BYTE_MAP =
-		IntStream.range(0, Arrays.stream(values()).mapToInt(NumberSize::bytes).max().orElseThrow() + 1)
-		         .mapToObj(b -> Arrays.stream(values()).filter(f -> f.bytes>=b).reduce(NumberSize::min).orElseThrow())
-		         .toArray(NumberSize[]::new);
+	private static final NumberSize[] BYTE_MAP;
+	
+	static{
+		var len  = 0;
+		var vals = values();
+		for(var n : vals) len = Math.max(len, n.bytes);
+		var res = new NumberSize[len + 1];
+		for(var n : vals){
+			for(int i = 0; i<n.bytes + 1; i++){
+				res[i] = res[i] == null? n : n.min(res[i]);
+			}
+		}
+		BYTE_MAP = res;
+	}
 	
 	public static final EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
 	
-	public static final NumberSize SMALEST_REAL = BYTE;
-	public static final NumberSize LARGEST      = LONG;
+	public static final NumberSize LARGEST = LONG;
 	
 	static{
 		for(NumberSize ns : values()){
-			ns.prev = FLAG_INFO.stream().filter(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
-			ns.next = FLAG_INFO.stream().filter(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.next = FLAG_INFO.filtered(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
 		}
 	}
 	
@@ -59,13 +67,16 @@ public enum NumberSize{
 	public static NumberSize bySize(long size, boolean unsigned){
 		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
 	}
+	
 	public static NumberSize bySizeSigned(long size){
 		if(size == 0) return VOID;
-		return byBytes(BitUtils.bitsToBytes((Long.SIZE - Long.numberOfLeadingZeros(Math.abs(size))) + 1));
+		var off = size<0? -(size + 1) : size;
+		return byBytes(BitUtils.bitsToBytes(Long.SIZE - Long.numberOfLeadingZeros(off) + 1));
 	}
 	public static NumberSize bySizeSigned(int size){
 		if(size == 0) return VOID;
-		return byBytes(BitUtils.bitsToBytes((Integer.SIZE - Integer.numberOfLeadingZeros(Math.abs(size))) + 1));
+		var off = size<0? -(size + 1) : size;
+		return byBytes(BitUtils.bitsToBytes(Integer.SIZE - Integer.numberOfLeadingZeros(off) + 1));
 	}
 	
 	public static NumberSize bySize(int size){
@@ -94,7 +105,9 @@ public enum NumberSize{
 	
 	public final int  bytes;
 	public final long maxSize;
+	public final int  maxSizeI;
 	public final long signedMaxValue;
+	public final int  signedMaxValueI;
 	public final long signedMinValue;
 	public final char shortName;
 	
@@ -111,6 +124,9 @@ public enum NumberSize{
 		
 		optionalBytes = OptionalInt.of(bytes);
 		optionalBytesLong = OptionalLong.of(bytes);
+		
+		maxSizeI = (int)Math.min(maxSize, Integer.MAX_VALUE);
+		signedMaxValueI = (int)Math.min(signedMaxValue, Integer.MAX_VALUE);
 	}
 	
 	public double readFloating(ContentReader in) throws IOException{
@@ -125,7 +141,6 @@ public enum NumberSize{
 	
 	public void writeFloating(ContentWriter out, double value) throws IOException{
 		switch(this){
-			case null -> { }
 			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
 			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
 			case SHORT -> out.writeInt2(IOUtils.floatToShortBits((float)value));
@@ -153,7 +168,7 @@ public enum NumberSize{
 			case BYTE -> in.readUnsignedInt1();
 			case SHORT -> in.readUnsignedInt2();
 			case SMALL_INT -> in.readUnsignedInt3();
-			case INT -> Math.toIntExact(in.readUnsignedInt4());
+			case INT -> (int)in.readUnsignedInt4();
 			case BIG_INT, SMALL_LONG, LONG -> throw new IOException("Attempted to read too large of a number");
 		};
 	}
@@ -163,10 +178,12 @@ public enum NumberSize{
 	}
 	
 	public long readSigned(ContentReader in) throws IOException{
+		if(this == VOID) return 0;
 		return toSigned(read(in));
 	}
 	
 	public int readIntSigned(ContentReader in) throws IOException{
+		if(this == VOID) return 0;
 		return toSigned(readInt(in));
 	}
 	
@@ -186,6 +203,26 @@ public enum NumberSize{
 			case BIG_INT -> out.writeInt5(value);
 			case SMALL_LONG -> out.writeInt6(value);
 			case LONG -> out.writeInt8(value);
+			case null -> { }
+		}
+	}
+	
+	public void write(byte[] out, int off, ChunkPointer value) throws IOException{
+		write(out, off, value == null? 0 : value.getValue());
+	}
+	
+	public void write(byte[] out, int off, long value) throws IOException{
+		if(DEBUG_VALIDATION) validateUnsigned(value);
+		
+		switch(this){
+			case VOID -> { }
+			case BYTE -> ContentSupport.writeInt1(out, off, (byte)value);
+			case SHORT -> ContentSupport.writeInt2(out, off, (int)value);
+			case SMALL_INT -> ContentSupport.writeInt3(out, off, (int)value);
+			case INT -> ContentSupport.writeInt4(out, off, (int)value);
+			case BIG_INT -> ContentSupport.writeInt5(out, off, value);
+			case SMALL_LONG -> ContentSupport.writeInt6(out, off, value);
+			case LONG -> ContentSupport.writeInt8(out, off, value);
 			case null -> { }
 		}
 	}
@@ -216,7 +253,7 @@ public enum NumberSize{
 		try{
 			ensureCanFit(value);
 		}catch(OutOfBitDepth e){
-			throw new RuntimeException(e);
+			throw new AssertionError(e);
 		}
 		if(value<0 && this != LONG && this != VOID){
 			throw new IllegalStateException(value + " is signed! " + this);
@@ -226,13 +263,27 @@ public enum NumberSize{
 		try{
 			ensureCanFit(value);
 		}catch(OutOfBitDepth e){
-			throw new RuntimeException(e);
+			throw new AssertionError(e);
 		}
-		if(value<0 && this != LONG && this != VOID){
+		if(value<0 && this != INT && this != VOID){
 			throw new IllegalStateException(value + " is signed! " + this);
 		}
 	}
+	
+	private long toUnsigned(long value){ return this == LONG || value>=0? value : value + maxSize + 1; }
+	private int toUnsigned(int value)  { return this == INT || value>=0? value : value + maxSizeI + 1; }
+	private long toSigned(long value)  { return this == LONG || value<=signedMaxValue? value : value - maxSize - 1; }
+	private int toSigned(int value)    { return this == INT || value<=signedMaxValueI? value : value - maxSizeI - 1; }
+	
 	private void validateSigned(long value){
+		if(this != VOID){
+			var un = toUnsigned(value);
+			if(this != LONG) validateUnsigned(un);
+			if(this != LONG && un<0) throw new AssertionError(un + "<0");
+			var back = toSigned(un);
+			if(value != back) throw new AssertionError(value + "!=" + back);
+		}
+		
 		try{
 			ensureCanFitSigned(value);
 		}catch(OutOfBitDepth e){
@@ -240,6 +291,14 @@ public enum NumberSize{
 		}
 	}
 	private void validateSigned(int value){
+		if(this != VOID){
+			var un = toUnsigned(value);
+			if(this != INT) validateUnsigned(un);
+			if(this != INT && un<0) throw new AssertionError(un + "<0");
+			var back = toSigned(un);
+			if(value != back) throw new AssertionError(value + "!=" + back);
+		}
+		
 		try{
 			ensureCanFitSigned(value);
 		}catch(OutOfBitDepth e){
@@ -249,30 +308,14 @@ public enum NumberSize{
 	
 	public void writeSigned(ContentWriter out, long value) throws IOException{
 		if(DEBUG_VALIDATION) validateSigned(value);
+		if(this == VOID) return;
 		write(out, toUnsigned(value));
 	}
 	
 	public void writeIntSigned(ContentWriter out, int value) throws IOException{
 		if(DEBUG_VALIDATION) validateSigned(value);
+		if(this == VOID) return;
 		writeInt(out, toUnsigned(value));
-	}
-	
-	private long toUnsigned(long value){
-		if(this == LONG) return value;
-		return value&this.maxSize;
-	}
-	private int toUnsigned(int value){
-		return value&(int)this.maxSize;
-	}
-	private long toSigned(long value){
-		if(this == LONG || this == VOID) return value;
-		if(value<=signedMaxValue) return value;
-		return value - maxSize - 1;
-	}
-	private int toSigned(int value){
-		if(this == VOID) return value;
-		if(value<=signedMaxValue) return value;
-		return value - (int)maxSize - 1;
 	}
 	
 	public NumberSize prev(){ return prev; }
@@ -296,7 +339,7 @@ public enum NumberSize{
 	public boolean canFit(long num)                { return num<=maxSize; }
 	public boolean canFit(int num)                 { return num<=maxSize; }
 	public boolean canFitSigned(long num)          { return signedMinValue<=num && num<=signedMaxValue; }
-	public boolean canFitSigned(int num)           { return signedMinValue<=num && num<=signedMaxValue; }
+	public boolean canFitSigned(int num)           { return signedMinValue<=num && num<=signedMaxValueI; }
 	public boolean canFit(long num, boolean signed){ return signed? canFitSigned(num) : canFit(num); }
 	public boolean canFit(int num, boolean signed) { return signed? canFitSigned(num) : canFit(num); }
 	

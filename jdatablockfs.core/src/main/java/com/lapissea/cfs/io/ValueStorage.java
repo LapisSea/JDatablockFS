@@ -1,7 +1,10 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.SealedUtil;
+import com.lapissea.cfs.SealedUtil.SealedInstanceUniverse;
+import com.lapissea.cfs.SealedUtil.SealedUniverse;
 import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.bit.EnumUniverse;
@@ -28,6 +31,8 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
+import com.lapissea.cfs.type.compilation.WrapperStructs;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
@@ -36,6 +41,7 @@ import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.DynamicSupport;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -47,7 +53,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Function;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
@@ -188,6 +197,8 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			pipe.write(provider, dest, src);
 		}
+		
+		private static final Reference DUMMY = new Reference(ChunkPointer.of(Long.MAX_VALUE), 420);
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var ptrs = new ArrayList<ChunkPointer>();
@@ -195,8 +206,7 @@ public sealed interface ValueStorage<T>{
 			var startPos = io.getPos();
 			var root     = readNew(io);
 			
-			var rootRef = new Reference(ChunkPointer.of(69), 420);
-			var dirty   = structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
+			var dirty = structWalk(provider, ptrs, dereferenceWrite, pipe, root, DUMMY);
 			if(dirty){
 				write(io.setPos(startPos), root);
 			}
@@ -224,7 +234,7 @@ public sealed interface ValueStorage<T>{
 					return MemoryWalker.CONTINUE;
 				}
 				@Override
-				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value) throws IOException{
+				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value){
 					return MemoryWalker.CONTINUE;
 				}
 			};
@@ -877,16 +887,169 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class UnknownIDReference<T> implements ValueStorage<T>, RefStorage<TypedReference>{
+		
+		private final DataProvider               provider;
+		private final GenericContext             generics;
+		private final StructPipe<TypedReference> refPipe;
+		
+		private final long inlineSize;
+		
+		public UnknownIDReference(DataProvider provider, GenericContext generics, StructPipe<TypedReference> refPipe){
+			this.provider = provider;
+			this.generics = generics;
+			this.refPipe = refPipe;
+			inlineSize = refPipe.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(-1);
+		}
+		
+		@Override
+		public T readNew(ContentReader src) throws IOException{
+			var ref  = readInline(src);
+			var type = ref.getType(provider.getTypeDb());
+			try(var io = ref.getRef().io(provider)){
+				//noinspection unchecked
+				return (T)DynamicSupport.readTyp(type, provider, io, generics);
+			}
+		}
+		
+		@Override
+		public void write(RandomIO dest, T src) throws IOException{
+			var id     = provider.getTypeDb().toID(src);
+			var orgPos = dest.getPos();
+			var refId  = dest.remaining() == 0? new TypedReference() : readInline(dest);
+			if(refId.isNull()){
+				var size = DynamicSupport.calcSize(provider, src);
+				
+				var ticket = AllocateTicket.bytes(size)
+				                           .withDataPopulated((u, io) -> DynamicSupport.writeValue(provider, io, src));
+				if(dest instanceof ChunkChainIO io){
+					ticket = ticket.withPositionMagnet(io.calcGlobalPos());
+				}
+				var ch = ticket.submit(provider);
+				try{
+					writeInline(dest.setPos(orgPos), new TypedReference(ch.getPtr().makeReference(), id));
+				}catch(Throwable e){
+					provider.getMemoryManager().free(ch);
+					throw e;
+				}
+			}else{
+				if(refId.getId() != id){
+					refId = new TypedReference(refId.getRef(), id);
+					writeInline(dest.setPos(orgPos), refId);
+				}
+				try(var io = refId.getRef().io(provider)){
+					DynamicSupport.writeValue(provider, io, src);
+				}
+			}
+		}
+		
+		@Override
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var startPos = io.getPos();
+			var refId    = readInline(io);
+			if(refId.isNull()){
+				return List.of();
+			}
+			if(dereferenceWrite){
+				writeInline(io.setPos(startPos), new TypedReference());
+			}
+			
+			var type = refId.getType(provider.getTypeDb());
+			var raw  = type.getTypeClass(provider.getTypeDb());
+			
+			if(IOInstance.isInstance(raw)){
+				var struct = Struct.ofUnknown(raw);
+				if(struct.getCanHavePointers()){
+					var ref  = refId.getRef();
+					var ptrs = new ArrayList<ChunkPointer>(4);
+					ptrs.add(ref.getPtr());
+					IOInstance val;
+					try(var refIo = ref.io(provider)){
+						val = (IOInstance)DynamicSupport.readTyp(type, provider, refIo, generics);
+					}
+					FixedInstance.structWalk(provider, ptrs, false, (StructPipe)StandardStructPipe.of(struct), val, ref);
+					return ptrs;
+				}
+			}
+			return List.of(refId.getRef().getPtr());
+		}
+		@Override
+		public boolean needsRemoval(){
+			return true;
+		}
+		
+		@Override
+		public TypedReference readInline(ContentReader src) throws IOException{
+			return refPipe.readNew(provider, src, null);
+		}
+		@Override
+		public void writeInline(RandomIO dest, TypedReference src) throws IOException{
+			refPipe.write(provider, dest, src);
+		}
+		
+		@Override
+		public long inlineSize(){
+			return inlineSize;
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			return new RefField.NoIOObj<>(accessor, (SizeDescriptor<I>)refPipe.getSizeDescriptor()){
+				@Override
+				public void setReference(I instance, Reference newRef) throws IOException{
+					try(var io = ioAt.get()){
+						var pos   = io.getPos();
+						var refId = readInline(io);
+						io.setPos(pos);
+						writeInline(io, refId.withRef(newRef));
+					}
+				}
+				@Override
+				public Reference getReference(I instance) throws IOException{
+					return readRef().getRef();
+				}
+				@SuppressWarnings("unchecked")
+				@Override
+				public ObjectPipe<T, ?> getReferencedPipe(I instance) throws IOException{
+					var refId = readRef();
+					var type  = refId.getType(provider.getTypeDb());
+					var raw   = type.getTypeClass(provider.getTypeDb());
+					if(IOInstance.isInstance(raw)){
+						return (ObjectPipe<T, ?>)StandardStructPipe.of(Struct.ofUnknown(raw));
+					}
+					if(raw == String.class){
+						return (ObjectPipe<T, ?>)AutoText.STR_PIPE;
+					}
+					throw new NotImplementedException();//TODO: What to do with the rest?
+				}
+				private TypedReference readRef() throws IOException{
+					TypedReference refId;
+					try(var io = ioAt.get()){
+						refId = readInline(io);
+					}
+					return refId;
+				}
+			};
+		}
+		
+		@Override
+		public RuntimeType<T> getType(){
+			//noinspection unchecked
+			return new RuntimeType.Lambda<>(true, (Class<T>)Object.class, null);
+		}
+	}
+	
 	final class SealedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
-		private final GenericContext                  ctx;
-		private final DataProvider                    provider;
-		private final Utils.SealedInstanceUniverse<T> universe;
-		private final boolean                         canHavePointers;
-		private final SizeDescriptor<T>               sizeDescriptor;
-		private final RuntimeType<T>                  type;
+		private final GenericContext            ctx;
+		private final DataProvider              provider;
+		private final SealedInstanceUniverse<T> universe;
+		private final boolean                   canHavePointers;
+		private final SizeDescriptor<T>         sizeDescriptor;
+		private final RuntimeType<T>            type;
 		
-		public SealedInstance(GenericContext ctx, DataProvider provider, Utils.SealedInstanceUniverse<T> universe){
+		public SealedInstance(GenericContext ctx, DataProvider provider, SealedInstanceUniverse<T> universe){
 			this.ctx = ctx;
 			this.provider = provider;
 			this.universe = universe;
@@ -972,12 +1135,12 @@ public sealed interface ValueStorage<T>{
 		
 		private final BaseFixedStructPipe<TypedReference> refPipe;
 		private final long                                size;
-		private final Utils.SealedInstanceUniverse<T>     universe;
+		private final SealedInstanceUniverse<T>           universe;
 		private final RuntimeType<T>                      type;
 		
 		public FixedReferenceSealedInstance(
 			GenericContext ctx, DataProvider provider,
-			BaseFixedStructPipe<TypedReference> refPipe, Utils.SealedInstanceUniverse<T> universe
+			BaseFixedStructPipe<TypedReference> refPipe, SealedInstanceUniverse<T> universe
 		){
 			this.ctx = ctx;
 			this.provider = provider;
@@ -1108,6 +1271,59 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class InlineWrapped<T> implements ValueStorage<T>{
+		
+		private final RuntimeType<T> type;
+		
+		private final DataProvider provider;
+		
+		private final StandardStructPipe<WrapperStructs.Wrapper<T>> pipe;
+		private final Function<T, WrapperStructs.Wrapper<T>>        ctor;
+		
+		public InlineWrapped(DataProvider provider, Class<T> type){
+			this.provider = provider;
+			this.type = RuntimeType.of(type);
+			var res = WrapperStructs.getWrapperStruct(type);
+			pipe = StandardStructPipe.of(res.struct());
+			ctor = res.constructor();
+		}
+		
+		@Override
+		public T readNew(ContentReader src) throws IOException{
+			return pipe.readNew(provider, src, null).get();
+		}
+		@Override
+		public void write(RandomIO dest, T src) throws IOException{
+			pipe.write(provider, dest, ctor.apply(src));
+		}
+		@Override
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
+		
+		@Override
+		public boolean needsRemoval(){
+			return false;
+		}
+		
+		@Override
+		public long inlineSize(){
+			return -1;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			var d = pipe.getSizeDescriptor();
+			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value) -> {
+				var str = type.getType().cast(accessor.get(ioPool, value));
+				if(str == null) return 0;
+				return pipe.getSizeDescriptor().calcUnknown(null, prov, ctor.apply(str), d.getWordSpace());
+			}));
+		}
+		@Override
+		public RuntimeType<T> getType(){
+			return type;
+		}
+	}
+	
 	sealed interface StorageRule{
 		record Default() implements StorageRule{ }
 		
@@ -1118,8 +1334,19 @@ public sealed interface ValueStorage<T>{
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
+		if(DEBUG_VALIDATION){
+			assert UtilL.instanceOf(clazz, generics.owner())
+				: clazz + " != " + generics.owner();
+		}
 		if(clazz == Object.class){
-			return new UnknownIDObject(provider, generics);
+			return switch(rule){
+				case StorageRule.Default ignored -> new UnknownIDObject(provider, generics);
+				case StorageRule.FixedOnly ignored -> new UnknownIDReference<>(provider, generics, FixedStructPipe.of(TypedReference.class));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Struct.of(TypedReference.class), conf.provider);
+					yield new UnknownIDReference<>(provider, generics, pipe);
+				}
+			};
 		}
 		{
 			var primitive = SupportedPrimitive.get(clazz);
@@ -1132,16 +1359,27 @@ public sealed interface ValueStorage<T>{
 			return switch(rule){
 				case StorageRule.Default ignored -> new InlineString(provider);
 				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider, Reference.fixedPipe());
-				case StorageRule.VariableFixed conf -> new FixedReferenceString(provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+					yield new FixedReferenceString(provider, pipe);
+				}
 			};
 		}
 		
-		if(clazz.isSealed()){
+		if(FieldCompiler.getWrapperTypes().contains(clazz)){
+			return switch(rule){
+				case StorageRule.Default ignored -> new InlineWrapped<>(provider, clazz);
+				case StorageRule.FixedOnly ignored -> throw new NotImplementedException();//TODO
+				case StorageRule.VariableFixed conf -> throw new NotImplementedException();//TODO
+			};
+		}
+		
+		if(isSealedCached(clazz)){
 			//noinspection rawtypes,unchecked
-			Optional<Utils.SealedInstanceUniverse> oUniverse =
-				Utils.getSealedUniverse(clazz, false).flatMap(u -> Utils.SealedInstanceUniverse.of((Utils.SealedUniverse)u));
+			Optional<SealedInstanceUniverse> oUniverse =
+				SealedUtil.getSealedUniverse(clazz, false).flatMap(u -> SealedInstanceUniverse.of((SealedUniverse)u));
 			if(oUniverse.isPresent()){
-				Utils.SealedInstanceUniverse<?> universe = oUniverse.get();
+				SealedInstanceUniverse<?> universe = oUniverse.get();
 				return switch(rule){
 					case StorageRule.Default ignored -> new SealedInstance<>(generics, provider, universe);
 					case StorageRule.FixedOnly ignored -> {
@@ -1156,11 +1394,18 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		
+		if(!IOInstance.isInstance(clazz)){
+			throw new IllegalArgumentException(clazz.getTypeName() + " is not an IOInstance");
+		}
+		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
 				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());
 				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());
-				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+				case StorageRule.VariableFixed conf -> {
+					var pipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+					yield new UnmanagedInstance<>(typeDef, provider, pipe);
+				}
 			};
 		}else{
 			var struct = Struct.ofUnknown(clazz);
@@ -1179,7 +1424,9 @@ public sealed interface ValueStorage<T>{
 						yield new FixedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(struct, conf.provider));
 					}catch(UnsupportedStructLayout ignored){
 						conf.provider.reset(id);
-						yield new FixedReferenceInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider), StandardStructPipe.of(struct));
+						var valPipe = StandardStructPipe.of(struct);
+						var refPipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+						yield new FixedReferenceInstance<>(generics, provider, refPipe, valPipe);
 					}
 				}
 			};

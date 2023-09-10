@@ -200,7 +200,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	private BitFieldMerger(List<BitField<T, ?>> group){
 		super(null);
-		this.group = group;
+		this.group = List.copyOf(group);
 		
 		var bits      = IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed);
 		var fixedSize = BitUtils.bitsToBytes(bits);

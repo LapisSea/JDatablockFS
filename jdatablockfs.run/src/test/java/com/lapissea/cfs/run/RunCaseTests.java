@@ -10,18 +10,18 @@ import java.io.IOException;
 
 public class RunCaseTests{
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void sparseImage() throws Exception{
 		SparseImage.main(ZeroArrays.ZERO_STRING);
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void world() throws IOException{
 		World.main(ZeroArrays.ZERO_STRING);
 	}
 	
-	@Test
-	void randomLists() throws IOException{
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
+	void randomLists(){
 		RandomLists.main(ZeroArrays.ZERO_STRING);
 	}
 	

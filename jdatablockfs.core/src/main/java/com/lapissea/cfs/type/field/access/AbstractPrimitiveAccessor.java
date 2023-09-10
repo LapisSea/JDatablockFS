@@ -1,16 +1,36 @@
 package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.utils.function.ConsumerOBool;
+import com.lapissea.cfs.utils.function.ConsumerOByt;
+import com.lapissea.cfs.utils.function.ConsumerOC;
+import com.lapissea.cfs.utils.function.ConsumerOD;
+import com.lapissea.cfs.utils.function.ConsumerOF;
+import com.lapissea.cfs.utils.function.ConsumerOI;
+import com.lapissea.cfs.utils.function.ConsumerOL;
+import com.lapissea.cfs.utils.function.ConsumerOS;
+import com.lapissea.cfs.utils.function.FunctionOBool;
+import com.lapissea.cfs.utils.function.FunctionOByt;
+import com.lapissea.cfs.utils.function.FunctionOC;
+import com.lapissea.cfs.utils.function.FunctionOD;
+import com.lapissea.cfs.utils.function.FunctionOF;
+import com.lapissea.cfs.utils.function.FunctionOI;
+import com.lapissea.cfs.utils.function.FunctionOL;
+import com.lapissea.cfs.utils.function.FunctionOS;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 
@@ -37,6 +57,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final Type     genericType;
 	private final Class<?> rawType;
 	private final int      typeID;
+	private final boolean  genericTypeHasArgs;
 	
 	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
 		super(struct, name, annotations);
@@ -45,8 +66,41 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 		
 		typeID = TypeFlag.getId(type);
 		
-		this.genericType = Utils.prottectFromVarType(genericType);
+		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(this.genericType);
+		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
+	}
+	
+	@Override
+	public boolean genericTypeHasArgs(){
+		return genericTypeHasArgs;
+	}
+	
+	@SuppressWarnings("unchecked")
+	protected final Function<CTyp, Object> makeGetter(Method m){
+		var typ = m.getReturnType();
+		if(typ == short.class) return Access.makeLambda(m, FunctionOS.class);
+		if(typ == char.class) return Access.makeLambda(m, FunctionOC.class);
+		if(typ == long.class) return Access.makeLambda(m, FunctionOL.class);
+		if(typ == byte.class) return Access.makeLambda(m, FunctionOByt.class);
+		if(typ == int.class) return Access.makeLambda(m, FunctionOI.class);
+		if(typ == double.class) return Access.makeLambda(m, FunctionOD.class);
+		if(typ == float.class) return Access.makeLambda(m, FunctionOF.class);
+		if(typ == boolean.class) return Access.makeLambda(m, FunctionOBool.class);
+		return Access.makeLambda(m, Function.class);
+	}
+	@SuppressWarnings("unchecked")
+	protected final BiConsumer<CTyp, Object> makeSetter(Method m){
+		var typ = m.getParameterTypes()[0];
+		if(typ == short.class) return Access.makeLambda(m, ConsumerOS.class);
+		if(typ == char.class) return Access.makeLambda(m, ConsumerOC.class);
+		if(typ == long.class) return Access.makeLambda(m, ConsumerOL.class);
+		if(typ == byte.class) return Access.makeLambda(m, ConsumerOByt.class);
+		if(typ == int.class) return Access.makeLambda(m, ConsumerOI.class);
+		if(typ == double.class) return Access.makeLambda(m, ConsumerOD.class);
+		if(typ == float.class) return Access.makeLambda(m, ConsumerOF.class);
+		if(typ == boolean.class) return Access.makeLambda(m, ConsumerOBool.class);
+		return Access.makeLambda(m, BiConsumer.class);
 	}
 	
 	@Override
@@ -60,7 +114,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	
 	@Override
 	public final Type getGenericType(GenericContext genericContext){
-		if(genericContext == null){
+		if(genericContext == null || !genericTypeHasArgs){
 			return genericType;
 		}
 		return genericContext.resolveType(genericType);

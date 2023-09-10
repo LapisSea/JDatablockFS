@@ -8,7 +8,6 @@ module JDatablockFS.tools {
 	requires org.lwjgl.glfw;
 	requires org.lwjgl.opengl;
 	requires com.google.gson;
-	requires java.sql;
 	requires com.esotericsoftware.kryo;
 	requires RoaringBitmap;
 	

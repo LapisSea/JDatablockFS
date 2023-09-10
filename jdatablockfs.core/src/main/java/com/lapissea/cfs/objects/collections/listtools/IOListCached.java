@@ -294,7 +294,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	public long indexOf(T value) throws IOException{
 		for(var e : cache.entrySet()){
 			var c = e.getValue();
-			if(c != null) continue;
+			if(c == null) continue;
 			if(Objects.equals(c, value)) return e.getKey();
 		}
 		return data.indexOf(value);

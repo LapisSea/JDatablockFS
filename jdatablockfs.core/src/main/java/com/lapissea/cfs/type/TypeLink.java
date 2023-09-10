@@ -1,7 +1,10 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SyntheticParameterizedType;
+import com.lapissea.cfs.SyntheticWildcardType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -33,7 +36,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 				RawCheck PRIMITIVE        = of(SupportedPrimitive::isAny, "is not primitive");
 				RawCheck INSTANCE         = of(
 					type -> {
-						if(Utils.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent()){
+						if(SealedUtil.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent()){
 							return true;
 						}
 						
@@ -151,7 +154,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 					throw err;
 				}
 			}catch(Throwable e){
-				throw new IllegalArgumentException(type.toShortString() + " is not valid!", e);
+				throw new InvalidGenericArgument(type.toShortString() + " is not valid!", e);
 			}
 		}
 	}
@@ -254,10 +257,14 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		PRIMITIVE_MARKER + "V", void.class
 	);
 	
+	private static final int PRIMITIVE_NAMES_MAX_LEN = PRIMITIVE_NAMES.values().stream()
+	                                                                  .map(Class::getName).mapToInt(String::length)
+	                                                                  .max().orElseThrow();
+	
 	private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
 		PRIMITIVE_NAMES.entrySet()
 		               .stream()
-		               .collect(Collectors.toMap(e -> e.getValue().getName(), Map.Entry::getKey));
+		               .collect(Collectors.toUnmodifiableMap(e -> e.getValue().getName(), Map.Entry::getKey));
 	
 	private Class<?> typeClass;
 	
@@ -294,7 +301,13 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	private void setTypeName(String typeName){
-		this.typeName = PRIMITIVE_CLASS_NAMES_TO_SHORT.getOrDefault(typeName, typeName);
+		String n;
+		if(typeName.length()>PRIMITIVE_NAMES_MAX_LEN) n = typeName;
+		else{
+			n = PRIMITIVE_CLASS_NAMES_TO_SHORT.get(typeName);
+			if(n == null) n = typeName;
+		}
+		this.typeName = n;
 	}
 	
 	public String getTypeName(){
@@ -306,7 +319,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public Class<?> getTypeClass(IOTypeDB db){
 		if(typeWild != TypeWild.NORMAL){
-			return Object.class;
+			if(args.length == 0) return Object.class;
+			if(args.length != 1) throw new NotImplementedException("Unsure how to handle " + this);
+			return args[0].getTypeClass(db);
 		}
 		var c = typeClass;
 		if(c != null) return c;
@@ -404,9 +419,15 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		if(generic == null){
 			Type[] tArgs = new Type[args.length];
 			for(int i = 0; i<args.length; i++){
-				tArgs[i] = args[i].getTypeClass(db);
+				tArgs[i] = args[i].generic(db);
 			}
-			generic = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
+			Type gen;
+			if(typeWild == TypeWild.NORMAL){
+				gen = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
+			}else{
+				gen = new SyntheticWildcardType(List.of(tArgs), typeWild == TypeWild.WILD_LOWER);
+			}
+			generic = gen;
 		}
 		return generic;
 	}
@@ -416,7 +437,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return this == o ||
 		       o instanceof TypeLink that &&
 		       typeWild == that.typeWild &&
-		       getTypeName().equals(that.getTypeName()) &&
+		       typeName.equals(that.typeName) &&
 		       argsEqual(args, that.args);
 	}
 	
@@ -449,5 +470,8 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		l.args = safeArgs(args);
 		
 		return l;
+	}
+	public TypeLink withRaw(Class<?> raw){
+		return new TypeLink(raw, args);
 	}
 }

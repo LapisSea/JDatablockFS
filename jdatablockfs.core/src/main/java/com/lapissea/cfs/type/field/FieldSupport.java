@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.SealedUtil.isSealedCached;
 import static com.lapissea.cfs.type.field.IOField.*;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -30,7 +31,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 /**
  * Stores bulk code for basic operations and information for {@link IOField}. Also provides emotional support
  */
-class FieldSupport{
+final class FieldSupport{
 	static <T extends IOInstance<T>> int hash(IOField<T, ?> field, VarPool<T> ioPool, T instance){
 		var acc = field.getAccessor();
 		var id  = acc.getTypeID();
@@ -202,7 +203,7 @@ class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor) || accessor.getType().isSealed();
+			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(accessor.getType());
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}
@@ -217,7 +218,7 @@ class FieldSupport{
 				}
 				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
 					typeGen = switch(typeGen){
-						case Class<?> c -> typeGen = Object.class;
+						case Class<?> c -> Object.class;
 						case ParameterizedType t -> t.getActualTypeArguments()[0];
 						default -> throw new NotImplementedException(typeGen.getClass() + "");
 					};

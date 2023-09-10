@@ -72,7 +72,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		public String toString(){
 			String      ext;
 			List<JType> bounds;
-			if(lower.size() == 0){
+			if(lower.isEmpty()){
 				if(noUpper()){
 					return "?";
 				}
@@ -88,7 +88,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		}
 		
 		private boolean noUpper(){
-			return upper.size() == 0 || upper.get(0).equals(GenericType.OBJECT);
+			return upper.isEmpty() || upper.get(0).equals(GenericType.OBJECT);
 		}
 	}
 	
@@ -103,12 +103,8 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		};
 	}
 	
-	default String jvmSignatureStr(){
-		return jvmSignature().toString();
-	}
-	
-	default CharSequence jvmSignature() { return jvmString(true); }
-	default CharSequence jvmDescriptor(){ return jvmString(false); }
+	default String jvmSignatureStr() { return jvmString(true).toString(); }
+	default String jvmDescriptorStr(){ return jvmString(false).toString(); }
 	default void jvmSignature(StringBuilder sb){
 		sb.ensureCapacity(sb.length() + jvmSignatureLen());
 		jvmString(sb, true);

@@ -87,24 +87,22 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		}
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 		long rawVal = getTargetPool(ioPool, instance).getLong(this);
 		if(filter == null) return rawVal;
-		return ((GetterFilter.L<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
+		return (long)filter.filter(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
 	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		getTargetPool(ioPool, instance).setLong(this, value);
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 		int rawVal = getTargetPool(ioPool, instance).getInt(this);
 		if(filter == null) return rawVal;
-		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
+		return (int)filter.filter(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
 	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){ getTargetPool(ioPool, instance).setInt(this, value); }

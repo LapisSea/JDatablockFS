@@ -61,6 +61,9 @@ public record AllocateTicket(
 		return DEFAULT.withApproval(approve);
 	}
 	
+	public static AllocateTicket explicitNextSize(Optional<NumberSize> explicitNextSize){
+		return DEFAULT.withExplicitNextSize(explicitNextSize);
+	}
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
 		if(this.approve.isPresent()){

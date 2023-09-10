@@ -86,7 +86,7 @@ public class GeneralTypeHandlingTests{
 		return new Object[][]{{Dummy.first()}, {deps}, {arr}};
 	}
 	
-	@Test(dataProvider = "genericObjects")
+	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
 		TestUtils.testCluster(TestInfo.of(obj), ses -> {
 			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(TypeLink.ofFlat(
@@ -212,7 +212,7 @@ public class GeneralTypeHandlingTests{
 		byte[] data();
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void compressByteArray() throws IOException{
 		TestUtils.testCluster(TestInfo.of(), provider -> {
 			var blob = IOInstance.Def.of(
@@ -470,7 +470,7 @@ public class GeneralTypeHandlingTests{
 		assertEquals(expected, actual);
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void testSealedType() throws IOException{
 		TestUtils.testCluster(TestInfo.of(), provider -> {
 			@IOInstance.Def.Order({"seal1", "seal2"})
@@ -537,7 +537,7 @@ public class GeneralTypeHandlingTests{
 		public OrderTestType(){ }
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void orderTestType() throws IOException{
 		
 		var cluster = Cluster.emptyMem();
@@ -619,6 +619,29 @@ public class GeneralTypeHandlingTests{
 			int bad;
 		}
 		Struct.of(Foo.class, STATE_DONE);
+	}
+	
+	public interface GenericChild<A> extends IOInstance.Def<GenericChild<A>>{
+		ContiguousIOList<A> list();
+	}
+	
+	
+	public interface GenericArg extends IOInstance.Def<GenericArg>{
+		GenericChild<String> strings();
+//		GenericChild<ObjectID> ids();
+//		GenericChild<T> generic();
+	}
+	
+	@Test
+	void genericPropagation() throws IOException{
+		var d    = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		var data = IOInstance.Def.of(GenericArg.class);
+		data.allocateNulls(d, null);
+		var strings = data.strings().list();
+		strings.add("foo");
+		strings.add("bar");
+		assertEquals(List.of("foo", "bar"), strings.collectToList());
+		assertEquals(TypeLink.of(ContiguousIOList.class, String.class), strings.getTypeDef());
 	}
 	
 }

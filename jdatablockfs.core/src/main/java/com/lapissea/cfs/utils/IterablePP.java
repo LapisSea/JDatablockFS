@@ -2,12 +2,13 @@ package com.lapissea.cfs.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -15,6 +16,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	
 	default Stream<T> stream(){
 		return StreamSupport.stream(spliterator(), false);
+	}
+	
+	default boolean isEmpty(){
+		return !iterator().hasNext();
 	}
 	
 	default OptionalPP<T> first(){
@@ -183,32 +188,23 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
-	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
-		return () -> new Iterator<T>(){
-			final Supplier<T> src = supplier.get();
-			T next;
-			
-			void calcNext(){
-				next = src.get();
-			}
-			
-			@Override
-			public boolean hasNext(){
-				if(next == null) calcNext();
-				return next != null;
-			}
-			@Override
-			public T next(){
-				if(next == null){
-					calcNext();
-					if(next == null) throw new NoSuchElementException();
-				}
-				try{
-					return next;
-				}finally{
-					next = null;
-				}
-			}
-		};
+	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
+		final Iterator<T> src = IterablePP.this.iterator();
+		if(!src.hasNext()) return OptionalPP.empty();
+		var result = src.next();
+		while(src.hasNext()){
+			var next = src.next();
+			result = reducer.apply(result, next);
+		}
+		return OptionalPP.of(result);
 	}
+	
+	default OptionalPP<T> min(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.minBy(comparator));
+	}
+	
+	default OptionalPP<T> max(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.maxBy(comparator));
+	}
+	
 }

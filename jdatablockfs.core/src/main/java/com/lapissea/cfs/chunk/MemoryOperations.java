@@ -4,7 +4,6 @@ import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
-import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -35,7 +34,7 @@ import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 
-public class MemoryOperations{
+public final class MemoryOperations{
 	
 	public static void purgePossibleChunkHeaders(DataProvider provider, long from, long size) throws IOException{
 		var maxHeaderSize = (int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
@@ -256,7 +255,7 @@ public class MemoryOperations{
 	}
 	
 	
-	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
+	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolveVal();
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();
@@ -290,11 +289,7 @@ public class MemoryOperations{
 		for(Chunk chunk : oks){
 			chunk.setSize(0);
 			chunk.clearAndCompressHeader();
-			
-			var    size      = chunk.getHeaderSize();
-			byte[] headBytes = new byte[size];
-			chunk.writeHeader(new ContentOutputStream.BA(headBytes));
-			writeChunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes));
+			writeChunks.add(chunk.writeHeaderToBuf());
 		}
 		
 		var purgeTransaction = PURGE_ACCIDENTAL? provider.getSource().openIOTransaction() : null;
@@ -358,11 +353,11 @@ public class MemoryOperations{
 	
 	
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
-		smallTrace("growing {} by {} by growing file", target, toAllocate);
-		
 		DataProvider context = target.getDataProvider();
 		
 		if(context.isLastPhysical(target)){
+			smallTrace("growing {} by {} by growing file", target, toAllocate);
+			
 			var remaining = target.getBodyNumSize().remaining(target.getCapacity());
 			var toGrow    = Math.min(toAllocate, remaining);
 			if(toGrow>0){
@@ -399,7 +394,7 @@ public class MemoryOperations{
 		var toPin = AllocateTicket.bytes(toAllocate)
 		                          .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
 		                          .withPositionMagnet(target)
-		                          .withExplicitNextSize(explicitNextSize(manager, isChain))
+		                          .withExplicitNextSize(calcExplicitNextSize(manager, isChain))
 		                          .submit(manager);
 		if(toPin == null) return 0;
 		target.modifyAndSave(c -> {
@@ -427,11 +422,13 @@ public class MemoryOperations{
 		while(iter.hasPrevious()){
 			var ch = iter.previous();
 			
-			var allocated = AllocateTicket.bytes(toAllocate + toCopy)
-			                              .withPositionMagnet(ch)
-			                              .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
-			                              .withExplicitNextSize(explicitNextSize(manager, true))
-			                              .submit(manager);
+			Chunk allocated;
+			if(ch.getNextSize() == NumberSize.VOID) allocated = null;
+			else allocated = AllocateTicket.bytes(toAllocate + toCopy)
+			                               .withPositionMagnet(ch)
+			                               .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
+			                               .withExplicitNextSize(calcExplicitNextSize(manager, true))
+			                               .submit(manager);
 			if(allocated == null){
 				toCopy += ch.getCapacity();
 				continue;
@@ -471,29 +468,62 @@ public class MemoryOperations{
 		
 		boolean isChain = first != target;
 		
-		var siz = target.getNextSize();
+		NumberSize nextSiz;
+		NumberSize bodyNum;
+		int        growth, bodyShrink;
+		Chunk      toPin = null;
 		
-		var ticket = AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
-		                                   .withPositionMagnet(target);
+		var baseTicket = AllocateTicket.explicitNextSize(calcExplicitNextSize(manager, isChain));
 		
-		Chunk toPin;
-		int   growth;
-		do{
-			if(siz == NumberSize.LARGEST){
-				throw new OutOfMemoryError();
-			}
+		while(true){
+			nextSiz = target.getNextSize();
+			bodyNum = target.getBodyNumSize();
+			bodyShrink = 0;
+			baseTicket = baseTicket.withPositionMagnet(target);
+			do{
+				if(nextSiz == NumberSize.LARGEST){
+					throw new OutOfMemoryError();
+				}
+				
+				nextSiz = nextSiz.next();
+				growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
+				
+				overflow:
+				if(target.getCapacity()<growth){
+					var prevBodyNum = bodyNum.prev();
+					bodyShrink = (bodyNum.bytes - prevBodyNum.bytes)*2;
+					growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
+					while(true){
+						var newCap = target.getCapacity() - growth;
+						if(newCap<0) break;
+						
+						if(prevBodyNum.canFit(newCap)){
+							bodyNum = prevBodyNum;
+							break overflow;
+						}
+						
+						nextSiz = nextSiz.next();
+						growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
+						
+						if(nextSiz == NumberSize.LARGEST){
+							break;
+						}
+					}
+					
+					break;
+				}
+				
+				toPin = baseTicket.withBytes(toAllocate + growth)
+				                  .withApproval(Chunk.sizeFitsPointer(nextSiz))
+				                  .submit(manager);
+			}while(toPin == null);
+			if(toPin != null) break;
 			
-			siz = siz.next();
-			growth = siz.bytes - target.getNextSize().bytes;
-			
-			if(target.getCapacity()<growth){
-				return 0;
-			}
-			
-			toPin = ticket.withBytes(toAllocate + growth)
-			              .withApproval(Chunk.sizeFitsPointer(siz))
-			              .submit(manager);
-		}while(toPin == null);
+			toAllocate += target.getSize();
+			target = target.findPrev(first);
+			if(target == null) return 0;
+			nextSiz = target.getNextSize();
+		}
 		
 		IOInterface source = target.getDataProvider().getSource();
 		
@@ -510,22 +540,36 @@ public class MemoryOperations{
 		}
 		
 		var oldCapacity = target.getCapacity();
+		var dataEnd     = target.dataEnd();
+		
+		var toFree = target.next();
 		
 		target.requireReal();
+		
 		try{
-			target.setNextSize(siz);
+			target.setNextSize(nextSiz);
 			target.setNextPtr(toPin.getPtr());
 			target.setSize(shiftSize);
 			target.setCapacity(oldCapacity - growth);
+			target.setBodyNumSize(bodyNum);
 		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
+		
+		assert dataEnd == target.dataEnd() : target + ": " + dataEnd + "!=" + target.dataEnd();
+		
 		try(var ignored = source.openIOTransaction()){
 			target.syncStruct();
 			source.write(target.dataStart(), false, toShift);
 		}
 		
-		return (target.getCapacity() + toPin.getCapacity()) - oldCapacity;
+		var moved = 0L;
+		if(toFree != null){
+			moved = toFree.chainLength();
+			toFree.freeChaining();
+		}
+		
+		return target.getCapacity() + toPin.getCapacity() - moved - oldCapacity;
 	}
 	
 	
@@ -693,7 +737,10 @@ public class MemoryOperations{
 		var end = target.dataEnd();
 		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
 			ChunkPointer freePtr = iter.ioNext();
-			if(!freePtr.equals(end)) continue;
+			if(!freePtr.equals(end)){
+				if(freePtr.compareTo(end)>0) return 0;
+				continue;
+			}
 			
 			var provider  = manager.getDataProvider();
 			var freeChunk = freePtr.dereference(provider);
@@ -763,7 +810,7 @@ public class MemoryOperations{
 		return 0;
 	}
 	
-	private static Optional<NumberSize> explicitNextSize(MemoryManager manager, boolean isChain) throws IOException{
+	private static Optional<NumberSize> calcExplicitNextSize(MemoryManager manager, boolean isChain) throws IOException{
 		if(!isChain){
 			return Optional.empty();
 		}

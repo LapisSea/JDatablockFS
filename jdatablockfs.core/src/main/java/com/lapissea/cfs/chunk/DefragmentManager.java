@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFile;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -146,7 +147,7 @@ public class DefragmentManager{
 				if(IOInstance.isUnmanaged(type)){
 					if(allowUnmanaged){
 						move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), ticketFn);
-					}
+					}else Log.trace("Disallowed move of unmanaged");
 					return END;
 				}
 				
@@ -230,7 +231,7 @@ public class DefragmentManager{
 						
 						if(IOInstance.isUnmanaged(type)){
 							var move = reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
-							if(move != null) run[0] = true;
+							if(move.hasAny()) run[0] = true;
 							return END;
 						}
 						
@@ -470,9 +471,8 @@ public class DefragmentManager{
 				warn("found unknown free chunks: {}", unreferencedChunks);
 				
 				List<Chunk> unreferenced = new ArrayList<>(MathUtil.snap((int)unreferencedChunks.trueSize(), 1, 50));
-				var         iter         = unreferencedChunks.iterator();
-				while(iter.hasNext()){
-					unreferenced.add(iter.next().dereference(cluster));
+				for(var unreferencedChunk : unreferencedChunks){
+					unreferenced.add(unreferencedChunk.dereference(cluster));
 					
 					if(unreferenced.size()>=64){
 						cluster.getMemoryManager().free(unreferenced);

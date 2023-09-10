@@ -180,9 +180,7 @@ public final class Plan<TState, TAction>{
 			if(state.reported) report = "There are fails";
 			else{
 				report = "\n" + switch(state.fails){
-					case Fails.FailList<TState, TAction>(var fails) -> {
-						yield FuzzFail.report(fails);
-					}
+					case Fails.FailList<TState, TAction>(var fails) -> FuzzFail.report(fails);
 					case Fails.StableFail<TState, TAction>(var fail, var stability) -> {
 						if(stability instanceof Stability.FailsNotSame){
 							yield stability.makeReport();

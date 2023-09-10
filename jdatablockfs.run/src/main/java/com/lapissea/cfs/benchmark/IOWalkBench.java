@@ -30,14 +30,14 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
 	
-	private final Cluster cluster;
-	MemoryWalker.PointerRecord rec = new MemoryWalker.PointerRecord(){
+	private final Cluster                    cluster;
+	final         MemoryWalker.PointerRecord rec = new MemoryWalker.PointerRecord(){
 		@Override
-		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
+		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
 			return MemoryWalker.CONTINUE;
 		}
 		@Override
-		public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+		public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 			return MemoryWalker.CONTINUE;
 		}
 	};

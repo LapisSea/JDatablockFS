@@ -1,11 +1,11 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -336,12 +336,26 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
-		public void allocateNulls(DataProvider provider) throws IOException{
-			var ctx = this instanceof IOInstance.Unmanaged<?> u? u.getGenerics() : null;
-			for(var ref : getThisStruct().getRealFields().onlyRefs()){
+		public void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException{
+			var ctx = genericContext;
+			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
+			var s = getThisStruct();
+			for(var ref : s.getRealFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
-				ref.allocate(self(), provider, ctx);
+				ref.allocate(self(), provider, genericContext);
+			}
+			
+			for(var pair : s.getNullContainInstances()){
+				var field = pair.field();
+				if(!field.isNull(null, self())){
+					continue;
+				}
+				var struct = pair.struct();
+				var val    = struct.make();
+				val.allocateNulls(provider, field.makeContext(genericContext));
+				//noinspection rawtypes,unchecked
+				((IOField)field).set(null, self(), val);
 			}
 		}
 		
@@ -613,7 +627,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final void allocateNulls() throws IOException{
-			allocateNulls(getDataProvider());
+			allocateNulls(getDataProvider(), getGenerics());
 		}
 		
 		@Override
@@ -636,7 +650,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	Struct<SELF> getThisStruct();
 	
-	void allocateNulls(DataProvider provider) throws IOException;
+	void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException;
 	
 	@Override
 	default String toShortString(){
@@ -653,7 +667,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	private SELF self(){ return (SELF)this; }
 	
 	
-	static boolean isInstance(Utils.SealedUniverse<?> universe){
+	static boolean isInstance(SealedUtil.SealedUniverse<?> universe){
 		return universe.universe().stream().allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){

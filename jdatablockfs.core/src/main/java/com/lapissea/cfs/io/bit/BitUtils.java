@@ -4,28 +4,19 @@ import java.util.OptionalLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class BitUtils{
+public final class BitUtils{
 	
-	public static int binaryRangeFindZero(long chunk, int bits, int offset){
-		
-		if(bits == 1){
-			if((chunk&1) == 0) return offset;
-			else return -1;
+	public static int findBinaryZero(long chunk, int bits){
+		var mask = makeMask(bits);
+		if(mask == (chunk&mask)){
+			return -1;
 		}
 		
-		int  leftSize = bits/2;
-		long leftMask = (1L<<leftSize) - 1L;
-		
-		if((chunk&leftMask) != leftMask){
-			return binaryRangeFindZero(chunk, leftSize, offset);
+		for(int i = 0; i<bits; i++){
+			if(((chunk>>i)&1) == 0){
+				return i;
+			}
 		}
-		
-		long rightMask = ~leftMask;
-		
-		if((chunk&rightMask) != rightMask){
-			return binaryRangeFindZero(chunk >>> leftSize, bits - leftSize, offset + leftSize);
-		}
-		
 		return -1;
 	}
 	

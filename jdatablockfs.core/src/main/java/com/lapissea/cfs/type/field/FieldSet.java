@@ -16,11 +16,11 @@ import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
@@ -211,8 +211,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
-	private static final IOField[]   NO_FIELDS = new IOField[0];
-	private static final FieldSet<?> EMPTY     = new FieldSet<>(NO_FIELDS, 0);
+	private static final FieldSet<?> EMPTY = new FieldSet<>(new IOField[0]);
 	
 	public static <T extends IOInstance<T>> FieldSet<T> of(){
 		return (FieldSet<T>)EMPTY;
@@ -223,33 +222,31 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		private int             pos;
 		
 		private SetBuilder(int size){
-			safeData = switch(size){
-				case -1 -> null;
-				case 0 -> NO_FIELDS;
-				default -> new IOField[size];
-			};
+			safeData = size<=0? ((FieldSet<T>)EMPTY).data : new IOField[size];
 		}
 		
 		@Override
 		public void accept(IOField<T, ?> e){
 			Objects.requireNonNull(e);
-			if(safeData == null){
-				safeData = new IOField[2];
-			}
-			for(int i = 0; i<pos; i++){
-				if(safeData[i].getName().equals(e.getName())){
+			var data = safeData;
+			var lPos = pos;
+			for(int i = 0; i<lPos; i++){
+				if(data[i].getName().equals(e.getName())){
 					return;
 				}
 			}
-			if(pos == safeData.length){
-				safeData = Arrays.copyOf(safeData, Math.max(pos + 1, safeData.length*2));
+			if(lPos == data.length){
+				safeData = data = Arrays.copyOf(data, Math.max(lPos + 1, data.length*2));
 			}
-			safeData[pos++] = e;
+			data[lPos] = e;
+			pos = lPos + 1;
 		}
 		
 		private FieldSet<T> make(){
-			if(pos == 0) return of();
-			return new FieldSet<>(safeData, pos);
+			var lPos = pos;
+			if(lPos == 0) return of();
+			var data = safeData;
+			return new FieldSet<>(data.length != lPos? Arrays.copyOf(data, lPos) : data);
 		}
 	}
 	
@@ -257,6 +254,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		var s = stream.spliterator();
 		var b = new SetBuilder<T>((int)s.getExactSizeIfKnown());
 		s.forEachRemaining(b);
+		return b.make();
+	}
+	public static <T extends IOInstance<T>> FieldSet<T> of(Iterable<IOField<T, ?>> iterable){
+		var b = new SetBuilder<T>(-1);
+		iterable.forEach(b);
 		return b.make();
 	}
 	
@@ -268,7 +270,12 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		if(data == null || data.isEmpty()) return of();
 		if(data instanceof FieldSet<T> f) return f;
 		
-		var safeData = new SetBuilder<T>(data.size());
+		var size = data.size();
+		if(size == 1 && data instanceof List<IOField<T, ?>> l){
+			return new FieldSet<>(new IOField[]{l.get(0)});
+		}
+		
+		var safeData = new SetBuilder<T>(size);
 		for(var e : data){
 			safeData.accept(e);
 		}
@@ -282,8 +289,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	private Map<String, Integer> nameLookup;
 	
-	private FieldSet(IOField<T, ?>[] data, int size){
-		this.data = data.length != size? Arrays.copyOf(data, size) : data;
+	private FieldSet(IOField<T, ?>[] data){
+		this.data = data;
 	}
 	
 	@Override
@@ -446,8 +453,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return data.length;
 	}
 	
-	public Optional<IOField<T, ?>> byName(String name){
-		return Optional.ofNullable(getNameLookup().get(name)).map(this::get);
+	public OptionalPP<IOField<T, ?>> byName(String name){
+		return OptionalPP.ofNullable(getNameLookup().get(name)).map(this::get);
 	}
 	
 	private Map<String, Integer> getNameLookup(){
@@ -466,7 +473,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	@Override
 	public boolean contains(Object o){
 		if(!(o instanceof IOField<?, ?> f)) return false;
-		return contains(o);
+		return contains(f);
 	}
 	public boolean contains(IOField<?, ?> f){
 		if(size() == 1){
@@ -503,7 +510,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return byType(type).filtered(f -> f.getName().equals(name)).first();
 	}
 	
-	public <E extends IOField<T, ?>> Optional<? extends E> exactFieldType(Class<E> type, String name){
+	public <E extends IOField<T, ?>> OptionalPP<? extends E> exactFieldType(Class<E> type, String name){
 		return byName(name).filter(type::isInstance).map(type::cast);
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){

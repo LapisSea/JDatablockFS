@@ -5,9 +5,9 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkBuilder;
+import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
@@ -69,7 +69,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
 		ContiguousIOList.class,
-		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"))
+		TypeLink.Check.ArgCheck.rawAny(
+			PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"),
+			TypeLink.Check.ArgCheck.RawCheck.of(c -> c == Object.class, "is not an Object")
+		)
 	);
 	
 	@IOValue
@@ -142,6 +145,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			case ValueStorage.Primitive<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
 			case ValueStorage.SealedInstance<?> instance -> throw new NotImplementedException();
+			case ValueStorage.InlineWrapped<?> inlineWrapped -> throw new NotImplementedException();
+			case ValueStorage.UnknownIDReference<?> inlineWrapped -> throw new NotImplementedException();
 		};
 	}
 	
@@ -150,16 +155,18 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		private static final List<Annotation> NULLABLE_ANNS = List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE));
 		
 		private final Type     elementType;
-		private final Class<?> rawelementType;
+		private final boolean  genericTypeHasArgs;
+		private final Class<?> rawElementType;
 		private       long     index;
 		private final int      typeID;
 		
 		protected IndexAccessor(Type elementType, boolean nullable){
 			super(null, "", nullable? NULLABLE_ANNS : List.of());
 			this.elementType = elementType;
-			rawelementType = Utils.typeToRaw(elementType);
+			rawElementType = Utils.typeToRaw(elementType);
 			this.index = -1;
 			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
+			genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(elementType);
 		}
 		
 		@NotNull
@@ -174,12 +181,16 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		}
 		@Override
 		public Class<?> getType(){
-			return rawelementType;
+			return rawElementType;
 		}
 		
 		@Override
 		public int getTypeID(){
 			return typeID;
+		}
+		@Override
+		public boolean genericTypeHasArgs(){
+			return genericTypeHasArgs;
 		}
 		
 		@Override
@@ -333,6 +344,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
 			case ValueStorage.FixedReferenceSealedInstance<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.InlineWrapped<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.UnknownIDReference<?> stor -> new CommandSet.RepeaterEnd(PREF_SET, size());
 		};
 	}
 	
@@ -430,8 +443,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		calcHead();
 	}
 	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, TypeLink typeDef){
+		var g   = getGenerics();
+		var ctx = g.argAsContext("T");
 		return (ValueStorage<T>)ValueStorage.makeStorage(
-			makeMagnetProvider(), typeDef, getGenerics().argAsContext("T"),
+			makeMagnetProvider(), typeDef, ctx,
 			new StorageRule.VariableFixed(varying)
 		);
 	}
@@ -754,7 +769,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
 				notifySingleFree(io, false);
-				io.revalidate();
 			}
 			
 			long sm1 = size - 1;

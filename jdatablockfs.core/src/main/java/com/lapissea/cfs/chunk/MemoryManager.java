@@ -1,7 +1,6 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.UnknownAllocationMethod;
-import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;

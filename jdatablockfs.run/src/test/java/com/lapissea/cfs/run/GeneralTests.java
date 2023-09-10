@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -121,7 +122,7 @@ public class GeneralTests{
 		return new Object[][]{{ContiguousIOList.class}, {LinkedIOList.class}};
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<L extends IOInstance.Unmanaged<L> & IOList<Integer>> void listTestIntAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Integer.class, list -> {
 			list.add(69);
@@ -129,7 +130,7 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listTestSimpleAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
@@ -137,14 +138,14 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<L extends IOInstance.Unmanaged<L> & IOList<BooleanContainer>> void listBitValue(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, BooleanContainer.class, list -> {
 			var rand = new Random(1);
@@ -155,7 +156,7 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listInsert(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy('1'));
@@ -167,7 +168,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listIndexRemove(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
@@ -178,7 +179,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider = "lists")
+	@Test(dataProvider = "lists", groups = "lists")
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listComplexIndexRemove(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
@@ -195,7 +196,7 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test
+	@Test(groups = {"hashMap", "rootProvider"})
 	void testHashIOMap() throws IOException{
 		TestUtils.ioMapComplianceSequence(
 			TestInfo.of(),
@@ -342,5 +343,45 @@ public class GeneralTests{
 			assertEquals(first.chainLength(), 2);
 			assertEquals(first.readAll(), bb);
 		});
+	}
+	
+	@Test
+	void bySizeSignedInt(){
+		NumberSize.FLAG_INFO
+			.stream().flatMapToLong(
+			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
+			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.filter(l -> Integer.MAX_VALUE>=l && l>=Integer.MIN_VALUE)
+			.mapToInt(Math::toIntExact)
+			.forEach(e -> {
+				var v = NumberSize.bySizeSigned(e);
+				
+				if(v.signedMinValue>e || e>v.signedMaxValue){
+					throw new RuntimeException(e + " " + v);
+				}
+				var p = v.prev();
+				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+					throw new RuntimeException(e + " prev " + v);
+				}
+			});
+	}
+	
+	@Test
+	void bySizeSignedLong(){
+		NumberSize.FLAG_INFO
+			.stream().flatMapToLong(
+			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
+			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.forEach(e -> {
+				var v = NumberSize.bySizeSigned(e);
+				
+				if(v.signedMinValue>e || e>v.signedMaxValue){
+					throw new RuntimeException(e + " " + v);
+				}
+				var p = v.prev();
+				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+					throw new RuntimeException(e + " prev " + v);
+				}
+			});
 	}
 }

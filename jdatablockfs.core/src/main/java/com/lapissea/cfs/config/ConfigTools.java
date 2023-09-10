@@ -53,6 +53,10 @@ public final class ConfigTools{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
+			
+			/**
+			 * @see FBool#resolveVal()
+			 */
 			@Override
 			@Deprecated
 			public Boolean resolve(){ return resolveVal(); }
@@ -81,6 +85,9 @@ public final class ConfigTools{
 				Flag.super.set(val);
 			}
 			
+			/**
+			 * @see FInt#resolveVal()
+			 */
 			@Override
 			@Deprecated
 			public Integer resolve(){ return resolveVal(); }

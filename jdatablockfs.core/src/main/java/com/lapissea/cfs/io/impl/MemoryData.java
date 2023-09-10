@@ -192,8 +192,8 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-					transactionBuff.write(ioOffset, data, dataOffset, dataLength);
+				for(var e : writeData){
+					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}
 				return;
 			}
@@ -208,8 +208,8 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			
 			used = Math.max(used, Math.toIntExact(required));
 			
-			for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
-				writeN(data, dataOffset, fileData, Math.toIntExact(ioOffset), dataLength);
+			for(var e : writeData){
+				writeN(e.data(), e.dataOffset(), fileData, Math.toIntExact(e.ioOffset()), e.dataLength());
 			}
 			
 			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
@@ -225,7 +225,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		public void writeWord(long v, int len) throws IOException{
+		public void writeWord(long v, int len){
 			if(transactionOpen){
 				transactionBuff.writeWord(pos, v, len);
 				pos += len;
@@ -363,7 +363,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return new MemRandomIO();
 	}
 	@Override
-	public RandomIO ioAt(long offset) throws IOException{
+	public RandomIO ioAt(long offset){
 		return new MemRandomIO((int)offset);
 	}
 	
