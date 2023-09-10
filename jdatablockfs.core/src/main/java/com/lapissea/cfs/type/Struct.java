@@ -670,25 +670,31 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public FieldSet<T> getRealFields(){
-		if(realFields == null){
-			realFields = FieldSet.of(getFields().stream().filter(e -> !e.isVirtual(IO)));
-		}
-		return realFields;
+		var f = realFields;
+		return f == null? realFields = calcRealFields() : f;
+	}
+	private FieldSet<T> calcRealFields(){
+		var fields = getFields();
+		var res    = FieldSet.of(fields.filtered(e -> !e.isVirtual(IO)));
+		if(res.size() == fields.size()) return fields;
+		return res;
 	}
 	
 	public FieldSet<T> getCloneFields(){
-		if(cloneFields == null){
-			cloneFields = FieldSet.of(getFields().stream().filter(f -> {
-				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
-				var acc = f.getAccessor();
-				if(acc != null){
-					var typ = acc.getType();
-					return typ != String.class;
-				}
-				return true;
-			}));
-		}
-		return cloneFields;
+		var f = cloneFields;
+		return f == null? cloneFields = calcCloneFields() : f;
+	}
+	private FieldSet<T> calcCloneFields(){
+		return FieldSet.of(getFields().filtered(f -> {
+			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
+			var acc = f.getAccessor();
+			if(acc != null){
+				var typ = acc.getType();
+				return !FieldCompiler.getWrapperTypes().contains(typ);
+			}
+			return true;
+		}));
+	}
 	}
 	
 	public FieldSet<T> getFields(){
@@ -826,6 +832,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(() -> {
 			return new GenericContext.TypeArgs(getType(), def.generic(null));
+		});
+	}
+	public GenericContext describeGenerics(Type def){
+		return new GenericContext.Deferred(() -> {
+			return new GenericContext.TypeArgs(getType(), def);
 		});
 	}
 	

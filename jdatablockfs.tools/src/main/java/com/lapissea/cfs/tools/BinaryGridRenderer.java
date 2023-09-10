@@ -1418,7 +1418,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ioPool = instance.getThisStruct().allocVirtualVarPool(IO);
 			if(ioPool != null){
 				try(var io = reference.io(ctx.provider)){
-					var virtuals = FieldSet.of(pipe.getSpecificFields().stream().filter(f -> f.isVirtual(IO)));
+					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.isVirtual(IO)));
 					pipe.readDeps(ioPool, ctx.provider, io, pipe.getFieldDependency().getDeps(virtuals), instance, generics(instance, parentGenerics));
 				}catch(Throwable e){
 					var size = 1L;
