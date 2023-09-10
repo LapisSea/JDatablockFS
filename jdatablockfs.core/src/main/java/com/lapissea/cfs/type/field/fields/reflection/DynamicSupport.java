@@ -41,7 +41,7 @@ public abstract class DynamicSupport{
 	
 	
 	@SuppressWarnings({"unchecked"})
-	static long calcSize(DataProvider prov, Object val){
+	public static long calcSize(DataProvider prov, Object val){
 		return switch(val){
 			case null -> 0;
 			case Boolean ignored -> 1;
@@ -100,7 +100,7 @@ public abstract class DynamicSupport{
 		};
 	}
 	@SuppressWarnings("unchecked")
-	static void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
+	public static void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
 		switch(val){
 			case Boolean v -> dest.writeBoolean(v);
 			case Float v -> NumberSize.INT.writeFloating(dest, v);
@@ -258,7 +258,7 @@ public abstract class DynamicSupport{
 		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo)) throw new AssertionError(tyo + " is not an integer");
 	}
 	
-	static Object readTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public static Object readTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
 		if(typ == Boolean.class) return src.readBoolean();
 		if(typ == Float.class) return (float)NumberSize.INT.readFloating(src);
@@ -325,7 +325,7 @@ public abstract class DynamicSupport{
 		
 		throw new NotImplementedException(typ + "");
 	}
-	static void skipTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public static void skipTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var        typ = typDef.getTypeClass(provider.getTypeDb());
 		NumberSize siz = null;
 		if(typ == Boolean.class) siz = NumberSize.BYTE;

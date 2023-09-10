@@ -103,12 +103,8 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		};
 	}
 	
-	default String jvmSignatureStr(){
-		return jvmSignature().toString();
-	}
-	
-	default CharSequence jvmSignature() { return jvmString(true); }
-	default CharSequence jvmDescriptor(){ return jvmString(false); }
+	default String jvmSignatureStr() { return jvmString(true).toString(); }
+	default String jvmDescriptorStr(){ return jvmString(false).toString(); }
 	default void jvmSignature(StringBuilder sb){
 		sb.ensureCapacity(sb.length() + jvmSignatureLen());
 		jvmString(sb, true);

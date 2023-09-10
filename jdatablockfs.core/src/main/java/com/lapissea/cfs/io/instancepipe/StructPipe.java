@@ -960,7 +960,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return shortPipeName(getClass()) + "(" + type.cleanName() + ")";
 	}
 	
-	private static String shortPipeName(Class<?> cls){
+	protected static String shortPipeName(Class<?> cls){
 		var pipName = cls.getSimpleName();
 		var end     = "StructPipe";
 		if(pipName.endsWith(end)){

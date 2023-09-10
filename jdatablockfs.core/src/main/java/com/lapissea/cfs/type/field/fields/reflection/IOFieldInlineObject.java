@@ -70,7 +70,9 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		var struct = (Struct<ValueType>)Struct.ofUnknown(getType());
 		if(fixed){
 			instancePipe = FixedVaryingStructPipe.tryVarying(struct, varProvider);
-		}else instancePipe = StandardStructPipe.of(struct);
+		}else{
+			instancePipe = StandardStructPipe.of(struct);
+		}
 		
 		var desc = instancePipe.getSizeDescriptor();
 		

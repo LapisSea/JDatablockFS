@@ -80,6 +80,8 @@ public final class Jorth extends CodeDestination{
 	private final EnumSet<Access>        accessSet   = EnumSet.noneOf(Access.class);
 	private final Map<ClassName, AnnGen> annotations = new HashMap<>();
 	
+	private final Map<ClassName, GenericType> typeArgs = new HashMap<>();
+	
 	private final Map<String, ClassName>   imports = new HashMap<>();
 	private final Map<ClassName, ClassGen> classes = new HashMap<>();
 	
@@ -106,6 +108,11 @@ public final class Jorth extends CodeDestination{
 				return makeArr(type);
 			}
 			return Optional.of(jorthClass);
+		}
+		
+		var argType = typeArgs.get(name.dotted());
+		if(argType != null){
+			return typeSource.maybeByType(argType);
 		}
 		
 		if(currentClass == null) return Optional.empty();
@@ -167,7 +174,6 @@ public final class Jorth extends CodeDestination{
 	protected TokenSource transform(TokenSource src){
 		if(printBack == null) return src;
 		return TokenSource.listen(src, tok -> {
-			var t0 = tab;
 			if(tok instanceof Token.KWord k){
 				switch(k.keyword()){
 					case START -> tab++;
@@ -289,7 +295,7 @@ public final class Jorth extends CodeDestination{
 		switch(keyword){
 			case FIELD -> {
 				var name = source.readWord();
-				var type = readType(source);
+				var type = readType(source, typeArgs);
 				currentClass.defineField(popVisibility(), popAccessSet(), popAnnotations(), type, name);
 				memberFlag = true;
 			}
@@ -330,7 +336,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case ARG -> {
 							var name = source.readWord();
-							var type = readType(source);
+							var type = readType(source, typeArgs);
 							
 							var access = popAccessSet();
 							if(!access.isEmpty()){
@@ -343,7 +349,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case RETURNS -> {
 							if(returnType != null) throw new MalformedJorth("Duplicate returns statement");
-							returnType = readType(source);
+							returnType = readType(source, typeArgs);
 						}
 						default -> throw new MalformedJorth("Unexpected keyword " + k.key);
 					}
@@ -373,8 +379,8 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private JType readType(TokenSource source) throws MalformedJorth{
-		var type = source.readType(importsFun);
+	private JType readType(TokenSource source, Map<ClassName, GenericType> typeArgs) throws MalformedJorth{
+		var type = source.readType(importsFun, typeArgs);
 		typeSource.validateType(type);
 		return type;
 	}
@@ -608,10 +614,10 @@ public final class Jorth extends CodeDestination{
 					if(!permits.isEmpty()){
 						throw new MalformedJorth("Enum can not be sealed");
 					}
-					extension = new GenericType(ClassName.of(Enum.class), 0, List.of(new GenericType(className)));
+					extension = new GenericType(ClassName.of(Enum.class), Optional.empty(), 0, List.of(new GenericType(className)));
 				}
 				
-				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, permits, accessSet, anns);
+				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, permits, accessSet, anns, typeArgs);
 				classes.put(className, currentClass);
 				
 				typeSource.validateType(extension);
@@ -622,11 +628,11 @@ public final class Jorth extends CodeDestination{
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
-				extensionBuffer = source.readTypeSimple(importsFun);
+				extensionBuffer = source.readTypeSimple(importsFun, typeArgs);
 				typeSource.validateType(extensionBuffer.raw());
 			}
 			case IMPLEMENTS -> {
-				var interf = source.readTypeSimple(importsFun);
+				var interf = source.readTypeSimple(importsFun, typeArgs);
 				typeSource.validateType(interf.raw());
 				interfaces.add(interf);
 			}
@@ -634,6 +640,14 @@ public final class Jorth extends CodeDestination{
 				var permit = source.readClassName(importsFun);
 //				typeSource.validateType(permit);
 				permits.add(permit);
+			}
+			case TYPE_ARG -> {
+				var name = ClassName.dotted(source.readWord());
+				if(typeArgs.containsKey(name)){
+					throw new MalformedJorth(name + " is already a defined type argument");
+				}
+				var type = source.readTypeSimple(importsFun, Map.of());
+				typeArgs.put(name, type);
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 		}
@@ -647,6 +661,7 @@ public final class Jorth extends CodeDestination{
 	
 	private void endClass() throws MalformedJorth{
 		currentClass.end();
+		typeArgs.clear();
 		currentClass = null;
 		memberFlag = true;
 	}

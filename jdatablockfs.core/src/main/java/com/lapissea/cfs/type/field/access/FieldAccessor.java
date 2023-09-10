@@ -8,6 +8,7 @@ import com.lapissea.util.NotNull;
 public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>{
 	
 	int getTypeID();
+	boolean genericTypeHasArgs();
 	
 	Struct<CTyp> getDeclaringStruct();
 	

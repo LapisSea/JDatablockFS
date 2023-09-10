@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -51,7 +52,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
+			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
 			stack.push(type);
 		}
 		
@@ -74,7 +75,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
+			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
 		}
 		
 		public void loadArgumentIns(Arg arg){
@@ -642,6 +643,6 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var typ   = new GenericType(clazz);
 		writer.visitLdcInsn(org.objectweb.asm.Type.getType(typ.jvmSignatureStr()));
 		
-		stack.push(new GenericType(ClassName.of(Class.class), 0, List.of(typ)));
+		stack.push(new GenericType(ClassName.of(Class.class), Optional.empty(), 0, List.of(typ)));
 	}
 }

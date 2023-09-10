@@ -5,22 +5,15 @@ import com.lapissea.jorth.lang.type.BaseType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.TypeSource;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 public final class ClassName{
-	
-	private static final Map<String, ClassName> CACHE = new ConcurrentHashMap<>();
 	
 	public static ClassName of(Class<?> t){
 		return dotted(t.getName());
 	}
 	
 	public static ClassName dotted(String s){
-		return CACHE.computeIfAbsent(s, st -> {
-			if(s.indexOf('/') != -1) throw new IllegalArgumentException(s);
-			return new ClassName(s, null);
-		});
+		if(s.indexOf('/') != -1) throw new IllegalArgumentException(s);
+		return new ClassName(s, null);
 	}
 	
 	public static ClassName slashed(String s){

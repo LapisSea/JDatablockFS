@@ -11,6 +11,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -121,6 +122,15 @@ public interface TokenSource{
 				}, () -> listener.accept(t));
 				return t;
 			}
+			@Override
+			public String toString(){
+				if(!source.hasMore()) return "END";
+				try{
+					return "{next: " + source.peekToken() + "}";
+				}catch(MalformedJorth e){
+					throw new RuntimeException(e);
+				}
+			}
 		};
 	}
 	
@@ -212,15 +222,15 @@ public interface TokenSource{
 	// array: foo.Bar array
 	// generic: foo.Bar<ay.Lmao idk.Something>
 	// generic array: foo.Bar<ay.Lmao idk.Something> array
-	default JType readType(Function<ClassName, ClassName> imports) throws MalformedJorth{
-		return readType(imports, true, true);
+	default JType readType(Function<ClassName, ClassName> imports, Map<ClassName, GenericType> typeArgs) throws MalformedJorth{
+		return readType(imports, typeArgs, true, true);
 	}
 	
-	default GenericType readTypeSimple(Function<ClassName, ClassName> imports) throws MalformedJorth{
-		return (GenericType)readType(imports, false, false);
+	default GenericType readTypeSimple(Function<ClassName, ClassName> imports, Map<ClassName, GenericType> typeArgs) throws MalformedJorth{
+		return (GenericType)readType(imports, typeArgs, false, false);
 	}
 	
-	default JType readType(Function<ClassName, ClassName> imports, boolean allowArray, boolean allowWildcard) throws MalformedJorth{
+	default JType readType(Function<ClassName, ClassName> imports, Map<ClassName, GenericType> typeArgs, boolean allowArray, boolean allowWildcard) throws MalformedJorth{
 		if(allowWildcard && consumeTokenIf(Token.Wildcard.class)){
 			var typeO = readEnumOptional(Token.Wildcard.BoundType.class);
 			if(typeO.isEmpty()) return new JType.Wildcard(List.of(), List.of());
@@ -228,10 +238,10 @@ public interface TokenSource{
 			var bounds = new ArrayList<JType>();
 			if(consumeTokenIfIsText('[')){
 				while(!consumeTokenIfIsText(']')){
-					bounds.add(readType(imports, allowArray, allowWildcard));
+					bounds.add(readType(imports, typeArgs, allowArray, allowWildcard));
 				}
 			}else{
-				bounds.add(readType(imports, allowArray, allowWildcard));
+				bounds.add(readType(imports, typeArgs, allowArray, allowWildcard));
 			}
 			List<JType> lower = List.of(), upper = List.of(GenericType.OBJECT);
 			switch(type){
@@ -241,22 +251,31 @@ public interface TokenSource{
 			return new JType.Wildcard(lower, upper);
 		}
 		
-		var raw = readClassName(imports);
+		ClassName   raw      = readClassName(imports);
+		var         typeName = Optional.<ClassName>empty();
+		int         dims     = 0;
+		List<JType> args     = new ArrayList<>();
 		
-		var args = new ArrayList<JType>();
+		var argType = typeArgs.get(raw);
+		if(argType != null){
+			typeName = Optional.of(raw);
+			raw = argType.raw();
+			args = argType.args();
+		}
+		
 		if(consumeTokenIfIsText('<')){
+			if(typeName.isPresent()) throw new MalformedJorth("Generic arguments are not allowed on type variables");
 			do{
-				args.add(readType(imports));
+				args.add(readType(imports, typeArgs));
 			}while(!consumeTokenIfIsText('>'));
 		}
 		
-		int dims = 0;
 		while(consumeTokenIfIsText("array")){
 			dims++;
 			if(!allowArray) throw new MalformedJorth("Array not allowed");
 		}
 		
-		return new GenericType(raw, dims, args);
+		return new GenericType(raw, typeName, dims, args);
 	}
 	
 	default Token.BracketedSet bracketSet(char... allowed) throws MalformedJorth{

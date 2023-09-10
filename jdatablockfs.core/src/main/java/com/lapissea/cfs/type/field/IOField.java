@@ -369,6 +369,17 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		       ? acc : null;
 	}
 	
+	public GenericContext makeContext(GenericContext parent){
+		var acc = getAccessor();
+		if(parent == null && acc.genericTypeHasArgs()){
+			return null;
+		}
+		var raw = acc.getType();
+		if(raw == Object.class) return null;
+		var type = acc.getGenericType(parent);
+		return GenericContext.of(raw, type);
+	}
+	
 	private void requireLateData(){
 		if(!lateDataInitialized){
 			throw new IllegalStateException(this.getName() + " late data not initialized");

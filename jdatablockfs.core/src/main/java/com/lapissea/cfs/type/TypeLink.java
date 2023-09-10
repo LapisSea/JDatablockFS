@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SyntheticParameterizedType;
+import com.lapissea.cfs.SyntheticWildcardType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.InvalidGenericArgument;
 import com.lapissea.cfs.logging.Log;
@@ -318,7 +319,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public Class<?> getTypeClass(IOTypeDB db){
 		if(typeWild != TypeWild.NORMAL){
-			return Object.class;
+			if(args.length == 0) return Object.class;
+			if(args.length != 1) throw new NotImplementedException("Unsure how to handle " + this);
+			return args[0].getTypeClass(db);
 		}
 		var c = typeClass;
 		if(c != null) return c;
@@ -418,7 +421,13 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 			for(int i = 0; i<args.length; i++){
 				tArgs[i] = args[i].generic(db);
 			}
-			generic = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
+			Type gen;
+			if(typeWild == TypeWild.NORMAL){
+				gen = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
+			}else{
+				gen = new SyntheticWildcardType(List.of(tArgs), typeWild == TypeWild.WILD_LOWER);
+			}
+			generic = gen;
 		}
 		return generic;
 	}

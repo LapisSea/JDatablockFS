@@ -241,11 +241,11 @@ public class SlowTests{
 		}
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void bigMapCompliant() throws IOException{
 		bigMapRun(true);
 	}
-	@Test
+	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void bigMap() throws IOException{
 		bigMapRun(false);
 	}
@@ -446,7 +446,7 @@ public class SlowTests{
 		    .assertFail();
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void simpleHashSet() throws IOException{
 		checkSet(IOHashSet.class, (d, set) -> {
 			set.add(2);
@@ -461,12 +461,12 @@ public class SlowTests{
 		}, false);
 	}
 	
-	@Test(dependsOnMethods = "simpleHashSet")
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzIOSet(){
 		runSetFuzz(100000, IOHashSet.class);
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void simpleTreeSet() throws IOException{
 		checkSet(IOTreeSet.class, (d, set) -> {
 			set.add(2);
@@ -481,7 +481,7 @@ public class SlowTests{
 		}, false);
 	}
 	
-	@Test(dependsOnMethods = "simpleTreeSet")
+	@Test(dependsOnMethods = "simpleTreeSet", ignoreMissingDependencies = true)
 	void fuzzTreeSet(){
 		runSetFuzz(20000, IOTreeSet.class);
 	}
@@ -537,7 +537,7 @@ public class SlowTests{
 			};
 	}
 	
-	@Test(dataProvider = "listMakers")
+	@Test(dataProvider = "listMakers", dependsOnGroups = "lists", ignoreMissingDependencies = true)
 	void fuzzIOList(ListMaker maker){
 		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
@@ -679,7 +679,7 @@ public class SlowTests{
 		record ContainsKey(Object key) implements MapAction{ }
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void fuzzHashMap(){
 		record MapState(Cluster provider, IOMap<Object, Object> map){ }
 		var rnr = new FuzzingRunner.StateEnv.Marked<MapState, MapAction, IOException>(){
@@ -753,7 +753,7 @@ public class SlowTests{
 		record Trim(int newSiz) implements BlobAction{ }
 	}
 	
-	@Test
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
 		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingRunner.StateEnv<>(){

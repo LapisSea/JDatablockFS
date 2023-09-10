@@ -11,14 +11,23 @@ import java.util.function.Function;
 
 import static com.lapissea.cfs.type.SupportedPrimitive.BOOLEAN;
 
-public class CompilationTools{
+public final class CompilationTools{
 	
 	enum Style{
 		NAMED("FieldType getName() / void setName(FieldType newValue)"),
 		RAW("FieldType name() / void name(FieldType newValue)");
 		
 		final String humanPattern;
-		Style(String humanPattern){ this.humanPattern = humanPattern; }
+		Style(String humanPattern)        { this.humanPattern = humanPattern; }
+		
+		String mapGetter(String fieldName){ return mapName(true, fieldName); }
+		String mapSetter(String fieldName){ return mapName(false, fieldName); }
+		String mapName(boolean isGetter, String fieldName){
+			return switch(this){
+				case NAMED -> (isGetter? "get" : "set") + TextUtil.firstToUpperCase(fieldName);
+				case RAW -> fieldName;
+			};
+		}
 	}
 	
 	record FieldStub(Method method, String varName, Type type, Style style, boolean isGetter){

@@ -156,7 +156,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			}
 			
 			TypeLink typ = getType(ioPool, provider, instance);
-			val = DynamicSupport.readTyp(typ, provider, src, genericContext);
+			val = DynamicSupport.readTyp(typ, provider, src, makeContext(genericContext));
 		}
 		//noinspection unchecked
 		set(ioPool, instance, (ValueType)val);

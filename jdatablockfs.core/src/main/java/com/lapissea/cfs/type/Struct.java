@@ -256,6 +256,19 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public static Optional<Struct<?>> tryOf(@NotNull Class<?> instanceClass){
+		if(!IOInstance.isInstance(instanceClass)){
+			return Optional.empty();
+		}
+		if(!IOInstance.Def.isDefinition(instanceClass) && Modifier.isAbstract(instanceClass.getModifiers())){
+			return Optional.empty();
+		}
+		
+		var s = of0((Class<? extends IOInstance>)instanceClass, false);
+		return Optional.of(s);
+	}
+	
 	private static void validateStructType(Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
@@ -367,7 +380,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
 				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
 				
+				if(runNow) lock.getLock().unlock();
 				struct = newStruct.make(instanceClass, runNow);
+				if(runNow) lock.getLock().lock();
 				
 				STRUCT_CACHE.put(instanceClass, struct);
 			}catch(MalformedStruct e){
@@ -468,6 +483,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
+	public record FieldStruct<T extends IOInstance<T>>
+		(IOField<T, ?> field, Struct<?> struct){
+		public FieldStruct{
+			if(field.getType() != struct.getType()){
+				throw new IllegalArgumentException(field.getType().getName() + " != " + struct.getType().getName());
+			}
+		}
+	}
+	
 	private final Class<T> type;
 	private       Class<T> concreteType;
 	private       boolean  isDefinition;
@@ -475,6 +499,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private FieldSet<T> fields;
 	private FieldSet<T> realFields;
 	private FieldSet<T> cloneFields;
+	
+	private List<FieldStruct<T>> nullContainInstances;
 	
 	short[] poolObjectsSize;
 	short[] poolPrimitivesSize;
@@ -668,25 +694,44 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public FieldSet<T> getRealFields(){
-		if(realFields == null){
-			realFields = FieldSet.of(getFields().stream().filter(e -> !e.isVirtual(IO)));
-		}
-		return realFields;
+		var f = realFields;
+		return f == null? realFields = calcRealFields() : f;
+	}
+	private FieldSet<T> calcRealFields(){
+		var fields = getFields();
+		var res    = FieldSet.of(fields.filtered(e -> !e.isVirtual(IO)));
+		if(res.size() == fields.size()) return fields;
+		return res;
 	}
 	
 	public FieldSet<T> getCloneFields(){
-		if(cloneFields == null){
-			cloneFields = FieldSet.of(getFields().stream().filter(f -> {
-				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
-				var acc = f.getAccessor();
-				if(acc != null){
-					var typ = acc.getType();
-					return typ != String.class;
-				}
-				return true;
-			}));
-		}
-		return cloneFields;
+		var f = cloneFields;
+		return f == null? cloneFields = calcCloneFields() : f;
+	}
+	private FieldSet<T> calcCloneFields(){
+		return FieldSet.of(getFields().filtered(f -> {
+			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
+			var acc = f.getAccessor();
+			if(acc != null){
+				var typ = acc.getType();
+				return !FieldCompiler.getWrapperTypes().contains(typ);
+			}
+			return true;
+		}));
+	}
+	
+	public List<FieldStruct<T>> getNullContainInstances(){
+		var f = nullContainInstances;
+		return f == null? nullContainInstances = calcNullContainInstances() : f;
+	}
+	private List<FieldStruct<T>> calcNullContainInstances(){
+		return getRealFields()
+			       .map(f -> Struct.tryOf(f.getType())
+			                       .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
+			                       .map(s -> new FieldStruct<>(f, s)))
+			       .filtered(Optional::isPresent)
+			       .map(Optional::get)
+			       .collectToList();
 	}
 	
 	public FieldSet<T> getFields(){

@@ -18,7 +18,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.joining;
 
-public record GenericType(ClassName raw, int dims, List<JType> args) implements JType{
+public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args) implements JType{
 	
 	public static final GenericType OBJECT = new GenericType(ClassName.of(Object.class));
 	public static final GenericType STRING = new GenericType(ClassName.of(String.class));
@@ -37,7 +37,7 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 				c = c.componentType();
 				dims++;
 			}
-			return new GenericType(ClassName.of(c), dims, List.of());
+			return new GenericType(ClassName.of(c), Optional.empty(), dims, List.of());
 		}
 		
 		if(type instanceof ParameterizedType p){
@@ -47,7 +47,7 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 			for(var arg : tArgs){
 				args.add(JType.of(stack, arg));
 			}
-			return new GenericType(raw.raw, raw.dims, args);
+			return new GenericType(raw.raw, Optional.empty(), raw.dims, args);
 		}
 		
 		if(type instanceof GenericArrayType p){
@@ -58,11 +58,12 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 			if(stack == null) stack = new HashSet<>();
 			if(stack.contains(var)){
 				var bounds = var.getBounds();
-				return of(switch(bounds[0]){
+				var nonArg = of(switch(bounds[0]){
 					case Class<?> c -> c;
 					case ParameterizedType t -> t.getRawType();
 					default -> throw new NotImplementedException(bounds[0].getClass().getName());
 				});
+				return new GenericType(nonArg.raw, Optional.of(ClassName.dotted(var.getName())), nonArg.dims, nonArg.args);
 			}
 			stack.add(var);
 			var bounds = var.getBounds()[0];
@@ -77,18 +78,19 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 	}
 	
 	public GenericType(ClassName raw){
-		this(raw, 0, List.of());
+		this(raw, Optional.empty(), 0, List.of());
 	}
 	
-	public GenericType(ClassName raw, int dims, List<JType> args){
+	public GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args){
 		this.raw = Objects.requireNonNull(raw);
+		this.typeArgName = Objects.requireNonNull(typeArgName);
 		this.dims = dims;
 		this.args = List.copyOf(args);
 	}
 	
 	@Override
 	public BaseType getBaseType(){
-		if(dims != 0) return BaseType.OBJ;
+		if(dims != 0 || typeArgName.isPresent()) return BaseType.OBJ;
 		return BaseType.of(raw);
 	}
 	@Override
@@ -104,14 +106,15 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 	
 	@Override
 	public int jvmStringLen(boolean includeGenerics){
-		var primitive = getPrimitiveType().map(BaseType::jvmStr).orElse(null);
+		var primitiveComp = BaseType.ofPrimitive(raw);
+		var typeArgName   = this.typeArgName.filter(f -> includeGenerics);
 		
 		int len = dims;
 		
-		if(primitive == null){
-			var t = BaseType.ofPrimitive(raw);
+		if(primitiveComp == null){
+			var t = typeArgName.isEmpty()? null : BaseType.ofPrimitive(raw);
 			if(t != null) len++;
-			else len += 1 + raw.any().length();
+			else len += 1 + typeArgName.orElse(raw).any().length();
 			if(includeGenerics && !args.isEmpty()){
 				for(var arg : args){
 					len += arg.jvmStringLen(true);
@@ -120,24 +123,24 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 			}
 			if(t == null) len++;
 		}else{
-			len += primitive.length();
+			len += primitiveComp.jvmStr.length();
 		}
 		return len;
 	}
 	
 	@Override
 	public void jvmString(StringBuilder sb, boolean includeGenerics){
-		var primitive = getPrimitiveType().map(BaseType::jvmStr).orElse(null);
-		
+		var primitiveComp = BaseType.ofPrimitive(raw);
+		var typeArgName   = this.typeArgName.filter(f -> includeGenerics);
 		
 		for(int i = 0; i<dims; i++){
 			sb.append('[');
 		}
 		
-		if(primitive == null){
-			var t = BaseType.ofPrimitive(raw);
+		if(primitiveComp == null){
+			var t = typeArgName.isEmpty()? null : BaseType.ofPrimitive(raw);
 			if(t != null) sb.append(t.jvmStr);
-			else sb.append('L').append(raw.slashed());
+			else sb.append(typeArgName.isEmpty()? 'L' : 'T').append(typeArgName.orElse(raw).slashed());
 			
 			if(includeGenerics && !args.isEmpty()){
 				sb.append('<');
@@ -148,7 +151,7 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 			}
 			if(t == null) sb.append(';');
 		}else{
-			sb.append(primitive);
+			sb.append(primitiveComp.jvmStr);
 		}
 	}
 	
@@ -186,21 +189,22 @@ public record GenericType(ClassName raw, int dims, List<JType> args) implements 
 	
 	@Override
 	public String toString(){
-		return raw.dotted() + "[]".repeat(dims) + (
-			args.isEmpty()? "" :
-			args.stream()
-			    .map(Object::toString)
-			    .collect(joining(", ", "<", ">"))
-		);
+		return typeArgName.map(n -> n + ": ").orElse("") +
+		       raw.dotted() + "[]".repeat(dims) + (
+			       args.isEmpty()? "" :
+			       args.stream()
+			           .map(Object::toString)
+			           .collect(joining(", ", "<", ">"))
+		       );
 	}
 	
 	@Override
 	public GenericType withoutArgs(){
 		if(args.isEmpty()) return this;
-		return new GenericType(raw, dims, List.of());
+		return new GenericType(raw, typeArgName, dims, List.of());
 	}
 	
 	public GenericType withDims(int dims){
-		return new GenericType(raw, dims, args);
+		return new GenericType(raw, typeArgName, dims, args);
 	}
 }

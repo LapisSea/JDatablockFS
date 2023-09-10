@@ -48,6 +48,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	private final Type     genericType;
 	private final Class<?> rawType;
 	private final int      typeId;
+	private final boolean  genericTypeHasArgs;
 	
 	private final Field        field;
 	private final MethodHandle getter;
@@ -56,9 +57,10 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 		super(struct, name, IOFieldTools.computeAnnotations(field));
 		this.field = field;
-		this.genericType = Utils.prottectFromVarType(genericType);
+		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(this.genericType);
 		typeId = TypeFlag.getId(rawType);
+		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
 		getter.ifPresent(get -> validateGetter(genericType, get));
 		setter.ifPresent(set -> validateSetter(genericType, set));
@@ -74,6 +76,10 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public int getTypeID(){
 		return typeId;
+	}
+	@Override
+	public boolean genericTypeHasArgs(){
+		return genericTypeHasArgs;
 	}
 	
 	@Override

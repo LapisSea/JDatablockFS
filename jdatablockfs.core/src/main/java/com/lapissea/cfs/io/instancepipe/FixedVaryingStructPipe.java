@@ -20,11 +20,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
+public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
-	private static class ProviderReply<T extends IOInstance<T>>{
+	private static final class ProviderReply<T extends IOInstance<T>>{
 		
 		private record Step(NumberSize max, boolean ptr){ }
 		
@@ -42,18 +43,24 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		private FixedVaryingStructPipe<T> make(VaryingSize.Provider rule) throws UseFixed{
 			if(steps == null){
 				List<Step> steps = new ArrayList<>();
-				var pip = new FixedVaryingStructPipe<>(
+				var        sb    = new StringBuilder();
+				var pipe = new FixedVaryingStructPipe<>(
 					type,
-					VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> steps.add(new Step(max, ptr)))
+					VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> {
+						steps.add(new Step(max, ptr));
+						sb.append(actual.size.shortName);
+					})
 				);
+				pipe.sizesStr = sb.toString();
 				this.steps = List.copyOf(steps);
-				return pip;
+				return pipe;
 			}
 			
 			List<NumberSize> buff = new ArrayList<>(steps.size());
 			for(Step(NumberSize max, boolean ptr) : steps){
 				buff.add(rule.provide(max, null, ptr).size);
 			}
+			buff = List.copyOf(buff);
 			
 			try(var ignored = cacheLock.read()){
 				var cached = cache.get(buff);
@@ -67,6 +74,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
 				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
+				pipe.sizesStr = buff.stream().map(s -> s.shortName + "").collect(Collectors.joining());
 				cache.put(buff, pipe);
 				
 				return pipe;
@@ -101,6 +109,8 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	}
 	
 	public static final class UseFixed extends Exception{ }
+	
+	private String sizesStr;
 	
 	private FixedVaryingStructPipe(Struct<T> type, VaryingSize.Provider rule) throws UseFixed{
 		super(type, (t, structFields) -> {
@@ -140,5 +150,9 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
+	}
+	@Override
+	public String toString(){
+		return shortPipeName(getClass()) + "(" + getType().cleanName() + ":" + sizesStr + ")";
 	}
 }
