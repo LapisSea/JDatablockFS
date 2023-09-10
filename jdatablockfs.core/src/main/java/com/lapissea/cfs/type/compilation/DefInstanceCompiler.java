@@ -388,25 +388,25 @@ public final class DefInstanceCompiler{
 		var node = (ImplNode<T>)CACHE.computeIfAbsent(key, i -> new ImplNode<>((Key<T>)i));
 		
 		try(var ignored = node.lock.open()){
-			switch(node.state){
+			return switch(node.state){
 				case null -> throw new ShouldNeverHappenError();
-				case NEW -> { }
-				case COMPILING -> throw new MalformedStruct("Type requires itself to compile");
-				case DONE -> { return node; }
-			}
-			
-			compileNode(node);
-			
-			StagedInit.runBaseStageTask(() -> {
-				try{
-					//Eagerly load struct
-					Struct.of(node.impl).waitForStateDone();
-				}catch(Throwable e){
-					Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e.getMessage());
+				case NEW -> {
+					compileNode(node);
+					
+					StagedInit.runBaseStageTask(() -> {
+						try{
+							//Eagerly load struct
+							Struct.of(node.impl).waitForStateDone();
+						}catch(Throwable e){
+							Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e.getMessage());
+						}
+					});
+					
+					yield node;
 				}
-			});
-			
-			return node;
+				case COMPILING -> throw new MalformedStruct("Type requires itself to compile");
+				case DONE -> node;
+			};
 		}catch(Throwable e){
 			node.state = ImplNode.State.NEW;
 			throw e;

@@ -11,6 +11,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -224,7 +225,10 @@ public class Utils{
 				yield "? " + ext + " " + Arrays.stream(bounds).map(b -> typeToHuman(b, doShort))
 				                               .collect(Collectors.joining(" & "));
 			}
-			
+			case GenericArrayType a -> typeToHuman(a.getGenericComponentType(), doShort) + "[]";
+			case TypeVariable<?> t -> {
+				yield t.getName() + ":" + Arrays.stream(t.getBounds()).map(b -> typeToHuman(b, doShort)).collect(Collectors.joining("&"));
+			}
 			default -> type.getTypeName();
 		};
 	}
