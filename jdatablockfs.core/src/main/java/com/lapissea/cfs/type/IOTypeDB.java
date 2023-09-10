@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
-import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -226,50 +225,48 @@ public sealed interface IOTypeDB{
 		
 		final class Synchronized extends Basic{
 			
-			private final ReadWriteClosableLock rwLock = ReadWriteClosableLock.reentrant();
-			
 			@Override
 			public int toID(TypeLink type){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.toID(type);
 				}
 			}
 			
 			@Override
 			protected TypeID newID(TypeLink type, boolean recordNew){
-				try(var ignored = rwLock.write()){
+				synchronized(this){
 					return super.newID(type, recordNew);
 				}
 			}
 			
 			@Override
 			public TypeLink fromID(int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.fromID(id);
 				}
 			}
 			
 			@Override
 			public boolean hasType(TypeLink type){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.hasType(type);
 				}
 			}
 			@Override
 			public boolean hasID(int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.hasID(id);
 				}
 			}
 			@Override
 			public <T> Class<T> fromID(Class<T> rootType, int id){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.fromID(rootType, id);
 				}
 			}
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
-				try(var ignored = rwLock.read()){
+				synchronized(this){
 					return super.toID(rootType, type, record);
 				}
 			}
@@ -282,7 +279,7 @@ public sealed interface IOTypeDB{
 			private final TypeLink[]             idToTyp;
 			private final Map<TypeLink, Integer> typToID;
 			
-			private static class MemUniverse<T>{
+			private static final class MemUniverse<T>{
 				private final Class<T>[]             id2cl;
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
