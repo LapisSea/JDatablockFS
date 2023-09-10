@@ -26,6 +26,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
+import com.lapissea.cfs.utils.IterablePPs;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -236,7 +237,7 @@ public final class FieldCompiler{
 	
 	
 	private static IterablePP<Class<?>> deepClasses(Class<?> clazz){
-		return IterablePP.nullTerminated(() -> new Supplier<>(){
+		return IterablePPs.nullTerminated(() -> new Supplier<>(){
 			Class<?> c = clazz;
 			@Override
 			public Class<?> get(){

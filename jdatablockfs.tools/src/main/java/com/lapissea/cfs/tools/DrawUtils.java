@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.utils.IterablePP;
+import com.lapissea.cfs.utils.IterablePPs;
 import com.lapissea.util.UtilL;
 
 import java.awt.Color;
@@ -344,7 +345,7 @@ class DrawUtils{
 		renderer.drawLine(xFrom*scale, yFrom*scale, xTo*scale, yTo*scale);
 	}
 	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
-		return IterablePP.nullTerminated(() -> new Supplier<>(){
+		return IterablePPs.nullTerminated(() -> new Supplier<>(){
 			long remaining = size;
 			final ChunkChainIO io;
 			

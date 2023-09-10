@@ -9,7 +9,6 @@ import java.util.NoSuchElementException;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -17,6 +16,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	
 	default Stream<T> stream(){
 		return StreamSupport.stream(spliterator(), false);
+	}
+	
+	default boolean isEmpty(){
+		return !iterator().hasNext();
 	}
 	
 	default OptionalPP<T> first(){
@@ -204,32 +207,4 @@ public interface IterablePP<T> extends Iterable<T>{
 		return reduce(BinaryOperator.maxBy(comparator));
 	}
 	
-	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
-		return () -> new Iterator<T>(){
-			final Supplier<T> src = supplier.get();
-			T next;
-			
-			void calcNext(){
-				next = src.get();
-			}
-			
-			@Override
-			public boolean hasNext(){
-				if(next == null) calcNext();
-				return next != null;
-			}
-			@Override
-			public T next(){
-				if(next == null){
-					calcNext();
-					if(next == null) throw new NoSuchElementException();
-				}
-				try{
-					return next;
-				}finally{
-					next = null;
-				}
-			}
-		};
-	}
 }
