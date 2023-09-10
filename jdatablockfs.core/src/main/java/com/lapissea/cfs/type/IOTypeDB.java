@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.DataPool;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
@@ -434,6 +435,7 @@ public sealed interface IOTypeDB{
 					Double.class,
 					
 					Reference.class,
+					DataPool.Persistent.TypeData.class,
 					}){
 					db.newID(TypeLink.of(c), true);
 				}

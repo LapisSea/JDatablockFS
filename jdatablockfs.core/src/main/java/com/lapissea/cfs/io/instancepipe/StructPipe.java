@@ -677,7 +677,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 		}catch(VaryingSize.TooSmall e){
-			throw VaryingSize.makeInvalid(fields, ioPool, instance, e);
+			throw VaryingSize.makeInvalid(fields, ioPool, instance, provider, e);
 		}
 		
 		if(destBuff != null){

@@ -26,8 +26,8 @@ import static com.lapissea.cfs.config.GlobalConfig.COSTLY_STACK_TRACE;
 
 public final class VaryingSize implements Stringify{
 	
-	public static <T extends IOInstance<T>> TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, TooSmall e){
-		var all = scanInvalidSizes(fields, ioPool, instance);
+	public static <T extends IOInstance<T>> TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, DataProvider provider, TooSmall e){
+		var all = scanInvalidSizes(fields, ioPool, instance, provider);
 		if(e.tooSmallIdMap.equals(all.tooSmallIdMap)){
 			throw e;
 		}
@@ -35,10 +35,9 @@ public final class VaryingSize implements Stringify{
 		return all;
 	}
 	
-	private static <T extends IOInstance<T>> TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
+	private static <T extends IOInstance<T>> TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance, DataProvider provider){
 		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
 		
-		var provider = DataProvider.newVerySimpleProvider(makeFakeData());
 		try(var blackHole = new ContentWriter(){
 			@Override
 			public void write(int b){ }

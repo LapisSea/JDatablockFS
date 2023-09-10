@@ -75,11 +75,9 @@ public sealed interface DataPool{
 	final class Persistent implements DataPool{
 		
 		@IOValue
-		static final class TypeData<T> extends IOInstance.Managed<TypeData<T>>{
+		public static final class TypeData<T> extends IOInstance.Managed<TypeData<T>>{
 			private IOList<T>             index;
 			private IOMap<Integer, int[]> hashLookup;
-			
-			public TypeData(){ }
 		}
 		
 		static{
@@ -101,7 +99,7 @@ public sealed interface DataPool{
 			if(data == null){
 				if(!write) return null;
 				data = new TypeData<>();
-				var ctx = data.getThisStruct().describeGenerics(TypeLink.of(TypeData.class, type));
+				var ctx = data.getThisStruct().describeGenerics(TypeLink.of(TypeData.class, Object.class));
 				data.allocateNulls(typeMap.getDataProvider(), ctx);
 				typeMap.put(name, data);
 			}
