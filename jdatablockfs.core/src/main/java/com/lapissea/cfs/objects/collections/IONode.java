@@ -93,6 +93,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					return TypeFlag.ID_OBJECT;
 				}
 				@Override
+				public boolean genericTypeHasArgs(){ return false; }
+				@Override
 				public T get(VarPool<IONode<T>> ioPool, IONode<T> instance){
 					try{
 						return instance.getValue();
@@ -143,6 +145,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				@Override
 				public int getTypeID(){
 					return TypeFlag.ID_OBJECT;
+				}
+				@Override
+				public boolean genericTypeHasArgs(){
+					return true;
 				}
 				@Override
 				public Object get(VarPool<IONode<T>> ioPool, IONode<T> instance){
@@ -285,7 +291,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		var magnetProvider = provider.withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
 		//noinspection unchecked
-		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
+		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
 		
 		try{
 			readManagedFields();

@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.utils.function.ConsumerOBool;
 import com.lapissea.cfs.utils.function.ConsumerOByt;
 import com.lapissea.cfs.utils.function.ConsumerOC;
@@ -56,6 +57,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final Type     genericType;
 	private final Class<?> rawType;
 	private final int      typeID;
+	private final boolean  genericTypeHasArgs;
 	
 	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
 		super(struct, name, annotations);
@@ -64,8 +66,14 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 		
 		typeID = TypeFlag.getId(type);
 		
-		this.genericType = Utils.prottectFromVarType(genericType);
+		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(this.genericType);
+		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
+	}
+	
+	@Override
+	public boolean genericTypeHasArgs(){
+		return genericTypeHasArgs;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -106,7 +114,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	
 	@Override
 	public final Type getGenericType(GenericContext genericContext){
-		if(genericContext == null){
+		if(genericContext == null || !genericTypeHasArgs){
 			return genericType;
 		}
 		return genericContext.resolveType(genericType);

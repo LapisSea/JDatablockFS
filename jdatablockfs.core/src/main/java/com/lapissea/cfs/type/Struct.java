@@ -256,6 +256,19 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public static Optional<Struct<?>> tryOf(@NotNull Class<?> instanceClass){
+		if(!IOInstance.isInstance(instanceClass)){
+			return Optional.empty();
+		}
+		if(!IOInstance.Def.isDefinition(instanceClass) && Modifier.isAbstract(instanceClass.getModifiers())){
+			return Optional.empty();
+		}
+		
+		var s = of0((Class<? extends IOInstance>)instanceClass, false);
+		return Optional.of(s);
+	}
+	
 	private static void validateStructType(Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
@@ -470,6 +483,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
+	public record FieldStruct<T extends IOInstance<T>>
+		(IOField<T, ?> field, Struct<?> struct){
+		public FieldStruct{
+			if(field.getType() != struct.getType()){
+				throw new IllegalArgumentException(field.getType().getName() + " != " + struct.getType().getName());
+			}
+		}
+	}
+	
 	private final Class<T> type;
 	private       Class<T> concreteType;
 	private       boolean  isDefinition;
@@ -477,6 +499,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private FieldSet<T> fields;
 	private FieldSet<T> realFields;
 	private FieldSet<T> cloneFields;
+	
+	private List<FieldStruct<T>> nullContainInstances;
 	
 	short[] poolObjectsSize;
 	short[] poolPrimitivesSize;
@@ -695,6 +719,19 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return true;
 		}));
 	}
+	
+	public List<FieldStruct<T>> getNullContainInstances(){
+		var f = nullContainInstances;
+		return f == null? nullContainInstances = calcNullContainInstances() : f;
+	}
+	private List<FieldStruct<T>> calcNullContainInstances(){
+		return getRealFields()
+			       .map(f -> Struct.tryOf(f.getType())
+			                       .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
+			                       .map(s -> new FieldStruct<>(f, s)))
+			       .filtered(Optional::isPresent)
+			       .map(Optional::get)
+			       .collectToList();
 	}
 	
 	public FieldSet<T> getFields(){
@@ -832,11 +869,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(() -> {
 			return new GenericContext.TypeArgs(getType(), def.generic(null));
-		});
-	}
-	public GenericContext describeGenerics(Type def){
-		return new GenericContext.Deferred(() -> {
-			return new GenericContext.TypeArgs(getType(), def);
 		});
 	}
 	

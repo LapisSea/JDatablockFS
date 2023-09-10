@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.SealedUtil.isSealedCached;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
@@ -1333,6 +1334,10 @@ public sealed interface ValueStorage<T>{
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
+		if(DEBUG_VALIDATION){
+			assert UtilL.instanceOf(clazz, generics.owner())
+				: clazz + " != " + generics.owner();
+		}
 		if(clazz == Object.class){
 			return switch(rule){
 				case StorageRule.Default ignored -> new UnknownIDObject(provider, generics);

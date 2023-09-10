@@ -19,6 +19,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -28,10 +29,15 @@ import com.lapissea.util.WeakValueHashMap;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -534,5 +540,28 @@ public final class IOFieldTools{
 			return makeNumberSizeName(field);
 		}
 		return nam;
+	}
+	public static boolean doesTypeHaveArgs(Type type){
+		return switch(type){
+			case Class<?> c -> false;
+			case ParameterizedType t -> {
+				for(var arg : t.getActualTypeArguments()){
+					if(doesTypeHaveArgs(arg)) yield true;
+				}
+				yield false;
+			}
+			case TypeVariable<?> t -> true;
+			case GenericArrayType t -> doesTypeHaveArgs(t.getGenericComponentType());
+			case WildcardType t -> {
+				for(var bound : t.getUpperBounds()){
+					if(doesTypeHaveArgs(bound)) yield true;
+				}
+				for(var bound : t.getLowerBounds()){
+					if(doesTypeHaveArgs(bound)) yield true;
+				}
+				yield false;
+			}
+			default -> throw new NotImplementedException(type.getClass().getName());
+		};
 	}
 }

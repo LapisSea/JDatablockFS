@@ -1694,6 +1694,8 @@ public class BinaryGridRenderer implements DataRenderer{
 												return TypeFlag.ID_OBJECT;
 											}
 											@Override
+											public boolean genericTypeHasArgs(){ return false; }
+											@Override
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
 											}
@@ -1748,6 +1750,8 @@ public class BinaryGridRenderer implements DataRenderer{
 										public int getTypeID(){
 											return TypeFlag.ID_OBJECT;
 										}
+										@Override
+										public boolean genericTypeHasArgs(){ return false; }
 										@NotNull
 										@Override
 										public String getName(){
@@ -1804,6 +1808,8 @@ public class BinaryGridRenderer implements DataRenderer{
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
 											}
+											@Override
+											public boolean genericTypeHasArgs(){ return false; }
 											@NotNull
 											@Override
 											public String getName(){
@@ -1918,6 +1924,8 @@ public class BinaryGridRenderer implements DataRenderer{
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
+			public boolean genericTypeHasArgs(){ return false; }
+			@Override
 			public Object get(VarPool<T> ioPool, T instance){
 				return arrayLenSiz;
 			}
@@ -1936,6 +1944,8 @@ public class BinaryGridRenderer implements DataRenderer{
 			public int getTypeID(){
 				return TypeFlag.ID_OBJECT;
 			}
+			@Override
+			public boolean genericTypeHasArgs(){ return false; }
 			@Override
 			public Object get(VarPool<T> ioPool, T instance){
 				return arr.length;

@@ -331,11 +331,23 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException{
 			var ctx = genericContext;
 			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
-			
-			for(var ref : getThisStruct().getRealFields().onlyRefs()){
+			var s = getThisStruct();
+			for(var ref : s.getRealFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
-				ref.allocate(self(), provider, ctx);
+				ref.allocate(self(), provider, genericContext);
+			}
+			
+			for(var pair : s.getNullContainInstances()){
+				var field = pair.field();
+				if(!field.isNull(null, self())){
+					continue;
+				}
+				var struct = pair.struct();
+				var val    = struct.make();
+				val.allocateNulls(provider, field.makeContext(genericContext));
+				//noinspection rawtypes,unchecked
+				((IOField)field).set(null, self(), val);
 			}
 		}
 		

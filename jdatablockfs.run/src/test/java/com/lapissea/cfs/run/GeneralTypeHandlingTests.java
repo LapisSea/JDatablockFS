@@ -622,7 +622,7 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	public interface GenericChild<A> extends IOInstance.Def<GenericChild<A>>{
-		IOList<A> list();
+		ContiguousIOList<A> list();
 	}
 	
 	
@@ -634,11 +634,14 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void genericPropagation() throws IOException{
-		var d = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
-		//"com/lapissea/jorth/WTFIsMyBytecode",                         "Ljava/lang/Object;Ljava/lang/Comparable<Ljava/lang/Object;>;", "java/lang/Object", new String[]{"java/lang/Comparable"});
-		//"com/lapissea/jorth/WTFIsMyBytecode", "<ARG:Ljava/lang/Object;>Ljava/lang/Object;Ljava/lang/Comparable<TARG;>;",              "java/lang/Object", new String[]{"java/lang/Comparable"});
-		var g = IOInstance.Def.of(GenericArg.class);
-		g.allocateNulls(d, null);
+		var d    = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		var data = IOInstance.Def.of(GenericArg.class);
+		data.allocateNulls(d, null);
+		var strings = data.strings().list();
+		strings.add("foo");
+		strings.add("bar");
+		assertEquals(List.of("foo", "bar"), strings.collectToList());
+		assertEquals(TypeLink.of(ContiguousIOList.class, String.class), strings.getTypeDef());
 	}
 	
 }

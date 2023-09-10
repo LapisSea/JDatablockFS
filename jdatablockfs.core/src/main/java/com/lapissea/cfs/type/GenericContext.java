@@ -5,7 +5,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -15,13 +14,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public interface GenericContext extends Stringify{
 	
+	static GenericContext of(Class<?> type, Type actual){
+		return new GenericContext.Deferred(() -> {
+			return new GenericContext.TypeArgs(type, actual);
+		});
+	}
+	
 	final class TypeArgs implements GenericContext, Stringify{
 		private final Map<String, Type> actualTypes;
+		private final Class<?>          type;
 		
 		public TypeArgs(Class<?> type, Type actual){
+			this.type = type;
 			var params     = type.getTypeParameters();
 			var actualArgs = actual instanceof ParameterizedType p? p.getActualTypeArguments() : new Type[0];
 			
@@ -33,12 +41,23 @@ public interface GenericContext extends Stringify{
 		}
 		
 		@Override
+		public Class<?> owner(){
+			return type;
+		}
+		
+		@Override
 		public String toString(){
-			return "Ctx" + TextUtil.toString(actualTypes);
+			return Utils.typeToHuman(type, false) +
+			       actualTypes.entrySet().stream()
+			                  .map(e -> e.getKey() + "=" + Utils.typeToHuman(e.getValue(), false))
+			                  .collect(Collectors.joining(", ", "<", ">"));
 		}
 		@Override
 		public String toShortString(){
-			return "Ctx" + Utils.toShortString(actualTypes);
+			return Utils.typeToHuman(type, true) +
+			       actualTypes.entrySet().stream()
+			                  .map(e -> e.getKey() + "=" + Utils.typeToHuman(e.getValue(), true))
+			                  .collect(Collectors.joining(", ", "<", ">"));
 		}
 		
 		private Type getType(String name){
@@ -141,6 +160,11 @@ public interface GenericContext extends Stringify{
 			return getData();
 		}
 		
+		
+		@Override
+		public Class<?> owner(){
+			return getData().owner();
+		}
 		@Override
 		public Type resolveType(Type genericType){
 			return getData().resolveType(genericType);
@@ -160,6 +184,8 @@ public interface GenericContext extends Stringify{
 			return getData().toShortString();
 		}
 	}
+	
+	Class<?> owner();
 	
 	Type resolveType(Type genericType);
 	GenericContext argAsContext(String argName);

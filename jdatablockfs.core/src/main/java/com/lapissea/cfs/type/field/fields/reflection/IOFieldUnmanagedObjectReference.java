@@ -21,9 +21,11 @@ import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType>{
@@ -118,6 +120,11 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 		return val.getReference();
 	}
 	private ValueType makeValueObject(DataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
+		if(DEBUG_VALIDATION && genericContext != null){
+			var struct = declaringStruct();
+			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner()) :
+				genericContext.owner().getName() + " != " + struct.getType();
+		}
 		if(readNew.isNull()){
 			if(nullable()) return null;
 			throw new NullPointerException();
