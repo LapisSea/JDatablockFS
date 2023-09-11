@@ -43,7 +43,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 				buffer |= (long)source.tryRead()<<bufferedBits;
 				bufferedBits += Byte.SIZE;
 			}else{
-				buffer |= Long.reverseBytes(source.readWord(bytesToRead)<<((8 - bytesToRead)*8))<<bufferedBits;
+				buffer |= source.readWord(bytesToRead)<<bufferedBits;
 				bufferedBits += bytesToRead*Byte.SIZE;
 			}
 		}

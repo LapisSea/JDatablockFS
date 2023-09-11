@@ -59,11 +59,9 @@ public interface ContentReader extends AutoCloseable{
 		byte[] readBuffer = new byte[len];
 		readFully(readBuffer, 0, len);
 		
-		final var lm1 = len - 1;
-		
 		long val = 0;
 		for(int i = 0; i<len; i++){
-			val |= (readBuffer[i]&0xFFL)<<((lm1 - i)*8);
+			val |= (readBuffer[i]&0xFFL)<<(i*8);
 		}
 		return val;
 	}

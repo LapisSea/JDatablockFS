@@ -52,7 +52,7 @@ public interface ContentWriter extends AutoCloseable{
 		final var lm1         = len - 1;
 		
 		for(int i = 0; i<len; i++){
-			writeBuffer[i] = (byte)(v >>> ((lm1 - i)*8));
+			writeBuffer[i] = (byte)(v >>> (i*8));
 		}
 		
 		write(writeBuffer, 0, len);
