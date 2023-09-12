@@ -224,21 +224,24 @@ public final class ConfigTools{
 		}
 	}
 	
-	public static String configFlagsToTable(List<ConfEntry> values, int padding){
+	public static String configFlagsToTable(List<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
 		var nameLen = values.stream().map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
 		
-		var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
-		
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
-		for(var e : groups.entrySet()){
-			if(e.getValue().size() == 1){
-				singles.add(e.getValue().get(0));
-			}else{
-				groupsE.add(e);
+		if(grouping){
+			var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
+			for(var e : groups.entrySet()){
+				if(e.getValue().size() == 1){
+					singles.add(e.getValue().get(0));
+				}else{
+					groupsE.add(e);
+				}
 			}
+		}else{
+			singles.addAll(values);
 		}
 		singles.sort(Comparator.comparing(e -> e.name));
 		groupsE.sort(Map.Entry.comparingByKey());

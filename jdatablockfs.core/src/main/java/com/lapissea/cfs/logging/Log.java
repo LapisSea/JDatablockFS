@@ -70,10 +70,26 @@ public class Log{
 		
 		if(ConfigDefs.PRINT_FLAGS.resolveVal()){
 			var values = ConfigTools.collectConfigFlags();
+			
+			var existingNames = values.stream().map(ConfigTools.ConfEntry::name).collect(Collectors.toSet());
+			var badValues     = new ArrayList<ConfigTools.ConfEntry>();
+			for(var o : System.getProperties().keySet()){
+				if(!(o instanceof String key) || !key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX)) continue;
+				if(!existingNames.contains(o)){
+					badValues.add(new ConfigTools.ConfEntry(key, System.getProperty(key)));
+				}
+			}
+			
 			info(
 				"{#yellowBrightRunning with debugging:#}\n" +
-				ConfigTools.configFlagsToTable(values, 4)
+				ConfigTools.configFlagsToTable(values, 4, true)
 			);
+			if(!badValues.isEmpty()){
+				info(
+					"{#redBrightUnrecognised flags:#}\n" +
+					ConfigTools.configFlagsToTable(badValues, 4, false)
+				);
+			}
 		}
 		
 		LogUtil.registerSkipClass(Log.class);
