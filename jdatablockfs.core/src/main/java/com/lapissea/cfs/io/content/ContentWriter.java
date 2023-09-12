@@ -71,7 +71,7 @@ public interface ContentWriter extends AutoCloseable{
 		write(v);
 	}
 	
-	default void writeInts2(int[] b) throws IOException{
+	default void writeInts2(short[] b) throws IOException{
 		int    numSize = 2;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){

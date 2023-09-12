@@ -217,7 +217,7 @@ public enum NumberSize{
 		switch(this){
 			case VOID -> { }
 			case BYTE -> ContentSupport.writeInt1(out, off, (byte)value);
-			case SHORT -> ContentSupport.writeInt2(out, off, (int)value);
+			case SHORT -> ContentSupport.writeInt2(out, off, (short)value);
 			case SMALL_INT -> ContentSupport.writeInt3(out, off, (int)value);
 			case INT -> ContentSupport.writeInt4(out, off, (int)value);
 			case BIG_INT -> ContentSupport.writeInt5(out, off, value);
