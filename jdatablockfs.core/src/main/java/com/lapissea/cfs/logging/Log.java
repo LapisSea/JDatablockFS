@@ -3,15 +3,18 @@ package com.lapissea.cfs.logging;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.config.ConfigTools;
+import com.lapissea.cfs.exceptions.IllegalConfiguration;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -70,29 +73,39 @@ public class Log{
 		
 		if(ConfigDefs.PRINT_FLAGS.resolveVal()){
 			var values = ConfigTools.collectConfigFlags();
-			
-			var existingNames = values.stream().map(ConfigTools.ConfEntry::name).collect(Collectors.toSet());
-			var badValues     = new ArrayList<ConfigTools.ConfEntry>();
-			for(var o : System.getProperties().keySet()){
-				if(!(o instanceof String key) || !key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX)) continue;
-				if(!existingNames.contains(o)){
-					badValues.add(new ConfigTools.ConfEntry(key, System.getProperty(key)));
-				}
-			}
-			
 			info(
 				"{#yellowBrightRunning with debugging:#}\n" +
 				ConfigTools.configFlagsToTable(values, 4, true)
 			);
-			if(!badValues.isEmpty()){
-				info(
-					"{#redBrightUnrecognised flags:#}\n" +
-					ConfigTools.configFlagsToTable(badValues, 4, false)
-				);
-			}
+			
+			var existingNames = values.stream().map(ConfigTools.ConfEntry::name).collect(Collectors.toSet());
+			scanBadFlags(existingNames);
+			Thread.startVirtualThread(() -> {
+				UtilL.sleep(1000);
+				scanBadFlags(existingNames);
+			});
 		}
 		
 		LogUtil.registerSkipClass(Log.class);
+	}
+	
+	private static void scanBadFlags(Set<String> existingNames){
+		var badValues = System.getProperties().keySet().stream().filter(String.class::isInstance).map(o -> (String)o)
+		                      .filter(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
+		                      .filter(key -> !existingNames.contains(key))
+		                      .map(key -> new ConfigTools.ConfEntry(key, Objects.toString(System.getProperty(key))))
+		                      .toList();
+		
+		if(!badValues.isEmpty()){
+			var msg = resolveArgs(
+				"{#redBrightUnrecognised flags:#}\n{}",
+				ConfigTools.configFlagsToTable(badValues, 4, false)
+			).toString();
+			if(ConfigDefs.STRICT_FLAGS.resolveVal()){
+				throw new IllegalConfiguration("\n" + msg);
+			}
+			Log.info(msg);
+		}
 	}
 	
 	public static void log(String message){
@@ -216,7 +229,7 @@ public class Log{
 		return formatted;
 	}
 	
-	private static StringBuilder resolveArgs(String message, Object[] args){
+	public static StringBuilder resolveArgs(String message, Object... args){
 		var formatted = new StringBuilder(message.length() + 32);
 		rawToMsg(message, formatted);
 		int start = 0;

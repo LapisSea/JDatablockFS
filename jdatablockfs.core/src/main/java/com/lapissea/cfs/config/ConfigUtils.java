@@ -1,5 +1,6 @@
 package com.lapissea.cfs.config;
 
+import com.lapissea.cfs.exceptions.IllegalConfiguration;
 import com.lapissea.cfs.logging.Log;
 
 import java.util.Arrays;
@@ -7,23 +8,31 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public class ConfigUtils{
+public final class ConfigUtils{
 	
 	public record FuzzyResult<T extends Enum<T>>(T value, String incorrect){
 		public FuzzyResult(T value){
 			this(value, null);
 		}
 		
-		public T warn(String nameOfBadEnum){
-			if(incorrect != null){
-				Log.warn("{} can only be one of {} but is actually \"{}\". Defaulting to {}",
-				         nameOfBadEnum,
-				         value.getClass().getEnumConstants(),
-				         incorrect,
-				         value
-				);
-			}
+		public T fail(String nameOfBadEnum){
+			if(incorrect != null && (Log.WARN || ConfigDefs.STRICT_FLAGS.resolveVal())) logBad(nameOfBadEnum);
 			return value;
+		}
+		
+		private void logBad(String nameOfBadEnum){
+			var msg = Log.resolveArgs(
+				"{} can only be one of {} but is actually \"{}\". Defaulting to {}",
+				nameOfBadEnum,
+				value.getClass().getEnumConstants(),
+				incorrect,
+				value
+			).toString();
+			
+			if(ConfigDefs.STRICT_FLAGS.resolveVal()){
+				throw new IllegalConfiguration("\n" + msg);
+			}
+			Log.log(msg);
 		}
 	}
 	
@@ -39,17 +48,27 @@ public class ConfigUtils{
 			try{
 				return Integer.parseInt(s);
 			}catch(NumberFormatException e){
-				Log.warn("{} can only be an integer but is \"{}\"", name, s);
+				logBadInt(name, s);
 				return null;
 			}
 		}).orElse(defaultValue);
+	}
+	
+	private static void logBadInt(String name, String s){
+		var msg = Log.resolveArgs(
+			"{} can only be an integer but is \"{}\"", name, s
+		).toString();
+		if(ConfigDefs.STRICT_FLAGS.resolveVal()){
+			throw new IllegalConfiguration("\n" + msg);
+		}
+		Log.log(msg);
 	}
 	
 	public static <T extends Enum<T>> T configEnum(String name, Map<String, ?> map, T defaultValue){
 		return configEnum(name, Optional.ofNullable(map.get(name)).map(Object::toString), defaultValue);
 	}
 	public static <T extends Enum<T>> T configEnum(String name, Optional<String> value, T defaultValue){
-		return configEnum(value, defaultValue).warn(name);
+		return configEnum(value, defaultValue).fail(name);
 	}
 	public static <T extends Enum<T>> T configEnum(String name, T defaultValue){
 		return configEnum(name, optionalProperty(name), defaultValue);
@@ -78,10 +97,21 @@ public class ConfigUtils{
 			case "true", "yes" -> true;
 			case "false", "no" -> false;
 			default -> {
-				Log.warn("{} can only be one of [true, false, yes, no] but is \"{}\"", name, val);
-				yield false;
+				if(Log.WARN || ConfigDefs.STRICT_FLAGS.resolveVal()) logBadBool(name, val);
+				yield defaultValue;
 			}
 		}).orElse(defaultValue);
+	}
+	
+	private static void logBadBool(String name, String val){
+		var msg = Log.resolveArgs(
+			"{} can only be one of [true, false, yes, no] but is \"{}\"", name, val
+		).toString();
+		
+		if(ConfigDefs.STRICT_FLAGS.resolveVal()){
+			throw new IllegalConfiguration("\n" + msg);
+		}
+		Log.log(msg);
 	}
 	
 	

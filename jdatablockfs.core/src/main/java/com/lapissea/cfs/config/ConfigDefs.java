@@ -21,6 +21,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
+	Flag.FBool STRICT_FLAGS    = flagB("strictFlags", false);
 	Flag.FBool RELEASE_MODE    = flagB("releaseMode", () -> !deb() && isInJar());
 	Flag.FBool TYPE_VALIDATION = flagB("typeValidation", deb());
 	Flag.FInt  BATCH_BYTES     = flagI("batchBytes", 8192).natural();
