@@ -1,6 +1,6 @@
 package com.lapissea.cfs.internal;
 
-import com.lapissea.cfs.io.content.ContentSupport;
+import com.lapissea.cfs.io.content.BBView;
 
 import java.nio.ByteOrder;
 
@@ -20,10 +20,10 @@ public final class WordIO{
 	private static long getWordLE(byte[] data, int off, int len){
 		return switch(len){
 			case 1 -> Byte.toUnsignedLong(data[off]);
-			case 2 -> ContentSupport.readUnsignedInt2(data, off);
-			case 3 -> ContentSupport.readUnsignedInt3(data, off);
-			case 4 -> Integer.toUnsignedLong(ContentSupport.readInt4(data, off));
-			case 8 -> ContentSupport.readInt8(data, off);
+			case 2 -> BBView.readUnsignedInt2(data, off);
+			case 3 -> BBView.readUnsignedInt3(data, off);
+			case 4 -> Integer.toUnsignedLong(BBView.readInt4(data, off));
+			case 8 -> BBView.readInt8(data, off);
 			default -> getWordLoopLE(data, off, len);
 		};
 	}
@@ -37,10 +37,10 @@ public final class WordIO{
 		}
 		switch(len){
 			case 1 -> writeBuffer[off] = (byte)v;
-			case 2 -> ContentSupport.writeInt2(writeBuffer, off, (short)v);
-			case 3 -> ContentSupport.writeInt3(writeBuffer, off, (int)v);
-			case 4 -> ContentSupport.writeInt4(writeBuffer, off, (int)v);
-			case 8 -> ContentSupport.writeInt8(writeBuffer, off, v);
+			case 2 -> BBView.writeInt2(writeBuffer, off, (short)v);
+			case 3 -> BBView.writeInt3(writeBuffer, off, (int)v);
+			case 4 -> BBView.writeInt4(writeBuffer, off, (int)v);
+			case 8 -> BBView.writeInt8(writeBuffer, off, v);
 			default -> setWordLoopLE(v, writeBuffer, off, len);
 		}
 	}

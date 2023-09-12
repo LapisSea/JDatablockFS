@@ -3,8 +3,8 @@ package com.lapissea.cfs.objects;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
+import com.lapissea.cfs.io.content.BBView;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentSupport;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.utils.IOUtils;
 
@@ -216,13 +216,13 @@ public enum NumberSize{
 		
 		switch(this){
 			case VOID -> { }
-			case BYTE -> ContentSupport.writeInt1(out, off, (byte)value);
-			case SHORT -> ContentSupport.writeInt2(out, off, (short)value);
-			case SMALL_INT -> ContentSupport.writeInt3(out, off, (int)value);
-			case INT -> ContentSupport.writeInt4(out, off, (int)value);
-			case BIG_INT -> ContentSupport.writeInt5(out, off, value);
-			case SMALL_LONG -> ContentSupport.writeInt6(out, off, value);
-			case LONG -> ContentSupport.writeInt8(out, off, value);
+			case BYTE -> BBView.writeInt1(out, off, (byte)value);
+			case SHORT -> BBView.writeInt2(out, off, (short)value);
+			case SMALL_INT -> BBView.writeInt3(out, off, (int)value);
+			case INT -> BBView.writeInt4(out, off, (int)value);
+			case BIG_INT -> BBView.writeInt5(out, off, value);
+			case SMALL_LONG -> BBView.writeInt6(out, off, value);
+			case LONG -> BBView.writeInt8(out, off, value);
 			case null -> { }
 		}
 	}

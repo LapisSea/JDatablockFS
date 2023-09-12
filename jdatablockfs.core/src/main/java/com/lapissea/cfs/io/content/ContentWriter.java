@@ -75,7 +75,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 2;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt2(bb, i*numSize, b[i]);
+			BBView.writeInt2(bb, i*numSize, b[i]);
 		}
 		write(bb);
 	}
@@ -88,7 +88,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 3;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt3(bb, i*numSize, b[i]);
+			BBView.writeInt3(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -101,7 +101,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 4;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt4(bb, i*numSize, b[i]);
+			BBView.writeInt4(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -126,7 +126,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 5;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt5(bb, i*numSize, b[i]);
+			BBView.writeInt5(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -139,7 +139,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 6;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt6(bb, i*numSize, b[i]);
+			BBView.writeInt6(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -152,7 +152,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 8;
 		byte[] bb      = new byte[b.length*numSize];
 		for(int i = 0; i<b.length; i++){
-			ContentSupport.writeInt8(bb, i*numSize, b[i]);
+			BBView.writeInt8(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -176,7 +176,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 4;
 		byte[] bb      = new byte[f.length*numSize];
 		for(int i = 0; i<f.length; i++){
-			ContentSupport.writeFloat4(bb, i*numSize, f[i]);
+			BBView.writeFloat4(bb, i*numSize, f[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -189,7 +189,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 8;
 		byte[] bb      = new byte[f.length*numSize];
 		for(int i = 0; i<f.length; i++){
-			ContentSupport.writeFloat8(bb, i*numSize, f[i]);
+			BBView.writeFloat8(bb, i*numSize, f[i]);
 		}
 		write(bb, 0, bb.length);
 	}
@@ -202,7 +202,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 2;
 		byte[] bb      = new byte[c.length()*numSize];
 		for(int i = 0; i<c.length(); i++){
-			ContentSupport.writeChar2(bb, i*numSize, c.charAt(i));
+			BBView.writeChar2(bb, i*numSize, c.charAt(i));
 		}
 		write(bb, 0, bb.length);
 	}
@@ -211,7 +211,7 @@ public interface ContentWriter extends AutoCloseable{
 		int    numSize = 2;
 		byte[] bb      = new byte[c.length*numSize];
 		for(int i = 0; i<c.length; i++){
-			ContentSupport.writeChar2(bb, i*numSize, c[i]);
+			BBView.writeChar2(bb, i*numSize, c[i]);
 		}
 		write(bb, 0, bb.length);
 	}

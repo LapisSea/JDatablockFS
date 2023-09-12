@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.io.content.ContentSupport;
+import com.lapissea.cfs.io.content.BBView;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
@@ -106,8 +106,8 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(primitives == null) return 0;
 			
 			return switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> ContentSupport.readInt8(primitives, accessor.getPrimitiveOffset());
-				case Integer.BYTES -> ContentSupport.readInt4(primitives, accessor.getPrimitiveOffset());
+				case Long.BYTES -> BBView.readInt8(primitives, accessor.getPrimitiveOffset());
+				case Integer.BYTES -> BBView.readInt4(primitives, accessor.getPrimitiveOffset());
 				default -> throw new IllegalStateException();
 			};
 		}
@@ -119,7 +119,7 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			ContentSupport.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
+			BBView.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
 		}
 		
 		@Override
@@ -127,7 +127,7 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(DEBUG_VALIDATION) protectAccessor(accessor, int.class);
 			
 			if(primitives == null) return 0;
-			return ContentSupport.readInt4(primitives, accessor.getPrimitiveOffset());
+			return BBView.readInt4(primitives, accessor.getPrimitiveOffset());
 		}
 		@Override
 		public void setInt(VirtualAccessor<T> accessor, int value){
@@ -139,8 +139,8 @@ public interface VarPool<T extends IOInstance<T>>{
 			}
 			
 			switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> ContentSupport.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
-				case Integer.BYTES -> ContentSupport.writeInt4(primitives, accessor.getPrimitiveOffset(), value);
+				case Long.BYTES -> BBView.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
+				case Integer.BYTES -> BBView.writeInt4(primitives, accessor.getPrimitiveOffset(), value);
 				default -> throw new IllegalStateException();
 			}
 		}

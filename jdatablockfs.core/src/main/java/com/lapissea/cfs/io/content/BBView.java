@@ -6,7 +6,7 @@ import static java.lang.invoke.MethodHandles.byteArrayViewVarHandle;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 @SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression"})
-public final class ContentSupport{
+public final class BBView{
 	
 	private static final VarHandle SHORT_VIEW  = var(short.class);
 	private static final VarHandle CHAR_VIEW   = var(char.class);

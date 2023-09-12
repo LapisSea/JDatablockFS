@@ -126,7 +126,7 @@ public interface ContentReader extends AutoCloseable{
 			readFully(buff, 0, readElements*bytesPerElement);
 			
 			for(int i = 0; i<readElements; i++){
-				result[read + i] = ContentSupport.readChar2(buff, i*bytesPerElement);
+				result[read + i] = BBView.readChar2(buff, i*bytesPerElement);
 			}
 			
 			remaining -= readElements;
@@ -178,7 +178,7 @@ public interface ContentReader extends AutoCloseable{
 			readFully(buff, 0, readElements*bytesPerElement);
 			
 			for(int i = 0; i<readElements; i++){
-				result[read + i] = ContentSupport.readInt2(buff, i*bytesPerElement);
+				result[read + i] = BBView.readInt2(buff, i*bytesPerElement);
 			}
 			
 			remaining -= readElements;
@@ -193,7 +193,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	
 	default int[] readUnsignedInts2(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 2, ContentSupport::readUnsignedInt2);
+		return readInts(elementsToRead, 2, BBView::readUnsignedInt2);
 	}
 	
 	default int readUnsignedInt2() throws IOException{
@@ -202,7 +202,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	
 	default int[] readUnsignedInts3(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 3, ContentSupport::readUnsignedInt3);
+		return readInts(elementsToRead, 3, BBView::readUnsignedInt3);
 	}
 	
 	default int readUnsignedInt3() throws IOException{
@@ -227,12 +227,12 @@ public interface ContentReader extends AutoCloseable{
 		return readWord(4);
 	}
 	default long readUnsignedInt4(byte[] readBuffer, int offset){
-		return ContentSupport.readInt4(readBuffer, offset)&0xFFFFFFFFL;
+		return BBView.readInt4(readBuffer, offset)&0xFFFFFFFFL;
 	}
 	
 	
 	default int[] readInts4(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 4, ContentSupport::readInt4);
+		return readInts(elementsToRead, 4, BBView::readInt4);
 	}
 	
 	default int readInt4() throws IOException{
@@ -241,7 +241,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	
 	default long[] readUnsignedInts5(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 5, ContentSupport::readUnsignedInt5);
+		return readLongs(elementsToRead, 5, BBView::readUnsignedInt5);
 	}
 	
 	default long readUnsignedInt5() throws IOException{
@@ -250,7 +250,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	
 	default long[] readUnsignedInt6(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 6, ContentSupport::readUnsignedInt6);
+		return readLongs(elementsToRead, 6, BBView::readUnsignedInt6);
 	}
 	
 	default long readUnsignedInt6() throws IOException{
@@ -258,7 +258,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default long[] readInts8(int elementsToRead) throws IOException{
-		return readLongs(elementsToRead, 8, ContentSupport::readInt8);
+		return readLongs(elementsToRead, 8, BBView::readInt8);
 	}
 	
 	default long readUnsignedInt8Dynamic() throws IOException{
@@ -333,7 +333,7 @@ public interface ContentReader extends AutoCloseable{
 		int    numSize = 4;
 		byte[] bb      = readInts1(f.length*numSize);
 		for(int i = 0; i<f.length; i++){
-			f[i] = ContentSupport.readFloat4(bb, i*numSize);
+			f[i] = BBView.readFloat4(bb, i*numSize);
 		}
 	}
 	
@@ -349,7 +349,7 @@ public interface ContentReader extends AutoCloseable{
 		int    numSize = 8;
 		byte[] bb      = readInts1(f.length*numSize);
 		for(int i = 0; i<f.length; i++){
-			f[i] = ContentSupport.readFloat8(bb, i*numSize);
+			f[i] = BBView.readFloat8(bb, i*numSize);
 		}
 	}
 	
