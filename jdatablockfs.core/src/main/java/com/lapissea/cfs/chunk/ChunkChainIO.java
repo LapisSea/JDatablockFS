@@ -302,18 +302,18 @@ public final class ChunkChainIO implements RandomIO{
 		
 		long val = 0;
 		
-		var toReadReamining = len;
-		while(toReadReamining>0){
-			long cOff      = calcCursorOffset();
-			long remaining = cursor.getSize() - cOff;
-			if(remaining == 0) throw new EOFException();
+		var remaining = len;
+		do{
+			long cOff            = calcCursorOffset();
+			long cursorRemaining = cursor.getSize() - cOff;
+			if(cursorRemaining == 0) throw new EOFException();
 			
-			int toRead = (int)Math.min(toReadReamining, remaining);
-			toReadReamining -= toRead;
+			int toRead = (int)Math.min(remaining, cursorRemaining);
 			syncSourceCursor(cOff);
-			val |= source.readWord(toRead)<<(toReadReamining*8);
+			val |= source.readWord(toRead)<<((len - remaining)*8);
 			advanceCursorBy(toRead);
-		}
+			remaining -= toRead;
+		}while(remaining>0);
 		
 		return val;
 	}

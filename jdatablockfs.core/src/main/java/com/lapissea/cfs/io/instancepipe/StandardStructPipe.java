@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.io.content.BBView;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
@@ -106,7 +106,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			@Override
 			public void write(int off, byte[] dest){
 				dest[off] = SKIP_FIXED;
-				MemPrimitive.setLong(dest, off + 1, bytes);
+				BBView.writeInt8(dest, off + 1, bytes);
 			}
 		}
 		
@@ -184,7 +184,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var cmds = skip.cmds;
 		for(int f = 0, c = 0; c<cmds.length; f++){
 			switch(cmds[c++]){
-				case SKIP_FIXED -> src.skipExact(MemPrimitive.getLong(cmds, (c += 8) - 8));
+				case SKIP_FIXED -> src.skipExact(BBView.readInt8(cmds, (c += 8) - 8));
 				case READ -> skip.fields.get(f).read(pool, provider, src, inst, genericContext);
 				case SKIP -> skip.fields.get(f).skip(pool, provider, src, inst, genericContext);
 				default -> throw new IllegalStateException();

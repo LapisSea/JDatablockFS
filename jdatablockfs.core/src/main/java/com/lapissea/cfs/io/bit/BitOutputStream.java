@@ -65,7 +65,7 @@ public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseabl
 		switch(bytesToWrite){
 			case 0 -> { return; }
 			case 1 -> dest.write((int)(buffer&BYTE_MASK));
-			default -> dest.writeWord(Long.reverseBytes(buffer) >>> ((8 - bytesToWrite)*8), bytesToWrite);
+			default -> dest.writeWord(buffer, bytesToWrite);
 		}
 		written -= bytesToWrite*8;
 		buffer >>>= bytesToWrite*8;
