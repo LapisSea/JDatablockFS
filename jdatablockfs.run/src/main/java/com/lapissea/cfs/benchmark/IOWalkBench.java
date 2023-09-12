@@ -79,19 +79,19 @@ public class IOWalkBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=varhandle")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=VAR_HANDLE")
 	public void walkAccVarHandle(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=reflection")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=REFLECTION")
 	public void walkAccReflection(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=unsafe")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=UNSAFE")
 	public void walkAccUnsafe(){
 		doWalk();
 	}
