@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.compress;
 
-import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.internal.WordIO;
 import com.lapissea.cfs.objects.NumberSize;
 
 import java.util.Arrays;
@@ -113,11 +113,7 @@ public final class RlePacker implements Packer{
 		}
 		
 		private void writeSiz(NumberSize siz, int pos, int num){
-			switch(siz){
-				case VOID -> { }
-				case BYTE -> packed[pos] = (byte)num;
-				default -> MemPrimitive.setWord(num, packed, pos, siz.bytes);
-			}
+			WordIO.setWord(num, packed, pos, siz.bytes);
 		}
 		
 		private void flushRaw(){
@@ -151,11 +147,7 @@ public final class RlePacker implements Packer{
 		}
 		
 		private int readLen(NumberSize siz, int pos){
-			return switch(siz){
-				case VOID -> 0;
-				case BYTE -> packedData[pos]&0xFF;
-				default -> (int)MemPrimitive.getWord(packedData, pos, siz.bytes);
-			};
+			return (int)WordIO.getWord(packedData, pos, siz.bytes);
 		}
 		
 		private int scanSize(){

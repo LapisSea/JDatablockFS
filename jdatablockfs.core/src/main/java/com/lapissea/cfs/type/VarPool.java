@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.io.content.ContentSupport;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
@@ -106,8 +106,8 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(primitives == null) return 0;
 			
 			return switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> MemPrimitive.getLong(primitives, accessor.getPrimitiveOffset());
-				case Integer.BYTES -> MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+				case Long.BYTES -> ContentSupport.readInt8(primitives, accessor.getPrimitiveOffset());
+				case Integer.BYTES -> ContentSupport.readInt4(primitives, accessor.getPrimitiveOffset());
 				default -> throw new IllegalStateException();
 			};
 		}
@@ -119,7 +119,7 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
+			ContentSupport.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
 		}
 		
 		@Override
@@ -127,7 +127,7 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(DEBUG_VALIDATION) protectAccessor(accessor, int.class);
 			
 			if(primitives == null) return 0;
-			return MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+			return ContentSupport.readInt4(primitives, accessor.getPrimitiveOffset());
 		}
 		@Override
 		public void setInt(VirtualAccessor<T> accessor, int value){
@@ -139,8 +139,8 @@ public interface VarPool<T extends IOInstance<T>>{
 			}
 			
 			switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
-				case Integer.BYTES -> MemPrimitive.setInt(primitives, accessor.getPrimitiveOffset(), value);
+				case Long.BYTES -> ContentSupport.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
+				case Integer.BYTES -> ContentSupport.writeInt4(primitives, accessor.getPrimitiveOffset(), value);
 				default -> throw new IllegalStateException();
 			}
 		}
@@ -169,14 +169,14 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		private byte getByte0(VirtualAccessor<T> accessor){
 			if(primitives == null) return 0;
-			return MemPrimitive.getByte(primitives, accessor.getPrimitiveOffset());
+			return primitives[accessor.getPrimitiveOffset()];
 		}
 		private void setByte0(VirtualAccessor<T> accessor, byte value){
 			if(primitives == null){
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			MemPrimitive.setByte(primitives, accessor.getPrimitiveOffset(), value);
+			primitives[accessor.getPrimitiveOffset()] = value;
 		}
 		
 		

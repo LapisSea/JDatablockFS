@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.internal.WordIO;
 import com.lapissea.util.NotNull;
 
 import java.io.EOFException;
@@ -91,7 +91,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public long readWord(int len) throws IOException{
 			int rem = available();
 			if(rem<len) throw new EOFException();
-			var val = MemPrimitive.getWord(ba, pos, len);
+			var val = WordIO.getWord(ba, pos, len);
 			pos += len;
 			return val;
 		}

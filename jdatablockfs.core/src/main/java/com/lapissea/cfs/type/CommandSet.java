@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
+import com.lapissea.cfs.io.content.ContentSupport;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.util.TextUtil;
@@ -42,12 +42,12 @@ public final class CommandSet{
 					case SKIPB_B -> dest.write((int)bytes);
 					case SKIPB_I -> {
 						byte[] bb = new byte[4];
-						MemPrimitive.setInt(bb, 0, (int)bytes);
+						ContentSupport.writeInt4(bb, 0, (int)bytes);
 						dest.write(bb);
 					}
 					case SKIPB_L -> {
 						byte[] bb = new byte[8];
-						MemPrimitive.setLong(bb, 0, bytes);
+						ContentSupport.writeInt8(bb, 0, bytes);
 						dest.write(bb);
 					}
 					default -> throw new IllegalStateException("Unexpected value: " + cmd);
@@ -292,13 +292,13 @@ public final class CommandSet{
 		public int read32(){
 			var p = pos;
 			pos += 4;
-			return MemPrimitive.getInt(code, p);
+			return ContentSupport.readInt4(code, p);
 		}
 		@Override
 		public long read64(){
 			var p = pos;
 			pos += 8;
-			return MemPrimitive.getLong(code, p);
+			return ContentSupport.readInt8(code, p);
 		}
 		@Override
 		public boolean readBool(){
