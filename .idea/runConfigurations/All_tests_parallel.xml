@@ -8,7 +8,7 @@
     <option name="METHOD_NAME" value="" />
     <option name="GROUP_NAME" value="" />
     <option name="TEST_OBJECT" value="PACKAGE" />
-    <option name="VM_PARAMETERS" value="-DdeleteOk=true -Ddfs.printCompilation=false -Ddfs.log.level=WARN" />
+    <option name="VM_PARAMETERS" value="-DdeleteOk=true -Ddfs.log.level=WARN" />
     <option name="PARAMETERS" value="-parallel methods -threadcount 12" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/test" />
     <option name="OUTPUT_DIRECTORY" value="" />

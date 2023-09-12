@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.bit;
 
-import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotNull;
@@ -10,7 +9,6 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.AbstractList;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -24,46 +22,6 @@ import java.util.stream.Stream;
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP<T>{
 	
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
-	
-	private interface UGet{
-		<E extends Enum<E>> E[] get(Class<E> type);
-	}
-	
-	private static final UGet UNIVERSE_GETTER;
-	
-	static{
-		UGet uget;
-		try{
-			long universeOffset = MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
-			uget = new UGet(){
-				@SuppressWarnings("unchecked")
-				@Override
-				public <E extends Enum<E>> E[] get(Class<E> type){
-					return (E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
-				}
-			};
-			
-			enum DryRun{FOO, BAR}
-			if(!Arrays.equals(DryRun.class.getEnumConstants(), uget.get(DryRun.class))){
-				uget = null;
-			}
-		}catch(Throwable e){
-			uget = null;
-		}
-		if(uget == null){
-			uget = new UGet(){
-				@Override
-				public <E extends Enum<E>> E[] get(Class<E> type){
-					return type.getEnumConstants();
-				}
-			};
-		}
-		UNIVERSE_GETTER = uget;
-	}
-	
-	private static <T extends Enum<T>> T[] getUniverse(Class<T> type){
-		return UNIVERSE_GETTER.get(type);
-	}
 	
 	private static void ensureEnum(Class<?> type){
 		if(!type.isEnum()) throw new IllegalArgumentException(type.getName() + " not an Enum");
@@ -100,7 +58,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	
 	private EnumUniverse(Class<T> type){
 		this.type = type;
-		universe = getUniverse(type);
+		universe = type.getEnumConstants();
 		
 		bitSize = calcBits(size());
 		nullableBitSize = calcBits(size() + 1);

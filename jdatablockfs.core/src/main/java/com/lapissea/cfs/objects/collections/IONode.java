@@ -468,6 +468,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			io.trim();
 		}
+		if(DEBUG_VALIDATION){
+			assert Objects.equals(value, getValue()) :
+				value + " != " + getValue();
+		}
 	}
 	
 	private ChunkPointer nextPtrCache;

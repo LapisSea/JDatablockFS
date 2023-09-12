@@ -70,7 +70,7 @@ public interface BitReader{
 	
 	default boolean[] readBits(boolean[] data) throws IOException{
 		
-		int maxBatch = 60;
+		int maxBatch = 63;
 		for(int start = 0; start<data.length; start += maxBatch){
 			var batchSize = Math.min(data.length - start, maxBatch);
 			

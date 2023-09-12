@@ -4,13 +4,10 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.nio.ByteOrder;
 
-public class MyUnsafe{
+public final class MyUnsafe{
 	
 	public static final Unsafe UNSAFE;
-	
-	public static final boolean IS_BIG_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
 	
 	static{
 		try{

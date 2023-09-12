@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.run.Configuration;
+import com.lapissea.cfs.run.JMHRun;
 import com.lapissea.cfs.run.sparseimage.SparseImage;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
+	public static void main(String[] args){ JMHRun.run(args); }
 	
 	private final Cluster                    cluster;
 	final         MemoryWalker.PointerRecord rec = new MemoryWalker.PointerRecord(){
@@ -77,19 +79,19 @@ public class IOWalkBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=varhandle")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=VAR_HANDLE")
 	public void walkAccVarHandle(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=reflection")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=REFLECTION")
 	public void walkAccReflection(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=unsafe")
+	@Fork(jvmArgsAppend = "-Ddfs.tweaks.fieldAccess=UNSAFE")
 	public void walkAccUnsafe(){
 		doWalk();
 	}

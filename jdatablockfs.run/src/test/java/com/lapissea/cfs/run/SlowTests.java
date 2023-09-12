@@ -539,18 +539,17 @@ public class SlowTests{
 	
 	@Test(dataProvider = "listMakers", dependsOnGroups = "lists", ignoreMissingDependencies = true)
 	void fuzzIOList(ListMaker maker){
-		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
-			@Override
-			public boolean shouldRun(FuzzSequence sequence, FuzzingRunner.Mark mark){
-//				return sequence.index() == 6;
-				return true;
-			}
+		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv.Marked<>(){
 			@Override
 			public IOList<Integer> create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				return new CheckIOList<>(maker.make());
 			}
 			@Override
 			public void applyAction(IOList<Integer> state, long actionIndex, ListAction action, FuzzingRunner.Mark mark) throws IOException{
+				if(mark.action(actionIndex)){
+//					LogUtil.println(action);
+					int a = 0;
+				}
 				switch(action){
 					case ListAction.Num(ListAction.NumT type, int num) -> {
 						switch(type){
@@ -581,7 +580,8 @@ public class SlowTests{
 			r -> new ListAction.Num2(RNGEnum.anyOf(r, ListAction.Num2T.class), r.nextInt(200), r.nextInt(200))
 		)).chanceFor(ListAction.Clear.class, 1F/1000));
 		
-		runner.runAndAssert(69_420, (long)(400_000L*maker.weight), 5000);
+		
+		stableRun(Plan.start(runner, 69_420, (long)(400_000L*maker.weight), 5000), maker.name);
 	}
 	
 	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.internal.WordIO;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
@@ -618,11 +618,11 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		protected long readWord(byte[] fileData, int fileOffset, int len){
-			return MemPrimitive.getWord(fileData, fileOffset, len);
+			return WordIO.getWord(fileData, fileOffset, len);
 		}
 		@Override
 		protected void writeWord(long value, byte[] fileData, int fileOffset, int len){
-			MemPrimitive.setWord(value, fileData, fileOffset, len);
+			WordIO.setWord(value, fileData, fileOffset, len);
 		}
 	}
 	

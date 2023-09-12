@@ -4,7 +4,6 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.utils.RawRandom;
-import com.lapissea.util.LogUtil;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
@@ -26,21 +25,6 @@ import java.util.stream.Collectors;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class HashMapBenchmark{
-	public static void main(String[] args) throws Throwable{
-		manual();
-	}
-	
-	private static void manual() throws IOException{
-		var b = new HashMapBenchmark();
-		b.initSize = 500;
-		b.rangeMul = 2;
-		
-		b.init();
-		for(int i = 0; i<100000; i++){
-			if(i%1000 == 0) LogUtil.println(i/100000D);
-			b.get();
-		}
-	}
 	
 	private final RawRandom rand = new RawRandom();
 	
@@ -53,7 +37,7 @@ public class HashMapBenchmark{
 	private IOMap<Integer, Integer> map;
 	
 	
-	@Setup(Level.Invocation)
+	@Setup(Level.Iteration)
 	public void init() throws IOException{
 		range = Math.max(initSize, 1)*rangeMul;
 		
@@ -72,15 +56,16 @@ public class HashMapBenchmark{
 		map.get(rand.nextInt(range));
 	}
 	
-	@Benchmark
-	public void put() throws IOException{
-		map.put(rand.nextInt(range), rand.nextInt(range));
-	}
-	
-	@Benchmark
-	public void remove() throws IOException{
-		map.remove(rand.nextInt(range));
-	}
+	//Setup has to be Level.Invocation
+//	@Benchmark
+//	public void put() throws IOException{
+//		map.put(rand.nextInt(range), rand.nextInt(range));
+//	}
+//
+//	@Benchmark
+//	public void remove() throws IOException{
+//		map.remove(rand.nextInt(range));
+//	}
 	
 	@Benchmark
 	public void contains() throws IOException{

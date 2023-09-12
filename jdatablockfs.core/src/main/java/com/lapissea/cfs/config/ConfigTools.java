@@ -217,28 +217,36 @@ public final class ConfigTools{
 	
 	
 	public record ConfEntry(String name, String val){
-		public ConfEntry{
+		public static ConfEntry checked(String name, String val){
 			if(!name.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX)){
 				throw new IllegalArgumentException(name + " does not start with " + ConfigDefs.CONFIG_PROPERTY_PREFIX);
 			}
+			return new ConfEntry(name, val);
+		}
+		public ConfEntry{
+			Objects.requireNonNull(name);
+			Objects.requireNonNull(val);
 		}
 	}
 	
-	public static String configFlagsToTable(List<ConfEntry> values, int padding){
+	public static String configFlagsToTable(List<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
 		var nameLen = values.stream().map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
 		
-		var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
-		
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
-		for(var e : groups.entrySet()){
-			if(e.getValue().size() == 1){
-				singles.add(e.getValue().get(0));
-			}else{
-				groupsE.add(e);
+		if(grouping){
+			var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
+			for(var e : groups.entrySet()){
+				if(e.getValue().size() == 1){
+					singles.add(e.getValue().get(0));
+				}else{
+					groupsE.add(e);
+				}
 			}
+		}else{
+			singles.addAll(values);
 		}
 		singles.sort(Comparator.comparing(e -> e.name));
 		groupsE.sort(Map.Entry.comparingByKey());
@@ -246,10 +254,13 @@ public final class ConfigTools{
 		
 		StringBuilder sb = new StringBuilder();
 		for(ConfEntry(String name, String val) : singles){
-			var segments = name.split("\\.");
-			var len      = segments[0].length() + 1;
 			sb.append(padStr);
-			sb.append(BLACK_BRIGHT).append(name, 0, len).append(RESET).append(name, len, name.length());
+			var dotPos = name.indexOf('.');
+			if(dotPos == -1) sb.append(name);
+			else{
+				sb.append(BLACK_BRIGHT).append(name, 0, dotPos + 1).append(RESET)
+				  .append(name, dotPos + 1, name.length());
+			}
 			sb.append(" ".repeat(nameLen - name.length())).append(": ")
 			  .append(val).append('\n');
 		}
@@ -282,7 +293,7 @@ public final class ConfigTools{
 	public static List<ConfEntry> collectConfigFlags(){
 		return configFlagFields().map(val -> {
 			var name = val.name();
-			return new ConfEntry(name, switch(val){
+			return ConfEntry.checked(name, switch(val){
 				case Flag.FEnum<?> enumFlag -> {
 					var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
 					var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));

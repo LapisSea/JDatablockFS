@@ -10,4 +10,6 @@ module JDatablockFS.run {
 	opens com.lapissea.cfs.run.world;
 	opens com.lapissea.cfs.run.examples;
 	opens com.lapissea.cfs.benchmark;
+	
+	exports com.lapissea.cfs.benchmark.jmh_generated to jmh.core;
 }
