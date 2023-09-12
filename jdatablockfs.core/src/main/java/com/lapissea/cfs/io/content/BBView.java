@@ -19,61 +19,61 @@ public final class BBView{
 	
 	//////////WRITE//////////
 	
-	public static void writeInt1(byte[] out, int off, byte value)     { out[off] = value; }
-	public static void writeChar2(byte[] writeBuffer, int off, char v){ CHAR_VIEW.set(writeBuffer, off, v); }
-	public static void writeInt2(byte[] writeBuffer, int off, short v){ SHORT_VIEW.set(writeBuffer, off, v); }
-	public static void writeInt3(byte[] writeBuffer, int off, int v){
-		writeBuffer[off + 0] = (byte)((v >>> 0)&0xFF);
-		writeBuffer[off + 1] = (byte)((v >>> 8)&0xFF);
-		writeBuffer[off + 2] = (byte)((v >>> 16)&0xFF);
+	public static void writeInt1(byte[] out, int off, byte value)    { out[off] = value; }
+	public static void writeChar2(byte[] byteBuffer, int off, char v){ CHAR_VIEW.set(byteBuffer, off, v); }
+	public static void writeInt2(byte[] byteBuffer, int off, short v){ SHORT_VIEW.set(byteBuffer, off, v); }
+	public static void writeInt3(byte[] byteBuffer, int off, int v){
+		byteBuffer[off + 0] = (byte)((v >>> 0)&0xFF);
+		byteBuffer[off + 1] = (byte)((v >>> 8)&0xFF);
+		byteBuffer[off + 2] = (byte)((v >>> 16)&0xFF);
 	}
-	public static void writeInt4(byte[] writeBuffer, int off, int v){ INT_VIEW.set(writeBuffer, off, v); }
-	public static void writeInt5(byte[] writeBuffer, int off, long v){
-		writeBuffer[off + 0] = (byte)(v >>> 0);
-		writeBuffer[off + 1] = (byte)(v >>> 8);
-		writeBuffer[off + 2] = (byte)(v >>> 16);
-		writeBuffer[off + 3] = (byte)(v >>> 24);
-		writeBuffer[off + 4] = (byte)(v >>> 32);
+	public static void writeInt4(byte[] byteBuffer, int off, int v){ INT_VIEW.set(byteBuffer, off, v); }
+	public static void writeInt5(byte[] byteBuffer, int off, long v){
+		byteBuffer[off + 0] = (byte)(v >>> 0);
+		byteBuffer[off + 1] = (byte)(v >>> 8);
+		byteBuffer[off + 2] = (byte)(v >>> 16);
+		byteBuffer[off + 3] = (byte)(v >>> 24);
+		byteBuffer[off + 4] = (byte)(v >>> 32);
 	}
-	public static void writeInt6(byte[] writeBuffer, int off, long v){
-		writeBuffer[off + 0] = (byte)(v >>> 0);
-		writeBuffer[off + 1] = (byte)(v >>> 8);
-		writeBuffer[off + 2] = (byte)(v >>> 16);
-		writeBuffer[off + 3] = (byte)(v >>> 24);
-		writeBuffer[off + 4] = (byte)(v >>> 32);
-		writeBuffer[off + 5] = (byte)(v >>> 40);
+	public static void writeInt6(byte[] byteBuffer, int off, long v){
+		byteBuffer[off + 0] = (byte)(v >>> 0);
+		byteBuffer[off + 1] = (byte)(v >>> 8);
+		byteBuffer[off + 2] = (byte)(v >>> 16);
+		byteBuffer[off + 3] = (byte)(v >>> 24);
+		byteBuffer[off + 4] = (byte)(v >>> 32);
+		byteBuffer[off + 5] = (byte)(v >>> 40);
 	}
-	public static void writeInt8(byte[] writeBuffer, int off, long v)    { LONG_VIEW.set(writeBuffer, off, v); }
-	public static void writeFloat4(byte[] writeBuffer, int off, float v) { FLOAT_VIEW.set(writeBuffer, off, v); }
-	public static void writeFloat8(byte[] writeBuffer, int off, double v){ DOUBLE_VIEW.set(writeBuffer, off, v); }
+	public static void writeInt8(byte[] byteBuffer, int off, long v)    { LONG_VIEW.set(byteBuffer, off, v); }
+	public static void writeFloat4(byte[] byteBuffer, int off, float v) { FLOAT_VIEW.set(byteBuffer, off, v); }
+	public static void writeFloat8(byte[] byteBuffer, int off, double v){ DOUBLE_VIEW.set(byteBuffer, off, v); }
 	
 	//////////READ//////////
 	
-	public static char readChar2(byte[] readBuffer, int offset)      { return (char)CHAR_VIEW.get(readBuffer, offset); }
-	public static short readInt2(byte[] readBuffer, int offset)      { return (short)SHORT_VIEW.get(readBuffer, offset); }
-	public static int readUnsignedInt2(byte[] readBuffer, int offset){ return readChar2(readBuffer, offset); }
-	public static int readUnsignedInt3(byte[] readBuffer, int offset){
-		return (((readBuffer[offset + 0]&255)<<0) +
-		        ((readBuffer[offset + 1]&255)<<8) +
-		        ((readBuffer[offset + 2]&255)<<16));
+	public static char readChar2(byte[] byteBuffer, int offset)      { return (char)CHAR_VIEW.get(byteBuffer, offset); }
+	public static short readInt2(byte[] byteBuffer, int offset)      { return (short)SHORT_VIEW.get(byteBuffer, offset); }
+	public static int readUnsignedInt2(byte[] byteBuffer, int offset){ return readChar2(byteBuffer, offset); }
+	public static int readUnsignedInt3(byte[] byteBuffer, int offset){
+		return (((byteBuffer[offset + 0]&255)<<0) +
+		        ((byteBuffer[offset + 1]&255)<<8) +
+		        ((byteBuffer[offset + 2]&255)<<16));
 	}
-	public static int readInt4(byte[] readBuffer, int offset){ return (int)INT_VIEW.get(readBuffer, offset); }
-	public static long readUnsignedInt5(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset + 0]&255)<<0) +
-		        ((long)(readBuffer[offset + 1]&255)<<8) +
-		        ((long)(readBuffer[offset + 2]&255)<<16) +
-		        ((long)(readBuffer[offset + 3]&255)<<24) +
-		        ((long)(readBuffer[offset + 4]&255)<<32));
+	public static int readInt4(byte[] byteBuffer, int offset){ return (int)INT_VIEW.get(byteBuffer, offset); }
+	public static long readUnsignedInt5(byte[] byteBuffer, int offset){
+		return (((long)(byteBuffer[offset + 0]&255)<<0) +
+		        ((long)(byteBuffer[offset + 1]&255)<<8) +
+		        ((long)(byteBuffer[offset + 2]&255)<<16) +
+		        ((long)(byteBuffer[offset + 3]&255)<<24) +
+		        ((long)(byteBuffer[offset + 4]&255)<<32));
 	}
-	public static long readUnsignedInt6(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset + 0]&255)<<0) +
-		        ((long)(readBuffer[offset + 1]&255)<<8) +
-		        ((long)(readBuffer[offset + 2]&255)<<16) +
-		        ((long)(readBuffer[offset + 3]&255)<<24) +
-		        ((long)(readBuffer[offset + 4]&255)<<32) +
-		        ((long)(readBuffer[offset + 5]&255)<<40));
+	public static long readUnsignedInt6(byte[] byteBuffer, int offset){
+		return (((long)(byteBuffer[offset + 0]&255)<<0) +
+		        ((long)(byteBuffer[offset + 1]&255)<<8) +
+		        ((long)(byteBuffer[offset + 2]&255)<<16) +
+		        ((long)(byteBuffer[offset + 3]&255)<<24) +
+		        ((long)(byteBuffer[offset + 4]&255)<<32) +
+		        ((long)(byteBuffer[offset + 5]&255)<<40));
 	}
-	public static long readInt8(byte[] readBuffer, int offset) { return (long)LONG_VIEW.get(readBuffer, offset); }
-	public static float readFloat4(byte[] readBuffer, int off) { return (float)FLOAT_VIEW.get(readBuffer, off); }
-	public static double readFloat8(byte[] readBuffer, int off){ return (double)DOUBLE_VIEW.get(readBuffer, off); }
+	public static long readInt8(byte[] byteBuffer, int offset) { return (long)LONG_VIEW.get(byteBuffer, offset); }
+	public static float readFloat4(byte[] byteBuffer, int off) { return (float)FLOAT_VIEW.get(byteBuffer, off); }
+	public static double readFloat8(byte[] byteBuffer, int off){ return (double)DOUBLE_VIEW.get(byteBuffer, off); }
 }
