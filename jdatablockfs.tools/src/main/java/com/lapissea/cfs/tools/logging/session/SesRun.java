@@ -6,16 +6,19 @@ import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LogUtil;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Random;
 
-public class SesRun{
+public final class SesRun{
 	
 	public static void main(String[] args) throws IOException{
 		var file = new File("sessions.dfs");
 		var mem  = LoggedMemoryUtils.newLoggedMemory("ses", LoggedMemoryUtils.createLoggerFromConfig());
-		IOFileData.readInto(file, mem);
+		try{
+			IOFileData.readInto(file, mem);
+		}catch(FileNotFoundException e){ }
 		
 		try(var service = SessionService.of(mem)){
 			var n = "ayy" + new Random().nextInt(3);

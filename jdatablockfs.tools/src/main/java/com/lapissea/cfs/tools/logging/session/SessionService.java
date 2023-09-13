@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.logging.session;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.InvalidMagicID;
@@ -45,6 +45,9 @@ public abstract sealed class SessionService implements Closeable{
 			}catch(IOException e){
 				e.printStackTrace();
 			}
+		});
+		Thread.startVirtualThread(() -> {
+			SealedUtil.SealedInstanceUniverse.of(SealedUtil.getSealedUniverse(Frame.class, false).orElseThrow());
 		});
 	}
 	
@@ -121,7 +124,7 @@ public abstract sealed class SessionService implements Closeable{
 				
 				var session = sessions.computeIfAbsent(name, () -> {
 					var frames = IOInstance.Def.of(SessionsInfo.Frames.class);
-					frames.allocateNulls(this.prov);
+					frames.allocateNulls(this.prov, null);
 					return frames;
 				});
 				if(clear && !session.frames().isEmpty() && !session.strings().isEmpty()){
@@ -233,7 +236,7 @@ public abstract sealed class SessionService implements Closeable{
 		
 		private static void eagerFrameDefine(IOTypeDB db, ClosableLock globalLock){
 			Thread.startVirtualThread(() -> {
-				var uni = Utils.getSealedUniverse(Frame.class, false).orElseThrow();
+				var uni = SealedUtil.getSealedUniverse(Frame.class, false).orElseThrow();
 				try(var ignore = globalLock.open()){
 					for(var cls : uni.universe()){
 						db.toID(uni.root(), cls, true);
