@@ -160,7 +160,7 @@ public class InstanceCollection{
 			}
 			
 			int size = collectionSize.get(ioPool, instance);
-			var data = dataAdapter.read(size, provider, src, genericContext);
+			var data = dataAdapter.read(size, provider, src, makeContext(genericContext));
 			set(ioPool, instance, data);
 		}
 		
@@ -173,7 +173,7 @@ public class InstanceCollection{
 			}
 			
 			int size = collectionSize.get(ioPool, instance);
-			dataAdapter.skipData(size, provider, src, genericContext);
+			dataAdapter.skipData(size, provider, src, makeContext(genericContext));
 		}
 		
 		@Override
@@ -311,7 +311,7 @@ public class InstanceCollection{
 				}
 			}
 			
-			set(ioPool, instance, ref.read(provider, refPipe, genericContext));
+			set(ioPool, instance, ref.read(provider, refPipe, makeContext(genericContext)));
 		}
 		
 		@Override

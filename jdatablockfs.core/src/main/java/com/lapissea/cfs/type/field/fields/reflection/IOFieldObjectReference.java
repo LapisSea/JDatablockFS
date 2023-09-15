@@ -99,7 +99,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 				case DEFAULT_IF_NULL -> struct.make();
 			};
 		}
-		return readNew.readNew(provider, instancePipe, genericContext);
+		return readNew.readNew(provider, instancePipe, makeContext(genericContext));
 	}
 	
 	@Override

@@ -193,7 +193,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	private ValueType readValue(DataProvider provider, TypeLink type, Reference readNew, GenericContext genericContext) throws IOException{
 		try(var io = readNew.io(provider)){
 			//noinspection unchecked
-			return (ValueType)DynamicSupport.readTyp(type, provider, io, genericContext);
+			return (ValueType)DynamicSupport.readTyp(type, provider, io, makeContext(genericContext));
 		}
 	}
 	
@@ -208,7 +208,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			val = null;
 		}else{
 			var type = getType(ioPool, provider, instance);
-			val = readValue(provider, type, ref, genericContext);
+			val = readValue(provider, type, ref, makeContext(genericContext));
 		}
 		set(ioPool, instance, val);
 	}

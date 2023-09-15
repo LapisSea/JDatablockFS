@@ -172,7 +172,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		var type         = provider.getTypeDb().fromID(rootType, id);
 		var instancePipe = typeToPipe.get(type);
 		
-		return instancePipe.readNew(provider, src, genericContext);
+		return instancePipe.readNew(provider, src, makeContext(genericContext));
 	}
 	
 	@Override
@@ -198,6 +198,6 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		var instancePipe = typeToPipe.get(type);
 		
-		instancePipe.skip(provider, src, genericContext);
+		instancePipe.skip(provider, src, makeContext(genericContext));
 	}
 }

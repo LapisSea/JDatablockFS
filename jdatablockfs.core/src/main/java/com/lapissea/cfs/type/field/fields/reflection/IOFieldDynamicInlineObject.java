@@ -171,6 +171,6 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		}
 		
 		TypeLink typ = getType(ioPool, provider, instance);
-		DynamicSupport.skipTyp(typ, provider, src, genericContext);
+		DynamicSupport.skipTyp(typ, provider, src, makeContext(genericContext));
 	}
 }

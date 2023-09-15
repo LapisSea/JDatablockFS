@@ -144,7 +144,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			}
 		}
 		
-		return instancePipe.readNew(provider, src, genericContext);
+		return instancePipe.readNew(provider, src, makeContext(genericContext));
 	}
 	
 	@Override
@@ -167,7 +167,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				return;
 			}
 		}
-		instancePipe.skip(provider, src, genericContext);
+		instancePipe.skip(provider, src, makeContext(genericContext));
 	}
 	
 	public StructPipe<ValueType> getInstancePipe(){

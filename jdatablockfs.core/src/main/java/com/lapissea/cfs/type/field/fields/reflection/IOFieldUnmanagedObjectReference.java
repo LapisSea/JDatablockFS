@@ -151,6 +151,6 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 			return;
 		}
 		
-		referencePipe.skip(provider, src, genericContext);
+		referencePipe.skip(provider, src, makeContext(genericContext));
 	}
 }
