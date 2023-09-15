@@ -560,6 +560,10 @@ public sealed interface IOTypeDB{
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 		}
 		
+		public Set<String> listStoredTypeDefinitionNames(){
+			return defs.stream().map(k -> k.getKey().typeName).collect(Collectors.toSet());
+		}
+		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
 			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
 			if(newDefs.isEmpty()) return;

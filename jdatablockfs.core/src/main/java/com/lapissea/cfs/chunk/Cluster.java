@@ -3,7 +3,9 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedPointer;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
@@ -17,6 +19,8 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
+import com.lapissea.cfs.type.StagedInit;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -227,6 +231,27 @@ public class Cluster implements DataProvider{
 				.mappedView(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class))
 				.cachedView(128)
 		);
+		
+		if(GlobalConfig.TYPE_VALIDATION){
+			scanTypeDB();
+		}
+	}
+	
+	private void scanTypeDB(){
+		var db    = metadata.db;
+		var names = db.listStoredTypeDefinitionNames();
+		if(names.isEmpty()) return;
+		for(String name : names){
+			if(name.isEmpty()) continue;
+			try{
+				var clazz = db.getTemplateLoader().loadClass(name);
+				if(IOInstance.isInstance(clazz)){
+					Struct.ofUnknown(clazz, StagedInit.STATE_DONE);
+				}
+			}catch(Throwable e){
+				throw new MalformedStruct("Failed to load type of " + name, e);
+			}
+		}
 	}
 	
 	@Override
