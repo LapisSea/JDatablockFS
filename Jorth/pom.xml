@@ -14,7 +14,6 @@
 	</parent>
 	
 	<properties>
-		<java.version>20</java.version>
 		<asmVersion>9.5</asmVersion>
 	</properties>
 	
@@ -55,16 +54,12 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${maven-surefire-plugin-version}</version>
-				<configuration>
-					<argLine>--enable-preview</argLine>
-				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${maven-compiler-plugin-version}</version>
 				<configuration>
-					<compilerArgs>--enable-preview</compilerArgs>
 					<release>${java.version}</release>
 					<source>${java.version}</source>
 					<target>${java.version}</target>

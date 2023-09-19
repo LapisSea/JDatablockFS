@@ -158,8 +158,8 @@ public final class MemFrame implements Serializable{
 	private byte[] calcDiff(){
 		var diffBytes = Arrays.copyOf(this.prev.bytes(), len);
 		
-		for(DiffChunk(byte[] data, int pos) : diff){
-			System.arraycopy(data, 0, diffBytes, pos, data.length);
+		for(var chunk : diff){
+			System.arraycopy(chunk.data, 0, diffBytes, chunk.pos, chunk.data.length);
 		}
 		
 		return diffBytes;

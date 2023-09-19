@@ -1044,8 +1044,8 @@ public class BinaryGridRenderer implements DataRenderer{
 				ctx.renderer.getFont().fillStrings(chars);
 			}
 		}
-		for(Range(long from, long to) : clampedOverflow){
-			ctx.filled.add(from, to);
+		for(var range : clampedOverflow){
+			ctx.filled.add(range.from(), range.to());
 		}
 	}
 	private void drawBackgroundDots(RenderBackend renderer){
@@ -1292,8 +1292,8 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		for(CRange(Color col, Range rang) : flatRanges){
-			DrawUtils.fillByteRange(alpha(col, 0.2F), ctx, rang);
+		for(var range : flatRanges){
+			DrawUtils.fillByteRange(alpha(range.col, 0.2F), ctx, range.rang);
 		}
 		
 		for(int i = ctx.hoverMessages.size() - 1; i>=0; i--){

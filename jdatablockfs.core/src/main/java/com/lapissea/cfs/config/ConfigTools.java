@@ -253,7 +253,9 @@ public final class ConfigTools{
 		
 		
 		StringBuilder sb = new StringBuilder();
-		for(ConfEntry(String name, String val) : singles){
+		for(var e : singles){
+			var name = e.name;
+			var val  = e.val;
 			sb.append(padStr);
 			var dotPos = name.indexOf('.');
 			if(dotPos == -1) sb.append(name);
@@ -274,7 +276,9 @@ public final class ConfigTools{
 			  .append("-".repeat(after)).append('\n');
 			
 			var len = Arrays.stream(elements.get(0).name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
-			for(ConfEntry(String name, String val) : elements){
+			for(var e : elements){
+				var name     = e.name;
+				var val      = e.val;
 				var segments = name.split("\\.");
 				sb.append(padStr);
 				if(segments.length == 2){

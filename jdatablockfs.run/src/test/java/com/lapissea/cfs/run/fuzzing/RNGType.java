@@ -43,9 +43,9 @@ public final class RNGType<E> implements Function<Random, E>{
 	}
 	
 	private Function<Random, E> getFn(Random random){
-		for(Chance(var val, var chance) : chances){
-			if(random.nextFloat()<=chance){
-				return val;
+		for(var ch : chances){
+			if(random.nextFloat()<=ch.chance){
+				return ch.gen;
 			}
 		}
 		if(randomPick.isEmpty()){
@@ -68,7 +68,7 @@ public final class RNGType<E> implements Function<Random, E>{
 		randomPick.remove(fn);
 		
 		if(randomPick.isEmpty()){
-			var totalChance = 0;
+			var totalChance = 0F;
 			for(var i : chances){
 				totalChance += i.chance;
 			}

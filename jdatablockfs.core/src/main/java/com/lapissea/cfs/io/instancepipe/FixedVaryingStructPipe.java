@@ -57,8 +57,8 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			}
 			
 			List<NumberSize> buff = new ArrayList<>(steps.size());
-			for(Step(NumberSize max, boolean ptr) : steps){
-				buff.add(rule.provide(max, null, ptr).size);
+			for(var step : steps){
+				buff.add(rule.provide(step.max, null, step.ptr).size);
 			}
 			buff = List.copyOf(buff);
 			

@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	
 	<properties>
-		<java.version>20</java.version>
+		<java.version>21</java.version>
 		<maven.compiler.release>${java.version}</maven.compiler.release>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
@@ -16,7 +16,7 @@
 		<maven-surefire-plugin-version>3.1.2</maven-surefire-plugin-version>
 		<maven-assembly-plugin-version>3.6.0</maven-assembly-plugin-version>
 		<maven-gpg-plugin-version>3.0.1</maven-gpg-plugin-version>
-		<maven-source-plugin-version>3.2.1</maven-source-plugin-version>
+		<maven-source-plugin-version>3.3.0</maven-source-plugin-version>
 		
 		<child-build-dir>../target</child-build-dir>
 	</properties>

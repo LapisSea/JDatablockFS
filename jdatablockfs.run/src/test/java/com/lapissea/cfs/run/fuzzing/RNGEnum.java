@@ -49,9 +49,9 @@ public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 	
 	@Override
 	public E apply(Random random){
-		for(Chance(var val, var chance) : chances){
-			if(random.nextFloat()<=chance){
-				return val;
+		for(var ch : chances){
+			if(random.nextFloat()<=ch.chance){
+				return ch.val;
 			}
 		}
 		
