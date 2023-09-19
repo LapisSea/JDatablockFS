@@ -12,8 +12,8 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -201,7 +201,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private final Map<K, IOEntry.Modifiable<K, V>>    readOnlyCache;
 	private final Map<Integer, BucketContainer<K, V>> hotBuckets = new ConcurrentHashMap<>();
 	
-	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
+	public HashIOMap(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		readOnlyCache = readOnly? new HashMap<>() : null;
 		
@@ -563,7 +563,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(!(value instanceof IOInstance.Unmanaged)){
 			try{
 				var d    = MemoryData.empty();
-				var link = TypeLink.of(value.getClass());
+				var link = IOType.of(value.getClass());
 				var vCtx = getGenerics().argAsContext("V");
 				var v    = ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), link, vCtx, new ValueStorage.StorageRule.Default());
 				//noinspection unchecked
@@ -719,10 +719,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return PutAction.BUCKET_APPEND;
 	}
 	
-	private TypeLink buckedNodeType(){
-		return new TypeLink(
+	private IOType buckedNodeType(){
+		return IOType.of(
 			IONode.class,
-			getTypeDef().withRaw(BucketEntry.class)
+			((IOType.RawAndArg)getTypeDef()).withRaw(BucketEntry.class)
 		);
 	}
 	

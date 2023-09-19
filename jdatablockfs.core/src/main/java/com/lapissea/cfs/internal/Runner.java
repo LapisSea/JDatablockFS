@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -20,9 +21,9 @@ import java.util.function.Supplier;
 
 import static com.lapissea.cfs.config.GlobalConfig.RELEASE_MODE;
 
-public class Runner{
+public final class Runner{
 	
-	private static class Task implements Runnable{
+	private static final class Task implements Runnable{
 		
 		private static final AtomicLong ID_COUNTER = new AtomicLong();
 		
@@ -183,13 +184,13 @@ public class Runner{
 	}
 	
 	private static void virtualRun(Runnable task){
-		Thread.ofVirtual().name(BASE_NAME + Task.ID_COUNTER.incrementAndGet()).start(task);
+		CompletableFuture.runAsync(task, Thread.ofVirtual().name(BASE_NAME + Task.ID_COUNTER.incrementAndGet())::start);
 	}
 	
 	private static void robustRun(Runnable task){
 		var t = new Task(task);
 		
-		Thread.ofVirtual().name(BASE_NAME + t.id).start(t);
+		CompletableFuture.runAsync(t, Thread.ofVirtual().name(BASE_NAME + t.id)::start);
 		
 		// If tasks were choking recently, it is beneficial to
 		// immediately attempt to work on a platform thread
@@ -197,7 +198,7 @@ public class Runner{
 			synchronized(Runner.class){
 				if(virtualChoke>0) virtualChoke--;
 			}
-			getPlatformExecutor().execute(t);
+			CompletableFuture.runAsync(t, getPlatformExecutor());
 		}else{
 			synchronized(TASKS){
 				pingWatcher();

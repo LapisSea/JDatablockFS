@@ -8,7 +8,7 @@ import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.EOFException;
@@ -209,10 +209,10 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	
 	public static Blob request(DataProvider provider, long capacity) throws IOException{
 		var ch = AllocateTicket.bytes(capacity).submit(provider);
-		return new Blob(provider, ch.getPtr().makeReference(), TypeLink.of(Blob.class));
+		return new Blob(provider, ch.getPtr().makeReference(), IOType.of(Blob.class));
 	}
 	
-	public Blob(DataProvider provider, Reference reference, TypeLink typeDef){
+	public Blob(DataProvider provider, Reference reference, IOType typeDef){
 		super(provider, reference, typeDef);
 		assert StandardStructPipe.of(getThisStruct()).getSizeDescriptor().getMin() == 0;
 	}

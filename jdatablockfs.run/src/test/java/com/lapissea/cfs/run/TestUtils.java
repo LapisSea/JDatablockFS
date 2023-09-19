@@ -13,10 +13,10 @@ import com.lapissea.cfs.run.checked.CheckMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.NewUnmanaged;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -31,7 +31,7 @@ import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static org.testng.Assert.assertEquals;
 
-public class TestUtils{
+public final class TestUtils{
 	
 	private static final LateInit<DataLogger, RuntimeException> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
 	
@@ -92,7 +92,7 @@ public class TestUtils{
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
 		TestInfo info, int initalCapacity,
 		NewUnmanaged<T> constr,
-		TypeLink typeDef,
+		IOType typeDef,
 		UnsafeConsumer<T, IOException> session,
 		boolean useCluster
 	) throws IOException{
@@ -134,7 +134,7 @@ public class TestUtils{
 	static <E, T extends IOInstance.Unmanaged<T> & IOList<E>> void ioListComplianceSequence(
 		TestInfo info, int initalCapacity,
 		NewUnmanaged<T> constr,
-		TypeLink typeDef,
+		IOType typeDef,
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list -> {
@@ -147,7 +147,7 @@ public class TestUtils{
 	static <K, V, T extends IOInstance.Unmanaged<T> & IOMap<K, V>> void ioMapComplianceSequence(
 		TestInfo info,
 		NewUnmanaged<T> constr,
-		TypeLink typeDef,
+		IOType typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
 		int initial = (int)StandardStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null)), STATE_DONE).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);

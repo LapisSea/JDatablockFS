@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.config.ConfigDefs;
@@ -168,7 +169,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return overridingDynamicUnmanaged;
 		}
 		
-		public T make(DataProvider provider, Reference reference, TypeLink type) throws IOException{
+		public T make(DataProvider provider, Reference reference, IOType type) throws IOException{
 			return unmanagedConstructor.make(provider, reference, type);
 		}
 		
@@ -740,6 +741,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public static boolean canUnknownHavePointers(@NotNull Class<?> instanceClass){
+		if(SealedUtil.isSealedCached(instanceClass)){
+			var uni = SealedUtil.getSealedUniverse(instanceClass, false);
+			return uni.flatMap(SealedUtil.SealedInstanceUniverse::ofUnknown)
+			          .map(SealedUtil.SealedInstanceUniverse::calcCanHavePointers)
+			          .orElse(true);
+		}
 		var s = ofUnknown(instanceClass, STATE_DONE);
 		return s.canHavePointers;
 	}
@@ -866,7 +873,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return hasPools != null && hasPools[pool.ordinal()];
 	}
 	
-	public GenericContext describeGenerics(TypeLink def){
+	public GenericContext describeGenerics(IOType def){
 		return new GenericContext.Deferred(() -> {
 			return new GenericContext.TypeArgs(getType(), def.generic(null));
 		});

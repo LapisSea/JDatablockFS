@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -7,6 +8,7 @@ import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
@@ -20,8 +22,10 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -30,8 +34,7 @@ import java.util.function.Supplier;
 public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
-	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
-		public Usage(){ super(IOInstance.class, Set.of(IOFieldUnmanagedObjectReference.class, IOFieldObjectReference.class, IOFieldInlineObject.class)); }
+	private static final class Usage implements FieldUsage{
 		@Override
 		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
 			Class<?> raw       = field.getType();
@@ -44,6 +47,17 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				return new IOFieldObjectReference<>(field);
 			}
 			return new IOFieldInlineObject<>(field);
+		}
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			return !IOFieldInlineSealedObject.isCompatible(type) &&
+			       UtilL.instanceOf(Utils.typeToRaw(type), getType());
+		}
+		public Class<IOInstance> getType(){ return IOInstance.class; }
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){
+			return Set.of(IOFieldUnmanagedObjectReference.class, IOFieldObjectReference.class, IOFieldInlineObject.class);
 		}
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){

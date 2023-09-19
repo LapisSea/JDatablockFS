@@ -7,7 +7,7 @@ import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
@@ -20,8 +20,8 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 	@IOValue
 	private ContiguousIOList<IONode<T>> data;
 	
-	public IOHashSet(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
-		super(provider, reference, typeDef.argCount() == 0? typeDef.withArgs(TypeLink.of(Object.class)) : typeDef);
+	public IOHashSet(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
+		super(provider, reference, ((IOType.RawAndArg)typeDef).withArgs(IOType.of(Object.class)));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();
@@ -147,8 +147,8 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 	private IONode<T> allocByValue(T value) throws IOException{
 		var provider = getDataProvider();
 		try(var ignored = provider.getSource().openIOTransaction()){
-			var genericType = getTypeDef().arg(0);
-			var type        = new TypeLink(IONode.class, genericType);
+			var genericType = IOType.getArg(getTypeDef(), 0);
+			var type        = IOType.of(IONode.class, genericType);
 			provider.getTypeDb().toID(type);
 			
 			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());

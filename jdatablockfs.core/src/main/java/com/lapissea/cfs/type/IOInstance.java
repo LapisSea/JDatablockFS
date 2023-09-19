@@ -410,24 +410,24 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		private final DataProvider   provider;
 		private       Chunk          identity;
-		private final TypeLink       typeDef;
+		private final IOType         typeDef;
 		private       GenericContext genericCtx;
 		
 		private StructPipe<SELF> pipe;
 		
 		protected final boolean readOnly;
 		
-		protected Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
+		protected Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
 			this(thisStruct, provider, reference, typeDef);
 			check.ensureValid(typeDef, provider.getTypeDb());
 		}
 		
-		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
+		protected Unmanaged(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef, provider.getTypeDb());
 		}
 		
-		public Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, TypeLink typeDef){
+		public Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, IOType typeDef){
 			super(thisStruct);
 			this.provider = Objects.requireNonNull(provider);
 			setIdentity(reference);
@@ -435,7 +435,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			readOnly = getDataProvider().isReadOnly();
 		}
 		
-		public Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef){
+		public Unmanaged(DataProvider provider, Reference reference, IOType typeDef){
 			this.provider = Objects.requireNonNull(provider);
 			setIdentity(reference);
 			this.typeDef = typeDef;
@@ -479,7 +479,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			}
 		}
 		
-		public final TypeLink getTypeDef(){
+		public final IOType getTypeDef(){
 			return typeDef;
 		}
 		

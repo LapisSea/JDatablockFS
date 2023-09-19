@@ -7,10 +7,11 @@ import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.query.Query;
 import com.lapissea.cfs.query.QuerySupport;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.RuntimeType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.TypeLink.Check.ArgCheck;
+import com.lapissea.cfs.type.TypeCheck;
+import com.lapissea.cfs.type.TypeCheck.ArgCheck;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -25,8 +26,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalLong;
 
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE_MANAGED;
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
+import static com.lapissea.cfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE_MANAGED;
+import static com.lapissea.cfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 
 @SuppressWarnings("unchecked")
 public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
@@ -96,7 +97,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		}
 	}
 	
-	private static final TypeLink.Check LIST_TYPE_CHECK = new TypeLink.Check(
+	private static final TypeCheck LIST_TYPE_CHECK = new TypeCheck(
 		LinkedIOList.class,
 		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
@@ -115,24 +116,24 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private long size;
 	
 	private final ValueStorage<T> valueStorage;
-	private final TypeLink        nodeType;
+	private final IOType          nodeType;
 	
 	private final boolean      readOnly;
 	private final Map<Long, T> cache;
 	
 	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
+	public LinkedIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
 		readOnly = getDataProvider().isReadOnly();
 		cache = readOnly? new HashMap<>() : null;
 		
-		nodeType = new TypeLink(
-			IONode.class,
-			getTypeDef().arg(0)
-		);
+		nodeType = ((IOType.RawAndArg)typeDef).withRaw(IONode.class);
 		
-		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
+		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(
+			provider, IOType.getArg(typeDef, 0),
+			getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default()
+		);
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();

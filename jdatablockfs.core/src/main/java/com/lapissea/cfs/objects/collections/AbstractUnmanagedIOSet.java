@@ -4,7 +4,8 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
+import com.lapissea.cfs.type.TypeCheck;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -19,10 +20,10 @@ public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<Abs
 	@IOValue
 	private long size;
 	
-	protected AbstractUnmanagedIOSet(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
+	protected AbstractUnmanagedIOSet(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
 		super(provider, reference, typeDef, check);
 	}
-	public AbstractUnmanagedIOSet(DataProvider provider, Reference reference, TypeLink typeDef){
+	public AbstractUnmanagedIOSet(DataProvider provider, Reference reference, IOType typeDef){
 		super(provider, reference, typeDef);
 	}
 	

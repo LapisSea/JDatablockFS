@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
@@ -9,6 +10,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
@@ -22,6 +24,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -86,6 +89,78 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 			@Override
 			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 				getPipe().skip(provider, src, genericContext);
+			}
+		}
+		
+		final class SealedTypeImpl<E extends IOInstance<E>> implements ElementIOImpl<E>{
+			
+			private SealedUtil.SealedInstanceUniverse<E> universe;
+			
+			public SealedTypeImpl(SealedUtil.SealedInstanceUniverse<E> universe){
+				this.universe = Objects.requireNonNull(universe);
+				for(var componentType : universe.pipeMap().keySet()){
+					if(!IOInstance.isInstance(componentType)) throw new MalformedStruct(componentType + " is not an IOInstance");
+					if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct(componentType + " is unmanaged");
+				}
+			}
+			
+			private StructPipe<E> getPipe(E element){
+				return universe.pipeMap().get(element.getClass());
+			}
+			private StructPipe<E> getPipe(Class<E> type){
+				return universe.pipeMap().get(type);
+			}
+			
+			@Override
+			public Class<E> componentType(){
+				return universe.root();
+				
+			}
+			@Override
+			public long calcByteSize(DataProvider provider, E element){
+				if(element == null) return 1;
+				var pip = getPipe(element);
+				int id;
+				try{
+					id = provider.getTypeDb().toID(universe.root(), (Class<E>)element.getClass(), false);
+				}catch(IOException e){
+					throw new RuntimeException("Failed to compute ID", e);
+				}
+				return 1 + NumberSize.bySize(id).bytes + pip.calcUnknownSize(provider, element, WordSpace.BYTE);
+			}
+			@Override
+			public OptionalLong getFixedByteSize(){
+				//Empty even if all children are the same fixed size because children may be changed and new IDs introduced.
+				// This gives a chance that the ID size may grow. TODO: Solution may be to restrict sealed type ID to a u16
+				return OptionalLong.empty();
+			}
+			@Override
+			public void write(DataProvider provider, ContentWriter dest, E element) throws IOException{
+				int id = 0;
+				if(element != null){
+					//noinspection unchecked
+					var type = (Class<E>)element.getClass();
+					id = provider.getTypeDb().toID(universe.root(), type, true);
+				}
+				dest.writeInt4Dynamic(id);
+				if(id != 0){
+					var pip = getPipe(element);
+					pip.write(provider, dest, element);
+				}
+			}
+			@Override
+			public E read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+				var id = src.readInt4Dynamic();
+				if(id == 0) return null;
+				var type = provider.getTypeDb().fromID(universe.root(), id);
+				return getPipe(type).readNew(provider, src, genericContext);
+			}
+			@Override
+			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+				var id = src.readInt4Dynamic();
+				if(id == 0) return;
+				var type = provider.getTypeDb().fromID(universe.root(), id);
+				getPipe(type).skip(provider, src, genericContext);
 			}
 		}
 		

@@ -54,15 +54,15 @@ public sealed interface IOTypeDB{
 		@Override
 		TypeID toID(Class<?> type, boolean recordNew);
 		@Override
-		TypeID toID(TypeLink type, boolean recordNew);
+		TypeID toID(IOType type, boolean recordNew);
 		@Override
 		int toID(Class<?> type);
 		@Override
-		int toID(TypeLink type);
+		int toID(IOType type);
 		
 		@Override
-		TypeLink fromID(int id);
-		boolean hasType(TypeLink type);
+		IOType fromID(int id);
+		boolean hasType(IOType type);
 		boolean hasID(int id);
 		
 		@Override
@@ -72,9 +72,9 @@ public sealed interface IOTypeDB{
 			
 			private final Map<String, TypeDef> defs = new HashMap<>();
 			
-			private final Map<Integer, TypeLink> idToTyp = new HashMap<>();
-			private final Map<TypeLink, Integer> typToID = new HashMap<>();
-			private       int                    maxID   = 0;
+			private final Map<Integer, IOType> idToTyp = new HashMap<>();
+			private final Map<IOType, Integer> typToID = new HashMap<>();
+			private       int                  maxID   = 0;
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 			
@@ -99,7 +99,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
-				return toID(TypeLink.of(type), recordNew);
+				return toID(IOType.of(type), recordNew);
 			}
 			
 			@Override
@@ -108,7 +108,7 @@ public sealed interface IOTypeDB{
 			public long definitionCount(){ return defs.size(); }
 			
 			@Override
-			public TypeID toID(TypeLink type, boolean recordNew){
+			public TypeID toID(IOType type, boolean recordNew){
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
 				return newID(type, recordNew);
@@ -116,16 +116,16 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public int toID(Class<?> type){
-				return toID(TypeLink.of(type));
+				return toID(IOType.of(type));
 			}
 			@Override
-			public int toID(TypeLink type){
+			public int toID(IOType type){
 				var id = typToID.get(type);
 				if(id != null) return id;
 				return newID(type, true).requireStored();
 			}
 			
-			protected TypeID newID(TypeLink type, boolean recordNew){
+			protected TypeID newID(IOType type, boolean recordNew){
 				if(typToID.containsKey(type)){
 					throw new IllegalArgumentException(type + " is already registered");
 				}
@@ -140,26 +140,25 @@ public sealed interface IOTypeDB{
 				return new TypeID(newID, true);
 			}
 			
-			private void recordType(TypeLink type){
-				if(!defs.containsKey(type.getTypeName())){
-					var def = new TypeDef(type.getTypeClass(null));
-					if(!def.isUnmanaged()){
-						defs.putIfAbsent(type.getTypeName(), def);
-					}else{
-						defs.put(type.getTypeName(), null);
+			private void recordType(IOType type){
+				for(var typeRaw : type.collectRaws(this)){
+					if(!defs.containsKey(typeRaw.getName())){
+						var def = new TypeDef(type.getTypeClass(this));
+						if(!def.isUnmanaged()){
+							defs.putIfAbsent(typeRaw.getName(), def);
+						}else{
+							defs.put(typeRaw.getName(), null);
+						}
+						
+						for(TypeDef.FieldDef field : def.getFields()){
+							recordType(field.getType());
+						}
 					}
-					
-					for(TypeDef.FieldDef field : def.getFields()){
-						recordType(field.getType());
-					}
-				}
-				for(int i = 0; i<type.argCount(); i++){
-					recordType(type.arg(i));
 				}
 			}
 			
 			@Override
-			public TypeLink fromID(int id){
+			public IOType fromID(int id){
 				var type = idToTyp.get(id);
 				if(type == null){
 					throw new RuntimeException("Unknown type from ID of " + id);
@@ -176,7 +175,7 @@ public sealed interface IOTypeDB{
 			public <T> Class<T> fromID(Class<T> rootType, int id){
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
-				return universe.id2cl.get(id);
+				return universe.id2cl.get(id - 1);
 			}
 			
 			@Override
@@ -187,11 +186,11 @@ public sealed interface IOTypeDB{
 				if(id == null){
 					id = universe.newId(type);
 				}
-				return id;
+				return id + 1;
 			}
 			
 			@Override
-			public boolean hasType(TypeLink type){
+			public boolean hasType(IOType type){
 				return typToID.containsKey(type);
 			}
 			@Override
@@ -226,28 +225,28 @@ public sealed interface IOTypeDB{
 		final class Synchronized extends Basic{
 			
 			@Override
-			public int toID(TypeLink type){
+			public int toID(IOType type){
 				synchronized(this){
 					return super.toID(type);
 				}
 			}
 			
 			@Override
-			protected TypeID newID(TypeLink type, boolean recordNew){
+			protected TypeID newID(IOType type, boolean recordNew){
 				synchronized(this){
 					return super.newID(type, recordNew);
 				}
 			}
 			
 			@Override
-			public TypeLink fromID(int id){
+			public IOType fromID(int id){
 				synchronized(this){
 					return super.fromID(id);
 				}
 			}
 			
 			@Override
-			public boolean hasType(TypeLink type){
+			public boolean hasType(IOType type){
 				synchronized(this){
 					return super.hasType(type);
 				}
@@ -276,8 +275,8 @@ public sealed interface IOTypeDB{
 			
 			private final Map<String, TypeDef> defs;
 			
-			private final TypeLink[]             idToTyp;
-			private final Map<TypeLink, Integer> typToID;
+			private final IOType[]             idToTyp;
+			private final Map<IOType, Integer> typToID;
 			
 			private static final class MemUniverse<T>{
 				private final Class<T>[]             id2cl;
@@ -292,10 +291,10 @@ public sealed interface IOTypeDB{
 			
 			private final Map<Class<?>, MemUniverse<?>> sealedMultiverse;
 			
-			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
+			private Fixed(Map<String, TypeDef> defs, Map<Integer, IOType> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
 				var maxID = idToTyp.keySet().stream().mapToInt(i -> i).max().orElse(0);
-				this.idToTyp = new TypeLink[maxID + 1];
+				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
 				typToID = idToTyp.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
 				this.sealedMultiverse = sealedMultiverse.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id)));
@@ -305,7 +304,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
-				return toID(TypeLink.of(type), recordNew);
+				return toID(IOType.of(type), recordNew);
 			}
 			
 			@Override
@@ -314,7 +313,7 @@ public sealed interface IOTypeDB{
 			public long definitionCount(){ return defs.size(); }
 			
 			@Override
-			public TypeID toID(TypeLink type, boolean recordNew){
+			public TypeID toID(IOType type, boolean recordNew){
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
 				if(!recordNew) return new TypeID(idToTyp.length, false);
@@ -323,17 +322,17 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public int toID(Class<?> type){
-				return toID(TypeLink.of(type));
+				return toID(IOType.of(type));
 			}
 			@Override
-			public int toID(TypeLink type){
+			public int toID(IOType type){
 				var id = typToID.get(type);
 				if(id != null) return id;
 				throw new UnsupportedOperationException();
 			}
 			
 			@Override
-			public TypeLink fromID(int id){
+			public IOType fromID(int id){
 				var type = idToTyp(id);
 				if(type == null){
 					throw new RuntimeException("Unknown type from ID of " + id);
@@ -350,23 +349,23 @@ public sealed interface IOTypeDB{
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				if(universe == null) return null;
-				if(id>=universe.id2cl.length || id<0) return null;
-				return universe.id2cl[id];
+				if(id>universe.id2cl.length || id<=0) return null;
+				return universe.id2cl[id - 1];
 			}
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
-				return universe.cl2id.get(type);
+				return universe.cl2id.get(type) + 1;
 			}
 			
-			private TypeLink idToTyp(int id){
+			private IOType idToTyp(int id){
 				return id>=idToTyp.length || id<0? null : idToTyp[id];
 			}
 			
 			@Override
-			public boolean hasType(TypeLink type){
+			public boolean hasType(IOType type){
 				return typToID.containsKey(type);
 			}
 			@Override
@@ -435,10 +434,10 @@ public sealed interface IOTypeDB{
 					
 					Reference.class,
 					}){
-					db.newID(TypeLink.of(c), true);
+					db.newID(IOType.of(c), true);
 				}
 				for(Class<?> wrapperType : FieldCompiler.getWrapperTypes()){
-					db.newID(TypeLink.of(wrapperType), true);
+					db.newID(IOType.of(wrapperType), true);
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
@@ -480,14 +479,14 @@ public sealed interface IOTypeDB{
 		}
 		
 		@IOValue
-		private IOMap<Integer, TypeLink> data;
+		private IOMap<Integer, IOType> data;
 		
 		@IOValue
 		private IOMap<TypeName, TypeDef> defs;
 		
-		private final Map<Integer, TypeLink> dataCache = new HashMap<>();
-		private       Map<TypeLink, Integer> reverseDataCache;
-		private       int                    max;
+		private final Map<Integer, IOType> dataCache = new HashMap<>();
+		private       Map<IOType, Integer> reverseDataCache;
+		private       int                  max;
 		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
@@ -497,7 +496,7 @@ public sealed interface IOTypeDB{
 		public long definitionCount(){ return defs.size(); }
 		
 		@Override
-		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
+		public TypeID toID(IOType type, boolean recordNew) throws IOException{
 			var builtIn = BUILT_IN.get();
 			var id      = builtIn.toID(type, false);
 			if(id.stored()) return id;
@@ -548,7 +547,7 @@ public sealed interface IOTypeDB{
 			return new TypeID(newID, true);
 		}
 		
-		private void recordType(List<TypeLink> types) throws IOException{
+		private void recordType(List<IOType> types) throws IOException{
 			var builtIn = BUILT_IN.get();
 			var newDefs = new HashMap<TypeName, TypeDef>();
 			for(var type : types){
@@ -669,11 +668,11 @@ public sealed interface IOTypeDB{
 			if(e != null) throw e;
 		}
 		
-		private void recordType(MemoryOnlyDB.Fixed builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
+		private void recordType(MemoryOnlyDB.Fixed builtIn, IOType type, Map<TypeName, TypeDef> newDefs) throws IOException{
 			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()).isPresent();
 			if(isBuiltIn){
-				for(int i = 0; i<type.argCount(); i++){
-					recordType(builtIn, type.arg(i), newDefs);
+				for(IOType arg : IOType.getArgs(type)){
+					recordType(builtIn, arg, newDefs);
 				}
 				return;
 			}
@@ -692,14 +691,14 @@ public sealed interface IOTypeDB{
 					base = base.componentType();
 				}
 				if(base.isPrimitive()) return;
-				recordType(builtIn, new TypeLink(base), newDefs);
+				recordType(builtIn, IOType.of(base), newDefs);
 				return;
 			}
 			
 			var def    = new TypeDef(typ);
 			var parent = def.getSealedParent();
 			if(parent != null){
-				recordType(builtIn, new TypeLink(switch(parent.type()){
+				recordType(builtIn, IOType.of(switch(parent.type()){
 					case EXTEND -> typ.getSuperclass();
 					case JUST_INTERFACE -> Arrays.stream(typ.getInterfaces())
 					                             .filter(i -> i.getName().equals(parent.name()))
@@ -711,8 +710,8 @@ public sealed interface IOTypeDB{
 				newDefs.put(typeName, def);
 			}
 			
-			for(int i = 0; i<type.argCount(); i++){
-				recordType(builtIn, type.arg(i), newDefs);
+			for(IOType arg : IOType.getArgs(type)){
+				recordType(builtIn, arg, newDefs);
 			}
 			
 			if(def.isUnmanaged()) return;
@@ -728,7 +727,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		@Override
-		public TypeLink fromID(int id) throws IOException{
+		public IOType fromID(int id) throws IOException{
 			var builtIn = BUILT_IN.get();
 			if(builtIn.hasID(id)){
 				return builtIn.fromID(id);
@@ -761,17 +760,20 @@ public sealed interface IOTypeDB{
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
 			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
+			if(id<=0){
+				return null;
+			}
 			
-			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
+			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id - 1));
 			if(touched.isPresent()){
 				return touched.get();
 			}
 			
 			var universe = sealedMultiverse.get(rootType.getName());
-			if(universe == null || id<0 || id>=universe.size()){
+			if(universe == null || id>universe.size()){
 				return null;
 			}
-			var name = universe.get(id);
+			var name = universe.get(id - 1);
 			if(name == null) return null;
 			//noinspection unchecked
 			return (Class<T>)loadClass(name);
@@ -794,31 +796,31 @@ public sealed interface IOTypeDB{
 			var rootTypeName = rootType.getName();
 			var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
 			if(universe == null){
-				return touch(rootType, type, 0);
+				return touch(rootType, type, 1);
 			}
 			
 			var max = Math.toIntExact(universe.size());
 			for(int i = 0; i<max; i++){
 				var name = universe.get(i);
 				if(name.equals(typeName)){
-					return i;
+					return i + 1;
 				}
 			}
 			
 			if(record){
-				recordType(List.of(TypeLink.of(type)));
+				recordType(List.of(IOType.of(type)));
 				universe.add(typeName);
-				return max;
+				return max + 1;
 			}
 			
-			return touch(rootType, type, max);
+			return touch(rootType, type, max + 1);
 		}
 		
 		private <T> void recordTouched(Class<T> rootType) throws IOException{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				recordType(universe.id2cl.values().stream().map(TypeLink::of).toList());
+				recordType(universe.id2cl.values().stream().map(IOType::of).toList());
 				
 				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				for(var e : universe.id2cl.entrySet()){
@@ -847,7 +849,7 @@ public sealed interface IOTypeDB{
 				var ch = AllocateTicket.bytes(16)
 				                       .withPositionMagnet(sm.getReference().getPtr().getValue())
 				                       .submit(sm);
-				var type = TypeLink.of(ContiguousIOList.class, String.class);
+				var type = IOType.of(ContiguousIOList.class, String.class);
 				return new ContiguousIOList<>(sm.getDataProvider(), ch.getPtr().makeReference(), type);
 			});
 		}
@@ -904,14 +906,14 @@ public sealed interface IOTypeDB{
 		}
 	}
 	
-	private TypeLink makeLink(Object obj){
+	private IOType makeLink(Object obj){
 		if(obj instanceof IOInstance.Unmanaged<?> u){
 			return u.getTypeDef();
 		}
 		if(obj instanceof IOInstance.Def<?> u){
-			return TypeLink.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
+			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
-		return TypeLink.of(obj.getClass());
+		return IOType.of(obj.getClass());
 	}
 	
 	default int toID(Object obj) throws IOException{
@@ -925,14 +927,14 @@ public sealed interface IOTypeDB{
 	}
 	
 	default int toID(Class<?> type) throws IOException{
-		return toID(TypeLink.of(type), true).requireStored();
+		return toID(IOType.of(type), true).requireStored();
 	}
-	default int toID(TypeLink type) throws IOException{
+	default int toID(IOType type) throws IOException{
 		return toID(type, true).requireStored();
 	}
 	
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
-		return toID(TypeLink.of(type), recordNew);
+		return toID(IOType.of(type), recordNew);
 	}
 	
 	record TypeID(int val, boolean stored){
@@ -945,8 +947,8 @@ public sealed interface IOTypeDB{
 	long typeLinkCount();
 	long definitionCount();
 	
-	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
-	TypeLink fromID(int id) throws IOException;
+	TypeID toID(IOType type, boolean recordNew) throws IOException;
+	IOType fromID(int id) throws IOException;
 	
 	
 	<T> Class<T> fromID(Class<T> rootType, int id) throws IOException;

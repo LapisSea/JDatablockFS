@@ -13,8 +13,8 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.VaryingSize;
@@ -129,7 +129,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 			if(nullable()) return null;
 			throw new NullPointerException();
 		}
-		var type = TypeLink.of(getAccessor().getGenericType(genericContext));
+		var type = IOType.of(getAccessor().getGenericType(genericContext));
 		return struct.make(provider, readNew, type);
 	}
 	

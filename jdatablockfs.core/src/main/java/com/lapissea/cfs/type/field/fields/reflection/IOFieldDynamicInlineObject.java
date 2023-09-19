@@ -10,9 +10,9 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BehaviourSupport;
@@ -138,7 +138,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		DynamicSupport.writeValue(provider, dest, val);
 	}
 	
-	private TypeLink getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+	private IOType getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
 		int id = typeID.getValue(ioPool, instance);
 		return provider.getTypeDb().fromID(id);
 	}
@@ -155,7 +155,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 				}
 			}
 			
-			TypeLink typ = getType(ioPool, provider, instance);
+			IOType typ = getType(ioPool, provider, instance);
 			val = DynamicSupport.readTyp(typ, provider, src, makeContext(genericContext));
 		}
 		//noinspection unchecked
@@ -170,7 +170,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			}
 		}
 		
-		TypeLink typ = getType(ioPool, provider, instance);
+		IOType typ = getType(ioPool, provider, instance);
 		DynamicSupport.skipTyp(typ, provider, src, makeContext(genericContext));
 	}
 }

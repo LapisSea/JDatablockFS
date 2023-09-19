@@ -1,9 +1,9 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -32,7 +32,7 @@ public final class TypedReference extends IOInstance.Managed<TypedReference>{
 	public int getId(){
 		return id;
 	}
-	public TypeLink getType(IOTypeDB db) throws IOException{
+	public IOType getType(IOTypeDB db) throws IOException{
 		return db.fromID(id);
 	}
 	public <T> Class<T> getType(IOTypeDB db, Class<T> root) throws IOException{

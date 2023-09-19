@@ -3,8 +3,9 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.RuntimeType;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.TypeCheck;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -19,8 +20,8 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	private IOField<SELF, ?> sizeField;
 	
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){ super(provider, reference, typeDef, check); }
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      { super(provider, reference, typeDef); }
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){ super(provider, reference, typeDef, check); }
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, IOType typeDef)                 { super(provider, reference, typeDef); }
 	
 	public abstract RuntimeType<T> getElementType();
 	

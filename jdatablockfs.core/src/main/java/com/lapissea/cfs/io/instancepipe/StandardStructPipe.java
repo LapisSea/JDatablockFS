@@ -38,7 +38,13 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return of(Struct.of(type));
 	}
 	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Class<T> type, int minRequestedStage){
-		return of(Struct.of(type), minRequestedStage);
+		Struct<T> struct;
+		if(minRequestedStage == STATE_DONE){
+			struct = Struct.of(type, STATE_DONE);
+		}else{
+			struct = Struct.of(type);
+		}
+		return of(struct, minRequestedStage);
 	}
 	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Struct<T> struct){
 		return of(StandardStructPipe.class, struct);

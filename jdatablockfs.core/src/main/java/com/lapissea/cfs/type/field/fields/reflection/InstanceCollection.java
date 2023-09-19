@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
@@ -13,7 +14,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
@@ -79,7 +80,7 @@ public class InstanceCollection{
 			if(!(type instanceof ParameterizedType parmType)) return false;
 			if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
 			var args = parmType.getActualTypeArguments();
-			return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
+			return IOInstance.isManaged(Objects.requireNonNull(IOType.of(args[0])).getTypeClass(null));
 		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
@@ -363,7 +364,15 @@ public class InstanceCollection{
 		var collectionType = accessor.getGenericType(null);
 		var type           = CollectionAddapter.getComponentType(addapterType, collectionType);
 		
-		var impl = new CollectionAddapter.ElementIOImpl.PipeImpl<>((Class<E>)type);
+		CollectionAddapter.ElementIOImpl<E> impl;
+		
+		var universe = SealedUtil.getSealedUniverse(type, false).flatMap(SealedUtil.SealedInstanceUniverse::ofUnknown);
+		if(universe.isPresent()){
+			impl = new CollectionAddapter.ElementIOImpl.SealedTypeImpl<>((SealedUtil.SealedInstanceUniverse<E>)universe.get());
+		}else{
+			impl = new CollectionAddapter.ElementIOImpl.PipeImpl<>((Class<E>)type);
+		}
+		
 		return CollectionAddapter.newAddapter(addapterType, impl);
 	}
 }

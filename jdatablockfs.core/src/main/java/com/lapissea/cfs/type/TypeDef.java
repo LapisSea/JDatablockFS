@@ -25,7 +25,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	
 	@IOValue
 	public static final class FieldDef extends IOInstance.Managed<FieldDef>{
-		private TypeLink type;
+		private IOType   type;
 		private String   name;
 		private boolean  isDynamic;
 		private boolean  unsigned;
@@ -38,7 +38,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		public FieldDef(){ }
 		
 		public FieldDef(IOField<?, ?> field){
-			type = TypeLink.of(field.getAccessor().getGenericType(null));
+			type = IOType.of(field.getAccessor().getGenericType(null));
 			name = field.getName();
 			nullability = IOFieldTools.getNullability(field);
 			isDynamic = IOFieldTools.isGeneric(field);
@@ -50,7 +50,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			unsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
 		}
 		
-		public TypeLink getType()  { return type; }
+		public IOType getType()    { return type; }
 		public String getName()    { return name; }
 		public boolean isDynamic() { return isDynamic; }
 		public boolean isUnsigned(){ return unsigned; }

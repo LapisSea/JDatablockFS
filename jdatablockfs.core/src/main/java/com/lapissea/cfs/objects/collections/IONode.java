@@ -17,8 +17,9 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.TypeCheck;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
@@ -106,8 +107,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
 					try{
 						if(value != null){
-							var arg = instance.getTypeDef().arg(0);
-							if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg + " not compatible with " + value);
+							var arg = IOType.getArg(instance.getTypeDef(), 0);
+							if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))){
+								throw new ClassCastException(arg + " not compatible with " + value);
+							}
 						}
 						
 						instance.setValue((T)value);
@@ -206,7 +209,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	@SuppressWarnings("unchecked")
 	private static final Struct<IONode<Object>> STRUCT = (Struct<IONode<Object>>)(Object)Struct.of(IONode.class);
 	
-	private static final TypeLink.Check NODE_TYPE_CHECK = new TypeLink.Check(
+	private static final TypeCheck NODE_TYPE_CHECK = new TypeCheck(
 		IONode.class,
 		(type, db) -> { }
 	);
@@ -233,7 +236,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
+	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, IOType nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		var nextSize = getNextSize(next, provider);
 		
 		var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
@@ -248,7 +251,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
-	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
+	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, IOType nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		var nextSize = getNextSize(next, provider);
 		
 		var bytes = 1 + nextSize.bytes + valueBytes.remaining();
@@ -269,7 +272,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	@IOValue
 	private NumberSize nextSize;
 	
-	public IONode(DataProvider provider, Reference reference, TypeLink typeDef, T val, IONode<T> next) throws IOException{
+	public IONode(DataProvider provider, Reference reference, IOType typeDef, T val, IONode<T> next) throws IOException{
 		this(provider, reference, typeDef);
 		
 		var newSiz = calcOptimalNextSize(provider);
@@ -285,13 +288,13 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	@SuppressWarnings("unchecked")
-	public IONode(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
+	public IONode(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super((Struct<IONode<T>>)(Object)STRUCT, provider, reference, typeDef, NODE_TYPE_CHECK);
 		
 		var magnetProvider = provider.withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
 		//noinspection unchecked
-		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
+		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, IOType.getArg(typeDef, 0), getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
 		
 		try{
 			readManagedFields();

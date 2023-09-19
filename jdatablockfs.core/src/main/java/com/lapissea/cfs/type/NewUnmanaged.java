@@ -6,5 +6,5 @@ import com.lapissea.cfs.objects.Reference;
 import java.io.IOException;
 
 public interface NewUnmanaged<T extends IOInstance.Unmanaged<T>>{
-	T make(DataProvider provider, Reference reference, TypeLink type) throws IOException;
+	T make(DataProvider provider, Reference reference, IOType type) throws IOException;
 }

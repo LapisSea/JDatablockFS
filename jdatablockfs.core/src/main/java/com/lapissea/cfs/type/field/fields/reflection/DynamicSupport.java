@@ -18,9 +18,9 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -258,7 +258,7 @@ public abstract class DynamicSupport{
 		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo)) throw new AssertionError(tyo + " is not an integer");
 	}
 	
-	public static Object readTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public static Object readTyp(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
 		if(typ == Boolean.class) return src.readBoolean();
 		if(typ == Float.class) return (float)NumberSize.INT.readFloating(src);
@@ -325,7 +325,7 @@ public abstract class DynamicSupport{
 		
 		throw new NotImplementedException(typ + "");
 	}
-	public static void skipTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public static void skipTyp(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var        typ = typDef.getTypeClass(provider.getTypeDb());
 		NumberSize siz = null;
 		if(typ == Boolean.class) siz = NumberSize.BYTE;

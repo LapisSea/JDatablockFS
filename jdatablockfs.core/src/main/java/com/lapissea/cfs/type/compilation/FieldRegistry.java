@@ -258,6 +258,16 @@ final class FieldRegistry{
 					typs.stream().map(Class::getName).collect(Collectors.joining("\n"))
 				);
 			}
+			
+			var allCompatible = getData().stream().filter(u -> u.isCompatible(type, ann)).toList();
+			if(allCompatible.size()>1){
+				throw new RuntimeException(
+					"Ambiguous usage picking\n" +
+					allCompatible.stream()
+					             .map(u -> "\t" + u.getClass().getName())
+					             .collect(Collectors.joining("\n"))
+				);
+			}
 		}
 		return res;
 	}

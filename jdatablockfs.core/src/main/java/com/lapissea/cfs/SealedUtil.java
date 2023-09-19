@@ -25,6 +25,13 @@ import static java.util.stream.Collectors.toUnmodifiableMap;
 public final class SealedUtil{
 	
 	public record SealedInstanceUniverse<T extends IOInstance<T>>(Class<T> root, Map<Class<T>, StructPipe<T>> pipeMap){
+		public static Optional<SealedInstanceUniverse<?>> ofUnknown(SealedUniverse<?> universe){
+			if(IOInstance.isInstance(universe)){
+				//noinspection rawtypes,unchecked
+				return Optional.of(new SealedInstanceUniverse<>((SealedUniverse)universe));
+			}
+			return Optional.empty();
+		}
 		public static <T extends IOInstance<T>> Optional<SealedInstanceUniverse<T>> of(SealedUniverse<T> universe){
 			if(IOInstance.isInstance(universe)){
 				return Optional.of(new SealedInstanceUniverse<>(universe));

@@ -5,10 +5,11 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.NewObj;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck;
+import com.lapissea.cfs.type.TypeCheck;
+import com.lapissea.cfs.type.TypeCheck.ArgCheck.RawCheck;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -133,13 +134,13 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	@IOValue
 	private IOList<Node>   nodes;
 	
-	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
+	private static final TypeCheck TYPE_CHECK = new TypeCheck(
 		IOTreeSet.class,
 		RawCheck.of(Comparable.class::isAssignableFrom, "is not Comparable").arg()
 	);
 	
-	public IOTreeSet(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
-		super(provider, reference, typeDef.argCount() == 0? typeDef.withArgs(TypeLink.of(Object.class)) : typeDef, TYPE_CHECK);
+	public IOTreeSet(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
+		super(provider, reference, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.of(Object.class)));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();

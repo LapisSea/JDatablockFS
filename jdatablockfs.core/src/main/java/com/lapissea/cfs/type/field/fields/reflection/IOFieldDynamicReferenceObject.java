@@ -12,8 +12,8 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.IOTypeDB;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.BehaviourSupport;
@@ -185,12 +185,12 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		}
 	}
 	
-	private TypeLink getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+	private IOType getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
 		int id = typeID.getValue(ioPool, instance);
 		return provider.getTypeDb().fromID(id);
 	}
 	
-	private ValueType readValue(DataProvider provider, TypeLink type, Reference readNew, GenericContext genericContext) throws IOException{
+	private ValueType readValue(DataProvider provider, IOType type, Reference readNew, GenericContext genericContext) throws IOException{
 		try(var io = readNew.io(provider)){
 			//noinspection unchecked
 			return (ValueType)DynamicSupport.readTyp(type, provider, io, makeContext(genericContext));

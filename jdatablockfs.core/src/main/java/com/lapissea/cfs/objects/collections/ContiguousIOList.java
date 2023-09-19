@@ -23,9 +23,10 @@ import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.CommandSet;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.NewObj;
 import com.lapissea.cfs.type.RuntimeType;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.TypeCheck;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
@@ -60,18 +61,18 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE;
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
+import static com.lapissea.cfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
+import static com.lapissea.cfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings("unchecked")
 public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
 	
-	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
+	private static final TypeCheck TYPE_CHECK = new TypeCheck(
 		ContiguousIOList.class,
-		TypeLink.Check.ArgCheck.rawAny(
-			PRIMITIVE, INSTANCE, TypeLink.Check.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"),
-			TypeLink.Check.ArgCheck.RawCheck.of(c -> c == Object.class, "is not an Object")
+		TypeCheck.ArgCheck.rawAny(
+			PRIMITIVE, INSTANCE, TypeCheck.ArgCheck.RawCheck.of(c -> c == String.class, "is not a string"),
+			TypeCheck.ArgCheck.RawCheck.of(c -> c == Object.class, "is not an Object")
 		)
 	);
 	
@@ -89,7 +90,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private static final Object       NULL_VAL = new Object();
 	
 	
-	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
+	public ContiguousIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef, TYPE_CHECK);
 		cache = readOnly? new ConcurrentHashMap<>() : null;
 		
@@ -110,7 +111,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			return max.min(num);
 		});
 		
-		this.storage = makeValueStorage(rec, typeDef.arg(0));
+		this.storage = makeValueStorage(rec, IOType.getArg(typeDef, 0));
 		
 		Assert(this.storage.inlineSize() != -1);
 		
@@ -258,7 +259,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typeDatabase = getDataProvider().getTypeDb();
-		var genericType  = getTypeDef().genericArg(0, typeDatabase);
+		var genericType  = IOType.getArg(getTypeDef(), 0).generic(typeDatabase);
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
 		
 		
@@ -388,7 +389,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.getId(), s));
 		var newVarying = List.copyOf(newBuffer);
 		
-		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), getTypeDef().arg(0));
+		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), IOType.getArg(getTypeDef(), 0));
 		
 		var oldVal = ValueStorage.RefStorage.<T, Inline>of(storage);
 		var newVal = ValueStorage.RefStorage.<T, Inline>of(newStorage);
@@ -442,7 +443,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		storage = newStorage;
 		calcHead();
 	}
-	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, TypeLink typeDef){
+	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, IOType typeDef){
 		var g   = getGenerics();
 		var ctx = g.argAsContext("T");
 		return (ValueStorage<T>)ValueStorage.makeStorage(

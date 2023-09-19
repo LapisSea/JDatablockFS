@@ -79,17 +79,18 @@ public class Log{
 			);
 			
 			var existingNames = values.stream().map(ConfigTools.ConfEntry::name).collect(Collectors.toSet());
-			scanBadFlags(existingNames);
-			Thread.startVirtualThread(() -> {
-				UtilL.sleep(1000);
-				scanBadFlags(existingNames);
-			});
+			if(scanBadFlags(existingNames)){
+				Thread.startVirtualThread(() -> {
+					UtilL.sleep(1000);
+					scanBadFlags(existingNames);
+				});
+			}
 		}
 		
 		LogUtil.registerSkipClass(Log.class);
 	}
 	
-	private static void scanBadFlags(Set<String> existingNames){
+	private static boolean scanBadFlags(Set<String> existingNames){
 		var badValues = System.getProperties().keySet().stream().filter(String.class::isInstance).map(o -> (String)o)
 		                      .filter(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
 		                      .filter(key -> !existingNames.contains(key))
@@ -106,6 +107,7 @@ public class Log{
 			}
 			Log.info(msg);
 		}
+		return badValues.isEmpty();
 	}
 	
 	public static void log(String message){

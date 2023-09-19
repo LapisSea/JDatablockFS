@@ -3,7 +3,8 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
+import com.lapissea.cfs.type.TypeCheck;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
@@ -19,8 +20,8 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	
 	private IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField;
 	
-	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){ super(provider, reference, typeDef, check); }
-	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         { super(provider, reference, typeDef); }
+	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){ super(provider, reference, typeDef, check); }
+	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, IOType typeDef)                    { super(provider, reference, typeDef); }
 	
 	@Override
 	public long size(){ return size; }

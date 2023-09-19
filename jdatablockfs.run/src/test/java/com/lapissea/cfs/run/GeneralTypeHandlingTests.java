@@ -2,6 +2,7 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
@@ -10,6 +11,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -20,8 +22,8 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.tools.utils.ToolUtils;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
@@ -89,7 +91,7 @@ public class GeneralTypeHandlingTests{
 	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
 		TestUtils.testCluster(TestInfo.of(obj), ses -> {
-			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(TypeLink.ofFlat(
+			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
 			)).request();
@@ -557,7 +559,7 @@ public class GeneralTypeHandlingTests{
 	
 	public static class ValuesAnn extends IOInstance.Managed<ValuesAnn>{
 		@IOValue
-		TypeLink     link;
+		IOType       link;
 		@IOValue
 		String       str;
 		@IOValue
@@ -568,7 +570,7 @@ public class GeneralTypeHandlingTests{
 	
 	@IOValue
 	public static class ClassAnn extends IOInstance.Managed<ClassAnn>{
-		TypeLink     link;
+		IOType       link;
 		String       str;
 		List<String> list;
 		int[]        ints;
@@ -585,7 +587,7 @@ public class GeneralTypeHandlingTests{
 		}
 		
 		var a = new ValuesAnn();
-		a.link = new TypeLink(List.class, new TypeLink(String.class));
+		a.link = IOType.of(List.class, IOType.of(String.class));
 		a.str = "test";
 		a.list = List.of("idk");
 		a.ints = new int[1];
@@ -641,7 +643,22 @@ public class GeneralTypeHandlingTests{
 		strings.add("foo");
 		strings.add("bar");
 		assertEquals(List.of("foo", "bar"), strings.collectToList());
-		assertEquals(TypeLink.of(ContiguousIOList.class, String.class), strings.getTypeDef());
+		assertEquals(IOType.of(ContiguousIOList.class, String.class), strings.getTypeDef());
+	}
+	
+	static{
+		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
+	}
+	
+	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
+	void genericStore() throws IOException{
+		var d = Cluster.emptyMem();
+		var data = d.getRootProvider().request(new ObjectID("obj"), () -> {
+			var v = IOInstance.Def.of(GenericArg.class);
+			v.allocateNulls(d, null);
+			return v;
+		});
+		data.strings().list().addAll(List.of("foo", "bar"));
 	}
 	
 }

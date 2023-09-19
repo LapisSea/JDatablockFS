@@ -2,7 +2,6 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.SealedUtil.SealedInstanceUniverse;
-import com.lapissea.cfs.SealedUtil.SealedUniverse;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkChainIO;
 import com.lapissea.cfs.chunk.DataProvider;
@@ -25,11 +24,11 @@ import com.lapissea.cfs.objects.TypedReference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.RuntimeType;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.compilation.WrapperStructs;
@@ -443,7 +442,7 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnmanagedInstance<T extends IOInstance.Unmanaged<T>> implements ValueStorage<T>, RefStorage<Reference>{
 		
-		private final TypeLink            type;
+		private final IOType              type;
 		private final DataProvider        provider;
 		private final Struct.Unmanaged<T> struct;
 		
@@ -451,7 +450,7 @@ public sealed interface ValueStorage<T>{
 		private final long                  size;
 		
 		@SuppressWarnings("unchecked")
-		public UnmanagedInstance(TypeLink type, DataProvider provider, StructPipe<Reference> refPipe){
+		public UnmanagedInstance(IOType type, DataProvider provider, StructPipe<Reference> refPipe){
 			this.type = type;
 			this.provider = provider;
 			this.refPipe = refPipe;
@@ -1332,7 +1331,7 @@ public sealed interface ValueStorage<T>{
 		record VariableFixed(VaryingSize.Provider provider) implements StorageRule{ }
 	}
 	
-	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
+	static ValueStorage<?> makeStorage(DataProvider provider, IOType typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
 		if(DEBUG_VALIDATION){
 			assert UtilL.instanceOf(clazz, generics.owner())
@@ -1375,9 +1374,9 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		if(isSealedCached(clazz)){
-			//noinspection rawtypes,unchecked
+			//noinspection rawtypes
 			Optional<SealedInstanceUniverse> oUniverse =
-				SealedUtil.getSealedUniverse(clazz, false).flatMap(u -> SealedInstanceUniverse.of((SealedUniverse)u));
+				SealedUtil.getSealedUniverse(clazz, false).flatMap(SealedInstanceUniverse::ofUnknown);
 			if(oUniverse.isPresent()){
 				SealedInstanceUniverse<?> universe = oUniverse.get();
 				return switch(rule){

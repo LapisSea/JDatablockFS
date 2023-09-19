@@ -15,8 +15,8 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
@@ -201,7 +201,7 @@ public class GeneralTests{
 		TestUtils.ioMapComplianceSequence(
 			TestInfo.of(),
 			HashIOMap<Integer, Integer>::new,
-			TypeLink.of(HashIOMap.class, Integer.class, Integer.class),
+			IOType.of(HashIOMap.class, Integer.class, Integer.class),
 			map -> {
 				map.put(0, 10);
 				map.put(0, 11);
@@ -290,7 +290,7 @@ public class GeneralTests{
 				var lTyp = Struct.Unmanaged.ofUnmanaged(listType);
 				return lTyp.make(provider, reference, typeDef);
 			},
-			TypeLink.of(listType, typ),
+			IOType.of(listType, typ),
 			session, useCluster
 		);
 	}

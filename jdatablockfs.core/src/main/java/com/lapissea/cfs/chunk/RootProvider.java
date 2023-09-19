@@ -7,9 +7,9 @@ import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
@@ -17,6 +17,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Objects;
 
 @SuppressWarnings("unused")
@@ -52,12 +53,12 @@ public interface RootProvider extends DataProvider.Holder{
 			return new Builder<>(provider, id, objectGenerator);
 		}
 		@SuppressWarnings("unchecked")
-		public <CT> Builder<? extends CT> withType(Class<CT> genericType, Type... args){ return (Builder<CT>)withType(TypeLink.of(genericType, args)); }
+		public <CT> Builder<? extends CT> withType(Class<CT> genericType, Type... args){ return (Builder<CT>)withType(IOType.of(genericType, args)); }
 		@SuppressWarnings("unchecked")
-		public <CT> Builder<CT> withType(Class<CT> genericType){ return (Builder<CT>)withType(TypeLink.of(genericType)); }
-		public Builder<T> withType(Type genericType){ return withType(Objects.requireNonNull(TypeLink.of(genericType))); }
+		public <CT> Builder<CT> withType(Class<CT> genericType){ return (Builder<CT>)withType(IOType.of(genericType)); }
+		public Builder<T> withType(Type genericType){ return withType(Objects.requireNonNull(IOType.of(genericType))); }
 		@SuppressWarnings("unchecked")
-		public Builder<T> withType(TypeLink genericType){
+		public Builder<T> withType(IOType genericType){
 			var provider = this.provider.getDataProvider();
 			var rawType  = genericType.getTypeClass(provider.getTypeDb());
 			
@@ -66,9 +67,12 @@ public interface RootProvider extends DataProvider.Holder{
 				if(defTypAnn != null){
 					var defTyp = defTypAnn.value();
 					if(!IOInstance.isInstance(defTyp)) throw new IllegalStateException();
-					var args = genericType.genericArgsCopy(provider.getTypeDb());
+					List<Type> args = switch(genericType){
+						case IOType.TypeGeneric g -> g.genericArgs(provider.getTypeDb());
+						default -> List.of();
+					};
 					
-					return withType(TypeLink.of(defTypAnn.value(), args));
+					return withType(IOType.of(defTypAnn.value(), args));
 				}
 			}
 			
@@ -96,7 +100,9 @@ public interface RootProvider extends DataProvider.Holder{
 				}
 			}
 			
-			if(genericType.argCount() != 0) throw new IllegalStateException(rawType.getName() + " should not be generic");
+			if(IOType.getArgs(genericType).isEmpty()){
+				throw new IllegalStateException(rawType.getName() + " should not be generic");
+			}
 			
 			var p = SupportedPrimitive.get(rawType).map(typ -> withGenerator(() -> (T)typ.getDefaultValue()));
 			if(p.isPresent()) return p.get();
@@ -135,7 +141,7 @@ public interface RootProvider extends DataProvider.Holder{
 		return type.cast(val);
 	}
 	
-	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(TypeLink.of(raw, args)).request(); }
+	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }
 	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException{ return this.builder(id).withType(type.getType()).request(); }
 	default <T> T request(String id, Class<T> type) throws IOException                       { return this.builder(id).withType(type).request(); }
 	

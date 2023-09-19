@@ -76,7 +76,6 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	private final Map<Class<ValueType>, StructPipe<ValueType>> typeToPipe;
 	private final Class<ValueType>                             rootType;
 	private       IOFieldPrimitive.FInt<CTyp>                  universeID;
-	private final boolean                                      canHavePointers;
 	
 	private IOFieldInlineSealedObject(FieldAccessor<CTyp> accessor){
 		super(accessor);
@@ -84,12 +83,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		rootType = (Class<ValueType>)accessor.getType();
 		var universe = SealedUtil.getSealedUniverse(rootType, false).flatMap(SealedUtil.SealedInstanceUniverse::of).orElseThrow();
 		typeToPipe = universe.pipeMap();
-		canHavePointers = universe.calcCanHavePointers();
 		initSizeDescriptor(universe.makeSizeDescriptor(nullable(), (p, inst) -> get(null, inst)));
-	}
-	
-	public boolean canHavePointers(){
-		return canHavePointers;
 	}
 	
 	@Override

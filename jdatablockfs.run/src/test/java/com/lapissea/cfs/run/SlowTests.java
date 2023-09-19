@@ -28,7 +28,7 @@ import com.lapissea.cfs.run.fuzzing.RNGEnum;
 import com.lapissea.cfs.run.fuzzing.RNGType;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.IOType;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -298,7 +298,7 @@ public class SlowTests{
 				provider = new Cluster(provider.getSource());
 			}
 			
-			var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map").withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).request();
+			var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map").withType(IOType.of(HashIOMap.class, Object.class, Object.class)).request();
 			if(mode == Mode.CHECKPOINT){
 				info("Starting on step", map.size());
 			}
@@ -710,7 +710,7 @@ public class SlowTests{
 			public MapState create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				Cluster provider = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "");
 				var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map")
-				                  .withType(TypeLink.of(HashIOMap.class, Object.class, Object.class))
+				                  .withType(IOType.of(HashIOMap.class, Object.class, Object.class))
 				                  .request();
 				
 				return new MapState(provider, new CheckMap<>(map));

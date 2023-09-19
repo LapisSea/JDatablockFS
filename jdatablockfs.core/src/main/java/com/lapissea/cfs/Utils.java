@@ -35,8 +35,8 @@ import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
 
-@SuppressWarnings({"unchecked", "unused"})
-public class Utils{
+@SuppressWarnings({"unused"})
+public final class Utils{
 	
 	public static void fairDistribute(long[] values, long toDistribute){
 		
