@@ -81,9 +81,16 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		super(accessor);
 		//noinspection unchecked
 		rootType = (Class<ValueType>)accessor.getType();
-		var universe = SealedUtil.getSealedUniverse(rootType, false).flatMap(SealedUtil.SealedInstanceUniverse::of).orElseThrow();
+		var universe = SealedUtil.getSealedUniverse(rootType, false)
+		                         .flatMap(SealedUtil.SealedInstanceUniverse::of).orElseThrow();
 		typeToPipe = universe.pipeMap();
-		initSizeDescriptor(universe.makeSizeDescriptor(nullable(), (p, inst) -> get(null, inst)));
+		
+		var circularDep = !typeToPipe.containsKey(accessor.getDeclaringStruct().getType());
+		
+		initSizeDescriptor(universe.makeSizeDescriptor(
+			nullable(), circularDep,
+			(p, inst) -> get(null, inst))
+		);
 	}
 	
 	@Override
@@ -102,15 +109,15 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		var gen = new ValueGeneratorInfo<>(universeID, new ValueGenerator<>(){
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
-				var id     = getUniverseID(ioPool, instance);
-				var actual = valId(ioPool, provider, instance, false);
-				return id != actual;
+				var val = get(ioPool, instance);
+				if(val == null){
+					var id = getUniverseID(ioPool, instance);
+					return id != 0;
+				}
+				return true;
 			}
 			@Override
 			public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
-				return valId(ioPool, provider, instance, allowExternalMod);
-			}
-			private int valId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
 				var val = get(ioPool, instance);
 				if(val == null) return 0;
 				var db   = provider.getTypeDb();
@@ -155,19 +162,20 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	}
 	
 	private ValueType readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+		var id = getUniverseID(ioPool, instance);
 		if(nullable()){
-			boolean isNull = getIsNull(ioPool, instance);
+			boolean isNull = id<=0 || getIsNull(ioPool, instance);
 			if(isNull){
 				return null;
 			}
 		}
 		
-		var id           = getUniverseID(ioPool, instance);
 		var type         = provider.getTypeDb().fromID(rootType, id);
 		var instancePipe = typeToPipe.get(type);
 		
 		return instancePipe.readNew(provider, src, makeContext(genericContext));
 	}
+	
 	
 	@Override
 	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{

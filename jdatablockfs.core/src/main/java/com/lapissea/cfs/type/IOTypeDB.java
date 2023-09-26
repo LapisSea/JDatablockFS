@@ -1,8 +1,8 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
@@ -28,6 +28,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -175,7 +176,7 @@ public sealed interface IOTypeDB{
 			public <T> Class<T> fromID(Class<T> rootType, int id){
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
-				return universe.id2cl.get(id - 1);
+				return universe.id2cl.get(id);
 			}
 			
 			@Override
@@ -186,7 +187,7 @@ public sealed interface IOTypeDB{
 				if(id == null){
 					id = universe.newId(type);
 				}
-				return id + 1;
+				return id;
 			}
 			
 			@Override
@@ -283,7 +284,7 @@ public sealed interface IOTypeDB{
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
 					this.cl2id = Map.copyOf(cl2id);
-					var maxId = this.cl2id.values().stream().mapToInt(i -> i).max().orElse(0);
+					var maxId = this.cl2id.values().stream().mapToInt(i -> i + 1).max().orElse(0);
 					id2cl = new Class[maxId];
 					this.cl2id.forEach((t, i) -> id2cl[i] = t);
 				}
@@ -350,14 +351,15 @@ public sealed interface IOTypeDB{
 				var universe = getUniverse(rootType);
 				if(universe == null) return null;
 				if(id>universe.id2cl.length || id<=0) return null;
-				return universe.id2cl[id - 1];
+				return universe.id2cl[id];
 			}
 			
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
-				return universe.cl2id.get(type) + 1;
+				if(universe == null) return -1;
+				return universe.cl2id.get(type);
 			}
 			
 			private IOType idToTyp(int id){
@@ -417,7 +419,8 @@ public sealed interface IOTypeDB{
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
 		private static       int                               FIRST_ID = -1;
-		private static final LateInit.Safe<MemoryOnlyDB.Fixed> BUILT_IN = Runner.async(() -> {
+		private static final LateInit.Safe<MemoryOnlyDB.Fixed> BUILT_IN = new LateInit.Safe<>(() -> {
+			//TODO: there is a deadlock of some sort involving virtual threads and a low core count. Investigate
 			var db = new MemoryOnlyDB.Basic();
 			try{
 				for(var c : new Class<?>[]{
@@ -450,6 +453,11 @@ public sealed interface IOTypeDB{
 					}){
 					registerBuiltIn(db, c);
 				}
+				
+				var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
+				uni.universe().stream().sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
+					db.toID(uni.root(), cls, true);
+				});
 			}catch(Throwable e){
 				e.printStackTrace();
 				throw new RuntimeException("Failed to initialize built in type IDs", e);
@@ -470,7 +478,10 @@ public sealed interface IOTypeDB{
 				
 				for(var field : cl.getDeclaredFields()){
 					if(IOFieldTools.isIOField(field) && IOInstance.isInstance(field.getType())){
-						registerBuiltIn(builtIn, field.getType());
+						var typ = field.getType();
+						if(!builtIn.hasType(IOType.of(typ))){
+							registerBuiltIn(builtIn, typ);
+						}
 					}
 				}
 				
@@ -669,6 +680,14 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void recordType(MemoryOnlyDB.Fixed builtIn, IOType type, Map<TypeName, TypeDef> newDefs) throws IOException{
+			if(type instanceof IOType.TypeNameArg arg){
+				var raws = arg.collectRaws(this);
+				for(var raw : raws){
+					recordType(builtIn, raw, newDefs);
+				}
+				return;
+			}
+			
 			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()).isPresent();
 			if(isBuiltIn){
 				for(IOType arg : IOType.getArgs(type)){
@@ -706,7 +725,7 @@ public sealed interface IOTypeDB{
 				}), newDefs);
 			}
 			
-			if(!def.isUnmanaged()){
+			if(!def.isUnmanaged() && (def.isIoInstance() || def.isEnum() || def.isJustInterface())){
 				newDefs.put(typeName, def);
 			}
 			
@@ -760,11 +779,16 @@ public sealed interface IOTypeDB{
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
 			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
+			
+			var builtIn = BUILT_IN.get();
+			var bcls    = builtIn.fromID(rootType, id);
+			if(bcls != null) return bcls;
+			
 			if(id<=0){
 				return null;
 			}
 			
-			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id - 1));
+			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
 			if(touched.isPresent()){
 				return touched.get();
 			}
@@ -781,6 +805,11 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
+			var builtIn = BUILT_IN.get();
+			var bid     = builtIn.toID(rootType, type, false);
+			if(bid != -1) return bid;
+			
+			
 			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
 			var touched = getTouched(rootType, type);

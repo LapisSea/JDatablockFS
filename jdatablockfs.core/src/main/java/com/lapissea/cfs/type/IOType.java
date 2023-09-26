@@ -11,7 +11,6 @@ import com.lapissea.util.NotImplementedException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -30,7 +29,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	
-	public sealed interface RawAndArg{
+	public interface RawAndArg{
 		default IOType withDefaultArgs(IOType... args){
 			var existing = getArgs();
 			
@@ -95,8 +94,13 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		protected TypeRaw getRaw(){ return this; }
+		
 		@Override
-		protected Type makeGeneric(IOTypeDB db){ return getTypeClass(db); }
+		public Class<?> generic(IOTypeDB db){
+			return (Class<?>)super.generic(db);
+		}
+		@Override
+		protected Class<?> makeGeneric(IOTypeDB db){ return getTypeClass(db); }
 		@Override
 		public boolean equals(Object o){
 			if(o instanceof TypeGeneric that){
@@ -264,21 +268,32 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		protected Type makeGeneric(IOTypeDB db){
-			Type bound = this.bound.generic(db);
+			Type bound = this.bound == null? Object.class : this.bound.generic(db);
 			return new SyntheticWildcardType(List.of(bound), isLower);
 		}
 		@Override
 		public int hashCode(){
-			int result = bound.hashCode();
+			int result = Objects.hashCode(bound);
 			result = 31*result + (isLower? 0 : 1);
 			return result;
 		}
 		@Override
 		public boolean equals(Object o){
-			return o instanceof TypeWildcard that &&
-			       that.isLower == isLower &&
-			       that.bound.equals(bound);
+			if(!(o instanceof TypeWildcard that)) return false;
+			
+			if(that.isLower != isLower) return false;
+			var b1 = bound;
+			var b2 = that.bound;
+			
+			if(Objects.equals(b1, b2)) return true;
+			if(b1 == null || b2 == null){
+				var b = b1 == null? b2 : b1;
+				return b instanceof TypeRaw raw &&
+				       raw.getName().equals(Object.class.getName());
+			}
+			return false;
 		}
+		
 		@Override
 		public String toString(){
 			if(isAnyWildcard()){
@@ -317,38 +332,41 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			return Utils.typeToRaw(generic(db));
 		}
 		
+		private record GenTypeVariable(String name, Type[] bounds, Class<?> declaration) implements TypeVariable<Class<?>>{
+			@Override
+			public Type[] getBounds(){ return bounds.clone(); }
+			@Override
+			public Class<?> getGenericDeclaration(){ return declaration; }
+			@Override
+			public String getName(){ return name; }
+			
+			@Override
+			public <T extends Annotation> T getAnnotation(Class<T> annotationClass){ return null; }
+			@Override
+			public Annotation[] getAnnotations(){ return new Annotation[0]; }
+			@Override
+			public Annotation[] getDeclaredAnnotations(){ return new Annotation[0]; }
+			@Override
+			public AnnotatedType[] getAnnotatedBounds(){ return new AnnotatedType[0]; }
+			@Override
+			public boolean equals(Object obj){
+				return obj instanceof TypeVariable<?> that &&
+				       that.getGenericDeclaration().equals(declaration) &&
+				       that.getName().equals(name);
+			}
+			@Override
+			public String toString(){
+				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t, false)).collect(Collectors.joining(" & "));
+			}
+		}
+		
+		
 		@Override
 		protected Type makeGeneric(IOTypeDB db){
-			var name        = this.name;
-			var declaration = parent.getTypeClass(db);
-			var bounds      = findBounds(declaration, name);
-			return new TypeVariable<>(){
-				@Override
-				public Type[] getBounds(){ return bounds.clone(); }
-				@Override
-				public GenericDeclaration getGenericDeclaration(){ return declaration; }
-				@Override
-				public String getName(){ return name; }
-				
-				@Override
-				public <T extends Annotation> T getAnnotation(Class<T> annotationClass){ return null; }
-				@Override
-				public Annotation[] getAnnotations(){ return new Annotation[0]; }
-				@Override
-				public Annotation[] getDeclaredAnnotations(){ return new Annotation[0]; }
-				@Override
-				public AnnotatedType[] getAnnotatedBounds(){ return new AnnotatedType[0]; }
-				@Override
-				public boolean equals(Object obj){
-					return obj instanceof TypeVariable<?> that &&
-					       that.getGenericDeclaration().equals(declaration) &&
-					       that.getName().equals(name);
-				}
-				@Override
-				public String toString(){
-					return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t, false)).collect(Collectors.joining(" & "));
-				}
-			};
+			var    name        = this.name;
+			var    declaration = parent.getTypeClass(db);
+			Type[] bounds      = findBounds(declaration, name);
+			return new GenTypeVariable(name, bounds, declaration);
 		}
 		
 		public Type[] findBounds(IOTypeDB db){

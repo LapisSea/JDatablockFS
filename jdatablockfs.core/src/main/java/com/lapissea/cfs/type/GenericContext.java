@@ -129,6 +129,13 @@ public interface GenericContext extends Stringify{
 					}
 					yield new TypeArgs(raw, SyntheticParameterizedType.of(raw, List.of(rawArgs)));
 				}
+				case TypeVariable<?> var -> {
+					var bounds = var.getBounds();
+					if(bounds.length != 1){
+						throw new NotImplementedException("Multiple bounds not implemented: " + var);
+					}
+					yield new TypeArgs(Utils.typeToRaw(bounds[0]), bounds[0]);
+				}
 				default -> throw new NotImplementedException(type.getClass().getName());
 			};
 		}
