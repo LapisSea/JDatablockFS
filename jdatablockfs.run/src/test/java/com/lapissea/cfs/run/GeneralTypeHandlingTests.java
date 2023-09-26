@@ -661,4 +661,24 @@ public class GeneralTypeHandlingTests{
 		data.strings().list().addAll(List.of("foo", "bar"));
 	}
 	
+	sealed interface RecursiveSeal{
+		
+		final class A extends IOInstance.Managed<A> implements RecursiveSeal{
+			@IOValue
+			int a;
+		}
+		
+		final class B extends IOInstance.Managed<B> implements RecursiveSeal{
+			@IOValue
+			int           b;
+			@IOValue
+			RecursiveSeal recursiveSeal;
+		}
+		
+	}
+	
+	@Test(timeOut = 2000)
+	void recursiveSeal(){
+		StandardStructPipe.of(RecursiveSeal.B.class).waitForStateDone();
+	}
 }

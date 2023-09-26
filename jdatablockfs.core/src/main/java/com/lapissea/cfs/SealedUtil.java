@@ -43,20 +43,33 @@ public final class SealedUtil{
 			this(data.root, data.universe.stream().collect(toUnmodifiableMap(t -> t, StandardStructPipe::of)));
 		}
 		
-		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(boolean nullable, BiFunction<VarPool<Inst>, Inst, T> get){
+		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(
+			boolean nullable, boolean computeSize, BiFunction<VarPool<Inst>, Inst, T> get
+		){
 			
-			var sizes     = pipeMap.values().stream().map(StructPipe::getSizeDescriptor).toList();
-			var wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
-			var fixed = sizes.stream().map(s -> s.getFixed(wordSpace))
-			                 .reduce((a, b) -> a.isPresent() && b.isPresent() && a.getAsLong() == b.getAsLong()?
-			                                   a : OptionalLong.empty())
-			                 .orElseThrow();
-			if(fixed.isPresent()){
-				return SizeDescriptor.Fixed.of(wordSpace, fixed.getAsLong());
+			long         minSize;
+			OptionalLong maxSize;
+			WordSpace    wordSpace;
+			
+			if(computeSize){
+				var sizes = pipeMap.values().stream().map(StructPipe::getSizeDescriptor).toList();
+				
+				wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
+				var fixed = sizes.stream().map(s -> s.getFixed(wordSpace))
+				                 .reduce((a, b) -> a.isPresent() && b.isPresent() && a.getAsLong() == b.getAsLong()?
+				                                   a : OptionalLong.empty())
+				                 .orElseThrow();
+				if(fixed.isPresent()){
+					return SizeDescriptor.Fixed.of(wordSpace, fixed.getAsLong());
+				}
+				
+				minSize = nullable? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
+				maxSize = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
+			}else{
+				wordSpace = WordSpace.BYTE;
+				minSize = 0;
+				maxSize = OptionalLong.empty();
 			}
-			
-			var minSize = nullable? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
-			var maxSize = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
 			
 			return SizeDescriptor.Unknown.of(
 				wordSpace, minSize, maxSize,

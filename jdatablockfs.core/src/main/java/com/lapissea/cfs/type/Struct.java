@@ -628,6 +628,19 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			if(IOInstance.isInstance(acc.getType())){
 				if(!IOInstance.isManaged(acc.getType())) return true;
+				var uni = SealedUtil.getSealedUniverse(acc.getType(), false)
+				                    .filter(IOInstance::isInstance)
+				                    .filter(u -> u.universe().contains(this.getType()));
+				if(uni.isPresent()){
+					for(var typ : uni.get().universe()){
+						if(typ == this.getType()) continue;
+						if(Struct.canUnknownHavePointers(typ)){
+							return true;
+						}
+					}
+					return false;
+				}
+				
 				return Struct.canUnknownHavePointers(acc.getType());
 			}
 			return false;

@@ -1052,7 +1052,7 @@ public sealed interface ValueStorage<T>{
 			this.ctx = ctx;
 			this.provider = provider;
 			this.universe = universe;
-			sizeDescriptor = universe.makeSizeDescriptor(false, (pool, inst) -> inst);
+			sizeDescriptor = universe.makeSizeDescriptor(true, false, (pool, inst) -> inst);
 			canHavePointers = universe.calcCanHavePointers();
 			
 			type = new RuntimeType.Lambda<>(canHavePointers, universe.root(), null);
@@ -1118,7 +1118,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new NoIOField<>(accessor, universe.makeSizeDescriptor(false, (pool, inst) -> (T)accessor.get(pool, inst)));
+			return new NoIOField<>(accessor, universe.makeSizeDescriptor(false, false, (pool, inst) -> (T)accessor.get(pool, inst)));
 		}
 		
 		@Override
