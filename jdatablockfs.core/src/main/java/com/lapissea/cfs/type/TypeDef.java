@@ -7,11 +7,14 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -22,6 +25,17 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABL
 
 @IOValue
 public final class TypeDef extends IOInstance.Managed<TypeDef>{
+	
+	@IOValue
+	@Def.Order({"name", "bound"})
+	public interface ClassArgDef extends IOInstance.Def<ClassArgDef>{
+		String name();
+		IOType bound();
+		
+		static ClassArgDef of(String name, IOType bound){
+			return Def.of(ClassArgDef.class, name, bound);
+		}
+	}
 	
 	@IOValue
 	public static final class FieldDef extends IOInstance.Managed<FieldDef>{
@@ -99,17 +113,18 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	}
 	
 	
-	private boolean        ioInstance;
-	private boolean        unmanaged;
-	private boolean        justInterface;
-	private FieldDef[]     fields     = new FieldDef[0];
-	private int[]          fieldOrder = new int[0];
+	private boolean           ioInstance;
+	private boolean           unmanaged;
+	private boolean           justInterface;
+	private FieldDef[]        fields     = new FieldDef[0];
+	private int[]             fieldOrder = new int[0];
 	@IONullability(NULLABLE)
-	private EnumConstant[] enumConstants;
+	private EnumConstant[]    enumConstants;
 	@IONullability(NULLABLE)
-	private String[]       permits;
+	private String[]          permits;
 	@IONullability(NULLABLE)
-	private SealedParent   sealedParent;
+	private SealedParent      sealedParent;
+	private List<ClassArgDef> typeArgs   = List.of();
 	
 	public TypeDef(){ }
 	
@@ -155,11 +170,21 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(!isIoInstance() && !isEnum() && type.isInterface()){
 			justInterface = true;
 		}
+		
+		var typeArgs = type.getTypeParameters();
+		this.typeArgs = new ArrayList<>(typeArgs.length);
+		for(var arg : typeArgs){
+			var bounds = arg.getBounds();
+			if(bounds.length != 1){
+				throw new NotImplementedException("Multiple bounds not implemented: " + type.getName());
+			}
+			this.typeArgs.add(ClassArgDef.of(arg.getName(), IOType.of(bounds[0])));
+		}
 	}
 	
 	private void setSealedParent(SealedParent sealedParent){
 		if(this.sealedParent != null){
-			throw new IllegalStateException("multiple sealed parents not supported:\n" + this.sealedParent + "\n" + sealedParent);
+			throw new IllegalStateException("multiple sealed parents not supported:\n" + this + "\n\t" + this.sealedParent + "\n\t" + sealedParent);
 		}
 		this.sealedParent = sealedParent;
 	}
@@ -191,6 +216,11 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(!isEnum()) return List.of();
 		return ArrayViewList.create(enumConstants, null);
 	}
+	
+	public List<ClassArgDef> getTypeArgs(){
+		return Collections.unmodifiableList(typeArgs);
+	}
+	
 	@Override
 	public String toShortString(){
 		return toString();

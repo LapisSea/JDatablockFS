@@ -98,6 +98,11 @@ public final class TemplateClassLoader extends ClassLoader{
 		var log = JorthLogger.make();
 		try{
 			var bytecode = Jorth.generateClass(this, classType.name, writer -> {
+				for(var typeArg : classType.def.getTypeArgs()){
+					var type = typeArg.bound().generic(db);
+					writer.write("type-arg {!} {}", typeArg.name(), type);
+				}
+				
 				if(classType.def.isIoInstance()){
 					generateIOInstance(classType, writer);
 				}else if(classType.def.isEnum()){
