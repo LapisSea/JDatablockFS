@@ -16,6 +16,7 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
@@ -109,6 +110,8 @@ public final class TemplateClassLoader extends ClassLoader{
 					generateEnum(classType, writer);
 				}else if(classType.def.isJustInterface()){
 					generateJustAnInterface(classType, writer);
+				}else{
+					throw new NotImplementedException(classType.name);
 				}
 			}, log == null? null : log::log);
 			if(log != null) Log.log(log.output());

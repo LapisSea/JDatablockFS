@@ -277,7 +277,7 @@ public abstract class StagedInit{
 	
 	private void threadCheck(){
 		if(initThread == Thread.currentThread()){
-			throw new RuntimeException("Self deadlock");
+			throw new RuntimeException("Self deadlock: " + this);
 		}
 	}
 }

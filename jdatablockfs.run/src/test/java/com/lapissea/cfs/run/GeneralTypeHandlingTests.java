@@ -2,7 +2,6 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
@@ -11,7 +10,6 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -644,10 +642,6 @@ public class GeneralTypeHandlingTests{
 		strings.add("bar");
 		assertEquals(List.of("foo", "bar"), strings.collectToList());
 		assertEquals(IOType.of(ContiguousIOList.class, String.class), strings.getTypeDef());
-	}
-	
-	static{
-		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
 	}
 	
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
