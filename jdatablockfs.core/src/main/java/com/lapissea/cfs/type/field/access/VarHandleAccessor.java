@@ -35,100 +35,100 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 		@Override
 		protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactShort(ioPool, instance, value);
+			else super.setExactShort(ioPool, instance, value);
 		}
 		@Override
 		protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (short)getter.apply(instance);
-			return super.getExactShort(ioPool, instance);
+			else return super.getExactShort(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactChar(ioPool, instance, value);
+			else super.setExactChar(ioPool, instance, value);
 		}
 		@Override
 		protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (char)getter.apply(instance);
-			return super.getExactChar(ioPool, instance);
+			else return super.getExactChar(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactLong(ioPool, instance, value);
+			else super.setExactLong(ioPool, instance, value);
 		}
 		@Override
 		protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (long)getter.apply(instance);
-			return super.getExactLong(ioPool, instance);
+			else return super.getExactLong(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactByte(ioPool, instance, value);
+			else super.setExactByte(ioPool, instance, value);
 		}
 		@Override
 		protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (byte)getter.apply(instance);
-			return super.getExactByte(ioPool, instance);
+			else return super.getExactByte(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactInt(ioPool, instance, value);
+			else super.setExactInt(ioPool, instance, value);
 		}
 		@Override
 		protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (int)getter.apply(instance);
-			return super.getExactInt(ioPool, instance);
+			else return super.getExactInt(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactDouble(ioPool, instance, value);
+			else super.setExactDouble(ioPool, instance, value);
 		}
 		@Override
 		protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (double)getter.apply(instance);
-			return super.getExactDouble(ioPool, instance);
+			else return super.getExactDouble(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactFloat(ioPool, instance, value);
+			else super.setExactFloat(ioPool, instance, value);
 		}
 		@Override
 		protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (float)getter.apply(instance);
-			return super.getExactFloat(ioPool, instance);
+			else return super.getExactFloat(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactBoolean(ioPool, instance, value);
+			else super.setExactBoolean(ioPool, instance, value);
 		}
 		@Override
 		protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return (boolean)getter.apply(instance);
-			return super.getExactBoolean(ioPool, instance);
+			else return super.getExactBoolean(ioPool, instance);
 		}
 		
 		@Override
 		protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
 			if(setter != null) setter.accept(instance, value);
-			super.setExactObject(ioPool, instance, value);
+			else super.setExactObject(ioPool, instance, value);
 		}
 		@Override
 		protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter != null) return getter.apply(instance);
-			return super.getExactObject(ioPool, instance);
+			else return super.getExactObject(ioPool, instance);
 		}
 	}
 	
