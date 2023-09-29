@@ -20,8 +20,10 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -465,6 +467,54 @@ public sealed interface IOTypeDB{
 			FIRST_ID = db.maxID();
 			return db.bake();
 		});
+		
+		private static void threadDump(){
+			record StackThread(Thread thread, List<StackTraceElement> stack){ }
+			var res = jdk.internal.vm.ThreadContainers
+				          .root()
+				          .threads()
+				          .map(t -> new StackThread(t, Arrays.stream(t.getStackTrace())
+//				                                             .dropWhile(s -> s.getModuleName().equals("java.base"))
+                                                             .toList()))
+				          .filter(t -> t.stack.stream().anyMatch(p -> !"java.base".equals(p.getModuleName())))
+				          .collect(Collectors.groupingBy(StackThread::stack))
+				          .values()
+				          .stream()
+				          .sorted(Comparator.comparing(s -> s.get(0).stack.size()))
+				          .sorted(Comparator.comparing(s -> !s.get(0).thread.isVirtual()))
+				          .map(l -> l.stream().map(s -> s.thread.getName() + " (" + (s.thread.isVirtual()? "V" : "O") + ")").collect(Collectors.joining(", ")) + "\n"
+				                    + l.get(0).stack.stream()
+				                                    .map(s -> "\t" + s)
+				                                    .collect(Collectors.joining("\n")))
+				          .collect(Collectors.joining("\n\n"));
+			
+			LogUtil.println(res);
+		}
+		public static boolean stackDump = false;
+		
+		static{
+			Thread.ofPlatform().daemon(true).start(() -> {
+				UtilL.sleep(15*1000);
+				if(BUILT_IN.isInitialized()) return;
+				try{
+					//May be in a different class loader so ensure proper access
+					var cls = ClassLoader.getPlatformClassLoader().loadClass(PersistentDB.class.getName());
+					var f   = cls.getField("stackDump");
+					f.set(null, true);
+				}catch(Throwable e){
+					e.printStackTrace();
+				}
+				int a = 0;
+			});
+			Thread.ofPlatform().daemon(true).start(() -> {
+				while(true){
+					UtilL.sleep(200);
+					if(!stackDump) continue;
+					threadDump();
+					System.exit(0);
+				}
+			});
+		}
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
 			builtIn.toID(c);
