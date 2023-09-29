@@ -4,12 +4,10 @@ import com.lapissea.cfs.SealedUtil;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -28,9 +26,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
-import static com.lapissea.cfs.type.StagedInit.runBaseStageTask;
 
 public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 	
@@ -38,7 +34,7 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 		
 		final class PipeImpl<E extends IOInstance<E>> implements ElementIOImpl<E>{
 			
-			private       StructPipe<E> pipe;
+			private final StructPipe<E> pipe;
 			private final Class<E>      componentType;
 			
 			public PipeImpl(Class<E> componentType){
@@ -46,49 +42,33 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 				if(!IOInstance.isInstance(componentType)) throw new MalformedStruct(componentType + " is not an IOInstance");
 				if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct(componentType + " is unmanaged");
 				
-				try{
-					//preload pipe
-					if(TYPE_VALIDATION){
-						runBaseStageTask(this::getPipe);
-					}else{
-						StandardStructPipe.of(componentType);
-					}
-				}catch(RecursiveSelfCompilation e){
-					Log.debug("recursive compilation for {}", componentType);
-				}
-			}
-			
-			private StructPipe<E> getPipe(){
-				if(pipe == null){
-					pipe = StandardStructPipe.of(componentType, STATE_DONE);
-				}
-				return pipe;
+				pipe = StandardStructPipe.of(componentType, STATE_DONE);
 			}
 			
 			@Override
 			public Class<E> componentType(){
 				return componentType;
-				
 			}
+			
 			@Override
 			public long calcByteSize(DataProvider provider, E element){
-				return getPipe().calcUnknownSize(provider, element, WordSpace.BYTE);
+				return pipe.calcUnknownSize(provider, element, WordSpace.BYTE);
 			}
 			@Override
 			public OptionalLong getFixedByteSize(){
-				return getPipe().getSizeDescriptor().getFixed(WordSpace.BYTE);
+				return pipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 			}
 			@Override
 			public void write(DataProvider provider, ContentWriter dest, E element) throws IOException{
-				getPipe().write(provider, dest, element);
+				pipe.write(provider, dest, element);
 			}
 			@Override
 			public E read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				return getPipe().readNew(provider, src, genericContext);
+				return pipe.readNew(provider, src, genericContext);
 			}
 			@Override
 			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				getPipe().skip(provider, src, genericContext);
+				pipe.skip(provider, src, genericContext);
 			}
 		}
 		

@@ -46,6 +46,7 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 public class Cluster implements DataProvider{
 	
 	static{
+		Thread.startVirtualThread(() -> new IOTypeDB.PersistentDB());
 		Thread.startVirtualThread(FieldCompiler::init);
 	}
 	
