@@ -24,7 +24,6 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.Random;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.cfs.logging.Log.trace;
@@ -170,7 +169,7 @@ public final class TestUtils{
 				task.run(state, actionIndex);
 			}
 			@Override
-			public RawRandom create(Random random, long sequenceIndex, FuzzingRunner.Mark mark){
+			public RawRandom create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark){
 				return new RawRandom(random.nextLong());
 			}
 		}, r -> null);

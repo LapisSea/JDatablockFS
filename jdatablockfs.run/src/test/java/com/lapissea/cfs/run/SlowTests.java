@@ -52,6 +52,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -387,7 +388,7 @@ public class SlowTests{
 		
 		var rnr = new FuzzingRunner.StateEnv.Marked<State, Action, IOException>(){
 			@Override
-			public State create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public State create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "map-fuzz" + sequenceIndex);
 				return new State(cluster, new CheckSet<>(cluster.getRootProvider().request("hi", type, Integer.class)));
 			}
@@ -537,7 +538,7 @@ public class SlowTests{
 	void fuzzIOList(ListMaker maker){
 		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv.Marked<>(){
 			@Override
-			public IOList<Integer> create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public IOList<Integer> create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				return new CheckIOList<>(maker.make());
 			}
 			@Override
@@ -606,7 +607,7 @@ public class SlowTests{
 				return true;
 			}
 			@Override
-			public State create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public State create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				var s = new CheckIOList<>(maker.make());
 				for(int i = 0, j = random.nextInt(50); i<j; i++){
 					s.add(random.nextInt(200));
@@ -703,7 +704,7 @@ public class SlowTests{
 			}
 			
 			@Override
-			public MapState create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public MapState create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				Cluster provider = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "");
 				var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map")
 				                  .withType(IOType.of(HashIOMap.class, Object.class, Object.class))
@@ -789,7 +790,7 @@ public class SlowTests{
 			}
 			
 			@Override
-			public BlobState create(Random random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public BlobState create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
 				var initial = new byte[random.nextInt(0, 100)];
 				random.nextBytes(initial);
 				

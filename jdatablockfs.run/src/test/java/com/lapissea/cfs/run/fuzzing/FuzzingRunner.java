@@ -1,5 +1,7 @@
 package com.lapissea.cfs.run.fuzzing;
 
+import com.lapissea.cfs.utils.RawRandom;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -8,7 +10,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,6 +17,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.random.RandomGenerator;
 import java.util.stream.IntStream;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -89,13 +91,13 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		
 		boolean shouldRun(FuzzSequence sequence, Mark mark);
 		void applyAction(State state, long actionIndex, Action action, Mark mark) throws Err;
-		State create(Random random, long sequenceIndex, Mark mark) throws Err;
+		State create(RandomGenerator random, long sequenceIndex, Mark mark) throws Err;
 	}
 	
-	private final StateEnv<State, Action, Err> stateEnv;
-	private final Function<Random, Action>     actionFactory;
+	private final StateEnv<State, Action, Err>      stateEnv;
+	private final Function<RandomGenerator, Action> actionFactory;
 	
-	public FuzzingRunner(StateEnv<State, Action, Err> stateEnv, Function<Random, Action> actionFactory){
+	public FuzzingRunner(StateEnv<State, Action, Err> stateEnv, Function<RandomGenerator, Action> actionFactory){
 		this.stateEnv = stateEnv;
 		this.actionFactory = actionFactory;
 	}
@@ -192,7 +194,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		if(progress != null && progress.hasErr()) return Optional.empty();
 		
 		var start = Instant.now();
-		var rand  = new Random(sequence.seed());
+		var rand  = new RawRandom(sequence.seed());
 		
 		State state;
 		try{

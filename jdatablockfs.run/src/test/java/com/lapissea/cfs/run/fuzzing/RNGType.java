@@ -1,32 +1,34 @@
 package com.lapissea.cfs.run.fuzzing;
 
+import com.lapissea.cfs.utils.RawRandom;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 
-public final class RNGType<E> implements Function<Random, E>{
+public final class RNGType<E> implements Function<RandomGenerator, E>{
 	
-	public static <E> RNGType<E> of(List<Function<Random, E>> definition){
+	public static <E> RNGType<E> of(List<Function<RandomGenerator, E>> definition){
 		return new RNGType<>(definition);
 	}
 	
-	private record Chance<E>(Function<Random, E> gen, float chance){ }
+	private record Chance<E>(Function<RandomGenerator, E> gen, float chance){ }
 	
-	private final Map<Class<? extends E>, Function<Random, E>> universe;
+	private final Map<Class<? extends E>, Function<RandomGenerator, E>> universe;
 	
-	private final List<Function<Random, E>> randomPick;
-	private final List<Chance<E>>           chances = new ArrayList<>();
-	private       float                     totalChance;
+	private final List<Function<RandomGenerator, E>> randomPick;
+	private final List<Chance<E>>                    chances = new ArrayList<>();
+	private       float                              totalChance;
 	
-	private RNGType(List<Function<Random, E>> definition){
+	private RNGType(List<Function<RandomGenerator, E>> definition){
 		if(definition.isEmpty()) throw new IllegalArgumentException("Definitions required");
 		
-		var rand = new Random(123);
+		var rand = new RawRandom(123);
 		//noinspection unchecked
 		universe = definition.stream()
 		                     .collect(Collectors.toUnmodifiableMap(
@@ -38,11 +40,11 @@ public final class RNGType<E> implements Function<Random, E>{
 	}
 	
 	@Override
-	public E apply(Random random){
+	public E apply(RandomGenerator random){
 		return getFn(random).apply(random);
 	}
 	
-	private Function<Random, E> getFn(Random random){
+	private Function<RandomGenerator, E> getFn(RandomGenerator random){
 		for(var ch : chances){
 			if(random.nextFloat()<=ch.chance){
 				return ch.gen;
@@ -77,7 +79,7 @@ public final class RNGType<E> implements Function<Random, E>{
 		return this;
 	}
 	
-	public <Typ> Function<Random, Typ> map(BiFunction<E, Random, Typ> mapper){
+	public <Typ> Function<RandomGenerator, Typ> map(BiFunction<E, RandomGenerator, Typ> mapper){
 		return random -> {
 			var e = RNGType.this.apply(random);
 			return mapper.apply(e, random);

@@ -4,12 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.random.RandomGenerator;
 
-public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
+public final class RNGEnum<E extends Enum<E>> implements Function<RandomGenerator, E>{
 	
 	@SuppressWarnings("rawtypes")
 	private static final Map<Class<? extends Enum>, List<?>> ENUM_CACHE = new ConcurrentHashMap<>();
@@ -28,7 +28,7 @@ public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 		return uni;
 	}
 	
-	public static <E extends Enum<E>> E anyOf(Random random, Class<E> type){
+	public static <E extends Enum<E>> E anyOf(RandomGenerator random, Class<E> type){
 		var uni = getUniverse(type);
 		return uni.get(random.nextInt(uni.size()));
 	}
@@ -48,7 +48,7 @@ public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 	}
 	
 	@Override
-	public E apply(Random random){
+	public E apply(RandomGenerator random){
 		for(var ch : chances){
 			if(random.nextFloat()<=ch.chance){
 				return ch.val;
@@ -82,7 +82,7 @@ public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 		return this;
 	}
 	
-	public <Typ> Function<Random, Typ> map(BiFunction<E, Random, Typ> mapper){
+	public <Typ> Function<RandomGenerator, Typ> map(BiFunction<E, RandomGenerator, Typ> mapper){
 		return random -> {
 			var e = RNGEnum.this.apply(random);
 			return mapper.apply(e, random);
