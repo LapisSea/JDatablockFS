@@ -19,7 +19,6 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
-import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
@@ -31,8 +30,10 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -242,17 +243,41 @@ public class Cluster implements DataProvider{
 		var db    = metadata.db;
 		var names = db.listStoredTypeDefinitionNames();
 		if(names.isEmpty()) return;
+		
+		var tLoader = db.getTemplateLoader();
+		
+		List<Struct<?>> structs = new ArrayList<>(names.size());
 		for(String name : names){
 			if(name.isEmpty()) continue;
 			try{
-				var clazz = db.getTemplateLoader().loadClass(name);
-				if(IOInstance.isInstance(clazz)){
-					Struct.ofUnknown(clazz, StagedInit.STATE_DONE);
+				var def = db.getDefinitionFromClassName(name).orElseThrow();
+				if(!def.isIoInstance() || def.isUnmanaged()) continue;
+				var clazz = tLoader.loadClass(name);
+				if(clazz.getClassLoader() != tLoader){
+					continue;
 				}
+				structs.add(Struct.ofUnknown(clazz));
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to load type of " + name, e);
+				throw fail(names, name, e);
 			}
 		}
+		
+		for(Struct<?> struct : structs){
+			try{
+				struct.waitForStateDone();
+			}catch(Throwable e){
+				throw fail(names, struct.getType().getName(), e);
+			}
+		}
+	}
+	
+	private static MalformedStruct fail(Set<String> names, String name, Throwable e){
+		throw new MalformedStruct(
+			"Failed to load type of " + name + "\n" +
+			"Stored names:\n" +
+			names.stream().map(s -> "\t" + s).collect(Collectors.joining("\n")),
+			e
+		);
 	}
 	
 	@Override
