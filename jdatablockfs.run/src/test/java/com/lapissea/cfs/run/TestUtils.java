@@ -10,6 +10,7 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.run.checked.CheckIOList;
 import com.lapissea.cfs.run.checked.CheckMap;
+import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
@@ -18,13 +19,13 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.NewUnmanaged;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.utils.RawRandom;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.function.IntConsumer;
-import java.util.stream.IntStream;
+import java.util.random.RandomGenerator;
 
 import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
@@ -159,32 +160,21 @@ public final class TestUtils{
 	
 	
 	public interface Task{
-		void run(Random r, int iter, boolean tick);
+		void run(RandomGenerator r, long iter);
 	}
 	
-	public static void randomBatch(int totalTasks, Task task){
-		var cores = Runtime.getRuntime().availableProcessors();
-		IntStream.range(0, cores).parallel().map(i -> i*10000).forEach(new IntConsumer(){
-			int index;
-			long lastTime = 0;
+	public static void randomBatch(int totalTasks, int batch, Task task){
+		var fuz = new FuzzingRunner<>(new FuzzingRunner.StateEnv.Marked<RawRandom, Object, Throwable>(){
 			@Override
-			public void accept(int seed){
-				Random r     = new Random(seed);
-				var    batch = totalTasks/cores;
-				for(int i = 0; i<batch; i++){
-					int     iter;
-					boolean tick = false;
-					synchronized(this){
-						iter = index;
-						index++;
-						if(System.currentTimeMillis() - lastTime>1000){
-							lastTime = System.currentTimeMillis();
-							tick = true;
-						}
-					}
-					task.run(r, iter, tick);
-				}
+			public void applyAction(RawRandom state, long actionIndex, Object action, FuzzingRunner.Mark mark){
+				task.run(state, actionIndex);
 			}
-		});
+			@Override
+			public RawRandom create(Random random, long sequenceIndex, FuzzingRunner.Mark mark){
+				return new RawRandom(random.nextLong());
+			}
+		}, r -> null);
+		
+		fuz.runAndAssert(69, totalTasks, batch);
 	}
 }

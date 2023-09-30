@@ -6,7 +6,6 @@ import org.testng.annotations.Test;
 
 import java.util.Arrays;
 
-import static com.lapissea.cfs.logging.Log.info;
 import static com.lapissea.cfs.run.TestUtils.randomBatch;
 import static org.testng.Assert.assertEquals;
 
@@ -19,11 +18,7 @@ public class CompressionTests{
 	
 	@Test(dataProvider = "comps")
 	void compressionIntegrity(IOCompression.Type type){
-		randomBatch(500, (r, iter, tick) -> {
-			if(tick){
-				info("iteration: {}", iter);
-			}
-			
+		randomBatch(500, 100, (r, iter) -> {
 			try{
 				byte[] raw;
 				if(iter == 0){

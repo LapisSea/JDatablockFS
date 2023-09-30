@@ -75,10 +75,7 @@ public class SlowTests{
 			Cluster.init(d);
 			baked = d.readAll();
 		}
-		randomBatch(300000, (r, iter, tick) -> {
-			if(tick){
-				info("iteration: {}", iter);
-			}
+		randomBatch(300000, 1000, (r, iter) -> {
 			try{
 				List<RandomIO.WriteChunk> allWrites;
 				if(iter == 0){
@@ -158,7 +155,7 @@ public class SlowTests{
 	}
 	
 	@Test
-	void ioTransaction() throws IOException{
+	void ioTransaction(){
 		int cap = 50;
 		
 		ThreadLocal<IOInterface> dataLocal   = ThreadLocal.withInitial(() -> MemoryData.builder().withCapacity(cap + 10).build());
@@ -167,8 +164,7 @@ public class SlowTests{
 		
 		
 		//Dumb brute force all possible edge cases
-		randomBatch(50000, (rand, run, tick) -> {
-			if(tick) info("{}", run);
+		randomBatch(50000, 1000, (rand, run) -> {
 			int runIndex = 0;
 			
 			IOInterface data   = dataLocal.get();
