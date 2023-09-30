@@ -26,7 +26,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.fields.CollectionAddapter;
+import com.lapissea.cfs.type.field.fields.CollectionAdapter;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -55,9 +55,9 @@ public class InstanceCollection{
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
-				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
+				return new InstanceCollection.ReferenceField<>(field, CollectionAdapter.OfArray.class);
 			}
-			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
+			return new InstanceCollection.InlineField<>(field, CollectionAdapter.OfArray.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -85,9 +85,9 @@ public class InstanceCollection{
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)){
-				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
+				return new InstanceCollection.ReferenceField<>(field, CollectionAdapter.OfList.class);
 			}
-			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
+			return new InstanceCollection.InlineField<>(field, CollectionAdapter.OfList.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -106,14 +106,14 @@ public class InstanceCollection{
 	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends NullFlagCompanyField<T, CollectionType>{
 		
-		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;
+		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
 		private IOField<T, Integer> collectionSize;
 		
 		@SuppressWarnings({"rawtypes"})
-		public InlineField(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> dataAdapterType){
+		public InlineField(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> dataAdapterType){
 			super(accessor);
-			dataAdapter = makeAddapter(accessor, dataAdapterType);
+			dataAdapter = makeAdapter(accessor, dataAdapterType);
 			
 			initSizeDescriptor(SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 				var arr = get(null, inst);
@@ -194,14 +194,14 @@ public class InstanceCollection{
 	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends RefField.ReferenceCompanion<T, CollectionType>{
 		
-		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;
+		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
 		private final ObjectPipe<CollectionType, Void> refPipe;
 		
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		public ReferenceField(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> dataAdapterType){
+		public ReferenceField(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> dataAdapterType){
 			super(accessor, SizeDescriptor.Fixed.empty());
-			dataAdapter = makeAddapter(accessor, dataAdapterType);
+			dataAdapter = makeAdapter(accessor, dataAdapterType);
 			
 			refPipe = new ObjectPipe<>(){
 				@Override
@@ -360,19 +360,19 @@ public class InstanceCollection{
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static <E extends IOInstance<E>, C> CollectionAddapter<E, C> makeAddapter(FieldAccessor<?> accessor, Class<? extends CollectionAddapter> addapterType){
+	private static <E extends IOInstance<E>, C> CollectionAdapter<E, C> makeAdapter(FieldAccessor<?> accessor, Class<? extends CollectionAdapter> adapterType){
 		var collectionType = accessor.getGenericType(null);
-		var type           = CollectionAddapter.getComponentType(addapterType, collectionType);
+		var type           = CollectionAdapter.getComponentType(adapterType, collectionType);
 		
-		CollectionAddapter.ElementIOImpl<E> impl;
+		CollectionAdapter.ElementIOImpl<E> impl;
 		
 		var universe = SealedUtil.getSealedUniverse(type, false).flatMap(SealedUtil.SealedInstanceUniverse::ofUnknown);
 		if(universe.isPresent()){
-			impl = new CollectionAddapter.ElementIOImpl.SealedTypeImpl<>((SealedUtil.SealedInstanceUniverse<E>)universe.get());
+			impl = new CollectionAdapter.ElementIOImpl.SealedTypeImpl<>((SealedUtil.SealedInstanceUniverse<E>)universe.get());
 		}else{
-			impl = new CollectionAddapter.ElementIOImpl.PipeImpl<>((Class<E>)type);
+			impl = new CollectionAdapter.ElementIOImpl.PipeImpl<>((Class<E>)type);
 		}
 		
-		return CollectionAddapter.newAddapter(addapterType, impl);
+		return CollectionAdapter.newAdapter(adapterType, impl);
 	}
 }

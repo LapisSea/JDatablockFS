@@ -20,7 +20,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.fields.CollectionAddapter;
+import com.lapissea.cfs.type.field.fields.CollectionAdapter;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
@@ -44,7 +44,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
-			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfList.class);
+			return new IOFieldEnumCollection<>(field, CollectionAdapter.OfList.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -69,7 +69,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){
-			return new IOFieldEnumCollection<>(field, CollectionAddapter.OfArray.class);
+			return new IOFieldEnumCollection<>(field, CollectionAdapter.OfArray.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -83,7 +83,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		}
 	}
 	
-	private static final class EnumIO<E extends Enum<E>> implements CollectionAddapter.ElementIOImpl<E>{
+	private static final class EnumIO<E extends Enum<E>> implements CollectionAdapter.ElementIOImpl<E>{
 		
 		private final EnumUniverse<E> uni;
 		private EnumIO(EnumUniverse<E> uni){
@@ -106,13 +106,13 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext){ throw new UnsupportedOperationException(); }
 	}
 	
-	private final EnumUniverse<E>                universe;
-	private final CollectionAddapter<E, ColType> addapter;
-	private       IOFieldPrimitive.FInt<T>       collectionLength;
+	private final EnumUniverse<E>               universe;
+	private final CollectionAdapter<E, ColType> adapter;
+	private       IOFieldPrimitive.FInt<T>      collectionLength;
 	
-	public IOFieldEnumCollection(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> addapterType){
+	public IOFieldEnumCollection(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> adapterType){
 		super(accessor);
-		addapter = makeAddapter(accessor, addapterType);
+		adapter = makeAdapter(accessor, adapterType);
 		var gt   = accessor.getGenericType(null);
 		var etyp = ((ParameterizedType)gt).getActualTypeArguments()[0];
 		universe = EnumUniverse.of((Class<E>)etyp);
@@ -122,16 +122,16 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			if(siz>0) return byteCount(siz);
 			var col = get(ioPool, inst);
 			if(col == null) return 0;
-			return byteCount(addapter.getSize(col));
+			return byteCount(adapter.getSize(col));
 		}));
 	}
 	
 	@SuppressWarnings({"rawtypes"})
-	private static <E extends Enum<E>, C> CollectionAddapter<E, C> makeAddapter(FieldAccessor<?> accessor, Class<? extends CollectionAddapter> addapterType){
+	private static <E extends Enum<E>, C> CollectionAdapter<E, C> makeAdapter(FieldAccessor<?> accessor, Class<? extends CollectionAdapter> adapterType){
 		var collectionType = accessor.getGenericType(null);
-		var type           = CollectionAddapter.getComponentType(addapterType, collectionType);
+		var type           = CollectionAdapter.getComponentType(adapterType, collectionType);
 		var uni            = EnumUniverse.<E>ofUnknown(type);
-		return CollectionAddapter.newAddapter(addapterType, new EnumIO<>(uni));
+		return CollectionAdapter.newAdapter(adapterType, new EnumIO<>(uni));
 	}
 	
 	@Override
@@ -144,7 +144,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var enums = get(ioPool, instance);
 		if(enums == null) return;
-		new BitOutputStream(dest).writeEnums(universe, addapter.asListView(enums)).close();
+		new BitOutputStream(dest).writeEnums(universe, adapter.asListView(enums)).close();
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -156,7 +156,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			try(var s = new BitInputStream(src, (long)universe.bitSize*size)){
 				tmp = s.readEnums(universe, size);
 			}
-			enums = addapter.asCollection(tmp);
+			enums = adapter.asCollection(tmp);
 		}
 		set(ioPool, instance, enums);
 	}

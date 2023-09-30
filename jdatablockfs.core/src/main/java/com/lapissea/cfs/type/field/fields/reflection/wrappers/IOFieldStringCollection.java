@@ -18,7 +18,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.fields.CollectionAddapter;
+import com.lapissea.cfs.type.field.fields.CollectionAdapter;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
@@ -37,7 +37,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		public UsageArr(){ super(String[].class, Set.of(IOFieldStringCollection.class)); }
 		@Override
 		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
-			return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
+			return new IOFieldStringCollection<>(field, CollectionAdapter.OfArray.class);
 		}
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
@@ -59,7 +59,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field){
-			return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
+			return new IOFieldStringCollection<>(field, CollectionAdapter.OfList.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -74,7 +74,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	}
 	
 	
-	private static final class StringIO implements CollectionAddapter.ElementIOImpl<String>{
+	private static final class StringIO implements CollectionAdapter.ElementIOImpl<String>{
 		private static final StringIO INSTANCE = new StringIO();
 		
 		@Override
@@ -103,18 +103,18 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 	}
 	
-	private final CollectionAddapter<String, CollectionType> addapter;
+	private final CollectionAdapter<String, CollectionType> adapter;
 	
 	private IOFieldPrimitive.FInt<T> collectionSize;
 	
-	public IOFieldStringCollection(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> dataAdapterType){
+	public IOFieldStringCollection(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> dataAdapterType){
 		super(accessor);
-		addapter = makeAddapter(accessor, dataAdapterType);
+		adapter = makeAdapter(accessor, dataAdapterType);
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var col = get(ioPool, inst);
 			if(col == null) return 0;
 			long sum = 0;
-			for(String s : addapter.asListView(col)){
+			for(String s : adapter.asListView(col)){
 				sum += StringIO.INSTANCE.calcByteSize(prov, s);
 			}
 			return sum;
@@ -122,12 +122,12 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	}
 	
 	@SuppressWarnings({"rawtypes"})
-	private static <C> CollectionAddapter<String, C> makeAddapter(FieldAccessor<?> accessor, Class<? extends CollectionAddapter> addapterType){
+	private static <C> CollectionAdapter<String, C> makeAdapter(FieldAccessor<?> accessor, Class<? extends CollectionAdapter> adapterType){
 		var collectionType = accessor.getGenericType(null);
-		var type           = CollectionAddapter.getComponentType(addapterType, collectionType);
+		var type           = CollectionAdapter.getComponentType(adapterType, collectionType);
 		if(type != String.class) throw new IllegalArgumentException(collectionType + " is not a collection of strings");
 		
-		return CollectionAddapter.newAddapter(addapterType, StringIO.INSTANCE);
+		return CollectionAdapter.newAdapter(adapterType, StringIO.INSTANCE);
 	}
 	
 	@Override
@@ -139,7 +139,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		if(nullable() && getIsNull(ioPool, instance)) return;
-		addapter.write(get(ioPool, instance), provider, dest);
+		adapter.write(get(ioPool, instance), provider, dest);
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -151,12 +151,12 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		
 		int size = collectionSize.getValue(ioPool, instance);
-		set(ioPool, instance, addapter.read(size, provider, src, genericContext));
+		set(ioPool, instance, adapter.read(size, provider, src, genericContext));
 	}
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = collectionSize.getValue(ioPool, instance);
-		addapter.skipData(size, provider, src, genericContext);
+		adapter.skipData(size, provider, src, genericContext);
 	}
 }

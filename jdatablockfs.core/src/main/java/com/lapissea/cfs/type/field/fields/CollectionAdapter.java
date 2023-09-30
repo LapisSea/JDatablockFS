@@ -28,7 +28,7 @@ import java.util.OptionalLong;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
-public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
+public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 	
 	public interface ElementIOImpl<E>{
 		
@@ -152,7 +152,7 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 		void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
 	}
 	
-	public static final class OfArray<E> extends CollectionAddapter<E, E[]>{
+	public static final class OfArray<E> extends CollectionAdapter<E, E[]>{
 		
 		public static Class<?> getComponentType(Type type){
 			var raw  = Utils.typeToRaw(type);
@@ -179,7 +179,7 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 		public List<E> asListView(E[] collection){ return Arrays.asList(collection); }
 	}
 	
-	public static final class OfList<E> extends CollectionAddapter<E, List<E>>{
+	public static final class OfList<E> extends CollectionAdapter<E, List<E>>{
 		public static Class<?> getComponentType(Type type){
 			var parmType = (ParameterizedType)type;
 			return Utils.typeToRaw(parmType.getActualTypeArguments()[0]);
@@ -213,19 +213,19 @@ public abstract sealed class CollectionAddapter<ElementType, CollectionType>{
 	}
 	
 	@SuppressWarnings("rawtypes")
-	public static Class<?> getComponentType(Class<? extends CollectionAddapter> dataAdapterType, Type type){
+	public static Class<?> getComponentType(Class<? extends CollectionAdapter> dataAdapterType, Type type){
 		if(UtilL.instanceOf(dataAdapterType, OfArray.class)) return OfArray.getComponentType(type);
 		if(UtilL.instanceOf(dataAdapterType, OfList.class)) return OfList.getComponentType(type);
 		throw new ShouldNeverHappenError();
 	}
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public static <E, C> CollectionAddapter<E, C> newAddapter(Class<? extends CollectionAddapter> type, ElementIOImpl<E> elementIO){
-		if(UtilL.instanceOf(type, OfArray.class)) return (CollectionAddapter<E, C>)new OfArray<>(elementIO);
-		if(UtilL.instanceOf(type, OfList.class)) return (CollectionAddapter<E, C>)new OfList<>(elementIO);
+	public static <E, C> CollectionAdapter<E, C> newAdapter(Class<? extends CollectionAdapter> type, ElementIOImpl<E> elementIO){
+		if(UtilL.instanceOf(type, OfArray.class)) return (CollectionAdapter<E, C>)new OfArray<>(elementIO);
+		if(UtilL.instanceOf(type, OfList.class)) return (CollectionAdapter<E, C>)new OfList<>(elementIO);
 		throw new ShouldNeverHappenError();
 	}
 	
-	public CollectionAddapter(ElementIOImpl<ElementType> elementIO){
+	public CollectionAdapter(ElementIOImpl<ElementType> elementIO){
 		this.elementIO = elementIO;
 	}
 	
