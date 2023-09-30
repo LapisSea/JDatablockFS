@@ -65,34 +65,41 @@ public final class Utils{
 		return type;
 	}
 	public static Class<?> typeToRaw(Type type){
-		if(type instanceof Class<?> c) return c;
-		if(type instanceof ParameterizedType c) return (Class<?>)c.getRawType();
-		if(type instanceof TypeVariable<?> c){
-			return typeToRaw(extractFromVarType(c));
-		}
-		throw new IllegalArgumentException(type.toString());
+		return switch(type){
+			case Class<?> cl -> cl;
+			case ParameterizedType parm -> typeToRaw(parm.getRawType());
+			case TypeVariable<?> var -> typeToRaw(extractBound(var));
+			case WildcardType wild -> typeToRaw(extractBound(wild));
+			case GenericArrayType a -> typeToRaw(a.getGenericComponentType());
+			default -> throw new NotImplementedException(type.getClass().getName());
+		};
 	}
 	
-	public static Type prottectFromVarType(Type type){
-		if(type instanceof TypeVariable<?> c){
-			return extractFromVarType(c);
-		}
-		return type;
+	public static Type extractBound(TypeVariable<?> c){
+		return extractBound(c.getBounds());
+	}
+	public static Type extractBound(WildcardType type){
+		return extractBound(type.getLowerBounds(), type.getUpperBounds());
 	}
 	
-	public static Type extractFromVarType(TypeVariable<?> c){
-		var bounds = c.getBounds();
+	public static Type extractBound(Type[] lower, Type[] upper){
+		if(lower.length == 0){
+			if(upper.length == 0 || Object.class == upper[0]) return Object.class;
+			else return extractBound(upper);
+		}else return extractBound(lower);
+	}
+	public static Type extractBound(Type[] bounds){
 		if(bounds.length == 1){
 			return bounds[0];
 		}
-		throw new NotImplementedException(TextUtil.toString("wut? ", bounds));
+		throw new NotImplementedException("Multiple bounds not implemented yet");//TODO
 	}
 	
 	public static boolean genericInstanceOf(Type testType, Type type){
 		if(testType.equals(type)) return true;
 		
-		if(testType instanceof TypeVariable<?> c) return genericInstanceOf(extractFromVarType(c), type);
-		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractFromVarType(c));
+		if(testType instanceof TypeVariable<?> c) return genericInstanceOf(extractBound(c), type);
+		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractBound(c));
 		
 		if(type instanceof Class || testType instanceof Class<?>){
 			var rawTestType = typeToRaw(testType);

@@ -258,7 +258,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		protected TypeRaw getRaw(){
-			throw new UnsupportedOperationException();
+			return bound == null? new TypeRaw(Object.class) : bound.getRaw();
 		}
 		
 		@Override

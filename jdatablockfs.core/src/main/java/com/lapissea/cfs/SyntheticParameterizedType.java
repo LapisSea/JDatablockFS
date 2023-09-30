@@ -1,14 +1,18 @@
 package com.lapissea.cfs;
 
+import com.lapissea.util.NotImplementedException;
+
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.Utils.extractFromVarType;
+import static com.lapissea.cfs.Utils.extractBound;
 
 public final class SyntheticParameterizedType implements ParameterizedType{
 	
@@ -24,9 +28,14 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	
 	public static SyntheticParameterizedType generalize(Type type){
 		return switch(type){
-			case ParameterizedType t -> new SyntheticParameterizedType((Class<?>)t.getRawType(), List.of(t.getActualTypeArguments()));
-			case TypeVariable t -> new SyntheticParameterizedType((Class<?>)extractFromVarType(t), List.of());
-			default -> new SyntheticParameterizedType((Class<?>)type, List.of());
+			case Class<?> cl -> new SyntheticParameterizedType(cl, List.of());
+			case ParameterizedType parm -> new SyntheticParameterizedType(
+				parm.getOwnerType(), (Class<?>)parm.getRawType(), List.of(parm.getActualTypeArguments())
+			);
+			case TypeVariable<?> var -> generalize(extractBound(var));
+			case WildcardType wild -> generalize(extractBound(wild));
+			case GenericArrayType a -> generalize(a.getGenericComponentType());
+			default -> throw new NotImplementedException(type.getClass().getName());
 		};
 	}
 	
