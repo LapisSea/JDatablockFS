@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -53,13 +54,24 @@ final class FieldRegistry{
 			Log.trace("{#yellowBrightDiscovering IOFields#}");
 			
 			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
-			scan(IOField.class, tasks);
+			var lines = Log.TRACE? new ConcurrentLinkedDeque<CharSequence>() : null;
+			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
 			while(!tasks.isEmpty()){
-				tasks.pop().get().ifPresent(
-					e -> scanned.put(e.getKey(), e.getValue())
-				);
+				var any = tasks.removeIf(c -> {
+					if(!c.isInitialized()) return false;
+					c.get().ifPresent(
+						e -> scanned.put(e.getKey(), e.getValue())
+					);
+					return true;
+				});
+				if(lines != null && !lines.isEmpty()){
+					var res = new StringJoiner("\n");
+					while(!lines.isEmpty()) res.add(lines.pop());
+					Log.log(res.toString());
+				}
+				if(!any) UtilL.sleep(0.1);
 			}
 			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
 			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
@@ -67,33 +79,33 @@ final class FieldRegistry{
 			return usages;
 		}
 		
-		private static void log(String str, Class<?> typ){
+		private static void log(String str, Class<?> typ, Deque<CharSequence> lines){
 			if(!Log.TRACE) return;
-			Thread.startVirtualThread(() -> Log.trace(str, typ));
+			lines.add(Log.resolveArgs(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks){
+		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<CharSequence> lines){
 			if(type.getSimpleName().contains("NoIO")){
-				log("Ignoring \"NoIO\" {#blackBright{}~#}", type);
+				log("Ignoring \"NoIO\" {#blackBright{}~#}", type, lines);
 				return;
 			}
 			if(isSealedCached(type)){
 				var usage = getFieldUsage(type);
 				if(usage.isPresent()){
-					log("Sealed {#blackBright{}~#} has usage, ignoring children", type);
+					log("Sealed {#blackBright{}~#} has usage, ignoring children", type, lines);
 					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
 					return;
 				}
-				log("Scanning sealed {#blackBright{}~#} children", type);
+				log("Scanning sealed {#blackBright{}~#} children", type, lines);
 				var ch = new ConcurrentLinkedDeque<>(getPermittedSubclasses(type));
 				tasks.add(Runner.async(() -> {
 					for(Class<?> c = ch.poll(); c != null; c = ch.poll()){
-						scan(c, tasks);
+						scan(c, tasks, lines);
 					}
 					return Optional.empty();
 				}));
 				for(Class<?> c = ch.poll(); c != null; c = ch.poll()){
-					scan(c, tasks);
+					scan(c, tasks, lines);
 				}
 				return;
 			}
@@ -106,16 +118,16 @@ final class FieldRegistry{
 					var typ = typ0;
 					var res = getFieldUsage(typ);
 					if(res.isPresent()){
-						log("{#blackBright{}~#} has usage", typ);
+						log("{#blackBright{}~#} has usage", typ, lines);
 						return res;
 					}
 					
 					var up = typ.getEnclosingClass();
 					if(up == null || isSealedCached(up)){
-						log("{#blackBright{}~#} does NOT have usage", typ);
+						log("{#blackBright{}~#} does NOT have usage", typ, lines);
 						return Optional.empty();
 					}
-					log("{#blackBright{}~#} does NOT have usage, scanning parent", typ);
+					log("{#blackBright{}~#} does NOT have usage, scanning parent", typ, lines);
 					typ0 = up;
 				}
 			}));
