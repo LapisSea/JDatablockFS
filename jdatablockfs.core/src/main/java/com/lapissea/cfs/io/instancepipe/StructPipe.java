@@ -317,6 +317,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
+			if(field instanceof IOFieldInlineSealedObject<?, ?> seal){
+				if(seal.getTypePipes().stream().anyMatch(p -> p.getType().getCanHavePointers())){
+					builder.dynamic();
+				}else{
+					builder.skipField(field);
+				}
+				continue;
+			}
+			
 			if(field.typeFlag(IOField.DYNAMIC_FLAG)){
 				builder.dynamic();
 				continue;
@@ -324,10 +333,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			if(field instanceof RefField){
 				builder.referenceField();
-				continue;
-			}
-			if(field instanceof IOFieldInlineSealedObject){
-				builder.dynamic();//TODO determine if sealed object can have pointers, if not skip here
 				continue;
 			}
 			
