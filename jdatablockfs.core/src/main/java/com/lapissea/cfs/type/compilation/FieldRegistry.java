@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.exceptions.IllegalAnnotation;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.internal.Runner;
@@ -53,8 +54,11 @@ final class FieldRegistry{
 		public List<FieldUsage> get(){
 			Log.trace("{#yellowBrightDiscovering IOFields#}");
 			
+			var log = Log.TRACE && !ConfigUtils.configBoolean(FieldRegistry.class.getName() + "#printed", false);
+			if(log) System.setProperty(FieldRegistry.class.getName() + "#printed", "true");
+			
 			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
-			var lines = Log.TRACE? new ConcurrentLinkedDeque<CharSequence>() : null;
+			var lines = log? new ConcurrentLinkedDeque<CharSequence>() : null;
 			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
@@ -75,13 +79,12 @@ final class FieldRegistry{
 			}
 			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
 			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
-			if(Log.TRACE) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
+			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
 		}
 		
 		private static void log(String str, Class<?> typ, Deque<CharSequence> lines){
-			if(!Log.TRACE) return;
-			lines.add(Log.resolveArgs(str, typ));
+			if(lines != null) lines.add(Log.resolveArgs(str, typ));
 		}
 		
 		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<CharSequence> lines){

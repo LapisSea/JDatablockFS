@@ -3,6 +3,7 @@ package com.lapissea.cfs.logging;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.config.ConfigTools;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.exceptions.IllegalConfiguration;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
@@ -71,7 +72,9 @@ public class Log{
 		TRACE = level.isWithin(LogLevel.TRACE);
 		SMALL_TRACE = level.isWithin(LogLevel.SMALL_TRACE);
 		
-		if(ConfigDefs.PRINT_FLAGS.resolveVal()){
+		var printed = ConfigUtils.configBoolean(Log.class.getName() + "#printed", false);
+		if(!printed && ConfigDefs.PRINT_FLAGS.resolveVal()){
+			System.setProperty(Log.class.getName() + "#printed", "true");
 			var values = ConfigTools.collectConfigFlags();
 			info(
 				"{#yellowBrightRunning with debugging:#}\n" +
