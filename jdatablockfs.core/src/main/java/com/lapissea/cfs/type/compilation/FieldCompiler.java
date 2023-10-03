@@ -50,6 +50,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
@@ -58,6 +59,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Comparator.naturalOrder;
 import static java.util.function.Function.identity;
 import static java.util.function.Predicate.not;
 import static java.util.stream.Collectors.joining;
@@ -124,6 +126,8 @@ public final class FieldCompiler{
 		
 		var accessors = scanFields(struct);
 		
+		checkIOFieldValidity(accessors);
+		
 		var fields = new ArrayList<IOField<T, ?>>(Math.max(accessors.size()*2, accessors.size() + 5));//Give extra capacity for virtual fields
 		for(var a : accessors){
 			fields.add(FieldRegistry.create(a));
@@ -134,6 +138,20 @@ public final class FieldCompiler{
 		initLateData(fields);
 		
 		return FieldSet.of(fields);
+	}
+	
+	private static <T extends IOInstance<T>> void checkIOFieldValidity(List<FieldAccessor<T>> fields){
+		var fails = fields.stream()
+		                  .filter(field -> {
+			                  return !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field));
+		                  })
+		                  .toList();
+		if(!fails.isEmpty()){
+			throw new IllegalField(
+				"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
+				(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
+			);
+		}
 	}
 	
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
@@ -257,46 +275,10 @@ public final class FieldCompiler{
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
 		
-		var fields     = new ArrayList<FieldAccessor<T>>();
 		var usedFields = new HashSet<Method>();
 		
 		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).toList();
-		
-		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
-			try{
-				Type type = getType(field);
-				
-				field.setAccessible(true);
-				
-				String fieldName = getFieldName(field);
-				
-				Optional<Method> getter, setter;
-				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
-					IntFunction<Optional<Method>> getMethod = count -> ioMethods.stream().filter(
-						m -> m.getParameterCount() == count &&
-						     m.getAnnotation(IOValue.class).name().equals(fieldName)
-					).findAny();
-					getter = getMethod.apply(0);
-					setter = getMethod.apply(1);
-				}else{
-					Function<String, Optional<Method>> getMethod =
-						prefix -> ioMethods.stream().filter(m -> checkMethod(fieldName, prefix, m)).findFirst();
-					getter = calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
-					setter = getMethod.apply("set");
-				}
-				
-				getter.ifPresent(usedFields::add);
-				setter.ifPresent(usedFields::add);
-				
-				fields.add(switch(FIELD_ACCESS){
-					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
-					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
-					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
-				});
-			}catch(Throwable e){
-				throw new MalformedStruct("Failed to scan field #" + field.getName() + " on " + struct.cleanName(), e);
-			}
-		}
+		var fields    = collectAccessors(struct, ioMethods, usedFields::add);
 		
 		var hangingMethods = ioMethods.stream().filter(method -> !usedFields.contains(method)).collect(Collectors.toList());
 		
@@ -326,45 +308,22 @@ public final class FieldCompiler{
 			
 			return false;
 		});
-		{
-			var errors = functionFields.entrySet()
-			                           .stream()
-			                           .filter(e -> e.getValue().stream().anyMatch(Objects::isNull))
-			                           .toList();
-			if(!errors.isEmpty()){
-				throw new IllegalField(
-					"Invalid transient (getter+setter, no value) " + TextUtil.plural("IOField", errors.size()) +
-					" for " + cl.getName() + ":\n" +
-					errors.stream()
-					      .map(e -> "\t" + e.getKey() + ": " + (e.getValue().obj1 == null? "getter" : "setter") + " missing")
-					      .collect(joining("\n"))
-				);
-			}
-		}
-		{
-			Predicate<Method> isGetterOrSetter =
-				m -> functionFields.values().stream()
-				                   .flatMap(PairM::stream)
-				                   .anyMatch(mt -> mt == m);
-			var unusedWaning =
-				hangingMethods.stream()
-				              .filter(not(isGetterOrSetter))
-				              .map(method -> {
-					              String helpStr = "";
-					              if(fields.stream().anyMatch(f -> f.getName().equals(method.getName()))){
-						              helpStr = " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName()))
-						                                                                  .collect(joining(" or ")) + "?";
-					              }
-					              return method + helpStr;
-				              })
-				              .collect(joining("\n"));
-			if(!unusedWaning.isEmpty()){
-				throw new MalformedStruct("There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" + unusedWaning);
-			}
-		}
 		
-		fields.sort(Comparator.naturalOrder());
+		checkInvalidFunctionOnlyFields(functionFields, cl);
 		
+		checkForUnusedFunctions(functionFields, hangingMethods, fields);
+		
+		fields.sort(naturalOrder());
+		
+		var funFields = functionFieldsToAccessors(struct, functionFields);
+		fields.addAll(funFields);
+		fields.sort(naturalOrder());
+		
+		return fields;
+	}
+	
+	private static <T extends IOInstance<T>> List<FieldAccessor<T>> functionFieldsToAccessors(Struct<T> struct, Map<String, PairM<Method, Method>> functionFields){
+		List<FieldAccessor<T>> fields = new ArrayList<>(functionFields.size());
 		for(var e : functionFields.entrySet()){
 			String name = e.getKey();
 			var    p    = e.getValue();
@@ -383,24 +342,103 @@ public final class FieldCompiler{
 				throw new IllegalField(setType + " is not a valid argument in\n" + setter);
 			}
 			
-			UtilL.addRemainSorted(fields, FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
+			fields.add(FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
 		}
+		return fields;
+	}
+	
+	private static <T extends IOInstance<T>> void checkForUnusedFunctions(
+		Map<String, PairM<Method, Method>> functionFields, List<Method> hangingMethods, List<FieldAccessor<T>> fields
+	){
+		Predicate<Method> isGetterOrSetter =
+			m -> functionFields.values().stream()
+			                   .flatMap(PairM::stream)
+			                   .anyMatch(mt -> mt == m);
 		
-		{
-			var fails = fields.stream()
-			                  .filter(field -> {
-				                  return !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field));
-			                  })
-			                  .toList();
-			if(!fails.isEmpty()){
-				throw new IllegalField(
-					"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
-					(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
-				);
+		var unusedWaning = hangingMethods.stream().filter(not(isGetterOrSetter)).map(method -> {
+			String helpStr = "";
+			if(fields.stream().anyMatch(f -> f.getName().equals(method.getName()))){
+				helpStr = " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName()))
+				                                                    .collect(joining(" or ")) + "?";
+			}
+			return method + helpStr;
+		}).toList();
+		
+		if(!unusedWaning.isEmpty()){
+			throw new MalformedStruct(
+				"There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" +
+				String.join("\n", unusedWaning)
+			);
+		}
+	}
+	
+	private static <T extends IOInstance<T>> List<FieldAccessor<T>> collectAccessors(
+		Struct<T> struct, List<Method> ioMethods, Consumer<Method> reportField
+	){
+		var cl     = struct.getConcreteType();
+		var fields = new ArrayList<FieldAccessor<T>>();
+		
+		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
+			try{
+				Type type = getType(field);
+				
+				field.setAccessible(true);
+				
+				String fieldName = getFieldName(field);
+				
+				Optional<Method> getter, setter;
+				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
+					IntFunction<Optional<Method>> getMethod = count -> {
+						var res = ioMethods.stream().filter(
+							m -> m.getParameterCount() == count &&
+							     m.getAnnotation(IOValue.class).name().equals(fieldName)
+						).toList();
+						if(res.size()>1) throw new IllegalField('"' + fieldName + "\" is an illegal field name");
+						return res.stream().findAny();
+					};
+					getter = getMethod.apply(0);
+					setter = getMethod.apply(1);
+				}else{
+					Function<String, Optional<Method>> getMethod =
+						prefix -> ioMethods.stream().filter(m -> {
+							if(!IOFieldTools.isIOField(m)) return false;
+							var name = getMethodFieldName(prefix, m);
+							return name.isPresent() && name.get().equals(fieldName);
+						}).findFirst();
+					getter = calcGetPrefixes(field).map(getMethod)
+					                               .filter(Optional::isPresent).map(Optional::get).findAny();
+					setter = getMethod.apply("set");
+				}
+				
+				getter.ifPresent(reportField);
+				setter.ifPresent(reportField);
+				
+				fields.add(switch(FIELD_ACCESS){
+					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
+					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+				});
+			}catch(Throwable e){
+				throw new MalformedStruct("Failed to scan field #" + field.getName() + " on " + struct.cleanName(), e);
 			}
 		}
-		
 		return fields;
+	}
+	
+	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, PairM<Method, Method>> functionFields, Class<T> cl){
+		var errors = functionFields.entrySet()
+		                           .stream()
+		                           .filter(e -> e.getValue().stream().anyMatch(Objects::isNull))
+		                           .toList();
+		if(errors.isEmpty()) return;
+		
+		throw new IllegalField(
+			"Invalid transient (getter+setter, no field) " + TextUtil.plural("IOField", errors.size()) +
+			" for " + cl.getName() + ":\n" +
+			errors.stream()
+			      .map(e -> "\t" + e.getKey() + ": " + (e.getValue().obj1 == null? "getter" : "setter") + " missing")
+			      .collect(joining("\n"))
+		);
 	}
 	
 	private static Stream<String> calcGetPrefixes(Field field)  { return calcGetPrefixes(field.getType()); }
@@ -426,11 +464,7 @@ public final class FieldCompiler{
 			return Optional.of(ann.name());
 		}
 	}
-	private static boolean checkMethod(String fieldName, String prefix, Method m){
-		if(!IOFieldTools.isIOField(m)) return false;
-		var name = getMethodFieldName(prefix, m);
-		return name.isPresent() && name.get().equals(fieldName);
-	}
+	
 	private static String getFieldName(Field field){
 		String fieldName;
 		{
