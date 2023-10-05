@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;

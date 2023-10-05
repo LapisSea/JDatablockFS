@@ -1,7 +1,7 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.BracketType;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.util.ZeroArrays;
 
