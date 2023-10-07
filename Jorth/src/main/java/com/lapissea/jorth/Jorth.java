@@ -1,5 +1,7 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.EndOfCode;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.CodeDestination;
 import com.lapissea.jorth.lang.Endable;

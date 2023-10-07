@@ -1,4 +1,4 @@
-package com.lapissea.jorth;
+package com.lapissea.jorth.exceptions;
 
 public class EndOfCode extends MalformedJorth{
 	

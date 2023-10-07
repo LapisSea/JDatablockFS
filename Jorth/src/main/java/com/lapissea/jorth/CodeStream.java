@@ -1,5 +1,6 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.Tokenizer;
 import com.lapissea.jorth.lang.text.CharJoin;
 import com.lapissea.jorth.lang.text.CharSubview;

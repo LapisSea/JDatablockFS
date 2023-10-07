@@ -1,8 +1,8 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.EndOfCode;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.EndOfCode;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
