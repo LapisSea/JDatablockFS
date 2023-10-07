@@ -22,6 +22,7 @@ import com.lapissea.cfs.type.IOType;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.compilation.WrapperStructs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -93,6 +94,18 @@ public abstract class DynamicSupport{
 						
 						yield Stream.of((IOInstance<?>[])val).mapToLong(i -> pip.calcUnknownSize(prov, i, WordSpace.BYTE)).sum() + lenSize;
 					}
+					
+					long sum = 0;
+					for(int i = 0; i<len; i++){
+						sum += calcSize(prov, Array.get(val, i));
+					}
+					yield sum;
+				}
+				
+				var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(type);
+				if(wrapper != null){
+					var obj = wrapper.constructor().apply(val);
+					yield StandardStructPipe.sizeOfUnknown(prov, obj, WordSpace.BYTE);
 				}
 				
 				throw new NotImplementedException(val.getClass() + "");
@@ -161,6 +174,19 @@ public abstract class DynamicSupport{
 						b.writeTo(dest);
 						break;
 					}
+					
+					for(int i = 0; i<len; i++){
+						writeValue(provider, dest, Array.get(val, i));
+					}
+					break;
+				}
+				
+				var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(type);
+				if(wrapper != null){
+					var obj = wrapper.constructor().apply(val);
+					var pip = StandardStructPipe.of(wrapper.struct());
+					pip.write(provider, dest, obj);
+					break;
 				}
 				
 				throw new NotImplementedException(val.getClass() + "");
@@ -321,6 +347,13 @@ public abstract class DynamicSupport{
 				}
 				return arr;
 			}
+		}
+		
+		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
+		if(wrapper != null){
+			var pip = StandardStructPipe.of(wrapper.struct());
+			var obj = pip.readNew(provider, src, genericContext);
+			return obj.get();
 		}
 		
 		throw new NotImplementedException(typ + "");

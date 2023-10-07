@@ -47,7 +47,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupported e){
-			throw new UnsupportedStructLayout(type.getFullName() + " does not support fixed size layout because of " + e.getField(), e);
+			throw new UnsupportedStructLayout(type.getFullName() + " does not support fixed size layout because of " + e.getFieldName(), e);
 		}
 	}
 	

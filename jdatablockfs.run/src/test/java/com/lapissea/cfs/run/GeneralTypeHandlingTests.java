@@ -29,6 +29,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -83,11 +84,11 @@ public class GeneralTypeHandlingTests{
 		deps.d = 4;
 		var arr = new Arr();
 		arr.arr = new float[]{1, 2, 3, 4, 5};
-		return new Object[][]{{Dummy.first()}, {deps}, {arr}};
+		return new Object[][]{{Dummy.first()}, {deps}, {arr}, {arr.arr}, {Instant.now()}, {"Foo"}, {-1}, {12.34}, {true}};
 	}
 	
 	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
+	void genericStorage(Object obj) throws IOException{
 		TestUtils.testCluster(TestInfo.of(obj), ses -> {
 			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
 				LinkedIOList.class,
@@ -98,7 +99,7 @@ public class GeneralTypeHandlingTests{
 			ls.clear();
 			ls.add(c);
 			var read = ls.get(0).value;
-			assertEquals(obj, read);
+			Assert.assertEquals(obj, read);
 		});
 	}
 	

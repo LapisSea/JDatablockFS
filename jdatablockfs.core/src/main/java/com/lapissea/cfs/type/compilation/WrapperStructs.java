@@ -24,7 +24,7 @@ public final class WrapperStructs{
 	
 	public static <T> WrapperRes<T> getWrapperStruct(Class<T> type){
 		if(!FieldCompiler.getWrapperTypes().contains(type)){
-			throw new IllegalArgumentException(type.getTypeName() + " is not a wrapper");
+			return null;
 		}
 		var res = WRAPPER_STRUCT_CACHE.computeIfAbsent(type, generateWrapper);
 		//noinspection unchecked
@@ -58,7 +58,7 @@ public final class WrapperStructs{
 							end
 							
 							public function get
-								returns {1}
+								returns #Object
 							start
 								get this val
 							end

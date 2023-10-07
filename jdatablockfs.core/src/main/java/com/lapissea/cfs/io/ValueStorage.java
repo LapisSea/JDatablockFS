@@ -1283,6 +1283,7 @@ public sealed interface ValueStorage<T>{
 			this.provider = provider;
 			this.type = RuntimeType.of(type);
 			var res = WrapperStructs.getWrapperStruct(type);
+			if(res == null) throw new IllegalArgumentException(type.getTypeName() + " is not a wrapper");
 			pipe = StandardStructPipe.of(res.struct());
 			ctor = res.constructor();
 		}

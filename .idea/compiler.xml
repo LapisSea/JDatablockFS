@@ -34,7 +34,26 @@
         <sourceOutputDir name="../target/core/generated-sources/annotations" />
         <sourceTestOutputDir name="../target/core/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="core" />
         <module name="jdatablockfs.core" />
+      </profile>
+      <profile name="Annotation profile for tools" enabled="true">
+        <sourceOutputDir name="../target/tools/generated-sources/annotations" />
+        <sourceTestOutputDir name="../target/tools/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="tools" />
+      </profile>
+      <profile name="Annotation profile for run" enabled="true">
+        <sourceOutputDir name="../target/run/generated-sources/annotations" />
+        <sourceTestOutputDir name="../target/run/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/openjdk/jmh/jmh-generator-annprocess/1.35/jmh-generator-annprocess-1.35.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/openjdk/jmh/jmh-core/1.35/jmh-core-1.35.jar" />
+          <entry name="$MAVEN_REPOSITORY$/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar" />
+        </processorPath>
+        <module name="run" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="20" />
