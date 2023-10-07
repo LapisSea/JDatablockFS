@@ -28,7 +28,7 @@ import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;

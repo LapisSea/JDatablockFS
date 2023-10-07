@@ -14,7 +14,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;

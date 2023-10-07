@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 

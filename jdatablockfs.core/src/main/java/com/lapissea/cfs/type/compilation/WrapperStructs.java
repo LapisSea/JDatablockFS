@@ -5,7 +5,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ConcurrentHashMap;
