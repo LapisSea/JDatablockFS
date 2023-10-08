@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+import static com.lapissea.fuzz.FuzzConfig.LogState.stdTime;
+
 public final class FuzzProgress{
 	
 	private final AtomicLong executedCount = new AtomicLong();
@@ -14,9 +16,9 @@ public final class FuzzProgress{
 	private       boolean    hasErr;
 	private       boolean    errMark;
 	
-	private final FuzzingRunner.Config config;
-	private final long                 totalIterations;
-	public FuzzProgress(FuzzingRunner.Config config, long totalIterations){
+	private final FuzzConfig config;
+	private final long       totalIterations;
+	public FuzzProgress(FuzzConfig config, long totalIterations){
 		this.config = config;
 		this.totalIterations = totalIterations;
 	}
@@ -65,7 +67,7 @@ public final class FuzzProgress{
 		}
 	}
 	
-	private static final Consumer<FuzzingRunner.LogState> TO_CONSOLE = state -> {
+	private static final Consumer<FuzzConfig.LogState> TO_CONSOLE = state -> {
 		final String red   = "\033[0;91m";
 		final String green = "\033[0;92m";
 		
@@ -76,9 +78,9 @@ public final class FuzzProgress{
 		System.out.println(
 			(state.hasFail()? red + "FAIL " : green + "OK | ") +
 			gray + "Progress: " + reset + (f.length()<4? " " + f : f) + "%" +
-			gray + ", ET: " + reset + FuzzingRunner.LogState.stdTime(state.estimatedTotalTime()) +
-			gray + ", ETR: " + reset + FuzzingRunner.LogState.stdTime(state.estimatedTimeRemaining()) +
-			gray + ", elapsed: " + reset + FuzzingRunner.LogState.stdTime(state.elapsed()) +
+			gray + ", ET: " + reset + stdTime(state.estimatedTotalTime()) +
+			gray + ", ETR: " + reset + stdTime(state.estimatedTimeRemaining()) +
+			gray + ", elapsed: " + reset + stdTime(state.elapsed()) +
 			gray + ", ms/op: " + reset + (state.durationPerOp() == null? "--" :
 			                              "~" + String.format("%.3f", state.durationPerOp().toNanos()/1000_000D))
 		);
@@ -93,7 +95,7 @@ public final class FuzzProgress{
 		var totalTimeEstimated = elapsedTimeMs/progress;
 		var timeRemaining      = totalTimeEstimated - elapsedTimeMs;
 		
-		config.logFunct().orElse(TO_CONSOLE).accept(new FuzzingRunner.LogState(
+		config.logFunct().orElse(TO_CONSOLE).accept(new FuzzConfig.LogState(
 			progress,
 			count<10? null : Duration.ofMillis((long)totalTimeEstimated),
 			count<10? null : Duration.ofMillis((long)timeRemaining),

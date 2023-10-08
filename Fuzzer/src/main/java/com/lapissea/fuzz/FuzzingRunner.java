@@ -22,51 +22,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
-	public record LogState(
-		float progress,
-		Duration estimatedTotalTime, Duration estimatedTimeRemaining,
-		Duration elapsed, Duration durationPerOp,
-		boolean hasFail
-	){
-		public static String stdTime(Duration tim){
-			if(tim == null) return "-:--:--";
-			return String.format("%d:%02d:%02d",
-			                     tim.toHoursPart(),
-			                     tim.toMinutesPart(),
-			                     tim.toSecondsPart());
-		}
-	}
-	
-	@SuppressWarnings("unused")
-	public record Config(
-		boolean shouldLog, Optional<Consumer<LogState>> logFunct, Duration logTimeout,
-		Optional<String> name, int maxWorkers,
-		Duration errorDelay, Optional<FailOrder> failOrder
-	){
-		public Config{
-			Objects.requireNonNull(logFunct);
-			if(logTimeout.isNegative()) throw new IllegalArgumentException("logTimeout must be positive");
-			if(errorDelay.isNegative()) throw new IllegalArgumentException("errorDelay must be positive");
-			if(name.map(String::isEmpty).orElse(false)) throw new IllegalArgumentException("Name can not be empty");
-			if(maxWorkers<=0) throw new IllegalArgumentException("maxWorkers must be greater than 0");
-		}
-		public Config(){
-			this(
-				true, Optional.empty(), Duration.ofMillis(900),
-				Optional.empty(), Math.max(1, Runtime.getRuntime().availableProcessors() + 1),
-				Duration.ofSeconds(2), Optional.empty()
-			);
-		}
-		
-		public Config dontLog()                           { return new Config(false, Optional.empty(), logTimeout, name, maxWorkers, errorDelay, failOrder); }
-		public Config logWith(Consumer<LogState> logFunct){ return new Config(true, Optional.of(logFunct), logTimeout, name, maxWorkers, errorDelay, failOrder); }
-		public Config withLogTimeout(Duration logTimeout) { return new Config(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-		public Config withName(String name)               { return new Config(shouldLog, logFunct, logTimeout, Optional.of(name), maxWorkers, errorDelay, failOrder); }
-		public Config withMaxWorkers(int maxWorkers)      { return new Config(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-		public Config withErrorDelay(Duration errorDelay) { return new Config(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-		public Config withFailOrder(FailOrder failOrder)  { return new Config(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, Optional.of(failOrder)); }
-	}
-	
 	private final FuzzingStateEnv<State, Action, Err> stateEnv;
 	private final Function<RandomGenerator, Action>   actionFactory;
 	
@@ -137,9 +92,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		var mark     = failShort.mark();
 		
 		var fails = run(
-			new Config().withName("establishStableFail")
-			            .withErrorDelay(Duration.ofMillis(Long.MAX_VALUE))
-			            .dontLog(),
+			new FuzzConfig().withName("establishStableFail")
+			                .withErrorDelay(Duration.ofMillis(Long.MAX_VALUE))
+			                .dontLog(),
 			RunMark.NONE, () -> IntStream.range(0, reruns).mapToObj(i -> sequence)
 		);
 		if(fails.size() != reruns){
@@ -197,7 +152,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
-	public void runAndAssert(Config config, long seed, long totalIterations, int sequenceLength){
+	public void runAndAssert(FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		Plan.start(this, config, seed, totalIterations, sequenceLength)
 		    .runAll()
 		    .assertFail();
@@ -206,14 +161,14 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	public List<FuzzFail<State, Action>> run(long seed, long totalIterations, int sequenceLength){
 		return run(null, seed, totalIterations, sequenceLength);
 	}
-	public List<FuzzFail<State, Action>> run(Config config, long seed, long totalIterations, int sequenceLength){
+	public List<FuzzFail<State, Action>> run(FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		return run(config, RunMark.NONE, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	public List<FuzzFail<State, Action>> run(Config config, RunMark mark, long seed, long totalIterations, int sequenceLength){
+	public List<FuzzFail<State, Action>> run(FuzzConfig config, RunMark mark, long seed, long totalIterations, int sequenceLength){
 		return run(config, mark, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	public List<FuzzFail<State, Action>> run(Config config, RunMark mark, FuzzSequenceSource source){
-		final var conf = config == null? new Config() : config;
+	public List<FuzzFail<State, Action>> run(FuzzConfig config, RunMark mark, FuzzSequenceSource source){
+		final var conf = config == null? new FuzzConfig() : config;
 		
 		return switch(RunType.of(source, stateEnv, mark)){
 			case RunType.Noop ignored -> List.of();
@@ -222,15 +177,15 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				yield fail.stream().toList();
 			}
 			case RunType.Many(long sequencesToRun, long totalIterations) -> {
-				var name     = conf.name.orElseGet(FuzzingRunner::getTaskName);
-				int nThreads = (int)Math.max(Math.min(conf.maxWorkers, sequencesToRun) - 1, 1);
+				var name     = conf.name().orElseGet(FuzzingRunner::getTaskName);
+				int nThreads = (int)Math.max(Math.min(conf.maxWorkers(), sequencesToRun) - 1, 1);
 				var progress = new FuzzProgress(conf, totalIterations);
 				
 				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>());
 				
 				ScheduledExecutorService          delayExec;
 				Consumer<FuzzFail<State, Action>> reportFail;
-				if(conf.errorDelay.isZero()){
+				if(conf.errorDelay().isZero()){
 					delayExec = null;
 					reportFail = f -> {
 						progress.err();
@@ -242,7 +197,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					reportFail = f -> {
 						progress.errLater();
 						
-						delayExec.schedule(progress::err, conf.errorDelay.toMillis(), MILLISECONDS);
+						delayExec.schedule(progress::err, conf.errorDelay().toMillis(), MILLISECONDS);
 						fails.add(f);
 					};
 				}
@@ -275,7 +230,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				
 				Thread.startVirtualThread(System::gc);
 				
-				yield FuzzFail.sortFails(fails, conf.failOrder.orElse(null));
+				yield FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
 			}
 		};
 	}

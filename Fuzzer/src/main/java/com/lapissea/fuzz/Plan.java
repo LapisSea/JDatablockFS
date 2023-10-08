@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 public final class Plan<TState, TAction>{
 	
-	private record RunInfo(FuzzingRunner.Config config, FuzzSequenceSource seed){ }
+	private record RunInfo(FuzzConfig config, FuzzSequenceSource seed){ }
 	
 	private record State<TState, TAction>(Fails<TState, TAction> fails, boolean reported, RunMark mark, Optional<File> saveFile){
 		State<TState, TAction> withFails(List<FuzzFail<TState, TAction>> data){
@@ -53,10 +53,10 @@ public final class Plan<TState, TAction>{
 	}
 	
 	public static <S, a> Plan<S, a> start(FuzzingRunner<S, a, ?> runner, long seed, long totalIterations, int sequenceLength){ return start(runner, null, seed, totalIterations, sequenceLength); }
-	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzingRunner.Config config, long seed, long totalIterations, int sequenceLength){
+	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		return start(runner, config, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzingRunner.Config config, FuzzSequenceSource source){
+	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzConfig config, FuzzSequenceSource source){
 		return new Plan<>(
 			runner,
 			new RunInfo(config, source),
@@ -214,9 +214,9 @@ public final class Plan<TState, TAction>{
 		return withState(new State<>(fails, false, mark, Optional.of(file)));
 	}
 	
-	public Plan<TState, TAction> configMod(Function<FuzzingRunner.Config, FuzzingRunner.Config> mod){
+	public Plan<TState, TAction> configMod(Function<FuzzConfig, FuzzConfig> mod){
 		var cfg = runInfo.config;
-		if(cfg == null) cfg = new FuzzingRunner.Config();
+		if(cfg == null) cfg = new FuzzConfig();
 		cfg = mod.apply(cfg);
 		return new Plan<>(runner, new RunInfo(cfg, runInfo.seed), state);
 	}
