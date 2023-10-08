@@ -46,6 +46,11 @@ public final class RawRandom implements RandomGenerator{
 			}
 		}
 	}
+	public byte[] nextBytes(int length){
+		var data = new byte[length];
+		nextBytes(data);
+		return data;
+	}
 	
 	@Override
 	public long nextLong(){

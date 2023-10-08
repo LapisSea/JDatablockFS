@@ -1,6 +1,7 @@
 module JDatablockFS.run {
 	requires JDatablockFS.core;
 	requires JDatablockFS.tools;
+	requires Jorth;
 	requires jlapisutil;
 	requires jmh.core;
 	requires com.google.gson;
