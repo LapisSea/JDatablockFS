@@ -1,13 +1,7 @@
-package com.lapissea.cfs.run.fuzzing;
-
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner.Config;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner.Mark;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner.Stability;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner.Stability.Ok;
-import com.lapissea.util.LogUtil;
+package com.lapissea.fuzz;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,14 +17,14 @@ import java.util.stream.Stream;
 
 public final class Plan<TState, TAction>{
 	
-	private record RunInfo(Config config, FuzzSequenceSource seed){ }
+	private record RunInfo(FuzzingRunner.Config config, FuzzSequenceSource seed){ }
 	
-	private record State<TState, TAction>(Fails<TState, TAction> fails, boolean reported, Mark mark, Optional<File> saveFile){
+	private record State<TState, TAction>(Fails<TState, TAction> fails, boolean reported, RunMark mark, Optional<File> saveFile){
 		State<TState, TAction> withFails(List<FuzzFail<TState, TAction>> data){
-			return new State<>(new Fails.FailList<>(data), false, data.isEmpty()? Mark.NONE : data.get(0).mark(), saveFile);
+			return new State<>(new Fails.FailList<>(data), false, data.isEmpty()? RunMark.NONE : data.get(0).mark(), saveFile);
 		}
 		
-		State<TState, TAction> withFail(FuzzFail<TState, TAction> fail, Stability stability){
+		State<TState, TAction> withFail(FuzzFail<TState, TAction> fail, FuzzingRunner.Stability stability){
 			return new State<>(new Fails.StableFail<>(fail, stability), false, fail.mark(), saveFile);
 		}
 		
@@ -46,7 +40,7 @@ public final class Plan<TState, TAction>{
 			public Stream<FuzzFail<S, A>> fails(){ return data.stream(); }
 		}
 		
-		record StableFail<S, A>(FuzzFail<S, A> fail, Stability stability) implements Fails<S, A>{
+		record StableFail<S, A>(FuzzFail<S, A> fail, FuzzingRunner.Stability stability) implements Fails<S, A>{
 			public StableFail{
 				Objects.requireNonNull(fail);
 				Objects.requireNonNull(stability);
@@ -59,14 +53,14 @@ public final class Plan<TState, TAction>{
 	}
 	
 	public static <S, a> Plan<S, a> start(FuzzingRunner<S, a, ?> runner, long seed, long totalIterations, int sequenceLength){ return start(runner, null, seed, totalIterations, sequenceLength); }
-	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, Config config, long seed, long totalIterations, int sequenceLength){
+	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzingRunner.Config config, long seed, long totalIterations, int sequenceLength){
 		return start(runner, config, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
-	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, Config config, FuzzSequenceSource source){
+	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzingRunner.Config config, FuzzSequenceSource source){
 		return new Plan<>(
 			runner,
 			new RunInfo(config, source),
-			new State<>(new Fails.FailList<>(List.of()), false, Mark.NONE, Optional.empty())
+			new State<>(new Fails.FailList<>(List.of()), false, RunMark.NONE, Optional.empty())
 		);
 	}
 	
@@ -85,12 +79,12 @@ public final class Plan<TState, TAction>{
 	}
 	
 	public Plan<TState, TAction> runAll(){
-		var fails = runner.run(runInfo.config, Mark.NONE, runInfo.seed);
+		var fails = runner.run(runInfo.config, RunMark.NONE, runInfo.seed);
 		return withState(state.withFails(fails));
 	}
 	
 	public Plan<TState, TAction> runMark(){
-		if(!state.mark.hasSequence() || state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof Ok)){
+		if(!state.mark.hasSequence() || state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof FuzzingRunner.Stability.Ok)){
 			return this;
 		}
 		
@@ -128,7 +122,7 @@ public final class Plan<TState, TAction>{
 				}
 			}
 			case Fails.StableFail<TState, TAction>(var fail, var stability) -> {
-				if(stability instanceof Ok){
+				if(stability instanceof FuzzingRunner.Stability.Ok){
 					System.out.println(stability.makeReport());
 					System.err.println(fail.trace());
 				}else{
@@ -141,8 +135,8 @@ public final class Plan<TState, TAction>{
 	}
 	public Plan<TState, TAction> clearUnstable(){
 		return switch(state.fails){
-			case Fails.StableFail(var fail, var stability) when !(stability instanceof Ok) -> {
-				yield withState(new State<>(new Fails.FailList<>(List.of()), false, Mark.NONE, state.saveFile));
+			case Fails.StableFail(var fail, var stability) when !(stability instanceof FuzzingRunner.Stability.Ok) -> {
+				yield withState(new State<>(new Fails.FailList<>(List.of()), false, RunMark.NONE, state.saveFile));
 			}
 			default -> this;
 		};
@@ -151,7 +145,7 @@ public final class Plan<TState, TAction>{
 		var newFails = state.fails.fails().filter(filter).toList();
 		var mark     = state.mark;
 		if(mark.hasSequence()){
-			mark = newFails.isEmpty()? Mark.NONE : newFails.get(0).mark();
+			mark = newFails.isEmpty()? RunMark.NONE : newFails.get(0).mark();
 		}
 		return withState(new State<>(new Fails.FailList<>(newFails), false, mark, state.saveFile));
 	}
@@ -165,7 +159,7 @@ public final class Plan<TState, TAction>{
 				yield withState(state.withFail(fail, stability));
 			}
 			case Fails.StableFail(var fail, var stability) -> {
-				if(!(stability instanceof Ok)){
+				if(!(stability instanceof FuzzingRunner.Stability.Ok)){
 					throw new AssertionError(stability.makeReport());
 				}
 				var stab = runner.establishFailStability(fail, reruns);
@@ -182,7 +176,7 @@ public final class Plan<TState, TAction>{
 				report = "\n" + switch(state.fails){
 					case Fails.FailList<TState, TAction>(var fails) -> FuzzFail.report(fails);
 					case Fails.StableFail<TState, TAction>(var fail, var stability) -> {
-						if(stability instanceof Stability.FailsNotSame){
+						if(stability instanceof FuzzingRunner.Stability.FailsNotSame){
 							yield stability.makeReport();
 						}else{
 							yield stability.makeReport() + "\n" + fail.trace();
@@ -220,9 +214,9 @@ public final class Plan<TState, TAction>{
 		return withState(new State<>(fails, false, mark, Optional.of(file)));
 	}
 	
-	public Plan<TState, TAction> configMod(Function<Config, Config> mod){
+	public Plan<TState, TAction> configMod(Function<FuzzingRunner.Config, FuzzingRunner.Config> mod){
 		var cfg = runInfo.config;
-		if(cfg == null) cfg = new Config();
+		if(cfg == null) cfg = new FuzzingRunner.Config();
 		cfg = mod.apply(cfg);
 		return new Plan<>(runner, new RunInfo(cfg, runInfo.seed), state);
 	}
@@ -234,17 +228,25 @@ public final class Plan<TState, TAction>{
 		
 		FuzzFail<TState, TAction> fail = switch(state.fails){
 			case Fails.FailList(var f) -> f.isEmpty()? null : f.get(0);
-			case Fails.StableFail(var f, var stability) -> stability instanceof Ok? f : null;
+			case Fails.StableFail(var f, var stability) -> stability instanceof FuzzingRunner.Stability.Ok? f : null;
 		};
 		if(fail != null){
-			LogUtil.println("saving fail");
-			fileInf.getParentFile().mkdir();
-			try(var out = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(fileInf)))){
+			System.out.println("Saving fail");
+			var buff = new ByteArrayOutputStream();
+			try(var out = new ObjectOutputStream(buff)){
 				out.writeObject(fail);
 			}catch(NotSerializableException e){
-				throw new RuntimeException(e);
+				new RuntimeException("Fail not saved because it is not serializable", e).printStackTrace();
 			}catch(Throwable e){
 				System.err.println("Failed to save data: " + e);
+			}
+			
+			fileInf.getParentFile().mkdir();
+			try(var out = new FileOutputStream(fileInf)){
+				buff.writeTo(out);
+			}catch(Throwable e){
+				System.err.println("Failed to save data: " + e);
+				fileInf.delete();
 			}
 		}else{
 			fileInf.delete();

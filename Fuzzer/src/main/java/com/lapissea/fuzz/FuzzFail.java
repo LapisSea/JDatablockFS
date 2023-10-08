@@ -1,4 +1,4 @@
-package com.lapissea.cfs.run.fuzzing;
+package com.lapissea.fuzz;
 
 import java.io.PrintWriter;
 import java.io.Serializable;
@@ -81,8 +81,8 @@ public sealed interface FuzzFail<State, Act>{
 			return sw.toString();
 		}
 		@Override
-		public FuzzingRunner.Mark mark(){
-			return new FuzzingRunner.Mark(sequence.index(), -1);
+		public RunMark mark(){
+			return new RunMark(sequence.index(), -1);
 		}
 		@Override
 		public boolean equals(Object o){
@@ -124,8 +124,8 @@ public sealed interface FuzzFail<State, Act>{
 			return sw.toString();
 		}
 		@Override
-		public FuzzingRunner.Mark mark(){
-			return new FuzzingRunner.Mark(sequence.index(), actionIndex);
+		public RunMark mark(){
+			return new RunMark(sequence.index(), actionIndex);
 		}
 		
 		@Override
@@ -234,5 +234,5 @@ public sealed interface FuzzFail<State, Act>{
 	
 	FuzzSequence sequence();
 	
-	FuzzingRunner.Mark mark();
+	RunMark mark();
 }

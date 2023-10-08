@@ -10,6 +10,7 @@
 !/jdatablockfs.tools/
 !/jdatablockfs.run/
 !/Jorth/
+!/Fuzzer/
 !pom.xml
 
 !/.idea/

@@ -23,6 +23,11 @@
 			<artifactId>tools</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>com.github.lapissea</groupId>
+			<artifactId>Fuzzer</artifactId>
+			<version>1.0</version>
+		</dependency>
 		
 		<dependency>
 			<groupId>org.testng</groupId>

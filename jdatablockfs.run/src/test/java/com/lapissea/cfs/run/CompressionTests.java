@@ -2,11 +2,12 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.fuzz.FuzzingRunner;
+import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.jorth.Jorth;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -84,12 +85,15 @@ public class CompressionTests{
 		var struct = Struct.of(clazz);
 		var pipe   = StandardStructPipe.of(struct);
 		
-		var fuz = new FuzzingRunner<>(FuzzingRunner.StateEnv.JustRandom.of(
+		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> {
 				var instance = struct.emptyConstructor().make();
 				
+				var bytes = new byte[rand.nextInt(100)];
+				rand.nextBytes(bytes);
+				
 				struct.getFields().requireExact(byte[].class, "data")
-				      .set(null, instance, rand.nextBytes(rand.nextInt(100)));
+				      .set(null, instance, bytes);
 				
 				var data = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
 				var ch   = AllocateTicket.bytes(120).submit(data);

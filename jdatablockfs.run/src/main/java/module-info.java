@@ -5,6 +5,7 @@ module JDatablockFS.run {
 	requires jlapisutil;
 	requires jmh.core;
 	requires com.google.gson;
+	requires Fuzzer;
 	
 	opens com.lapissea.cfs.run;
 	opens com.lapissea.cfs.run.sparseimage;

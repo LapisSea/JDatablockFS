@@ -1,4 +1,4 @@
-package com.lapissea.cfs.run.fuzzing;
+package com.lapissea.fuzz;
 
 import java.util.Arrays;
 import java.util.Objects;

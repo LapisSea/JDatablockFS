@@ -10,7 +10,6 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.run.checked.CheckIOList;
 import com.lapissea.cfs.run.checked.CheckMap;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
@@ -19,6 +18,8 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.NewUnmanaged;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.fuzz.FuzzingRunner;
+import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -162,7 +163,7 @@ public final class TestUtils{
 	}
 	
 	public static void randomBatch(int totalTasks, int batch, Task task){
-		var fuz = new FuzzingRunner<>(FuzzingRunner.StateEnv.JustRandom.of(
+		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
 		), r -> null);
 		

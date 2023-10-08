@@ -38,6 +38,11 @@ public @interface IOValue{
 		}
 		
 		PipeType dataPipeType() default PipeType.FLEXIBLE;
+		
+		/**
+		 * Does not load type immediately but only once it is accessed. Can only be true on {@link IOInstance.Def} types.
+		 */
+		boolean lazyLoad() default false;
 	}
 	
 	/**

@@ -32,6 +32,7 @@
 		<module>jdatablockfs.run</module>
 		<module>jdatablockfs.tools</module>
 		<module>Jorth</module>
+		<module>Fuzzer</module>
 	</modules>
 	
 	<dependencyManagement>

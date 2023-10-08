@@ -1,4 +1,4 @@
-package com.lapissea.cfs.run.fuzzing;
+package com.lapissea.fuzz;
 
 import java.io.Serializable;
 

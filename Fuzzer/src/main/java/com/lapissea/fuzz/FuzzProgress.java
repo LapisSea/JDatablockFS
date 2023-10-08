@@ -1,11 +1,9 @@
-package com.lapissea.cfs.run.fuzzing;
+package com.lapissea.fuzz;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-
-import static com.lapissea.cfs.run.fuzzing.FuzzingRunner.LogState.stdTime;
 
 public final class FuzzProgress{
 	
@@ -78,9 +76,9 @@ public final class FuzzProgress{
 		System.out.println(
 			(state.hasFail()? red + "FAIL " : green + "OK | ") +
 			gray + "Progress: " + reset + (f.length()<4? " " + f : f) + "%" +
-			gray + ", ET: " + reset + stdTime(state.estimatedTotalTime()) +
-			gray + ", ETR: " + reset + stdTime(state.estimatedTimeRemaining()) +
-			gray + ", elapsed: " + reset + stdTime(state.elapsed()) +
+			gray + ", ET: " + reset + FuzzingRunner.LogState.stdTime(state.estimatedTotalTime()) +
+			gray + ", ETR: " + reset + FuzzingRunner.LogState.stdTime(state.estimatedTimeRemaining()) +
+			gray + ", elapsed: " + reset + FuzzingRunner.LogState.stdTime(state.elapsed()) +
 			gray + ", ms/op: " + reset + (state.durationPerOp() == null? "--" :
 			                              "~" + String.format("%.3f", state.durationPerOp().toNanos()/1000_000D))
 		);

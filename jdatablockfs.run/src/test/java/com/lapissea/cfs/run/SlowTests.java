@@ -20,15 +20,17 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.run.checked.CheckIOList;
 import com.lapissea.cfs.run.checked.CheckMap;
 import com.lapissea.cfs.run.checked.CheckSet;
-import com.lapissea.cfs.run.fuzzing.FuzzFail;
-import com.lapissea.cfs.run.fuzzing.FuzzSequence;
-import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
-import com.lapissea.cfs.run.fuzzing.Plan;
-import com.lapissea.cfs.run.fuzzing.RNGEnum;
-import com.lapissea.cfs.run.fuzzing.RNGType;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOType;
+import com.lapissea.fuzz.FuzzFail;
+import com.lapissea.fuzz.FuzzSequence;
+import com.lapissea.fuzz.FuzzingRunner;
+import com.lapissea.fuzz.FuzzingStateEnv;
+import com.lapissea.fuzz.Plan;
+import com.lapissea.fuzz.RNGEnum;
+import com.lapissea.fuzz.RNGType;
+import com.lapissea.fuzz.RunMark;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -386,14 +388,14 @@ public class SlowTests{
 		}
 		
 		
-		var rnr = new FuzzingRunner.StateEnv.Marked<State, Action, IOException>(){
+		var rnr = new FuzzingStateEnv.Marked<State, Action, IOException>(){
 			@Override
-			public State create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "map-fuzz" + sequenceIndex);
 				return new State(cluster, new CheckSet<>(cluster.getRootProvider().request("hi", type, Integer.class)));
 			}
 			@Override
-			public void applyAction(State state, long actionIndex, Action action, FuzzingRunner.Mark mark) throws IOException{
+			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
 				if(mark.action(actionIndex)){
 //					LogUtil.println(action);
 					int a = 0;
@@ -536,13 +538,13 @@ public class SlowTests{
 	
 	@Test(dataProvider = "listMakers", dependsOnGroups = "lists", ignoreMissingDependencies = true)
 	void fuzzIOList(ListMaker maker){
-		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv.Marked<>(){
+		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			@Override
-			public IOList<Integer> create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public IOList<Integer> create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				return new CheckIOList<>(maker.make());
 			}
 			@Override
-			public void applyAction(IOList<Integer> state, long actionIndex, ListAction action, FuzzingRunner.Mark mark) throws IOException{
+			public void applyAction(IOList<Integer> state, long actionIndex, ListAction action, RunMark mark) throws IOException{
 				if(mark.action(actionIndex)){
 //					LogUtil.println(action);
 					int a = 0;
@@ -600,14 +602,14 @@ public class SlowTests{
 			}
 		}
 		
-		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
+		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingStateEnv<>(){
 			@Override
-			public boolean shouldRun(FuzzSequence sequence, FuzzingRunner.Mark mark){
+			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
 //				return sequence.index() == 12;
 				return true;
 			}
 			@Override
-			public State create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				var s = new CheckIOList<>(maker.make());
 				for(int i = 0, j = random.nextInt(50); i<j; i++){
 					s.add(random.nextInt(200));
@@ -615,7 +617,7 @@ public class SlowTests{
 				return new State(s.listIterator());
 			}
 			@Override
-			public void applyAction(State state, long actionIndex, Action action, FuzzingRunner.Mark mark) throws IOException{
+			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
 				switch(action.type){
 					case null -> { }
 					case NEXT -> {
@@ -679,9 +681,9 @@ public class SlowTests{
 	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void fuzzHashMap(){
 		record MapState(Cluster provider, IOMap<Object, Object> map){ }
-		var rnr = new FuzzingRunner.StateEnv.Marked<MapState, MapAction, IOException>(){
+		var rnr = new FuzzingStateEnv.Marked<MapState, MapAction, IOException>(){
 			@Override
-			public void applyAction(MapState state, long actionIndex, MapAction action, FuzzingRunner.Mark mark) throws IOException{
+			public void applyAction(MapState state, long actionIndex, MapAction action, RunMark mark) throws IOException{
 				boolean deb;
 				deb = mark.hasAction()? mark.action(actionIndex) : mark.hasSequence();
 				if(deb){
@@ -704,7 +706,7 @@ public class SlowTests{
 			}
 			
 			@Override
-			public MapState create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public MapState create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				Cluster provider = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "");
 				var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map")
 				                  .withType(IOType.of(HashIOMap.class, Object.class, Object.class))
@@ -753,15 +755,15 @@ public class SlowTests{
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
-		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingRunner.StateEnv<>(){
+		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv<>(){
 			
 			@Override
-			public boolean shouldRun(FuzzSequence sequence, FuzzingRunner.Mark mark){
+			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
 				return true;
 			}
 			
 			@Override
-			public void applyAction(BlobState state, long actionIndex, BlobAction action, FuzzingRunner.Mark mark) throws IOException{
+			public void applyAction(BlobState state, long actionIndex, BlobAction action, RunMark mark) throws IOException{
 				if(mark.action(actionIndex)){
 					LogUtil.println(action);
 					int a = 0;//for breakpoint
@@ -790,7 +792,7 @@ public class SlowTests{
 			}
 			
 			@Override
-			public BlobState create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark) throws IOException{
+			public BlobState create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				var initial = new byte[random.nextInt(0, 100)];
 				random.nextBytes(initial);
 				

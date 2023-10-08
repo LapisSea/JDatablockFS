@@ -1,6 +1,4 @@
-package com.lapissea.cfs.run.fuzzing;
-
-import com.lapissea.cfs.utils.RawRandom;
+package com.lapissea.fuzz;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +26,7 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 	private RNGType(List<Function<RandomGenerator, E>> definition){
 		if(definition.isEmpty()) throw new IllegalArgumentException("Definitions required");
 		
-		var rand = new RawRandom(123);
+		var rand = new SimpleRandom(123);
 		//noinspection unchecked
 		universe = definition.stream()
 		                     .collect(Collectors.toUnmodifiableMap(
