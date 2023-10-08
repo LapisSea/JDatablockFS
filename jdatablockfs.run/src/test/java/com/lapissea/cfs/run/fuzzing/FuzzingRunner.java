@@ -89,6 +89,27 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			}
 		}
 		
+		abstract class JustRandom<Action, Err extends Throwable> extends Marked<RawRandom, Action, Err>{
+			
+			public interface RandomApply<Action, Err extends Throwable>{
+				void applyAction(RawRandom rand, long actionIndex, Mark mark) throws Err;
+			}
+			
+			public static <Action, Err extends Throwable> JustRandom<Action, Err> of(RandomApply<Action, Err> rAction){
+				return new JustRandom<>(){
+					@Override
+					public void applyAction(RawRandom rawRandom, long actionIndex, Action action, Mark mark) throws Err{
+						rAction.applyAction(rawRandom, actionIndex, mark);
+					}
+				};
+			}
+			
+			@Override
+			public RawRandom create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark){
+				return new RawRandom(random.nextLong());
+			}
+		}
+		
 		boolean shouldRun(FuzzSequence sequence, Mark mark);
 		void applyAction(State state, long actionIndex, Action action, Mark mark) throws Err;
 		State create(RandomGenerator random, long sequenceIndex, Mark mark) throws Err;
@@ -242,8 +263,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	public List<FuzzFail<State, Action>> run(Config config, Mark mark, FuzzSequenceSource source){
 		final var conf = config == null? new Config() : config;
 		
-		var runType = RunType.of(source, stateEnv, mark);
-		return switch(runType){
+		return switch(RunType.of(source, stateEnv, mark)){
 			case RunType.Noop ignored -> List.of();
 			case RunType.Single(var sequence) -> {
 				var fail = runSequence(mark, sequence, new FuzzProgress(conf, sequence.iterations()));
@@ -309,42 +329,27 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	private sealed interface RunType{
-		static RunType of(FuzzSequence sequence){ return new Single(sequence); }
 		static RunType of(FuzzSequenceSource source, StateEnv<?, ?, ?> stateEnv, Mark mark){
-			return source.all()
-			             .filter(sequence -> stateEnv.shouldRun(sequence, mark))
-			             .map(RunType::of)
-			             .reduce(new RunType.Noop(), RunType::merge);
-		}
-		
-		record Noop() implements RunType{
-			@Override
-			public RunType merge(RunType other){ return other; }
-		}
-		
-		record Single(FuzzSequence sequence) implements RunType{
-			@Override
-			public RunType merge(RunType other){
-				return switch(other){
-					case Noop noop -> this;
-					case Many o -> new Many(o.sequencesToRun + 1, o.totalIterations + sequence.iterations());
-					case Single o -> new Many(2, sequence.iterations() + o.sequence.iterations());
-				};
+			var i = source.all().filter(sequence -> stateEnv.shouldRun(sequence, mark)).iterator();
+			
+			long         sequencesToRun = 0, totalIterations = 0;
+			FuzzSequence sequence       = null;
+			while(i.hasNext()){
+				sequence = i.next();
+				sequencesToRun++;
+				totalIterations += sequence.iterations();
 			}
+			
+			if(sequencesToRun == 0) return new Noop();
+			if(sequencesToRun == 1) return new Single(sequence);
+			return new Many(sequencesToRun, totalIterations);
 		}
 		
-		record Many(long sequencesToRun, long totalIterations) implements RunType{
-			@Override
-			public RunType merge(RunType other){
-				return switch(other){
-					case Noop noop -> this;
-					case Many o -> new Many(o.sequencesToRun + sequencesToRun, o.totalIterations + totalIterations);
-					case Single single -> single.merge(this);
-				};
-			}
-		}
+		record Noop() implements RunType{ }
 		
-		RunType merge(RunType other);
+		record Single(FuzzSequence sequence) implements RunType{ }
+		
+		record Many(long sequencesToRun, long totalIterations) implements RunType{ }
 	}
 	
 	private static String getTaskName(){

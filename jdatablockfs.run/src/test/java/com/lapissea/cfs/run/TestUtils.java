@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.NewUnmanaged;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.utils.RawRandom;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -163,16 +162,9 @@ public final class TestUtils{
 	}
 	
 	public static void randomBatch(int totalTasks, int batch, Task task){
-		var fuz = new FuzzingRunner<>(new FuzzingRunner.StateEnv.Marked<RawRandom, Object, Throwable>(){
-			@Override
-			public void applyAction(RawRandom state, long actionIndex, Object action, FuzzingRunner.Mark mark){
-				task.run(state, actionIndex);
-			}
-			@Override
-			public RawRandom create(RandomGenerator random, long sequenceIndex, FuzzingRunner.Mark mark){
-				return new RawRandom(random.nextLong());
-			}
-		}, r -> null);
+		var fuz = new FuzzingRunner<>(FuzzingRunner.StateEnv.JustRandom.of(
+			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
+		), r -> null);
 		
 		fuz.runAndAssert(69, totalTasks, batch);
 	}
