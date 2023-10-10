@@ -22,7 +22,7 @@ public class StartingBench{
 	@BenchmarkMode(Mode.SingleShotTime)
 	public void initAndRoot(){
 		try{
-			var roots = Cluster.emptyMem().getRootProvider();
+			var roots = Cluster.emptyMem().roots();
 			roots.request("benchy", Reference.class);
 		}catch(Throwable e){
 			throw new RuntimeException(e);

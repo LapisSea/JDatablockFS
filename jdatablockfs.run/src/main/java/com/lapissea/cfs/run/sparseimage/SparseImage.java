@@ -61,7 +61,7 @@ public class SparseImage{
 		int iterations = args.getInt("iterations", 100);
 		
 		LogUtil.println("data gen");
-		var image = cluster.getRootProvider().request("my image", Image.class);
+		var image = cluster.roots().request("my image", Image.class);
 		
 		Random r = new Random(1);
 		for(int i = 0; i<iterations; i++){

@@ -51,11 +51,11 @@ public static class IP extends IOInstance.Managed<IP>{
 	String v6;
 	
 	//Every IOInstance needs an empty constructor
-	public IP(){}
+	public IP(){ }
 	public IP(double latitude, double longitude, String v6){
-		this.latitude=latitude;
-		this.longitude=longitude;
-		this.v6=v6;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.v6 = v6;
 	}
 }
 ```
@@ -67,7 +67,7 @@ Create database and add sample data:
 Cluster cluster=Cluster.init(MemoryData.empty());
 
 //Ask root provider for list of IPs with the id of "my ips"
-IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
+IOList<IP> ips=cluster.roots().request("my ips",IOList.class,IP.class);
 
 //Adding sample data to database:
 ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
@@ -76,7 +76,7 @@ ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
 
 Details:
 
-`cluster.getRootProvider().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
+`cluster.roots().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
 
 `ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically created and allocated by the rootProvider.
 

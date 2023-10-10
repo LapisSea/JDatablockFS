@@ -145,7 +145,7 @@ public class Cluster implements DataProvider{
 	private final Metadata metadata;
 	
 	
-	private final RootProvider rootProvider = new RootProvider(){
+	private final RootProvider roots = new RootProvider(){
 		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
 		
 		private static class Node{
@@ -298,7 +298,7 @@ public class Cluster implements DataProvider{
 	@Override
 	public ChunkCache getChunkCache(){ return chunkCache; }
 	
-	public RootProvider getRootProvider(){ return rootProvider; }
+	public RootProvider roots(){ return roots; }
 	
 	@Override
 	public String toString(){

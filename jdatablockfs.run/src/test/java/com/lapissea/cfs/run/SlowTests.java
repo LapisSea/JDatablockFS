@@ -297,7 +297,7 @@ public class SlowTests{
 				provider = new Cluster(provider.getSource());
 			}
 			
-			var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map").withType(IOType.of(HashIOMap.class, Object.class, Object.class)).request();
+			var map = provider.roots().<IOMap<Object, Object>>builder("map").withType(IOType.of(HashIOMap.class, Object.class, Object.class)).request();
 			if(mode == Mode.CHECKPOINT){
 				info("Starting on step", map.size());
 			}
@@ -358,7 +358,7 @@ public class SlowTests{
 		}
 	}
 	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
-		var set = provider.getRootProvider().<IOSet<Integer>>request("hi", type, Integer.class);
+		var set = provider.roots().<IOSet<Integer>>request("hi", type, Integer.class);
 		session.accept(provider, new CheckSet<>(set));
 		provider.scanGarbage(ERROR);
 	}
@@ -371,7 +371,7 @@ public class SlowTests{
 				@Serial
 				private Object readResolve() throws IOException{
 					var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
-					return new State(cluster, new CheckSet<>(cluster.getRootProvider().require("hi", IOSet.class)));
+					return new State(cluster, new CheckSet<>(cluster.roots().require("hi", IOSet.class)));
 				}
 			}
 			
@@ -392,7 +392,7 @@ public class SlowTests{
 			@Override
 			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "map-fuzz" + sequenceIndex);
-				return new State(cluster, new CheckSet<>(cluster.getRootProvider().request("hi", type, Integer.class)));
+				return new State(cluster, new CheckSet<>(cluster.roots().request("hi", type, Integer.class)));
 			}
 			@Override
 			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
@@ -531,8 +531,8 @@ public class SlowTests{
 		return new Object[][]{
 			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
 			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40))},
-			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().getRootProvider().request("list", ContiguousIOList.class, Integer.class))},
-			{new ListMaker("linked list", 0.1, () -> Cluster.emptyMem().getRootProvider().request("list", LinkedIOList.class, Integer.class))},
+			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().roots().request("list", ContiguousIOList.class, Integer.class))},
+			{new ListMaker("linked list", 0.1, () -> Cluster.emptyMem().roots().request("list", LinkedIOList.class, Integer.class))},
 			};
 	}
 	
@@ -708,7 +708,7 @@ public class SlowTests{
 			@Override
 			public MapState create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				Cluster provider = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "");
-				var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map")
+				var map = provider.roots().<IOMap<Object, Object>>builder("map")
 				                  .withType(IOType.of(HashIOMap.class, Object.class, Object.class))
 				                  .request();
 				
@@ -797,7 +797,7 @@ public class SlowTests{
 				random.nextBytes(initial);
 				
 				var cl   = optionallyLogged(mark.sequence(sequenceIndex), sequenceIndex + "fuzzBlobIO");
-				var blob = cl.getRootProvider().request("blob", Blob.class);
+				var blob = cl.roots().request("blob", Blob.class);
 				blob.write(true, initial);
 				
 				return new BlobState(blob, MemoryData.builder().withRaw(initial).build());

@@ -109,7 +109,7 @@ public final class TestUtils{
 			}
 			
 			if(provider instanceof Cluster c){
-				c.getRootProvider().provide("test_obj", obj);
+				c.roots().provide("test_obj", obj);
 			}
 			
 			session.accept(obj);

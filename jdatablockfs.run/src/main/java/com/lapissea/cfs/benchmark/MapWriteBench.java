@@ -24,7 +24,7 @@ public class MapWriteBench{
 	@Benchmark
 	public void write() throws IOException{
 		var cluster = Cluster.emptyMem();
-		IOMap<Object, Object> map = cluster.getRootProvider()
+		IOMap<Object, Object> map = cluster.roots()
 		                                   .builder("map")
 		                                   .withType(HashIOMap.class, Object.class, Object.class)
 		                                   .request();

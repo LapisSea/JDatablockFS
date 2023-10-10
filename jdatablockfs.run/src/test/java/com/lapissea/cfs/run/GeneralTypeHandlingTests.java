@@ -90,7 +90,7 @@ public class GeneralTypeHandlingTests{
 	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void genericStorage(Object obj) throws IOException{
 		TestUtils.testCluster(TestInfo.of(obj), ses -> {
-			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
+			var ls = ses.roots().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
 			)).request();
@@ -184,13 +184,13 @@ public class GeneralTypeHandlingTests{
 	
 	public static byte[] make() throws IOException{
 		var data = MemoryData.empty();
-		Cluster.init(data).getRootProvider().request("hello!", EnumContainer.class);
+		Cluster.init(data).roots().request("hello!", EnumContainer.class);
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{
 		var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
 		
-		var r         = cluster.getRootProvider().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
+		var r         = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
 		var container = (IOInstance<?>)r.request();
 		
 		IOField f = container.getThisStruct().getFields().byName("r").orElseThrow();
@@ -222,8 +222,8 @@ public class GeneralTypeHandlingTests{
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
-			provider.getRootProvider().provide(new ObjectID("obj"), blob);
-			var read = provider.getRootProvider().request("obj", NamedBlob.class);
+			provider.roots().provide(new ObjectID("obj"), blob);
+			var read = provider.roots().request("obj", NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			
@@ -500,7 +500,7 @@ public class GeneralTypeHandlingTests{
 			}
 			chunk.freeChaining();
 			
-			IOList<Seal> list = provider.getRootProvider().request("list", IOList.class, Seal.class);
+			IOList<Seal> list = provider.roots().request("list", IOList.class, Seal.class);
 			list.add(new Seal.A(69));
 			list.add(new Seal.B(Instant.now()));
 			list.add(new Seal.C(4, 2, 0));
@@ -542,7 +542,7 @@ public class GeneralTypeHandlingTests{
 	void orderTestType() throws IOException{
 		
 		var cluster = Cluster.emptyMem();
-		var roots   = cluster.getRootProvider();
+		var roots   = cluster.roots();
 		
 		var typ = new OrderTestType();
 		typ.commands = List.of(OrderTestType.EnumThing.SET_CLASS_NAME, OrderTestType.EnumThing.SET_METHOD_NAME);
@@ -648,7 +648,7 @@ public class GeneralTypeHandlingTests{
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void genericStore() throws IOException{
 		var d = Cluster.emptyMem();
-		var data = d.getRootProvider().request(new ObjectID("obj"), () -> {
+		var data = d.roots().request(new ObjectID("obj"), () -> {
 			var v = IOInstance.Def.of(GenericArg.class);
 			v.allocateNulls(d, null);
 			return v;

@@ -50,8 +50,8 @@ public class QueryTests{
 		var cl = Cluster.init(MemoryData.empty());
 		return new Object[][]{
 			{IOList.wrap(new ArrayList<>())},
-			{cl.getRootProvider().request("arr", ContiguousIOList.class, el)},
-			{cl.getRootProvider().request("lin", LinkedIOList.class, el)},
+			{cl.roots().request("arr", ContiguousIOList.class, el)},
+			{cl.roots().request("lin", LinkedIOList.class, el)},
 			};
 	}
 	

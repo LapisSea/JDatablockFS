@@ -47,7 +47,7 @@ public class IPs{
 		var cluster = Cluster.init(memory);
 		
 		//Ask root provider for a list of IPs with the id of "my ips"
-		IOList<IP> ips = cluster.getRootProvider().request("my ips", IOList.class, IP.class);
+		IOList<IP> ips = cluster.roots().request("my ips", IOList.class, IP.class);
 		
 		//Nice thing to do, reduces the possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
 		ips.requestRelativeCapacity(2);
@@ -63,7 +63,7 @@ public class IPs{
 //		System.out.println();
 		System.out.println("Data in memory:");
 		
-		for(var e : new Cluster(memory).getRootProvider().listAll()){
+		for(var e : new Cluster(memory).roots().listAll()){
 			System.out.println(e.getKey() + ": " + switch(e.getValue()){
 				//Just a fancy toString that every IOInstance has that allows for printing the data in a more appealing way
 				case IOInstance<?> inst -> inst.toString(false, "{\n\t", "\n}", ": ", ",\n\t");

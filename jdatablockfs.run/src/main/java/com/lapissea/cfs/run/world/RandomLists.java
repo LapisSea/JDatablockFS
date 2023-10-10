@@ -46,7 +46,7 @@ public class RandomLists{
 			var rand = new Random((long)listCount<<4);
 			try{
 				var cl = Cluster.init(mem);
-				var p  = cl.getRootProvider();
+				var p  = cl.roots();
 				for(int i = 0; i<400; i++){
 					var m = p.request("map" + rand.nextInt(listCount), Map.class);
 					m.entities.addNew(e -> {
