@@ -355,6 +355,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(!IOInstance.isInstance(instanceClass)){
 			throw new ClassCastException(instanceClass.getName() + " is not an " + IOInstance.class.getSimpleName());
 		}
+		if(Utils.isInnerClass(instanceClass)){
+			throw new IllegalArgumentException(instanceClass.getName() + " is an inner non static class. Did you mean to make the class static?");
+		}
 		
 		boolean needsImpl = IOInstance.Def.isDefinition(instanceClass);
 		

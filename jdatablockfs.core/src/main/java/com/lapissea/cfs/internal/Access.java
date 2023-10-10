@@ -270,7 +270,12 @@ public final class Access{
 				
 				return makeLambda(of, functionalInterface);
 			}catch(ReflectiveOperationException ofe){
-				var e = new MissingConstruct(clazz.getName() + " does not have a valid constructor or of static method with arguments of " + Arrays.toString(parameterTypes));
+				var argStr = switch(parameterTypes.length){
+					case 0 -> "empty arguments";
+					case 1 -> "argument of " + parameterTypes[0];
+					default -> "arguments of " + Arrays.toString(parameterTypes);
+				};
+				var e = new MissingConstruct(clazz.getName() + " does not have a valid constructor or \"of\" static method with " + argStr);
 				e.addSuppressed(ce);
 				e.addSuppressed(ofe);
 				throw e;

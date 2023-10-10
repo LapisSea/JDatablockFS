@@ -44,10 +44,10 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
 
-public class Cluster implements DataProvider{
+public final class Cluster implements DataProvider{
 	
 	static{
-		Thread.startVirtualThread(() -> new IOTypeDB.PersistentDB());
+		Thread.startVirtualThread(IOTypeDB.PersistentDB::new);
 		Thread.startVirtualThread(FieldCompiler::init);
 	}
 	

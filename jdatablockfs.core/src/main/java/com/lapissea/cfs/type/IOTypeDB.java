@@ -935,7 +935,7 @@ public sealed interface IOTypeDB{
 		}
 	}
 	
-	private IOType makeLink(Object obj){
+	private IOType makeType(Object obj){
 		if(obj instanceof IOInstance.Unmanaged<?> u){
 			return u.getTypeDef();
 		}
@@ -947,12 +947,12 @@ public sealed interface IOTypeDB{
 	
 	default int toID(Object obj) throws IOException{
 		if(obj == null) return 0;
-		return toID(makeLink(obj));
+		return toID(makeType(obj));
 	}
 	default TypeID toID(Object obj, boolean recordNew) throws IOException{
 		if(obj == null) return new TypeID(0, true);
-		var link = makeLink(obj);
-		return toID(link, recordNew);
+		var type = makeType(obj);
+		return toID(type, recordNew);
 	}
 	
 	default int toID(Class<?> type) throws IOException{

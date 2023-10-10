@@ -12,6 +12,7 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -324,5 +325,8 @@ public final class Utils{
 		l.addAll(a);
 		l.add(b);
 		return List.copyOf(l);
+	}
+	public static boolean isInnerClass(Class<?> clazz){
+		return clazz.isMemberClass() && !Modifier.isStatic(clazz.getModifiers());
 	}
 }
