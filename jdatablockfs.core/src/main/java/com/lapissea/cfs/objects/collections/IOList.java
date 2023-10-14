@@ -445,7 +445,7 @@ public interface IOList<T> extends IterablePP<T>{
 				}catch(IndexOutOfBoundsException ex){
 					throw new ConcurrentModificationException();
 				}catch(IOException e){
-					throw new RuntimeException(e);
+					throw new RuntimeException("Failed to iterate over List", e);
 				}
 			}
 		}
@@ -558,6 +558,7 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 	}
 	
+	@Override
 	default boolean isEmpty(){
 		return size() == 0;
 	}

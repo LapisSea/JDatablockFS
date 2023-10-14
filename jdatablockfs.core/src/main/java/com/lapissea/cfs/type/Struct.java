@@ -385,8 +385,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
 				
 				if(runNow) lock.getLock().unlock();
-				struct = newStruct.make(instanceClass, runNow);
-				if(runNow) lock.getLock().lock();
+				try{
+					struct = newStruct.make(instanceClass, runNow);
+				}finally{
+					if(runNow) lock.getLock().lock();
+				}
 				
 				STRUCT_CACHE.put(instanceClass, struct);
 			}catch(MalformedStruct e){
