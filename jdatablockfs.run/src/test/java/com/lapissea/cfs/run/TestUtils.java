@@ -22,8 +22,14 @@ import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.cfs.logging.Log.trace;
@@ -168,5 +174,78 @@ public final class TestUtils{
 		), r -> null);
 		
 		fuz.runAndAssert(69, totalTasks, batch);
+	}
+	
+	public static <T> T callWithClassLoader(ClassLoader classLoader, String sesName) throws ReflectiveOperationException{
+		Class<?> cl = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+		var      fn = cl.getDeclaredMethod(sesName);
+		fn.setAccessible(true);
+		return callWithClassLoader(classLoader, fn);
+	}
+	@SuppressWarnings("unchecked")
+	public static <T> T callWithClassLoader(ClassLoader classLoader, Method session) throws ReflectiveOperationException{
+		
+		var orgClass = session.getDeclaringClass();
+		var cname    = orgClass.getName();
+		var fname    = session.getName();
+		
+		var cl = classLoader.loadClass(cname);
+		var fn = cl.getDeclaredMethod(fname);
+		fn.setAccessible(true);
+		var res = fn.invoke(null);
+		return (T)res;
+	}
+	
+	public static ClassLoader makeShadowClassLoader(Map<String, UnsafeFunction<String, byte[], Exception>> shadowingTypes){
+		var mapping = Map.copyOf(shadowingTypes);
+		
+		class ShadowClassLoader extends ClassLoader{
+			static{ registerAsParallelCapable(); }
+			
+			private final Map<Object, Lock> lockMap = new ConcurrentHashMap<>();
+			static        long              ay;
+			
+			@Override
+			protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+				if(name.startsWith("java.lang")) return getParent().loadClass(name);
+				{
+					Class<?> c = findLoadedClass(name);
+					if(c != null) return c;
+				}
+				var lock = lockMap.computeIfAbsent(getClassLoadingLock(name), o -> new ReentrantLock());
+				lock.lock();
+				try{
+					Class<?> c = findLoadedClass(name);
+					if(c != null) return c;
+					
+					var fn = mapping.get(name);
+					if(fn == null){
+						var cls1 = super.loadClass(name, resolve);
+						if(cls1.getClassLoader() == getParent()){
+							var r = getParent().getResourceAsStream(name.replace('.', '/') + ".class");
+							if(r == null) return getParent().loadClass(name);
+							try(r){
+								var bb = r.readAllBytes();
+								return defineClass(name, bb, 0, bb.length);
+							}catch(IOException e){
+								throw new RuntimeException(e);
+							}
+						}
+						return cls1;
+					}
+					
+					try{
+						var bytecode = fn.apply(name);
+						return defineClass(name, bytecode, 0, bytecode.length);
+					}catch(Exception e){
+						throw new RuntimeException("Failed to generate shadow class", e);
+					}
+				}finally{
+					lock.unlock();
+				}
+			}
+		}
+		
+		return new ShadowClassLoader();
 	}
 }
