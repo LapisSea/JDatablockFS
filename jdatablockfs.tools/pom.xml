@@ -12,7 +12,7 @@
 	</properties>
 	
 	<parent>
-		<groupId>com.github.lapissea.jdatablockfs</groupId>
+		<groupId>lapissea.jdatablockfs</groupId>
 		<artifactId>JDatablockFS</artifactId>
 		<version>1.0</version>
 	</parent>
@@ -22,7 +22,7 @@
 	
 	<dependencies>
 		<dependency>
-			<groupId>com.github.lapissea.jdatablockfs</groupId>
+			<groupId>lapissea.jdatablockfs</groupId>
 			<artifactId>core</artifactId>
 			<version>${project.version}</version>
 		</dependency>

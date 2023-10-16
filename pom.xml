@@ -21,7 +21,7 @@
 		<child-build-dir>../target</child-build-dir>
 	</properties>
 	
-	<groupId>com.github.lapissea.jdatablockfs</groupId>
+	<groupId>lapissea.jdatablockfs</groupId>
 	<artifactId>JDatablockFS</artifactId>
 	<packaging>pom</packaging>
 	
