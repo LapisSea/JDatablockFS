@@ -3,11 +3,11 @@
     <output-path>$PROJECT_DIR$/run/main/DisplayHost_jar</output-path>
     <root id="archive" name="jdatablockfs.run.jar">
       <element id="directory" name="META-INF">
-        <element id="file-copy" path="$PROJECT_DIR$/jdatablockfs.run/src/main/resources/dm/META-INF/MANIFEST.MF" />
+        <element id="file-copy" path="$PROJECT_DIR$/jdbfs-run/src/main/resources/dm/META-INF/MANIFEST.MF" />
       </element>
-      <element id="module-output" name="jdatablockfs.run" />
-      <element id="module-output" name="jdatablockfs.tools" />
-      <element id="module-output" name="jdatablockfs.core" />
+      <element id="module-output" name="jdbfs-run" />
+      <element id="module-output" name="jdbfs-tools" />
+      <element id="module-output" name="jdbfs-core" />
       <element id="module-output" name="Jorth" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/roaringbitmap/RoaringBitmap/0.9.39/RoaringBitmap-0.9.39.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/google/code/gson/gson/2.10.1/gson-2.10.1.jar" path-in-jar="/" />

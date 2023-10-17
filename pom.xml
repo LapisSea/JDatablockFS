@@ -28,9 +28,9 @@
 	<version>1.0</version>
 	
 	<modules>
-		<module>jdatablockfs.core</module>
-		<module>jdatablockfs.run</module>
-		<module>jdatablockfs.tools</module>
+		<module>/jdbfs-core</module>
+		<module>/jdbfs-run</module>
+		<module>/jdbfs-tools</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
 	</modules>
