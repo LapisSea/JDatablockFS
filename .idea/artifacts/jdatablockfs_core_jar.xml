@@ -2,7 +2,7 @@
   <artifact type="jar" name="jdatablockfs.core:jar">
     <output-path>$PROJECT_DIR$/target/artifacts/jdatablockfs_core_jar</output-path>
     <root id="archive" name="jdatablockfs.core.jar">
-      <element id="module-output" name="jdatablockfs.core" />
+      <element id="module-output" name="jdbfs-core" />
       <element id="module-output" name="Jorth" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/atteo/evo-inflector/1.3/evo-inflector-1.3.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/ow2/asm/asm/9.4/asm-9.4.jar" path-in-jar="/" />

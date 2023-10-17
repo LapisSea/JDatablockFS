@@ -2,9 +2,9 @@
   <artifact type="jar" name="SparseImage jar">
     <output-path>$PROJECT_DIR$/target/artifacts/SparseImage_jar</output-path>
     <root id="archive" name="jdatablockfs.run.jar">
-      <element id="module-output" name="jdatablockfs.run" />
-      <element id="module-output" name="jdatablockfs.tools" />
-      <element id="module-output" name="jdatablockfs.core" />
+      <element id="module-output" name="jdbfs-run" />
+      <element id="module-output" name="jdbfs-tools" />
+      <element id="module-output" name="jdbfs-core" />
       <element id="module-output" name="Jorth" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-assimp/3.3.1/lwjgl-assimp-3.3.1.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/github/lapissea/jlapisvector/1.1/jlapisvector-1.1.jar" path-in-jar="/" />
