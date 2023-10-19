@@ -45,6 +45,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,6 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
@@ -935,22 +937,19 @@ public final class DefInstanceCompiler{
 		}
 		var orderedFields = oOrderedFields.get();
 		
-		var part = writer.codePart();
-		writer.write("public function <init>");
-		for(int i = 0; i<orderedFields.size(); i++){
-			FieldInfo info    = orderedFields.get(i);
-			var       argName = "arg" + i;
-			writer.write("arg {!} {}", argName, info.type);
-		}
-		writer.write("start");
-		part.close();
-		
 		writer.write(
 			"""
-				super start
-					get #typ.impl $STRUCT
-				end
-				""");
+				public function <init>
+					template-for #e in {0} start
+						arg #e.key #e.value
+					end
+				start
+					super start
+						get #typ.impl $STRUCT
+					end
+				""",
+			IntStream.range(0, orderedFields.size()).mapToObj(i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
+		);
 		
 		for(int i = 0; i<orderedFields.size(); i++){
 			FieldInfo info     = orderedFields.get(i);

@@ -22,7 +22,9 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -136,6 +138,17 @@ public final class TemplateClassLoader extends ClassLoader{
 		writer.write("end");
 	}
 	
+	private static void stringsAnnotation(CodeStream code, Class<? extends Annotation> type, Collection<String> values) throws MalformedJorth{
+		code.write(
+			"""
+				@{0} start value [
+					template-for #val in {1} start '#val' end
+				] end
+				""",
+			type, values
+		);
+	}
+	
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
 		
@@ -159,13 +172,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		if(!fields.isEmpty()){
 			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).toList();
-			try(var ignored = writer.codePart()){
-				writer.write(" @{} start value [", DataOrder.class);
-				for(String dependency : order){
-					writer.write("'{}'", dependency);
-				}
-				writer.write("] end");
-			}
+			stringsAnnotation(writer, DataOrder.class, order);
 		}
 		
 		if(extend) writer.write("extends {}<#genClassName>", IOInstance.Managed.class);
@@ -213,13 +220,7 @@ public final class TemplateClassLoader extends ClassLoader{
 				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
-				try(var ignored = writer.codePart()){
-					writer.write(" @{} start value [", IODependency.class);
-					for(String dependency : field.getDependencies()){
-						writer.write("'{}'", dependency);
-					}
-					writer.write("] end");
-				}
+				stringsAnnotation(writer, IODependency.class, field.getDependencies());
 			}
 			
 			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));

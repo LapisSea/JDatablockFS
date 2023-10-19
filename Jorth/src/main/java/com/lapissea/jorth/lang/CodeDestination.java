@@ -4,7 +4,9 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 
 public abstract class CodeDestination{
 	
-	protected abstract TokenSource transform(TokenSource src);
+	protected TokenSource transform(TokenSource src){
+		return src;
+	}
 	
 	protected abstract void parse(TokenSource source) throws MalformedJorth;
 	
