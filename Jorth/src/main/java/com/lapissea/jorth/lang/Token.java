@@ -145,12 +145,12 @@ public sealed interface Token{
 			if(type == Word.class){
 				return Optional.of(type.cast(new Word(
 					line,
-					'"' +
+					"'" +
 					value.replace("\"", "\\\"")
 					     .replace("\n", "\\n")
 					     .replace("\r", "\\r")
 					     .replace("\t", "\\t")
-					+ '"'
+					+ "'"
 				)));
 			}
 			return Token.super.as(type);
