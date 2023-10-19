@@ -583,7 +583,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public void loadFloatOp(float value){
-		code().stack.push(GenericType.BOOL);
+		code().stack.push(GenericType.FLOAT);
 		writer.visitLdcInsn(value);
 	}
 	
