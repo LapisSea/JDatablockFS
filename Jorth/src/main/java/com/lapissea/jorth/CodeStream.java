@@ -15,15 +15,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 public interface CodeStream extends AutoCloseable{
 	
 	static CharSequence processFragment(String code, Object... objs){
 		while(true){
-			var newCode = resolveTemplate(code, objs);
-			//noinspection StringEquality
-			if(newCode == code) break;
-			code = newCode;
+			var res = resolveTemplate(code, objs);
+			if(res.isEmpty()) break;
+			code = res.get();
 		}
 		
 		int start = 0;
@@ -48,10 +49,7 @@ public interface CodeStream extends AutoCloseable{
 		return new CharJoin(parts);
 	}
 	
-	/**
-	 * returns the same string object if it nothing found
-	 */
-	private static String resolveTemplate(String src, Object[] objs){
+	private static Optional<String> resolveTemplate(String src, Object[] objs){
 		for(int i = 0; i<src.length(); i++){
 			if(src.charAt(i) != 't') continue;
 			
@@ -62,17 +60,17 @@ public interface CodeStream extends AutoCloseable{
 				!Character.isWhitespace(src.charAt(i + tfor.length()))
 			) continue;
 			
-			return unwrapTemplate(src, objs, i, tfor);
+			return Optional.of(unwrapTemplate(src, objs, i, tfor));
 		}
-		return src;
+		return Optional.empty();
 	}
 	
 	private static String unwrapTemplate(String src, Object[] objs, int start, String forTrigger){
-		var parts = new ArrayList<CharSequence>();
-		parts.add(new CharSubview(src, 0, start));
+		var result = new StringBuilder();
+		result.append(src, 0, start);
 		
 		try(var t = new Tokenizer(new CodeDestination(){
-			record Part(boolean isKey, String val){ }
+			record Part(boolean isKey, boolean inString, String val){ }
 			@Override
 			protected void parse(TokenSource source) throws MalformedJorth{
 				var nameToken = source.readToken();
@@ -87,18 +85,28 @@ public interface CodeStream extends AutoCloseable{
 				var template = readTemplate(source, valName);
 				
 				for(var val : vals){
+					boolean inString = false;
 					for(var part : template){
 						if(part.isKey){
 							var obj = getVal(val, part.val);
 							var str = objToJorthStr(obj, !(obj instanceof Type));
-							parts.add(str);
+							if(part.inString){
+								result.append(str.replace("'", "\\'"));
+								inString = true;
+							}else{
+								if(inString) inString = false;
+								else result.append(' ');
+								result.append(str);
+							}
 						}else{
-							parts.add(part.val);
+							if(inString) inString = false;
+							else result.append(' ');
+							result.append(part.val);
 						}
 					}
 				}
 				
-				parts.add(source.restRaw());
+				result.append(' ').append(source.restRaw());
 			}
 			
 			private static Object getVal(Object val, String key){
@@ -113,12 +121,16 @@ public interface CodeStream extends AutoCloseable{
 						var f = typ.getField(key);
 						return f.get(val);
 					}catch(NoSuchFieldException e){
-						var f = typ.getMethod("get" + TextUtil.firstToUpperCase(key));
+						try{
+							var f = typ.getMethod("get" + TextUtil.firstToUpperCase(key));
+							return f.invoke(val);
+						}catch(NoSuchMethodException e1){ }
+						var f = typ.getMethod(key);
 						return f.invoke(val);
 					}
 					
 				}catch(ReflectiveOperationException e){
-					throw new RuntimeException(e);
+					throw new RuntimeException("Unable to find key \"" + key + "\" in " + val);
 				}
 			}
 			
@@ -126,6 +138,13 @@ public interface CodeStream extends AutoCloseable{
 				var part     = new StringBuilder();
 				var template = new ArrayList<Part>();
 				int line     = 0, depth = 1;
+				
+				Runnable pushPart = () -> {
+					if(part.isEmpty()) return;
+					template.add(new Part(false, false, part.toString()));
+					part.setLength(0);
+				};
+				
 				loop:
 				while(true){
 					if(source.line() != line){
@@ -138,9 +157,7 @@ public interface CodeStream extends AutoCloseable{
 							switch(w.keyword()){
 								case START -> depth++;
 								case END -> {
-									if(!part.isEmpty()){
-										template.add(new Part(false, part.toString()));
-									}
+									pushPart.run();
 									depth--;
 								}
 							}
@@ -158,11 +175,44 @@ public interface CodeStream extends AutoCloseable{
 								}
 							}
 							var key = w.value().substring(len);
-							if(!part.isEmpty()){
-								template.add(new Part(false, part.toString()));
-								part.setLength(0);
+							pushPart.run();
+							template.add(new Part(true, false, key));
+							continue;
+						}
+						case Token.StrValue s -> {
+							var val = "'" + s.value() + "'";
+							int i   = 0, head = 0;
+							for(; i<=val.length() - valPart.length(); i++){
+								if(val.regionMatches(i, valPart, 0, valPart.length())){
+									int keyStart = i + valPart.length(), keyEnd = keyStart;
+									if(val.length()>keyEnd){
+										if(val.charAt(keyEnd) == '.'){
+											keyStart++;
+											keyEnd++;
+											
+											while(val.length()>keyEnd && Character.isJavaIdentifierPart(val.charAt(keyEnd))){
+												keyEnd++;
+											}
+										}else{
+											//Check if the name is part of a larger word
+											if(Character.isJavaIdentifierPart(val.charAt(keyEnd))){
+												continue;
+											}
+										}
+									}
+									
+									var start = val.substring(0, i);
+									var key   = val.substring(keyStart, keyEnd);
+									
+									i = head = keyEnd;
+									
+									part.append(start);
+									pushPart.run();
+									template.add(new Part(true, true, key));
+								}
 							}
-							template.add(new Part(true, key));
+							var end = val.substring(head);
+							part.append(end);
 							continue;
 						}
 						default -> { }
@@ -180,13 +230,15 @@ public interface CodeStream extends AutoCloseable{
 				for(var indexTok : listArgs.contents()){
 					var idx = indexTok.requireAs(Token.NumToken.IntVal.class).value();
 					
-					var l = objs[idx];
-					if(l instanceof Collection<?> col){
-						vals.addAll(col);
-					}else if(l.getClass().isArray()){
+					var l = Objects.requireNonNull(objs[idx], "Arguments can not be null");
+					if(l instanceof Collection<?> col) vals.addAll(col);
+					else if(l instanceof Stream<?> s) s.forEach(vals::add);
+					else if(l.getClass().isArray()){
 						for(int i = 0, len = Array.getLength(l); i<len; i++){
 							vals.add(Array.get(l, i));
 						}
+					}else{
+						throw new IllegalArgumentException(l.getClass().getName() + " is not a list or array or stream");
 					}
 				}
 				for(Object val : vals){
@@ -206,7 +258,7 @@ public interface CodeStream extends AutoCloseable{
 			throw new RuntimeException(e);
 		}
 		
-		return String.join(" ", parts);
+		return result.toString();
 	}
 	
 	private static int resolveArg(String src, List<CharSequence> dest, Object[] objs, int iter, int start){
