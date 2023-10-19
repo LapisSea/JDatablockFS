@@ -1,29 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-
+	
 	<artifactId>Jorth</artifactId>
 	<version>0.0.1</version>
-
+	
 	<parent>
-		<groupId>com.github.lapissea.jdatablockfs</groupId>
+		<groupId>lapissea.jdatablockfs</groupId>
 		<artifactId>JDatablockFS</artifactId>
 		<version>1.0</version>
 	</parent>
-
+	
 	<properties>
-		<java.version>20</java.version>
-		<asmVersion>9.4</asmVersion>
+		<asmVersion>9.5</asmVersion>
 	</properties>
-
+	
 	<dependencies>
 		<dependency>
 			<groupId>com.github.lapissea</groupId>
 			<artifactId>jlapisutil</artifactId>
 		</dependency>
-
+		
 		<dependency>
 			<groupId>org.ow2.asm</groupId>
 			<artifactId>asm</artifactId>
@@ -34,30 +33,33 @@
 			<artifactId>asm-util</artifactId>
 			<version>${asmVersion}</version>
 		</dependency>
-
+		
 		<dependency>
 			<groupId>org.testng</groupId>
 			<artifactId>testng</artifactId>
-			<version>7.7.1</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-
+	
 	<repositories>
 		<repository>
 			<id>ow2</id>
 			<url>https://repository.ow2.org/nexus/content/repositories/releases</url>
 		</repository>
 	</repositories>
-
+	
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>${maven-surefire-plugin-version}</version>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${maven-compiler-plugin-version}</version>
 				<configuration>
-					<compilerArgs>--enable-preview</compilerArgs>
 					<release>${java.version}</release>
 					<source>${java.version}</source>
 					<target>${java.version}</target>

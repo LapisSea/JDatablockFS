@@ -1,10 +1,10 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="SparseImage no debug" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.sparseimage.SparseImage" />
-    <module name="jdatablockfs.run" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.run.sparseimage.SparseImage" />
+    <module name="jdbfs-run" />
     <option name="PROGRAM_PARAMETERS" value="-iterations 10" />
     <option name="VM_PARAMETERS" value="--finalization=disabled -Ddfs.printCompilation=false" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="com.lapisseqa.cfs.run.sparseimage.*" />

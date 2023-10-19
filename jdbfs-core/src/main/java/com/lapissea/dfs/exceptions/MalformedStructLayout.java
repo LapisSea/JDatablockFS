@@ -1,0 +1,19 @@
+package com.lapissea.dfs.exceptions;
+
+public class MalformedStructLayout extends MalformedStruct{
+	
+	public MalformedStructLayout(){
+	}
+	
+	public MalformedStructLayout(String message){
+		super(message);
+	}
+	
+	public MalformedStructLayout(String message, Throwable cause){
+		super(message, cause);
+	}
+	
+	public MalformedStructLayout(Throwable cause){
+		super(cause);
+	}
+}

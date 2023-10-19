@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Practice Suite">
+	<test name="Test Basics 1">
+		<classes>
+			<class name="com.lapissea.dfs.run.GeneralTests"/>
+			<class name="com.lapissea.dfs.run.GeneralTypeHandlingTests"/>
+			<class name="com.lapissea.dfs.run.RunCaseTests"/>
+			<class name="com.lapissea.dfs.run.BitTests"/>
+			<class name="com.lapissea.dfs.run.QueryTests"/>
+			<class name="com.lapissea.dfs.run.TypeGenTests"/>
+		</classes>
+	</test>
+</suite>

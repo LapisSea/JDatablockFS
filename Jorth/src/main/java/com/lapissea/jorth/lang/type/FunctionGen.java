@@ -206,9 +206,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
 		int counter = isStatic()? 0 : 1;
-		for(ArgInfo(var type, var argName) : args){
-			var info = type.getBaseType();
-			this.args.put(argName, new Arg(type, info, argName, counter));
+		for(var arg : args){
+			var info = arg.type.getBaseType();
+			this.args.put(arg.name, new Arg(arg.type, info, arg.name, counter));
 			counter += info.slots;
 		}
 		

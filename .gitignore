@@ -6,15 +6,16 @@
 !/README.md
 !.editorconfig
 
-!/jdatablockfs.core/
-!/jdatablockfs.tools/
-!/jdatablockfs.run/
+!/jdbfs-core/
+!/jdbfs-tools/
+!/jdbfs-run/
 !/Jorth/
+!/Fuzzer/
 !pom.xml
 
 !/.idea/
 !*.iml
 !*/*.iml
-!/run/
+!/runDir/
 
 /*/target/

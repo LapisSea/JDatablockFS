@@ -35,7 +35,7 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 ### IPSet example:
 
-This shows very simple list of ipv6 and their cordinates on earth. (made up data)
+This shows a very simple list of ipv6 and their cordinates on earth. (made up data)
 
 _You can find the complete code of the example in `/jdatablockfs.run/src/main/java/com/lapissea/cfs/run/examples/IPs.java`_
 
@@ -43,7 +43,7 @@ _You can find the complete code of the example in `/jdatablockfs.run/src/main/ja
 //Setting up classes
 public static class IP extends IOInstance.Managed<IP>{
 	@IOValue
-	double latitude
+	double latitude;
 	@IOValue
 	double longitude;
 	
@@ -51,11 +51,11 @@ public static class IP extends IOInstance.Managed<IP>{
 	String v6;
 	
 	//Every IOInstance needs an empty constructor
-	public IP(){}
+	public IP(){ }
 	public IP(double latitude, double longitude, String v6){
-		this.latitude=latitude;
-		this.longitude=longitude;
-		this.v6=v6;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.v6 = v6;
 	}
 }
 ```
@@ -63,20 +63,24 @@ public static class IP extends IOInstance.Managed<IP>{
 Create database and add sample data:
 
 ```java
-//init and create new Cluster with in memory (byte[]) data
-Cluster cluster=Cluster.init(MemoryData.empty());
-
-//Ask root provider for list of IPs with the id of "my ips"
-IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
-
-//Adding sample data to database:
-ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
+class Example{
+	public static void main(String[] args){
+		//init and create new Cluster with in memory (byte[]) data
+		Cluster cluster = Cluster.init(MemoryData.empty());
+		
+		//Ask root provider for list of IPs with the id of "my ips"
+		IOList<IP> ips = cluster.roots().request("my ips", IOList.class, IP.class);
+		
+		//Adding sample data to database:
+		ips.add(new IP(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+		ips.add(new IP(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
+	}
+}
 ```
 
 Details:
 
-`cluster.getRootProvider().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
+`cluster.roots().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
 
 `ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically created and allocated by the rootProvider.
 
@@ -85,6 +89,7 @@ Details:
 _Alternative IP type definition with an interface_
 
 ```java
+
 @IOInstance.Def.Order({"latitude", "longitude", "v6"})
 @IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
 public interface IP extends IOInstance.Def<IP>{
@@ -117,13 +122,18 @@ NOTE: You *can* create your own implementation of an interface like this, but it
 Simply paste this in to your pom.xml
 
 ```xml
+
 <dependencies>
 	<dependency>
-		<groupId>com.github.lapissea.jdatablockfs</groupId>
+		<groupId>lapissea.jdatablockfs</groupId>
 		<artifactId>core</artifactId>
 		<version>1.0</version>
 	</dependency>
 </dependencies>
+```
+
+```xml
+
 <repositories>
 	<repository>
 		<id>lapissnap</id>
@@ -138,7 +148,7 @@ Simply paste this in to your pom.xml
 </repositories>
 ```
 
-Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `com.github.lapissea.jdatablockfs` with the id `core` and the `1.0` version.
+Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `lapissea.jdatablockfs` with the id `core` and the `1.0` version.
 
 ---
 
@@ -153,7 +163,7 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 
 ---
 
-### Note: Documentation is unfinished!!
+___Note: Documentation is unfinished!!___
 
 **Please create an issue and ask a question about anything that is not clear! I'm just 1 guy, and it's hard to know what may be complicated or unclear when I've designed it. Thanks ☺️**
 
@@ -189,3 +199,6 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 - `@IOValueUnmanaged`: This annotation can be used on static methods inside an `IOInstance.Unmanaged` to mark that function as a static unmanaged field factory.
 
 ---
+
+
+Author: LapisSea

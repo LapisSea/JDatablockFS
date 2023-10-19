@@ -1,16 +1,16 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All tests" type="TestNG">
-    <module name="jdatablockfs.run" />
+    <module name="jdbfs-run" />
     <shortenClasspath name="NONE" />
     <option name="SUITE_NAME" value="" />
-    <option name="PACKAGE_NAME" value="com.lapissea.cfs" />
+    <option name="PACKAGE_NAME" value="com.lapissea.dfs" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
     <option name="GROUP_NAME" value="" />
     <option name="TEST_OBJECT" value="PACKAGE" />
-    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Ddfs.test.standardInit=true -Ddfs.printCompilation=false -Ddfs.log.level=TRACE -Ddfs.classGen.printBytecode=false" />
+    <option name="VM_PARAMETERS" value="-ea -Djdk.trackAllThreads=true -DdeleteOk=true -Ddfs.log.level=TRACE -Ddfs.classGen.printBytecode=false" />
     <option name="PARAMETERS" value="" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/test" />
     <option name="OUTPUT_DIRECTORY" value="" />
     <option name="PROPERTIES_FILE" value="" />
     <properties />

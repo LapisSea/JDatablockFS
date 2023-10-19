@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="MapWriteBench.*" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.cfs.benchmark.MapWriteBench.*" working-dir="$MODULE_WORKING_DIR$" benchmark-type="CLASS" benchmark-class="com.lapissea.cfs.benchmark.MapWriteBench" isAlternativeJrePathEnabled="false">
-    <module name="jdatablockfs.run" />
+  <configuration default="false" name="MapWriteBench.*" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.dfs.benchmark.MapWriteBench.*" working-dir="C:\Programming\Java\JDatablockFS project\JDatablockFS\runDir\main" benchmark-type="CLASS" benchmark-class="com.lapissea.dfs.benchmark.MapWriteBench" isAlternativeJrePathEnabled="false">
+    <module name="jdbfs-run" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
