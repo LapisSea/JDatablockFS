@@ -1,18 +1,31 @@
 package com.lapissea.jorth;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.CodeDestination;
+import com.lapissea.jorth.lang.Token;
+import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.Tokenizer;
 import com.lapissea.jorth.lang.text.CharJoin;
 import com.lapissea.jorth.lang.text.CharSubview;
+import com.lapissea.util.TextUtil;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
 public interface CodeStream extends AutoCloseable{
 	
 	static CharSequence processFragment(String code, Object... objs){
+		while(true){
+			var newCode = resolveTemplate(code, objs);
+			//noinspection StringEquality
+			if(newCode == code) break;
+			code = newCode;
+		}
+		
 		int start = 0;
 		var parts = new ArrayList<CharSequence>(objs.length*2 + 1);
 		int iter  = 0;
@@ -33,6 +46,167 @@ public interface CodeStream extends AutoCloseable{
 		
 		if(parts.size() == 1) return parts.get(0);
 		return new CharJoin(parts);
+	}
+	
+	/**
+	 * returns the same string object if it nothing found
+	 */
+	private static String resolveTemplate(String src, Object[] objs){
+		for(int i = 0; i<src.length(); i++){
+			if(src.charAt(i) != 't') continue;
+			
+			var tfor = "template-for";
+			if(
+				src.length()<=i + tfor.length() + 2 ||
+				!src.regionMatches(i, tfor, 0, tfor.length()) ||
+				!Character.isWhitespace(src.charAt(i + tfor.length()))
+			) continue;
+			
+			return unwrapTemplate(src, objs, i, tfor);
+		}
+		return src;
+	}
+	
+	private static String unwrapTemplate(String src, Object[] objs, int start, String forTrigger){
+		var parts = new ArrayList<CharSequence>();
+		parts.add(new CharSubview(src, 0, start));
+		
+		try(var t = new Tokenizer(new CodeDestination(){
+			record Part(boolean isKey, String val){ }
+			@Override
+			protected void parse(TokenSource source) throws MalformedJorth{
+				var nameToken = source.readToken();
+				var valName = switch(nameToken){
+					case Token.Word w -> w.value();
+					default -> throw new MalformedJorth("Name can not be \"" + nameToken.requireAs(Token.Word.class).value() + '"');
+				};
+				source.requireWord("in");
+				var vals = readVals(source);
+				source.requireWord("start");
+				
+				var template = readTemplate(source, valName);
+				
+				for(var val : vals){
+					for(var part : template){
+						if(part.isKey){
+							var obj = getVal(val, part.val);
+							var str = objToJorthStr(obj, !(obj instanceof Type));
+							parts.add(str);
+						}else{
+							parts.add(part.val);
+						}
+					}
+				}
+				
+				parts.add(source.restRaw());
+			}
+			
+			private static Object getVal(Object val, String key){
+				if(key.isEmpty()) return val;
+				try{
+					var typ = val.getClass();
+					if(typ.isRecord()){
+						var mth = typ.getMethod(key);
+						return mth.invoke(val);
+					}
+					try{
+						var f = typ.getField(key);
+						return f.get(val);
+					}catch(NoSuchFieldException e){
+						var f = typ.getMethod("get" + TextUtil.firstToUpperCase(key));
+						return f.invoke(val);
+					}
+					
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			}
+			
+			private List<Part> readTemplate(TokenSource source, String valPart) throws MalformedJorth{
+				var part     = new StringBuilder();
+				var template = new ArrayList<Part>();
+				int line     = 0, depth = 1;
+				loop:
+				while(true){
+					if(source.line() != line){
+						line = source.line();
+						part.append('\n');
+					}
+					var tok = source.readToken();
+					switch(tok){
+						case Token.KWord w -> {
+							switch(w.keyword()){
+								case START -> depth++;
+								case END -> {
+									if(!part.isEmpty()){
+										template.add(new Part(false, part.toString()));
+									}
+									depth--;
+								}
+							}
+							if(depth == 0) break loop;
+						}
+						case Token.Word w when w.value().startsWith(valPart) -> {
+							var len = valPart.length();
+							if(w.value().length()>len){
+								var c = w.value().charAt(len);
+								if(c == '.'){
+									len++;
+									if(w.value().length() == len){
+										break;
+									}
+								}
+							}
+							var key = w.value().substring(len);
+							if(!part.isEmpty()){
+								template.add(new Part(false, part.toString()));
+								part.setLength(0);
+							}
+							template.add(new Part(true, key));
+							continue;
+						}
+						default -> { }
+					}
+					part.append(tok.requireAs(Token.Word.class).value()).append(' ');
+				}
+				return template;
+			}
+			
+			private List<Object> readVals(TokenSource source) throws MalformedJorth{
+				var listArgs = source.bracketSet('{');
+				if(listArgs.contents().isEmpty()) throw new MalformedJorth("For args needed");
+				
+				List<Object> vals = new ArrayList<>();
+				for(var indexTok : listArgs.contents()){
+					var idx = indexTok.requireAs(Token.NumToken.IntVal.class).value();
+					
+					var l = objs[idx];
+					if(l instanceof Collection<?> col){
+						vals.addAll(col);
+					}else if(l.getClass().isArray()){
+						for(int i = 0, len = Array.getLength(l); i<len; i++){
+							vals.add(Array.get(l, i));
+						}
+					}
+				}
+				for(Object val : vals){
+					if(val == null) throw new NullPointerException("Source elements can not be null");
+				}
+				return vals;
+			}
+			
+			@Override
+			public void addImport(String clasName){ }
+			@Override
+			public void addImportAs(String clasName, String name){ }
+		}, 0)){
+			t.write(new CharSubview(src, start + forTrigger.length(), src.length()));
+		}catch(
+			 Throwable e){
+			throw new RuntimeException(e);
+		}
+		
+		return String.join(" ", parts);
 	}
 	
 	private static int resolveArg(String src, List<CharSequence> dest, Object[] objs, int iter, int start){
@@ -62,15 +236,7 @@ public interface CodeStream extends AutoCloseable{
 				if(num == -1) num = iter;
 				
 				if(c2 == '}'){
-					var obj = objs[num];
-					var str = switch(obj){
-						case Type t -> {
-							if(escape) throw new IllegalArgumentException("Types should not be escaped");
-							yield JorthUtils.toJorthGeneric(t);
-						}
-						default -> Objects.toString(obj);
-					};
-					objs[num] = str;
+					var str = objToJorthStr(objs[num], escape);
 					
 					if(escape) str = Tokenizer.escape(str);
 					if(start != i) dest.add(CharSubview.of(src, start, i));
@@ -80,6 +246,14 @@ public interface CodeStream extends AutoCloseable{
 			}
 		}
 		return -1;
+	}
+	
+	private static String objToJorthStr(Object obj, boolean escape){
+		if(obj instanceof Type t){
+			if(escape) throw new IllegalArgumentException("Types should not be escaped");
+			return JorthUtils.toJorthGeneric(t);
+		}
+		return Objects.toString(obj);
 	}
 	
 	CodeStream write(CharSequence code) throws MalformedJorth;

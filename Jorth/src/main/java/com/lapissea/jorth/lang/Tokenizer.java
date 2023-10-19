@@ -8,8 +8,10 @@ import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Deque;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static java.lang.Float.parseFloat;
@@ -59,6 +61,30 @@ public class Tokenizer implements CodeStream, TokenSource{
 	@Override
 	public boolean hasMore(){
 		return code != null || peeked != null || !codeBuffer.isEmpty();
+	}
+	
+	@Override
+	public String restRaw() throws MalformedJorth{
+		List<CharSequence> parts = new ArrayList<>();
+		
+		var peek = peeked;
+		if(peek != null){
+			peeked = null;
+			parts.add(peek.requireAs(Token.Word.class).value());
+		}
+		
+		if(code != null){
+			if(pos != 0) parts.add("\n");
+			parts.add(code.subSequence(pos, code.length()));
+			code = null;
+			pos = 0;
+		}
+		for(var p : codeBuffer){
+			parts.add("\n");
+			parts.add(p);
+		}
+		codeBuffer.clear();
+		return String.join(" ", parts);
 	}
 	
 	private boolean buffering;

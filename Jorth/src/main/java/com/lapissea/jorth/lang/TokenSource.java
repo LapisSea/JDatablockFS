@@ -40,6 +40,12 @@ public interface TokenSource{
 				readNext();
 				return !(e instanceof EndOfCode);
 			}
+			
+			@Override
+			public String restRaw(){
+				throw new UnsupportedOperationException();
+			}
+			
 			@Override
 			public Token readToken(boolean required) throws MalformedJorth{
 				readNext();
@@ -79,6 +85,14 @@ public interface TokenSource{
 			@Override
 			public boolean hasMore(){
 				return source.hasMore();
+			}
+			
+			@Override
+			public String restRaw() throws MalformedJorth{
+				var line = source.line();
+				var rest = source.restRaw();
+				listener.accept(new Token.Word(line, rest));
+				return rest;
 			}
 			
 			@Override
@@ -165,6 +179,8 @@ public interface TokenSource{
 	default Token peekToken() throws MalformedJorth{
 		return peekToken(true);
 	}
+	
+	String restRaw() throws MalformedJorth;
 	
 	Token readToken(boolean required) throws MalformedJorth;
 	Token peekToken(boolean required) throws MalformedJorth;

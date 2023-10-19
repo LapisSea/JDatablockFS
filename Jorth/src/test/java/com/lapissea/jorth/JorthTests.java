@@ -2,6 +2,7 @@ package com.lapissea.jorth;
 
 import com.lapissea.util.LogUtil;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
@@ -849,5 +850,83 @@ public class JorthTests{
 		var ttyp = (TypeVariable<?>)type;
 		assertEquals("T", ttyp.getName());
 		assertArrayEquals(new Type[]{CharSequence.class}, ttyp.getBounds());
+	}
+	
+	private record Prop(String name, Class<?> type, Object defaultVal){ }
+	
+	@DataProvider
+	Object[][] props(){
+		return new Object[][]{
+			{List.of(new Prop("foo", int.class, 69))},
+			{List.of()},
+			{List.of(new Prop("foo", int.class, 69), new Prop("bar", float.class, 69.0F))},
+			};
+	}
+	
+	@Test(dataProvider = "props")
+	void templateFor(List<Prop> props) throws Exception{
+		
+		var name = "Props" + props.stream().map(Prop::name).collect(Collectors.joining());
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(CharSequence.class);
+			writer.write(
+				"""
+					class {0} start
+						
+						template-for #field in {1} start
+							public field #field.name #field.type
+						end
+						
+						function <init> start
+							super
+							
+							template-for #field in {1} start
+								#field.defaultVal set this #field.name
+							end
+						end
+					end
+					""",
+				name, props
+			);
+		});
+		
+		assertEquals(
+			props.stream().map(Prop::name).collect(Collectors.toSet()),
+			Arrays.stream(cls.getFields()).map(Field::getName).collect(Collectors.toSet())
+		);
+		
+		var inst = cls.getConstructor().newInstance();
+		for(Field field : cls.getFields()){
+			assertEquals(
+				"Invalid default value for " + field.getName(),
+				props.stream().filter(f -> f.name.equals(field.getName())).map(Prop::defaultVal).findAny().orElseThrow(),
+				field.get(inst)
+			);
+		}
+	}
+	
+	@Test
+	void templateForRaw() throws Exception{
+		var names = Set.of("a", "b", "c");
+		var name  = "Props";
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(CharSequence.class);
+			writer.write(
+				"""
+					class {0} start
+						
+						template-for #name in {1} start
+							public field #name int
+						end
+					end
+					""",
+				name, names
+			);
+		});
+		
+		assertEquals(
+			names,
+			Arrays.stream(cls.getFields()).map(Field::getName).collect(Collectors.toSet())
+		);
 	}
 }

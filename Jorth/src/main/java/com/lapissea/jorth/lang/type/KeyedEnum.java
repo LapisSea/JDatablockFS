@@ -37,9 +37,18 @@ public interface KeyedEnum{
 			var names = HashMap.<String, E>newHashMap(values.size());
 			int count = 0;
 			for(var value : values){
-				String key = value instanceof KeyedEnum e? e.key() : value.name().toLowerCase();
-				if(key.length() == 1) count++;
-				else names.put(key, value);
+				if(value instanceof KeyedEnum e){
+					String key = e.key();
+					if(key.length() == 1) count++;
+					else names.put(key, value);
+				}else{
+					String key = value.name();
+					if(key.length() == 1) count += 2;
+					else{
+						names.put(key.toLowerCase(), value);
+						names.put(key, value);
+					}
+				}
 			}
 			
 			//noinspection unchecked
