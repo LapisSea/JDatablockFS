@@ -301,14 +301,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 	}
 	
-	@Nullable
+	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		var gens = getGenerators();
-		return gens == null? Stream.of() : gens.stream();
+		return getGenerators().stream();
 	}
 	
 	

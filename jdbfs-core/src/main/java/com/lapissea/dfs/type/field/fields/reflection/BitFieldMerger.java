@@ -1,6 +1,5 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.chunk.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.io.bit.BitInputStream;
@@ -216,7 +215,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			));
 		}
 		initLateData(-1, FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
-		generators = Utils.nullIfEmpty(streamUnpackedFields().flatMap(IOField::generatorStream).toList());
+		generators = group.stream().flatMap(IOField::generatorStream).toList();
 	}
 	
 	@Override
