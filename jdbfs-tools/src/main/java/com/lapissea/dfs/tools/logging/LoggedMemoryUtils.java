@@ -36,7 +36,7 @@ public class LoggedMemoryUtils{
 			Log.info("Loaded config from {}", f);
 		}catch(FileNotFoundException e){
 			data = Map.of();
-			Log.trace("Config does not exist", e);
+			Log.trace("Config does not exist! {}", e);
 		}catch(Exception e){
 			data = Map.of();
 			Log.warn("Unable to load config: {}", e);
