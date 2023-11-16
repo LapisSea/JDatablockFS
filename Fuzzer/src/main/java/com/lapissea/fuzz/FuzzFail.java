@@ -100,7 +100,6 @@ public sealed interface FuzzFail<State, Act>{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
-			Objects.requireNonNull(action);
 			if(actionIndex<0) throw new IllegalArgumentException("actionIndex must be positive");
 			Objects.requireNonNull(timeToFail);
 			Objects.requireNonNull(badState);
@@ -144,7 +143,7 @@ public sealed interface FuzzFail<State, Act>{
 			
 			return actionIndex == actionIndex2 &&
 			       sequence.equals(sequence2) &&
-			       action.equals(action2);
+			       Objects.equals(action, action2);
 		}
 		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
 		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }

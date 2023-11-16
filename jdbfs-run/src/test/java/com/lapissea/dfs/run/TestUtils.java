@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.jorth.CodeStream;
@@ -171,11 +172,16 @@ public final class TestUtils{
 	}
 	
 	public static void randomBatch(int totalTasks, int batch, Task task){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
+		randomBatch(name, totalTasks, batch, task);
+	}
+	
+	public static void randomBatch(String name, int totalTasks, int batch, Task task){
 		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
 		), r -> null);
 		
-		fuz.runAndAssert(69, totalTasks, batch);
+		fuz.runAndAssert(new FuzzConfig().withName(name), 69, totalTasks, batch);
 	}
 	
 	
