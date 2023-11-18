@@ -9,6 +9,7 @@ import com.lapissea.dfs.tools.DisplayManager;
 import com.lapissea.dfs.tools.server.DisplayIpc;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.File;
@@ -21,7 +22,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.stream.LongStream;
 
-public class LoggedMemoryUtils{
+public final class LoggedMemoryUtils{
 	
 	private static WeakReference<MemoryLogConfig> CONFIG = new WeakReference<>(null);
 	
@@ -43,6 +44,10 @@ public class LoggedMemoryUtils{
 		}
 		
 		var newConf = new MemoryLogConfig(data);
+		Thread.startVirtualThread(() -> {
+			UtilL.sleep(2000);
+			var ref = newConf;
+		});
 		CONFIG = new WeakReference<>(newConf);
 		return newConf;
 	}
