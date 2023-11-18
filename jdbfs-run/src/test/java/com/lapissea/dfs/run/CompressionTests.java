@@ -103,7 +103,7 @@ public class CompressionTests{
 				
 				assertEquals(instance, read);
 			}
-		), r -> null);
+		), FuzzingRunner::noopAction);
 		
 		fuz.runAndAssert(69, 500, 50);
 	}

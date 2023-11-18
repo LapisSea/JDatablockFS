@@ -22,6 +22,11 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
+	private record NOOP(){ }
+	
+	public static final Object NOOP_ACTION = new NOOP();
+	public static Object noopAction(RandomGenerator r){ return NOOP_ACTION; }
+	
 	private final FuzzingStateEnv<State, Action, Err> stateEnv;
 	private final Function<RandomGenerator, Action>   actionFactory;
 	
@@ -127,6 +132,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		State state;
 		try{
 			state = stateEnv.create(rand, sequence.index(), mark);
+			Objects.requireNonNull(state, "State can not be null");
 		}catch(Throwable e){
 			FuzzFail.trimErr(e);
 			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, Instant.now())));
@@ -136,7 +142,14 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			if(progress != null && progress.hasErr()) return Optional.empty();
 			
 			var action = actionFactory.apply(rand);
-			var idx    = sequence.startIndex() + actionIndex;
+			if(action == null){
+				return Optional.of(new FuzzFail.Create<>(
+					new NullPointerException("Action can not be null"),
+					sequence, Duration.between(start, Instant.now())
+				));
+			}
+			
+			var idx = sequence.startIndex() + actionIndex;
 			try{
 				stateEnv.applyAction(state, idx, action, mark);
 			}catch(Throwable e){

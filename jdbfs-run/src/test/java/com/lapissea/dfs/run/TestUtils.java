@@ -179,7 +179,7 @@ public final class TestUtils{
 	public static void randomBatch(String name, int totalTasks, int batch, Task task){
 		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
-		), r -> null);
+		), FuzzingRunner::noopAction);
 		
 		fuz.runAndAssert(new FuzzConfig().withName(name), 69, totalTasks, batch);
 	}
