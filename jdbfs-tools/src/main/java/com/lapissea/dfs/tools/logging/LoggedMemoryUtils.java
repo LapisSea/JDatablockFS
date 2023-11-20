@@ -85,7 +85,7 @@ public final class LoggedMemoryUtils{
 		}, Thread::startVirtualThread);
 	}
 	
-	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger){
+	public static MemoryData newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger){
 		var    hasFallback = readConfig().loggerFallbackType != MemoryLogConfig.LoggerType.NONE;
 		IOHook proxyLogger = adaptToHook(sessionName, hasFallback, logger);
 		

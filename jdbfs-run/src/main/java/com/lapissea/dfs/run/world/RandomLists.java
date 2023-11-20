@@ -40,7 +40,7 @@ public class RandomLists{
 		}).toList().forEach(CompletableFuture::join);
 	}
 	
-	private static void task(int listCount, LateInit.Safe<DataLogger> logger, MemoryData<?> mem){
+	private static void task(int listCount, LateInit.Safe<DataLogger> logger, MemoryData mem){
 		Log.info("{#purpleStarting: {} lists#}", listCount);
 		try{
 			var rand = new Random((long)listCount<<4);
