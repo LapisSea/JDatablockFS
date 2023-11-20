@@ -76,7 +76,7 @@ public class MemoryManagementBenchmark{
 	
 	@Setup(Level.Invocation)
 	public void initData(){
-		mem = MemoryData.builder().withRaw(src).build();
+		mem = MemoryData.of(src);
 		try{
 			cls = new Cluster(mem);
 		}catch(IOException e){

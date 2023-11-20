@@ -703,7 +703,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			
 			var rCtx = new RenderContext(RenderBackend.DRAW_DEBUG? direct : buff, bytes, getPixelsPerByte(), zoom, dis, new ArrayList<>());
 			
-			findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
+			findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.viewOf(bytes)));
 			
 			drawStatic(frame, rCtx, parsed);
 			
@@ -722,7 +722,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		buff.draw();
 		
-		findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
+		findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.viewOf(bytes)));
 		
 		if(!ctx.renderer.getDisplay().isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)){
 			drawMouse(ctx, cFrame);
@@ -789,7 +789,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		try{
 			Cluster cluster = parsed.getCluster().orElseGet(() -> {
 				try{
-					var c = new Cluster(MemoryData.builder().withRaw(bytes).asReadOnly().build());
+					var c = new Cluster(MemoryData.viewOf(bytes));
 					trace("parsed cluster at frame {}", frameIndex);
 					parsed.cluster = new WeakReference<>(c);
 					return c;
@@ -902,7 +902,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				
 				if(e1 != null) throw e1;
 			}else{
-				var         provider = DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).build());
+				var         provider = DataProvider.newVerySimpleProvider(MemoryData.of(bytes));
 				AnnotateCtx annCtx   = new AnnotateCtx(ctx, provider, new LinkedList<>(), pointerRecord, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;

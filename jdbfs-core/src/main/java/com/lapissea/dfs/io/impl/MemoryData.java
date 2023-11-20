@@ -479,6 +479,10 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return new MemoryData.Arr(data, new Builder().asReadOnly());
 	}
 	
+	public static MemoryData<?> of(byte[] data){
+		return builder().withRaw(data).build();
+	}
+	
 	public interface DataInitializer{
 		void init(ContentWriter dest) throws IOException;
 	}

@@ -369,7 +369,7 @@ public class SlowTests{
 				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Serial
 				private Object readResolve() throws IOException{
-					var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
+					var cluster = new Cluster(MemoryData.of(data));
 					return new State(cluster, new CheckSet<>(cluster.roots().require("hi", IOSet.class)));
 				}
 			}
@@ -799,7 +799,7 @@ public class SlowTests{
 				var blob = cl.roots().request("blob", Blob.class);
 				blob.write(true, initial);
 				
-				return new BlobState(blob, MemoryData.builder().withRaw(initial).build());
+				return new BlobState(blob, MemoryData.of(initial));
 			}
 		}, RNGType.<BlobAction>of(List.of(
 			r -> {
