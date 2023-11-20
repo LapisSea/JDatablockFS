@@ -343,7 +343,16 @@ public class Log{
 			}
 		}
 		
-		throw new IllegalArgumentException();
+		throw new IllegalArgumentException(
+			"Could not find {} / {}~ / {}#<color_name> in:\n" +
+			formatted.substring(start) + (
+				start == 0?
+				"" :
+				"\n" +
+				"Full formatted string:\n" +
+				formatted
+			)
+		);
 	}
 	
 	private static Optional<Tag> findColor(CharSequence formatted, int hStart){

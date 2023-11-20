@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.chunk.AllocateTicket;
 import com.lapissea.dfs.chunk.Cluster;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
@@ -34,13 +35,16 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.LongFunction;
@@ -675,5 +679,48 @@ public class GeneralTypeHandlingTests{
 	@Test(timeOut = 2000)
 	void recursiveSeal(){
 		StandardStructPipe.of(RecursiveSeal.B.class).waitForStateDone();
+	}
+	
+	@DataProvider
+	Object[][] intCollections(){
+		return new Object[][]{
+			{int[].class, new int[]{}},
+			{int[].class, new int[]{-1}},
+			{int[].class, new int[]{0, 1, 412531253}},
+			{Integer[].class, new Integer[]{}},
+			{Integer[].class, new Integer[]{0}},
+			{Integer[].class, new Integer[]{10, -156245, Integer.MAX_VALUE}},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of()},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of(0)},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of(10, -156245, Integer.MAX_VALUE)},
+			};
+	}
+	
+	Map<Type, Class<?>> intCollectionsTypes = new HashMap<>();
+	
+	@SuppressWarnings("unchecked")
+	@Test(dataProvider = "intCollections")
+	<T extends IOInstance<T>> void intCollections(Type typ, Object val) throws IOException{
+		var type = (Class<T>)intCollectionsTypes.computeIfAbsent(
+			typ,
+			t -> TestUtils.generateIOManagedClass("IntCollectionsType_" + t.getTypeName().hashCode(), List.of(
+				new TestUtils.Prop("val", t, null)
+			))
+		);
+		
+		var struct = Struct.of(type);
+		var pipe   = StandardStructPipe.of(struct);
+		
+		var instance = struct.make();
+		((IOField<T, Object>)struct.getFields().byName("val").orElseThrow()).set(null, instance, val);
+		
+		var prov  = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var chunk = AllocateTicket.bytes(64).submit(prov);
+		
+		pipe.write(chunk, instance);
+		
+		var read = pipe.readNew(chunk, null);
+		
+		Assert.assertEquals(read, instance);
 	}
 }

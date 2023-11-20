@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntArray;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntegerArray;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldDuration;
@@ -31,7 +32,7 @@ import java.util.List;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, InstanceCollection.InlineField, IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime, IOFieldStringCollection{
+	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, IOFieldIntegerArray, InstanceCollection.InlineField, IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime, IOFieldStringCollection{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	
