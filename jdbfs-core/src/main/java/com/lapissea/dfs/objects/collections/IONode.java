@@ -351,7 +351,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		var valueStart = valueStart();
 		var skipped    = io.skip(valueStart);
 		var toWrite    = valueStart - skipped;
-		IOUtils.zeroFill(io::write, toWrite);
+		IOUtils.zeroFill(io, toWrite);
 		io.setPos(0);
 	}
 	

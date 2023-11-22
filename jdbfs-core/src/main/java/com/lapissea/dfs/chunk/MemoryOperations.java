@@ -365,7 +365,7 @@ public final class MemoryOperations{
 					var old = io.getCapacity();
 					io.setCapacity(old + toGrow);
 					io.setPos(old);
-					IOUtils.zeroFill(io::write, toGrow);
+					IOUtils.zeroFill(io, toGrow);
 				}
 				target.modifyAndSave(ch -> {
 					try{
@@ -703,7 +703,7 @@ public final class MemoryOperations{
 		
 		try(var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
-			IOUtils.zeroFill(io::write, chunk.getCapacity());
+			IOUtils.zeroFill(io, chunk.getCapacity());
 		}
 		context.getChunkCache().add(chunk);
 		return chunk;
@@ -799,7 +799,7 @@ public final class MemoryOperations{
 			}
 			if(safeToAllocate<freeChunk.getHeaderSize()){
 				try(var io = provider.getSource().ioAt(freeChunk.getPtr().getValue())){
-					IOUtils.zeroFill(io::write, safeToAllocate);
+					IOUtils.zeroFill(io, safeToAllocate);
 				}
 				provider.getChunkCache().notifyDestroyed(freeChunk);
 			}else{

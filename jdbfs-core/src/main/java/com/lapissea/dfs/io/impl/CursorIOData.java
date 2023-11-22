@@ -240,7 +240,7 @@ public abstract class CursorIOData implements IOInterface{
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			var pos = this.pos;
-			IOUtils.zeroFill(this::write, requestedMemory);
+			IOUtils.zeroFill(this, requestedMemory);
 			this.pos = pos;
 		}
 		@Override

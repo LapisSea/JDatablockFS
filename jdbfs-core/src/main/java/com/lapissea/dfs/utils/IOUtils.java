@@ -1,5 +1,7 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.dfs.io.content.ContentWriter;
+
 import java.io.IOException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
@@ -51,6 +53,15 @@ public class IOUtils{
 		while(left>0){
 			int write = (int)Math.min(left, part.length);
 			dest.accept(part, 0, write);
+			left -= write;
+		}
+	}
+	public static void zeroFill(ContentWriter dest, long size) throws IOException{
+		var  part = new byte[(int)Math.min(size, BATCH_BYTES)];
+		long left = size;
+		while(left>0){
+			int write = (int)Math.min(left, part.length);
+			dest.write(part, 0, write);
 			left -= write;
 		}
 	}
