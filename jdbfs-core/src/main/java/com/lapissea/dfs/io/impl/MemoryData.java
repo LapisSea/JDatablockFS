@@ -53,12 +53,12 @@ public final class MemoryData extends CursorIOData{
 		fileData[(int)fileOffset] = b;
 	}
 	@Override
-	protected void readN(long fileOffset, byte[] dest, int off, int len){
-		System.arraycopy(fileData, (int)fileOffset, dest, off, len);
+	protected void readN(long fileOffset, byte[] dest, int destOff, int len){
+		System.arraycopy(fileData, (int)fileOffset, dest, destOff, len);
 	}
 	@Override
-	protected void writeN(byte[] src, int srcOffset, long fileOffset, int len){
-		System.arraycopy(src, srcOffset, fileData, (int)fileOffset, len);
+	protected void writeN(long fileOffset, byte[] src, int srcOff, int len){
+		System.arraycopy(src, srcOff, fileData, (int)fileOffset, len);
 	}
 	@Override
 	protected void resize(long newFileSize){
@@ -72,7 +72,7 @@ public final class MemoryData extends CursorIOData{
 		return WordIO.getWord(fileData, (int)fileOffset, len);
 	}
 	@Override
-	protected void writeWord(long value, long fileOffset, int len){
+	protected void writeWord(long fileOffset, long value, int len){
 		WordIO.setWord(value, fileData, (int)fileOffset, len);
 	}
 	

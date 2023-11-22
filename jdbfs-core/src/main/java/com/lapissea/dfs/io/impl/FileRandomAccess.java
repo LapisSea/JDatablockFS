@@ -10,10 +10,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-public final class IOFileData extends CursorIOData implements Closeable{
+public final class FileRandomAccess extends CursorIOData implements Closeable{
 	
 	public enum Mode{
 		READ_ONLY("r"),
@@ -40,33 +42,39 @@ public final class IOFileData extends CursorIOData implements Closeable{
 	
 	private final File             file;
 	private final RandomAccessFile fileData;
+	private final FileLock         fileLock;
 	
-	public IOFileData(File file) throws IOException{ this(file, false); }
-	public IOFileData(File file, boolean readOnly) throws IOException{
+	public FileRandomAccess(File file) throws IOException{ this(file, false); }
+	public FileRandomAccess(File file, boolean readOnly) throws IOException{
 		this(file,
 		     readOnly?
 		     Mode.READ_ONLY :
 		     ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE
 		);
 	}
-	public IOFileData(File file, Mode mode) throws IOException{
+	public FileRandomAccess(File file, Mode mode) throws IOException{
 		super(null, mode == Mode.READ_ONLY);
 		this.file = file;
 		
 		fileData = new RandomAccessFile(file, mode.str);
+		try{
+			fileLock = fileData.getChannel().lock();
+		}catch(IOException|OverlappingFileLockException e){
+			throw new IOException("Unable to acquire exclusive access to: " + file, e);
+		}
 		
 		this.used = getLength();
 	}
 	
 	@Override
 	public String toString(){
-		return IOFileData.class.getSimpleName() + "{" + file + "}";
+		return getClass().getSimpleName() + "{" + file + "}";
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		return this == o ||
-		       o instanceof IOFileData that &&
+		       o instanceof FileRandomAccess that &&
 		       fileData.equals(that.fileData);
 	}
 	
@@ -96,14 +104,14 @@ public final class IOFileData extends CursorIOData implements Closeable{
 	}
 	
 	@Override
-	protected void readN(long fileOffset, byte[] dest, int off, int len) throws IOException{
+	protected void readN(long fileOffset, byte[] dest, int destOff, int len) throws IOException{
 		fileData.seek(fileOffset);
-		fileData.readFully(dest, off, len);
+		fileData.readFully(dest, destOff, len);
 	}
 	@Override
-	protected void writeN(byte[] src, int index, long fileOffset, int len) throws IOException{
+	protected void writeN(long fileOffset, byte[] src, int srcOff, int len) throws IOException{
 		fileData.seek(fileOffset);
-		fileData.write(src, index, len);
+		fileData.write(src, srcOff, len);
 	}
 	
 	@Override
@@ -114,7 +122,7 @@ public final class IOFileData extends CursorIOData implements Closeable{
 		return WordIO.getWord(buff, 0, len);
 	}
 	@Override
-	protected void writeWord(long value, long fileOffset, int len) throws IOException{
+	protected void writeWord(long fileOffset, long value, int len) throws IOException{
 		fileData.seek(fileOffset);
 		byte[] buff = new byte[len];
 		WordIO.setWord(value, buff, 0, len);
@@ -122,11 +130,11 @@ public final class IOFileData extends CursorIOData implements Closeable{
 	}
 	
 	@Override
-	public IOFileData asReadOnly(){
+	public FileRandomAccess asReadOnly(){
 		if(isReadOnly()) return this;
 		try{
 			close();
-			return new IOFileData(file, true);
+			return new FileRandomAccess(file, true);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -134,6 +142,7 @@ public final class IOFileData extends CursorIOData implements Closeable{
 	
 	@Override
 	public void close() throws IOException{
+		fileLock.close();
 		fileData.close();
 	}
 }

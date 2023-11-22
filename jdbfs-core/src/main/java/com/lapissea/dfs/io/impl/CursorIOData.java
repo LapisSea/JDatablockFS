@@ -199,7 +199,7 @@ public abstract class CursorIOData implements IOInterface{
 			used = Math.max(used, required);
 			
 			for(var e : writeData){
-				writeN(e.data(), e.dataOffset(), e.ioOffset(), e.dataLength());
+				writeN(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 			}
 			
 			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
@@ -212,7 +212,7 @@ public abstract class CursorIOData implements IOInterface{
 			var remaining = cap - getPos();
 			if(remaining<len) setCapacity0(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)), false);
 			
-			writeN(b, off, pos, len);
+			writeN(pos, b, off, len);
 		}
 		
 		@Override
@@ -229,7 +229,7 @@ public abstract class CursorIOData implements IOInterface{
 			var remaining = cap - getPos();
 			if(remaining<len) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)));
 			
-			CursorIOData.this.writeWord(v, pos, len);
+			CursorIOData.this.writeWord(pos, v, len);
 			var oldPos = pos;
 			pos += len;
 			used = Math.max(used, pos);
@@ -433,7 +433,7 @@ public abstract class CursorIOData implements IOInterface{
 		}catch(IOException e){
 			h = 0;
 		}
-		return CursorIOData.class.getSimpleName() + "#" + Integer.toHexString(h) + "{" + getIOSize() + " bytes}";
+		return getClass().getSimpleName() + "#" + Integer.toHexString(h) + "{" + getIOSize() + " bytes}";
 	}
 	
 	@Override
@@ -447,11 +447,11 @@ public abstract class CursorIOData implements IOInterface{
 	
 	protected abstract byte read1(long fileOffset) throws IOException;
 	protected abstract void write1(long fileOffset, byte b) throws IOException;
-	protected abstract void readN(long fileOffset, byte[] dest, int off, int len) throws IOException;
-	protected abstract void writeN(byte[] src, int srcOffset, long fileOffset, int len) throws IOException;
+	protected abstract void readN(long fileOffset, byte[] dest, int destOff, int len) throws IOException;
+	protected abstract void writeN(long fileOffset, byte[] src, int srcOff, int len) throws IOException;
 	
 	protected abstract long readWord(long fileOffset, int len) throws IOException;
-	protected abstract void writeWord(long value, long fileOffset, int len) throws IOException;
+	protected abstract void writeWord(long fileOffset, long value, int len) throws IOException;
 	
 	@Override
 	public abstract CursorIOData asReadOnly();
