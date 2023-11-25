@@ -1,5 +1,6 @@
 package com.lapissea.fuzz;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
-	private record NOOP(){ }
+	private record NOOP() implements Serializable{ }
 	
 	public static final Object NOOP_ACTION = new NOOP();
 	public static Object noopAction(RandomGenerator r){ return NOOP_ACTION; }

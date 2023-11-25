@@ -84,8 +84,7 @@ public class DefragmentManager{
 				if(!iter.hasPrevious()) break;
 				var freeFirst = iter.ioPrevious().dereference(cluster);
 				iter.ioNext();
-				
-				boolean soround = false;
+				boolean surround = false;
 				
 				long sumMove = 0;
 				var  ch      = freeFirst;
@@ -96,11 +95,11 @@ public class DefragmentManager{
 					sumMove += ch.totalSize();
 					if(sumMove>=256) break;
 					if(freeNext.getPtr().equals(ch.dataEnd())){
-						soround = true;
+						surround = true;
 						break;
 					}
 				}
-				if(!soround) continue;
+				if(!surround) continue;
 				
 				var firstNext = freeFirst.nextPhysical();
 				var limit     = firstNext.getPtr().getValue();
