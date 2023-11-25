@@ -15,16 +15,19 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -33,6 +36,8 @@ public abstract class StagedInit{
 	
 	private static final boolean DO_ASYNC            = ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolveVal();
 	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
+	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
+	
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){
@@ -46,6 +51,8 @@ public abstract class StagedInit{
 	
 	private int       state = STATE_NOT_STARTED;
 	private Throwable e;
+	
+	private final Map<Integer, Instant> logCompletion = DO_TIMESTAMPS? new ConcurrentHashMap<>() : null;
 	
 	private       Thread       initThread;
 	private final ClosableLock rLock     = ClosableLock.reentrant();
@@ -100,6 +107,7 @@ public abstract class StagedInit{
 	protected final void setInitState(int state){
 		try(var ignored = rLock.open()){
 			if(DEBUG_VALIDATION) validateNewState(state);
+			if(DO_TIMESTAMPS) logCompletion.put(state, Instant.now());
 			this.state = state;
 			condition.signalAll();
 		}
@@ -246,10 +254,9 @@ public abstract class StagedInit{
 	
 	private void actuallyWaitForState(int state){
 		threadCheck();
+		var start = DO_TIMESTAMPS? Instant.now() : Instant.EPOCH;
 		
-		boolean threadCheck = false;
-		long    start       = System.nanoTime();
-		
+		var threadCheck = false;
 		while(true){
 			if(!threadCheck && this.state>=STATE_START){
 				threadCheck = true;
@@ -267,11 +274,20 @@ public abstract class StagedInit{
 		
 		checkErr();
 		
-		if(LONG_WAIT_THRESHOLD>0){
-			var delta = System.nanoTime() - start;
-			if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
-				Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
+		if(DO_TIMESTAMPS) logLongWait(state, start);
+	}
+	
+	private void logLongWait(int state, Instant start){
+		var end = Instant.now();
+		if(logCompletion != null){
+			var completionTime = logCompletion.get(state);
+			if(end.isAfter(completionTime) && start.isBefore(completionTime)){
+				end = completionTime;
 			}
+		}
+		var waitTime = Duration.between(start, end);
+		if(waitTime.toMillis()>LONG_WAIT_THRESHOLD){
+			Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", stateToString(state), this, waitTime.toMillis());
 		}
 	}
 	
