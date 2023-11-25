@@ -1,7 +1,11 @@
 package com.lapissea.dfs.io.impl;
 
+import com.lapissea.dfs.logging.Log;
+import com.lapissea.util.UtilL;
+
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
@@ -158,8 +162,31 @@ final class FileMappings implements Closeable{
 		return fileChannel.map(mode, pos, len);
 	}
 	private static void unmap(MappedByteBuffer value){
-		value.force();
+		try{
+			value.force();
+		}catch(UncheckedIOException e){
+			if(!tryFlush(value)){
+				throw e;
+			}
+		}
 		UNSAFE.invokeCleaner(value);
+	}
+	
+	private static boolean tryFlush(MappedByteBuffer value){
+		for(int attempts = 0; attempts<15; attempts++){
+			try{
+				value.force();
+				return true;
+			}catch(UncheckedIOException e){
+				if(e.getMessage().contains("Insufficient system resources")){
+					if(attempts>1) Log.warn("Failing mapped file flushing! Attempt {}/15, Reason: {}", attempts, e.getCause().getMessage());
+					UtilL.sleep(attempts*attempts*10L);
+				}else{
+					throw e;
+				}
+			}
+		}
+		return false;
 	}
 	
 	private void clearMappings(){
