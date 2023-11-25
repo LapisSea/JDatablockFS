@@ -17,6 +17,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
@@ -24,6 +26,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
 	
 	private final IOList<ChunkPointer> freeChunks;
+	private final Lock                 freeChunksLock = new ReentrantLock();
 	private       boolean              defragmentMode;
 	
 	private boolean adding, allowFreeRemove = true;
@@ -208,6 +211,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			return;
 		}
 		
+		freeChunksLock.lock();
 		adding = true;
 		try{
 			addQueue(toAdd);
@@ -216,20 +220,17 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				var optimalCapacity = freeChunks.size() + queuedFreeChunks.size();
 				if(capacity<optimalCapacity){
 					var cap = optimalCapacity + 1;
-					synchronized(freeChunks){
-						freeChunks.requestCapacity(cap);
-					}
+					freeChunks.requestCapacity(cap);
 				}
 				
 				var chs = popQueue();
-				synchronized(freeChunks){
-					try(var ignored = context.getSource().openIOTransaction()){
-						MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
-					}
+				try(var ignored = context.getSource().openIOTransaction()){
+					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
 				}
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{
 			adding = false;
+			freeChunksLock.unlock();
 		}
 		
 		tryPopFree();
