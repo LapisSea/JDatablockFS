@@ -1,5 +1,7 @@
 package com.lapissea.dfs.chunk;
 
+import com.lapissea.dfs.exceptions.FreeWhileUsed;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
@@ -176,6 +178,22 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
+		
+		for(Chunk chToFree : toFree){
+			var stack = getStack();
+			for(var c : stack){
+				for(Chunk lockedCH : c.head.walkNext()){
+					if(chToFree == lockedCH){
+						var err = Log.resolveArgs(
+							"{}#red was called to be freed but it is currently locked{}!",
+							chToFree,
+							lockedCH == c.head? "" : Log.resolveArgs(" by {}#yellow", lockedCH)
+						).toString();
+						throw new FreeWhileUsed(err);
+					}
+				}
+			}
+		}
 		
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
