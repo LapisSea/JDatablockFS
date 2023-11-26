@@ -1101,12 +1101,13 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private void drawPointers(RenderContext ctx, SessionHost.ParsedFrame parsed, List<Pointer> ptrs){
+//		if(true) return;
 		var                       renderer = ctx.renderer;
 		List<DrawFont.StringDraw> strings  = new ArrayList<>(ptrs.size());
 		for(Pointer ptr : ptrs){
 			boolean drawMsg = false;
 			
-			var siz   = ctx.pixelsPerByte()/16F;
+			var siz   = ctx.pixelsPerByte()/32F;
 			var alpha = Math.min(1, siz);
 			siz = Math.max(1, siz);
 			var sFul  = siz;
@@ -1125,7 +1126,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
 				
 			}else{
-				col = ptr.color();
+				col = ColorUtils.alpha(ptr.color(), 0.5F);
 			}
 			
 			renderer.setColor(ColorUtils.alpha(col, 0.7F*alpha));
