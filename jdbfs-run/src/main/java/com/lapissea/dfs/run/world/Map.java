@@ -6,6 +6,5 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 
 @IOValue
 public class Map extends IOInstance.Managed<Map>{
-	public IOList<Entity> entities;
-	public IOList<Chunk>  chunks;
+	public IOList<Chunk> chunks;
 }
