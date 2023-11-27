@@ -93,7 +93,7 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends NullF
 		if(nullable()){
 			if(val == null){
 				if(varSize != null){
-					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

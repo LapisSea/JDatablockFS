@@ -241,7 +241,8 @@ public final class Plan<TState, TAction>{
 				System.err.println("Failed to save data: " + e);
 			}
 			
-			fileInf.getParentFile().mkdir();
+			var parent = fileInf.getParentFile();
+			if(parent != null) parent.mkdir();
 			try(var out = new FileOutputStream(fileInf)){
 				buff.writeTo(out);
 			}catch(Throwable e){

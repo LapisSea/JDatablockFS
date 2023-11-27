@@ -1,5 +1,7 @@
 package com.lapissea.dfs.chunk;
 
+import com.lapissea.dfs.exceptions.FreeWhileUsed;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
@@ -15,6 +17,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
@@ -22,6 +26,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
 	
 	private final IOList<ChunkPointer> freeChunks;
+	private final Lock                 freeChunksLock = new ReentrantLock();
 	private       boolean              defragmentMode;
 	
 	private boolean adding, allowFreeRemove = true;
@@ -177,6 +182,22 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
 		
+		for(Chunk chToFree : toFree){
+			var stack = getStack();
+			for(var c : stack){
+				for(Chunk lockedCH : c.head.walkNext()){
+					if(chToFree == lockedCH){
+						var err = Log.resolveArgs(
+							"{}#red was called to be freed but it is currently locked{}!",
+							chToFree,
+							lockedCH == c.head? "" : Log.resolveArgs(" by {}#yellow", lockedCH)
+						).toString();
+						throw new FreeWhileUsed(err);
+					}
+				}
+			}
+		}
+		
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
 			tryPopFree();
@@ -190,6 +211,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			return;
 		}
 		
+		freeChunksLock.lock();
 		adding = true;
 		try{
 			addQueue(toAdd);
@@ -198,20 +220,17 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				var optimalCapacity = freeChunks.size() + queuedFreeChunks.size();
 				if(capacity<optimalCapacity){
 					var cap = optimalCapacity + 1;
-					synchronized(freeChunks){
-						freeChunks.requestCapacity(cap);
-					}
+					freeChunks.requestCapacity(cap);
 				}
 				
 				var chs = popQueue();
-				synchronized(freeChunks){
-					try(var ignored = context.getSource().openIOTransaction()){
-						MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
-					}
+				try(var ignored = context.getSource().openIOTransaction()){
+					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
 				}
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{
 			adding = false;
+			freeChunksLock.unlock();
 		}
 		
 		tryPopFree();

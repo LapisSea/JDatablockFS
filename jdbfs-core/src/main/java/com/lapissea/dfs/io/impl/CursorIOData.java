@@ -1,54 +1,39 @@
 package com.lapissea.dfs.io.impl;
 
-import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.IOTransactionBuffer;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.utils.IOUtils;
-import com.lapissea.util.MathUtil;
 import com.lapissea.util.NotNull;
 
-import java.io.Closeable;
 import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.LongStream;
 
-import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
-
-public final class IOFileData implements IOInterface, Closeable{
-	
-	private enum Mode{
-		READ_ONLY("r"),
-		READ_WRITE("rw"),
-		READ_WRITE_SYNCHRONOUS("rwd");
-		
-		final String str;
-		Mode(String str){ this.str = str; }
-	}
+public abstract class CursorIOData implements IOInterface{
 	
 	@SuppressWarnings("resource")
-	public class FileRandomIO implements RandomIO{
+	public final class CursorRandomIO implements RandomIO{
 		
 		private long pos;
 		
-		public FileRandomIO(){ }
+		public CursorRandomIO(){ }
 		
-		public FileRandomIO(int pos){
+		public CursorRandomIO(long pos){
 			if(pos<0) throw new IndexOutOfBoundsException(pos);
 			this.pos = pos;
 		}
 		
 		@Override
-		public FileRandomIO setPos(long pos){
+		public CursorRandomIO setPos(long pos){
 			if(pos<0) throw new IndexOutOfBoundsException();
-			this.pos = Math.toIntExact(pos);
+			this.pos = pos;
 			return this;
 		}
 		
@@ -59,7 +44,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		
 		@Override
 		public long getSize(){
-			return IOFileData.this.used;
+			return CursorIOData.this.used;
 		}
 		
 		@Override
@@ -68,7 +53,7 @@ public final class IOFileData implements IOInterface, Closeable{
 			if(transactionOpen) throw new UnsupportedOperationException();
 			var cap = getCapacity();
 			if(targetSize>cap) targetSize = cap;
-			IOFileData.this.used = Math.toIntExact(targetSize);
+			CursorIOData.this.used = targetSize;
 		}
 		
 		@Override
@@ -80,12 +65,14 @@ public final class IOFileData implements IOInterface, Closeable{
 		}
 		
 		@Override
-		public FileRandomIO setCapacity(long newCapacity) throws IOException{
+		public CursorRandomIO setCapacity(long newCapacity) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
-			
-			IOFileData.this.setCapacity(newCapacity);
-			pos = (int)Math.min(pos, getSize());
+			setCapacity0(newCapacity, true);
 			return this;
+		}
+		private void setCapacity0(long newCapacity, boolean log) throws IOException{
+			CursorIOData.this.setCapacity(newCapacity, log);
+			pos = Math.min(pos, getSize());
 		}
 		
 		@Override
@@ -97,22 +84,22 @@ public final class IOFileData implements IOInterface, Closeable{
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				int b = transactionBuff.readByte(this::readAt, pos);
+				int b = transactionBuff.readByte(readAt(), pos);
 				if(b>=0){
 					this.pos++;
 				}
 				return b;
 			}
 			
-			int remaining = (int)(getSize() - getPos());
+			var remaining = getSize() - getPos();
 			if(remaining<=0) return -1;
-			return read1(pos++)&0xFF;
+			return Byte.toUnsignedInt(read1(pos++));
 		}
 		
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				int read = transactionBuff.read(this::readAt, pos, b, off, len);
+				int read = transactionBuff.read(readAt(), pos, b, off, len);
 				pos += read;
 				return read;
 			}
@@ -125,7 +112,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		@Override
 		public long readWord(int len) throws IOException{
 			if(transactionOpen){
-				var word = transactionBuff.readWord(this::readAt, pos, len);
+				var word = transactionBuff.readWord(readAt(), pos, len);
 				pos += len;
 				return word;
 			}
@@ -135,16 +122,22 @@ public final class IOFileData implements IOInterface, Closeable{
 				throw new EOFException();
 			}
 			
-			long val = IOFileData.this.read8(pos, len);
+			long val = CursorIOData.this.readWord(pos, len);
 			pos += len;
 			return val;
 		}
 		
+		private IOTransactionBuffer.BaseAccess readAt;
+		private IOTransactionBuffer.BaseAccess readAt(){
+			if(readAt == null) readAt = this::readAt;
+			return readAt;
+		}
+		
 		private int readAt(long pos, byte[] b, int off, int len) throws IOException{
-			int remaining = (int)(getSize() - pos);
+			long remaining = getSize() - pos;
 			if(remaining<=0) return -1;
 			
-			int clampedLen = Math.min(remaining, len);
+			int clampedLen = (int)Math.min(remaining, len);
 			readN(pos, b, off, clampedLen);
 			return clampedLen;
 		}
@@ -158,33 +151,30 @@ public final class IOFileData implements IOInterface, Closeable{
 				return;
 			}
 			
-			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity() + 1, getCapacity() + 1 - remaining)));
+			var  cap       = getCapacity();
+			long remaining = cap - getPos();
+			if(remaining<=0) setCapacity0(Math.max(4, Math.max(cap + 1, cap + 1 - remaining)), false);
 			write1(pos, (byte)b);
+			if(hook != null) logWriteEvent(pos);
 			pos++;
 			used = Math.max(used, pos);
 		}
 		
 		@Override
 		public void write(byte[] b, int off, int len) throws IOException{
-			write(b, off, len, true);
-		}
-		
-		private void write(byte[] b, int off, int len, boolean pushPos) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
 				transactionBuff.write(pos, b, off, len);
-				if(pushPos) pos += len;
+				pos += len;
 				return;
 			}
 			
 			var oldPos = pos;
 			write0(b, off, len);
 			
-			if(pushPos){
-				pos += len;
-				used = Math.max(used, pos);
-			}
+			pos += len;
+			used = Math.max(used, pos);
+			if(hook != null) logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
@@ -198,23 +188,31 @@ public final class IOFileData implements IOInterface, Closeable{
 				return;
 			}
 			
-			var required = writeData.stream().mapToLong(WriteChunk::ioEnd).max().orElseThrow();
-			if(getCapacity()<required) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), required)));
+			long required = Long.MIN_VALUE;
+			for(var writeDatum : writeData){
+				long ioEnd = writeDatum.ioEnd();
+				if(ioEnd>required) required = ioEnd;
+			}
+			var cap = getCapacity();
+			if(cap<required) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), required)));
 			
-			used = Math.max(used, Math.toIntExact(required));
+			used = Math.max(used, required);
 			
 			for(var e : writeData){
-				writeN(e.data(), e.dataOffset(), e.ioOffset(), e.dataLength());
+				writeN(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 			}
+			
+			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
 		}
 		
 		private void write0(byte[] b, int off, int len) throws IOException{
 			if(len == 0) return;
 			
-			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
+			var cap       = getCapacity();
+			var remaining = cap - getPos();
+			if(remaining<len) setCapacity0(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)), false);
 			
-			writeN(b, off, pos, len);
+			writeN(pos, b, off, len);
 		}
 		
 		@Override
@@ -227,20 +225,22 @@ public final class IOFileData implements IOInterface, Closeable{
 			
 			if(len == 0) return;
 			
-			int remaining = (int)(getCapacity() - getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
+			var cap       = getCapacity();
+			var remaining = cap - getPos();
+			if(remaining<len) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)));
 			
-			IOFileData.this.write8(v, pos, len);
+			CursorIOData.this.writeWord(pos, v, len);
+			var oldPos = pos;
 			pos += len;
 			used = Math.max(used, pos);
+			if(hook != null) logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
-			
 			var pos = this.pos;
-			IOUtils.zeroFill(this::write, requestedMemory);
+			IOUtils.zeroFill(this, requestedMemory);
 			this.pos = pos;
 		}
 		@Override
@@ -257,11 +257,11 @@ public final class IOFileData implements IOInterface, Closeable{
 		public String toString(){
 			int count = 64;
 			
-			int start = (int)getPos(), end = start + count;
+			long start = getPos(), end = start + count;
 			
-			var used = (int)getSize();
+			var used = getSize();
 			
-			int overshoot = end - used;
+			var overshoot = end - used;
 			if(overshoot>0){
 				start = Math.max(0, start - overshoot);
 				end = used;
@@ -279,11 +279,11 @@ public final class IOFileData implements IOInterface, Closeable{
 			var more = used - end;
 			var post = more == 0? "}" : " ... " + more + "}";
 			
-			var result = new StringBuilder(name.length() + pre.length() + post.length() + end - start);
+			var result = new StringBuilder((int)(name.length() + pre.length() + post.length() + end - start));
 			
 			result.append(name).append(pre);
 			try(var io = ioAt(start)){
-				for(int i = start; i<end - 1; i++){
+				for(long i = start; i<end - 1; i++){
 					char c = (char)io.readInt1();
 					result.append(switch(c){
 						case 0 -> '␀';
@@ -307,23 +307,10 @@ public final class IOFileData implements IOInterface, Closeable{
 			return !transactionOpen;
 		}
 	}
-	public static void readInto(String path, IOInterface dest) throws IOException{
-		readInto(new File(path), dest);
-	}
-	public static void readInto(File file, IOInterface dest) throws IOException{
-		try(var in = new FileInputStream(file); var out = dest.io()){
-			var buff = new byte[MathUtil.snap((int)file.length(), 16, BATCH_BYTES)];
-			int read;
-			while((read = in.read(buff))>=0){
-				out.write(buff, 0, read);
-			}
-			out.trim();
-		}
-	}
 	
-	private final File             file;
-	private final RandomAccessFile fileData;
-	private       long             used;
+	private final IOHook hook;
+	
+	protected long used;
 	
 	private final boolean readOnly;
 	
@@ -331,27 +318,37 @@ public final class IOFileData implements IOInterface, Closeable{
 	private       boolean             transactionOpen;
 	private final IOTransactionBuffer transactionBuff = new IOTransactionBuffer();
 	
-	public IOFileData(File file) throws IOException{ this(file, false); }
-	public IOFileData(File file, boolean readOnly) throws IOException{
-		this.file = file;
+	public CursorIOData(IOHook hook, boolean readOnly){
 		this.readOnly = readOnly;
-		
-		Mode mode;
-		if(readOnly) mode = Mode.READ_ONLY;
-		else mode = ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE;
-		fileData = new RandomAccessFile(file, mode.str);
-		
-		this.used = getLength();
+		this.hook = hook;
+	}
+	
+	private void logWriteEvent(long single){
+		logWriteEvent(LongStream.of(single));
+	}
+	private void logWriteEvent(long start, long end){
+		logWriteEvent(LongStream.range(start, end));
+	}
+	private void logWriteEvent(LongStream ids){
+		try{
+			hook.writeEvent(this, ids);
+		}catch(Throwable e){
+			throw new RuntimeException("Exception on write event", e);
+		}
+	}
+	
+	public final IOHook getHook(){
+		return hook;
 	}
 	
 	@Override
 	@NotNull
-	public FileRandomIO io(){
-		return new FileRandomIO();
+	public CursorRandomIO io(){
+		return new CursorRandomIO();
 	}
 	@Override
 	public RandomIO ioAt(long offset){
-		return new FileRandomIO((int)offset);
+		return new CursorRandomIO(offset);
 	}
 	
 	@Override
@@ -362,7 +359,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		return used;
 	}
 	
-	private void setCapacity(long newCapacity) throws IOException{
+	private void setCapacity(long newCapacity, boolean log) throws IOException{
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
 			var siz = transactionBuff.getCapacity(used);
@@ -373,8 +370,13 @@ public final class IOFileData implements IOInterface, Closeable{
 		long lastCapacity = getLength();
 		if(lastCapacity == newCapacity) return;
 		
+		if(lastCapacity<newCapacity || lastCapacity>newCapacity*2L){
+			var newc = lastCapacity<newCapacity? Math.max(newCapacity, lastCapacity*4/3) : newCapacity;
+			resize(newc);
+		}
 		used = Math.min(used, newCapacity);
-		resize(used);
+		
+		if(log && hook != null) logWriteEvent(lastCapacity, newCapacity);
 	}
 	
 	@Override
@@ -386,7 +388,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	static{
 		try{
-			TRANSACTION_OPEN = MethodHandles.lookup().findVarHandle(IOFileData.class, "transactionOpen", boolean.class);
+			TRANSACTION_OPEN = MethodHandles.lookup().findVarHandle(CursorIOData.class, "transactionOpen", boolean.class);
 		}catch(ReflectiveOperationException e){
 			throw new Error(e);
 		}
@@ -401,80 +403,57 @@ public final class IOFileData implements IOInterface, Closeable{
 	@Override
 	public byte[] readAll() throws IOException{
 		if(transactionOpen) return IOInterface.super.readAll();
-		var usedI = Math.toIntExact(used);
-		var copy  = new byte[usedI];
-		readN(0, copy, 0, usedI);
+		var u = used;
+		if(u>Integer.MAX_VALUE) throw new OutOfMemoryError();
+		var iUsed = (int)u;
+		var copy  = new byte[iUsed];
+		try{
+			readN(0, copy, 0, iUsed);
+		}catch(Throwable e){
+			throw switch(e){
+				case IOException io -> io;
+				default -> new IOException("Failed to read " + iUsed + " bytes", e);
+			};
+		}
 		return copy;
 	}
 	
 	@Override
 	public String toString(){
-		return IOFileData.class.getSimpleName() + "{" + file + "}";
-	}
-	
-	@Override
-	public boolean equals(Object o){
-		return this == o ||
-		       o instanceof IOFileData that &&
-		       fileData.equals(that.fileData);
-	}
-	
-	@Override
-	public int hashCode(){
-		return fileData.hashCode();
-	}
-	
-	private long getLength() throws IOException{
-		return fileData.length();
-	}
-	private void resize(long newSize) throws IOException{
-		fileData.setLength(newSize);
-	}
-	
-	private byte read1(long fileOffset) throws IOException{
-		fileData.seek(fileOffset);
-		return fileData.readByte();
-	}
-	private void write1(long fileOffset, byte b) throws IOException{
-		fileData.seek(fileOffset);
-		fileData.writeByte(b);
-	}
-	
-	private void readN(long fileOffset, byte[] dest, int off, int len) throws IOException{
-		fileData.seek(fileOffset);
-		fileData.readFully(dest, off, len);
-	}
-	private void writeN(byte[] src, int index, long fileOffset, int len) throws IOException{
-		fileData.seek(fileOffset);
-		fileData.write(src, index, len);
-	}
-	
-	private long read8(long fileOffset, int len) throws IOException{
-		fileData.seek(fileOffset);
-		byte[] buff = new byte[len];
-		fileData.readFully(buff);
-		return WordIO.getWord(buff, 0, len);
-	}
-	private void write8(long value, long fileOffset, int len) throws IOException{
-		fileData.seek(fileOffset);
-		byte[] buff = new byte[len];
-		WordIO.setWord(value, buff, 0, len);
-		fileData.write(buff);
-	}
-	
-	@Override
-	public IOFileData asReadOnly(){
-		if(isReadOnly()) return this;
+		int h;
 		try{
-			close();
-			return new IOFileData(file, true);
+			var used = this.used;
+			var siz  = (int)Math.min(used, 128);
+			h = Arrays.hashCode(read(0, siz));
+			
+			var start = Math.max(used - siz, siz);
+			if(start != used){
+				h ^= Arrays.hashCode(read(start, (int)(used - start)));
+			}
 		}catch(IOException e){
-			throw new RuntimeException(e);
+			h = 0;
 		}
+		return getClass().getSimpleName() + "#" + Integer.toHexString(h) + "{" + getIOSize() + " bytes}";
 	}
 	
 	@Override
-	public void close() throws IOException{
-		fileData.close();
-	}
+	public abstract boolean equals(Object o);
+	
+	@Override
+	public abstract int hashCode();
+	
+	protected abstract long getLength() throws IOException;
+	protected abstract void resize(long newFileSize) throws IOException;
+	
+	protected abstract byte read1(long fileOffset) throws IOException;
+	protected abstract void write1(long fileOffset, byte b) throws IOException;
+	protected abstract void readN(long fileOffset, byte[] dest, int destOff, int len) throws IOException;
+	protected abstract void writeN(long fileOffset, byte[] src, int srcOff, int len) throws IOException;
+	
+	protected abstract long readWord(long fileOffset, int len) throws IOException;
+	protected abstract void writeWord(long fileOffset, long value, int len) throws IOException;
+	
+	@Override
+	public abstract CursorIOData asReadOnly();
+	
 }

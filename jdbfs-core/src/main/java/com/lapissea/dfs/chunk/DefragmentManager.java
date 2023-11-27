@@ -28,7 +28,6 @@ import java.util.function.Function;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.logging.Log.debug;
-import static com.lapissea.dfs.logging.Log.smallTrace;
 import static com.lapissea.dfs.logging.Log.warn;
 import static com.lapissea.dfs.type.MemoryWalker.CONTINUE;
 import static com.lapissea.dfs.type.MemoryWalker.END;
@@ -84,8 +83,7 @@ public class DefragmentManager{
 				if(!iter.hasPrevious()) break;
 				var freeFirst = iter.ioPrevious().dereference(cluster);
 				iter.ioNext();
-				
-				boolean soround = false;
+				boolean surround = false;
 				
 				long sumMove = 0;
 				var  ch      = freeFirst;
@@ -96,11 +94,11 @@ public class DefragmentManager{
 					sumMove += ch.totalSize();
 					if(sumMove>=256) break;
 					if(freeNext.getPtr().equals(ch.dataEnd())){
-						soround = true;
+						surround = true;
 						break;
 					}
 				}
-				if(!soround) continue;
+				if(!surround) continue;
 				
 				var firstNext = freeFirst.nextPhysical();
 				var limit     = firstNext.getPtr().getValue();
@@ -168,13 +166,18 @@ public class DefragmentManager{
 			private Chunk copyCh(Reference instanceReference, Chunk ch) throws IOException{
 				var ticket = AllocateTicket.bytes(ch.chainSize())
 				                           .withExplicitNextSize(Optional.of(ch.getNextSize()))
-				                           .withDataPopulated((p, dIo) -> ch.io(sIo -> sIo.transferTo(dIo)));
+				                           .withDataPopulated((p, dIo) -> {
+					                           ch.io(sIo -> sIo.transferTo(dIo));
+				                           });
 				ticket = ticketFn.apply(ticket);
 				if(ticket.positionMagnet().isEmpty()){
 					ticket = ticket.withPositionMagnet(instanceReference.calcGlobalOffset(cluster));
 				}
 				
-				return ticket.submit(cluster);
+				//Open IO in order to lock the chunk and prevent it from being deallocated as a side effect
+				try(var ignored = ch.io()){
+					return ticket.submit(cluster);
+				}
 			}
 			@Override
 			public <T extends IOInstance<T>> int logChunkPointer(
@@ -537,7 +540,6 @@ public class DefragmentManager{
 	}
 	
 	private static Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{
-		smallTrace("moving {} to {}", oldRef, newRef);
 		
 		boolean[]         found  = {false};
 		Set<ChunkPointer> toFree = new HashSet<>();

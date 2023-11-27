@@ -1,6 +1,8 @@
 package com.lapissea.dfs.chunk;
 
+import com.lapissea.dfs.exceptions.FreeWhileUsed;
 import com.lapissea.dfs.exceptions.MalformedClusterData;
+import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -211,7 +213,17 @@ public final class ChunkChainIO implements RandomIO{
 				}
 				
 				if(next != null){
-					next.freeChaining();
+					try{
+						next.freeChaining();
+					}catch(FreeWhileUsed e){
+						chunk.modifyAndSave(ch -> {
+							try{
+								ch.setNextPtr(next.getPtr());
+							}catch(OutOfBitDepth ex){
+								throw new RuntimeException(ex);
+							}
+						});
+					}
 					revalidate();
 				}
 				

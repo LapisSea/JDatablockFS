@@ -751,8 +751,7 @@ public class GraphRenderer implements DataRenderer{
 			var     parsed  = frame.parsed();
 			Cluster cluster = parsed.cluster.get();
 			if(cluster == null){
-				var mem = MemoryData.builder().withRaw(frame.memData().bytes()).asReadOnly().build();
-				cluster = new Cluster(mem);
+				cluster = new Cluster(MemoryData.viewOf(frame.memData().bytes()));
 				parsed.cluster = new WeakReference<>(cluster);
 			}
 			var w = renderer.getDisplay().getWidth();

@@ -703,7 +703,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			
 			var rCtx = new RenderContext(RenderBackend.DRAW_DEBUG? direct : buff, bytes, getPixelsPerByte(), zoom, dis, new ArrayList<>());
 			
-			findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
+			findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.viewOf(bytes)));
 			
 			drawStatic(frame, rCtx, parsed);
 			
@@ -722,7 +722,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		buff.draw();
 		
-		findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
+		findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.viewOf(bytes)));
 		
 		if(!ctx.renderer.getDisplay().isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)){
 			drawMouse(ctx, cFrame);
@@ -789,7 +789,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		try{
 			Cluster cluster = parsed.getCluster().orElseGet(() -> {
 				try{
-					var c = new Cluster(MemoryData.builder().withRaw(bytes).asReadOnly().build());
+					var c = new Cluster(MemoryData.viewOf(bytes));
 					trace("parsed cluster at frame {}", frameIndex);
 					parsed.cluster = new WeakReference<>(c);
 					return c;
@@ -902,7 +902,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				
 				if(e1 != null) throw e1;
 			}else{
-				var         provider = DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).build());
+				var         provider = DataProvider.newVerySimpleProvider(MemoryData.of(bytes));
 				AnnotateCtx annCtx   = new AnnotateCtx(ctx, provider, new LinkedList<>(), pointerRecord, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;
@@ -1101,12 +1101,13 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private void drawPointers(RenderContext ctx, SessionHost.ParsedFrame parsed, List<Pointer> ptrs){
+//		if(true) return;
 		var                       renderer = ctx.renderer;
 		List<DrawFont.StringDraw> strings  = new ArrayList<>(ptrs.size());
 		for(Pointer ptr : ptrs){
 			boolean drawMsg = false;
 			
-			var siz   = ctx.pixelsPerByte()/16F;
+			var siz   = ctx.pixelsPerByte()/32F;
 			var alpha = Math.min(1, siz);
 			siz = Math.max(1, siz);
 			var sFul  = siz;
@@ -1125,7 +1126,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
 				
 			}else{
-				col = ptr.color();
+				col = ColorUtils.alpha(ptr.color(), 0.5F);
 			}
 			
 			renderer.setColor(ColorUtils.alpha(col, 0.7F*alpha));

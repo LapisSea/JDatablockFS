@@ -192,7 +192,7 @@ public class GeneralTypeHandlingTests{
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{
-		var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
+		var cluster = new Cluster(MemoryData.of(data));
 		
 		var r         = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
 		var container = (IOInstance<?>)r.request();

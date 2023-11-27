@@ -139,7 +139,7 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFla
 		if(nullable()){
 			if(val == null){
 				if(fixed){
-					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

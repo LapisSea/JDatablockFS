@@ -336,8 +336,25 @@ public class MemoryWalker{
 								if(inst instanceof IOInstance.Unmanaged valueInstance){
 									{
 										var ref = valueInstance.getReference();
+										var uRefField = new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
+											@Override
+											public void setReference(T inst, Reference newRef){
+												if(inst != instance) throw new IllegalStateException();
+												valueInstance.notifyReferenceMovement(newRef);
+											}
+											@Override
+											public Reference getReference(T inst){
+												if(inst != instance) throw new IllegalStateException();
+												return valueInstance.getReference();
+											}
+											@Override
+											public StructPipe<T> getReferencedPipe(T inst){
+												if(inst != instance) throw new IllegalStateException();
+												return valueInstance.getPipe();
+											}
+										};
 										if(timer != null) timer.ignoreStart();
-										var res = pointerRecord.log(reference, instance, null, ref);
+										var res = pointerRecord.log(reference, instance, uRefField, ref);
 										if(timer != null) timer.ignoreEnd();
 										
 										checkResult(res);

@@ -2,9 +2,9 @@ package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.type.DataOrder;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
+import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.TypeDef;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -172,7 +172,8 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		if(!fields.isEmpty()){
 			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).toList();
-			stringsAnnotation(writer, DataOrder.class, order);
+			//noinspection deprecation
+			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}
 		
 		if(extend) writer.write("extends {}<#genClassName>", IOInstance.Managed.class);

@@ -139,7 +139,7 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFl
 		if(nullable()){
 			if(val == null){
 				if(fixed){
-					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

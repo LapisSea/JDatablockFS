@@ -36,11 +36,6 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 	@Override
 	public String toString(){
 		if(isNull()) return "NULL";
-		
-		if(getValue()>9999){
-			var h = Long.toHexString(getValue()).toUpperCase();
-			return "x" + h;
-		}
 		return "*" + getValue();
 	}
 	

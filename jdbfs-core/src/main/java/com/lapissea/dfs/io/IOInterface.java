@@ -28,7 +28,10 @@ public interface IOInterface extends RandomIO.Creator{
 	
 	@Override
 	default byte[] readAll() throws IOException{
-		return read(0, Math.toIntExact(getIOSize()));
+		var s = getIOSize();
+		if(s>Integer.MAX_VALUE) throw new OutOfMemoryError();
+		var iSize = (int)s;
+		return read(0, iSize);
 	}
 	
 	/**
@@ -70,7 +73,7 @@ public interface IOInterface extends RandomIO.Creator{
 			}
 			@Override
 			public IOTransaction openIOTransaction(){
-				return IOInterface.this.openIOTransaction();
+				return IOTransaction.NOOP;
 			}
 			@Override
 			public RandomIO io() throws IOException{

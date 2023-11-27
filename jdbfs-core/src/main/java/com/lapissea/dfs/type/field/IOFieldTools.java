@@ -3,9 +3,9 @@ package com.lapissea.dfs.type.field;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.type.DataOrder;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.DepSort;
@@ -112,15 +112,16 @@ public final class IOFieldTools{
 		return computeDependencyIndex(fields).mapData(fields);
 	}
 	
+	@SuppressWarnings("deprecation")
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		if(fields.isEmpty()) return new Index(new int[0]);
 		{
 			var struct       = fields.stream().map(IOField::getAccessor).filter(Objects::nonNull).findAny().orElseThrow().getDeclaringStruct();
 			var structType   = struct.getType();
-			var dataOrderAnn = structType.getAnnotation(DataOrder.class);
+			var dataOrderAnn = structType.getAnnotation(InternalDataOrder.class);
 			if(dataOrderAnn != null){
 				if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
-					throw new MalformedStruct(DataOrder.class.getName() + " is for internal use only. " +
+					throw new MalformedStruct(InternalDataOrder.class.getName() + " is for internal use only. " +
 					                          "To be used only by " + TemplateClassLoader.class.getName());
 				}
 				var dataOrder    = dataOrderAnn.value();
