@@ -101,11 +101,19 @@ public class VersioningTests{
 	static byte[] makeABCData() throws IOException   { return makeData(ABC.class); }
 	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
 	
+	static <T> T makeNGetRoot(Class<T> type) throws Exception{
+		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
+		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
+		
+		return data.roots()
+		           .require("obj", type);
+	}
+	
 	@Test
 	void ensureClassShadowing() throws Exception{
-		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeAData"));
+		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeAData"));
+		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
 		
-		var data  = new Cluster(MemoryData.builder().withRaw(bb).build());
 		var d     = Objects.requireNonNull(data.getTypeDb());
 		var def   = d.getDefinitionFromClassName(A.class.getName()).orElseThrow();
 		var names = def.getFields().stream().map(TypeDef.FieldDef::getName).collect(Collectors.toSet());
@@ -114,11 +122,7 @@ public class VersioningTests{
 	
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void newField() throws Exception{
-		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeABCData"));
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
-		
-		var val = data.roots()
-		              .require("obj", A.class);
+		var val = makeNGetRoot(A.class);
 		
 		var expected = new A();
 		expected.a = 1;
@@ -127,11 +131,7 @@ public class VersioningTests{
 	
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void removedField() throws Exception{
-		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeABCData"));
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
-		
-		var val = data.roots()
-		              .require("obj", ABC.class);
+		var val = makeNGetRoot(ABC.class);
 		
 		var expected = new ABC();
 		expected.a = 1;
@@ -141,11 +141,7 @@ public class VersioningTests{
 	
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void changedTypeField() throws Exception{
-		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeIntValData"));
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
-		
-		var val = data.roots()
-		              .require("obj", IntVal.class);
+		var val = makeNGetRoot(IntVal.class);
 		
 		var expected = new IntVal();
 		expected.val.add(1);
