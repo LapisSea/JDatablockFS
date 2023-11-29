@@ -100,8 +100,8 @@ public interface RootProvider extends DataProvider.Holder{
 				}
 			}
 			
-			if(IOType.getArgs(genericType).isEmpty()){
-				throw new IllegalStateException(rawType.getName() + " should not be generic");
+			if(!IOType.getArgs(genericType).isEmpty()){
+				throw new IllegalStateException(rawType.getName() + " should not be generic but is: " + genericType);
 			}
 			
 			var p = SupportedPrimitive.get(rawType).map(typ -> withGenerator(() -> (T)typ.getDefaultValue()));
@@ -138,7 +138,11 @@ public interface RootProvider extends DataProvider.Holder{
 		var val = builder(id).withGenerator(() -> {
 			throw new MissingRoot(id + " does not exist!");
 		}).request();
-		return type.cast(val);
+		//noinspection unchecked
+		var t = SupportedPrimitive.get(type)
+		                          .map(p -> (Class<T>)p.wrapper)
+		                          .orElse(type);
+		return t.cast(val);
 	}
 	
 	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }

@@ -1,6 +1,7 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.content.ContentInputStream;
@@ -215,6 +216,29 @@ public class GeneralTests{
 				map.put(5, 33);
 			}
 		);
+	}
+	
+	@Test(groups = {"rootProvider"})
+	void rootIntProvide() throws IOException{
+		var cl = Cluster.init(MemoryData.empty());
+		cl.roots().provide("val", -123);
+		int val = cl.roots().require("val", int.class);
+		assertEquals(val, -123);
+	}
+	
+	@Test(groups = {"rootProvider"})
+	void rootIntegerProvide() throws IOException{
+		var cl = Cluster.init(MemoryData.empty());
+		cl.roots().provide("val", -123);
+		Integer val = cl.roots().require("val", Integer.class);
+		assertEquals(val, -123);
+	}
+	
+	@Test(groups = {"rootProvider"})
+	void rootIntRequest() throws IOException{
+		var cl  = Cluster.init(MemoryData.empty());
+		var val = cl.roots().request("val", int.class);
+		assertEquals(val, 0);
 	}
 	
 	@Test
