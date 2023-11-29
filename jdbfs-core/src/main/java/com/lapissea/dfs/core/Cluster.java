@@ -49,106 +49,7 @@ import static com.lapissea.dfs.type.field.annotations.IOValue.Reference.PipeType
 
 public final class Cluster implements DataProvider{
 	
-	static{
-		Thread.startVirtualThread(IOTypeDB.PersistentDB::new);
-		Thread.startVirtualThread(FieldCompiler::init);
-	}
-	
-	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
-	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
-	
-	public static Cluster emptyMem() throws IOException{
-		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
-	}
-	
-	public static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
-		var provider = DataProvider.newVerySimpleProvider(data);
-		var db       = new IOTypeDB.PersistentDB();
-		
-		try(var io = data.write(true)){
-			MagicID.write(io);
-		}
-		
-		var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-		                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
-		                               .submit(provider);
-		
-		db.init(provider);
-		
-		ROOT_PIPE.modify(firstChunk, root -> {
-			root.metadata.db = db;
-			root.metadata.allocateNulls(provider, null);
-		}, null);
-	}
-	
-	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
-	private static ByteBuffer getEmptyClusterSnapshot() throws IOException{
-		var emptyClusterSnap = EMPTY_CLUSTER_SNAP.get();
-		if(emptyClusterSnap == null){
-			var mem = MemoryData.builder().withCapacity(MagicID.size()).build();
-			initEmptyClusterSnapshot(mem);
-			emptyClusterSnap = ByteBuffer.wrap(mem.readAll()).asReadOnlyBuffer();
-			
-			EMPTY_CLUSTER_SNAP = new WeakReference<>(emptyClusterSnap);
-		}
-		return emptyClusterSnap;
-	}
-	
-	public static Cluster init(IOInterface data) throws IOException{
-		data.write(true, getEmptyClusterSnapshot());
-		return new Cluster(data);
-	}
-	
-	private static class RootRef extends IOInstance.Managed<RootRef>{
-		@IOValue
-		@IOValue.Reference(dataPipeType = FLEXIBLE)
-		@IONullability(DEFAULT_IF_NULL)
-		private Metadata metadata;
-	}
-	
-	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
-	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
-		
-		ChunkPointer getVal();
-	}
-	
-	@IOValue
-	@IONullability(NULLABLE)
-	@SuppressWarnings("unused")
-	private static class Metadata extends IOInstance.Managed<Metadata>{
-		
-		@IOValue.OverrideType(value = HashIOMap.class)
-		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
-		
-		private IOTypeDB.PersistentDB db;
-		
-		private IOList<IOChunkPointer> freeChunks;
-		
-		@Override
-		public String toString(){
-			return this.getClass().getSimpleName() + toShortString();
-		}
-		@Override
-		public String toShortString(){
-			return "{db: " + db.toShortString() + ", " +
-			       freeChunks.size() + " freeChunks, " +
-			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
-			                                    .collect(Collectors.joining(", ", "[", "]"))
-			       + "}";
-		}
-	}
-	
-	private final ChunkCache chunkCache = ChunkCache.strong();
-	
-	private final IOInterface       source;
-	private final MemoryManager     memoryManager;
-	private final DefragmentManager defragmentManager = new DefragmentManager(this);
-	
-	private final RootRef  root;
-	private final Metadata metadata;
-	
-	
-	private final RootProvider roots = new RootProvider(){
+	private class Roots implements RootProvider{
 		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
 		
 		private static class Node{
@@ -214,7 +115,108 @@ public final class Cluster implements DataProvider{
 		public void drop(ObjectID id) throws IOException{
 			metadata.rootObjects.remove(id);
 		}
-	};
+	}
+	
+	private static class RootRef extends IOInstance.Managed<RootRef>{
+		@IOValue
+		@IOValue.Reference(dataPipeType = FLEXIBLE)
+		@IONullability(DEFAULT_IF_NULL)
+		private Metadata metadata;
+	}
+	
+	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
+	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
+		ChunkPointer getVal();
+	}
+	
+	@IOValue
+	@IONullability(NULLABLE)
+	@SuppressWarnings("unused")
+	private static class Metadata extends IOInstance.Managed<Metadata>{
+		
+		@IOValue.OverrideType(value = HashIOMap.class)
+		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
+		
+		private IOTypeDB.PersistentDB db;
+		
+		private IOList<IOChunkPointer> freeChunks;
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName() + toShortString();
+		}
+		@Override
+		public String toShortString(){
+			return "{db: " + db.toShortString() + ", " +
+			       freeChunks.size() + " freeChunks, " +
+			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
+			                                    .collect(Collectors.joining(", ", "[", "]"))
+			       + "}";
+		}
+	}
+	
+	
+	static{
+		Thread.startVirtualThread(IOTypeDB.PersistentDB::new);
+		Thread.startVirtualThread(FieldCompiler::init);
+	}
+	
+	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
+	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	
+	private static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
+		var provider = DataProvider.newVerySimpleProvider(data);
+		var db       = new IOTypeDB.PersistentDB();
+		
+		try(var io = data.write(true)){
+			MagicID.write(io);
+		}
+		
+		var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
+		                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
+		                               .submit(provider);
+		
+		db.init(provider);
+		
+		ROOT_PIPE.modify(firstChunk, root -> {
+			root.metadata.db = db;
+			root.metadata.allocateNulls(provider, null);
+		}, null);
+	}
+	
+	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
+	private static ByteBuffer getEmptyClusterSnapshot() throws IOException{
+		var emptyClusterSnap = EMPTY_CLUSTER_SNAP.get();
+		if(emptyClusterSnap == null){
+			var mem = MemoryData.builder().withCapacity(MagicID.size()).build();
+			initEmptyClusterSnapshot(mem);
+			emptyClusterSnap = ByteBuffer.wrap(mem.readAll()).asReadOnlyBuffer();
+			
+			EMPTY_CLUSTER_SNAP = new WeakReference<>(emptyClusterSnap);
+		}
+		return emptyClusterSnap;
+	}
+	
+	
+	public static Cluster init(IOInterface data) throws IOException{
+		data.write(true, getEmptyClusterSnapshot());
+		return new Cluster(data);
+	}
+	
+	public static Cluster emptyMem() throws IOException{
+		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
+	}
+	
+	
+	private final ChunkCache chunkCache = ChunkCache.strong();
+	
+	private final IOInterface   source;
+	private final MemoryManager memoryManager;
+	
+	private final RootRef  root;
+	private final Metadata metadata;
+	
+	private final RootProvider roots = new Roots();
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source = source;
@@ -375,10 +377,10 @@ public final class Cluster implements DataProvider{
 	}
 	
 	public void defragment() throws IOException{
-		defragmentManager.defragment();
+		new DefragmentManager(this).defragment();
 	}
 	
 	public void scanGarbage(DefragmentManager.FreeFoundAction action) throws IOException{
-		defragmentManager.scanFreeChunks(action);
+		new DefragmentManager(this).scanFreeChunks(action);
 	}
 }
