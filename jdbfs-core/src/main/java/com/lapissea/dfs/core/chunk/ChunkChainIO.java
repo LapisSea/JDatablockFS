@@ -1,4 +1,4 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.exceptions.FreeWhileUsed;
 import com.lapissea.dfs.exceptions.MalformedClusterData;

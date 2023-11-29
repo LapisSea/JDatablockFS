@@ -1,5 +1,6 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.objects.ChunkPointer;
 
 import java.util.Arrays;

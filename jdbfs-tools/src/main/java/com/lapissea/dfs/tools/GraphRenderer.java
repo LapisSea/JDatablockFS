@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools;
 
-import com.lapissea.dfs.chunk.Cluster;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;

@@ -1,5 +1,9 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.memory;
 
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.MemoryManager;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
 

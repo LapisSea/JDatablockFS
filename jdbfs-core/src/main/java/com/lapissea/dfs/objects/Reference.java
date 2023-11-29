@@ -1,8 +1,8 @@
 package com.lapissea.dfs.objects;
 
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.content.ContentReader;

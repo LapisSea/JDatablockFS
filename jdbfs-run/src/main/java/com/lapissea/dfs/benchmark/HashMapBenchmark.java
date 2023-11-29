@@ -1,6 +1,6 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.utils.RawRandom;

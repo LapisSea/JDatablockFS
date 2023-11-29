@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools;
 
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
 import com.lapissea.util.UtilL;

@@ -2,8 +2,8 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.ContentReader;

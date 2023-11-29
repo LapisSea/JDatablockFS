@@ -1,9 +1,9 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.MagicID;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Cluster;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.collections.IOList;

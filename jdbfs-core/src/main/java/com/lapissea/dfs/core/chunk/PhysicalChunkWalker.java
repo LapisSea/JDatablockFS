@@ -1,4 +1,4 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.util.UtilL;

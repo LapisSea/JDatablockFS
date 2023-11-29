@@ -1,6 +1,13 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.memory;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.MemoryManager;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkBuilder;
+import com.lapissea.dfs.core.chunk.ChunkSet;
+import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;

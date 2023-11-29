@@ -1,6 +1,6 @@
 package com.lapissea.dfs.run.world;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.CursorIOData;
 import com.lapissea.dfs.io.impl.FileMemoryMapped;
 import com.lapissea.dfs.io.impl.MemoryData;

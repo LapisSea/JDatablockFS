@@ -1,8 +1,8 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.SyntheticParameterizedType;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
@@ -322,7 +322,7 @@ public class GeneralTypeHandlingTests{
 		var r    = new Random(69420);
 		var info = EnumUniverse.of(eType);
 		var pip  = StandardStructPipe.of(type);
-		var data = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var data = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		for(int i = 0; i<1000; i++){
 			
 			var set = IOInstance.Def.of(
@@ -595,7 +595,7 @@ public class GeneralTypeHandlingTests{
 		a.list = List.of("idk");
 		a.ints = new int[1];
 		
-		var prov = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var prov = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var val  = AllocateTicket.bytes(128).submit(prov);
 		aPipe.write(val, a);
 		
@@ -639,7 +639,7 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void genericPropagation() throws IOException{
-		var d    = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var d    = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var data = IOInstance.Def.of(GenericArg.class);
 		data.allocateNulls(d, null);
 		var strings = data.strings().list();
@@ -714,7 +714,7 @@ public class GeneralTypeHandlingTests{
 		var instance = struct.make();
 		((IOField<T, Object>)struct.getFields().byName("val").orElseThrow()).set(null, instance, val);
 		
-		var prov  = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var prov  = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var chunk = AllocateTicket.bytes(64).submit(prov);
 		
 		pipe.write(chunk, instance);
