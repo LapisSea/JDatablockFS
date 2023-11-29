@@ -1,6 +1,6 @@
 package com.lapissea.dfs.run.world;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;

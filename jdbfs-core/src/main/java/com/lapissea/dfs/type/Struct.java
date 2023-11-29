@@ -2,9 +2,10 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.internal.Access;
@@ -76,7 +77,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	/**
 	 * This annotation is not really supposed to be used. It is a workaround for structs that do not have a default constructor and are never
-	 * supposed to be created by the struct API. This is used only for the internal {@link com.lapissea.dfs.chunk.Chunk} but it may have its
+	 * supposed to be created by the struct API. This is used only for the internal {@link Chunk} but it may have its
 	 * uses elsewhere
 	 */
 	@Retention(RetentionPolicy.RUNTIME)

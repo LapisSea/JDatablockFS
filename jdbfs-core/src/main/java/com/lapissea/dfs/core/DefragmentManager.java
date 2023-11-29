@@ -1,5 +1,8 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkBuilder;
+import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.exceptions.MalformedFile;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.instancepipe.ObjectPipe;

@@ -1,6 +1,6 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
+import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -95,7 +95,7 @@ public class CompressionTests{
 				struct.getFields().requireExact(byte[].class, "data")
 				      .set(null, instance, bytes);
 				
-				var data = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+				var data = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 				var ch   = AllocateTicket.bytes(120).submit(data);
 				
 				pipe.write(ch, instance);

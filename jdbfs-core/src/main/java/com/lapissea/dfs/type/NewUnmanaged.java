@@ -1,6 +1,6 @@
 package com.lapissea.dfs.type;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.objects.Reference;
 
 import java.io.IOException;

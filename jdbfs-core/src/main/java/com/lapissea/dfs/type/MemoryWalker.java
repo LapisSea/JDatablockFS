@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type;
 
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.AverageDouble;
 import com.lapissea.dfs.objects.ChunkPointer;

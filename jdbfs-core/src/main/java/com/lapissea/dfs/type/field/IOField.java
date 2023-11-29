@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.dfs.io.IO;

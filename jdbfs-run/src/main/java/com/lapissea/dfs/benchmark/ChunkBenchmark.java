@@ -1,8 +1,8 @@
 package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.MagicID;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import org.openjdk.jmh.annotations.Benchmark;

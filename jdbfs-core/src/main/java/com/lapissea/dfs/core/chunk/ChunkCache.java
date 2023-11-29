@@ -1,5 +1,6 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.chunk;
 
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;

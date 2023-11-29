@@ -1,6 +1,6 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.objects.Reference;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

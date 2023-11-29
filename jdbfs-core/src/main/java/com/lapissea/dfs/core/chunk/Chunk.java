@@ -1,6 +1,7 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;

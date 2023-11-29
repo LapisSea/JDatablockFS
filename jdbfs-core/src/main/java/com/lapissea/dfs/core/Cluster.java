@@ -1,9 +1,12 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
 import com.lapissea.dfs.MagicID;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.memory.PersistentMemoryManager;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.IOInterface;

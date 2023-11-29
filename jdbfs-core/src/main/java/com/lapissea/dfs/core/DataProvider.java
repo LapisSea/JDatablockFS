@@ -1,6 +1,10 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
 import com.lapissea.dfs.MagicID;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.memory.VerySimpleMemoryManager;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.PointerOutsideFile;
 import com.lapissea.dfs.io.IOHook;

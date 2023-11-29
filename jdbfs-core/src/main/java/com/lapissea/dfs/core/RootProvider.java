@@ -1,4 +1,4 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
 import com.lapissea.dfs.exceptions.MissingRoot;
 import com.lapissea.dfs.io.bit.EnumUniverse;

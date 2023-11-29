@@ -1,6 +1,6 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.internal.HashCommons;
 import com.lapissea.dfs.io.IOTransaction;

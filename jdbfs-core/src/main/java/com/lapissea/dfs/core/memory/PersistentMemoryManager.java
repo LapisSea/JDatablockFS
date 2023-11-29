@@ -1,5 +1,10 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core.memory;
 
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DefragmentManager;
+import com.lapissea.dfs.core.MemoryManager;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.FreeWhileUsed;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;

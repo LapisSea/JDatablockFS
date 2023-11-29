@@ -1,6 +1,6 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;

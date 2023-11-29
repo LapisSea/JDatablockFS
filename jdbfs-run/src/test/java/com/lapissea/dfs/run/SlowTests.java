@@ -1,8 +1,8 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -58,7 +58,7 @@ import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.lapissea.dfs.chunk.DefragmentManager.FreeFoundAction.ERROR;
+import static com.lapissea.dfs.core.DefragmentManager.FreeFoundAction.ERROR;
 import static com.lapissea.dfs.logging.Log.info;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;

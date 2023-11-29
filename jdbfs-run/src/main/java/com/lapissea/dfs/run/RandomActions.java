@@ -1,8 +1,8 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.HashIOMap;

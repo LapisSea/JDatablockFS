@@ -2,9 +2,9 @@ package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.SealedUtil.SealedInstanceUniverse;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.ChunkChainIO;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.bit.FlagReader;

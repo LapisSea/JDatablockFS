@@ -1,6 +1,6 @@
 package com.lapissea.dfs.io.instancepipe;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;

@@ -1,12 +1,12 @@
 package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.ChainWalker;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.ChunkBuilder;
-import com.lapissea.dfs.chunk.ChunkChainIO;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.chunk.ChainWalker;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkBuilder;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;

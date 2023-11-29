@@ -1,5 +1,6 @@
-package com.lapissea.dfs.chunk;
+package com.lapissea.dfs.core;
 
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.ObjectPipe;

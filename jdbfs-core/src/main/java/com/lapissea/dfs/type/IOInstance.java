@@ -1,10 +1,10 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.ChunkChainIO;
-import com.lapissea.dfs.chunk.DataProvider;
-import com.lapissea.dfs.chunk.MemoryOperations;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
