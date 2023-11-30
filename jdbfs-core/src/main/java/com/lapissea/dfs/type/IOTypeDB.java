@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
@@ -946,6 +947,97 @@ public sealed interface IOTypeDB{
 			if(data == null) return "{uninitialized}";
 			return "{" + data.size() + " " + TextUtil.plural("link", (int)data.size()) + ", " + defs.size() + " class " + TextUtil.plural("definition", (int)defs.size()) + "}";
 		}
+		
+		public void rename(Set<String> nameSet, Function<String, String> transformName) throws IOException{
+			for(var e : defs.stream().filter(e -> nameSet.contains(e.getKey().typeName)).toList()){
+				var def   = e.getValue();
+				var clone = def.clone();
+				rename(nameSet, transformName, def);
+				
+				var newName = new TypeName(rename(nameSet, transformName, e.getKey().typeName));
+				if(!newName.equals(e.getKey()) || !clone.equals(def)){
+					defs.remove(e.getKey());
+					defs.put(newName, def);
+					LogUtil.println(e.getKey(), clone);
+					LogUtil.println(newName, def);
+				}
+			}
+			
+			for(var e : data.stream().filter(e -> !rename(nameSet, transformName, e.getValue()).equals(e.getValue())).toList()){
+				var typ = rename(nameSet, transformName, e.getValue());
+				LogUtil.println(e, typ);
+				data.put(e.getKey(), typ);
+			}
+			for(var e : sealedMultiverse){
+				var name = rename(nameSet, transformName, e.getKey());
+				if(!name.equals(e.getKey())){
+					sealedMultiverse.put(e.getKey(), null);
+					sealedMultiverse.remove(e.getKey());
+					sealedMultiverse.put(name, e.getValue());
+				}
+				var ls = e.getValue().listIterator();
+				while(ls.hasNext()){
+					var val = ls.ioNext();
+					if(nameSet.contains(val)){
+						ls.ioSet(rename(nameSet, transformName, val));
+					}
+				}
+			}
+			
+			sealedMultiverseTouch.clear();
+			templateLoader = new WeakReference<>(null);
+			reverseDataCache = null;
+			dataCache.clear();
+			
+			LogUtil.println(getThisStruct().instanceToString(self(), false));
+		}
+		
+		private void rename(Set<String> nameSet, Function<String, String> transformName, TypeDef def){
+			var fields = def.getFields();
+			for(var f : fields){
+				var typ = rename(nameSet, transformName, f.getType());
+				f.getThisStruct().getFields().requireExact(IOType.class, "type").set(null, f, typ);
+			}
+			var res = def.getPermittedSubclasses().stream().map(n -> rename(nameSet, transformName, n)).toArray(String[]::new);
+			if(res.length>0){
+				def.getThisStruct().getFields().requireExact(String[].class, "permits").set(null, def, res);
+			}
+			
+			var sealedP = def.getSealedParent();
+			if(sealedP != null){
+				sealedP = TypeDef.SealedParent.of(rename(nameSet, transformName, sealedP.name()), sealedP.type());
+				def.getThisStruct().getFields().requireExact(TypeDef.SealedParent.class, "sealedParent").set(null, def, sealedP);
+			}
+			
+			var args = def.getTypeArgs().stream().map(s -> TypeDef.ClassArgDef.of(s.name(), rename(nameSet, transformName, s.bound()))).toList();
+			def.getThisStruct().getFields().requireExact(List.class, "typeArgs").set(null, def, args);
+		}
+		private IOType rename(Set<String> nameSet, Function<String, String> transformName, IOType type){
+			return switch(type){
+				case IOType.TypeGeneric typ -> {
+					var raw  = (IOType.TypeRaw)rename(nameSet, transformName, typ.getRaw());
+					var args = typ.getArgs().stream().map(n -> rename(nameSet, transformName, n)).toList();
+					yield new IOType.TypeGeneric(raw, args);
+				}
+				case IOType.TypeNameArg typ -> {
+					yield new IOType.TypeNameArg((IOType.TypeRaw)rename(nameSet, transformName, typ.getParent()), typ.getName());
+				}
+				case IOType.TypeRaw typ -> {
+					var name = rename(nameSet, transformName, typ.getName());
+					yield new IOType.TypeRaw(name);
+				}
+				case IOType.TypeWildcard typ -> {
+					yield new IOType.TypeWildcard(rename(nameSet, transformName, typ.getBound()), typ.isLower());
+				}
+			};
+		}
+		private String rename(Set<String> nameSet, Function<String, String> transformName, String val){
+			if(nameSet.contains(val)){
+				return transformName.apply(val);
+			}
+			return val;
+		}
+		
 	}
 	
 	private IOType makeType(Object obj){

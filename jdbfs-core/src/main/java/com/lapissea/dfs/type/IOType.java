@@ -79,10 +79,13 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		private Class<?> typeClassCache;
 		
+		
 		public TypeRaw(){ name = ""; }
 		
 		public TypeRaw(Class<?> clazz){
-			var    name = clazz.getName();
+			this(clazz.getName());
+		}
+		public TypeRaw(String name){
 			String n;
 			if(name.length()>PRIMITIVE_NAMES_MAX_LEN) n = name;
 			else{
@@ -308,6 +311,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			return "? " + (isLower? "super" : "extends") + " " + bound.toShortString();
 		}
+		
+		public boolean isLower(){
+			return isLower;
+		}
 	}
 	
 	public static final class TypeNameArg extends IOType{
@@ -318,9 +325,15 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		public TypeNameArg(){ }
 		public TypeNameArg(Class<?> parent, String name){
-			this.parent = new TypeRaw(parent);
+			this(new TypeRaw(parent), name);
+		}
+		public TypeNameArg(TypeRaw parent, String name){
+			this.parent = parent;
 			this.name = name;
 		}
+		
+		public TypeRaw getParent(){ return parent; }
+		public String getName()   { return name; }
 		
 		@Override
 		protected TypeRaw getRaw(){

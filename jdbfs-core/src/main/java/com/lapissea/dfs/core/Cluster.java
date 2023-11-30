@@ -260,9 +260,6 @@ public final class Cluster implements DataProvider{
 		var storedClassNames = db.listStoredTypeDefinitionNames();
 		if(storedClassNames.isEmpty()) return;
 		
-		LogUtil.println("versionForward");
-		
-		
 		var existing =
 			storedClassNames
 				.stream()
@@ -276,7 +273,20 @@ public final class Cluster implements DataProvider{
 		
 		if(existing.isEmpty()) return;
 		
+		var nameSet = existing.stream().map(e -> e.matchingClassName).collect(Collectors.toSet());
 		
+		var index = 0;
+		while(true){
+			var mod = "€old" + (index == 0? "" : index);
+			if(nameSet.stream().anyMatch(name -> storedClassNames.contains(name + mod))){
+				index++;
+				continue;
+			}
+			break;
+		}
+		var mod = "€old" + (index == 0? "" : index);
+		db.rename(nameSet, name -> name + mod);
+		LogUtil.println(existing);
 	}
 	
 	private void scanTypeDB(){

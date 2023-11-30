@@ -115,7 +115,7 @@ public class VersioningTests{
 		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
 		
 		var d     = Objects.requireNonNull(data.getTypeDb());
-		var def   = d.getDefinitionFromClassName(A.class.getName()).orElseThrow();
+		var def   = d.getDefinitionFromClassName(A.class.getName() + "€old").orElseThrow();
 		var names = def.getFields().stream().map(TypeDef.FieldDef::getName).collect(Collectors.toSet());
 		Assert.assertEquals(names, Set.of("a"));
 	}
