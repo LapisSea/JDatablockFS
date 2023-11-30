@@ -134,7 +134,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		unmanaged = IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
-				var structFields = Struct.ofUnknown(type).getFields();
+				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
 				fields = structFields.stream().map(FieldDef::new).toArray(FieldDef[]::new);
 				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
 			}

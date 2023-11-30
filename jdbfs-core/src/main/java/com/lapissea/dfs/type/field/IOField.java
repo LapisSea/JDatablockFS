@@ -381,9 +381,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	private void requireLateData(){
-		if(!lateDataInitialized){
-			throw new IllegalStateException(this.getName() + " late data not initialized");
+		if(lateDataInitialized) return;
+		var struct = declaringStruct();
+		if(struct != null){
+			struct.waitForState(Struct.STATE_INIT_FIELDS);
 		}
+		if(lateDataInitialized) return;
+		throw new IllegalStateException(this.getName() + " late data not initialized");
 	}
 	
 	@Nullable

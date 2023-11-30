@@ -14,6 +14,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.config;
 	exports com.lapissea.dfs.core;
 	exports com.lapissea.dfs.core.chunk;
+	exports com.lapissea.dfs.core.versioning;
 	exports com.lapissea.dfs.io;
 	exports com.lapissea.dfs.io.content;
 	exports com.lapissea.dfs.io.bit;

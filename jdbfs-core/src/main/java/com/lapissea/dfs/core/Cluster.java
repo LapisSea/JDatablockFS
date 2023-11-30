@@ -7,8 +7,11 @@ import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
+import com.lapissea.dfs.core.versioning.ClassVersionDiff;
+import com.lapissea.dfs.core.versioning.Versioning;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -28,6 +31,8 @@ import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -39,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -218,8 +224,12 @@ public final class Cluster implements DataProvider{
 	
 	private final RootProvider roots = new Roots();
 	
-	public Cluster(IOInterface source) throws IOException{
+	private final Versioning versioning;
+	
+	public Cluster(IOInterface source) throws IOException{ this(source, Versioning.JUST_FAIL); }
+	public Cluster(IOInterface source, Versioning versioning) throws IOException{
 		this.source = source;
+		this.versioning = versioning;
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
@@ -242,6 +252,31 @@ public final class Cluster implements DataProvider{
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
 		}
+		
+		versionForward();
+	}
+	private void versionForward() throws IOException{
+		var db               = metadata.db;
+		var storedClassNames = db.listStoredTypeDefinitionNames();
+		if(storedClassNames.isEmpty()) return;
+		
+		LogUtil.println("versionForward");
+		
+		
+		var existing =
+			storedClassNames
+				.stream()
+				.map(className -> Runner.async(() -> ClassVersionDiff.of(className, db)))
+				.toList()
+				.stream()
+				.map(LateInit::get)
+				.flatMap(Optional::stream)
+				.map(versioning::createTransformer)
+				.toList();
+		
+		if(existing.isEmpty()) return;
+		
+		
 	}
 	
 	private void scanTypeDB(){
