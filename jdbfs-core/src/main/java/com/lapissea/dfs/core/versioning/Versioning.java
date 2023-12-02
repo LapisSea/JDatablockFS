@@ -29,26 +29,28 @@ public class Versioning{
 	
 	public VersionTransformer<?> createTransformer(ClassVersionDiff diff){
 		if(diff.changedFields().isEmpty() && diff.removedFields().isEmpty()){
-			var nf     = diff.newFields();
-			var struct = Struct.ofUnknown(diff.real());
-			return new VersionTransformer<>(diff.real().getName(), unpacked -> {
-				IOInstance inst = struct.make();
-				for(String s : nf){
-					IOField f = struct.getFields().byName(s).orElseThrow();
-					if(!f.nullable() && f.isNull(null, inst)){
-						throw new IncompatibleVersionTransform(
-							"Can not automatically create new field: " + s +
-							" because it is non null but is not initialized by default"
-						);
+			if(options.contains(VersioningOptions.ATTEMPT_NEW_VALUE_DEFAULT)){
+				var nf     = diff.newFields();
+				var struct = Struct.ofUnknown(diff.real());
+				return new VersionTransformer<>(diff.real().getName(), unpacked -> {
+					IOInstance inst = struct.make();
+					for(String s : nf){
+						IOField f = struct.getFields().byName(s).orElseThrow();
+						if(!f.nullable() && f.isNull(null, inst)){
+							throw new IncompatibleVersionTransform(
+								"Can not automatically create new field: " + s +
+								" because it is non null but is not initialized by default"
+							);
+						}
+						
 					}
-					
-				}
-				for(var e : unpacked){
-					IOField f = struct.getFields().byName(e.getKey()).orElseThrow();
-					f.set(null, inst, e.getValue());
-				}
-				return inst;
-			});
+					for(var e : unpacked){
+						IOField f = struct.getFields().byName(e.getKey()).orElseThrow();
+						f.set(null, inst, e.getValue());
+					}
+					return inst;
+				});
+			}
 		}
 		
 		return new VersionTransformer<>(diff.real().getName(), unpacked -> {

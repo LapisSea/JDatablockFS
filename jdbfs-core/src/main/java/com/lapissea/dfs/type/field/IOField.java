@@ -163,8 +163,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int typeFlags   = -1;
-	private int inStructUID = -1;
+	private int     typeFlags   = -1;
+	private int     inStructUID = -1;
+	private Boolean needsIOPool;
 	
 	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
 		this.accessor = accessor;
@@ -510,5 +511,15 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	@Override
 	public final int hashCode(){
 		return getName().hashCode();
+	}
+	
+	public boolean needsIOPool(){
+		if(needsIOPool == null) calcNeedsIOPool();
+		return needsIOPool;
+	}
+	private void calcNeedsIOPool(){
+		//TODO: make this fully compliant and handle deep dependencies
+		needsIOPool = Stream.concat(Stream.of(this), dependencies == null? Stream.empty() : dependencies.stream())
+		                    .anyMatch((IOField<?, ?> f) -> f.isVirtual(StoragePool.IO));
 	}
 }

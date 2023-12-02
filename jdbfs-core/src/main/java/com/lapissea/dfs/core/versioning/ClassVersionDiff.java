@@ -52,7 +52,7 @@ public record ClassVersionDiff(Class<?> real, TypeDef stored, List<String> newFi
 				.map(p -> p.real.getName())
 				.toList();
 		
-		if(newF.size() + removedF.size() + changedF.size() == 0){
+		if(newF.isEmpty() && removedF.isEmpty() && changedF.isEmpty()){
 			return Optional.empty();
 		}
 		

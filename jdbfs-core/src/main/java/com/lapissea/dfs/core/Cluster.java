@@ -9,6 +9,7 @@ import com.lapissea.dfs.core.chunk.ChunkCache;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
 import com.lapissea.dfs.core.versioning.ClassVersionDiff;
 import com.lapissea.dfs.core.versioning.Versioning;
+import com.lapissea.dfs.exceptions.IncompatibleVersionTransform;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Runner;
@@ -22,12 +23,14 @@ import com.lapissea.dfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
+import com.lapissea.dfs.type.FieldWalker;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
@@ -47,6 +50,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -255,12 +259,13 @@ public final class Cluster implements DataProvider{
 		
 		versionForward();
 	}
+	
 	private void versionForward() throws IOException{
 		var db               = metadata.db;
 		var storedClassNames = db.listStoredTypeDefinitionNames();
 		if(storedClassNames.isEmpty()) return;
 		
-		var existing =
+		var transformers =
 			storedClassNames
 				.stream()
 				.map(className -> Runner.async(() -> ClassVersionDiff.of(className, db)))
@@ -271,9 +276,13 @@ public final class Cluster implements DataProvider{
 				.map(versioning::createTransformer)
 				.toList();
 		
-		if(existing.isEmpty()) return;
+		if(transformers.isEmpty()) return;
 		
-		var nameSet = existing.stream().map(e -> e.matchingClassName).collect(Collectors.toSet());
+		if(isReadOnly()){
+			throw new IncompatibleVersionTransform("Can not update read only database");
+		}
+		
+		var nameSet = transformers.stream().map(e -> e.matchingClassName).collect(Collectors.toSet());
 		
 		var index = 0;
 		while(true){
@@ -286,7 +295,38 @@ public final class Cluster implements DataProvider{
 		}
 		var mod = "€old" + (index == 0? "" : index);
 		db.rename(nameSet, name -> name + mod);
-		LogUtil.println(existing);
+		
+		var oldSet = transformers.stream().collect(Collectors.toMap(e -> e.matchingClassName + mod, Function.identity()));
+		
+		LogUtil.println("Replacing:\n" + oldSet.keySet() + " with:\n" + nameSet);
+		
+		LogUtil.println("================ WALKING ================");
+		FieldWalker.walk(this, root, new FieldWalker.FieldRecord(){
+			@Override
+			public <I extends IOInstance<I>> int log(I instance, IOField<I, ?> field){
+				Object   val  = null;
+				Class<?> type = field.getType();
+				
+				var dyn = field.typeFlag(IOField.DYNAMIC_FLAG);
+				if(dyn){
+					val = field.get(null, instance);
+					if(val != null) type = val.getClass();
+				}
+				
+				var transformer = oldSet.get(type.getName());
+				if(transformer != null){
+					if(!dyn) val = field.get(null, instance);
+					
+					var transformed = transformer.apply((IOInstance<?>)val);
+					
+					LogUtil.println(val, "to", transformed);
+					((IOField<I, Object>)field).set(null, instance, transformed);
+					return FieldWalker.SAVE|FieldWalker.CONTINUE;
+				}
+				return FieldWalker.CONTINUE;
+			}
+		});
+		
 	}
 	
 	private void scanTypeDB(){

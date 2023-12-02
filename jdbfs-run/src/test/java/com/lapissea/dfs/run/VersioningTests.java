@@ -1,18 +1,25 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.versioning.Versioning;
+import com.lapissea.dfs.core.versioning.VersioningOptions;
+import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.tools.logging.DataLogger;
+import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.TypeDef;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.LateInit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -101,9 +108,20 @@ public class VersioningTests{
 	static byte[] makeABCData() throws IOException   { return makeData(ABC.class); }
 	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
 	
+	private static final LateInit<DataLogger, RuntimeException> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
+	
+	private static final Versioning VERSIONING =
+		new Versioning(
+			EnumSet.allOf(VersioningOptions.class),
+			List.of()
+		);
+	
 	static <T> T makeNGetRoot(Class<T> type) throws Exception{
-		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
+		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
+		
+		IOInterface mem = LoggedMemoryUtils.newLoggedMemory(type.getName(), LOGGER);
+		mem.write(0, true, bb);
+		var data = new Cluster(mem, VERSIONING);
 		
 		return data.roots()
 		           .require("obj", type);
@@ -112,7 +130,7 @@ public class VersioningTests{
 	@Test
 	void ensureClassShadowing() throws Exception{
 		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeAData"));
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build());
+		var    data = new Cluster(MemoryData.builder().withRaw(bb).build(), VERSIONING);
 		
 		var d     = Objects.requireNonNull(data.getTypeDb());
 		var def   = d.getDefinitionFromClassName(A.class.getName() + "€old").orElseThrow();
