@@ -6,21 +6,21 @@
   </component>
   <component name="EntryPointsManager">
     <list size="11">
-      <item index="0" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Construct" />
-      <item index="1" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.EnumValue" />
-      <item index="2" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Get" />
-      <item index="3" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Read" />
-      <item index="4" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Set" />
-      <item index="5" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Size" />
-      <item index="6" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Value" />
-      <item index="7" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Write" />
-      <item index="8" class="java.lang.String" itemvalue="com.lapissea.cfs.io.struct.IOStruct.Write" />
-      <item index="9" class="java.lang.String" itemvalue="com.lapissea.cfs.type.field.annotations.IOValue" />
-      <item index="10" class="java.lang.String" itemvalue="com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo" />
+      <item index="0" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Construct" />
+      <item index="1" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.EnumValue" />
+      <item index="2" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Get" />
+      <item index="3" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Read" />
+      <item index="4" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Set" />
+      <item index="5" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Size" />
+      <item index="6" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Value" />
+      <item index="7" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Write" />
+      <item index="8" class="java.lang.String" itemvalue="com.lapissea.dfs.io.struct.IOStruct.Write" />
+      <item index="9" class="java.lang.String" itemvalue="com.lapissea.dfs.type.field.annotations.IOValue" />
+      <item index="10" class="java.lang.String" itemvalue="com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo" />
     </list>
     <writeAnnotations>
-      <writeAnnotation name="com.lapissea.cfs.io.struct.IOStruct.PointerValue" />
-      <writeAnnotation name="com.lapissea.cfs.type.field.annotations.IOValue" />
+      <writeAnnotation name="com.lapissea.dfs.io.struct.IOStruct.PointerValue" />
+      <writeAnnotation name="com.lapissea.dfs.type.field.annotations.IOValue" />
     </writeAnnotations>
   </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />
