@@ -25,7 +25,7 @@ public class UnpackedInstance implements IterablePP<Map.Entry<String, Object>>{
 	}
 	
 	public Object byName(String name){
-		return ((IOField)fields.byName(name).orElseThrow()).get(null, inst);
+		return ((IOField)fields.requireByName(name)).get(null, inst);
 	}
 	
 	@Override

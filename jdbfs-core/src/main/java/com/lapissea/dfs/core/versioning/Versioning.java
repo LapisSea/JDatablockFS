@@ -3,7 +3,6 @@ package com.lapissea.dfs.core.versioning;
 import com.lapissea.dfs.exceptions.IncompatibleVersionTransform;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.util.NotImplementedException;
 
@@ -39,15 +38,13 @@ public class Versioning{
 			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				//noinspection unchecked
-				FieldSet<T> ioFields = realT.getFields();
-				var         f        = (IOField<T, Object>)ioFields.byName(name).orElseThrow();
+				var f = (IOField<T, Object>)realT.getFields().requireByName(name);
 				f.set(null, realIns, oldIns.byName(name));
 			}
 		}, NEW_DEFAULT    = new FieldHandler(){
 			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
-				FieldSet<T> ioFields = realT.getFields();
-				var         f        = ioFields.byName(name).orElseThrow();
+				var f = realT.getFields().requireByName(name);
 				
 				if(!f.nullable() && f.isNull(null, realIns)){
 					throw new IncompatibleVersionTransform(
@@ -101,8 +98,7 @@ public class Versioning{
 		if(!diff.changedFields().isEmpty()){
 			if(options.contains(VersioningOptions.AUTO_COLLECTION_INTERPRET)){
 				for(var name : diff.changedFields()){
-					FieldSet<T> ioFields = struct.getFields();
-					var         field    = ioFields.byName(name).orElseThrow();
+					var field = struct.getFields().requireByName(name);
 					if(field.typeFlag(IOField.DYNAMIC_FLAG)){
 						return incompatibleTransform(diff, "Can not handle dynamic collection transform");
 					}
