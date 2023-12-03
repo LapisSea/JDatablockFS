@@ -346,8 +346,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			//noinspection unchecked
 			keyVar = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
 			               .getFields()
-			               .byName("key")
-			               .orElseThrow();
+			               .requireByName("key");
 		}
 		
 		var be = BucketEntry.<K, V>of();

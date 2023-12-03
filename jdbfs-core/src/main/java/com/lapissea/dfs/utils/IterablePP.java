@@ -3,9 +3,11 @@ package com.lapissea.dfs.utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -30,6 +32,14 @@ public interface IterablePP<T> extends Iterable<T>{
 	
 	default List<T> collectToList(){
 		var res = new ArrayList<T>();
+		for(T t : this){
+			res.add(t);
+		}
+		return res;
+	}
+	
+	default Set<T> collectToSet(){
+		var res = new HashSet<T>();
 		for(T t : this){
 			res.add(t);
 		}

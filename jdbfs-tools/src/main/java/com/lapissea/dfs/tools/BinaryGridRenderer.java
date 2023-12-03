@@ -1575,7 +1575,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									var bCol = ColorUtils.makeCol(rand, typeHash, bit);
 									var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 									
-									if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+									if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset%8, siz, reference, fieldOffset + bitOffset/8);
 									bitOffset += siz;
 								}
 							}
