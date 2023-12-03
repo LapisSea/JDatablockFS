@@ -7,10 +7,10 @@ import java.util.function.Function;
 
 public class VersionTransformer<To extends IOInstance<To>> implements Function<IOInstance<?>, To>{
 	
-	public final  String                            matchingClassName;
-	private final Function<UnpackedInstance<?>, To> fn;
+	public final  String                         matchingClassName;
+	private final Function<UnpackedInstance, To> fn;
 	
-	protected VersionTransformer(String matchingClassName, Function<UnpackedInstance<?>, To> transformer){
+	protected VersionTransformer(String matchingClassName, Function<UnpackedInstance, To> transformer){
 		this.matchingClassName = Objects.requireNonNull(matchingClassName);
 		this.fn = Objects.requireNonNull(transformer);
 	}
@@ -21,7 +21,7 @@ public class VersionTransformer<To extends IOInstance<To>> implements Function<I
 		return fn.apply(unpack(instance));
 	}
 	
-	private <T extends IOInstance<T>> UnpackedInstance<?> unpack(T instance){
-		return new UnpackedInstance<>(instance.getThisStruct(), instance);
+	private <T extends IOInstance<T>> UnpackedInstance unpack(T instance){
+		return new UnpackedInstance(instance.getThisStruct(), instance);
 	}
 }

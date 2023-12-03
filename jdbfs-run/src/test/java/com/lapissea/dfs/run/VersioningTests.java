@@ -28,24 +28,6 @@ import java.util.stream.Collectors;
 
 public class VersioningTests{
 	
-	@IOValue
-	public static class A extends IOInstance.Managed<A>{
-		int a = 69;
-		int b = 420;
-	}
-	
-	@IOValue
-	public static class ABC extends IOInstance.Managed<ABC>{
-		int a = 69;
-		int c = 420;
-	}
-	
-	
-	@IOValue
-	public static class IntVal extends IOInstance.Managed<IntVal>{
-		List<Integer> val = new ArrayList<>();
-	}
-	
 	public record Prop(String name, Class<?> type, Object val){ }
 	
 	private static void writeIOManagedClass(CodeStream code, String className, List<Prop> props) throws MalformedJorth{
@@ -104,10 +86,6 @@ public class VersioningTests{
 		return data.getSource().readAll();
 	}
 	
-	static byte[] makeAData() throws IOException     { return makeData(A.class); }
-	static byte[] makeABCData() throws IOException   { return makeData(ABC.class); }
-	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
-	
 	private static final LateInit<DataLogger, RuntimeException> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
 	
 	private static final Versioning VERSIONING =
@@ -138,6 +116,14 @@ public class VersioningTests{
 		Assert.assertEquals(names, Set.of("a"));
 	}
 	
+	
+	@IOValue
+	public static class A extends IOInstance.Managed<A>{
+		int a = 69;
+		int b = 420;
+	}
+	
+	static byte[] makeAData() throws IOException{ return makeData(A.class); }
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void newField() throws Exception{
 		var val = makeNGetRoot(A.class);
@@ -147,6 +133,13 @@ public class VersioningTests{
 		Assert.assertEquals(val, expected);
 	}
 	
+	
+	@IOValue
+	public static class ABC extends IOInstance.Managed<ABC>{
+		int a = 69;
+		int c = 420;
+	}
+	static byte[] makeABCData() throws IOException{ return makeData(ABC.class); }
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void removedField() throws Exception{
 		var val = makeNGetRoot(ABC.class);
@@ -157,6 +150,11 @@ public class VersioningTests{
 		Assert.assertEquals(val, expected);
 	}
 	
+	@IOValue
+	public static class IntVal extends IOInstance.Managed<IntVal>{
+		List<Integer> val = new ArrayList<>();
+	}
+	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
 	@Test(dependsOnMethods = "ensureClassShadowing")
 	void changedTypeField() throws Exception{
 		var val = makeNGetRoot(IntVal.class);
