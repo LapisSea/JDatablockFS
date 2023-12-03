@@ -197,7 +197,7 @@ public class GeneralTypeHandlingTests{
 		var r         = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
 		var container = (IOInstance<?>)r.request();
 		
-		IOField f = container.getThisStruct().getFields().byName("r").orElseThrow();
+		IOField f = container.getThisStruct().getFields().requireByName("r");
 		assertEquals(f.instanceToString(null, container, false).orElse(null), "A");
 	}
 	
@@ -712,7 +712,7 @@ public class GeneralTypeHandlingTests{
 		var pipe   = StandardStructPipe.of(struct);
 		
 		var instance = struct.make();
-		((IOField<T, Object>)struct.getFields().byName("val").orElseThrow()).set(null, instance, val);
+		((IOField<T, Object>)struct.getFields().requireByName("val")).set(null, instance, val);
 		
 		var prov  = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var chunk = AllocateTicket.bytes(64).submit(prov);

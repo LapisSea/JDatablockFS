@@ -145,7 +145,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	protected void deltaSize(long delta) throws IOException{
 		if(sizeField == null){
 			var pipe = newPipe();
-			sizeField = pipe.getSpecificFields().byName("size").orElseThrow();
+			sizeField = pipe.getSpecificFields().requireByName("size");
 		}
 		setSize(size() + delta);
 		writeManagedField(sizeField);

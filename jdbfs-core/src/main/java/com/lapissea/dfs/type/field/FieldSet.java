@@ -457,6 +457,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return OptionalPP.ofNullable(getNameLookup().get(name)).map(this::get);
 	}
 	
+	public IOField<T, ?> requireByName(String name){
+		return byName(name).orElseThrow();
+	}
+	
 	private Map<String, Integer> getNameLookup(){
 		var nl = nameLookup;
 		if(nl == null) nameLookup = nl = buildNameLookup();

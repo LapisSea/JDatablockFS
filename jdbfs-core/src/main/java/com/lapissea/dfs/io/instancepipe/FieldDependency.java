@@ -40,7 +40,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
-		return getDeps(FieldSet.of(names.stream().map(n -> allFields.byName(n).orElseThrow())));
+		return getDeps(FieldSet.of(names.stream().map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()) return emptyTicket();
