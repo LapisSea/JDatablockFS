@@ -949,6 +949,11 @@ public sealed interface IOTypeDB{
 		}
 		
 		public void rename(Set<String> nameSet, Function<String, String> transformName) throws IOException{
+			try(var transaction = sealedMultiverse.getDataProvider().getSource().openIOTransaction()){
+				rename0(nameSet, transformName);
+			}
+		}
+		private void rename0(Set<String> nameSet, Function<String, String> transformName) throws IOException{
 			for(var e : defs.stream().filter(e -> nameSet.contains(e.getKey().typeName)).toList()){
 				var def   = e.getValue();
 				var clone = def.clone();
@@ -958,8 +963,6 @@ public sealed interface IOTypeDB{
 				if(!newName.equals(e.getKey()) || !clone.equals(def)){
 					defs.remove(e.getKey());
 					defs.put(newName, def);
-					LogUtil.println(e.getKey(), clone);
-					LogUtil.println(newName, def);
 				}
 			}
 			
@@ -988,8 +991,6 @@ public sealed interface IOTypeDB{
 			templateLoader = new WeakReference<>(null);
 			reverseDataCache = null;
 			dataCache.clear();
-			
-			LogUtil.println(getThisStruct().instanceToString(self(), false));
 		}
 		
 		private void rename(Set<String> nameSet, Function<String, String> transformName, TypeDef def){

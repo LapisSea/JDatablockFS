@@ -30,8 +30,7 @@ public record ClassVersionDiff(Class<?> real, TypeDef stored, List<String> newFi
 		}
 		
 		var storedF = stored.getFields();
-		var realF   = struct.getFields();
-		
+		var realF   = struct.getRealFields();
 		
 		
 		var newF = realF.stream().map(IOField::getName)

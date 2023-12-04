@@ -156,7 +156,7 @@ public class VersioningTests{
 	}
 	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
 	@Test(dependsOnMethods = "ensureClassShadowing")
-	void changedTypeField() throws Exception{
+	void changedTypeFieldIntToList() throws Exception{
 		var val = makeNGetRoot(IntVal.class);
 		
 		var expected = new IntVal();

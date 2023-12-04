@@ -300,7 +300,6 @@ public final class Cluster implements DataProvider{
 		
 		LogUtil.println("Replacing:\n" + oldSet.keySet() + " with:\n" + nameSet);
 		
-		LogUtil.println("================ WALKING ================");
 		FieldWalker.walk(this, root, new FieldWalker.FieldRecord(){
 			@Override
 			public <I extends IOInstance<I>> int log(I instance, IOField<I, ?> field){

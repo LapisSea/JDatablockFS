@@ -1,11 +1,15 @@
 package com.lapissea.dfs.core.versioning;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.IncompatibleVersionTransform;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -58,6 +62,26 @@ public class Versioning{
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				//Nothing to do, just lose the data
 			}
+		}, VAL_TO_LIST    = new FieldHandler(){
+			@Override
+			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
+				var val = oldIns.byName(name);
+				//noinspection unchecked
+				var field = (IOField<T, Object>)realT.getFields().requireByName(name);
+				if(val != null){
+					var arg = ((ParameterizedType)field.getGenericType(null)).getActualTypeArguments()[0];
+					Utils.typeToRaw(arg).cast(val);
+				}
+				var l = new ArrayList<>();
+				l.add(val);
+				field.set(null, realIns, l);
+			}
+		}, VAL_TO_ARRAY   = new FieldHandler(){
+			@Override
+			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
+				
+				throw new NotImplementedException();
+			}
 		};
 	}
 	
@@ -104,7 +128,19 @@ public class Versioning{
 					}
 					var type = field.getGenericType(null);
 					
-					return incompatibleTransform(diff, "not implemented");
+					if(type instanceof ParameterizedType parm &&
+					   parm.getActualTypeArguments().length == 1 &&
+					   UtilL.instanceOf((Class<?>)parm.getRawType(), List.class)
+					){
+						autoOps.add(new FieldOp(name, FieldHandler.VAL_TO_LIST));
+						continue;
+					}
+					if(Utils.typeToRaw(type).isArray()){
+						autoOps.add(new FieldOp(name, FieldHandler.VAL_TO_ARRAY));
+						continue;
+					}
+					
+					return incompatibleTransform(diff, "Could not handle changed fields");
 				}
 			}else{
 				return incompatibleTransform(diff, "Could not handle changed fields");
