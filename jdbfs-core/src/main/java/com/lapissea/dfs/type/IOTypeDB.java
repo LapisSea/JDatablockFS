@@ -20,7 +20,6 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
@@ -968,9 +967,9 @@ public sealed interface IOTypeDB{
 			
 			for(var e : data.stream().filter(e -> !rename(nameSet, transformName, e.getValue()).equals(e.getValue())).toList()){
 				var typ = rename(nameSet, transformName, e.getValue());
-				LogUtil.println(e, typ);
 				data.put(e.getKey(), typ);
 			}
+			
 			for(var e : sealedMultiverse){
 				var name = rename(nameSet, transformName, e.getKey());
 				if(!name.equals(e.getKey())){

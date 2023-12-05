@@ -8,10 +8,12 @@ import java.util.function.Function;
 public class VersionTransformer<To extends IOInstance<To>> implements Function<IOInstance<?>, To>{
 	
 	public final  String                         matchingClassName;
+	public final  String                         transformReport;
 	private final Function<UnpackedInstance, To> fn;
 	
-	protected VersionTransformer(String matchingClassName, Function<UnpackedInstance, To> transformer){
+	protected VersionTransformer(String matchingClassName, String transformReport, Function<UnpackedInstance, To> transformer){
 		this.matchingClassName = Objects.requireNonNull(matchingClassName);
+		this.transformReport = transformReport == null? "Transformation of: " + matchingClassName : transformReport;
 		this.fn = Objects.requireNonNull(transformer);
 	}
 	

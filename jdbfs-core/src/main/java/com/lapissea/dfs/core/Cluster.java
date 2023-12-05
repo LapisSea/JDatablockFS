@@ -16,6 +16,7 @@ import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
@@ -35,7 +36,6 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -51,6 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -298,7 +299,13 @@ public final class Cluster implements DataProvider{
 		
 		var oldSet = transformers.stream().collect(Collectors.toMap(e -> e.matchingClassName + mod, Function.identity()));
 		
-		LogUtil.println("Replacing:\n" + oldSet.keySet() + " with:\n" + nameSet);
+		Log.debug("Replacing:\n{}", (Supplier<?>)() -> {
+			StringJoiner sj = new StringJoiner("\n");
+			for(var transformer : transformers){
+				sj.add(transformer.transformReport);
+			}
+			return sj;
+		});
 		
 		FieldWalker.walk(this, root, new FieldWalker.FieldRecord(){
 			@Override
@@ -318,7 +325,7 @@ public final class Cluster implements DataProvider{
 					
 					var transformed = transformer.apply((IOInstance<?>)val);
 					
-					LogUtil.println(val, "to", transformed);
+					Log.debug("Versioned {} to {}", val, transformed);
 					((IOField<I, Object>)field).set(null, instance, transformed);
 					return FieldWalker.SAVE|FieldWalker.CONTINUE;
 				}

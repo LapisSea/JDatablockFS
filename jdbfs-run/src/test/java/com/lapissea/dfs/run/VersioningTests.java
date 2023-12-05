@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.versioning.Versioning;
 import com.lapissea.dfs.core.versioning.VersioningOptions;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
@@ -15,6 +16,7 @@ import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
 import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -103,6 +105,11 @@ public class VersioningTests{
 		
 		return data.roots()
 		           .require("obj", type);
+	}
+	
+	@BeforeTest
+	void before(){
+		Log.info("Started VersioningTests");
 	}
 	
 	@Test

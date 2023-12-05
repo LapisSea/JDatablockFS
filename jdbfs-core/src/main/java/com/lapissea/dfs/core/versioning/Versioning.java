@@ -6,6 +6,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.ParameterizedType;
@@ -40,12 +41,16 @@ public class Versioning{
 		
 		FieldHandler COPY = new FieldHandler(){
 			@Override
+			public String reportName(){ return "COPY"; }
+			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				//noinspection unchecked
 				var f = (IOField<T, Object>)realT.getFields().requireByName(name);
 				f.set(null, realIns, oldIns.byName(name));
 			}
 		}, NEW_DEFAULT    = new FieldHandler(){
+			@Override
+			public String reportName(){ return "NEW_DEFAULT"; }
 			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				var f = realT.getFields().requireByName(name);
@@ -59,10 +64,14 @@ public class Versioning{
 			}
 		}, REMOVE         = new FieldHandler(){
 			@Override
+			public String reportName(){ return "REMOVE"; }
+			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				//Nothing to do, just lose the data
 			}
 		}, VAL_TO_LIST    = new FieldHandler(){
+			@Override
+			public String reportName(){ return "VAL_TO_LIST"; }
 			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				var val = oldIns.byName(name);
@@ -78,15 +87,20 @@ public class Versioning{
 			}
 		}, VAL_TO_ARRAY   = new FieldHandler(){
 			@Override
+			public String reportName(){ return "VAL_TO_ARRAY"; }
+			@Override
 			public <T extends IOInstance<T>> void apply(String name, Struct<T> realT, T realIns, UnpackedInstance oldIns){
 				
 				throw new NotImplementedException();
 			}
 		};
+		String reportName();
 	}
 	
 	private <T extends IOInstance<T>> VersionTransformer<T> incompatibleTransform(ClassVersionDiff diff, String reason){
-		return new VersionTransformer<>(diff.real().getName(), unpacked -> {
+		var name   = diff.real().getName();
+		var report = "Incompatible transform of " + name + " because: " + reason;
+		return new VersionTransformer<>(name, report, unpacked -> {
 			var sj = new StringJoiner("\n");
 			sj.add("Could not transform: " + diff.real().getName());
 			sj.add("Reason: " + reason);
@@ -159,7 +173,13 @@ public class Versioning{
 		
 		var finalOps = List.copyOf(autoOps);
 		
-		return new VersionTransformer<>(diff.real().getName(), unpacked -> {
+		var name = diff.real().getName();
+		var report = TextUtil.toTable(
+			name,
+			List.of(finalOps.stream().collect(Collectors.toMap(op -> op.name, op -> op.op.reportName())))
+		).replaceAll("\n=+", "");
+		
+		return new VersionTransformer<>(name, report, unpacked -> {
 			var inst = struct.make();
 			for(var fieldOp : finalOps){
 				fieldOp.op.apply(fieldOp.name, struct, inst, unpacked);
