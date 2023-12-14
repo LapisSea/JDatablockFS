@@ -22,8 +22,6 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.OptionalLong;
 
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE_MANAGED;
@@ -118,15 +116,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private final ValueStorage<T> valueStorage;
 	private final IOType          nodeType;
 	
-	private final boolean      readOnly;
-	private final Map<Long, T> cache;
-	
-	
 	@SuppressWarnings("unchecked")
 	public LinkedIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
-		readOnly = getDataProvider().isReadOnly();
-		cache = readOnly? new HashMap<>() : null;
 		
 		nodeType = ((IOType.RawAndArg)typeDef).withRaw(IONode.class);
 		
@@ -176,19 +168,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	@Override
 	public T get(long index) throws IOException{
 		checkSize(index);
-		if(readOnly){
-			return getCached(index);
-		}
 		return getNode(index).getValue();
-	}
-	
-	private T getCached(long index) throws IOException{
-		if(cache.containsKey(index)){
-			return cache.get(index);
-		}
-		var val = getNode(index).getValue();
-		cache.put(index, val);
-		return val;
 	}
 	
 	@Override
@@ -298,31 +278,6 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	@Override
 	public IOIterator.Iter<T> iterator(){
-		if(readOnly){
-			return new IOIterator.Iter<>(){
-				LinkedListIterator src;
-				long index;
-				@Override
-				public boolean hasNext(){
-					return index<size();
-				}
-				@Override
-				public T ioNext() throws IOException{
-					try{
-						if(cache.containsKey(index)){
-							return cache.get(index);
-						}
-						if(src == null) src = new LinkedListIterator(index);
-						var e = src.getElement(index);
-						cache.put(index, e);
-						return e;
-					}finally{
-						index++;
-					}
-				}
-			};
-		}
-		
 		try{
 			var head = getHead();
 			if(head == null) return IOIterator.Iter.emptyIter();

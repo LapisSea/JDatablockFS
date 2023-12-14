@@ -198,12 +198,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private int datasetID;
 	
-	private final Map<K, IOEntry.Modifiable<K, V>>    readOnlyCache;
 	private final Map<Integer, BucketContainer<K, V>> hotBuckets = new ConcurrentHashMap<>();
 	
 	public HashIOMap(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef);
-		readOnlyCache = readOnly? new HashMap<>() : null;
 		
 		if(!readOnly && isSelfDataEmpty()){
 			newBuckets();
@@ -435,12 +433,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
-		if(readOnly){
-			if(readOnlyCache.containsKey(key)){
-				return readOnlyCache.get(key);
-			}
-		}
-		
 		for(int smallHash : new SmallHashes(bucketPO2, key)){
 			var bucket = getBucket(hotBuckets, buckets, smallHash);
 			
@@ -449,15 +441,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			var entry = bucket.entry(key);
 			if(entry == null) continue;
 			
-			if(readOnly){
-				var e = entry.unsupported();
-				readOnlyCache.put(key, e);
-				return e;
-			}
 			return new ModifiableIOEntry(bucket, entry);
 		}
-		
-		if(readOnly) readOnlyCache.put(key, null);
 		return null;
 	}
 	

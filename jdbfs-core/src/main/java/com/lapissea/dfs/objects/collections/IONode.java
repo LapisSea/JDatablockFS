@@ -2,9 +2,9 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
-import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
@@ -299,11 +299,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		try{
 			readManagedFields();
 		}catch(EOFException eof){
-			if(isSelfDataEmpty()){
+			if(isSelfDataEmpty() && !readOnly){
 				nextSize = calcOptimalNextSize(provider);
-				if(!readOnly){
-					writeManagedFields();
-				}
+				writeManagedFields();
 			}else{
 				throw eof;
 			}
@@ -355,17 +353,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		io.setPos(0);
 	}
 	
-	private T       valueCache;
-	private boolean valueRead;
-	
 	T getValue() throws IOException{
-		if(readOnly){
-			if(!valueRead){
-				valueCache = readValue();
-				valueRead = true;
-			}
-			return valueCache;
-		}
 		return readValue();
 	}
 	
@@ -477,16 +465,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
-	private ChunkPointer nextPtrCache;
-	private boolean      nextPtrRead;
 	private ChunkPointer getNextPtr() throws IOException{
-		if(readOnly){
-			if(!nextPtrRead){
-				nextPtrCache = readNextPtr();
-				nextPtrRead = true;
-			}
-			return nextPtrCache;
-		}
 		return readNextPtr();
 	}
 	private ChunkPointer readNextPtr() throws IOException{
@@ -510,17 +489,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
-	private IONode<T> nextCache;
-	private boolean   nextRead;
-	
 	IONode<T> getNext() throws IOException{
-		if(readOnly){
-			if(!nextRead){
-				nextCache = readNext();
-				nextRead = true;
-			}
-			return nextCache;
-		}
 		return readNext();
 	}
 	

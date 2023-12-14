@@ -2,11 +2,11 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.ChainWalker;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
-import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
@@ -56,7 +56,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
@@ -86,14 +85,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private ValueStorage<T> storage;
 	private int             headSize;
 	
-	private final        Map<Long, T> cache;
-	private static final Object       NULL_VAL = new Object();
-	
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
 		super(provider, reference, typeDef, TYPE_CHECK);
-		cache = readOnly? new ConcurrentHashMap<>() : null;
-		
 		//read data needed for proper function such as number of elements and varying sizes
 		if(!isSelfDataEmpty()){
 			readManagedFields();
@@ -476,29 +470,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@Override
 	public T get(long index) throws IOException{
 		checkSize(index);
-		if(readOnly){
-			return getCached(index);
-		}
 		return readAt(index);
-	}
-	
-	private T getCached(long index) throws IOException{
-		if(cache.containsKey(index)){
-			return cacheGet(index);
-		}
-		var val = readAt(index);
-		cachePut(index, val);
-		return val;
-	}
-	
-	private void cachePut(long index, T val){
-		cache.put(index, val == null? (T)NULL_VAL : val);
-	}
-	
-	private T cacheGet(long index){
-		var val = cache.get(index);
-		if(val == NULL_VAL) return null;
-		return val;
 	}
 	
 	@Override
@@ -884,9 +856,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					var index = cursor++;
 					return full -> {
 						checkSize(index);
-						if(readOnly){
-							return getCached(index);
-						}
 						try(var io = ioAtElement(index)){
 							if(!full && depTicket != null && storage instanceof ValueStorage.InstanceBased i){
 								return (T)i.readNewSelective(io, depTicket, true);
