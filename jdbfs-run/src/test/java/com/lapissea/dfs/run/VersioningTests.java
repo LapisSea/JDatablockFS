@@ -6,6 +6,9 @@ import com.lapissea.dfs.core.versioning.VersioningOptions;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.objects.collections.ContiguousIOList;
+import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
@@ -96,20 +99,24 @@ public class VersioningTests{
 			List.of()
 		);
 	
+	private static <T> Cluster versionedCl(Class<T> type, byte[] bb) throws IOException{
+		IOInterface mem = LoggedMemoryUtils.newLoggedMemory(type.getName(), LOGGER);
+		mem.write(0, true, bb);
+		return new Cluster(mem, VERSIONING);
+	}
+	
 	static <T> T makeNGetRoot(Class<T> type) throws Exception{
 		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
 		
-		IOInterface mem = LoggedMemoryUtils.newLoggedMemory(type.getName(), LOGGER);
-		mem.write(0, true, bb);
-		var data = new Cluster(mem, VERSIONING);
-		
+		var data = versionedCl(type, bb);
 		return data.roots()
 		           .require("obj", type);
 	}
 	
 	@BeforeTest
-	void before(){
+	void before() throws IOException{
 		Log.info("Started VersioningTests");
+		makeData(Reference.class);
 	}
 	
 	@Test
@@ -131,7 +138,7 @@ public class VersioningTests{
 	}
 	
 	static byte[] makeAData() throws IOException{ return makeData(A.class); }
-	@Test(dependsOnMethods = "ensureClassShadowing")
+	@Test
 	void newField() throws Exception{
 		var val = makeNGetRoot(A.class);
 		
@@ -147,7 +154,7 @@ public class VersioningTests{
 		int c = 420;
 	}
 	static byte[] makeABCData() throws IOException{ return makeData(ABC.class); }
-	@Test(dependsOnMethods = "ensureClassShadowing")
+	@Test
 	void removedField() throws Exception{
 		var val = makeNGetRoot(ABC.class);
 		
@@ -162,12 +169,35 @@ public class VersioningTests{
 		List<Integer> val = new ArrayList<>();
 	}
 	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
-	@Test(dependsOnMethods = "ensureClassShadowing")
+	@Test
 	void changedTypeFieldIntToList() throws Exception{
 		var val = makeNGetRoot(IntVal.class);
 		
 		var expected = new IntVal();
 		expected.val.add(1);
+		Assert.assertEquals(val, expected);
+	}
+	
+	static byte[] makeListOfIntVal() throws IOException{
+		var            data = Cluster.emptyMem();
+		IOList<IntVal> list = data.roots().request("obj", ContiguousIOList.class, IntVal.class);
+		list.addMultipleNew(4);
+		return data.getSource().readAll();
+	}
+	
+	@Test
+	void changedTypeInList() throws Exception{
+		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, "makeListOfIntVal");
+		
+		var data = versionedCl(IntVal.class, bb);
+		//noinspection unchecked
+		List<IntVal> val = data.roots()
+		                       .require("obj", IOList.class)
+		                       .collectToList();
+		
+		var iv = new IntVal();
+		iv.val.add(1);
+		var expected = List.of(iv, iv, iv, iv);
 		Assert.assertEquals(val, expected);
 	}
 	
