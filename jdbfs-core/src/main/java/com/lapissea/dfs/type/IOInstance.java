@@ -499,7 +499,23 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final boolean isSelfDataEmpty(){
-			return getIdentity().getSize() == 0;
+			var id = getIdentity();
+			if(id.getSize()>0){
+				return false;
+			}
+			try{
+				var next = id.next();
+				if(next != null){
+					for(Chunk chunk : next.walkNext()){
+						if(chunk.getSize()>0){
+							return false;
+						}
+					}
+				}
+			}catch(IOException e){
+				throw new UncheckedIOException(e);
+			}
+			return true;
 		}
 		
 		public final void notifyReferenceMovement(Reference newRef){
