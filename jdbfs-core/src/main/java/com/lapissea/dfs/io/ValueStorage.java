@@ -6,9 +6,6 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.UnsupportedStructLayout;
-import com.lapissea.dfs.io.bit.EnumUniverse;
-import com.lapissea.dfs.io.bit.FlagReader;
-import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
@@ -713,8 +710,6 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnknownIDObject implements ValueStorage<Object>{
 		
-		private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
-		
 		private final DataProvider   provider;
 		private final GenericContext generics;
 		
@@ -733,44 +728,7 @@ public sealed interface ValueStorage<T>{
 					throw UtilL.uncheckedThrow(e);
 				}
 				
-				long size = 1;
-				
-				size += NumberSize.bySize(id).bytes;
-				if(src == null) return size;
-				
-				if(src instanceof String str){
-					size += AutoText.PIPE.getSizeDescriptor().calcUnknown(null, provider, new AutoText(str), WordSpace.BYTE);
-					return size;
-				}
-				
-				var type = src.getClass();
-				
-				var p = SupportedPrimitive.get(type);
-				if(p.isPresent()){
-					return size + switch(p.get()){
-						case DOUBLE -> 8;
-						case FLOAT -> 4;
-						case CHAR, SHORT -> 2;
-						case LONG -> 1 + NumberSize.bySizeSigned((long)src).bytes;
-						case INT -> 1 + NumberSize.bySizeSigned((int)src).bytes;
-						case BYTE, BOOLEAN -> 1;
-					};
-				}
-				
-				if(type.isEnum()){
-					return size + EnumUniverse.ofUnknown(type).numSize(false).bytes;
-				}
-				
-				if(src instanceof IOInstance<?> inst){
-					if(inst instanceof IOInstance.Unmanaged<?> unm){
-						return size + ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, provider, unm.getPointer(), WordSpace.BYTE);
-					}
-					
-					//noinspection unchecked
-					return size + StandardStructPipe.of(inst.getClass()).calcUnknownSize(provider, inst, WordSpace.BYTE);
-				}
-				
-				throw new NotImplementedException("Unknown type: " + type);
+				return 1 + NumberSize.bySize(id).bytes + DynamicSupport.calcSize(provider, src);
 			});
 		}
 		
@@ -778,44 +736,8 @@ public sealed interface ValueStorage<T>{
 		public Object readNew(ContentReader src) throws IOException{
 			var id = src.readUnsignedInt4Dynamic();
 			if(id == 0) return null;
-			
 			var link = provider.getTypeDb().fromID(id);
-			var type = link.getTypeClass(provider.getTypeDb());
-			
-			var p = SupportedPrimitive.get(type).map(pr -> switch(pr){
-				case DOUBLE -> src.readFloat8();
-				case FLOAT -> src.readFloat4();
-				case CHAR -> src.readChar2();
-				case LONG -> src.readInt8Dynamic();
-				case INT -> src.readInt4Dynamic();
-				case SHORT -> src.readInt2();
-				case BYTE -> src.readInt1();
-				case BOOLEAN -> src.readBoolean();
-			});
-			if(p.isPresent()) return p.get();
-			
-			if(type == String.class){
-				return AutoText.PIPE.readNew(provider, src, null).getData();
-			}
-			
-			if(type.isEnum()){
-				var u = EnumUniverse.ofUnknown(type);
-				return FlagReader.readSingle(src, u);
-			}
-			
-			if(IOInstance.isInstance(type)){
-				if(IOInstance.isUnmanaged(type)){
-					var s   = Struct.Unmanaged.ofUnknown(type);
-					var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
-					return s.make(provider, ptr.dereference(provider), link);
-				}
-				
-				var s    = Struct.ofUnknown(type);
-				var pipe = StandardStructPipe.of(s);
-				return pipe.readNew(provider, src, generics);
-			}
-			
-			throw new NotImplementedException("Unknown type: " + type);
+			return DynamicSupport.readTyp(link, provider, src, generics);
 		}
 		@Override
 		public void write(RandomIO dest, Object src) throws IOException{
@@ -823,46 +745,7 @@ public sealed interface ValueStorage<T>{
 			dest.writeUnsignedInt4Dynamic(id);
 			if(src == null) return;
 			
-			if(src instanceof String str){
-				AutoText.PIPE.write(provider, dest, new AutoText(str));
-				return;
-			}
-			
-			var type = src.getClass();
-			
-			var p = SupportedPrimitive.get(type);
-			if(p.isPresent()){
-				switch(p.get()){
-					case DOUBLE -> dest.writeFloat8((double)src);
-					case FLOAT -> dest.writeFloat4((float)src);
-					case CHAR -> dest.writeChar2((char)src);
-					case LONG -> dest.writeInt8Dynamic((long)src);
-					case INT -> dest.writeInt4Dynamic((int)src);
-					case SHORT -> dest.writeInt2((short)src);
-					case BYTE -> dest.writeInt1((byte)src);
-					case BOOLEAN -> dest.writeBoolean((boolean)src);
-				}
-				return;
-			}
-			
-			if(type.isEnum()){
-				EnumUniverse uni = EnumUniverse.ofUnknown(type);
-				FlagWriter.writeSingle(dest, uni, (Enum)src);
-				return;
-			}
-			
-			if(src instanceof IOInstance<?> inst){
-				if(inst instanceof IOInstance.Unmanaged<?> unm){
-					ChunkPointer.DYN_PIPE.write(provider, dest, unm.getPointer());
-					return;
-				}
-				
-				//noinspection unchecked
-				StandardStructPipe.of(inst.getClass()).write(provider, dest, inst);
-				return;
-			}
-			
-			throw new NotImplementedException("Unknown type: " + type);
+			DynamicSupport.writeValue(provider, dest, src);
 		}
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
