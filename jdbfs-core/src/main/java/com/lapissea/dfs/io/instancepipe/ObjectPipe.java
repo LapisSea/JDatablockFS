@@ -13,9 +13,9 @@ import java.io.IOException;
 
 public interface ObjectPipe<T, PoolType>{
 	
-	interface NoPool<T> extends ObjectPipe<T, Void>{
+	abstract class NoPool<T> implements ObjectPipe<T, Void>{
 		@Override
-		default Void makeIOPool(){
+		public final Void makeIOPool(){
 			return null;
 		}
 	}
