@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.AllocateTicket;
-import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentReader;

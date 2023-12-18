@@ -1,6 +1,5 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -361,10 +360,6 @@ public class SlowTests{
 		var set = provider.roots().<IOSet<Integer>>request("hi", type, Integer.class);
 		session.accept(provider, new CheckSet<>(set));
 		provider.scanGarbage(ERROR);
-	}
-	
-	static{
-		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
 	}
 	
 	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
