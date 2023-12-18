@@ -86,7 +86,7 @@ public interface RootProvider extends DataProvider.Holder{
 						
 						var mem = AllocateTicket.bytes(siz).submit(provider);
 						
-						var inst = uStruct.make(provider, mem.getPtr().makeReference(), genericType);
+						var inst = uStruct.make(provider, mem, genericType);
 						return (T)inst;
 					});
 				}else{

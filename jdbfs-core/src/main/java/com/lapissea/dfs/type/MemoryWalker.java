@@ -128,7 +128,7 @@ public class MemoryWalker{
 	private final boolean             recordPerformance;
 	
 	public <T extends IOInstance.Unmanaged<T>> MemoryWalker(T root, boolean recordPerformance, PointerRecord pointerRecord){
-		this(root.getDataProvider(), root, root.getReference(), root.getPipe(), recordPerformance, pointerRecord);
+		this(root.getDataProvider(), root, root.getPointer().makeReference(), root.getPipe(), recordPerformance, pointerRecord);
 	}
 	public <T extends IOInstance<T>> MemoryWalker(DataProvider provider, T root, Reference rootReference, StructPipe<T> pipe, boolean recordPerformance, PointerRecord pointerRecord){
 		this.provider = provider;
@@ -335,17 +335,17 @@ public class MemoryWalker{
 								
 								if(inst instanceof IOInstance.Unmanaged valueInstance){
 									{
-										var ref = valueInstance.getReference();
+										var ptr = valueInstance.getPointer();
 										var uRefField = new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
 											@Override
-											public void setReference(T inst, Reference newRef){
+											public void setReference(T inst, Reference newRef) throws IOException{
 												if(inst != instance) throw new IllegalStateException();
-												valueInstance.notifyReferenceMovement(newRef);
+												valueInstance.notifyReferenceMovement(newRef.asJustChunk(provider));
 											}
 											@Override
 											public Reference getReference(T inst){
 												if(inst != instance) throw new IllegalStateException();
-												return valueInstance.getReference();
+												return valueInstance.getPointer().makeReference();
 											}
 											@Override
 											public StructPipe<T> getReferencedPipe(T inst){
@@ -354,7 +354,7 @@ public class MemoryWalker{
 											}
 										};
 										if(timer != null) timer.ignoreStart();
-										var res = pointerRecord.log(reference, instance, uRefField, ref);
+										var res = pointerRecord.log(reference, instance, uRefField, ptr.makeReference());
 										if(timer != null) timer.ignoreEnd();
 										
 										checkResult(res);
@@ -373,19 +373,17 @@ public class MemoryWalker{
 											}
 										}
 										
-										if(ref.getOffset() == 0){
-											var ch   = ref.getPtr().dereference(provider);
-											var flow = walkChunk(ch);
-											switch(flow){
-												case CONTINUE -> { }
-												case END -> { return END; }
-												default -> throw failFlow(flow);
-											}
+										var ch   = ptr.dereference(provider);
+										var flow = walkChunk(ch);
+										switch(flow){
+											case CONTINUE -> { }
+											case END -> { return END; }
+											default -> throw failFlow(flow);
 										}
 									}
 									
 									if(timer != null) timer.ignoreStart();
-									var res = walkStructFull(valueInstance, valueInstance.getReference(), valueInstance.getPipe(), false);
+									var res = walkStructFull(valueInstance, valueInstance.getPointer().makeReference(), valueInstance.getPipe(), false);
 									if(timer != null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){

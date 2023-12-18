@@ -1459,7 +1459,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								continue;
 							}
 							if(inst instanceof IOInstance.Unmanaged<?> unmanaged){
-								var        ref = unmanaged.getReference();
+								var        ref = unmanaged.getPointer().makeReference();
 								StructPipe pip = unmanaged.getPipe();
 								annotateStruct(ctx, (T)unmanaged, ref, pip, generics(instance, parentGenerics), annotate, noPtr);
 								if(annotate){

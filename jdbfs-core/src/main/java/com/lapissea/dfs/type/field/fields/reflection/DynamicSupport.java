@@ -13,6 +13,7 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.text.AutoText;
@@ -56,7 +57,7 @@ public abstract class DynamicSupport{
 			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
-					yield REF_PIPE.calcUnknownSize(prov, u.getReference(), WordSpace.BYTE);
+					yield ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, u.getPointer(), WordSpace.BYTE);
 				}else{
 					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
@@ -83,7 +84,7 @@ public abstract class DynamicSupport{
 					if(IOInstance.isInstance(e)){
 						var struct = Struct.ofUnknown(e);
 						if(struct instanceof Struct.Unmanaged){
-							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> REF_PIPE.calcUnknownSize(prov, i.getReference(), WordSpace.BYTE)).sum();
+							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, i.getPointer(), WordSpace.BYTE)).sum();
 						}
 						
 						StructPipe pip = StandardStructPipe.of(struct);
@@ -131,7 +132,7 @@ public abstract class DynamicSupport{
 				num.write(dest, array.length);
 				dest.writeInts1(array);
 			}
-			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
+			case IOInstance.Unmanaged inst -> ChunkPointer.DYN_PIPE.write(provider, dest, inst.getPointer());
 			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
 			
@@ -159,7 +160,7 @@ public abstract class DynamicSupport{
 						if(struct instanceof Struct.Unmanaged){
 							var b = new ContentOutputBuilder();
 							for(var i : (IOInstance.Unmanaged<?>[])val){
-								REF_PIPE.write(provider, b, i.getReference());
+								ChunkPointer.DYN_PIPE.write(provider, b, i.getPointer());
 							}
 							b.writeTo(dest);
 							break;
@@ -304,8 +305,9 @@ public abstract class DynamicSupport{
 		
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
-			var ref     = REF_PIPE.readNew(provider, src, genericContext);
-			return uStruct.make(provider, ref, typDef);
+			var ptr     = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
+			var ch      = ptr.dereference(provider);
+			return uStruct.make(provider, ch, typDef);
 		}
 		if(IOInstance.isInstance(typ)){
 			var struct = Struct.ofUnknown(typ);
@@ -333,8 +335,9 @@ public abstract class DynamicSupport{
 				if(struct instanceof Struct.Unmanaged<?> u){
 					var arr = (IOInstance.Unmanaged<?>[])Array.newInstance(e, len);
 					for(int i = 0; i<arr.length; i++){
-						var ref = REF_PIPE.readNew(provider, src, null);
-						arr[i] = u.make(provider, ref, typDef);
+						var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, genericContext);
+						var ch  = ptr.dereference(provider);
+						arr[i] = u.make(provider, ch, typDef);
 					}
 					return arr;
 				}

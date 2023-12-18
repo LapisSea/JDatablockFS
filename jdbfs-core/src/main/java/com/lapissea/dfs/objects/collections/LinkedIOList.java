@@ -1,10 +1,10 @@
 package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.IOType;
@@ -117,8 +117,8 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private final IOType          nodeType;
 	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, typeDef, LIST_TYPE_CHECK);
+	public LinkedIOList(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, typeDef, LIST_TYPE_CHECK);
 		
 		nodeType = ((IOType.RawAndArg)typeDef).withRaw(IONode.class);
 		
@@ -178,7 +178,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	private IONode<T> allocNode(T value, IONode<T> next) throws IOException{
-		var mag = OptionalLong.of((next == null? this : next).getReference().getPtr().getValue());
+		var mag = OptionalLong.of((next == null? this : next).getPointer().getValue());
 		return IONode.allocValNode(value, next, valueStorage.getSizeDescriptor(), nodeType, getDataProvider(), mag);
 	}
 	

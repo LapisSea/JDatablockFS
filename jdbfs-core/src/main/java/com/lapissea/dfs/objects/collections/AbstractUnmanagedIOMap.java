@@ -1,7 +1,7 @@
 package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
@@ -20,8 +20,8 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	
 	private IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField;
 	
-	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){ super(provider, reference, typeDef, check); }
-	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, IOType typeDef)                    { super(provider, reference, typeDef); }
+	protected AbstractUnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
+	public AbstractUnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef)                    { super(provider, identity, typeDef); }
 	
 	@Override
 	public long size(){ return size; }

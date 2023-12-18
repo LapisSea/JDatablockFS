@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -231,7 +230,7 @@ public class GraphRenderer implements DataRenderer{
 			pos(pos);
 			try{
 				if(val instanceof IOInstance.Unmanaged u){
-					size = u.getReference().ioMap(provider, RandomIO::remaining);
+					size = u.getPointer().dereference(provider).chainSize();
 				}else if(val == null) size = 0;
 				else{
 					size = StandardStructPipe.sizeOfUnknown(provider, (IOInstance)val, WordSpace.BYTE);
@@ -801,7 +800,7 @@ public class GraphRenderer implements DataRenderer{
 				}
 				var val = field.get(pool, inst);
 				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
-					var    ref   = unmanaged.getReference().getPtr().getValue();
+					var    ref   = unmanaged.getPointer().getValue();
 					Bubble child = parent.child(undead, path + "." + field.getName());
 					scan(child, provider, ref, unmanaged);
 					continue;
@@ -855,7 +854,7 @@ public class GraphRenderer implements DataRenderer{
 				}
 				var val = field.get(pool, inst);
 				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
-					var    ref   = unmanaged.getReference().getPtr().getValue();
+					var    ref   = unmanaged.getPointer().getValue();
 					Bubble child = bubble.child(undead, field.getName());
 					scan(child, provider, ref, unmanaged);
 					continue;

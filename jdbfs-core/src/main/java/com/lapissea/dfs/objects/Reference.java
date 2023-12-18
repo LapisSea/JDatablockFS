@@ -297,6 +297,17 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		var cursorOffset = localPos - cursorStart;
 		return cursor.dataStart() + cursorOffset;
 	}
+	
+	public ChunkPointer asJustPointer(){
+		if(offset != 0){
+			throw new IllegalStateException("Reference " + this + " has an offset");
+		}
+		return ptr;
+	}
+	public Chunk asJustChunk(DataProvider provider) throws IOException{
+		return provider.getChunk(asJustPointer());
+	}
+	
 	public String infoString(DataProvider provider) throws IOException{
 		return this + " / " + calcGlobalOffset(provider);
 	}

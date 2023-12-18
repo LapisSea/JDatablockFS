@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -362,6 +363,10 @@ public class SlowTests{
 		provider.scanGarbage(ERROR);
 	}
 	
+	static{
+		ConfigDefs.DISABLE_TRANSACTIONS.set(true);
+	}
+	
 	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
 		record State(Cluster cluster, IOSet<Integer> set) implements Serializable{
 			
@@ -399,13 +404,14 @@ public class SlowTests{
 //					LogUtil.println(action);
 					int a = 0;
 				}
+				
 				switch(action.type){
 					case ADD -> state.set.add(action.num);
 					case REMOVE -> state.set.remove(action.num);
 					case CONTAINS -> state.set.contains(action.num);
 					case CLEAR -> state.set.clear();
 				}
-				if(List.of(Type.REMOVE, Type.CLEAR).contains(action.type)){
+				if(List.of(Type.REMOVE, Type.CLEAR, Type.ADD).contains(action.type)){
 					state.cluster.scanGarbage(ERROR);
 				}
 			}
@@ -460,7 +466,7 @@ public class SlowTests{
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void fuzzIOSet(){
+	void fuzzIOHashSet(){
 		runSetFuzz(100000, IOHashSet.class);
 	}
 	

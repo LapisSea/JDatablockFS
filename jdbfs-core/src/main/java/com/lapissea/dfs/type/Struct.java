@@ -170,8 +170,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return overridingDynamicUnmanaged;
 		}
 		
-		public T make(DataProvider provider, Reference reference, IOType type) throws IOException{
-			return unmanagedConstructor.make(provider, reference, type);
+		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
+			return unmanagedConstructor.make(provider, identity, type);
 		}
 		
 		@Deprecated

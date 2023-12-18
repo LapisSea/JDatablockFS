@@ -3,8 +3,8 @@ package com.lapissea.dfs.io;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.SealedUtil.SealedInstanceUniverse;
 import com.lapissea.dfs.core.AllocateTicket;
-import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.bit.FlagReader;
@@ -446,35 +446,35 @@ public sealed interface ValueStorage<T>{
 		private final DataProvider        provider;
 		private final Struct.Unmanaged<T> struct;
 		
-		private final StructPipe<Reference> refPipe;
-		private final long                  size;
+		private final ObjectPipe<ChunkPointer, Void> ptrPipe;
+		private final long                           size;
 		
 		@SuppressWarnings("unchecked")
-		public UnmanagedInstance(IOType type, DataProvider provider, StructPipe<Reference> refPipe){
+		public UnmanagedInstance(IOType type, DataProvider provider, ObjectPipe<ChunkPointer, Void> ptrPipe){
 			this.type = type;
 			this.provider = provider;
-			this.refPipe = refPipe;
-			size = refPipe.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(-1);
+			this.ptrPipe = ptrPipe;
+			size = ptrPipe.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(-1);
 			struct = (Struct.Unmanaged<T>)Struct.Unmanaged.ofUnknown(type.getTypeClass(provider.getTypeDb()));
 		}
 		
-		public StructPipe<Reference> getRefPipe(){
-			return refPipe;
+		public ObjectPipe<ChunkPointer, Void> getPtrPipe(){
+			return ptrPipe;
 		}
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref = readInline(src);
+			var ref = readInlinePtr(src);
 			if(ref.isNull()){
 				return null;
 			}
 			
-			return struct.make(provider, ref, type);
+			return struct.make(provider, ref.dereference(provider), type);
 		}
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			writeInline(dest, src == null? new Reference() : src.getReference());
+			writeInline(dest, src == null? new Reference() : src.getPointer().makeReference());
 		}
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
@@ -485,11 +485,17 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public Reference readInline(ContentReader src) throws IOException{
-			return refPipe.readNew(provider, src, null);
+			return readInlinePtr(src).makeReference();
+		}
+		private ChunkPointer readInlinePtr(ContentReader src) throws IOException{
+			return ptrPipe.readNew(provider, src, null);
 		}
 		@Override
 		public void writeInline(RandomIO dest, Reference src) throws IOException{
-			refPipe.write(provider, dest, src);
+			writeInlinePtr(dest, src.asJustPointer());
+		}
+		public void writeInlinePtr(RandomIO dest, ChunkPointer src) throws IOException{
+			ptrPipe.write(provider, dest, src);
 		}
 		@Override
 		public long inlineSize(){
@@ -757,7 +763,7 @@ public sealed interface ValueStorage<T>{
 				
 				if(src instanceof IOInstance<?> inst){
 					if(inst instanceof IOInstance.Unmanaged<?> unm){
-						return size + REF_PIPE.calcUnknownSize(provider, unm.getReference(), WordSpace.BYTE);
+						return size + ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, provider, unm.getPointer(), WordSpace.BYTE);
 					}
 					
 					//noinspection unchecked
@@ -800,8 +806,8 @@ public sealed interface ValueStorage<T>{
 			if(IOInstance.isInstance(type)){
 				if(IOInstance.isUnmanaged(type)){
 					var s   = Struct.Unmanaged.ofUnknown(type);
-					var ref = REF_PIPE.readNew(provider, src, null);
-					return s.make(provider, ref, link);
+					var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
+					return s.make(provider, ptr.dereference(provider), link);
 				}
 				
 				var s    = Struct.ofUnknown(type);
@@ -847,7 +853,7 @@ public sealed interface ValueStorage<T>{
 			
 			if(src instanceof IOInstance<?> inst){
 				if(inst instanceof IOInstance.Unmanaged<?> unm){
-					REF_PIPE.write(provider, dest, unm.getReference());
+					ChunkPointer.DYN_PIPE.write(provider, dest, unm.getPointer());
 					return;
 				}
 				
@@ -1400,10 +1406,10 @@ public sealed interface ValueStorage<T>{
 		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
-				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());
-				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());
+				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, ChunkPointer.DYN_PIPE);
+				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, ChunkPointer.FIXED_PIPES.get(NumberSize.LARGEST));
 				case StorageRule.VariableFixed conf -> {
-					var pipe = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider);
+					var pipe = ChunkPointer.varSizePipe(conf.provider);
 					yield new UnmanagedInstance<>(typeDef, provider, pipe);
 				}
 			};

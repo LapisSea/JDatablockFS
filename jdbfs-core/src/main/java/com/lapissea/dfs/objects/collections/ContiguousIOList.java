@@ -12,8 +12,8 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.ValueStorage.StorageRule;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
+import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
@@ -86,8 +86,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private int             headSize;
 	
 	
-	public ContiguousIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, typeDef, TYPE_CHECK);
+	public ContiguousIOList(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, typeDef, TYPE_CHECK);
 		//read data needed for proper function such as number of elements and varying sizes
 		if(!isSelfDataEmpty()){
 			readManagedFields();
@@ -123,7 +123,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private DataProvider makeMagnetProvider(){
 		return getDataProvider().withRouter(t -> {
 			if(t.positionMagnet().isPresent()) return t;
-			return t.withPositionMagnet(getReference().getPtr().getValue());
+			return t.withPositionMagnet(getPointer().getValue());
 		});
 	}
 	
@@ -204,13 +204,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static class UnmanagedField<T extends IOInstance.Unmanaged<T>> extends RefField.NoIO<ContiguousIOList<T>, T>{
 		
-		private       long                           index;
-		private final BaseFixedStructPipe<Reference> refPipe;
+		private       long                        index;
+		private final ObjectPipe<ChunkPointer, ?> refPipe;
 		
 		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ValueStorage.UnmanagedInstance<T> storage){
 			super(accessor, SizeDescriptor.Fixed.of(storage.getSizeDescriptor()));
 			this.index = index;
-			refPipe = (BaseFixedStructPipe<Reference>)storage.getRefPipe();
+			refPipe = storage.getPtrPipe();
 		}
 		
 		@Override
@@ -226,7 +226,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public void setReference(ContiguousIOList<T> instance, Reference newRef){
 			try{
 				try(var io = instance.ioAtElement(index)){
-					refPipe.write(instance.getDataProvider(), io, newRef);
+					refPipe.write(instance.getDataProvider(), io, newRef.asJustPointer());
 				}
 			}catch(IOException e){
 				throw new RuntimeException(e);
@@ -237,7 +237,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public Reference getReference(ContiguousIOList<T> instance){
 			try{
 				try(var io = instance.ioAtElement(index)){
-					return refPipe.readNew(instance.getDataProvider(), io, null);
+					return refPipe.readNew(instance.getDataProvider(), io, null).makeReference();
 				}
 			}catch(IOException e){
 				throw new RuntimeException(e);
@@ -408,7 +408,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			varyingBuffer = newVarying;
 			writeManagedFields();
 			
-			try(var io = getReference().addOffset(headSiz).io(getDataProvider())){
+			try(var io = getPointer().makeReference().addOffset(headSiz).io(getDataProvider())){
 				
 				for(long i = 0; i<size(); i++){
 					var newDataStart = i*newElemenSize;
@@ -668,7 +668,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	private void defragData(long extraSlots) throws IOException{
-		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, 8);
+		defragData(getPointer().dereference(getDataProvider()), extraSlots, 8);
 	}
 	private void defragData(Chunk ch, long extraSlots, int max) throws IOException{
 		if(max<=2) return;
@@ -792,7 +792,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var prov = getDataProvider();
 		
-		var endRef  = getReference().addOffset(siz);
+		var endRef  = getPointer().makeReference().addOffset(siz);
 		var ptr     = ChunkPointer.of(endRef.calcGlobalOffset(prov));
 		var builder = new ChunkBuilder(prov, ptr).withCapacity(totalFree);
 		
@@ -800,7 +800,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var headerSize = ch.getHeaderSize();
 		if(headerSize>=totalFree) return;
 		
-		Chunk chRem   = getReference().getPtr().dereference(prov);
+		Chunk chRem   = getPointer().dereference(prov);
 		var   sizeRem = siz;
 		while(chRem.hasNextPtr()){
 			sizeRem -= chRem.getSize();

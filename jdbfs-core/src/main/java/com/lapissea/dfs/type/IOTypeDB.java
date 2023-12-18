@@ -889,10 +889,10 @@ public sealed interface IOTypeDB{
 			var sm = this.sealedMultiverse;
 			return sm.computeIfAbsent(rootTypeName, () -> {
 				var ch = AllocateTicket.bytes(16)
-				                       .withPositionMagnet(sm.getReference().getPtr().getValue())
+				                       .withPositionMagnet(sm.getPointer().getValue())
 				                       .submit(sm);
 				var type = IOType.of(ContiguousIOList.class, String.class);
-				return new ContiguousIOList<>(sm.getDataProvider(), ch.getPtr().makeReference(), type);
+				return new ContiguousIOList<>(sm.getDataProvider(), ch, type);
 			});
 		}
 		

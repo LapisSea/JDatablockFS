@@ -222,8 +222,8 @@ public class DefragmentManager{
 				@Override
 				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
-						var p    = u.getReference().getPtr();
-						var user = findReferenceUser(cluster, u.getReference());
+						var p    = u.getPointer();
+						var user = findReferenceUser(cluster, p.makeReference());
 						if(user.getPtr().compareTo(p)>0){
 							var move = reallocateUnmanaged(cluster, u, t -> t.withApproval(c -> c.getPtr().compareTo(user.getPtr())>0));
 							if(move.hasAny()) run[0] = true;
@@ -519,11 +519,10 @@ public class DefragmentManager{
 	}
 	
 	private <T extends IOInstance.Unmanaged<T>> MoveBuffer reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
-		return reallocateUnmanaged(cluster, instance, t -> t.withApproval(c -> c.getPtr().compareTo(instance.getReference().getPtr())>0));
+		return reallocateUnmanaged(cluster, instance, t -> t.withApproval(c -> c.getPtr().compareTo(instance.getPointer())>0));
 	}
 	private static <T extends IOInstance.Unmanaged<T>> MoveBuffer reallocateUnmanaged(Cluster cluster, T instance, Function<AllocateTicket, AllocateTicket> ticketFn) throws IOException{
-		var oldRef = instance.getReference();
-		var oldPtr = oldRef.asPtr();
+		var oldPtr = instance.getPointer();
 		
 		var siz = oldPtr.dereference(cluster).chainSize();
 		
@@ -536,10 +535,10 @@ public class DefragmentManager{
 		var newPtr = newCh.getPtr();
 		var newRef = newPtr.makeReference();
 		
-		var ptrsToFree = moveReference(cluster, oldRef, newRef);
-		instance.notifyReferenceMovement(newRef);
+		var ptrsToFree = moveReference(cluster, oldPtr.makeReference(), newRef);
+		instance.notifyReferenceMovement(newCh);
 		cluster.getMemoryManager().freeChains(ptrsToFree);
-		return new MoveBuffer(oldRef.getPtr(), newPtr);
+		return new MoveBuffer(oldPtr, newPtr);
 	}
 	
 	private static Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{
