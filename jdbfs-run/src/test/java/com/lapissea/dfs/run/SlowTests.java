@@ -390,13 +390,12 @@ public class SlowTests{
 		var rnr = new FuzzingStateEnv.Marked<State, Action, IOException>(){
 			@Override
 			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
-				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "map-fuzz" + sequenceIndex);
+				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "set-fuzz" + sequenceIndex);
 				return new State(cluster, new CheckSet<>(cluster.roots().request("hi", type, Integer.class)));
 			}
 			@Override
 			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
 				if(mark.action(actionIndex)){
-//					LogUtil.println(action);
 					int a = 0;
 				}
 				
