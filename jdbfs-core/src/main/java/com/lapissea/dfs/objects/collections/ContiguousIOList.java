@@ -39,6 +39,7 @@ import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -56,8 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
-import java.util.stream.LongStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
@@ -65,7 +64,8 @@ import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings("unchecked")
-public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
+public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>
+	implements RandomAccess, IOInstance.Unmanaged.DynamicFields<ContiguousIOList<T>>{
 	
 	private static final TypeCheck TYPE_CHECK = new TypeCheck(
 		ContiguousIOList.class,
@@ -251,7 +251,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	@NotNull
 	@Override
-	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
+	public Iterable<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typeDatabase = getDataProvider().getTypeDb();
 		var genericType  = IOType.getArg(getTypeDef(), 0).generic(typeDatabase);
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
@@ -275,13 +275,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
-			return LongStream.range(0, size()).mapToObj(
+			return IterablePPs.rangeMap(
+				0, size(),
 				index -> {
 					indexAccessor.index = index;
 					f.index = index;
 					return f;
-				}
-			);
+				});
 		}
 		
 		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
@@ -297,11 +297,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
 		
-		return LongStream.range(0, size()).mapToObj(index -> {
-			indexAccessor.index = index;
-			ioAt.index = index;
-			return indexField;
-		});
+		return IterablePPs.rangeMap(
+			0, size(),
+			index -> {
+				indexAccessor.index = index;
+				ioAt.index = index;
+				return indexField;
+			});
 	}
 	
 	private static final CommandSet END_SET  = CommandSet.builder(CommandSet.Builder::endFlow);

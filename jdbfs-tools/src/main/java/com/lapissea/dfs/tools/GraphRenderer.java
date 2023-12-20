@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -884,7 +885,7 @@ public class GraphRenderer implements DataRenderer{
 	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, Struct<T> str){
 		var fields = str.getFields();
 		if(instance instanceof IOInstance.Unmanaged unmanaged){
-			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
+			return IterablePPs.of(fields, unmanaged.listUnmanagedFields()).flatMap(Iterable::iterator).iterator();
 		}else{
 			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
 		}

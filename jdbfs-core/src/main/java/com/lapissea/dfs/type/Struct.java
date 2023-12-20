@@ -22,6 +22,8 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.access.VirtualAccessor;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -88,7 +90,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 * This is an unmanaged struct. It is like the regular {@link Struct} but it contains extra information
 	 * about unmanaged types.<br/>
 	 * Unmanaged struct are types that contain custom low level IO logic. Every unmanaged struct needs to
-	 * properly state the data it contains trough things such as {@link IOInstance.Unmanaged#listDynamicUnmanagedFields}
+	 * properly state the data it contains trough things such as {@link IOInstance.Unmanaged.DynamicFields#listDynamicUnmanagedFields}
 	 * for fields that may appear or change. For fields that are unchanging {@link IOUnmanagedValueInfo} is preferred.
 	 *
 	 * @param <T> the type of the containing class
@@ -151,19 +153,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		private Unmanaged(Class<T> type, boolean runNow){
 			super(type, runNow);
-			overridingDynamicUnmanaged = checkOverridingUnmanaged();
+			overridingDynamicUnmanaged = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
 			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class);
-		}
-		
-		private boolean checkOverridingUnmanaged(){
-			Class<?> t = getType();
-			while(true){
-				try{
-					return !t.getDeclaredMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
-				}catch(NoSuchMethodException e){
-					t = t.getSuperclass();
-				}
-			}
 		}
 		
 		public boolean isOverridingDynamicUnmanaged(){
@@ -189,7 +180,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				IterablePPs.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -789,11 +780,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
+			fields.filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
 		);
 	}
 	
-	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
+	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, IterablePP<IOField<T, ?>> fields){
 		var    prefix = start;
 		String name   = null;
 		if(!doShort){
@@ -827,7 +818,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.map(fieldMapper)
+		var str = fields.stream().map(fieldMapper)
 		                .filter(Optional::isPresent).map(Optional::get)
 		                .collect(Collectors.joining(fieldSeparator, prefix, end));
 		

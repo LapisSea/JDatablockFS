@@ -14,6 +14,7 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -37,7 +38,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.INSTANCE;
@@ -410,6 +410,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	abstract class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance.Managed<SELF> implements DataProvider.Holder{
 		
+		public interface DynamicFields<SELF extends Unmanaged<SELF>>{
+			@NotNull
+			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
+		}
+		
 		private final DataProvider   provider;
 		private       Chunk          identity;
 		private final IOType         typeDef;
@@ -466,19 +471,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return identity;
 		}
 		
+		@SuppressWarnings("unchecked")
 		@NotNull
-		protected Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
-			return Stream.of();
-		}
-		
-		@NotNull
-		public final Stream<IOField<SELF, ?>> listUnmanagedFields(){
+		public final Iterable<IOField<SELF, ?>> listUnmanagedFields(){
 			var s  = getThisStruct();
-			var fs = s.getUnmanagedStaticFields().stream();
+			var fs = s.getUnmanagedStaticFields();
 			if(!s.isOverridingDynamicUnmanaged()){
 				return fs;
 			}
-			return Stream.concat(listDynamicUnmanagedFields(), fs);
+			var dynamic = ((DynamicFields<SELF>)this).listDynamicUnmanagedFields();
+			if(fs.isEmpty()) return dynamic;
+			
+			return IterablePPs.concat(fs, dynamic);
 		}
 		
 		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
