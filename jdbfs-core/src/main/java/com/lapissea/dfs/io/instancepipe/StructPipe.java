@@ -459,6 +459,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected SizeRelationReport<T> createSizeReport(int minGroup){
 		FieldSet<T> fields = getSpecificFields();
 		if(type instanceof Struct.Unmanaged<?> u){
+			//noinspection unchecked
 			var unmanagedStatic = (FieldSet<T>)u.getUnmanagedStaticFields();
 			if(!unmanagedStatic.isEmpty()){
 				fields = FieldSet.of(Stream.concat(fields.stream(), unmanagedStatic.stream()));

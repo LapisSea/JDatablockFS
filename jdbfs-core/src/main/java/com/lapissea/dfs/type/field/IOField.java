@@ -465,7 +465,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return nullability;
 	}
 	private void calcNullability(){
-		nullability = accessor == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(accessor);
+		nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
 	}
 	
 	public final boolean nullable(){

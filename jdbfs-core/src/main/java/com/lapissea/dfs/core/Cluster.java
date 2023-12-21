@@ -147,6 +147,7 @@ public final class Cluster implements DataProvider{
 		}
 		@Override
 		public String toShortString(){
+			if(db == null) return "<uninitialized>";
 			return "{db: " + db.toShortString() + ", " +
 			       freeChunks.size() + " freeChunks, " +
 			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())

@@ -222,6 +222,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		@Override
 		public String toString(){
+			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
 			return raw + args.stream().map(IOType::toString).collect(Collectors.joining(", ", "<", ">"));
 		}
 		@Override
