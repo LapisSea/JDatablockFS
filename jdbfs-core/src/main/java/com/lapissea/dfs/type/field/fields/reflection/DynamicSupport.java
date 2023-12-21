@@ -15,7 +15,6 @@ import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -38,10 +37,6 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class DynamicSupport{
-	
-	private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
-	
-	
 	@SuppressWarnings({"unchecked"})
 	public static long calcSize(DataProvider prov, Object val){
 		return switch(val){
@@ -382,7 +377,7 @@ public abstract class DynamicSupport{
 		}
 		if(IOInstance.isInstance(typ)){
 			if(IOInstance.isUnmanaged(typ)){
-				REF_PIPE.skip(provider, src, genericContext);
+				ChunkPointer.DYN_PIPE.skip(provider, src, genericContext);
 			}else{
 				skipStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
