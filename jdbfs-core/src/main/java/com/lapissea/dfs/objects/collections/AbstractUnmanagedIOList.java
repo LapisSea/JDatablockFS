@@ -102,7 +102,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@Override
 	public boolean isFreed(){
 		if(super.isFreed()) return true;
-		if(DEBUG_VALIDATION){
+		if(DEBUG_VALIDATION && getDataProvider().getMemoryManager() != null){
 			boolean dataFreed;
 			try{
 				dataFreed = getDataProvider().getMemoryManager().getFreeChunks().contains(getPointer());

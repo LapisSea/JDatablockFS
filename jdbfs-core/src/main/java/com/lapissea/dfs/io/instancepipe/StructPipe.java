@@ -709,7 +709,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		if(sum != siz){
 			StringJoiner sj = new StringJoiner("\n");
-			sj.add("total" + siz);
+			sj.add("total " + siz);
 			for(IOField<T, ?> field : fields){
 				var desc  = field.getSizeDescriptor();
 				var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);

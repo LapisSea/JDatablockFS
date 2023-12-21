@@ -570,7 +570,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t -> t.getVirtual(null)).filter(Objects::nonNull);
+		return getFields().stream().map(t -> t.getVirtual(null)).flatMap(Optional::stream);
 	}
 	
 	private short[] calcPoolObjectsSize(){
