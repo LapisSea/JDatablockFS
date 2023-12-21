@@ -20,6 +20,8 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.access.VirtualAccessor;
+import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
+import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.IterablePP;
@@ -572,24 +574,27 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools = virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
-		if(vPools.isEmpty()) return null;
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Ptr)
+		                                    .mapToInt(a -> a.getStoragePool().ordinal()).toArray();
+		if(vPools.length == 0) return null;
 		var poolPointerSizes = new short[StoragePool.values().length];
-		for(var vPool : vPools){
-			if(poolPointerSizes[vPool.ordinal()] == Short.MAX_VALUE) throw new OutOfMemoryError();
-			poolPointerSizes[vPool.ordinal()]++;
+		for(var vPoolIndex : vPools){
+			if(poolPointerSizes[vPoolIndex] == Short.MAX_VALUE)
+				throw new OutOfMemoryError("Too many fields that need " + StoragePool.values()[vPoolIndex] + " pool");
+			poolPointerSizes[vPoolIndex]++;
 		}
 		return poolPointerSizes;
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Primitive)
+		                                    .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes = new short[StoragePool.values().length];
 		for(var e : vPools.entrySet()){
 			var siz = e.getValue()
 			           .stream()
-			           .mapToInt(VirtualAccessor::getPrimitiveSize)
+			           .mapToInt(a -> ((Primitive)a.typeOff).size)
 			           .sum();
 			if(siz>Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolSizes[e.getKey().ordinal()] = (short)siz;
