@@ -375,12 +375,65 @@ public abstract class DynamicSupport{
 			AutoText.PIPE.skip(provider, src, genericContext);
 			return;
 		}
+		if(typ == byte[].class){
+			var bytes = src.readUnsignedInt4Dynamic();
+			src.skipExact(bytes);
+			return;
+		}
 		if(IOInstance.isInstance(typ)){
 			if(IOInstance.isUnmanaged(typ)){
-				ChunkPointer.DYN_PIPE.skip(provider, src, genericContext);
+				ChunkPointer.DYN_PIPE.skip(provider, src, null);
 			}else{
 				skipStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
+			return;
+		}
+		
+		if(typ.isEnum()){
+			var universe = EnumUniverse.ofUnknown(typ);
+			universe.numSize(false).skip(src);
+			return;
+		}
+		
+		if(typ.isArray()){
+			int len = Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO).read(src));
+			
+			var e = typ.getComponentType();
+			
+			var pTypO = SupportedPrimitive.get(e);
+			if(pTypO.isPresent()){
+				var  pTyp = pTypO.get();
+				long bytes;
+				if(pTyp == SupportedPrimitive.BOOLEAN){
+					bytes = BitUtils.bitsToBytes(len);
+				}else{
+					bytes = len*pTyp.maxSize.get(WordSpace.BYTE);
+				}
+				src.skipExact(bytes);
+				return;
+			}
+			
+			if(IOInstance.isInstance(e)){
+				var struct = Struct.ofUnknown(e);
+				if(struct instanceof Struct.Unmanaged<?> u){
+					for(int i = 0; i<len; i++){
+						ChunkPointer.DYN_PIPE.skip(provider, src, null);
+					}
+					return;
+				}
+				
+				var pip = StandardStructPipe.of(struct);
+				for(int i = 0; i<len; i++){
+					pip.skip(provider, src, genericContext);
+				}
+				return;
+			}
+		}
+		
+		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
+		if(wrapper != null){
+			var pip = StandardStructPipe.of(wrapper.struct());
+			pip.skip(provider, src, genericContext);
 			return;
 		}
 		
