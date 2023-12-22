@@ -529,7 +529,7 @@ public class SlowTests{
 	Object[][] listMakers(){
 		return new Object[][]{
 			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
-			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40))},
+			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40, 20))},
 			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().roots().request("list", ContiguousIOList.class, Integer.class))},
 			{new ListMaker("linked list", 0.1, () -> Cluster.emptyMem().roots().request("list", LinkedIOList.class, Integer.class))},
 			};
