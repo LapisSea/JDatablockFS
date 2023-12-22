@@ -4,6 +4,7 @@ import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.SyntheticWildcardType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
@@ -90,6 +91,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				if(n == null) n = name;
 			}
 			this.name = n;
+			typeClassCache = clazz;
 		}
 		
 		@Override
@@ -140,7 +142,16 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public Class<?> getTypeClass(IOTypeDB db){
 			var cache = typeClassCache;
-			if(cache != null) return cache;
+			if(cache != null){
+				if(db != null && cache.getClassLoader() instanceof TemplateClassLoader cl){
+					var dbcl = db.getTemplateLoader();
+					if(cl != dbcl){
+						//TODO: invalidate cache? Is identity safe due to weak ref?
+						throw new IllegalStateException("Mismatching classloader");
+					}
+				}
+				return cache;
+			}
 			var loaded = loadClass(db);
 			typeClassCache = loaded;
 			return loaded;
