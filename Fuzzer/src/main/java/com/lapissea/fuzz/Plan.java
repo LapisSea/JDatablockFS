@@ -21,7 +21,7 @@ public final class Plan<TState, TAction>{
 	
 	private record State<TState, TAction>(Fails<TState, TAction> fails, boolean reported, RunMark mark, Optional<File> saveFile){
 		State<TState, TAction> withFails(List<FuzzFail<TState, TAction>> data){
-			return new State<>(new Fails.FailList<>(data), false, data.isEmpty()? RunMark.NONE : data.get(0).mark(), saveFile);
+			return new State<>(new Fails.FailList<>(data), false, data.isEmpty()? RunMark.NONE : data.getFirst().mark(), saveFile);
 		}
 		
 		State<TState, TAction> withFail(FuzzFail<TState, TAction> fail, FuzzingRunner.Stability stability){
@@ -145,7 +145,7 @@ public final class Plan<TState, TAction>{
 		var newFails = state.fails.fails().filter(filter).toList();
 		var mark     = state.mark;
 		if(mark.hasSequence()){
-			mark = newFails.isEmpty()? RunMark.NONE : newFails.get(0).mark();
+			mark = newFails.isEmpty()? RunMark.NONE : newFails.getFirst().mark();
 		}
 		return withState(new State<>(new Fails.FailList<>(newFails), false, mark, state.saveFile));
 	}
@@ -154,7 +154,7 @@ public final class Plan<TState, TAction>{
 		return switch(state.fails){
 			case Fails.FailList(var fails) -> {
 				if(fails.isEmpty()) yield this;
-				var fail      = fails.get(0);
+				var fail      = fails.getFirst();
 				var stability = runner.establishFailStability(fail, reruns);
 				yield withState(state.withFail(fail, stability));
 			}
@@ -227,7 +227,7 @@ public final class Plan<TState, TAction>{
 			() -> new IllegalStateException("File can not be inferred from context"));
 		
 		FuzzFail<TState, TAction> fail = switch(state.fails){
-			case Fails.FailList(var f) -> f.isEmpty()? null : f.get(0);
+			case Fails.FailList(var f) -> f.isEmpty()? null : f.getFirst();
 			case Fails.StableFail(var f, var stability) -> stability instanceof FuzzingRunner.Stability.Ok? f : null;
 		};
 		if(fail != null){

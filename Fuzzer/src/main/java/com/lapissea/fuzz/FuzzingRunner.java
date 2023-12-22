@@ -236,7 +236,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					if(delayExec != null){
 						var tasks = delayExec.shutdownNow();
 						if(!tasks.isEmpty()){
-							tasks.get(0).run();
+							tasks.getFirst().run();
 						}
 						delayExec.close();
 					}

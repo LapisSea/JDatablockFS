@@ -54,7 +54,7 @@ public final class RandomActions{
 				l.stream().map(Method::getName).collect(Collectors.joining(", "))
 			);
 		}
-		var meth = l.get(0);
+		var meth = l.getFirst();
 		LogUtil.println(meth);
 		var start = Instant.now();
 		meth.invoke(null);
@@ -159,7 +159,7 @@ public final class RandomActions{
 				var ch = chs.get(id);
 				if(id == chs.size() - 1){
 					chs.remove(id);
-					while(!chs.isEmpty() && chs.get(chs.size() - 1) == null) chs.remove(chs.size() - 1);
+					while(!chs.isEmpty() && chs.getLast() == null) chs.removeLast();
 				}else chs.set(id, null);
 				
 				provider.getMemoryManager().free(ch);

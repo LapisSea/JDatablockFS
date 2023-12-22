@@ -107,7 +107,7 @@ public final class LoggedMemoryUtils{
 			try(var ignored = lock.open()){
 				var ses = logger.get().getSession(sessionName);
 				while(!preBuf.isEmpty()){
-					ses.log(preBuf.remove(0));
+					ses.log(preBuf.removeFirst());
 				}
 			}catch(DataLogger.Closed ignored){
 			}
@@ -125,7 +125,7 @@ public final class LoggedMemoryUtils{
 				if(asyncLoad || logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
-						ses.log(preBuf.remove(0));
+						ses.log(preBuf.removeFirst());
 					}
 					ses.log(memFrame);
 				}else{

@@ -161,7 +161,7 @@ public final class VaryingSize implements Stringify{
 			public void reset(int id){
 				var size = marks.get(id);
 				while(data.size()>size){
-					data.remove(data.size() - 1);
+					data.removeLast();
 				}
 				marks.entrySet().removeIf(e -> e.getKey()>=id);
 			}

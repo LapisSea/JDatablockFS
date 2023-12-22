@@ -570,7 +570,7 @@ public final class ChunkChainIO implements RandomIO{
 		
 		while(iter.hasNext() || !redo.isEmpty()){
 			WriteChunk unmapped;
-			if(!redo.isEmpty()) unmapped = redo.remove(0);
+			if(!redo.isEmpty()) unmapped = redo.removeFirst();
 			else{
 				unmapped = iter.next();
 			}

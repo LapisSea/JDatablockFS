@@ -64,12 +64,12 @@ public class SessionHost implements DataLogger{
 					frames.clear();
 					MemFrame lastFull;
 					{
-						var f = tmpFrames.remove(0);
+						var f = tmpFrames.removeFirst();
 						lastFull = new MemFrame(f.memData.frameId(), f.memData.timeDelta(), f.memData.bytes(), f.memData.ids(), f.memData.e());
 						frames.add(new CachedFrame(lastFull, f.parsed));
 					}
 					while(!tmpFrames.isEmpty()){
-						var fr   = tmpFrames.remove(0);
+						var fr   = tmpFrames.removeFirst();
 						var diff = MemFrame.diff(lastFull, fr.memData);
 						frames.add(new CachedFrame(diff == null? fr.memData : diff, fr.parsed));
 						if(diff == null){
@@ -81,7 +81,7 @@ public class SessionHost implements DataLogger{
 			}
 			
 			synchronized(frames){
-				frames.add(new CachedFrame(frame, new ParsedFrame(frames.isEmpty()? 0 : frames.get(frames.size() - 1).parsed.index + 1)));
+				frames.add(new CachedFrame(frame, new ParsedFrame(frames.isEmpty()? 0 : frames.getLast().parsed.index + 1)));
 			}
 			synchronized(framePos){
 				framePos.set(-1);

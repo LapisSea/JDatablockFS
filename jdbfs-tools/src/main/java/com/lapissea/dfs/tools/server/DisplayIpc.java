@@ -139,7 +139,7 @@ public class DisplayIpc implements DataLogger{
 								}
 								Event e;
 								synchronized(queue){
-									e = queue.remove(0);
+									e = queue.removeFirst();
 								}
 
 //								writtenBytes+=e.len;
@@ -223,7 +223,7 @@ public class DisplayIpc implements DataLogger{
 									continue;
 								}
 								
-								r = queue.remove(0);
+								r = queue.removeFirst();
 							}
 							
 							var d = r.join();

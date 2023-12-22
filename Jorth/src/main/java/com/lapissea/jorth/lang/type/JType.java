@@ -19,10 +19,10 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 			if(lower.isEmpty()){
 				if(noUpper()) return 1;
 				if(upper.size() != 1) throw new UnsupportedOperationException();
-				return 1 + upper.get(0).jvmStringLen(true);
+				return 1 + upper.getFirst().jvmStringLen(true);
 			}else{
 				if(lower.size() != 1) throw new UnsupportedOperationException();
-				return 1 + lower.get(0).jvmStringLen(true);
+				return 1 + lower.getFirst().jvmStringLen(true);
 			}
 		}
 		
@@ -40,11 +40,11 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 					return;
 				}
 				if(upper.size() != 1) throw new UnsupportedOperationException();
-				b = upper.get(0);
+				b = upper.getFirst();
 				sb.append('+');
 			}else{
 				if(lower.size() != 1) throw new UnsupportedOperationException();
-				b = lower.get(0);
+				b = lower.getFirst();
 				sb.append('-');
 			}
 			
@@ -88,7 +88,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		}
 		
 		private boolean noUpper(){
-			return upper.isEmpty() || upper.get(0).equals(GenericType.OBJECT);
+			return upper.isEmpty() || upper.getFirst().equals(GenericType.OBJECT);
 		}
 	}
 	
@@ -137,11 +137,11 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 				var lower = wild.lower;
 				if(!lower.isEmpty()){
 					if(lower.size() != 1) throw new UnsupportedOperationException();
-					yield lower.get(0).asGeneric();
+					yield lower.getFirst().asGeneric();
 				}
 				var upper = wild.upper;
 				if(upper.size() != 1) throw new UnsupportedOperationException();
-				yield upper.get(0).asGeneric();
+				yield upper.getFirst().asGeneric();
 			}
 		};
 	}

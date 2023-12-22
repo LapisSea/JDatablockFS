@@ -110,7 +110,7 @@ public interface RootProvider extends DataProvider.Holder{
 			if(rawType.isEnum()){
 				var universe = EnumUniverse.ofUnknown(rawType);
 				if(universe.isEmpty()) throw new IllegalArgumentException();
-				return withGenerator(() -> (T)universe.get(0));
+				return withGenerator(() -> (T)universe.getFirst());
 			}
 			
 			if(rawType == String.class){

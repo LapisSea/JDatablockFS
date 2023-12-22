@@ -207,7 +207,7 @@ public sealed interface Token{
 	record BracketedSet(int line, BracketType type, List<Token> contents) implements Token{
 		public Object singleTypeUnpack() throws MalformedJorth{
 			if(contents.isEmpty()) return ZeroArrays.ZERO_OBJECT;
-			return switch(contents.get(0)){
+			return switch(contents.getFirst()){
 				case Token.NumToken.IntVal t -> {
 					var val = new int[contents.size()];
 					for(int i = 0; i<val.length; i++){
@@ -236,7 +236,7 @@ public sealed interface Token{
 					}
 					yield val;
 				}
-				default -> throw new MalformedJorth("Illegal token type " + contents.get(0) + " inside bracket block");
+				default -> throw new MalformedJorth("Illegal token type " + contents.getFirst() + " inside bracket block");
 			};
 		}
 		@Override

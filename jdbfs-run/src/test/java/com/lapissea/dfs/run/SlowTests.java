@@ -115,7 +115,7 @@ public class SlowTests{
 						chunks.set(bi, a);
 					}
 					
-					head = chunks.get(0);
+					head = chunks.getFirst();
 					var last = head;
 					for(int i = 1; i<chunks.size(); i++){
 						var next = chunks.get(i);
@@ -731,7 +731,7 @@ public class SlowTests{
 		if(fails.isEmpty()) return;
 		LogUtil.printlnEr(FuzzFail.report(fails));
 		
-		var stability = runner.establishFailStability(fails.get(0), 15);
+		var stability = runner.establishFailStability(fails.getFirst(), 15);
 		runner.runStable(stability);
 		fail("There were fails!");
 	}

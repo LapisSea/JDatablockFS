@@ -32,7 +32,7 @@ public class TypeStack{
 	}
 	public GenericType pop() throws MalformedJorth{
 		requireElements(1);
-		return stack.remove(stack.size() - 1);
+		return stack.removeLast();
 	}
 	
 	public boolean isEmpty(){

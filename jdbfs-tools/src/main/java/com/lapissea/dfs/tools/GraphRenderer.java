@@ -96,7 +96,7 @@ public class GraphRenderer implements DataRenderer{
 			try{
 				if(index == -1){
 					if(s.frames.isEmpty()) return null;
-					return s.frames.get(s.frames.size() - 1);
+					return s.frames.getLast();
 				}
 				if(s.frames.isEmpty()) return null;
 				return s.frames.get(index);

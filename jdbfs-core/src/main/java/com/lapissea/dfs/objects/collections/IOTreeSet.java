@@ -462,7 +462,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			IOFieldTools.requireFieldsEquals(cached, read, "Cache desync");
 		}
 		
-		var root = nodes.get(0);
+		var root = nodes.getFirst();
 		if(!root.hasValue()){
 			throw new IllegalStateException("Root has no value!");
 		}

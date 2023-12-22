@@ -767,7 +767,7 @@ public final class DefInstanceCompiler{
 				compact.add(frag);
 				return;
 			}
-			if(frag instanceof Literal l2 && compact.get(compact.size() - 1) instanceof Literal l1){
+			if(frag instanceof Literal l2 && compact.getLast() instanceof Literal l1){
 				compact.set(compact.size() - 1, new Literal(l1.value() + l2.value()));
 				return;
 			}
@@ -992,10 +992,10 @@ public final class DefInstanceCompiler{
 		var its = Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
 		if(its.size() != 1) return Optional.empty();
 		
-		Set<String> parentNames = collectNames(its.get(0));
+		Set<String> parentNames = collectNames(its.getFirst());
 		Set<String> thisNames   = collectNames(interf);
 		if(parentNames.equals(thisNames)){
-			return Optional.of(its.get(0));
+			return Optional.of(its.getFirst());
 		}
 		return Optional.empty();
 	}
@@ -1291,7 +1291,7 @@ public final class DefInstanceCompiler{
 			                                      .collect(Collectors.groupingBy(Annotation::annotationType))
 			                                      .values().stream()
 			                                      .filter(l -> l.size()>1)
-			                                      .map(l -> "\t\t" + l.get(0).annotationType().getName())
+			                                      .map(l -> "\t\t" + l.getFirst().annotationType().getName())
 			                                      .collect(Collectors.joining("\n"));
 			                          if(dup.isEmpty()) return "";
 			                          return "\t" + gs.name + ":\n" + dup;

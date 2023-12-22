@@ -287,7 +287,7 @@ public abstract class RenderBackend{
 		
 		@Override
 		public void setFontScale(float fontScale){
-			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetFontScale){
+			if(!buffer.isEmpty() && buffer.getLast() instanceof Command.SetFontScale){
 				buffer.set(buffer.size() - 1, new Command.SetFontScale(fontScale));
 			}else{
 				buffer.add(new Command.SetFontScale(fontScale));
@@ -297,7 +297,7 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public void setLineWidth(float line){
-			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetLineWidth){
+			if(!buffer.isEmpty() && buffer.getLast() instanceof Command.SetLineWidth){
 				buffer.set(buffer.size() - 1, new Command.SetLineWidth(line));
 			}else{
 				buffer.add(new Command.SetLineWidth(line));
@@ -308,9 +308,9 @@ public abstract class RenderBackend{
 		@Override
 		public void fillQuad(double x, double y, double width, double height){
 			if(!buffer.isEmpty()){
-				var last = buffer.get(buffer.size() - 1);
+				var last = buffer.getLast();
 				if(last instanceof Command.FillQuad q){
-					buffer.remove(buffer.size() - 1);
+					buffer.removeLast();
 					var qs = new Command.FillQuads();
 					qs.add(q.x, q.y, q.width, q.height);
 					qs.add(x, y, width, height);
@@ -331,9 +331,9 @@ public abstract class RenderBackend{
 		@Override
 		public void drawLine(double xFrom, double yFrom, double xTo, double yTo){
 			if(!buffer.isEmpty()){
-				var last = buffer.get(buffer.size() - 1);
+				var last = buffer.getLast();
 				if(last instanceof Command.DrawLine q){
-					buffer.remove(buffer.size() - 1);
+					buffer.removeLast();
 					var qs = new Command.DrawLines();
 					qs.add(q.xFrom, q.yFrom, q.xTo, q.yTo);
 					qs.add(xFrom, yFrom, xTo, yTo);
@@ -350,7 +350,7 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public void setColor(Color color){
-			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetColor){
+			if(!buffer.isEmpty() && buffer.getLast() instanceof Command.SetColor){
 				buffer.set(buffer.size() - 1, new Command.SetColor(color));
 			}else{
 				buffer.add(new Command.SetColor(color));

@@ -175,7 +175,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		synchronized(queuedFreeChunksIO){
 			var chs = new ArrayList<Chunk>(queuedFreeChunks.size());
 			while(!queuedFreeChunks.isEmpty()){
-				var ptr = queuedFreeChunks.remove(queuedFreeChunks.size() - 1);
+				var ptr = queuedFreeChunks.removeLast();
 				var ch  = context.getChunk(ptr);
 				chs.add(ch);
 			}

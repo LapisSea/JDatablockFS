@@ -277,7 +277,7 @@ public final class MemoryOperations{
 			chunks.sort(Chunk::compareTo);
 			while(chunks.size()>1){
 				var prev  = chunks.get(chunks.size() - 2);
-				var chunk = chunks.remove(chunks.size() - 1);
+				var chunk = chunks.removeLast();
 				assert prev.getPtr().getValue()<chunk.getPtr().getValue() : prev.getPtr() + " " + chunk.getPtr();
 				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
@@ -287,7 +287,7 @@ public final class MemoryOperations{
 					oks.add(chunk);
 				}
 			}
-			var chunk = chunks.remove(chunks.size() - 1);
+			var chunk = chunks.removeLast();
 			oks.add(chunk);
 		}
 		

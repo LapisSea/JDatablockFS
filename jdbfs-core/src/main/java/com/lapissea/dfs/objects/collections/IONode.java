@@ -364,7 +364,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			if(s == 0) return null;
 			if(s<NEXT_SIZE_FIELD_SIZE) return null;
 			if(DEBUG_VALIDATION){
-				if(!getPipe().getSpecificFields().get(0).equals(getNextSizeField())){
+				if(!getPipe().getSpecificFields().getFirst().equals(getNextSizeField())){
 					throw new ShouldNeverHappenError();
 				}
 			}
