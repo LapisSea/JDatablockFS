@@ -325,6 +325,14 @@ public final class IOTransactionBuffer{
 		write(offset, new byte[]{(byte)b}, 0, 1);
 	}
 	
+	public void writeChunks(Collection<RandomIO.WriteChunk> writeData){
+		try(var ignored = lock.write()){
+			for(var e : writeData){
+				write0(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+			}
+		}
+	}
+	
 	public void write(long offset, byte[] b, int off, int len){
 		try(var ignored = lock.write()){
 			write0(offset, b, off, len);
