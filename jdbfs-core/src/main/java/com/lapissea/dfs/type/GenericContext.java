@@ -9,12 +9,11 @@ import com.lapissea.util.NotImplementedException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public interface GenericContext extends Stringify{
 	
@@ -25,19 +24,31 @@ public interface GenericContext extends Stringify{
 	}
 	
 	final class TypeArgs implements GenericContext, Stringify{
-		private final Map<String, Type> actualTypes;
-		private final Class<?>          type;
+		private final String[] typeNames;
+		private final char[]   typeNamesC;
+		private final Type[]   actualTypes;
+		private final Class<?> type;
 		
 		public TypeArgs(Class<?> type, Type actual){
 			this.type = type;
 			var params     = type.getTypeParameters();
 			var actualArgs = actual instanceof ParameterizedType p? p.getActualTypeArguments() : new Type[0];
 			
-			actualTypes = HashMap.newHashMap(params.length);
-			
+			String[] typeNames  = null;
+			char[]   typeNamesC = null;
 			for(int i = 0; i<params.length; i++){
-				actualTypes.put(params[i].getName(), actualArgs[i]);
+				var name = params[i].getName();
+				if(name.length() == 1){
+					if(typeNamesC == null) typeNamesC = new char[params.length];
+					typeNamesC[i] = name.charAt(0);
+					continue;
+				}
+				if(typeNames == null) typeNames = new String[params.length];
+				typeNames[i] = name;
 			}
+			this.typeNames = typeNames;
+			this.typeNamesC = typeNamesC;
+			actualTypes = actualArgs;
 		}
 		
 		@Override
@@ -48,22 +59,44 @@ public interface GenericContext extends Stringify{
 		@Override
 		public String toString(){
 			return Utils.typeToHuman(type, false) +
-			       actualTypes.entrySet().stream()
-			                  .map(e -> e.getKey() + "=" + Utils.typeToHuman(e.getValue(), false))
-			                  .collect(Collectors.joining(", ", "<", ">"));
+			       IntStream.range(0, actualTypes.length)
+			                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes[i], false))
+			                .collect(Collectors.joining(", ", "<", ">"));
 		}
 		@Override
 		public String toShortString(){
 			return Utils.typeToHuman(type, true) +
-			       actualTypes.entrySet().stream()
-			                  .map(e -> e.getKey() + "=" + Utils.typeToHuman(e.getValue(), true))
-			                  .collect(Collectors.joining(", ", "<", ">"));
+			       IntStream.range(0, actualTypes.length)
+			                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes[i], true))
+			                .collect(Collectors.joining(", ", "<", ">"));
+		}
+		private String strName(int i){
+			if(typeNames != null){
+				var name = typeNames[i];
+				if(name != null) return name;
+			}
+			return "" + typeNamesC[i];
 		}
 		
 		private Type getType(String name){
-			var type = actualTypes.get(name);
-			if(type != null) return type;
-			
+			find:
+			if(name.length() == 1){
+				if(typeNamesC == null) break find;
+				var c = name.charAt(0);
+				if(c == '\0') break find;
+				for(int i = 0; i<typeNamesC.length; i++){
+					if(typeNamesC[i] == c){
+						return actualTypes[i];
+					}
+				}
+			}else{
+				if(typeNames == null) break find;
+				for(int i = 0; i<typeNames.length; i++){
+					if(name.equals(typeNames[i])){
+						return actualTypes[i];
+					}
+				}
+			}
 			throw new RuntimeException(name + " is not present");
 		}
 		

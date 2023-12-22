@@ -209,9 +209,16 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		protected Type makeGeneric(IOTypeDB db){
-			var args = new ArrayList<Type>(getArgs().size());
-			for(IOType arg : getArgs()){
-				args.add(arg.generic(db));
+			List<Type> args;
+			var        ioArgs = getArgs();
+			if(ioArgs.size() == 1){
+				args = List.of(ioArgs.getFirst().generic(db));
+			}else{
+				var arr = new Type[ioArgs.size()];
+				for(int i = 0; i<ioArgs.size(); i++){
+					arr[i] = ioArgs.get(i).generic(db);
+				}
+				args = List.of(arr);
 			}
 			return SyntheticParameterizedType.of(raw.getTypeClass(db), args);
 		}
