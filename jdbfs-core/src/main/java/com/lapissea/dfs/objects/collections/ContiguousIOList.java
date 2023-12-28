@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
@@ -275,6 +276,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
+			f.initLateData(-1, FieldSet.of());
 			return IterablePPs.rangeMap(
 				0, size(),
 				index -> {
@@ -296,6 +298,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
+		indexField.initLateData(-1, FieldSet.of());
 		
 		return IterablePPs.rangeMap(
 			0, size(),

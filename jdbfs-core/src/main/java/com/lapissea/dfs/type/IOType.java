@@ -85,6 +85,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		public TypeRaw(Class<?> clazz){
 			this(clazz.getName());
+			typeClassCache = clazz;
 		}
 		public TypeRaw(String name){
 			String n;
@@ -94,7 +95,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				if(n == null) n = name;
 			}
 			this.name = n;
-			typeClassCache = clazz;
 		}
 		
 		@Override
