@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -276,7 +277,7 @@ public final class MemoryOperations{
 			chunks.sort(Chunk::compareTo);
 			while(chunks.size()>1){
 				var prev  = chunks.get(chunks.size() - 2);
-				var chunk = chunks.remove(chunks.size() - 1);
+				var chunk = chunks.removeLast();
 				assert prev.getPtr().getValue()<chunk.getPtr().getValue() : prev.getPtr() + " " + chunk.getPtr();
 				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
@@ -286,7 +287,7 @@ public final class MemoryOperations{
 					oks.add(chunk);
 				}
 			}
-			var chunk = chunks.remove(chunks.size() - 1);
+			var chunk = chunks.removeLast();
 			oks.add(chunk);
 		}
 		
@@ -529,7 +530,6 @@ public final class MemoryOperations{
 			toAllocate += target.getSize();
 			target = target.findPrev(first);
 			if(target == null) return 0;
-			nextSiz = target.getNextSize();
 		}
 		
 		IOInterface source = target.getDataProvider().getSource();
@@ -539,12 +539,14 @@ public final class MemoryOperations{
 			shiftSize = 0;
 		}
 		byte[] toShift;
-		try(var io = target.io()){
-			toShift = io.readInts1(shiftSize);
-			try(var pio = toPin.io()){
-				io.transferTo(pio);
+		if(shiftSize>0){
+			try(var io = target.io()){
+				toShift = io.readInts1(shiftSize);
+				try(var pio = toPin.io()){
+					io.transferTo(pio);
+				}
 			}
-		}
+		}else toShift = ZeroArrays.ZERO_BYTE;
 		
 		var oldCapacity = target.getCapacity();
 		var dataEnd     = target.dataEnd();
@@ -552,6 +554,16 @@ public final class MemoryOperations{
 		var toFree = target.next();
 		
 		target.requireReal();
+		
+		if(oldCapacity == growth){
+			var numSizShrink     = bodyNum.bytes*2;
+			var ptrSizeCandidate = nextSiz.bytes + numSizShrink;
+			var newPtrSizeO      = NumberSize.FLAG_INFO.stream().filter(n -> n.bytes == ptrSizeCandidate).findAny();
+			if(newPtrSizeO.isPresent()){
+				nextSiz = newPtrSizeO.get();
+				bodyNum = NumberSize.VOID;
+			}
+		}
 		
 		try{
 			target.setNextSize(nextSiz);
@@ -841,7 +853,7 @@ public final class MemoryOperations{
 			ref.getPtr().dereference(prov).addChainTo(chunks);
 		};
 		
-		rec.accept(val.getReference());
+		rec.accept(val.getPointer().makeReference());
 		new MemoryWalker(val, false, MemoryWalker.PointerRecord.of(rec)).walk();
 		return chunks;
 	}

@@ -194,7 +194,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	private static final byte CHECK_BIT_MASK;
 	
 	static{
-		if(PIPE.getSpecificFields().get(0) instanceof BitFieldMerger<?> bf){
+		if(PIPE.getSpecificFields().getFirst() instanceof BitFieldMerger<?> bf){
 			var layout = bf.getSafetyBits().orElseThrow();
 			
 			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);

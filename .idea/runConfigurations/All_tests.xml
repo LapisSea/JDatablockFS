@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All tests" type="TestNG">
-    <module name="jdbfs-run" />
     <shortenClasspath name="NONE" />
+    <extension name="coverage" per_test_coverage_enabled="false" sample_coverage="false" />
     <option name="SUITE_NAME" value="" />
     <option name="PACKAGE_NAME" value="com.lapissea.dfs" />
     <option name="MAIN_CLASS_NAME" value="" />

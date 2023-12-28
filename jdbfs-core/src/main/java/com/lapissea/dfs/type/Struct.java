@@ -20,8 +20,12 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.access.VirtualAccessor;
+import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
+import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -88,7 +92,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 * This is an unmanaged struct. It is like the regular {@link Struct} but it contains extra information
 	 * about unmanaged types.<br/>
 	 * Unmanaged struct are types that contain custom low level IO logic. Every unmanaged struct needs to
-	 * properly state the data it contains trough things such as {@link IOInstance.Unmanaged#listDynamicUnmanagedFields}
+	 * properly state the data it contains trough things such as {@link IOInstance.Unmanaged.DynamicFields#listDynamicUnmanagedFields}
 	 * for fields that may appear or change. For fields that are unchanging {@link IOUnmanagedValueInfo} is preferred.
 	 *
 	 * @param <T> the type of the containing class
@@ -151,27 +155,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		private Unmanaged(Class<T> type, boolean runNow){
 			super(type, runNow);
-			overridingDynamicUnmanaged = checkOverridingUnmanaged();
+			overridingDynamicUnmanaged = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
 			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class);
-		}
-		
-		private boolean checkOverridingUnmanaged(){
-			Class<?> t = getType();
-			while(true){
-				try{
-					return !t.getDeclaredMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
-				}catch(NoSuchMethodException e){
-					t = t.getSuperclass();
-				}
-			}
 		}
 		
 		public boolean isOverridingDynamicUnmanaged(){
 			return overridingDynamicUnmanaged;
 		}
 		
-		public T make(DataProvider provider, Reference reference, IOType type) throws IOException{
-			return unmanagedConstructor.make(provider, reference, type);
+		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
+			return unmanagedConstructor.make(provider, identity, type);
 		}
 		
 		@Deprecated
@@ -189,7 +182,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				IterablePPs.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -577,28 +570,31 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t -> t.getVirtual(null)).filter(Objects::nonNull);
+		return getFields().stream().map(t -> t.getVirtual(null)).flatMap(Optional::stream);
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools = virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
-		if(vPools.isEmpty()) return null;
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Ptr)
+		                                    .mapToInt(a -> a.getStoragePool().ordinal()).toArray();
+		if(vPools.length == 0) return null;
 		var poolPointerSizes = new short[StoragePool.values().length];
-		for(var vPool : vPools){
-			if(poolPointerSizes[vPool.ordinal()] == Short.MAX_VALUE) throw new OutOfMemoryError();
-			poolPointerSizes[vPool.ordinal()]++;
+		for(var vPoolIndex : vPools){
+			if(poolPointerSizes[vPoolIndex] == Short.MAX_VALUE)
+				throw new OutOfMemoryError("Too many fields that need " + StoragePool.values()[vPoolIndex] + " pool");
+			poolPointerSizes[vPoolIndex]++;
 		}
 		return poolPointerSizes;
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Primitive)
+		                                    .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes = new short[StoragePool.values().length];
 		for(var e : vPools.entrySet()){
 			var siz = e.getValue()
 			           .stream()
-			           .mapToInt(VirtualAccessor::getPrimitiveSize)
+			           .mapToInt(a -> ((Primitive)a.typeOff).size)
 			           .sum();
 			if(siz>Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolSizes[e.getKey().ordinal()] = (short)siz;
@@ -789,11 +785,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
+			fields.filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
 		);
 	}
 	
-	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
+	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, IterablePP<IOField<T, ?>> fields){
 		var    prefix = start;
 		String name   = null;
 		if(!doShort){
@@ -827,7 +823,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.map(fieldMapper)
+		var str = fields.stream().map(fieldMapper)
 		                .filter(Optional::isPresent).map(Optional::get)
 		                .collect(Collectors.joining(fieldSeparator, prefix, end));
 		
@@ -894,9 +890,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public GenericContext describeGenerics(IOType def){
-		return new GenericContext.Deferred(() -> {
-			return new GenericContext.TypeArgs(getType(), def.generic(null));
-		});
+		return GenericContext.of(getType(), def.generic(null));
 	}
 	
 	@Override

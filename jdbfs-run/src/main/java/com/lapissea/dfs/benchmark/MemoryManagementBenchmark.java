@@ -1,8 +1,8 @@
 package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.core.AllocateTicket;
-import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.util.LogUtil;

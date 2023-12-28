@@ -13,8 +13,8 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -37,10 +37,6 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class DynamicSupport{
-	
-	private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
-	
-	
 	@SuppressWarnings({"unchecked"})
 	public static long calcSize(DataProvider prov, Object val){
 		return switch(val){
@@ -56,7 +52,7 @@ public abstract class DynamicSupport{
 			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
-					yield REF_PIPE.calcUnknownSize(prov, u.getReference(), WordSpace.BYTE);
+					yield ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, u.getPointer(), WordSpace.BYTE);
 				}else{
 					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
@@ -83,7 +79,7 @@ public abstract class DynamicSupport{
 					if(IOInstance.isInstance(e)){
 						var struct = Struct.ofUnknown(e);
 						if(struct instanceof Struct.Unmanaged){
-							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> REF_PIPE.calcUnknownSize(prov, i.getReference(), WordSpace.BYTE)).sum();
+							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, i.getPointer(), WordSpace.BYTE)).sum();
 						}
 						
 						StructPipe pip = StandardStructPipe.of(struct);
@@ -131,7 +127,7 @@ public abstract class DynamicSupport{
 				num.write(dest, array.length);
 				dest.writeInts1(array);
 			}
-			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
+			case IOInstance.Unmanaged inst -> ChunkPointer.DYN_PIPE.write(provider, dest, inst.getPointer());
 			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
 			
@@ -159,7 +155,7 @@ public abstract class DynamicSupport{
 						if(struct instanceof Struct.Unmanaged){
 							var b = new ContentOutputBuilder();
 							for(var i : (IOInstance.Unmanaged<?>[])val){
-								REF_PIPE.write(provider, b, i.getReference());
+								ChunkPointer.DYN_PIPE.write(provider, b, i.getPointer());
 							}
 							b.writeTo(dest);
 							break;
@@ -304,8 +300,9 @@ public abstract class DynamicSupport{
 		
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
-			var ref     = REF_PIPE.readNew(provider, src, genericContext);
-			return uStruct.make(provider, ref, typDef);
+			var ptr     = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
+			var ch      = ptr.dereference(provider);
+			return uStruct.make(provider, ch, typDef);
 		}
 		if(IOInstance.isInstance(typ)){
 			var struct = Struct.ofUnknown(typ);
@@ -333,8 +330,9 @@ public abstract class DynamicSupport{
 				if(struct instanceof Struct.Unmanaged<?> u){
 					var arr = (IOInstance.Unmanaged<?>[])Array.newInstance(e, len);
 					for(int i = 0; i<arr.length; i++){
-						var ref = REF_PIPE.readNew(provider, src, null);
-						arr[i] = u.make(provider, ref, typDef);
+						var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, genericContext);
+						var ch  = ptr.dereference(provider);
+						arr[i] = u.make(provider, ch, typDef);
 					}
 					return arr;
 				}
@@ -377,12 +375,65 @@ public abstract class DynamicSupport{
 			AutoText.PIPE.skip(provider, src, genericContext);
 			return;
 		}
+		if(typ == byte[].class){
+			var bytes = src.readUnsignedInt4Dynamic();
+			src.skipExact(bytes);
+			return;
+		}
 		if(IOInstance.isInstance(typ)){
 			if(IOInstance.isUnmanaged(typ)){
-				REF_PIPE.skip(provider, src, genericContext);
+				ChunkPointer.DYN_PIPE.skip(provider, src, null);
 			}else{
 				skipStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
+			return;
+		}
+		
+		if(typ.isEnum()){
+			var universe = EnumUniverse.ofUnknown(typ);
+			universe.numSize(false).skip(src);
+			return;
+		}
+		
+		if(typ.isArray()){
+			int len = Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO).read(src));
+			
+			var e = typ.getComponentType();
+			
+			var pTypO = SupportedPrimitive.get(e);
+			if(pTypO.isPresent()){
+				var  pTyp = pTypO.get();
+				long bytes;
+				if(pTyp == SupportedPrimitive.BOOLEAN){
+					bytes = BitUtils.bitsToBytes(len);
+				}else{
+					bytes = len*pTyp.maxSize.get(WordSpace.BYTE);
+				}
+				src.skipExact(bytes);
+				return;
+			}
+			
+			if(IOInstance.isInstance(e)){
+				var struct = Struct.ofUnknown(e);
+				if(struct instanceof Struct.Unmanaged<?> u){
+					for(int i = 0; i<len; i++){
+						ChunkPointer.DYN_PIPE.skip(provider, src, null);
+					}
+					return;
+				}
+				
+				var pip = StandardStructPipe.of(struct);
+				for(int i = 0; i<len; i++){
+					pip.skip(provider, src, genericContext);
+				}
+				return;
+			}
+		}
+		
+		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
+		if(wrapper != null){
+			var pip = StandardStructPipe.of(wrapper.struct());
+			pip.skip(provider, src, genericContext);
 			return;
 		}
 		

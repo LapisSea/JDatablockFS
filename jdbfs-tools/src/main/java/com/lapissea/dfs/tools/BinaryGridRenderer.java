@@ -226,7 +226,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			synchronized(s.frames){
 				if(index == -1){
 					if(s.frames.isEmpty()) return null;
-					return s.frames.get(s.frames.size() - 1);
+					return s.frames.getLast();
 				}
 				return s.frames.get(index);
 			}
@@ -1015,7 +1015,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			
 			List<DrawFont.StringDraw> chars = null;
 			if(clampedOverflow.size() == 1){
-				var r = clampedOverflow.get(0);
+				var r = clampedOverflow.getFirst();
 				if(r.size() == 1){
 					var i = (int)r.from();
 					if(ctx.renderer.getFont().canFontDisplay(ctx.bytes[i])){
@@ -1268,7 +1268,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				flatRanges.add(new CRange(e.getValue(), DrawUtils.Range.fromSize(e.getKey(), 1)));
 				return;
 			}
-			var  last = flatRanges.get(flatRanges.size() - 1);
+			var  last = flatRanges.getLast();
 			long pos  = e.getKey();
 			if(last.col.equals(e.getValue()) && pos == last.rang.to()){
 				flatRanges.set(flatRanges.size() - 1, new CRange(e.getValue(), new DrawUtils.Range(last.rang.from(), e.getKey() + 1)));
@@ -1459,7 +1459,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								continue;
 							}
 							if(inst instanceof IOInstance.Unmanaged<?> unmanaged){
-								var        ref = unmanaged.getReference();
+								var        ref = unmanaged.getPointer().makeReference();
 								StructPipe pip = unmanaged.getPipe();
 								annotateStruct(ctx, (T)unmanaged, ref, pip, generics(instance, parentGenerics), annotate, noPtr);
 								if(annotate){
@@ -1664,7 +1664,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									List<IOInstance<?>> inst = (List<IOInstance<?>>)(isList? instTmp : ArrayViewList.create((Object[])instTmp, null));
 									if(inst.isEmpty()) continue;
 									
-									StructPipe elementPipe = StandardStructPipe.of(Struct.ofUnknown(inst.get(0).getClass()));
+									StructPipe elementPipe = StandardStructPipe.of(Struct.ofUnknown(inst.getFirst().getClass()));
 									long       arrOffset   = 0;
 									for(IOInstance val : inst){
 										annotateStruct(ctx, val, reference.addOffset(fieldOffset + arrOffset), elementPipe, generics(instance, parentGenerics), annotate, noPtr);

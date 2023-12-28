@@ -3,10 +3,9 @@ package com.lapissea.dfs.objects.collections;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.HashCommons;
-import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 
@@ -20,8 +19,8 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 	@IOValue
 	private ContiguousIOList<IONode<T>> data;
 	
-	public IOHashSet(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, ((IOType.RawAndArg)typeDef).withArgs(IOType.of(Object.class)));
+	public IOHashSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, ((IOType.RawAndArg)typeDef).withArgs(IOType.of(Object.class)));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();
@@ -110,11 +109,11 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 		var provider = getDataProvider();
 		try(var ignored = provider.getSource().openIOTransaction()){
 			
-			var b2 = data.getReference().ioMap(provider, RandomIO::remaining)*2;
+			var b2 = data.getPointer().dereference(provider).chainLength()*2;
 			var chunk = AllocateTicket.bytes(b2)
-			                          .withPositionMagnet(getReference().calcGlobalOffset(provider))
+			                          .withPositionMagnet(getPointer().getValue())
 			                          .submit(provider);
-			var newData  = new ContiguousIOList<IONode<T>>(getDataProvider(), chunk.getPtr().makeReference(), data.getTypeDef());
+			var newData  = new ContiguousIOList<IONode<T>>(getDataProvider(), chunk, data.getTypeDef());
 			var oldWidth = data.size();
 			var newWidth = oldWidth*2;
 			newData.addMultipleNew(newWidth);
@@ -151,8 +150,10 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 			var type        = IOType.of(IONode.class, genericType);
 			provider.getTypeDb().toID(type);
 			
-			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
-			var magnet       = OptionalLong.of(data.getReference().calcGlobalOffset(provider));
+			var ctx = getGenerics().argAsContext("T");
+			@SuppressWarnings("unchecked")
+			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, ctx, new ValueStorage.StorageRule.Default());
+			var magnet = OptionalLong.of(data.getPointer().getValue());
 			return IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), type, provider, magnet);
 		}
 	}

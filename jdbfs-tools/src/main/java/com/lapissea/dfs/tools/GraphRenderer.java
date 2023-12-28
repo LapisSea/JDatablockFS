@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -13,6 +12,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -96,7 +96,7 @@ public class GraphRenderer implements DataRenderer{
 			try{
 				if(index == -1){
 					if(s.frames.isEmpty()) return null;
-					return s.frames.get(s.frames.size() - 1);
+					return s.frames.getLast();
 				}
 				if(s.frames.isEmpty()) return null;
 				return s.frames.get(index);
@@ -231,7 +231,7 @@ public class GraphRenderer implements DataRenderer{
 			pos(pos);
 			try{
 				if(val instanceof IOInstance.Unmanaged u){
-					size = u.getReference().ioMap(provider, RandomIO::remaining);
+					size = u.getPointer().dereference(provider).chainSize();
 				}else if(val == null) size = 0;
 				else{
 					size = StandardStructPipe.sizeOfUnknown(provider, (IOInstance)val, WordSpace.BYTE);
@@ -801,7 +801,7 @@ public class GraphRenderer implements DataRenderer{
 				}
 				var val = field.get(pool, inst);
 				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
-					var    ref   = unmanaged.getReference().getPtr().getValue();
+					var    ref   = unmanaged.getPointer().getValue();
 					Bubble child = parent.child(undead, path + "." + field.getName());
 					scan(child, provider, ref, unmanaged);
 					continue;
@@ -855,7 +855,7 @@ public class GraphRenderer implements DataRenderer{
 				}
 				var val = field.get(pool, inst);
 				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
-					var    ref   = unmanaged.getReference().getPtr().getValue();
+					var    ref   = unmanaged.getPointer().getValue();
 					Bubble child = bubble.child(undead, field.getName());
 					scan(child, provider, ref, unmanaged);
 					continue;
@@ -885,7 +885,7 @@ public class GraphRenderer implements DataRenderer{
 	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, Struct<T> str){
 		var fields = str.getFields();
 		if(instance instanceof IOInstance.Unmanaged unmanaged){
-			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
+			return IterablePPs.of(fields, unmanaged.listUnmanagedFields()).flatMap(Iterable::iterator).iterator();
 		}else{
 			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
 		}

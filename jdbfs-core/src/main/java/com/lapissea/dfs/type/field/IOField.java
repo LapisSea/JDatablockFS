@@ -34,6 +34,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -364,10 +367,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return getAccessor() instanceof VirtualAccessor<?> acc &&
 		       (pool == null || acc.getStoragePool() == pool);
 	}
-	public final VirtualAccessor<T> getVirtual(StoragePool pool){
-		return getAccessor() instanceof VirtualAccessor<T> acc &&
-		       (pool == null || acc.getStoragePool() == pool)
-		       ? acc : null;
+	public final Optional<VirtualAccessor<T>> getVirtual(StoragePool pool){
+		if(getAccessor() instanceof VirtualAccessor<T> acc){
+			if(pool == null || acc.getStoragePool() == pool){
+				return Optional.of(acc);
+			}
+		}
+		return Optional.empty();
 	}
 	
 	public GenericContext makeContext(GenericContext parent){
@@ -382,13 +388,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	private void requireLateData(){
-		if(lateDataInitialized) return;
-		var struct = declaringStruct();
-		if(struct != null){
-			struct.waitForState(Struct.STATE_INIT_FIELDS);
+		if(!lateDataInitialized){
+			throw new IllegalStateException(this.getName() + " late data not initialized");
 		}
-		if(lateDataInitialized) return;
-		throw new IllegalStateException(this.getName() + " late data not initialized");
 	}
 	
 	@Nullable
@@ -470,7 +472,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return nullability;
 	}
 	private void calcNullability(){
-		nullability = accessor == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(accessor);
+		nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
 	}
 	
 	public final boolean nullable(){
@@ -514,12 +516,32 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public boolean needsIOPool(){
-		if(needsIOPool == null) calcNeedsIOPool();
+		if(needsIOPool == null) needsIOPool = calcNeedsIOPool();
 		return needsIOPool;
 	}
-	private void calcNeedsIOPool(){
-		//TODO: make this fully compliant and handle deep dependencies
-		needsIOPool = Stream.concat(Stream.of(this), dependencies == null? Stream.empty() : dependencies.stream())
-		                    .anyMatch((IOField<?, ?> f) -> f.isVirtual(StoragePool.IO));
+	private boolean calcNeedsIOPool(){
+		final var depSet  = new HashSet<IOField<T, ?>>(Set.of(this));
+		final var scanned = new HashSet<IOField<T, ?>>();
+		final var toAdd   = new ArrayList<Collection<IOField<T, ?>>>();
+		var       change  = true;
+		while(change){
+			change = false;
+			for(var dep : depSet){
+				if(scanned.contains(dep)) continue;
+				
+				if(dep.isVirtual(StoragePool.IO)){
+					return true;
+				}
+				if(dep.hasDependencies()){
+					toAdd.add(dep.getDependencies());
+				}
+				scanned.add(dep);
+			}
+			for(var col : toAdd){
+				change |= depSet.addAll(col);
+			}
+			toAdd.clear();
+		}
+		return false;
 	}
 }

@@ -4,6 +4,7 @@ import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.SyntheticWildcardType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
@@ -93,6 +94,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				if(n == null) n = name;
 			}
 			this.name = n;
+			typeClassCache = clazz;
 		}
 		
 		@Override
@@ -143,7 +145,16 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public Class<?> getTypeClass(IOTypeDB db){
 			var cache = typeClassCache;
-			if(cache != null) return cache;
+			if(cache != null){
+				if(db != null && cache.getClassLoader() instanceof TemplateClassLoader cl){
+					var dbcl = db.getTemplateLoader();
+					if(cl != dbcl){
+						//TODO: invalidate cache? Is identity safe due to weak ref?
+						throw new IllegalStateException("Mismatching classloader");
+					}
+				}
+				return cache;
+			}
 			var loaded = loadClass(db);
 			typeClassCache = loaded;
 			return loaded;
@@ -201,9 +212,16 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		protected Type makeGeneric(IOTypeDB db){
-			var args = new ArrayList<Type>(getArgs().size());
-			for(IOType arg : getArgs()){
-				args.add(arg.generic(db));
+			List<Type> args;
+			var        ioArgs = getArgs();
+			if(ioArgs.size() == 1){
+				args = List.of(ioArgs.getFirst().generic(db));
+			}else{
+				var arr = new Type[ioArgs.size()];
+				for(int i = 0; i<ioArgs.size(); i++){
+					arr[i] = ioArgs.get(i).generic(db);
+				}
+				args = List.of(arr);
 			}
 			return SyntheticParameterizedType.of(raw.getTypeClass(db), args);
 		}
@@ -225,6 +243,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		@Override
 		public String toString(){
+			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
 			return raw + args.stream().map(IOType::toString).collect(Collectors.joining(", ", "<", ">"));
 		}
 		@Override

@@ -113,9 +113,8 @@ public final class TestUtils{
 	) throws IOException{
 		UnsafeConsumer<DataProvider, IOException> ses = provider -> {
 			var chunk = AllocateTicket.bytes(initalCapacity).submit(provider);
-			var ref   = chunk.getPtr().makeReference(0);
 			
-			T obj = constr.make(provider, ref, typeDef);
+			T obj = constr.make(provider, chunk, typeDef);
 			
 			var actualSize = StandardStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
@@ -131,7 +130,7 @@ public final class TestUtils{
 			
 			T read;
 			try{
-				read = constr.make(provider, ref, typeDef);
+				read = constr.make(provider, chunk, typeDef);
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to read object with data", e);
 			}

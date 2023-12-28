@@ -78,7 +78,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		
 		@Override
 		public String toString(){
-			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type.toString() + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
+			if(type == null) return getClass().getSimpleName() + "<uninitialized>";
+			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
 		}
 		@Override
 		public String toShortString(){

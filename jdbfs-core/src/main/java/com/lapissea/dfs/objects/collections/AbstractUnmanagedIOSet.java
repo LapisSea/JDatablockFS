@@ -2,7 +2,7 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
@@ -20,11 +20,11 @@ public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<Abs
 	@IOValue
 	private long size;
 	
-	protected AbstractUnmanagedIOSet(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
-		super(provider, reference, typeDef, check);
+	protected AbstractUnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
+		super(provider, identity, typeDef, check);
 	}
-	public AbstractUnmanagedIOSet(DataProvider provider, Reference reference, IOType typeDef){
-		super(provider, reference, typeDef);
+	public AbstractUnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef){
+		super(provider, identity, typeDef);
 	}
 	
 	protected void deltaSize(long delta) throws IOException{

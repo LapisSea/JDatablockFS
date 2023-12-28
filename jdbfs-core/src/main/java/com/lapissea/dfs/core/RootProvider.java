@@ -86,7 +86,7 @@ public interface RootProvider extends DataProvider.Holder{
 						
 						var mem = AllocateTicket.bytes(siz).submit(provider);
 						
-						var inst = uStruct.make(provider, mem.getPtr().makeReference(), genericType);
+						var inst = uStruct.make(provider, mem, genericType);
 						return (T)inst;
 					});
 				}else{
@@ -110,7 +110,7 @@ public interface RootProvider extends DataProvider.Holder{
 			if(rawType.isEnum()){
 				var universe = EnumUniverse.ofUnknown(rawType);
 				if(universe.isEmpty()) throw new IllegalArgumentException();
-				return withGenerator(() -> (T)universe.get(0));
+				return withGenerator(() -> (T)universe.getFirst());
 			}
 			
 			if(rawType == String.class){

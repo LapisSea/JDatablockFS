@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.AllocateTicket;
-import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -63,7 +63,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
-	private final ObjectPipe<ValueType, ?> valuePipe = new ObjectPipe<>(){
+	private final ObjectPipe.NoPool<ValueType> valuePipe = new ObjectPipe.NoPool<>(){
 		
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, ValueType instance){
@@ -78,12 +78,8 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			throw NotImplementedException.infer();//TODO: implement .readNew()
 		}
 		@Override
-		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
+		public BasicSizeDescriptor<ValueType, Void> getSizeDescriptor(){
 			return BasicSizeDescriptor.Unknown.of((pool, prov, value) -> DynamicSupport.calcSize(prov, value));
-		}
-		@Override
-		public Object makeIOPool(){
-			return null;
 		}
 	};
 	

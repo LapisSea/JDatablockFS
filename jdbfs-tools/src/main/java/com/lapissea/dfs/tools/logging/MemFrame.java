@@ -55,7 +55,7 @@ public final class MemFrame implements Serializable{
 					
 					if(bp == b) continue;
 					if(!ranges.isEmpty()){
-						var r = ranges.get(ranges.size() - 1);
+						var r = ranges.getLast();
 						if(r.to == i){
 							r.to++;
 							continue;
@@ -67,8 +67,8 @@ public final class MemFrame implements Serializable{
 				return ranges;
 			}).reduce((l1, l2) -> {
 				if(!l1.isEmpty() && !l2.isEmpty()){
-					var a = l1.get(l1.size() - 1);
-					var b = l2.get(0);
+					var a = l1.getLast();
+					var b = l2.getFirst();
 					if(a.to == b.from){
 						a.to = b.to;
 						l2 = l2.subList(1, l2.size());

@@ -86,7 +86,7 @@ public final class IOFieldTools{
 		Runnable pushBuilt = () -> {
 			switch(bitBuilder.size()){
 				case 0 -> { }
-				case 1 -> result.add(bitBuilder.remove(0));
+				case 1 -> result.add(bitBuilder.removeFirst());
 				default -> {
 					result.add(BitFieldMerger.of(bitBuilder));
 					bitBuilder.clear();

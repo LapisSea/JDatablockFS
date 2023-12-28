@@ -240,7 +240,7 @@ public final class ConfigTools{
 			var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
 			for(var e : groups.entrySet()){
 				if(e.getValue().size() == 1){
-					singles.add(e.getValue().get(0));
+					singles.add(e.getValue().getFirst());
 				}else{
 					groupsE.add(e);
 				}
@@ -275,7 +275,7 @@ public final class ConfigTools{
 			  .append(gName.length()>2? TextUtil.firstToUpperCase(gName) : gName).append(' ')
 			  .append("-".repeat(after)).append('\n');
 			
-			var len = Arrays.stream(elements.get(0).name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
+			var len = Arrays.stream(elements.getFirst().name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
 			for(var e : elements){
 				var name     = e.name;
 				var val      = e.val;

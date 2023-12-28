@@ -9,10 +9,12 @@ import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -20,6 +22,7 @@ import com.lapissea.util.function.TriFunction;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -35,7 +38,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.INSTANCE;
@@ -86,7 +88,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		static <T extends Def<T>> IntFunction<T> constrRefI(Class<T> type){
-			class Cache{
+			final class Cache{
 				static final Map<Class<?>, IntFunction<?>> CH = new ConcurrentHashMap<>();
 			}
 			
@@ -101,7 +103,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			});
 		}
 		static <T extends Def<T>> LongFunction<T> constrRefL(Class<T> type){
-			class Cache{
+			final class Cache{
 				static final Map<Class<?>, LongFunction<?>> CH = new ConcurrentHashMap<>();
 			}
 			
@@ -118,7 +120,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		static <T extends Def<T>, A1> Function<A1, T> constrRef(Class<T> type, Class<A1> arg1Type){
 			record Sig(Class<?> c, Class<?> arg){ }
-			class Cache{
+			final class Cache{
 				static final Map<Sig, Function<?, ?>> CH = new ConcurrentHashMap<>();
 			}
 			
@@ -135,7 +137,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		static <T extends Def<T>, A1, A2> BiFunction<A1, A2, T> constrRef(Class<T> type, Class<A1> arg1Type, Class<A1> arg2Type){
 			record Sig(Class<?> c, Class<?> arg1, Class<?> arg2){ }
-			class Cache{
+			final class Cache{
 				static final Map<Sig, BiFunction<?, ?, ?>> CH = new ConcurrentHashMap<>();
 			}
 			//noinspection unchecked
@@ -151,7 +153,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		static <T extends Def<T>, A1, A2, A3> TriFunction<A1, A2, A3, T> constrRef(Class<T> type, Class<A1> arg1Type, Class<A1> arg2Type, Class<A1> arg3Type){
 			record Sig(Class<?> c, Class<?> arg1, Class<?> arg2, Class<?> arg3){ }
-			class Cache{
+			final class Cache{
 				static final Map<Sig, TriFunction<?, ?, ?, ?>> CH = new ConcurrentHashMap<>();
 			}
 			//noinspection unchecked
@@ -167,7 +169,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		static <T extends Def<T>> MethodHandle constrRef(Class<T> type, Class<?>... argTypes){
 			record Sig(Class<?> c, Class<?>[] args){ }
-			class Cache{
+			final class Cache{
 				static final Map<Sig, MethodHandle> CH = new ConcurrentHashMap<>();
 			}
 			return Cache.CH.computeIfAbsent(new Sig(ensureConcrete(type), argTypes.clone()), t -> {
@@ -408,6 +410,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	abstract class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance.Managed<SELF> implements DataProvider.Holder{
 		
+		public interface DynamicFields<SELF extends Unmanaged<SELF>>{
+			@NotNull
+			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
+		}
+		
 		private final DataProvider   provider;
 		private       Chunk          identity;
 		private final IOType         typeDef;
@@ -417,58 +424,65 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		protected final boolean readOnly;
 		
-		protected Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
-			this(thisStruct, provider, reference, typeDef);
+		protected Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
+			this(thisStruct, provider, identity, typeDef);
 			check.ensureValid(typeDef, provider.getTypeDb());
 		}
 		
-		protected Unmanaged(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){
-			this(provider, reference, typeDef);
+		protected Unmanaged(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
+			this(provider, identity, typeDef);
 			check.ensureValid(typeDef, provider.getTypeDb());
 		}
 		
-		public Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, IOType typeDef){
+		public Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Chunk identity, IOType typeDef){
 			super(thisStruct);
 			this.provider = Objects.requireNonNull(provider);
-			setIdentity(reference);
+			setIdentity(identity);
 			this.typeDef = typeDef;
 			readOnly = getDataProvider().isReadOnly();
 		}
 		
-		public Unmanaged(DataProvider provider, Reference reference, IOType typeDef){
+		public Unmanaged(DataProvider provider, Chunk identity, IOType typeDef){
 			this.provider = Objects.requireNonNull(provider);
-			setIdentity(reference);
+			setIdentity(identity);
 			this.typeDef = typeDef;
 			readOnly = getDataProvider().isReadOnly();
 		}
 		
 		private void setIdentity(Reference reference){
-			if(reference.getOffset() != 0){
-				throw new IllegalStateException();
-			}
 			try{
-				identity = provider.getChunk(reference.getPtr());
+				setIdentity(reference.asJustChunk(provider));
 			}catch(IOException e){
-				throw new RuntimeException(e);
+				throw new UncheckedIOException(e);
 			}
 		}
+		private void setIdentity(Chunk reference){
+			if(DEBUG_VALIDATION){
+				try{
+					reference.requireReal();
+				}catch(IOException e){
+					throw new UncheckedIOException(e);
+				}
+			}
+			identity = reference;
+		}
+		
 		private Chunk getIdentity(){
 			return identity;
 		}
 		
+		@SuppressWarnings("unchecked")
 		@NotNull
-		protected Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
-			return Stream.of();
-		}
-		
-		@NotNull
-		public final Stream<IOField<SELF, ?>> listUnmanagedFields(){
+		public final Iterable<IOField<SELF, ?>> listUnmanagedFields(){
 			var s  = getThisStruct();
-			var fs = s.getUnmanagedStaticFields().stream();
+			var fs = s.getUnmanagedStaticFields();
 			if(!s.isOverridingDynamicUnmanaged()){
 				return fs;
 			}
-			return Stream.concat(listDynamicUnmanagedFields(), fs);
+			var dynamic = ((DynamicFields<SELF>)this).listDynamicUnmanagedFields();
+			if(fs.isEmpty()) return dynamic;
+			
+			return IterablePPs.concat(fs, dynamic);
 		}
 		
 		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
@@ -487,8 +501,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public final GenericContext getGenerics(){
 			if(genericCtx == null){
 				genericCtx = getThisStruct().describeGenerics(typeDef);
-			}else if(genericCtx instanceof GenericContext.Deferred d && d.dataBaked()){
-				genericCtx = d.actualData();
 			}
 			return genericCtx;
 		}
@@ -499,21 +511,37 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final boolean isSelfDataEmpty(){
-			return getIdentity().getSize() == 0;
+			var id = getIdentity();
+			if(id.getSize()>0){
+				return false;
+			}
+			try{
+				var next = id.next();
+				if(next != null){
+					for(Chunk chunk : next.walkNext()){
+						if(chunk.getSize()>0){
+							return false;
+						}
+					}
+				}
+			}catch(IOException e){
+				throw new UncheckedIOException(e);
+			}
+			return true;
 		}
 		
-		public final void notifyReferenceMovement(Reference newRef){
-			newRef.requireNonNull();
+		public final void notifyReferenceMovement(Chunk newRef){
+			Objects.requireNonNull(newRef);
 			
 			if(DEBUG_VALIDATION) ensureDataIntegrity(newRef);
 			
 			setIdentity(newRef);
 		}
 		
-		private void ensureDataIntegrity(Reference newRef){
+		private void ensureDataIntegrity(Chunk newRef){
 			byte[] oldData, newData;
 			try(var oldIo = selfIO();
-			    var newIo = newRef.io(this)
+			    var newIo = newRef.io()
 			){
 				oldData = oldIo.readRemaining();
 				newData = newIo.readRemaining();
@@ -585,6 +613,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			}
 			try(var io = selfIO()){
 				getPipe().write(provider, io, self());
+				var struct = getThisStruct();
+				if(!struct.isOverridingDynamicUnmanaged() && struct.getUnmanagedStaticFields().isEmpty()){
+					io.trim();
+				}
 			}
 		}
 		protected final void readManagedFields() throws IOException{
@@ -614,8 +646,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return siz.calcUnknown(pip.makeIOPool(), getDataProvider(), self(), wordSpace);
 		}
 		
-		public final Reference getReference(){
-			return getIdentity().getPtr().makeReference();
+		public final ChunkPointer getPointer(){
+			return getIdentity().getPtr();
 		}
 		
 		protected final void allocateNulls() throws IOException{

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
@@ -271,7 +272,7 @@ public final class IOTransactionBuffer{
 	private long getCapacity0(long fallback){
 		if(modifiedCapacity == -1){
 			if(!writeEvents.isEmpty()){
-				var last = writeEvents.get(writeEvents.size() - 1);
+				var last = writeEvents.getLast();
 				if(last.end()>fallback){
 					modifiedCapacity = last.end();
 					return last.end();
@@ -325,6 +326,14 @@ public final class IOTransactionBuffer{
 		write(offset, new byte[]{(byte)b}, 0, 1);
 	}
 	
+	public void writeChunks(Collection<RandomIO.WriteChunk> writeData){
+		try(var ignored = lock.write()){
+			for(var e : writeData){
+				write0(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+			}
+		}
+	}
+	
 	public void write(long offset, byte[] b, int off, int len){
 		try(var ignored = lock.write()){
 			write0(offset, b, off, len);
@@ -335,12 +344,12 @@ public final class IOTransactionBuffer{
 		try(var ignored = lock.write()){
 			var newEnd = offset + len;
 			if(!writeEvents.isEmpty()){
-				if(writeEvents.get(0).start()>newEnd){
-					writeEvents.add(0, makeWordEvent(offset, v, len));
+				if(writeEvents.getFirst().start()>newEnd){
+					writeEvents.addFirst(makeWordEvent(offset, v, len));
 					markIndexDirty(0);
 					return;
 				}
-				if(writeEvents.get(writeEvents.size() - 1).end()<offset){
+				if(writeEvents.getLast().end()<offset){
 					writeEvents.add(makeWordEvent(offset, v, len));
 					markIndexDirty(writeEvents.size() - 1);
 					return;
@@ -378,12 +387,12 @@ public final class IOTransactionBuffer{
 		var newEnd   = offset + len;
 		try{
 			if(!writeEvents.isEmpty()){
-				if(writeEvents.get(0).start()>newEnd){
-					writeEvents.add(0, makeEvent(offset, b, off, len));
+				if(writeEvents.getFirst().start()>newEnd){
+					writeEvents.addFirst(makeEvent(offset, b, off, len));
 					markIndexDirty(0);
 					return;
 				}
-				if(writeEvents.get(writeEvents.size() - 1).end()<newStart){
+				if(writeEvents.getLast().end()<newStart){
 					writeEvents.add(makeEvent(offset, b, off, len));
 					markIndexDirty(writeEvents.size() - 1);
 					return;
@@ -455,7 +464,7 @@ public final class IOTransactionBuffer{
 			askOptimize();
 		}finally{
 			if(modifiedCapacity != -1){
-				var last = writeEvents.get(writeEvents.size() - 1);
+				var last = writeEvents.getLast();
 				if(last.end()>modifiedCapacity){
 					modifiedCapacity = last.end();
 				}
@@ -576,7 +585,7 @@ public final class IOTransactionBuffer{
 			switch(writes.size()){
 				case 0 -> { }
 				case 1 -> {
-					var e = writes.get(0);
+					var e = writes.getFirst();
 					io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
 				}
 				default -> io.writeAtOffsets(writes);
@@ -616,7 +625,7 @@ public final class IOTransactionBuffer{
 	public String infoString(){
 		try(var ignored = lock.read()){
 			if(writeEvents.isEmpty()) return "no data";
-			return getTotalBytes() + " bytes overridden in range " + writeEvents.get(0).start() + " - " + writeEvents.get(writeEvents.size() - 1).end();
+			return getTotalBytes() + " bytes overridden in range " + writeEvents.getFirst().start() + " - " + writeEvents.getLast().end();
 		}
 	}
 	

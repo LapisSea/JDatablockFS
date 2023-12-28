@@ -68,7 +68,7 @@ public class G2DBackend extends RenderBackend{
 		@Override
 		public void fillStrings(List<StringDraw> strings){
 			for(List<StringDraw> batch : strings.size()<=1? List.of(strings) : strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
-				var pixelHeight = batch.get(0).pixelHeight();
+				var pixelHeight = batch.getFirst().pixelHeight();
 				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
 				for(StringDraw sd : batch){
 					var col = alphaScale(sd.color(), pixelHeight, false);
@@ -89,7 +89,7 @@ public class G2DBackend extends RenderBackend{
 		public void outlineStrings(List<StringDraw> strings){
 			
 			for(List<StringDraw> batch : strings.size()<=1? List.of(strings) : strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
-				var pixelHeight = batch.get(0).pixelHeight();
+				var pixelHeight = batch.getFirst().pixelHeight();
 				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
 				
 				setStrokeWidth(1);

@@ -272,7 +272,7 @@ public class Log{
 					i += 1 + col.name.length();
 					continue;
 				}else if(c == '#' && message.charAt(i + 1) == '}'){
-					var col = colorStack.remove(colorStack.size() - 1);
+					var col = colorStack.removeLast();
 					formatted.append(col);
 					last = col;
 					i++;

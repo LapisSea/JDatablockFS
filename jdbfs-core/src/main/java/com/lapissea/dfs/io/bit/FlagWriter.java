@@ -107,6 +107,10 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		numberSize.write(dest, off, buffer);
 	}
 	
+	public long getBuffer(){
+		return buffer;
+	}
+	
 	@Override
 	public String toString(){
 		var  bits = numberSize.bits();

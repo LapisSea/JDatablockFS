@@ -2,6 +2,7 @@ package com.lapissea.dfs.objects;
 
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.IOTransactionBuffer;
@@ -169,9 +170,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(var e : writeData){
-					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
-				}
+				transactionBuff.writeChunks(writeData);
 				return;
 			}
 			data.writeAtOffsets(writeData);
@@ -209,11 +208,11 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 	
 	public static Blob request(DataProvider provider, long capacity) throws IOException{
 		var ch = AllocateTicket.bytes(capacity).submit(provider);
-		return new Blob(provider, ch.getPtr().makeReference(), IOType.of(Blob.class));
+		return new Blob(provider, ch, IOType.of(Blob.class));
 	}
 	
-	public Blob(DataProvider provider, Reference reference, IOType typeDef){
-		super(provider, reference, typeDef);
+	public Blob(DataProvider provider, Chunk identity, IOType typeDef){
+		super(provider, identity, typeDef);
 		assert StandardStructPipe.of(getThisStruct()).getSizeDescriptor().getMin() == 0;
 	}
 	

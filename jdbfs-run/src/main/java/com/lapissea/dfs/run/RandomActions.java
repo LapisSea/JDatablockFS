@@ -1,12 +1,13 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.core.AllocateTicket;
-import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
+import com.lapissea.dfs.objects.collections.IOTreeSet;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -54,7 +55,7 @@ public final class RandomActions{
 				l.stream().map(Method::getName).collect(Collectors.joining(", "))
 			);
 		}
-		var meth = l.get(0);
+		var meth = l.getFirst();
 		LogUtil.println(meth);
 		var start = Instant.now();
 		meth.invoke(null);
@@ -108,7 +109,7 @@ public final class RandomActions{
 	
 	private static void treeSet() throws IOException{
 		var provider = Cluster.emptyMem();
-		var set      = provider.roots().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var set      = provider.roots().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
 		
 		
 		var r    = new RawRandom(420);
@@ -159,7 +160,7 @@ public final class RandomActions{
 				var ch = chs.get(id);
 				if(id == chs.size() - 1){
 					chs.remove(id);
-					while(!chs.isEmpty() && chs.get(chs.size() - 1) == null) chs.remove(chs.size() - 1);
+					while(!chs.isEmpty() && chs.getLast() == null) chs.removeLast();
 				}else chs.set(id, null);
 				
 				provider.getMemoryManager().free(ch);
@@ -173,7 +174,7 @@ public final class RandomActions{
 		var set = provider.roots().<IOHashSet<Object>>request("hi", IOHashSet.class);
 		
 		var r = new RawRandom(69);
-		runIter(50000000, 200000, () -> {
+		runIter(50000000, 50000000/200, () -> {
 			Integer num = r.nextInt(400);
 			switch(r.nextInt(3)){
 				case 0 -> set.add(num);

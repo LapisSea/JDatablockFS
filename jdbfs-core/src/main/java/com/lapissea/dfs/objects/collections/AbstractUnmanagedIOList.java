@@ -1,7 +1,7 @@
 package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.RuntimeType;
@@ -20,8 +20,8 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	private IOField<SELF, ?> sizeField;
 	
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, IOType typeDef, TypeCheck check){ super(provider, reference, typeDef, check); }
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, IOType typeDef)                 { super(provider, reference, typeDef); }
+	public AbstractUnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
+	public AbstractUnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef)                 { super(provider, identity, typeDef); }
 	
 	public abstract RuntimeType<T> getElementType();
 	
@@ -66,7 +66,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@Override
 	public int hashCode(){
 		int result = 1;
-		result = 31*result + getReference().hashCode();
+		result = 31*result + getPointer().hashCode();
 		result = 31*result + getElementType().hashCode();
 		return result;
 	}
@@ -75,7 +75,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	protected String getStringPrefix(){ return ""; }
 	
 	private String freeStr(){
-		return getStringPrefix() + "{size: " + size() + ", at: " + getReference() + " deallocated}";
+		return getStringPrefix() + "{size: " + size() + ", at: " + getPointer() + " deallocated}";
 	}
 	
 	@Override
@@ -102,10 +102,10 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@Override
 	public boolean isFreed(){
 		if(super.isFreed()) return true;
-		if(DEBUG_VALIDATION){
+		if(DEBUG_VALIDATION && getDataProvider().getMemoryManager() != null){
 			boolean dataFreed;
 			try{
-				dataFreed = getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
+				dataFreed = getDataProvider().getMemoryManager().getFreeChunks().contains(getPointer());
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}

@@ -158,6 +158,7 @@ public final class Cluster implements DataProvider{
 		}
 		@Override
 		public String toShortString(){
+			if(db == null) return "<uninitialized>";
 			return "{db: " + db.toShortString() + ", " +
 			       freeChunks.size() + " freeChunks, " +
 			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
@@ -251,7 +252,7 @@ public final class Cluster implements DataProvider{
 			this,
 			metadata.freeChunks
 				.mappedView(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class))
-				.cachedView(128)
+				.cachedView(128, 128)
 		);
 		
 		if(GlobalConfig.TYPE_VALIDATION){

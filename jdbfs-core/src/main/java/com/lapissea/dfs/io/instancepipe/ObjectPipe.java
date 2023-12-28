@@ -13,6 +13,13 @@ import java.io.IOException;
 
 public interface ObjectPipe<T, PoolType>{
 	
+	abstract class NoPool<T> implements ObjectPipe<T, Void>{
+		@Override
+		public final Void makeIOPool(){
+			return null;
+		}
+	}
+	
 	void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
 	T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;

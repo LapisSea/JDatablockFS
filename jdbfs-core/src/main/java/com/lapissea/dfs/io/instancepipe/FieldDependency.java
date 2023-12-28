@@ -45,7 +45,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()) return emptyTicket();
 		if(selectedFields.size() == 1){
-			return getDeps(selectedFields.get(0));
+			return getDeps(selectedFields.getFirst());
 		}
 		
 		try(var ignored = multiDependencyCacheLock.read()){

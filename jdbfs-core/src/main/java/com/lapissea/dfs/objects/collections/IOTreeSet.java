@@ -2,8 +2,8 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOTransaction;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.NewObj;
@@ -139,8 +139,8 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		RawCheck.of(Comparable.class::isAssignableFrom, "is not Comparable").arg()
 	);
 	
-	public IOTreeSet(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.of(Object.class)));
+	public IOTreeSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.of(Object.class)));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();
@@ -462,7 +462,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			IOFieldTools.requireFieldsEquals(cached, read, "Cache desync");
 		}
 		
-		var root = nodes.get(0);
+		var root = nodes.getFirst();
 		if(!root.hasValue()){
 			throw new IllegalStateException("Root has no value!");
 		}

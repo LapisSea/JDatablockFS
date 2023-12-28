@@ -9,14 +9,12 @@ import com.lapissea.dfs.tools.DisplayManager;
 import com.lapissea.dfs.tools.server.DisplayIpc;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -24,11 +22,11 @@ import java.util.stream.LongStream;
 
 public final class LoggedMemoryUtils{
 	
-	private static WeakReference<MemoryLogConfig> CONFIG = new WeakReference<>(null);
+	private static MemoryLogConfig CONFIG;
 	
 	public static synchronized MemoryLogConfig readConfig(){
-		MemoryLogConfig config = CONFIG.get();
-		if(config != null) return config;
+		var c = CONFIG;
+		if(c != null) return c;
 		
 		Map<String, Object> data;
 		var                 f = new File("config.json").getAbsoluteFile();
@@ -43,13 +41,7 @@ public final class LoggedMemoryUtils{
 			Log.warn("Unable to load config: {}", e);
 		}
 		
-		var newConf = new MemoryLogConfig(data);
-		Thread.startVirtualThread(() -> {
-			UtilL.sleep(2000);
-			var ref = newConf;
-		});
-		CONFIG = new WeakReference<>(newConf);
-		return newConf;
+		return CONFIG = new MemoryLogConfig(data);
 	}
 	
 	public static void simpleLoggedMemorySession(UnsafeConsumer<IOInterface, IOException> session) throws IOException{
@@ -115,7 +107,7 @@ public final class LoggedMemoryUtils{
 			try(var ignored = lock.open()){
 				var ses = logger.get().getSession(sessionName);
 				while(!preBuf.isEmpty()){
-					ses.log(preBuf.remove(0));
+					ses.log(preBuf.removeFirst());
 				}
 			}catch(DataLogger.Closed ignored){
 			}
@@ -133,7 +125,7 @@ public final class LoggedMemoryUtils{
 				if(asyncLoad || logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
-						ses.log(preBuf.remove(0));
+						ses.log(preBuf.removeFirst());
 					}
 					ses.log(memFrame);
 				}else{

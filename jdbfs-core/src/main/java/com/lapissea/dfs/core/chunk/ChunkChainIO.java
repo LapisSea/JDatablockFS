@@ -360,6 +360,27 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public void write(int b) throws IOException{
+		if(DEBUG_VALIDATION){
+			checkCursorInChain();
+		}
+		
+		long offset = calcCursorOffset();
+		long cRem   = cursor.getCapacity() - offset;
+		if(cRem>=1){
+			cursor.pushSize(offset + 1);
+			if(cursor.dirty()){
+				var chunks = new ArrayList<WriteChunk>(2);
+				writeHeadToBuf(chunks, cursor);
+				chunks.add(new WriteChunk(calcGlobalPos(), 0, 1, new byte[]{(byte)b}));
+				source.writeAtOffsets(chunks);
+			}else{
+				syncSourceCursor();
+				source.write(b);
+			}
+			advanceCursorBy(1);
+			return;
+		}
+		
 		write(new byte[]{(byte)b}, 0, 1);
 	}
 	
@@ -549,7 +570,7 @@ public final class ChunkChainIO implements RandomIO{
 		
 		while(iter.hasNext() || !redo.isEmpty()){
 			WriteChunk unmapped;
-			if(!redo.isEmpty()) unmapped = redo.remove(0);
+			if(!redo.isEmpty()) unmapped = redo.removeFirst();
 			else{
 				unmapped = iter.next();
 			}

@@ -104,7 +104,7 @@ public final class CommandSet{
 			optionals.clear();
 			
 			if(!commands.isEmpty()){
-				var last = commands.get(commands.size() - 1);
+				var last = commands.getLast();
 				if(last instanceof Obj o){
 					commands.set(commands.size() - 1, new Obj(o.cmd, false));
 				}

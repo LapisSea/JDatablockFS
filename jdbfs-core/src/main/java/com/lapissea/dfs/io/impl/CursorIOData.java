@@ -182,9 +182,7 @@ public abstract class CursorIOData implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(var e : writeData){
-					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
-				}
+				transactionBuff.writeChunks(writeData);
 				return;
 			}
 			

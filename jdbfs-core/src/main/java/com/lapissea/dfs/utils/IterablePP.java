@@ -3,9 +3,11 @@ package com.lapissea.dfs.utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.BinaryOperator;
@@ -42,6 +44,16 @@ public interface IterablePP<T> extends Iterable<T>{
 		var res = new HashSet<T>();
 		for(T t : this){
 			res.add(t);
+		}
+		return res;
+	}
+	default <K, V> Map<K, V> collectToMap(Function<T, K> key, Function<T, V> value){
+		var res = new HashMap<K, V>();
+		for(T t : this){
+			var k = key.apply(t);
+			if(res.put(k, value.apply(t)) != null){
+				throw new IllegalStateException("Duplicate key of: " + k);
+			}
 		}
 		return res;
 	}
@@ -215,6 +227,103 @@ public interface IterablePP<T> extends Iterable<T>{
 	
 	default OptionalPP<T> max(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.maxBy(comparator));
+	}
+	
+	interface Enumerator<T, R>{
+		R enumerate(int index, T value);
+	}
+	
+	interface EnumeratorL<T, R>{
+		R enumerate(long index, T value);
+	}
+	
+	record IdxValue<T>(int index, T val) implements Map.Entry<Integer, T>{
+		@Override
+		public Integer getKey(){ return index; }
+		@Override
+		public T getValue(){ return val; }
+		@Override
+		public T setValue(T value){ throw new UnsupportedOperationException(); }
+	}
+	
+	record LdxValue<T>(long index, T val) implements Map.Entry<Long, T>{
+		@Override
+		public Long getKey(){ return index; }
+		@Override
+		public T getValue(){ return val; }
+		@Override
+		public T setValue(T value){ throw new UnsupportedOperationException(); }
+	}
+	
+	default IterablePP<IdxValue<T>> enumerate(){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private int index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public IdxValue<T> next(){
+					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					return new IdxValue<>(index++, src.next());
+				}
+			};
+		};
+	}
+	
+	default IterablePP<LdxValue<T>> enumerateL(){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private long index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public LdxValue<T> next(){
+					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					return new LdxValue<>(index++, src.next());
+				}
+			};
+		};
+	}
+	
+	default <R> IterablePP<R> enumerate(Enumerator<T, R> enumerator){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private int index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public R next(){
+					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					return enumerator.enumerate(index++, src.next());
+				}
+			};
+		};
+	}
+	default <R> IterablePP<R> enumerateL(EnumeratorL<T, R> enumerator){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private long index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public R next(){
+					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					return enumerator.enumerate(index++, src.next());
+				}
+			};
+		};
 	}
 	
 }

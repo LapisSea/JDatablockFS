@@ -203,7 +203,7 @@ public class InstanceCollection{
 			super(accessor, SizeDescriptor.Fixed.empty());
 			dataAdapter = makeAdapter(accessor, dataAdapterType);
 			
-			refPipe = new ObjectPipe<>(){
+			refPipe = new ObjectPipe.NoPool<>(){
 				@Override
 				public void write(DataProvider provider, ContentWriter dest, CollectionType instance) throws IOException{
 					var        size   = dataAdapter.getSize(instance);
@@ -267,11 +267,6 @@ public class InstanceCollection{
 							return OptionalLong.empty();
 						}
 					};
-				}
-				
-				@Override
-				public Void makeIOPool(){
-					return null;
 				}
 			};
 		}
