@@ -2,231 +2,208 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public interface GenericContext extends Stringify{
+public final class GenericContext implements Stringify{
 	
-	static GenericContext of(Class<?> type, Type actual){
-		return new GenericContext.Deferred(() -> {
-			return new GenericContext.TypeArgs(type, actual);
-		});
+	public static GenericContext of(Class<?> type, Type actual){
+		return new GenericContext(type, actual);
 	}
 	
-	final class TypeArgs implements GenericContext, Stringify{
-		private final String[] typeNames;
-		private final char[]   typeNamesC;
-		private final Type[]   actualTypes;
-		private final Class<?> type;
-		
-		public TypeArgs(Class<?> type, Type actual){
-			this.type = type;
-			var params     = type.getTypeParameters();
-			var actualArgs = actual instanceof ParameterizedType p? p.getActualTypeArguments() : new Type[0];
-			
-			String[] typeNames  = null;
-			char[]   typeNamesC = null;
-			for(int i = 0; i<params.length; i++){
-				var name = params[i].getName();
-				if(name.length() == 1){
-					if(typeNamesC == null) typeNamesC = new char[params.length];
-					typeNamesC[i] = name.charAt(0);
-					continue;
+	private static final GenericContext[] RAW_CACHE = new GenericContext[16];
+	private static       int              cacheRollIndex;
+	
+	private static GenericContext getRawCache(Class<?> type){
+		for(var gen : RAW_CACHE){
+			if(gen == null || gen.owner != type) continue;
+			return gen;
+		}
+		return null;
+	}
+	
+	private static void putRawCache(GenericContext type){
+		for(int i = 0; i<RAW_CACHE.length; i++){
+			var lambSauce = RAW_CACHE[i];
+			if(lambSauce == null){
+				RAW_CACHE[i] = type;
+				return;
+			}
+		}
+		var i = cacheRollIndex++;
+		if(i>=RAW_CACHE.length) i = cacheRollIndex = 0;
+		RAW_CACHE[i] = type;
+	}
+	
+	public static GenericContext of(Class<?> owner){
+		var cached = getRawCache(owner);
+		if(cached != null) return cached;
+		return fromRaw(owner);
+	}
+	
+	private static GenericContext fromRaw(Class<?> owner){
+		var parms = owner.getTypeParameters();
+		List<Type> args = switch(parms.length){
+			case 0 -> List.of();
+			case 1 -> List.of(parms[0].getBounds()[0]);
+			case 2 -> List.of(parms[0].getBounds()[0], parms[1].getBounds()[0]);
+			default -> {
+				var rawArgs = new Type[parms.length];
+				for(int i = 0; i<parms.length; i++){
+					rawArgs[i] = parms[i].getBounds()[0];
 				}
-				if(typeNames == null) typeNames = new String[params.length];
-				typeNames[i] = name;
+				yield List.of(rawArgs);
 			}
-			this.typeNames = typeNames;
-			this.typeNamesC = typeNamesC;
-			actualTypes = actualArgs;
-		}
+		};
+		var parm = SyntheticParameterizedType.of(owner, args);
+		var ctx  = new GenericContext(owner, parm);
+		putRawCache(ctx);
+		return ctx;
+	}
+	
+	private final String[]   typeNames;
+	private final char[]     typeNamesC;
+	private final List<Type> actualTypes;
+	
+	public final Class<?> owner;
+	
+	private GenericContext(Class<?> owner, Type actual){
+		this.owner = owner;
+		var params = owner.getTypeParameters();
+		actualTypes = switch(actual){
+			case SyntheticParameterizedType syn -> syn.getActualTypeArgumentsList();
+			case ParameterizedType parm -> Arrays.asList(parm.getActualTypeArguments());
+			default -> List.of();
+		};
 		
-		@Override
-		public Class<?> owner(){
-			return type;
-		}
-		
-		@Override
-		public String toString(){
-			return Utils.typeToHuman(type, false) +
-			       IntStream.range(0, actualTypes.length)
-			                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes[i], false))
-			                .collect(Collectors.joining(", ", "<", ">"));
-		}
-		@Override
-		public String toShortString(){
-			return Utils.typeToHuman(type, true) +
-			       IntStream.range(0, actualTypes.length)
-			                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes[i], true))
-			                .collect(Collectors.joining(", ", "<", ">"));
-		}
-		private String strName(int i){
-			if(typeNames != null){
-				var name = typeNames[i];
-				if(name != null) return name;
-			}
-			return "" + typeNamesC[i];
-		}
-		
-		private Type getType(String name){
-			find:
+		String[] typeNames  = null;
+		char[]   typeNamesC = null;
+		for(int i = 0; i<params.length; i++){
+			var name = params[i].getName();
 			if(name.length() == 1){
-				if(typeNamesC == null) break find;
-				var c = name.charAt(0);
-				if(c == '\0') break find;
-				for(int i = 0; i<typeNamesC.length; i++){
-					if(typeNamesC[i] == c){
-						return actualTypes[i];
-					}
-				}
-			}else{
-				if(typeNames == null) break find;
-				for(int i = 0; i<typeNames.length; i++){
-					if(name.equals(typeNames[i])){
-						return actualTypes[i];
-					}
+				if(typeNamesC == null) typeNamesC = new char[params.length];
+				typeNamesC[i] = name.charAt(0);
+				continue;
+			}
+			if(typeNames == null) typeNames = new String[params.length];
+			typeNames[i] = name;
+		}
+		this.typeNames = typeNames;
+		this.typeNamesC = typeNamesC;
+	}
+	
+	@Override
+	public String toString(){
+		return Utils.typeToHuman(owner, false) +
+		       IntStream.range(0, actualTypes.size())
+		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i), false))
+		                .collect(Collectors.joining(", ", "<", ">"));
+	}
+	@Override
+	public String toShortString(){
+		return Utils.typeToHuman(owner, true) +
+		       IntStream.range(0, actualTypes.size())
+		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i), true))
+		                .collect(Collectors.joining(", ", "<", ">"));
+	}
+	private String strName(int i){
+		if(typeNames != null){
+			var name = typeNames[i];
+			if(name != null) return name;
+		}
+		return "" + typeNamesC[i];
+	}
+	
+	private Type getType(String name){
+		find:
+		if(name.length() == 1){
+			if(typeNamesC == null) break find;
+			var c = name.charAt(0);
+			if(c == '\0') break find;
+			for(int i = 0; i<typeNamesC.length; i++){
+				if(typeNamesC[i] == c){
+					return actualTypes.get(i);
 				}
 			}
-			throw new RuntimeException(name + " is not present");
-		}
-		
-		private Type resolveVarType(TypeVariable<?> var){
-			var realType = getType(var.getName());
-			for(Type bound : var.getBounds()){
-				if(!Utils.genericInstanceOf(realType, bound)){
-					throw new ClassCastException(realType + " is not valid for " + bound);
+		}else{
+			if(typeNames == null) break find;
+			for(int i = 0; i<typeNames.length; i++){
+				if(name.equals(typeNames[i])){
+					return actualTypes.get(i);
 				}
 			}
-			return realType;
 		}
-		
-		
-		@Override
-		public Type resolveType(Type genericType){
-			try{
-				return switch(genericType){
-					case null -> null;
-					case ParameterizedType parmType -> {
-						var args  = parmType.getActualTypeArguments();
-						var dirty = false;
-						for(int i = 0; i<args.length; i++){
-							switch(args[i]){
-								case TypeVariable<?> var -> {
-									args[i] = resolveVarType(var);
+		throw new RuntimeException(name + " is not present");
+	}
+	
+	private Type resolveVarType(TypeVariable<?> var){
+		var realType = getType(var.getName());
+		for(Type bound : var.getBounds()){
+			if(!Utils.genericInstanceOf(realType, bound)){
+				throw new ClassCastException(realType + " is not valid for " + bound);
+			}
+		}
+		return realType;
+	}
+	
+	
+	public Type resolveType(Type genericType){
+		try{
+			return switch(genericType){
+				case null -> null;
+				case ParameterizedType parmType -> {
+					var args  = parmType.getActualTypeArguments();
+					var dirty = false;
+					for(int i = 0; i<args.length; i++){
+						switch(args[i]){
+							case TypeVariable<?> var -> {
+								args[i] = resolveVarType(var);
+								dirty = true;
+							}
+							case ParameterizedType typ -> {
+								var resolved = resolveType(typ);
+								if(typ != resolved){
+									args[i] = resolved;
 									dirty = true;
 								}
-								case ParameterizedType typ -> {
-									var resolved = resolveType(typ);
-									if(typ != resolved){
-										args[i] = resolved;
-										dirty = true;
-									}
-								}
-								default -> { }
 							}
+							default -> { }
 						}
-						if(dirty){
-							yield SyntheticParameterizedType.of(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), List.of(args));
-						}
-						yield parmType;
 					}
-					default -> genericType;
-				};
-			}catch(Throwable e){
-				throw new IllegalArgumentException("Failed to resolve " + genericType, e);
-			}
-		}
-		
-		@Override
-		public GenericContext argAsContext(String argName){
-			var type = getType(argName);
-			
-			return switch(type){
-				case ParameterizedType parm -> new TypeArgs((Class<?>)parm.getRawType(), type);
-				case Class<?> raw -> {
-					var parms = raw.getTypeParameters();
-					
-					var rawArgs = new Type[parms.length];
-					for(int i = 0; i<parms.length; i++){
-						rawArgs[i] = parms[i].getBounds()[0];
+					if(dirty){
+						yield SyntheticParameterizedType.of(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), List.of(args));
 					}
-					yield new TypeArgs(raw, SyntheticParameterizedType.of(raw, List.of(rawArgs)));
+					yield parmType;
 				}
-				case TypeVariable<?> var -> {
-					var bounds = var.getBounds();
-					if(bounds.length != 1){
-						throw new NotImplementedException("Multiple bounds not implemented: " + var);
-					}
-					yield new TypeArgs(Utils.typeToRaw(bounds[0]), bounds[0]);
-				}
-				default -> throw new NotImplementedException(type.getClass().getName());
+				default -> genericType;
 			};
+		}catch(Throwable e){
+			throw new IllegalArgumentException("Failed to resolve " + genericType, e);
 		}
 	}
 	
-	final class Deferred implements GenericContext, Stringify{
+	public GenericContext argAsContext(String argName){
+		var type = getType(argName);
 		
-		private GenericContext           data;
-		private Supplier<GenericContext> dataSource;
-		
-		public Deferred(Supplier<GenericContext> dataSource){
-			this.dataSource = dataSource;
-		}
-		
-		private GenericContext getData(){
-			if(data == null) fillData();
-			return data;
-		}
-		
-		private synchronized void fillData(){
-			if(data != null) return;
-			data = Objects.requireNonNull(dataSource.get());
-			dataSource = null;
-		}
-		public boolean dataBaked(){
-			return data != null;
-		}
-		public GenericContext actualData(){
-			return getData();
-		}
-		
-		
-		@Override
-		public Class<?> owner(){
-			return getData().owner();
-		}
-		@Override
-		public Type resolveType(Type genericType){
-			return getData().resolveType(genericType);
-		}
-		@Override
-		public GenericContext argAsContext(String argName){
-			return getData().argAsContext(argName);
-		}
-		@Override
-		public String toString(){
-			if(data == null && GlobalConfig.RELEASE_MODE) return "DeferredCtx{?}";
-			return getData().toString();
-		}
-		@Override
-		public String toShortString(){
-			if(data == null && GlobalConfig.RELEASE_MODE) return "DeferredCtx";
-			return getData().toShortString();
-		}
+		return switch(type){
+			case ParameterizedType parm -> GenericContext.of((Class<?>)parm.getRawType(), type);
+			case Class<?> raw -> GenericContext.of(raw);
+			case TypeVariable<?> var -> {
+				var bounds = var.getBounds();
+				if(bounds.length != 1){
+					throw new NotImplementedException("Multiple bounds not implemented: " + var);
+				}
+				yield new GenericContext(Utils.typeToRaw(bounds[0]), bounds[0]);
+			}
+			default -> throw new NotImplementedException(type.getClass().getName());
+		};
 	}
-	
-	Class<?> owner();
-	
-	Type resolveType(Type genericType);
-	GenericContext argAsContext(String argName);
 }

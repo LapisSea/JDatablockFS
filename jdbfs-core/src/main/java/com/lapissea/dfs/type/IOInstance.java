@@ -501,8 +501,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public final GenericContext getGenerics(){
 			if(genericCtx == null){
 				genericCtx = getThisStruct().describeGenerics(typeDef);
-			}else if(genericCtx instanceof GenericContext.Deferred d && d.dataBaked()){
-				genericCtx = d.actualData();
 			}
 			return genericCtx;
 		}

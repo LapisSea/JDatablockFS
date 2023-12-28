@@ -131,8 +131,8 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	private ValueType makeValueObject(DataProvider provider, Chunk identity, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION && genericContext != null){
 			var struct = declaringStruct();
-			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner()) :
-				genericContext.owner().getName() + " != " + struct.getType();
+			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner) :
+				genericContext.owner.getName() + " != " + struct.getType();
 		}
 		if(identity == null){
 			if(nullable()) return null;

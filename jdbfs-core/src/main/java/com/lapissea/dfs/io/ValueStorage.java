@@ -1224,8 +1224,8 @@ public sealed interface ValueStorage<T>{
 	static ValueStorage<?> makeStorage(DataProvider provider, IOType typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
 		if(DEBUG_VALIDATION){
-			assert UtilL.instanceOf(clazz, generics.owner())
-				: clazz + " != " + generics.owner();
+			assert UtilL.instanceOf(clazz, generics.owner)
+				: clazz + " != " + generics.owner;
 		}
 		if(clazz == Object.class){
 			return switch(rule){
