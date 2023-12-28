@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
+import com.lapissea.dfs.objects.collections.IOTreeSet;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -108,7 +109,7 @@ public final class RandomActions{
 	
 	private static void treeSet() throws IOException{
 		var provider = Cluster.emptyMem();
-		var set      = provider.roots().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var set      = provider.roots().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
 		
 		
 		var r    = new RawRandom(420);
@@ -173,7 +174,7 @@ public final class RandomActions{
 		var set = provider.roots().<IOHashSet<Object>>request("hi", IOHashSet.class);
 		
 		var r = new RawRandom(69);
-		runIter(50000000, 200000, () -> {
+		runIter(50000000, 50000000/200, () -> {
 			Integer num = r.nextInt(400);
 			switch(r.nextInt(3)){
 				case 0 -> set.add(num);
