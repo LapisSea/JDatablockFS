@@ -12,18 +12,18 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import java.io.IOException;
 import java.util.StringJoiner;
 
-public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<AbstractUnmanagedIOSet<T>> implements IOSet<T>{
+public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIOSet<T>> implements IOSet<T>{
 	
 	
-	private IOField<AbstractUnmanagedIOSet<T>, ?> sizeField;
+	private IOField<UnmanagedIOSet<T>, ?> sizeField;
 	
 	@IOValue
 	private long size;
 	
-	protected AbstractUnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
+	protected UnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
 		super(provider, identity, typeDef, check);
 	}
-	public AbstractUnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef){
+	public UnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef){
 		super(provider, identity, typeDef);
 	}
 	

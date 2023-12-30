@@ -27,7 +27,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
@@ -81,7 +81,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private static <T> IOUnmanagedValueInfo.Data<IONode<T>> info(){
 		return () -> {
-			var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value", List.of(
+			var valueAccessor = new BasicFieldAccessor<IONode<T>>(null, "value", List.of(
 				IOFieldTools.makeAnnotation(IOValue.Generic.class),
 				IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)
 			)){
@@ -134,8 +134,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return siz;
 			});
 			
-			var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next",
-			                                                        List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE))){
+			var nextAccessor = new BasicFieldAccessor<IONode<T>>(null, "next",
+			                                                     List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE))){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					if(genericContext == null) return IONode.class;

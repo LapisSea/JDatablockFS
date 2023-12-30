@@ -16,7 +16,7 @@ import java.util.function.Function;
 
 import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 
-public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
+public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
 	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
 		
@@ -29,8 +29,8 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			getter.ifPresent(get -> validateGetter(genericType, get));
 			setter.ifPresent(set -> validateSetter(genericType, set));
 			
-			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(this::makeGetter).orElse(null);
-			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(this::makeSetter).orElse(null);
+			this.getter = getter.map(ExactFieldAccessor::findParent).map(this::makeGetter).orElse(null);
+			this.setter = setter.map(ExactFieldAccessor::findParent).map(this::makeSetter).orElse(null);
 		}
 		
 		@Override

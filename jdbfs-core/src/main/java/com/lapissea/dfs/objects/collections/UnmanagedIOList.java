@@ -16,12 +16,12 @@ import java.util.StringJoiner;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
-public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
+public abstract class UnmanagedIOList<T, SELF extends UnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
 	private IOField<SELF, ?> sizeField;
 	
-	public AbstractUnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
-	public AbstractUnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef)                 { super(provider, identity, typeDef); }
+	public UnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
+	public UnmanagedIOList(DataProvider provider, Chunk identity, IOType typeDef)                 { super(provider, identity, typeDef); }
 	
 	public abstract RuntimeType<T> getElementType();
 	
@@ -39,7 +39,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 			return false;
 		}
 		
-		if(that instanceof AbstractUnmanagedIOList<?, ?> ioL &&
+		if(that instanceof UnmanagedIOList<?, ?> ioL &&
 		   !getElementType().equals(ioL.getElementType())){
 			return false;
 		}

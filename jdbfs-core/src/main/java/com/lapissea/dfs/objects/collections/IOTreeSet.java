@@ -29,7 +29,7 @@ import java.util.TreeSet;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedIOSet<T>{
+public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	
 	private interface Node extends IOInstance.Def<Node>{
 		

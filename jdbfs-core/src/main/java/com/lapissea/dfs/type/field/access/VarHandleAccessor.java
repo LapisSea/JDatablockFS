@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
+public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
 	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
 		
@@ -28,8 +28,8 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 			getter.ifPresent(get -> validateGetter(genericType, get));
 			setter.ifPresent(set -> validateSetter(genericType, set));
 			
-			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(this::makeGetter).orElse(null);
-			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(this::makeSetter).orElse(null);
+			this.getter = getter.map(ExactFieldAccessor::findParent).map(this::makeGetter).orElse(null);
+			this.setter = setter.map(ExactFieldAccessor::findParent).map(this::makeSetter).orElse(null);
 		}
 		
 		@Override

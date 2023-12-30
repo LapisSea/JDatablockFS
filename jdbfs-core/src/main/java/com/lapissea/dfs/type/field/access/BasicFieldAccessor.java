@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
 
-public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
+public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
 	
 	protected static void validateSetter(Type fieldType, Method func){
 		if(!Utils.genericInstanceOf(func.getReturnType(), Void.TYPE)){
@@ -56,11 +56,11 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
-	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
+	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
 		this(declaringStruct, name, annotations.isEmpty()? Map.of() : annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity())));
 	}
-	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name,
-	                                Map<Class<? extends Annotation>, ? extends Annotation> annotations){
+	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name,
+	                             Map<Class<? extends Annotation>, ? extends Annotation> annotations){
 		this.declaringStruct = declaringStruct;
 		this.name = Objects.requireNonNull(name);
 		this.annotations = Map.copyOf(annotations);

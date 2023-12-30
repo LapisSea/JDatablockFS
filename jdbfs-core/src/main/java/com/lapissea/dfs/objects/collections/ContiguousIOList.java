@@ -33,7 +33,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
-import com.lapissea.dfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -64,7 +64,7 @@ import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings("unchecked")
-public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>
+public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOList<T>>
 	implements RandomAccess, IOInstance.Unmanaged.DynamicFields<ContiguousIOList<T>>{
 	
 	private static final TypeCheck TYPE_CHECK = new TypeCheck(
@@ -145,7 +145,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		};
 	}
 	
-	private static class IndexAccessor<T> extends AbstractFieldAccessor<ContiguousIOList<T>>{
+	private static class IndexAccessor<T> extends BasicFieldAccessor<ContiguousIOList<T>>{
 		
 		private static final List<Annotation> NULLABLE_ANNS = List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE));
 		
