@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -133,6 +134,24 @@ public interface RootProvider extends DataProvider.Holder{
 		return new Builder<>(this);
 	}
 	default <T> Builder<T> builder(String id){ return new Builder<T>(this).withId(id); }
+	
+	default <T extends IOInstance.Unmanaged<T>> T require(String id, Class<T> type, Class<?>... typeArgs) throws IOException{
+		var val        = require(id, type);
+		var typeDef    = val.getTypeDef();
+		var actualArgs = IOType.getArgs(typeDef);
+		if(actualArgs.size() != typeArgs.length){
+			throw new IllegalArgumentException("Expected " + actualArgs.size() + " args for " + type.getName());
+		}
+		var db = getDataProvider().getTypeDb();
+		for(int i = 0; i<typeArgs.length; i++){
+			var expected = typeArgs[i];
+			var actual   = actualArgs.get(i).getTypeClass(db);
+			if(UtilL.instanceOf(actual, expected)) continue;
+			throw new ClassCastException("Incompatible type: " + actual.getName() + " can not be cast to " + expected.getName());
+		}
+		
+		return val;
+	}
 	
 	default <T> T require(String id, Class<T> type) throws IOException{
 		var val = builder(id).withGenerator(() -> {
