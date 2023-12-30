@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.objects.collections.AbstractUnmanagedIOList;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
@@ -125,7 +126,9 @@ public class VersioningTests{
 		var    data = new Cluster(MemoryData.builder().withRaw(bb).build(), VERSIONING);
 		
 		var d     = Objects.requireNonNull(data.getTypeDb());
-		var def   = d.getDefinitionFromClassName(A.class.getName() + "€old").orElseThrow();
+		var dn    = d.listStoredTypeDefinitionNames();
+		var cName = dn.stream().filter(n -> n.startsWith(A.class.getName() + "€old")).findAny().orElseThrow();
+		var def   = d.getDefinitionFromClassName(cName).orElseThrow();
 		var names = def.getFields().stream().map(TypeDef.FieldDef::getName).collect(Collectors.toSet());
 		Assert.assertEquals(names, Set.of("a"));
 	}
@@ -192,7 +195,7 @@ public class VersioningTests{
 		var data = versionedCl(IntVal.class, bb);
 		//noinspection unchecked
 		List<IntVal> val = data.roots()
-		                       .require("obj", IOList.class)
+		                       .require("obj", AbstractUnmanagedIOList.class, IntVal.class)
 		                       .collectToList();
 		
 		var iv = new IntVal();

@@ -35,6 +35,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -262,6 +263,10 @@ public final class Cluster implements DataProvider{
 		versionForward();
 	}
 	
+	private static String oldName(String base, String rid, long uid){
+		return base + "€old_" + rid + (uid == 0? "" : "_" + uid);
+	}
+	
 	private void versionForward() throws IOException{
 		var db               = metadata.db;
 		var storedClassNames = db.listStoredTypeDefinitionNames();
@@ -286,19 +291,22 @@ public final class Cluster implements DataProvider{
 		
 		var nameSet = transformers.stream().map(e -> e.matchingClassName).collect(Collectors.toSet());
 		
-		var index = 0;
-		while(true){
-			var mod = "€old" + (index == 0? "" : index);
-			if(nameSet.stream().anyMatch(name -> storedClassNames.contains(name + mod))){
-				index++;
-				continue;
-			}
-			break;
-		}
-		var mod = "€old" + (index == 0? "" : index);
-		db.rename(nameSet, name -> name + mod);
+		var rid = Long.toHexString(Math.abs(new RawRandom().nextLong()));
 		
-		var oldSet = transformers.stream().collect(Collectors.toMap(e -> e.matchingClassName + mod, Function.identity()));
+		var index = 0L;
+		while(true){
+			var fi = index;
+			if(nameSet.stream().noneMatch(name -> storedClassNames.contains(oldName(name, rid, fi)))){
+				break;
+			}else{
+				index++;
+			}
+		}
+		
+		var fi = index;
+		db.rename(nameSet, name -> oldName(name, rid, fi));
+		
+		var oldSet = transformers.stream().collect(Collectors.toMap(e -> oldName(e.matchingClassName, rid, fi), Function.identity()));
 		
 		Log.debug("Replacing:\n{}", (Supplier<?>)() -> {
 			StringJoiner sj = new StringJoiner("\n");
@@ -387,7 +395,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	@Override
-	public IOTypeDB getTypeDb(){ return metadata == null? null : metadata.db; }
+	public IOTypeDB.PersistentDB getTypeDb(){ return metadata == null? null : metadata.db; }
 	@Override
 	public IOInterface getSource(){ return source; }
 	@Override
