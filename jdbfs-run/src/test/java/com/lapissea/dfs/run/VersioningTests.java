@@ -7,9 +7,9 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Reference;
-import com.lapissea.dfs.objects.collections.AbstractUnmanagedIOList;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.objects.collections.UnmanagedIOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
@@ -195,7 +195,7 @@ public class VersioningTests{
 		var data = versionedCl(IntVal.class, bb);
 		//noinspection unchecked
 		List<IntVal> val = data.roots()
-		                       .require("obj", AbstractUnmanagedIOList.class, IntVal.class)
+		                       .require("obj", UnmanagedIOList.class, IntVal.class)
 		                       .collectToList();
 		
 		var iv = new IntVal();

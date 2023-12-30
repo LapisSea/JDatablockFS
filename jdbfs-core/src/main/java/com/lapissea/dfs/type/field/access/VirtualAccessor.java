@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
+public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
 	public sealed interface TypeOff{
 		final class Ptr implements TypeOff{

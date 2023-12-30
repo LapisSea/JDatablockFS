@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 
-public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
+public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	@IOValue
 	private ContiguousIOList<IONode<T>> data;

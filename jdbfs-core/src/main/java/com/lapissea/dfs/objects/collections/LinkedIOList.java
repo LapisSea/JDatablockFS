@@ -28,7 +28,7 @@ import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE_MANAGED
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 
 @SuppressWarnings("unchecked")
-public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
+public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	
 	private class LinkedListIterator extends IOListIterator.AbstractIndex<T>{
 		

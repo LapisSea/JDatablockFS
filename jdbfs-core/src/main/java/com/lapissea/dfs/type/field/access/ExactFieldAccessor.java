@@ -34,7 +34,14 @@ import java.util.function.Function;
 
 import static com.lapissea.dfs.type.field.access.TypeFlag.*;
 
-public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+/**
+ * The {@link ExactFieldAccessor} class provides a simplified interface for exact access of values.
+ * The {@link FieldAccessor} normally must handle conversions of primitives and boxed types and also must handle data widening.
+ * This class provides the necessary conversions and provides a set of exact access functions that just have to handle the correct
+ * types. For example, if an {@link Integer} type is passed to the {@link FieldAccessor#set} function of a {@code long} accessor, then this class will unbox the
+ * {@link Integer} in to an int and widen it to a long. This value will then be passed on to the {@link ExactFieldAccessor#setExactLong} function
+ */
+public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	protected static Method findParent(Method method){
 		var cl = method.getDeclaringClass();
@@ -59,7 +66,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final int      typeID;
 	private final boolean  genericTypeHasArgs;
 	
-	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
+	public ExactFieldAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
 		super(struct, name, annotations);
 		
 		Class<?> type = Utils.typeToRaw(genericType);
@@ -154,31 +161,68 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	
 	@Override
 	public Object get(VarPool<CTyp> ioPool, CTyp instance){
+		if(typeID == ID_OBJECT){
+			return getExactObject(ioPool, instance);
+		}else{
+			return getPrimitiveAsObject(ioPool, instance);
+		}
+	}
+	private Object getPrimitiveAsObject(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_OBJECT -> getExactObject(ioPool, instance);
-			case ID_INT -> getInt(ioPool, instance);
-			case ID_LONG -> getLong(ioPool, instance);
-			case ID_FLOAT -> getFloat(ioPool, instance);
-			case ID_DOUBLE -> getDouble(ioPool, instance);
-			case ID_BOOLEAN -> getBoolean(ioPool, instance);
-			case ID_BYTE -> getByte(ioPool, instance);
-			case ID_SHORT -> getShort(ioPool, instance);
-			case ID_CHAR -> getChar(ioPool, instance);
+			case ID_INT -> getExactInt(ioPool, instance);
+			case ID_LONG -> getExactLong(ioPool, instance);
+			case ID_FLOAT -> getExactFloat(ioPool, instance);
+			case ID_DOUBLE -> getExactDouble(ioPool, instance);
+			case ID_BOOLEAN -> getExactBoolean(ioPool, instance);
+			case ID_BYTE -> getExactByte(ioPool, instance);
+			case ID_SHORT -> getExactShort(ioPool, instance);
+			case ID_CHAR -> getExactChar(ioPool, instance);
 			default -> throw new ShouldNeverHappenError();
 		};
 	}
+	
 	@Override
 	public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
+		if(typeID == ID_OBJECT){
+			setExactObject(ioPool, instance, value);
+		}else{
+			setObjectToPrimitive(ioPool, instance, value);
+		}
+	}
+	
+	private void setObjectToPrimitive(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		switch(typeID){
-			case ID_OBJECT -> setExactObject(ioPool, instance, value);
-			case ID_INT -> setInt(ioPool, instance, (Integer)value);
-			case ID_LONG -> setLong(ioPool, instance, (Long)value);
-			case ID_FLOAT -> setFloat(ioPool, instance, (Float)value);
-			case ID_DOUBLE -> setDouble(ioPool, instance, (Double)value);
-			case ID_BOOLEAN -> setBoolean(ioPool, instance, (Boolean)value);
-			case ID_BYTE -> setByte(ioPool, instance, (Byte)value);
-			case ID_SHORT -> setShort(ioPool, instance, (Short)value);
-			case ID_CHAR -> setChar(ioPool, instance, (Character)value);
+			case ID_INT -> setExactInt(ioPool, instance, switch(value){
+				case Integer v -> v;
+				case Short v -> v;
+				case Byte v -> v;
+				case null -> throw new NullPointerException();
+				default -> throw classCastThrow();
+			});
+			case ID_LONG -> setExactLong(ioPool, instance, switch(value){
+				case Long v -> v;
+				case Integer v -> v;
+				case Short v -> v;
+				case Byte v -> v;
+				case null -> throw new NullPointerException();
+				default -> throw classCastThrow();
+			});
+			case ID_FLOAT -> setExactFloat(ioPool, instance, (Float)value);
+			case ID_DOUBLE -> setExactDouble(ioPool, instance, switch(value){
+				case Double v -> v;
+				case Float v -> v;
+				case null -> throw new NullPointerException();
+				default -> throw classCastThrow();
+			});
+			case ID_BOOLEAN -> setExactBoolean(ioPool, instance, (Boolean)value);
+			case ID_BYTE -> setExactByte(ioPool, instance, (Byte)value);
+			case ID_SHORT -> setExactShort(ioPool, instance, switch(value){
+				case Short v -> v;
+				case Byte v -> v;
+				case null -> throw new NullPointerException();
+				default -> throw classCastThrow();
+			});
+			case ID_CHAR -> setExactChar(ioPool, instance, (Character)value);
 			default -> throw new ShouldNeverHappenError();
 		}
 	}

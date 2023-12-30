@@ -43,7 +43,7 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
+public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	@SuppressWarnings({"unchecked"})
 	@Def.ToString.Format("[!!className]{@key: @value}")

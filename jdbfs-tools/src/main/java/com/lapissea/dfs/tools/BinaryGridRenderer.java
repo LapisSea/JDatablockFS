@@ -34,7 +34,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.fields.BitField;
@@ -1910,7 +1910,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		var arrayLenName     = IOFieldTools.makeCollectionLenName(field.getAccessor());
 		var arrayLenSizeName = IOFieldTools.makeNumberSizeName(arrayLenName);
 		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName, List.of()){
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new BasicFieldAccessor<T>(null, arrayLenSizeName, List.of()){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return NumberSize.class;
@@ -1931,7 +1931,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}, SizeDescriptor.Fixed.of(1)), col, reference, DrawUtils.Range.fromSize(fieldOffset, 1));
 		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenName, List.of()){
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new BasicFieldAccessor<T>(null, arrayLenName, List.of()){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return int.class;

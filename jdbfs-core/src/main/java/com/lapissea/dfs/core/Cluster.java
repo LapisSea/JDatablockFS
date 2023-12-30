@@ -20,10 +20,10 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
-import com.lapissea.dfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
+import com.lapissea.dfs.objects.collections.UnmanagedIOMap;
 import com.lapissea.dfs.type.FieldWalker;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
@@ -147,7 +147,7 @@ public final class Cluster implements DataProvider{
 	private static class Metadata extends IOInstance.Managed<Metadata>{
 		
 		@IOValue.OverrideType(value = HashIOMap.class)
-		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
+		private UnmanagedIOMap<ObjectID, Object> rootObjects;
 		
 		private IOTypeDB.PersistentDB db;
 		

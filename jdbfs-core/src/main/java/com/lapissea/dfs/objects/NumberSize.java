@@ -68,6 +68,10 @@ public enum NumberSize{
 		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
 	}
 	
+	public static NumberSize bySize(int size, boolean unsigned){
+		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
+	}
+	
 	public static NumberSize bySizeSigned(long size){
 		if(size == 0) return VOID;
 		var off = size<0? -(size + 1) : size;

@@ -11,17 +11,17 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.io.IOException;
 
-public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<AbstractUnmanagedIOMap<K, V>> implements IOMap<K, V>{
+public abstract class UnmanagedIOMap<K, V> extends IOInstance.Unmanaged<UnmanagedIOMap<K, V>> implements IOMap<K, V>{
 	
 	@IOValue
 	@IOValue.Unsigned
 	@IODependency.VirtualNumSize
 	protected long size;
 	
-	private IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField;
+	private IOFieldPrimitive.FLong<UnmanagedIOMap<K, V>> sizeField;
 	
-	protected AbstractUnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
-	public AbstractUnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef)                    { super(provider, identity, typeDef); }
+	protected UnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){ super(provider, identity, typeDef, check); }
+	public UnmanagedIOMap(DataProvider provider, Chunk identity, IOType typeDef)                    { super(provider, identity, typeDef); }
 	
 	@Override
 	public long size(){ return size; }
