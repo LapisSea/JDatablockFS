@@ -30,7 +30,7 @@ public class Versioning{
 	
 	public Versioning(Set<VersioningOptions> options, List<VersionTransformer<?>> transformers){
 		this.options = options.isEmpty()? EnumSet.noneOf(VersioningOptions.class) : EnumSet.copyOf(options);
-		this.transformers = transformers.stream().collect(Collectors.toMap(t -> t.matchingClassName, Function.identity()));
+		this.transformers = transformers.stream().collect(Collectors.toMap(t -> t.newClassName, Function.identity()));
 	}
 	
 	

@@ -22,8 +22,11 @@ public final class WrapperStructs{
 	private static final ConcurrentHashMap<Class<?>, WrapperRes<?>> WRAPPER_STRUCT_CACHE = new ConcurrentHashMap<>();
 	private static final Function<Class<?>, WrapperRes<?>>          generateWrapper      = WrapperStructs::generateWrapper;
 	
+	public static <T> boolean isWrapperType(Class<T> type){
+		return FieldCompiler.getWrapperTypes().contains(type);
+	}
 	public static <T> WrapperRes<T> getWrapperStruct(Class<T> type){
-		if(!FieldCompiler.getWrapperTypes().contains(type)){
+		if(!isWrapperType(type)){
 			return null;
 		}
 		var res = WRAPPER_STRUCT_CACHE.computeIfAbsent(type, generateWrapper);

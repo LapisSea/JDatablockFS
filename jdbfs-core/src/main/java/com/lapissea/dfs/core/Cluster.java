@@ -6,8 +6,11 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
 import com.lapissea.dfs.core.versioning.ClassVersionDiff;
+import com.lapissea.dfs.core.versioning.VersionExecutor;
+import com.lapissea.dfs.core.versioning.VersionTransformer;
 import com.lapissea.dfs.core.versioning.Versioning;
 import com.lapissea.dfs.exceptions.IncompatibleVersionTransform;
 import com.lapissea.dfs.exceptions.MalformedPointer;
@@ -24,14 +27,12 @@ import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.objects.collections.UnmanagedIOMap;
-import com.lapissea.dfs.type.FieldWalker;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
-import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
@@ -51,7 +52,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -280,7 +280,7 @@ public final class Cluster implements DataProvider{
 				.stream()
 				.map(LateInit::get)
 				.flatMap(Optional::stream)
-				.map(versioning::createTransformer)
+				.<VersionTransformer<?>>map(versioning::createTransformer)
 				.toList();
 		
 		if(transformers.isEmpty()) return;
@@ -289,7 +289,7 @@ public final class Cluster implements DataProvider{
 			throw new IncompatibleVersionTransform("Can not update read only database");
 		}
 		
-		var nameSet = transformers.stream().map(e -> e.matchingClassName).collect(Collectors.toSet());
+		var nameSet = transformers.stream().map(e -> e.newClassName).collect(Collectors.toSet());
 		
 		var rid = Long.toHexString(Math.abs(new RawRandom().nextLong()));
 		
@@ -304,9 +304,11 @@ public final class Cluster implements DataProvider{
 		}
 		
 		var fi = index;
-		db.rename(nameSet, name -> oldName(name, rid, fi));
+		var executor = new VersionExecutor(
+			transformers.stream().<VersionTransformer<?>>map(t -> t.withOldName(oldName(t.newClassName, rid, fi))).toList()
+		);
 		
-		var oldSet = transformers.stream().collect(Collectors.toMap(e -> oldName(e.matchingClassName, rid, fi), Function.identity()));
+		db.rename(nameSet, name -> oldName(name, rid, fi));
 		
 		Log.debug("Replacing:\n{}", (Supplier<?>)() -> {
 			StringJoiner sj = new StringJoiner("\n");
@@ -316,32 +318,12 @@ public final class Cluster implements DataProvider{
 			return sj;
 		});
 		
-		FieldWalker.walk(this, root, new FieldWalker.FieldRecord(){
-			@Override
-			public <I extends IOInstance<I>> int log(I instance, IOField<I, ?> field){
-				Object   val  = null;
-				Class<?> type = field.getType();
-				
-				var dyn = field.typeFlag(IOField.DYNAMIC_FLAG);
-				if(dyn){
-					val = field.get(null, instance);
-					if(val != null) type = val.getClass();
-				}
-				
-				var transformer = oldSet.get(type.getName());
-				if(transformer != null){
-					if(!dyn) val = field.get(null, instance);
-					
-					var transformed = transformer.apply((IOInstance<?>)val);
-					
-					Log.debug("Versioned {} to {}", val, transformed);
-					((IOField<I, Object>)field).set(null, instance, transformed);
-					return FieldWalker.SAVE|FieldWalker.CONTINUE;
-				}
-				return FieldWalker.CONTINUE;
-			}
-		});
+		var chainsToFree = new ChunkSet();
+		var newRoot      = executor.versionForward(this, root, chainsToFree);
 		
+		ROOT_PIPE.write(getFirstChunk(), (RootRef)newRoot);
+		
+		getMemoryManager().freeChains(chainsToFree);
 	}
 	
 	private void scanTypeDB(){

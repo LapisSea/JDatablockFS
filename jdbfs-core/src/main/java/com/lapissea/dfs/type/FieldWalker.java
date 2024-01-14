@@ -22,17 +22,18 @@ public final class FieldWalker{
 	private static final int FLOW_MASK = 0b00110;
 	public static final  int CONTINUE  = 0b00010;
 	public static final  int END       = 0b00100;
+	public static final  int SKIP      = 0b00110;
 	
 	private static int getFlow(int flags)       { return flags&FLOW_MASK; }
 	private static boolean shouldSave(int flags){ return UtilL.checkFlag(flags&DATA_MASK, SAVE); }
 	
 	private static IllegalStateException failFlow(int res){
 		var flow = getFlow(res);
-		return new IllegalStateException(flow + " is not a valid flow, please provide any of [CONTINUE, END]");
+		return new IllegalStateException(flow + " is not a valid flow, please provide any of [CONTINUE, SKIP, END]");
 	}
 	
 	public interface FieldRecord{
-		<I extends IOInstance<I>> int log(I instance, IOField<I, ?> field);
+		<I extends IOInstance<I>> int log(I instance, IOField<I, ?> field) throws IOException;
 	}
 	
 	public static <T extends IOInstance<T>> void walk(DataProvider provider, T instance, FieldRecord record) throws IOException{
@@ -103,22 +104,25 @@ public final class FieldWalker{
 			var     f    = iterator.next();
 			var     res  = record.log(instance, f);
 			boolean save = shouldSave(res);
-			
-			if(getFlow(res) == CONTINUE){
-				if(f.typeFlag(IOField.IOINSTANCE_FLAG)){
-					res = walkField(provider, instance, record, instancePipe, instanceReference, offset, f);
-				}else if(f.typeFlag(IOField.DYNAMIC_FLAG)){
-					boolean inst = IOInstance.isInstance(f.getType());
-					if(!inst){
-						var val = f.get(null, instance);
-						inst = val instanceof IOInstance ||
-						       val instanceof IOInstance<?>[] ||
-						       (val instanceof List<?> l && l.stream().anyMatch(e -> e instanceof IOInstance));
-					}
-					if(inst){
+			switch(getFlow(res)){
+				case CONTINUE -> {
+					if(f.typeFlag(IOField.IOINSTANCE_FLAG)){
 						res = walkField(provider, instance, record, instancePipe, instanceReference, offset, f);
+					}else if(f.typeFlag(IOField.DYNAMIC_FLAG)){
+						boolean inst = IOInstance.isInstance(f.getType());
+						if(!inst){
+							var val = f.get(null, instance);
+							inst = val instanceof IOInstance ||
+							       val instanceof IOInstance<?>[] ||
+							       (val instanceof List<?> l && l.stream().anyMatch(e -> e instanceof IOInstance));
+						}
+						if(inst){
+							res = walkField(provider, instance, record, instancePipe, instanceReference, offset, f);
+						}
 					}
 				}
+				case SKIP -> { }//Nothing to do, continue already skipped
+				default -> throw failFlow(res);
 			}
 			
 			if(save || shouldSave(res)){
@@ -130,7 +134,7 @@ public final class FieldWalker{
 			}
 			
 			switch(getFlow(res)){
-				case CONTINUE -> { }
+				case CONTINUE, SKIP -> { }
 				case END -> { return END|(saveParent? SAVE : 0); }
 				default -> throw failFlow(res);
 			}

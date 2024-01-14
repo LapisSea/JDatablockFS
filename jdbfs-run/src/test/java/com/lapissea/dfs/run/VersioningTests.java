@@ -14,11 +14,14 @@ import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.TypeDef;
+import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -184,7 +187,15 @@ public class VersioningTests{
 	static byte[] makeListOfIntVal() throws IOException{
 		var            data = Cluster.emptyMem();
 		IOList<IntVal> list = data.roots().request("obj", ContiguousIOList.class, IntVal.class);
-		list.addMultipleNew(4);
+		int[]          arr  = new int[1];
+		list.addMultipleNew(4, v -> {
+			FieldSet<IntVal>              s = v.getThisStruct().getFields();
+			IOFieldPrimitive.FInt<IntVal> f = s.requireExactInt("val");
+			var                           i = ++arr[0];
+			f.setValue(null, v, i == 3? Integer.MAX_VALUE : i);
+		});
+		
+		LogUtil.println(list);
 		return data.getSource().readAll();
 	}
 	

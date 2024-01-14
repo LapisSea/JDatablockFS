@@ -7,6 +7,7 @@ import com.lapissea.dfs.core.chunk.ChainWalker;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.core.versioning.VersionExecutor;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
@@ -26,6 +27,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.NewObj;
 import com.lapissea.dfs.type.RuntimeType;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
@@ -40,6 +42,7 @@ import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -58,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
@@ -881,6 +885,108 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		try(var io = ioAtElement(index)){
 			notifySingleFree(io, true);
 		}
+	}
+	
+	@Override
+	public VersioningType versionForward(VersionExecutor executor, Set<ChunkPointer> chainsToFree) throws IOException{
+		var typ     = IOType.getArgs(getTypeDef()).getFirst();
+		var oldName = typ.getTypeName();
+		var newName = executor.oldToNew(oldName);
+		
+		ValueStorage<T> oldStorage = storage, newStorage;
+		
+		var prov = getDataProvider();
+		if(newName != null){
+			var newCls  = new IOType.TypeRaw(newName);
+			var ptrSize = NumberSize.bySize(prov.getSource().getIOSize());
+			
+			var rec = VaryingSize.Provider.record((max, ptr, id) -> {
+				return max.min(ptr? ptrSize : NumberSize.VOID);
+			});
+			
+			var typeDef = IOType.of(getTypeDef().getTypeClass(prov.getTypeDb()), newCls);
+			var g       = getThisStruct().describeGenerics(typeDef);
+			var ctx     = g.argAsContext("T");
+			newStorage = (ValueStorage<T>)ValueStorage.makeStorage(
+				makeMagnetProvider(), newCls, ctx,
+				new StorageRule.VariableFixed(rec)
+			);
+			
+			if(!(oldStorage.getType() instanceof Struct) || !(newStorage.getType() instanceof Struct)){
+				throw new NotImplementedException("Not implemented versioning between non IOInstances");//TODO
+			}
+			
+			var exp = new ArrayList<>(rec.export());
+			
+			//Make sure variable sizes are sufficient for stored data
+			var mem = MemoryData.builder().build();
+			var tmp = mem.io();
+			for(var old : this){
+				var     gnu    = (T)executor.versionForward(prov, (IOInstance)old, chainsToFree);
+				boolean repeat = true;
+				while(repeat) try{
+					newStorage.write(tmp, gnu);
+					repeat = false;
+				}catch(VaryingSize.TooSmall e){
+					e.tooSmallIdMap.forEach((v, s) -> {
+						exp.set(v.getId(), s);
+					});
+					newStorage = (ValueStorage<T>)ValueStorage.makeStorage(
+						makeMagnetProvider(), newCls, ctx,
+						new StorageRule.VariableFixed(VaryingSize.Provider.repeat(exp))
+					);
+				}
+				tmp.setPos(0);
+			}
+			if(newStorage.needsRemoval()){
+				var toFree = newStorage.notifyRemoval(tmp, true);
+				prov.getMemoryManager().freeChains(toFree);
+				tmp.setPos(0);
+				tmp.trim();
+			}
+		}else{
+			newStorage = storage;
+		}
+		
+		
+		long oldSize = oldStorage.inlineSize(), newSize = newStorage.inlineSize();
+		if(newSize>oldSize){
+			var delta = newSize - oldSize;
+			try(var io = ioAtElement(size)){
+				IOUtils.zeroFill(io, delta*size);
+			}
+		}
+		
+		var forwardBuffer = new HashMap<Long, T>();
+		
+		try(var io = selfIO()){
+			for(long i = 0, readPos = 0; i<size; i++){
+				var newOff = calcElementOffset(i, newSize);
+				var newEnd = newOff + newSize;
+				while(readPos<size){
+					var oldOff = calcElementOffset(readPos, oldSize);
+					if(oldOff>=newEnd && forwardBuffer.containsKey(i)) break;
+					
+					io.setPos(0);
+					io.skipExact(oldOff);
+					forwardBuffer.put(readPos, oldStorage.readNew(io));
+					readPos++;
+				}
+				assert forwardBuffer.containsKey(i);
+				var oldVal = (IOInstance)forwardBuffer.remove(i);
+				var newVal = (T)executor.versionForward(prov, oldVal, chainsToFree);
+				IOUtils.zeroFill(io.setPos(newOff), newSize);
+				newStorage.write(io.setPos(newOff), newVal);
+			}
+		}
+		storage = newStorage;
+		if(newSize<oldSize){
+			try(var io = ioAtElement(size)){
+				io.trim();
+			}
+		}
+		
+		return VersioningType.IN_PLACE;
 	}
 	
 	@Override
