@@ -299,8 +299,13 @@ public final class ConfigTools{
 			var name = val.name();
 			return ConfEntry.checked(name, switch(val){
 				case Flag.FEnum<?> enumFlag -> {
-					var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
-					var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
+					var enums = enumFlag.defaultValue().value().getClass().getEnumConstants();
+					var enumStr = Arrays.stream(enums).map(e -> {
+						if(e instanceof NamedEnum ne){
+							return String.join(" / ", ne.names());
+						}
+						return e.toString();
+					}).collect(Collectors.joining(", ", "[", "]"));
 					yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
 				}
 				case Flag.FBool bool -> BLUE + bool.resolve() + RESET;
