@@ -9,6 +9,8 @@ import java.net.URL;
 import java.util.Objects;
 
 import static com.lapissea.dfs.config.ConfigTools.*;
+import static com.lapissea.dfs.config.FreedMemoryPurgeType.ONLY_HEADER_BYTES;
+import static com.lapissea.dfs.config.FreedMemoryPurgeType.ZERO_OUT;
 import static com.lapissea.dfs.logging.Log.LogLevel.INFO;
 import static com.lapissea.dfs.logging.Log.LogLevel.SMALL_TRACE;
 import static com.lapissea.dfs.logging.Log.LogLevel.WARN;
@@ -40,7 +42,8 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
 	Flag.FBool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
 	
-	Flag.FBool PURGE_ACCIDENTAL_CHUNK_HEADERS = flagB("purgeAccidentalChunkHeaders", deb());
+	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE(
+		"purgeAccidentalChunkHeaders", RELEASE_MODE.boolMap(ZERO_OUT, ONLY_HEADER_BYTES));
 	
 	Flag.FBool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
 	
