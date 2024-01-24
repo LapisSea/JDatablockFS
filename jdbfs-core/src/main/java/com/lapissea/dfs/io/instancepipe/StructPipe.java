@@ -527,7 +527,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var wordSpace      = report.wordSpace;
 		var knownFixed     = report.knownFixed;
-		var genericUnknown = report.genericUnknown;
+		var genericUnknown = Utils.nullIfEmpty(report.genericUnknown);
 		
 		FieldAccessor<T>[] unkownNumAcc;
 		int[]              unkownNumAccMul;
@@ -556,9 +556,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException(e);
 			}
 			
-			var unkownSum = IOFieldTools.sumVars(genericUnknown, d -> {
-				return d.calcUnknown(ioPool, prov, inst, wordSpace);
-			});
+			long unkownSum;
+			if(genericUnknown != null){
+				unkownSum = IOFieldTools.sumVars(genericUnknown, d -> {
+					return d.calcUnknown(ioPool, prov, inst, wordSpace);
+				});
+			}else unkownSum = 0;
 			
 			if(unkownNumAcc != null){
 				for(int i = 0; i<unkownNumAcc.length; i++){

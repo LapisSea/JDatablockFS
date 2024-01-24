@@ -212,7 +212,7 @@ public final class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
-		var acc = WordSpace.BIT;
+		var acc = WordSpace.BYTE;
 		for(IOField<T, ?> field : fields){
 			var descriptor = field.getSizeDescriptor();
 			var wordSpace  = descriptor.getWordSpace();

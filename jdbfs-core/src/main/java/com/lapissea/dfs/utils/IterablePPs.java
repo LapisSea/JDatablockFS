@@ -38,8 +38,20 @@ public final class IterablePPs{
 		};
 	}
 	
-	@SuppressWarnings("unchecked")
+	private static final IterablePP<?> EMPTY = of0();
+	
+	public static <T> IterablePP<T> of(){
+		return (IterablePP<T>)EMPTY;
+	}
+	
+	@SafeVarargs
 	public static <T> IterablePP<T> of(T... data){
+		if(data.length == 0) return of();
+		return of0(data);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T> IterablePP<T> of0(T... data){
 		return () -> {
 			return new Iterator<>(){
 				private int index;
