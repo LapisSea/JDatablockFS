@@ -754,12 +754,7 @@ public class SlowTests{
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
-		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv<>(){
-			
-			@Override
-			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
-				return true;
-			}
+		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			
 			@Override
 			public void applyAction(BlobState state, long actionIndex, BlobAction action, RunMark mark) throws IOException{
