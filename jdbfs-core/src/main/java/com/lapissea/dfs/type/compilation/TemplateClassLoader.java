@@ -22,6 +22,7 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -49,6 +50,39 @@ public final class TemplateClassLoader extends ClassLoader{
 	public TemplateClassLoader(IOTypeDB db, ClassLoader parent){
 		super(TemplateClassLoader.class.getSimpleName() + "{" + db + "}", parent);
 		this.db = db;
+	}
+	
+	@Override
+	protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+		synchronized(getClassLoadingLock(name)){
+			// First, check if the class has already been loaded
+			Class<?> c1 = findLoadedClass(name);
+			if(c1 == null){
+				var parent = getParent();
+				try{
+					var c2 = c1 = parent.loadClass(name);
+					
+					if(!name.startsWith("java.")) try{
+						var builtIn = db.getDefinitionFromClassName(name);
+						if(builtIn.map(stored -> !new TypeDef(c2).equals(stored)).orElse(false)){
+							c1 = null;//Discard mismatching built in class
+						}
+					}catch(IOException e){
+						throw new UncheckedIOException("Failed to fetch data from database", e);
+					}
+				}catch(ClassNotFoundException ignored){ }
+				
+				if(c1 == null){
+					// If still not found, then invoke findClass in order
+					// to find the class.
+					c1 = findClass(name);
+				}
+			}
+			if(resolve){
+				resolveClass(c1);
+			}
+			return c1;
+		}
 	}
 	
 	@Override

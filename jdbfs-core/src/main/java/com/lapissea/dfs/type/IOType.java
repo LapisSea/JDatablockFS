@@ -9,6 +9,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericArrayType;
@@ -166,7 +168,22 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			var name = getTypeName();
 			try{
-				return Class.forName(name);
+				var builtIn = Class.forName(name);
+				try{
+					var storedO = db.getDefinitionFromClassName(name);
+					if(storedO.map(stored -> !new TypeDef(builtIn).equals(stored)).orElse(false)){
+						Log.trace("{#yellowBuilt in and stored classes are not the same for: #}{}#red\n" +
+						          "\t{#redBuilt in:#} {}\n" +
+						          "\t{#redStored  :#} {}", () -> {
+							return List.of(name, storedO.get(), new TypeDef(builtIn));
+						});
+						throw new ClassNotFoundException();
+					}
+				}catch(IOException e){
+					throw new UncheckedIOException("Failed to fetch data from database", e);
+				}
+				
+				return builtIn;
 			}catch(ClassNotFoundException e){
 				if(db == null){
 					throw new RuntimeException(name + " was unable to be resolved and there is no db provided");
