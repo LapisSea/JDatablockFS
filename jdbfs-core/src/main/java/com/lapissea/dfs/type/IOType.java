@@ -163,6 +163,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		
 		private Class<?> loadClass(IOTypeDB db){
+			Objects.requireNonNull(db);
 			if(isPrimitive()){
 				return PRIMITIVE_NAMES.get(name);
 			}
@@ -185,9 +186,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				
 				return builtIn;
 			}catch(ClassNotFoundException e){
-				if(db == null){
-					throw new RuntimeException(name + " was unable to be resolved and there is no db provided");
-				}
 				Log.trace("Loading template: {}#yellow", name);
 				try{
 					return Class.forName(name, true, db.getTemplateLoader());
