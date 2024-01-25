@@ -55,6 +55,19 @@ public class VersioningTests{
 					new Prop("a", int.class, 1)
 				));
 			});
+		},
+		TestNames.class.getName(), name -> {
+			return Jorth.generateClass(null, name, code -> {
+				code.write(
+					"""
+						public enum {!} start
+							enum FOO
+							enum John
+							enum BAR
+						end
+						""",
+					name);
+			});
 		}
 	));
 	
@@ -106,6 +119,29 @@ public class VersioningTests{
 		Assert.assertEquals(names, Set.of("a"));
 		var aField = type.getFields().requireExact(int.class, "a");
 		Assert.assertEquals(aField.get(null, obj), 1);
+	}
+	
+	public enum TestNames{
+		FOO, BAR
+	}
+	
+	static byte[] makeTestNamesData() throws IOException{
+		var data = Cluster.emptyMem();
+		data.roots().provide("names", new GenericContainer<>(List.of(TestNames.FOO, TestNames.BAR)));
+		return data.getSource().readAll();
+	}
+	
+	@Test
+	<T extends IOInstance<T>> void loadCorrectEnum() throws Exception{
+		var bb = makeCLDataRaw(TestNames.class);
+		var cl = new Cluster(MemoryData.viewOf(bb));
+		
+		//noinspection unchecked
+		var obj = (List<Enum<?>>)cl.roots()
+		                           .require("names", GenericContainer.class).value;
+		
+		var names = obj.stream().map(Enum::name).toList();
+		Assert.assertEquals(names, List.of("FOO", "BAR"));
 	}
 	
 }
