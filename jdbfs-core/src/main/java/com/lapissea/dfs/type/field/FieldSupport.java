@@ -21,7 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.IOField.*;
@@ -138,20 +137,32 @@ final class FieldSupport{
 		if(val.getClass().isArray()){
 			var res    = new StringJoiner(", ", "[", "]");
 			int resLen = 0, len = Array.getLength(val), remaining = len;
+			
+			var comp      = val.getClass().componentType();
+			var primitive = comp.isPrimitive();
+			
+			var oArr = primitive? null : (Object[])val;
 			for(int i = 0; i<len; i++){
-				var e = Utils.toShortString(Array.get(val, i));
-				resLen += 2 + e.length();
+				var element = oArr != null? oArr[i] : Array.get(val, i);
+				var elStr   = primitive? element + "" : Utils.toShortString(element);
+				resLen += 2 + elStr.length();
 				var lenNow = resLen + rem(remaining).length();
 				if(doShort && lenNow>=200){
-					var type = UtilL.findClosestCommonSuper(
-						IntStream.range(0, len)
-						         .mapToObj(j -> Array.get(val, j))
-						         .filter(Objects::nonNull)
-						         .map(Object::getClass));
+					Class<?> type;
+					if(comp.isPrimitive()) type = comp;
+					else{
+						type = null;
+						for(Object o : oArr){
+							if(o == null) continue;
+							var c = o.getClass();
+							if(type == null) type = c;
+							else type = UtilL.findClosestCommonSuper(type, c);
+						}
+					}
 					return Optional.of(type.getSimpleName() + "[" + len + "]");
 				}
 				if(lenNow<(doShort? 100 : 200)){
-					res.add(e);
+					res.add(elStr);
 					remaining--;
 				}
 			}
