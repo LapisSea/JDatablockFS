@@ -723,4 +723,14 @@ public class GeneralTypeHandlingTests{
 		
 		Assert.assertEquals(read, instance);
 	}
+	
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
+	void byteArrayGenericStore() throws IOException{
+		var d   = Cluster.emptyMem();
+		var arr = new byte[]{-10, 10, 0, 69, Byte.MIN_VALUE, Byte.MAX_VALUE};
+		d.roots().provide("obj", new GenericContainer<>(arr));
+		//noinspection unchecked
+		var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
+		Assert.assertEquals(generic.value, arr);
+	}
 }
