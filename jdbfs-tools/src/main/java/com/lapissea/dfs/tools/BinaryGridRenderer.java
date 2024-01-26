@@ -43,6 +43,8 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NanoTimer;
@@ -53,7 +55,6 @@ import com.lapissea.util.StreamUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import org.joml.SimplexNoise;
-import org.roaringbitmap.RoaringBitmap;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -69,6 +70,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -112,7 +114,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	
 	record RenderContext(
 		RenderBackend renderer,
-		byte[] bytes, RoaringBitmap filled,
+		byte[] bytes, BitSet filled,
 		int width, float pixelsPerByte, int hoverByteX, int hoverByteY, int hoverByteIndex,
 		List<HoverMessage> hoverMessages){
 		
@@ -129,7 +131,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		              byte[] bytes,
 		              float pixelsPerByte, float zoom, RenderBackend.DisplayInterface dis,
 		              List<HoverMessage> hoverMessages){
-			this(renderer, bytes, new RoaringBitmap(),
+			this(renderer, bytes, new BitSet(),
 			     (int)Math.max(1, dis.getWidth()/pixelsPerByte), pixelsPerByte*zoom,
 			     calcX(dis, pixelsPerByte, zoom),
 			     calcY(dis, pixelsPerByte, zoom),
@@ -354,7 +356,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 	}
 	private void fillBitByte(RenderContext ctx, long trueOffset){
-		if(ctx.filled.contains((int)trueOffset)) return;
+		if(ctx.filled.get((int)trueOffset)) return;
 		drawByteRanges(ctx, List.of(DrawUtils.Range.fromSize(trueOffset, 1)), Color.GREEN.darker(), false, true);
 	}
 	
@@ -383,6 +385,10 @@ public class BinaryGridRenderer implements DataRenderer{
 //				DrawUtils.fillByteRange(alpha(col, 0.2F), ctx.renderCtx, range);
 				hover = range;
 			}
+		}
+		
+		if(ctx.renderCtx.pixelsPerByte<6){
+			return;
 		}
 		
 		var color = ColorUtils.alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
@@ -929,7 +935,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			handleError(e, parsed);
 		}
 		
-		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)ctx.filled::contains).negate()), ColorUtils.alpha(Color.GRAY, 0.5F), true, true);
+		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)ctx.filled::get).negate()), ColorUtils.alpha(Color.GRAY, 0.5F), true, true);
 		
 		drawWriteIndex(frame, ctx);
 		
@@ -953,7 +959,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private void drawByteRanges(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar, boolean force){
 		List<DrawUtils.Range> actualRanges;
 		if(force) actualRanges = ranges;
-		else actualRanges = DrawUtils.Range.filterRanges(ranges, i -> !ctx.filled.contains((int)i));
+		else actualRanges = DrawUtils.Range.filterRanges(ranges, i -> !ctx.filled.get((int)i));
 		
 		drawByteRangesForced(ctx, actualRanges, color, withChar);
 	}
@@ -963,7 +969,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		var bitColor   = col;
 		var background = ColorUtils.mul(col, 0.6F);
 		
-		Consumer<Stream<DrawUtils.Range>> drawIndex = r -> {
+		Consumer<IterablePP<DrawUtils.Range>> drawIndex = r -> {
 			try(var ignored = ctx.renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
 				r.forEach(range -> DrawUtils.fillByteRange(ctx, range));
 			}
@@ -981,33 +987,35 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		drawIndex.accept(clampedOverflow.stream());
+		drawIndex.accept(IterablePPs.of(clampedOverflow));
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
-		drawIndex.accept(ranges.stream().map(r -> {
+		drawIndex.accept(IterablePPs.of(ranges).map(r -> {
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
-		}).filter(Objects::nonNull));
+		}).filtered(Objects::nonNull));
 		
 		ctx.renderer.setColor(bitColor);
 		try(var ignored = ctx.renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
-			clampedInts.get().forEach(i -> {
-				int b = ctx.bytes[i]&0xFF;
-				if(b == 0) return;
-				int   xi = i%ctx.width(), yi = i/ctx.width();
-				float xF = ctx.pixelsPerByte()*xi, yF = ctx.pixelsPerByte()*yi;
-				if(ctx.pixelsPerByte()<6){
-					ctx.renderer.fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()/8F*Integer.bitCount(b));
-				}else{
-					for(int bi = 0; bi<8; bi++){
-						if(((b>>bi)&1) == 1){
-							fillBit(ctx, xF, yF, bi, 0, 0);
+			for(var range : clampedOverflow){
+				for(int pos = Math.toIntExact(range.from()), iend = Math.toIntExact(range.to()); pos<iend; pos++){
+					var i = pos;
+					int b = ctx.bytes[i]&0xFF;
+					if(b == 0) continue;
+					int   xi = i%ctx.width(), yi = i/ctx.width();
+					float xF = ctx.pixelsPerByte()*xi, yF = ctx.pixelsPerByte()*yi;
+					if(ctx.pixelsPerByte()<6){
+						ctx.renderer.fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()/8F*Integer.bitCount(b));
+					}else{
+						for(int bi = 0; bi<8; bi++){
+							if(((b>>bi)&1) == 1){
+								fillBit(ctx, xF, yF, bi, 0, 0);
+							}
 						}
 					}
 				}
-				
-			});
+			}
 		}
 		
 		if(withChar){
@@ -1040,7 +1048,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		for(var range : clampedOverflow){
-			ctx.filled.add(range.from(), range.to());
+			ctx.filled.set((int)range.from(), (int)range.to());
 		}
 	}
 	private void drawBackgroundDots(RenderBackend renderer){
@@ -1455,7 +1463,8 @@ public class BinaryGridRenderer implements DataRenderer{
 							var inst = field.get(ioPool, instance);
 							if(inst == null) continue;
 							if(SupportedPrimitive.isAny(inst.getClass()) || inst.getClass() == String.class){
-								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+								if(annotate)
+									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							if(inst instanceof IOInstance.Unmanaged<?> unmanaged){
@@ -1491,7 +1500,8 @@ public class BinaryGridRenderer implements DataRenderer{
 								annotateDynamicArrayValueLength(ctx, instance, reference, fieldOffset, ioPool, field, col, arr);
 								var ahead       = 1 + NumberSize.bySize(arr.length).bytes;
 								var arrayOffset = fieldOffset + ahead;
-								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(arrayOffset, size - ahead));
+								if(annotate)
+									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(arrayOffset, size - ahead));
 								continue;
 							}
 							warn("unmanaged dynamic type {}", inst);
@@ -1575,7 +1585,8 @@ public class BinaryGridRenderer implements DataRenderer{
 									var bCol = ColorUtils.makeCol(rand, typeHash, bit);
 									var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 									
-									if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset%8, siz, reference, fieldOffset + bitOffset/8);
+									if(annotate)
+										annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset%8, siz, reference, fieldOffset + bitOffset/8);
 									bitOffset += siz;
 								}
 							}
@@ -1830,7 +1841,8 @@ public class BinaryGridRenderer implements DataRenderer{
 											}
 										}, SizeDescriptor.Fixed.of(WordSpace.BIT, siz));
 										
-										if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset + arrOffset);
+										if(annotate)
+											annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset + arrOffset);
 										bitOffset += siz;
 										while(bitOffset>=8){
 											bitOffset -= 8;

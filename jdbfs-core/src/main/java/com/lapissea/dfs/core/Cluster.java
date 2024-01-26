@@ -296,7 +296,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	@Override
-	public IOTypeDB getTypeDb(){ return metadata == null? null : metadata.db; }
+	public IOTypeDB.PersistentDB getTypeDb(){ return metadata == null? null : metadata.db; }
 	@Override
 	public IOInterface getSource(){ return source; }
 	@Override

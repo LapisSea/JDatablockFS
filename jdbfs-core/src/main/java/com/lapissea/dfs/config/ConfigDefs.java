@@ -43,7 +43,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
 	
 	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE(
-		"purgeAccidentalChunkHeaders", RELEASE_MODE.boolMap(ZERO_OUT, ONLY_HEADER_BYTES));
+		"purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	
 	Flag.FBool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
 	

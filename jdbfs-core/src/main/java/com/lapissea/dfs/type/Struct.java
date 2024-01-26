@@ -889,8 +889,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return hasPools != null && hasPools[pool.ordinal()];
 	}
 	
-	public GenericContext describeGenerics(IOType def){
-		return GenericContext.of(getType(), def.generic(null));
+	public GenericContext describeGenerics(IOType def, IOTypeDB db){
+		return GenericContext.of(getType(), def.generic(db));
 	}
 	
 	@Override

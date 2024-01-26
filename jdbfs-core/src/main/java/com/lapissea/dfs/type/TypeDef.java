@@ -32,7 +32,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String name();
 		IOType bound();
 		
-		static ClassArgDef of(String name, IOType bound){
+		public static ClassArgDef of(String name, IOType bound){
 			return Def.of(ClassArgDef.class, name, bound);
 		}
 	}
@@ -105,7 +105,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			JUST_INTERFACE
 		}
 		
-		private static SealedParent of(String name, Type type){
+		public static SealedParent of(String name, Type type){
 			return IOInstance.Def.of(SealedParent.class, name, type);
 		}
 		
@@ -135,7 +135,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		unmanaged = IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
-				var structFields = Struct.ofUnknown(type).getFields();
+				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
 				fields = structFields.stream().map(FieldDef::new).toArray(FieldDef[]::new);
 				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
 			}

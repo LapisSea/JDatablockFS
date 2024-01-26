@@ -500,7 +500,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		public final GenericContext getGenerics(){
 			if(genericCtx == null){
-				genericCtx = getThisStruct().describeGenerics(typeDef);
+				genericCtx = getThisStruct().describeGenerics(typeDef, getDataProvider().getTypeDb());
 			}
 			return genericCtx;
 		}

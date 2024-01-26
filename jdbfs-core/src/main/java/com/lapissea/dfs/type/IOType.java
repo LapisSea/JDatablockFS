@@ -9,6 +9,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericArrayType;
@@ -80,10 +82,14 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		private Class<?> typeClassCache;
 		
+		
 		public TypeRaw(){ name = ""; }
 		
 		public TypeRaw(Class<?> clazz){
-			var    name = clazz.getName();
+			this(clazz.getName());
+			typeClassCache = clazz;
+		}
+		public TypeRaw(String name){
 			String n;
 			if(name.length()>PRIMITIVE_NAMES_MAX_LEN) n = name;
 			else{
@@ -91,7 +97,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				if(n == null) n = name;
 			}
 			this.name = n;
-			typeClassCache = clazz;
 		}
 		
 		@Override
@@ -158,16 +163,29 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		
 		private Class<?> loadClass(IOTypeDB db){
+			Objects.requireNonNull(db);
 			if(isPrimitive()){
 				return PRIMITIVE_NAMES.get(name);
 			}
 			var name = getTypeName();
 			try{
-				return Class.forName(name);
-			}catch(ClassNotFoundException e){
-				if(db == null){
-					throw new RuntimeException(name + " was unable to be resolved and there is no db provided");
+				var builtIn = Class.forName(name);
+				try{
+					var storedO = db.getDefinitionFromClassName(name);
+					if(storedO.map(stored -> !new TypeDef(builtIn).equals(stored)).orElse(false)){
+						Log.trace("{#yellowBuilt in and stored classes are not the same for: #}{}#red\n" +
+						          "\t{#redBuilt in:#} {}\n" +
+						          "\t{#redStored  :#} {}", () -> {
+							return List.of(name, storedO.get(), new TypeDef(builtIn));
+						});
+						throw new ClassNotFoundException();
+					}
+				}catch(IOException e){
+					throw new UncheckedIOException("Failed to fetch data from database", e);
 				}
+				
+				return builtIn;
+			}catch(ClassNotFoundException e){
 				Log.trace("Loading template: {}#yellow", name);
 				try{
 					return Class.forName(name, true, db.getTemplateLoader());
@@ -327,6 +345,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			return "? " + (isLower? "super" : "extends") + " " + bound.toShortString();
 		}
+		
+		public boolean isLower(){
+			return isLower;
+		}
 	}
 	
 	public static final class TypeNameArg extends IOType{
@@ -337,9 +359,15 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		public TypeNameArg(){ }
 		public TypeNameArg(Class<?> parent, String name){
-			this.parent = new TypeRaw(parent);
+			this(new TypeRaw(parent), name);
+		}
+		public TypeNameArg(TypeRaw parent, String name){
+			this.parent = parent;
 			this.name = name;
 		}
+		
+		public TypeRaw getParent(){ return parent; }
+		public String getName()   { return name; }
 		
 		@Override
 		protected TypeRaw getRaw(){

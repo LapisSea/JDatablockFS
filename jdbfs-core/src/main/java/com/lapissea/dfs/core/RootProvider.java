@@ -94,7 +94,7 @@ public interface RootProvider extends DataProvider.Holder{
 					return withGenerator(() -> {
 						var inst = struct.make();
 						if(struct.hasInvalidInitialNulls()){
-							inst.allocateNulls(provider, struct.describeGenerics(genericType));
+							inst.allocateNulls(provider, struct.describeGenerics(genericType, provider.getTypeDb()));
 						}
 						return (T)inst;
 					});

@@ -8,8 +8,7 @@ import com.lapissea.util.LogUtil;
 import java.io.IOException;
 import java.util.stream.IntStream;
 
-public class World{
-	
+public final class World{
 	
 	public static void main(String[] args) throws IOException{
 		LoggedMemoryUtils.simpleLoggedMemorySession(mem -> {
@@ -18,7 +17,7 @@ public class World{
 			for(int x = 0; x<16; x++){
 				for(int y = 0; y<16; y++){
 					var ch = Chunk.newAt(x, y);
-					ch.entities().addAll(IntStream.range(0, r.nextInt(20)).mapToObj(i -> {
+					ch.entities().addAll(IntStream.range(0, (int)(Math.pow(r.nextFloat(), 4)*100)).mapToObj(i -> {
 						var e = new Entity();
 						e.pos.x = r.nextFloat();
 						e.pos.y = r.nextFloat();
@@ -30,7 +29,7 @@ public class World{
 					map.chunks.add(ch);
 				}
 			}
-			LogUtil.println(mem.getIOSize());
+			LogUtil.println(mem.getIOSize(), "bytes used");
 		});
 	}
 	

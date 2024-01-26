@@ -346,9 +346,13 @@ public final class MemoryOperations{
 					case ZERO_OUT -> {
 						try(var io = chunk.getDataProvider().getSource().io()){
 							var start = chunk.dataStart();
-							io.setPos(start);
-							if(io.getPos() != start) throw new IOException("Failed to zero out " + chunk);
-							IOUtils.zeroFill(io, chunk.getCapacity());
+							if(io.getSize()>=start){
+								io.setPos(start);
+								if(io.getPos() != start){
+									throw new IOException("Failed to zero out " + chunk + " : " + io.getPos() + " -> " + start + " size: " + io.getSize());
+								}
+								IOUtils.zeroFill(io, chunk.getCapacity());
+							}
 						}
 					}
 				}

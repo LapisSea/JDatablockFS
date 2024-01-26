@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -230,6 +231,8 @@ public final class Runner{
 		}
 	}
 	
+	private static final Executor run = Runner::run;
+	
 	/**
 	 * Creates a {@link LateInit} with no checked exception that is executed as a task. See {@link Runner#run)}<br>
 	 * This is useful when an expensive value can be computed asynchronously and fetched when ever it is ready and needed.
@@ -238,7 +241,7 @@ public final class Runner{
 	 * @return a new {@link LateInit} with no checked exception.
 	 */
 	public static <T> LateInit.Safe<T> async(Supplier<T> task){
-		return new LateInit.Safe<>(task, Runner::run);
+		return new LateInit.Safe<>(task, run);
 	}
 	
 	/**
@@ -249,6 +252,6 @@ public final class Runner{
 	 * @return a new {@link LateInit} that may throw a checked exception
 	 */
 	public static <T, E extends Throwable> LateInit<T, E> asyncChecked(UnsafeSupplier<T, E> task){
-		return new LateInit<>(task, Runner::run);
+		return new LateInit<>(task, run);
 	}
 }
