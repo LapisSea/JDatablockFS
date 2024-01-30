@@ -30,24 +30,32 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeBiFunction;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.LongFunction;
+import java.util.random.RandomGenerator;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
@@ -724,14 +732,91 @@ public class GeneralTypeHandlingTests{
 		Assert.assertEquals(read, instance);
 	}
 	
-	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void byteArrayGenericStore() throws IOException{
-		TestUtils.testCluster(d -> {
-			var arr = new byte[]{-10, 10, 0, 69, Byte.MIN_VALUE, Byte.MAX_VALUE};
-			d.roots().provide("obj", new GenericContainer<>(arr));
-			//noinspection unchecked
-			var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
-			Assert.assertEquals(generic.value, arr);
+	record Gen<T>(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type, String name){
+		Gen(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type){
+			this(gen, type, type.getTypeName());
+		}
+		@Override
+		public String toString(){
+			return name;
+		}
+	}
+	
+	@DataProvider
+	Object[][] genericCollections(){
+		List<Gen<?>> elementGenerator = new ArrayList<>(List.of(
+			new Gen<>((r1, d1) -> new Dummy(r1.nextInt()), Dummy.class),
+			new Gen<>((r, d) -> new GenericContainer<>(r.nextInt()), GenericContainer.class),
+			new Gen<>((r, d) -> {
+				var l = new ContiguousIOList<Integer>(d, AllocateTicket.bytes(64).submit(d), IOType.of(ContiguousIOList.class, int.class));
+				l.addAll(r.ints().limit(r.nextInt(20)).boxed().toList());
+				return l;
+			}, ContiguousIOList.class),
+			new Gen<>((r, d) -> r.nextDouble(), double.class),
+			new Gen<>((r, d) -> (char)r.nextInt(Character.MAX_VALUE), char.class),
+			new Gen<>((r, d) -> r.nextFloat(), float.class),
+			new Gen<>((r, d) -> r.nextLong(), long.class),
+			new Gen<>((r, d) -> r.nextInt(), int.class),
+			new Gen<>((r, d) -> (short)r.nextInt(Short.MIN_VALUE, Short.MAX_VALUE), short.class),
+			new Gen<>((r, d) -> (byte)r.nextInt(Byte.MIN_VALUE, Byte.MAX_VALUE), byte.class),
+			new Gen<>((r, d) -> r.nextBoolean(), boolean.class)
+		));
+		
+		var cp = List.copyOf(elementGenerator);
+		elementGenerator.add(new Gen<>((r, d) -> cp.get(r.nextInt(cp.size())).gen.apply(r, d), Object.class));
+		
+		List<Gen<?>> collectionGenerator = new ArrayList<>();
+		for(Gen<?> gen : elementGenerator){
+			collectionGenerator.add(new Gen<>((r, d) -> {
+				var s = r.nextInt(20);
+				var l = new ArrayList<>(s);
+				for(int i = 0; i<s; i++){
+					l.add(gen.gen.apply(r, d));
+				}
+				return l;
+			}, List.class, "List<" + gen.name + ">"));
+			collectionGenerator.add(new Gen<>((r, d) -> {
+				var s = r.nextInt(20);
+				var l = new ArrayList<>(s);
+				for(int i = 0; i<s; i++){
+					l.add(r.nextBoolean()? null : gen.gen.apply(r, d));
+				}
+				return l;
+			}, List.class, "List<" + gen.name + "?>"));
+			collectionGenerator.add(new Gen<>((r, d) -> {
+				var s = r.nextInt(20);
+				var l = Array.newInstance(gen.type, s);
+				for(int i = 0; i<s; i++){
+					Array.set(l, i, gen.gen.apply(r, d));
+				}
+				return l;
+			}, (Class<Object>)gen.type.arrayType()));
+		}
+		
+		var generators = Stream.of(elementGenerator, collectionGenerator).flatMap(Collection::stream)
+		                       .sorted(Comparator.comparing(Gen::name)).toList();
+		for(Gen<?> generator : generators){
+			Thread.startVirtualThread(() -> {
+				try{
+					genericCollectionStore(generator);
+				}catch(Throwable e){ }
+			});
+		}
+		return generators.stream().map(g -> new Object[]{g}).toArray(Object[][]::new);
+	}
+	
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
+	void genericCollectionStore(Gen<?> generator) throws IOException{
+		TestUtils.testCluster(TestInfo.of(generator), d -> {
+			var r = new RawRandom(generator.name.hashCode());
+			for(int i = 0; i<15; i++){
+				var value = generator.gen.apply(r, d);
+				LogUtil.println("Writing Type:", generator.name, "value:", value);
+				d.roots().provide("obj", new GenericContainer<>(value));
+				//noinspection unchecked
+				var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
+				Assert.assertEquals(generic.value, value);
+			}
 		});
 	}
 }
