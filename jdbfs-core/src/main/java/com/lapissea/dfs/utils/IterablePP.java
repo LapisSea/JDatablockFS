@@ -12,7 +12,9 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -32,6 +34,14 @@ public interface IterablePP<T> extends Iterable<T>{
 		return OptionalPP.empty();
 	}
 	
+	default <Accumulator, Result> Result collect(Collector<? super T, Accumulator, Result> collector){
+		var acc = collector.supplier().get();
+		var add = collector.accumulator();
+		for(T t : this){
+			add.accept(acc, t);
+		}
+		return collector.finisher().apply(acc);
+	}
 	default List<T> collectToList(){
 		var res = new ArrayList<T>();
 		for(T t : this){
@@ -266,7 +276,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public IdxValue<T> next(){
-					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementInt(index);
 					return new IdxValue<>(index++, src.next());
 				}
 			};
@@ -284,7 +294,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public LdxValue<T> next(){
-					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementLong(index);
 					return new LdxValue<>(index++, src.next());
 				}
 			};
@@ -302,7 +312,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public R next(){
-					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementInt(index);
 					return enumerator.enumerate(index++, src.next());
 				}
 			};
@@ -319,11 +329,38 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public R next(){
-					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementLong(index);
 					return enumerator.enumerate(index++, src.next());
 				}
 			};
 		};
 	}
 	
+	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
+		return collectToList().toArray(ctor);
+	}
+	default int count(){
+		int num = 0;
+		for(var ignore : this){
+			preIncrementInt(num);
+			num++;
+		}
+		return num;
+	}
+	
+	default long countL(){
+		long num = 0;
+		for(var ignore : this){
+			preIncrementLong(num);
+			num++;
+		}
+		return num;
+	}
+	
+	private static void preIncrementLong(long index){
+		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	private static void preIncrementInt(int num){
+		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
 }

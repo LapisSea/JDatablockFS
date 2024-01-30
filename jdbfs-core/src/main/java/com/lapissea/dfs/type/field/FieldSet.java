@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -441,6 +442,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	@Override
 	public Iterator<IOField<T, ?>> iterator(){
 		return new FieldSetIterator();
+	}
+	
+	@Override
+	public <T> T[] toArray(IntFunction<T[]> generator){
+		return super.toArray(generator);
 	}
 	
 	@Override

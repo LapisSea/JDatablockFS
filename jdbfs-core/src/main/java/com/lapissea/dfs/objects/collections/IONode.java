@@ -241,7 +241,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		
 		var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
 			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
-			case SizeDescriptor.Unknown unknown -> unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
+			case SizeDescriptor.Unknown unknown ->
+				unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
@@ -461,7 +462,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 		if(DEBUG_VALIDATION){
 			assert Objects.equals(value, getValue()) :
-				value + " != " + getValue();
+				"\n" + value + " != \n" + getValue();
 		}
 	}
 	
