@@ -1,18 +1,31 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.util.TextUtil;
+
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public final class IterablePPs{
 	
+	static{
+		TextUtil.CUSTOM_TO_STRINGS.register(IterablePP.class, (IterablePP<?> pp) -> {
+			return toString(pp);
+		});
+	}
+	
+	public static String toString(IterablePP<?> inst){
+		return inst.map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
+	}
+	
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
 		return () -> new Iterator<T>(){
-			final Supplier<T> src = supplier.get();
-			T next;
+			private final Supplier<T> src = supplier.get();
+			private T next;
 			
 			void calcNext(){
 				next = src.get();

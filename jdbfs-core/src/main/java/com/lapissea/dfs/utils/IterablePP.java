@@ -12,7 +12,9 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -32,6 +34,14 @@ public interface IterablePP<T> extends Iterable<T>{
 		return OptionalPP.empty();
 	}
 	
+	default <Accumulator, Result> Result collect(Collector<? super T, Accumulator, Result> collector){
+		var acc = collector.supplier().get();
+		var add = collector.accumulator();
+		for(T t : this){
+			add.accept(acc, t);
+		}
+		return collector.finisher().apply(acc);
+	}
 	default List<T> collectToList(){
 		var res = new ArrayList<T>();
 		for(T t : this){
@@ -326,6 +336,26 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
+		return collectToList().toArray(ctor);
+	}
+	default int count(){
+		int num = 0;
+		for(var ignore : this){
+			preIncrementInt(num);
+			num++;
+		}
+		return num;
+	}
+	
+	default long countL(){
+		long num = 0;
+		for(var ignore : this){
+			preIncrementLong(num);
+			num++;
+		}
+		return num;
+	}
 	
 	private static void preIncrementLong(long index){
 		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
