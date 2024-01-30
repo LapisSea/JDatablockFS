@@ -114,6 +114,10 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			}
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+				if(!isNull(ioPool, instance)){
+					var writtenId = typeID.getValue(ioPool, instance);
+					if(writtenId == 0) return true;
+				}
 				var id = getId(ioPool, provider, instance, false);
 				if(!id.stored()) return true;
 				var writtenId = typeID.getValue(ioPool, instance);

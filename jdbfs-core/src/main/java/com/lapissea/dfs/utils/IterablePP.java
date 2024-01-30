@@ -266,7 +266,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public IdxValue<T> next(){
-					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementInt(index);
 					return new IdxValue<>(index++, src.next());
 				}
 			};
@@ -284,7 +284,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public LdxValue<T> next(){
-					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementLong(index);
 					return new LdxValue<>(index++, src.next());
 				}
 			};
@@ -302,7 +302,7 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public R next(){
-					if(index == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementInt(index);
 					return enumerator.enumerate(index++, src.next());
 				}
 			};
@@ -319,11 +319,18 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public R next(){
-					if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+					preIncrementLong(index);
 					return enumerator.enumerate(index++, src.next());
 				}
 			};
 		};
 	}
 	
+	
+	private static void preIncrementLong(long index){
+		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	private static void preIncrementInt(int num){
+		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
 }

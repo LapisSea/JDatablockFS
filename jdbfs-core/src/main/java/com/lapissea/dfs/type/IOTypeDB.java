@@ -957,10 +957,16 @@ public sealed interface IOTypeDB{
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
 		if(obj instanceof List<?> l){
-			var el = l.stream().map(this::makeType).reduce((a, b) -> {
-				if(!a.equals(b)) throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
-				return a;
-			}).orElse(IOType.of(Object.class));
+			IOType acc = null;
+			for(var o : l){
+				if(o == null) continue;
+				var t = makeType(o);
+				if(acc == null) acc = t;
+				else if(!acc.equals(t)){
+					throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
+				}
+			}
+			var el = acc != null? acc : IOType.of(Object.class);
 			return IOType.of(List.class, el);
 		}
 		return IOType.of(obj.getClass());
