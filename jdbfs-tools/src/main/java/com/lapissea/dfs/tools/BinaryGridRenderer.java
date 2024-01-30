@@ -1495,7 +1495,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 								continue;
 							}
-							if(inst.getClass().isArray()){
+							if(inst.getClass().isArray() || UtilL.instanceOf(inst.getClass(), List.class)){
 								var ahead       = annotateDynamicArrayValueHead(ctx, instance, reference, fieldOffset, ioPool, field, col, inst);
 								var arrayOffset = fieldOffset + ahead;
 								if(annotate)

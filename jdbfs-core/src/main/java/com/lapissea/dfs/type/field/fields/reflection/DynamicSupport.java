@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
+import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -24,6 +25,8 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -32,9 +35,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -88,13 +93,18 @@ public abstract class DynamicSupport{
 					var primitiveO = SupportedPrimitive.get(res.constantType());
 					if(primitiveO.isPresent()){
 						var psiz = primitiveO.get();
+						int actualElements;
+						if(!res.hasNulls()) actualElements = len;
+						else{
+							actualElements = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull).count();
+						}
 						yield infoBytes + nullBufferBytes + switch(psiz){
-							case DOUBLE, FLOAT -> psiz.maxSize.get()*len;
-							case BOOLEAN -> BitUtils.bitsToBytes(len);
-							case LONG -> 1 + NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes*(long)len;
-							case INT -> 1 + NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes*(long)len;
-							case SHORT, CHAR -> 2L*len;
-							case BYTE -> len;
+							case DOUBLE, FLOAT -> psiz.maxSize.get()*actualElements;
+							case BOOLEAN -> BitUtils.bitsToBytes(actualElements);
+							case LONG -> 1 + NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes*(long)actualElements;
+							case INT -> 1 + NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes*(long)actualElements;
+							case SHORT, CHAR -> 2L*actualElements;
+							case BYTE -> actualElements;
 						};
 					}
 					
@@ -181,11 +191,15 @@ public abstract class DynamicSupport{
 					
 					if(res.length() == 0) break;
 					
-					var constType = res.constantType();
+					var constType       = res.constantType();
+					int nonNullElements = res.length();
 					if(res.hasNulls() && !(constType != null && constType.isEnum())){
 						try(var stream = new BitOutputStream(dest)){
+							nonNullElements = 0;
 							for(var e : CollectionInfo.iter(res.type(), val)){
-								stream.writeBoolBit(e != null);
+								var b = e != null;
+								nonNullElements += b? 1 : 0;
+								stream.writeBoolBit(b);
 							}
 						}
 					}
@@ -203,8 +217,12 @@ public abstract class DynamicSupport{
 					
 					var pTypO = SupportedPrimitive.get(constType);
 					if(pTypO.isPresent()){
-						if(res.type() != CollectionInfo.CollectionType.ARRAY)
-							throw new NotImplementedException("Non array of primitives not implemented yet");//TODO
+						if(res.type() != CollectionInfo.CollectionType.ARRAY){
+							var iter = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull);
+							LogUtil.println(iter);
+							writePrimitiveCollection(dest, iter, nonNullElements, pTypO.get());
+							break;
+						}
 						writePrimitiveArray(dest, val, res.length(), pTypO.get());
 						break;
 					}
@@ -257,7 +275,9 @@ public abstract class DynamicSupport{
 	
 	private static void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
 		switch(pTyp){
+			case null -> throw new NullPointerException();
 			case DOUBLE -> dest.writeFloats8((double[])array);
+			case CHAR -> dest.writeChars2((char[])array);
 			case FLOAT -> dest.writeFloats4((float[])array);
 			case BOOLEAN -> {
 				try(var bitOut = new BitOutputStream(dest)){
@@ -300,6 +320,96 @@ public abstract class DynamicSupport{
 			case BYTE -> dest.writeInts1((byte[])array);
 		}
 	}
+	private static void writePrimitiveCollection(ContentWriter dest, IterablePP<?> array, int len, SupportedPrimitive pTyp) throws IOException{
+		switch(pTyp){
+			case null -> throw new NullPointerException();
+			case DOUBLE -> {
+				int    numSize = 8;
+				byte[] bb      = new byte[len*numSize];
+				var    i       = 0;
+				for(var o : array){
+					BBView.writeFloat8(bb, i*numSize, (double)o);
+					i++;
+				}
+				assert len == i : len + " != " + i;
+				dest.write(bb, 0, bb.length);
+			}
+			case CHAR -> {
+				int    numSize = 2;
+				byte[] bb      = new byte[len*numSize];
+				var    i       = 0;
+				for(var o : array){
+					BBView.writeChar2(bb, i*numSize, (char)o);
+					i++;
+				}
+				assert len == i : len + " != " + i;
+				dest.write(bb, 0, bb.length);
+			}
+			case FLOAT -> {
+				int    numSize = 4;
+				byte[] bb      = new byte[len*numSize];
+				var    i       = 0;
+				for(var o : array){
+					BBView.writeFloat4(bb, i*numSize, (float)o);
+					i++;
+				}
+				assert len == i : len + " != " + i;
+				dest.write(bb, 0, bb.length);
+			}
+			case BOOLEAN -> {
+				try(var bitOut = new BitOutputStream(dest)){
+					for(var o : array){
+						bitOut.writeBoolBit((boolean)o);
+					}
+				}
+			}
+			case LONG -> {
+				var nums = array.map(Long.class::cast);
+				var siz  = NumberSize.bySize(nums.max(Comparator.comparing(Function.identity())).orElse(0L));
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
+				
+				byte[] bb = new byte[siz.bytes*len];
+				try(var io = new ContentOutputStream.BA(bb)){
+					for(long l : nums){
+						siz.write(io, l);
+					}
+				}
+				dest.write(bb);
+			}
+			case INT -> {
+				var nums = array.map(Integer.class::cast);
+				var siz  = NumberSize.bySize(nums.max(Comparator.comparing(Function.identity())).orElse(0));
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
+				
+				byte[] bb = new byte[siz.bytes*len];
+				try(var io = new ContentOutputStream.BA(bb)){
+					for(var l : nums){
+						siz.write(io, l);
+					}
+				}
+				dest.write(bb);
+			}
+			case SHORT -> {
+				byte[] bb = new byte[len*2];
+				try(var io = new ContentOutputStream.BA(bb)){
+					for(var l : array){
+						io.writeInt2(((short)l)&0xFFFF);
+					}
+				}
+				dest.write(bb);
+			}
+			case BYTE -> {
+				int    siz = array.count();
+				byte[] bb  = new byte[siz];
+				int    i   = 0;
+				for(var o : array){
+					bb[i++] = (byte)o;
+				}
+				assert len == i : len + " != " + i;
+				dest.writeInts1(bb);
+			}
+		}
+	}
 	
 	private static Object readPrimitiveArray(ContentReader src, int len, SupportedPrimitive pTyp) throws IOException{
 		return switch(pTyp){
@@ -322,7 +432,7 @@ public abstract class DynamicSupport{
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr = new int[len];
 				for(int i = 0; i<arr.length; i++){
-					arr[i] = (int)siz.read(src);
+					arr[i] = siz.readInt(src);
 				}
 				yield arr;
 			}
@@ -330,6 +440,56 @@ public abstract class DynamicSupport{
 			case CHAR -> src.readChars2(len);
 			case BYTE -> src.readInts1(len);
 		};
+	}
+	private static void readPrimitiveCollection(ContentReader src, int len, SupportedPrimitive pTyp, Consumer<Object> dest) throws IOException{
+		switch(pTyp){
+			case null -> throw new NullPointerException();
+			case DOUBLE -> {
+				for(double v : src.readFloats8(len)){
+					dest.accept(v);
+				}
+			}
+			case FLOAT -> {
+				for(float v : src.readFloats4(len)){
+					dest.accept(v);
+				}
+			}
+			case BOOLEAN -> {
+				try(var bitIn = new BitInputStream(src, len)){
+					for(boolean b : bitIn.readBits(new boolean[len])){
+						dest.accept(b);
+					}
+				}
+			}
+			case LONG -> {
+				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
+				for(int i = 0; i<len; i++){
+					dest.accept(siz.read(src));
+				}
+			}
+			case INT -> {
+				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
+				var arr = new int[len];
+				for(int i = 0; i<arr.length; i++){
+					dest.accept(siz.readInt(src));
+				}
+			}
+			case SHORT -> {
+				for(short i : src.readInts2(len)){
+					dest.accept(i);
+				}
+			}
+			case CHAR -> {
+				for(char c : src.readChars2(len)){
+					dest.accept(c);
+				}
+			}
+			case BYTE -> {
+				for(byte b : src.readInts1(len)){
+					dest.accept(b);
+				}
+			}
+		}
 	}
 	
 	private static long numToLong(Number integer){
@@ -396,11 +556,15 @@ public abstract class DynamicSupport{
 			}else componentType = null;
 			
 			BitInputStream nullBuffer;
+			byte[]         nullBufferBytes;
 			if(res.hasNullElements() && !(componentType != null && componentType.isEnum())){
 				var bytes = BitUtils.bitsToBytes(len);
-				var buff  = src.readInts1(bytes);
-				nullBuffer = new BitInputStream(new ContentInputStream.BA(buff), len);
-			}else nullBuffer = null;
+				nullBufferBytes = src.readInts1(bytes);
+				nullBuffer = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+			}else{
+				nullBuffer = null;
+				nullBufferBytes = null;
+			}
 			
 			Consumer<Object> dest;
 			Supplier<Object> end;
@@ -408,16 +572,14 @@ public abstract class DynamicSupport{
 				case null -> throw new NullPointerException();
 				case NULL -> { return null; }
 				case ARRAY -> {
-					var ct   = typ.getComponentType();
-					var arrO = Array.newInstance(ct, len);
-					var arr  = ct.isPrimitive()? null : (Object[])arrO;
+					var ct  = typ.getComponentType();
+					var arr = ct.isPrimitive()? null : (Object[])Array.newInstance(ct, len);
 					dest = new Consumer<>(){
 						private int i;
 						@Override
 						public void accept(Object o){
-							if(arr == null) Array.set(arrO, i, o);
-							else arr[i] = o;
-							i++;
+							assert arr != null;
+							arr[i++] = o;
 						}
 					};
 					end = () -> {
@@ -433,7 +595,9 @@ public abstract class DynamicSupport{
 					boolean fin = res.collectionType() == CollectionInfo.CollectionType.UNMODIFIABLE_LIST;
 					end = () -> {
 						try{
-							if(nullBuffer != null) nullBuffer.close();
+							if(nullBuffer != null){
+								nullBuffer.close();
+							}
 						}catch(IOException ex){ throw UtilL.uncheckedThrow(ex); }
 						
 						if(fin){
@@ -443,6 +607,8 @@ public abstract class DynamicSupport{
 					};
 				}
 			}
+			
+			if(res.length() == 0) return end.get();
 			
 			if(res.layout() == CollectionInfo.Layout.DYNAMIC){
 				for(int i = 0; i<len; i++){
@@ -463,8 +629,46 @@ public abstract class DynamicSupport{
 			
 			var pTypO = SupportedPrimitive.get(componentType);
 			if(pTypO.isPresent()){
-				if(res.collectionType() != CollectionInfo.CollectionType.ARRAY)
-					throw new NotImplementedException("Non array of primitives not implemented yet");//TODO
+				if(res.collectionType() != CollectionInfo.CollectionType.ARRAY){
+					int eCount;
+					if(nullBufferBytes == null) eCount = len;
+					else{
+						eCount = 0;
+						var lm1 = nullBufferBytes.length - 1;
+						for(int i = 0; i<lm1; i++){
+							eCount += Integer.bitCount(Byte.toUnsignedInt(nullBufferBytes[i]));
+						}
+						var endBits = len - lm1*8;
+						try(var f = new FlagReader(nullBufferBytes[lm1], endBits)){
+							for(int i = 0; i<endBits; i++){
+								if(f.readBoolBit()) eCount++;
+							}
+						}
+						
+						var b = 0;
+						try(var f = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len)){
+							for(int i = 0; i<len; i++){
+								if(f.readBoolBit()) b++;
+							}
+						}
+					}
+					readPrimitiveCollection(src, eCount, pTypO.get(), e -> {
+						while(true){
+							boolean hasVal;
+							try{
+								hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+							}catch(IOException ex){
+								throw new UncheckedIOException(ex);
+							}
+							if(hasVal){
+								dest.accept(e);
+								break;
+							}
+							dest.accept(null);
+						}
+					});
+					return end.get();
+				}
 				return readPrimitiveArray(src, len, pTypO.get());
 			}
 			
@@ -509,7 +713,7 @@ public abstract class DynamicSupport{
 				return end.get();
 			}
 			
-			throw new ShouldNeverHappenError("Case not handled for " + res);
+			throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ);
 		}
 		
 		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
