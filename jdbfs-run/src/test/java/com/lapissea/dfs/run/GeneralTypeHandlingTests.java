@@ -1,6 +1,7 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.SyntheticParameterizedType;
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
@@ -47,7 +48,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +56,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.LongFunction;
 import java.util.random.RandomGenerator;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
@@ -734,7 +736,7 @@ public class GeneralTypeHandlingTests{
 	
 	record Gen<T>(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type, String name){
 		Gen(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type){
-			this(gen, type, type.getTypeName());
+			this(gen, type, Utils.typeToHuman(type, false));
 		}
 		@Override
 		public String toString(){
@@ -744,7 +746,7 @@ public class GeneralTypeHandlingTests{
 	
 	@DataProvider
 	Object[][] genericCollections(){
-		List<Gen<?>> elementGenerator = new ArrayList<>(List.of(
+		List<Gen<?>> gens = new ArrayList<>(List.of(
 			new Gen<>((r1, d1) -> new Dummy(r1.nextInt()), Dummy.class),
 			new Gen<>((r, d) -> new GenericContainer<>(r.nextInt()), GenericContainer.class),
 			new Gen<>((r, d) -> {
@@ -759,63 +761,81 @@ public class GeneralTypeHandlingTests{
 			new Gen<>((r, d) -> r.nextInt(), int.class),
 			new Gen<>((r, d) -> (short)r.nextInt(Short.MIN_VALUE, Short.MAX_VALUE), short.class),
 			new Gen<>((r, d) -> (byte)r.nextInt(Byte.MIN_VALUE, Byte.MAX_VALUE), byte.class),
-			new Gen<>((r, d) -> r.nextBoolean(), boolean.class)
+			new Gen<>((r, d) -> r.nextBoolean(), boolean.class),
+			new Gen<>((r, d) -> IntStream.range(0, r.nextInt(20))
+			                             .mapToObj(i -> ((char)r.nextInt(200)) + "")
+			                             .collect(Collectors.joining("")), String.class),
+			new Gen<>((r, d) -> Instant.ofEpochMilli(r.nextLong(Long.MAX_VALUE)), Instant.class),
+			new Gen<>((r, d) -> LocalDate.ofEpochDay(r.nextLong(Long.MAX_VALUE)), LocalDate.class),
+			new Gen<>((r, d) -> Duration.ofMillis(r.nextLong(Long.MAX_VALUE)), Duration.class)
 		));
 		
-		var cp = List.copyOf(elementGenerator);
-		elementGenerator.add(new Gen<>((r, d) -> cp.get(r.nextInt(cp.size())).gen.apply(r, d), Object.class));
+		var cp = List.copyOf(gens);
+		gens.add(new Gen<>((r, d) -> cp.get(r.nextInt(cp.size())).gen.apply(r, d), Object.class));
 		
-		List<Gen<?>> collectionGenerator = new ArrayList<>();
-		for(Gen<?> gen : elementGenerator){
-			collectionGenerator.add(new Gen<>((r, d) -> {
-				var s = r.nextInt(20);
-				var l = new ArrayList<>(s);
-				for(int i = 0; i<s; i++){
-					l.add(gen.gen.apply(r, d));
-				}
-				return l;
-			}, List.class, "List<" + gen.name + ">"));
-			collectionGenerator.add(new Gen<>((r, d) -> {
-				var s = r.nextInt(20);
-				var l = new ArrayList<>(s);
-				for(int i = 0; i<s; i++){
-					l.add(r.nextBoolean()? null : gen.gen.apply(r, d));
-				}
-				return l;
-			}, List.class, "List<" + gen.name + "?>"));
-			collectionGenerator.add(new Gen<>((r, d) -> {
-				var s = r.nextInt(20);
+		return Stream.of(
+			             gens.stream(),
+			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)),
+			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)).flatMap(g1 -> wrappGenInCollections(g1, 10))
+		             ).flatMap(a -> a.sorted(Comparator.comparing(Gen::name)))
+		             .map(g -> new Object[]{g}).toArray(Object[][]::new);
+	}
+	
+	private static Stream<Gen<?>> wrappGenInCollections(Gen<?> gen, int maxLen){
+		var res = new ArrayList<Gen<?>>();
+		res.add(new Gen<>((r, d) -> {
+			var s = r.nextInt(maxLen);
+			var l = new ArrayList<>(s);
+			for(int i = 0; i<s; i++){
+				l.add(gen.gen.apply(r, d));
+			}
+			return l;
+		}, List.class, "List<" + gen.name + ">"));
+		res.add(new Gen<>((r, d) -> {
+			var s = r.nextInt(maxLen);
+			var l = new ArrayList<>(s);
+			for(int i = 0; i<s; i++){
+				l.add(r.nextBoolean()? null : gen.gen.apply(r, d));
+			}
+			return l;
+		}, List.class, "List<" + gen.name + "?>"));
+		res.add(new Gen<>((r, d) -> {
+			var s = r.nextInt(maxLen);
+			var l = Array.newInstance(gen.type, s);
+			for(int i = 0; i<s; i++){
+				Array.set(l, i, gen.gen.apply(r, d));
+			}
+			return l;
+		}, (Class<Object>)gen.type.arrayType(), gen.name + "[]"));
+		if(!gen.type.isPrimitive()){
+			res.add(new Gen<>((r, d) -> {
+				var s = r.nextInt(maxLen);
 				var l = Array.newInstance(gen.type, s);
 				for(int i = 0; i<s; i++){
-					Array.set(l, i, gen.gen.apply(r, d));
+					Array.set(l, i, r.nextBoolean()? null : gen.gen.apply(r, d));
 				}
 				return l;
-			}, (Class<Object>)gen.type.arrayType()));
+			}, (Class<Object>)gen.type.arrayType(), gen.name + "?[]"));
 		}
-		
-		var generators = Stream.of(elementGenerator, collectionGenerator).flatMap(Collection::stream)
-		                       .sorted(Comparator.comparing(Gen::name)).toList();
-		for(Gen<?> generator : generators){
-			Thread.startVirtualThread(() -> {
-				try{
-					genericCollectionStore(generator);
-				}catch(Throwable e){ }
-			});
-		}
-		return generators.stream().map(g -> new Object[]{g}).toArray(Object[][]::new);
+		return res.stream();
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
 	void genericCollectionStore(Gen<?> generator) throws IOException{
 		TestUtils.testCluster(TestInfo.of(generator), d -> {
 			var r = new RawRandom(generator.name.hashCode());
-			for(int i = 0; i<15; i++){
-				var value = generator.gen.apply(r, d);
-				LogUtil.println("Writing Type:", generator.name, "value:", value);
-				d.roots().provide("obj", new GenericContainer<>(value));
-				//noinspection unchecked
-				var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
-				Assert.assertEquals(generic.value, value);
+			try{
+				for(int i = 0; i<100; i++){
+					var value = generator.gen.apply(r, d);
+					LogUtil.println("Writing - iter", i, "Type:", generator.name, "value:", value);
+					d.roots().provide("obj", new GenericContainer<>(value));
+					//noinspection unchecked
+					var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
+					Assert.assertEquals(generic.value, value);
+				}
+			}catch(Throwable e){
+				int a = 0;
+				throw e;
 			}
 		});
 	}
