@@ -39,7 +39,8 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 	public enum Layout{
 		DYNAMIC,
 		STRIPED,
-		STRUCT_OF_ARRAYS
+		STRUCT_OF_ARRAYS,
+		NO_VALUES
 	}
 	
 	public record AnalysisResult(CollectionType type, Layout layout, boolean hasNulls, Class<?> constantType, int length){ }
@@ -73,6 +74,7 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 		this(analyze(collection));
 	}
 	public CollectionInfo(AnalysisResult analysis){
+		if(analysis == null) throw new IllegalArgumentException("Not a collection");
 		layout = analysis.layout;
 		collectionType = analysis.type;
 		hasNullElements = analysis.hasNulls;
@@ -134,6 +136,8 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 					case BYTE -> Layout.STRIPED;
 				};
 			}).orElse(layout);
+		}else{
+			layout = Layout.NO_VALUES;
 		}
 		
 		return new AnalysisResult(type, layout, hasNulls, constType, length(type, collection));

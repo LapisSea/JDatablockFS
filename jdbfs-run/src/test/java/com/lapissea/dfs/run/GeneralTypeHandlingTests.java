@@ -766,7 +766,7 @@ public class GeneralTypeHandlingTests{
 			                             .mapToObj(i -> ((char)r.nextInt(200)) + "")
 			                             .collect(Collectors.joining("")), String.class),
 			new Gen<>((r, d) -> Instant.ofEpochMilli(r.nextLong(Long.MAX_VALUE)), Instant.class),
-			new Gen<>((r, d) -> LocalDate.ofEpochDay(r.nextLong(Long.MAX_VALUE)), LocalDate.class),
+			new Gen<>((r, d) -> LocalDate.ofEpochDay(r.nextLong(-365243219162L, 365241780471L)), LocalDate.class),
 			new Gen<>((r, d) -> Duration.ofMillis(r.nextLong(Long.MAX_VALUE)), Duration.class)
 		));
 		
