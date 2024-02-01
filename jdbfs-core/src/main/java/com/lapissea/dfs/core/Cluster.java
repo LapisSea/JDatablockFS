@@ -98,6 +98,9 @@ public final class Cluster implements DataProvider{
 		@Override
 		public <T> void provide(ObjectID id, T obj) throws IOException{
 			Objects.requireNonNull(obj);
+			if(ROOT_PROVIDER_WARMUP_COUNT>0){
+				cache.remove(id);
+			}
 			metadata.rootObjects.put(id, obj);
 		}
 		
