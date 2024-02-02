@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -68,6 +69,13 @@ import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class GeneralTypeHandlingTests{
+	static{
+		Thread.startVirtualThread(() -> {
+			try{
+				Cluster.emptyMem();
+			}catch(IOException ignored){ }
+		});
+	}
 	
 	@IOValue
 	public static class Deps extends IOInstance.Managed<Deps>{
@@ -764,6 +772,7 @@ public class GeneralTypeHandlingTests{
 			new Gen<>((r, d) -> r.nextBoolean(), boolean.class),
 			new Gen<>((r, d) -> IntStream.range(0, r.nextInt(20))
 			                             .mapToObj(i -> ((char)r.nextInt(200)) + "")
+			                             .filter(StandardCharsets.UTF_8.newEncoder()::canEncode)
 			                             .collect(Collectors.joining("")), String.class),
 			new Gen<>((r, d) -> Instant.ofEpochMilli(r.nextLong(Long.MAX_VALUE)), Instant.class),
 			new Gen<>((r, d) -> LocalDate.ofEpochDay(r.nextLong(-365243219162L, 365241780471L)), LocalDate.class),
@@ -782,42 +791,30 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	private static Stream<Gen<?>> wrappGenInCollections(Gen<?> gen, int maxLen){
-		var res = new ArrayList<Gen<?>>();
-		res.add(new Gen<>((r, d) -> {
+		return Stream.concat(wrappGenInCollections(gen, maxLen, false), wrappGenInCollections(gen, maxLen, true));
+	}
+	private static Stream<Gen<?>> wrappGenInCollections(Gen<?> gen, int maxLen, boolean nulls){
+		var name = gen.name + (nulls? "?" : "");
+		var lGen = new Gen<>((r, d) -> {
 			var s = r.nextInt(maxLen);
 			var l = new ArrayList<>(s);
 			for(int i = 0; i<s; i++){
-				l.add(gen.gen.apply(r, d));
+				l.add(nulls && r.nextBoolean()? null : gen.gen.apply(r, d));
 			}
 			return l;
-		}, List.class, "List<" + gen.name + ">"));
-		res.add(new Gen<>((r, d) -> {
-			var s = r.nextInt(maxLen);
-			var l = new ArrayList<>(s);
-			for(int i = 0; i<s; i++){
-				l.add(r.nextBoolean()? null : gen.gen.apply(r, d));
-			}
-			return l;
-		}, List.class, "List<" + gen.name + "?>"));
-		res.add(new Gen<>((r, d) -> {
-			var s = r.nextInt(maxLen);
-			var l = Array.newInstance(gen.type, s);
-			for(int i = 0; i<s; i++){
-				Array.set(l, i, gen.gen.apply(r, d));
-			}
-			return l;
-		}, (Class<Object>)gen.type.arrayType(), gen.name + "[]"));
-		if(!gen.type.isPrimitive()){
-			res.add(new Gen<>((r, d) -> {
+		}, List.class, "List<" + name + ">");
+		if(!nulls || !gen.type.isPrimitive()){
+			var arrGen = new Gen<>((r, d) -> {
 				var s = r.nextInt(maxLen);
 				var l = Array.newInstance(gen.type, s);
 				for(int i = 0; i<s; i++){
-					Array.set(l, i, r.nextBoolean()? null : gen.gen.apply(r, d));
+					Array.set(l, i, nulls && r.nextBoolean()? null : gen.gen.apply(r, d));
 				}
 				return l;
-			}, (Class<Object>)gen.type.arrayType(), gen.name + "?[]"));
+			}, (Class<Object>)gen.type.arrayType(), name + "[]");
+			return Stream.of(lGen, arrGen);
 		}
-		return res.stream();
+		return Stream.of(lGen);
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
@@ -829,8 +826,7 @@ public class GeneralTypeHandlingTests{
 					var value = generator.gen.apply(r, d);
 					LogUtil.println("Writing - iter", i, "Type:", generator.name, "value:", value);
 					d.roots().provide("obj", new GenericContainer<>(value));
-					//noinspection unchecked
-					var generic = (GenericContainer<byte[]>)d.roots().request("obj", GenericContainer.class);
+					var generic = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
 					Assert.assertEquals(generic.value, value);
 				}
 			}catch(Throwable e){

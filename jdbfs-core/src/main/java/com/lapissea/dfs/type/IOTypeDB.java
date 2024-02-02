@@ -29,6 +29,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -956,18 +957,28 @@ public sealed interface IOTypeDB{
 		if(obj instanceof IOInstance.Def<?> u){
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
-		if(obj instanceof List<?> l){
-			IOType acc = null;
+		if(obj instanceof Collection<?> l){
+			IOType acc = null, fallback = null;
 			for(var o : l){
 				if(o == null) continue;
 				var t = makeType(o);
-				if(acc == null) acc = t;
-				else if(!acc.equals(t)){
+				if(acc == null){
+					if(o instanceof Collection<?> col && col.isEmpty()) fallback = t;
+					else acc = t;
+				}else if(!acc.equals(t)){
+					if(o instanceof Collection<?> col && col.isEmpty()) continue;
 					throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
 				}
 			}
-			var el = acc != null? acc : IOType.of(Object.class);
-			return IOType.of(List.class, el);
+			var el = acc != null? acc : fallback != null? fallback : IOType.of(Object.class);
+			Class<?> baseType = switch(obj){
+				case List<?> ignore -> List.class;
+				case Set<?> ignore -> Set.class;
+				default -> null;
+			};
+			if(baseType != null){
+				return IOType.of(baseType, el);
+			}
 		}
 		return IOType.of(obj.getClass());
 	}

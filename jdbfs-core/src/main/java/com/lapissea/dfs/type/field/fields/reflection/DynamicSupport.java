@@ -36,11 +36,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -121,8 +119,20 @@ public abstract class DynamicSupport{
 			return infoBytes + nullBufferBytes + switch(psiz){
 				case DOUBLE, FLOAT -> psiz.maxSize.get()*actualElements;
 				case BOOLEAN -> BitUtils.bitsToBytes(actualElements);
-				case LONG -> 1 + NumberSize.bySizeSigned(LongStream.of((long[])val).max().orElse(0)).bytes*(long)actualElements;
-				case INT -> 1 + NumberSize.bySizeSigned(IntStream.of((int[])val).max().orElse(0)).bytes*(long)actualElements;
+				case LONG -> {
+					long mv;
+					if(val instanceof long[] arr) mv = LongStream.of(arr).max().orElse(0);
+					else mv = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)
+					                        .map(Long.class::cast).reduce(Math::max).orElse(0L);
+					yield 1 + NumberSize.bySizeSigned(mv).bytes*(long)actualElements;
+				}
+				case INT -> {
+					int mv;
+					if(val instanceof int[] arr) mv = IntStream.of(arr).max().orElse(0);
+					else mv = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)
+					                        .map(Integer.class::cast).reduce(Math::max).orElse(0);
+					yield 1 + NumberSize.bySizeSigned(mv).bytes*(long)actualElements;
+				}
 				case SHORT, CHAR -> 2L*actualElements;
 				case BYTE -> actualElements;
 			};
@@ -172,6 +182,30 @@ public abstract class DynamicSupport{
 			return sum;
 		}
 		
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
+		if(wrapperType != null){
+			var  pip  = StandardStructPipe.of(wrapperType.struct());
+			var  ctor = wrapperType.constructor();
+			long sum  = infoBytes + nullBufferBytes;
+			for(var inst : CollectionInfo.iter(res.type(), val)){
+				if(inst == null) continue;
+				sum += pip.calcUnknownSize(prov, ctor.apply(inst), WordSpace.BYTE);
+			}
+			return sum;
+		}
+		
+		nestedCollection:
+		{
+			long sum = infoBytes + nullBufferBytes;
+			for(var e : CollectionInfo.iter(res.type(), val)){
+				var eRes = CollectionInfo.analyze(e);
+				if(eRes == null) break nestedCollection;
+				sum += calcCollectionSize(prov, e, eRes);
+			}
+			return sum;
+		}
+		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + TextUtil.toString(val));
 	}
 	
@@ -179,7 +213,7 @@ public abstract class DynamicSupport{
 	public static void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
 		switch(val){
 			case null -> { }
-			case String str -> AutoText.PIPE.write(provider, dest, new AutoText(str));
+			case String str -> AutoText.STR_PIPE.write(provider, dest, str);
 			case IOInstance.Unmanaged inst -> ChunkPointer.DYN_PIPE.write(provider, dest, inst.getPointer());
 			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
@@ -287,7 +321,23 @@ public abstract class DynamicSupport{
 			return;
 		}
 		
-		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + val);
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
+		if(wrapperType != null){
+			var pip  = StandardStructPipe.of(wrapperType.struct());
+			var ctor = wrapperType.constructor();
+			for(var inst : CollectionInfo.iter(res.type(), val)){
+				if(inst == null) continue;
+				pip.write(provider, dest, ctor.apply(inst));
+			}
+			return;
+		}
+		
+		for(var e : CollectionInfo.iter(res.type(), val)){
+			var eRes = CollectionInfo.analyze(e);
+			if(eRes == null) throw new ShouldNeverHappenError("Case not handled for " + res + " with " + val);
+			writeCollection(provider, dest, e, eRes);
+		}
 	}
 	
 	private static void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
@@ -302,25 +352,25 @@ public abstract class DynamicSupport{
 				}
 			}
 			case LONG -> {
-				var siz = NumberSize.bySize(LongStream.of((long[])array).max().orElse(0));
+				var siz = NumberSize.bySizeSigned(LongStream.of((long[])array).max().orElse(0));
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
 					for(long l : (long[])array){
-						siz.write(io, l);
+						siz.writeSigned(io, l);
 					}
 				}
 				dest.write(bb);
 			}
 			case INT -> {
-				var siz = NumberSize.bySize(IntStream.of((int[])array).max().orElse(0));
+				var siz = NumberSize.bySizeSigned(IntStream.of((int[])array).max().orElse(0));
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
 					for(var l : (int[])array){
-						siz.write(io, l);
+						siz.writeIntSigned(io, l);
 					}
 				}
 				dest.write(bb);
@@ -382,26 +432,26 @@ public abstract class DynamicSupport{
 			}
 			case LONG -> {
 				var nums = array.map(Long.class::cast);
-				var siz  = NumberSize.bySize(nums.max(Comparator.comparing(Function.identity())).orElse(0L));
+				var siz  = NumberSize.bySizeSigned(nums.reduce(Math::max).orElse(0L));
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
 					for(long l : nums){
-						siz.write(io, l);
+						siz.writeSigned(io, l);
 					}
 				}
 				dest.write(bb);
 			}
 			case INT -> {
 				var nums = array.map(Integer.class::cast);
-				var siz  = NumberSize.bySize(nums.max(Comparator.comparing(Function.identity())).orElse(0));
+				var siz  = NumberSize.bySizeSigned(nums.reduce(Math::max).orElse(0));
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
 					for(var l : nums){
-						siz.write(io, l);
+						siz.writeIntSigned(io, l);
 					}
 				}
 				dest.write(bb);
@@ -542,7 +592,7 @@ public abstract class DynamicSupport{
 			if(typ == Long.class) return longNum;
 			throw new NotImplementedException("Unkown integer type" + typ);
 		}
-		if(typ == String.class) return AutoText.PIPE.readNew(provider, src, genericContext).getData();
+		if(typ == String.class) return AutoText.STR_PIPE.readNew(provider, src, null);
 		
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
@@ -560,7 +610,7 @@ public abstract class DynamicSupport{
 			return FlagReader.readSingle(src, universe);
 		}
 		
-		if(typ.isArray() || UtilL.instanceOf(typ, List.class)){
+		if(CollectionInfo.isTypeCollection(typ)){
 			return readCollection(typDef, provider, src, genericContext, typ);
 		}
 		
@@ -583,7 +633,8 @@ public abstract class DynamicSupport{
 			if(typ.isArray()){
 				componentType = typ.getComponentType();
 			}else{
-				var arg = IOType.getArgs(typDef).getFirst();
+				var args = IOType.getArgs(typDef);
+				var arg  = args.getFirst();
 				componentType = arg.getTypeClass(provider.getTypeDb());
 			}
 		}else componentType = null;
@@ -619,6 +670,10 @@ public abstract class DynamicSupport{
 					try{
 						if(nullBuffer != null) nullBuffer.close();
 					}catch(IOException ex){ throw UtilL.uncheckedThrow(ex); }
+					if(arr == null){
+						assert len == 0;
+						return Array.newInstance(ct, len);
+					}
 					return arr;
 				};
 			}
@@ -736,6 +791,42 @@ public abstract class DynamicSupport{
 				if(!hasVal) element = null;
 				else{
 					element = pip.readNew(provider, src, genericContext);
+				}
+				dest.accept(element);
+			}
+			return end.get();
+		}
+		
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)componentType);
+		if(wrapperType != null){
+			var pip = StandardStructPipe.of(wrapperType.struct());
+			for(int i = 0; i<len; i++){
+				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+				Object  element;
+				if(!hasVal) element = null;
+				else{
+					element = pip.readNew(provider, src, genericContext).get();
+				}
+				dest.accept(element);
+			}
+			return end.get();
+		}
+		
+		if(CollectionInfo.isTypeCollection(typ)){
+			IOType eType;
+			if(componentType.isArray()){
+				eType = IOType.of(componentType.getComponentType());
+			}else{
+				eType = IOType.getArgs(typDef).getFirst();
+			}
+			
+			for(int i = 0; i<len; i++){
+				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+				Object  element;
+				if(!hasVal) element = null;
+				else{
+					element = readCollection(eType, provider, src, genericContext, componentType);
 				}
 				dest.accept(element);
 			}

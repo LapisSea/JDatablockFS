@@ -5,6 +5,7 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
@@ -13,6 +14,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -23,6 +25,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -48,6 +51,10 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 	private static final Set<Class<?>> UNMODIFIABLE_LISTS;
 	
 	public static final StructPipe<CollectionInfo> PIPE = StandardStructPipe.of(CollectionInfo.class);
+	
+	public static boolean isTypeCollection(Class<?> typ){
+		return typ.isArray() || UtilL.instanceOf(typ, List.class);
+	}
 	
 	static{
 		Set<Class<?>> ul = new HashSet<>();
@@ -113,6 +120,7 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 		Class<?> constType = null;
 		boolean  hasNulls  = false;
 		var      layout    = Layout.STRIPED;
+		boolean  uModList  = false;
 		
 		for(var el : iter(type, collection)){
 			if(el == null){
@@ -121,8 +129,14 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 			}
 			var eTyp = el.getClass();
 			if(layout != Layout.DYNAMIC){
-				if(constType == null) constType = eTyp;
-				else if(constType != eTyp){
+				if(constType == null){
+					constType = eTyp;
+					uModList = UNMODIFIABLE_LISTS.contains(eTyp);
+				}else if(constType != eTyp){
+					if(uModList && UNMODIFIABLE_LISTS.contains(eTyp)){//Ignore class difference for ulist
+						constType = eTyp;
+						continue;
+					}
 					layout = Layout.DYNAMIC;
 					constType = null;
 				}
@@ -136,7 +150,14 @@ public final class CollectionInfo extends IOInstance.Managed<CollectionInfo>{
 					case BYTE -> Layout.STRIPED;
 				};
 			}).orElse(layout);
-		}else{
+			
+			if(layout == Layout.STRUCT_OF_ARRAYS){
+				Log.warn("{}#red for type of {}#red is not implemented yet!", layout, constType);
+				layout = Layout.STRIPED;
+			}
+			
+		}else if(layout != Layout.DYNAMIC){
+			assert iter(type, collection).filtered(Objects::nonNull).isEmpty();
 			layout = Layout.NO_VALUES;
 		}
 		
