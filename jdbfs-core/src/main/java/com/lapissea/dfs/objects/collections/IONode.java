@@ -461,8 +461,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			io.trim();
 		}
 		if(DEBUG_VALIDATION){
-			assert Objects.equals(value, getValue()) :
-				"\n" + value + " != \n" + getValue();
+			T v;
+			assert Objects.equals(value, v = getValue()) :
+				"\n" + value + " != \n" + v;
 		}
 	}
 	
