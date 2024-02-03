@@ -18,9 +18,7 @@ import java.io.Reader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -35,18 +33,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 class Encoding{
 	
-	private record UTF(CharsetEncoder utf8Enc, CharsetDecoder utf8Dec){
-		private UTF(){
-			this(UTF_8.newEncoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT),
-			     UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT));
-		}
-		
-		private static final ThreadLocal<UTF> UTFS = ThreadLocal.withInitial(UTF::new);
-		
-		private static UTF get(){ return UTFS.get(); }
-	}
-	
-	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges, int optimizedBlockCharCount, int optimizedBlockBytes){
+	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges, int optimizedBlockCharCount,
+	                           int optimizedBlockBytes){
 		static TableCoding of(char... table){
 			assert table.length<=Byte.MAX_VALUE;
 			
@@ -271,6 +259,8 @@ class Encoding{
 		
 	}
 	
+	private static final CharsetDecoder UTF_8_DEC = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
+	
 	enum CharEncoding{
 		BASE_16_U(TableCoding.of(
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -301,7 +291,7 @@ class Encoding{
 		)),
 		ASCII(
 			1, String::length,
-			s -> s.chars().allMatch(c -> c<0xFF),
+			s -> s.chars().allMatch(c -> c<128),
 			(w, text) -> w.write(text.getBytes(US_ASCII)),
 			(r, charCount, dest) -> {
 				var data = r.readInts1(charCount);
@@ -321,14 +311,19 @@ class Encoding{
 				});
 			}),
 		UTF8(
-			1.1F, CharEncoding::utf8Len,
-			s -> tryEncode(UTF.get().utf8Enc(), s),
-			(w, s) -> encode(UTF.get().utf8Enc(), s, w),
+			1.1F,
+			CharEncoding::utf8Len,
+			s -> UTF_8.newEncoder().canEncode(s),
+			(w, s) -> {
+				var en = UTF_8.newEncoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
+				var b  = en.encode(CharBuffer.wrap(s));
+				w.write(b.array(), 0, b.limit());
+			},
 			(w, charCount, dest) -> {
 				char[] buff      = new char[Math.min(1024, charCount)];
 				int    remaining = charCount;
 				
-				try(Reader reader = new InputStreamReader(w, UTF.get().utf8Dec())){
+				try(Reader reader = new InputStreamReader(w, UTF_8_DEC)){
 					while(remaining>0){
 						int read = reader.read(buff, 0, Math.min(buff.length, remaining));
 						if(read == -1) throw new EOFException();
@@ -373,29 +368,6 @@ class Encoding{
 				
 			}
 			return count;
-		}
-		
-		
-		private static ByteBuffer encode(CharsetEncoder en, String s){
-			try{
-				return en.encode(CharBuffer.wrap(s));
-			}catch(CharacterCodingException e){
-				throw new RuntimeException(e);
-			}
-		}
-		
-		private static void encode(CharsetEncoder en, String s, ContentWriter w) throws IOException{
-			var b = encode(en, s);
-			w.write(b.array(), 0, b.limit());
-		}
-		
-		private static boolean tryEncode(CharsetEncoder en, String s){
-			try{
-				en.encode(CharBuffer.wrap(s));
-				return true;
-			}catch(CharacterCodingException e){
-				return false;
-			}
 		}
 		
 		private interface Read{
