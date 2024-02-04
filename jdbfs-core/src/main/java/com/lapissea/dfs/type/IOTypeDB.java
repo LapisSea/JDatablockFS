@@ -20,7 +20,6 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
@@ -967,7 +966,7 @@ public sealed interface IOTypeDB{
 					else acc = t;
 				}else if(!acc.equals(t)){
 					if(o instanceof Collection<?> col && col.isEmpty()) continue;
-					throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
+					acc = IOType.of(Object.class);
 				}
 			}
 			var el = acc != null? acc : fallback != null? fallback : IOType.of(Object.class);

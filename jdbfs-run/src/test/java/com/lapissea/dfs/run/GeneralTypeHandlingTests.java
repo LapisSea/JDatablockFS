@@ -744,7 +744,7 @@ public class GeneralTypeHandlingTests{
 	
 	record Gen<T>(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type, String name){
 		Gen(UnsafeBiFunction<RandomGenerator, com.lapissea.dfs.core.DataProvider, T, IOException> gen, Class<T> type){
-			this(gen, type, Utils.typeToHuman(type, false));
+			this(gen, type, Utils.typeToHuman(type));
 		}
 		@Override
 		public String toString(){

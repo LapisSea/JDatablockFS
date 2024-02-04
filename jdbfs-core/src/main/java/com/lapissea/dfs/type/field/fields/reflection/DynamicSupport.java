@@ -611,7 +611,7 @@ public abstract class DynamicSupport{
 		}
 		
 		if(CollectionInfo.isTypeCollection(typ)){
-			return readCollection(typDef, provider, src, genericContext, typ);
+			return readCollection(typDef, provider, src, genericContext);
 		}
 		
 		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
@@ -623,21 +623,27 @@ public abstract class DynamicSupport{
 		
 		throw new NotImplementedException(typ + "");
 	}
-	private static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext, Class<?> typ) throws IOException{
+	private static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var typ = typDef.getTypeClass(provider.getTypeDb());
 		var res = CollectionInfo.read(src);
-		
 		int len = res.length();
 		
 		Class<?> componentType;
+		IOType   componentIOType;
 		if(res.layout() != CollectionInfo.Layout.DYNAMIC){
 			if(typ.isArray()){
 				componentType = typ.getComponentType();
+				componentIOType = IOType.of(componentType);
 			}else{
 				var args = IOType.getArgs(typDef);
 				var arg  = args.getFirst();
+				componentIOType = arg;
 				componentType = arg.getTypeClass(provider.getTypeDb());
 			}
-		}else componentType = null;
+		}else{
+			componentType = null;
+			componentIOType = null;
+		}
 		
 		BitInputStream nullBuffer;
 		byte[]         nullBufferBytes;
@@ -777,7 +783,7 @@ public abstract class DynamicSupport{
 					else{
 						var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
 						var ch  = ptr.dereference(provider);
-						element = u.make(provider, ch, typDef);
+						element = u.make(provider, ch, componentIOType);
 					}
 					dest.accept(element);
 				}
@@ -813,20 +819,13 @@ public abstract class DynamicSupport{
 			return end.get();
 		}
 		
-		if(CollectionInfo.isTypeCollection(typ)){
-			IOType eType;
-			if(componentType.isArray()){
-				eType = IOType.of(componentType.getComponentType());
-			}else{
-				eType = IOType.getArgs(typDef).getFirst();
-			}
-			
+		if(CollectionInfo.isTypeCollection(componentType)){
 			for(int i = 0; i<len; i++){
 				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
 				Object  element;
 				if(!hasVal) element = null;
 				else{
-					element = readCollection(eType, provider, src, genericContext, componentType);
+					element = readCollection(componentIOType, provider, src, genericContext);
 				}
 				dest.accept(element);
 			}
