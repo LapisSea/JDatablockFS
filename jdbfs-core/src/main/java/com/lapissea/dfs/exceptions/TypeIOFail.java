@@ -8,9 +8,9 @@ import java.util.stream.Collectors;
 public class TypeIOFail extends IOException{
 	
 	private static String makeMsg(String note, Class<?> type, Throwable cause){
-		var base = note + (type == null? "" : ": " + Utils.typeToHuman(type, false));
+		var base = note + (type == null? "" : ": " + Utils.typeToHuman(type));
 		if(cause == null) return base;
-		var msg = cause.getMessage() == null? Utils.typeToHuman(cause.getClass(), false) : cause.getMessage().trim();
+		var msg = cause.getMessage() == null? Utils.typeToHuman(cause.getClass()) : cause.getMessage().trim();
 		return "\n" +
 		       base + "\n" +
 		       msg.lines().map(s -> "\t" + s).collect(Collectors.joining("\n"));

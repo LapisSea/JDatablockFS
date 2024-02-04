@@ -196,7 +196,7 @@ public interface VarPool<T extends IOInstance<T>>{
 			          .map(f -> f.getVirtual(StoragePool.values()[poolId]))
 			          .flatMap(Optional::stream)
 			          .map(c -> c.getName() + ": " + Utils.toShortString(get(c)))
-			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getFullName(), false) + "{", "}"));
+			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getFullName()) + "{", "}"));
 		}
 	}
 	

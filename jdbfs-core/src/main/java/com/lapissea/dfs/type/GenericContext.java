@@ -102,16 +102,16 @@ public final class GenericContext implements Stringify{
 	
 	@Override
 	public String toString(){
-		return Utils.typeToHuman(owner, false) +
+		return Utils.typeToHuman(owner) +
 		       IntStream.range(0, actualTypes.size())
-		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i), false))
+		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
 		                .collect(Collectors.joining(", ", "<", ">"));
 	}
 	@Override
 	public String toShortString(){
-		return Utils.typeToHuman(owner, true) +
+		return Utils.typeToHuman(owner) +
 		       IntStream.range(0, actualTypes.size())
-		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i), true))
+		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
 		                .collect(Collectors.joining(", ", "<", ">"));
 	}
 	private String strName(int i){

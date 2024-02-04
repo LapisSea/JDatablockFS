@@ -71,7 +71,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	}
 	@Override
 	public String toString(){
-		return name + ": " + Utils.typeToHuman(type, false);
+		return name + ": " + Utils.typeToHuman(type);
 	}
 	
 	public String name(){ return name; }

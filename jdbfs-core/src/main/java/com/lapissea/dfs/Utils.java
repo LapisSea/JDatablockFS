@@ -187,7 +187,7 @@ public final class Utils{
 	}
 	
 	
-	public static String classNameToHuman(String name, boolean doShort){
+	public static String classNameToHuman(String name){
 		int arrayLevels = 0;
 		for(int i = 0; i<name.length(); i++){
 			if(name.charAt(i) == '[') arrayLevels++;
@@ -196,28 +196,21 @@ public final class Utils{
 		name = name.substring(arrayLevels);
 		if(name.startsWith("L")) name = name.substring(1, name.length() - 1);
 		
-		
-		if(doShort){
-			var index = name.lastIndexOf('.');
-			name = (index != -1? name.substring(name.lastIndexOf('.')) : name) +
-			       ("[]".repeat(arrayLevels));
-		}else{
-			var parts = TextUtil.splitByChar(name, '.');
-			if(parts.length == 1) name = name + ("[]".repeat(arrayLevels));
-			else name = Arrays.stream(parts)
-			                  .limit(parts.length - 1)
-			                  .map(c -> c.charAt(0) + "")
-			                  .collect(Collectors.joining(".")) +
-			            "." + parts[parts.length - 1] +
-			            ("[]".repeat(arrayLevels));
-		}
+		var parts = TextUtil.splitByChar(name, '.');
+		if(parts.length == 1) name = name + ("[]".repeat(arrayLevels));
+		else name = Arrays.stream(parts)
+		                  .limit(parts.length - 1)
+		                  .map(c -> c.charAt(0) + "")
+		                  .collect(Collectors.joining(".")) +
+		            "." + parts[parts.length - 1] +
+		            ("[]".repeat(arrayLevels));
 		return name;
 	}
-	public static String typeToHuman(Type type, boolean doShort){
+	public static String typeToHuman(Type type){
 		return switch(type){
-			case Class<?> c -> classNameToHuman(c.getName(), doShort);
-			case ParameterizedType p -> typeToHuman(p.getRawType(), doShort) +
-			                            Arrays.stream(p.getActualTypeArguments()).map(t -> typeToHuman(t, doShort))
+			case Class<?> c -> classNameToHuman(c.getName());
+			case ParameterizedType p -> typeToHuman(p.getRawType()) +
+			                            Arrays.stream(p.getActualTypeArguments()).map(Utils::typeToHuman)
 			                                  .collect(Collectors.joining(", ", "<", ">"));
 			case WildcardType w -> {
 				var    lowerBounds = w.getLowerBounds();
@@ -230,12 +223,11 @@ public final class Utils{
 						ext = "extends";
 					}else yield "?";
 				}
-				yield "? " + ext + " " + Arrays.stream(bounds).map(b -> typeToHuman(b, doShort))
-				                               .collect(Collectors.joining(" & "));
+				yield "? " + ext + " " + Arrays.stream(bounds).map(Utils::typeToHuman).collect(Collectors.joining(" & "));
 			}
-			case GenericArrayType a -> typeToHuman(a.getGenericComponentType(), doShort) + "[]";
+			case GenericArrayType a -> typeToHuman(a.getGenericComponentType()) + "[]";
 			case TypeVariable<?> t -> {
-				yield t.getName() + ":" + Arrays.stream(t.getBounds()).map(b -> typeToHuman(b, doShort)).collect(Collectors.joining("&"));
+				yield t.getName() + ":" + Arrays.stream(t.getBounds()).map(Utils::typeToHuman).collect(Collectors.joining("&"));
 			}
 			default -> type.getTypeName();
 		};

@@ -120,9 +120,9 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public int hashCode(){ return name.hashCode(); }
 		@Override
-		public String toString(){ return Utils.classNameToHuman(getName(), false); }
+		public String toString(){ return Utils.classNameToHuman(getName()); }
 		@Override
-		public String toShortString(){ return Utils.classNameToHuman(getName(), true); }
+		public String toShortString(){ return Utils.classNameToHuman(getName()); }
 		@Override
 		public IOType withArgs(IOType... args){ return new TypeGeneric(this, List.of(args)); }
 		@Override
@@ -403,7 +403,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			@Override
 			public String toString(){
-				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t, false)).collect(Collectors.joining(" & "));
+				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t)).collect(Collectors.joining(" & "));
 			}
 		}
 		

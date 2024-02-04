@@ -249,7 +249,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 					startsPos--;
 				}
 				for(int i = 0; i<permits.length; i++){
-					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i], false);
+					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i]);
 				}
 			}
 			sb.append(Arrays.stream(permits).collect(Collectors.joining(", ", "->[", "]")));
