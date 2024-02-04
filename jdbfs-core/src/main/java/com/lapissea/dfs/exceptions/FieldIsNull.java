@@ -15,7 +15,7 @@ public class FieldIsNull extends NullPointerException{
 				field,
 				() -> {
 					var struct = field.declaringStruct();
-					return (struct != null? Utils.typeToHuman(struct.getType(), false) + "." : "") +
+					return (struct != null? Utils.typeToHuman(struct.getType()) + "." : "") +
 					       field.toShortString() +
 					       " should not be null";
 				}
@@ -57,7 +57,7 @@ public class FieldIsNull extends NullPointerException{
 			if(msgMake == null){
 				msg = this.field == null?
 				      "<unknown field>" :
-				      (Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field) + " is null";
+				      (Utils.typeToHuman(this.field.getClass()) + " - " + this.field) + " is null";
 			}else msg = msgMake.get();
 		}
 		return msg;

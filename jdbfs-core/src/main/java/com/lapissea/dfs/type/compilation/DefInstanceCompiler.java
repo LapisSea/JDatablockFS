@@ -122,7 +122,7 @@ public final class DefInstanceCompiler{
 		@Override
 		public String toString(){
 			return "{" +
-			       name + ": " + Utils.typeToHuman(type, false) +
+			       name + ": " + Utils.typeToHuman(type) +
 			       getter.map(v -> " getter: " + v).orElse("") +
 			       setter.map(v -> " setter: " + v).orElse("") +
 			       "}";

@@ -105,7 +105,7 @@ public class TypeCheck{
 	public TypeCheck(Class<?> rawType, ArgCheck... argChecks){
 		this(t -> {
 			if(!t.equals(rawType)){
-				throw new ClassCastException(rawType + " is not " + t);
+				throw new ClassCastException(rawType.getTypeName() + " is not " + t.getTypeName());
 			}
 		}, argChecks);
 	}

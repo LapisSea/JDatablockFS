@@ -94,11 +94,11 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 	@Override
 	public String toString(){
 		var struct = getDeclaringStruct();
-		return Utils.typeToHuman(getGenericType(null), false) + " " + (struct == null? "" : struct.cleanName()) + "#" + strName();
+		return Utils.typeToHuman(getGenericType(null)) + " " + (struct == null? "" : struct.cleanName()) + "#" + strName();
 	}
 	@Override
 	public String toShortString(){
-		return Utils.typeToHuman(getGenericType(null), true) + " " + strName();
+		return Utils.typeToHuman(getGenericType(null)) + " " + strName();
 	}
 	
 	@Override

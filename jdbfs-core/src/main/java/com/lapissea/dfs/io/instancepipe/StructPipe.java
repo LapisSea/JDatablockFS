@@ -675,7 +675,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			target = dest;
 		}
 		
-		generateAll(ioPool, provider, instance, true);
+		if(!DEBUG_VALIDATION){
+			generateAll(ioPool, provider, instance, true);
+		}
 		
 		try{
 			for(IOField<T, ?> field : fields){
@@ -698,9 +700,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		if(instance instanceof IOInstance.Unmanaged) return null;
-		
 		generateAll(ioPool, provider, instance, true);
+		if(instance instanceof IOInstance.Unmanaged) return null;
 		var siz = getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 		
 		var sum = 0L;
