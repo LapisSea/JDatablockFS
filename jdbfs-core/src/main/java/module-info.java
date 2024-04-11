@@ -2,7 +2,7 @@ module JDatablockFS.core {
 	requires jdk.unsupported;
 	
 	requires jlapisutil;
-	requires RoaringBitmap;
+	requires roaringbitmap;
 	requires Jorth;
 	requires generics.resolver;
 	requires org.lz4.java;
