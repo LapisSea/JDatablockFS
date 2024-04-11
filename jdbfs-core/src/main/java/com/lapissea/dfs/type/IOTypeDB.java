@@ -956,20 +956,9 @@ public sealed interface IOTypeDB{
 		if(obj instanceof IOInstance.Def<?> u){
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
+		
 		if(obj instanceof Collection<?> l){
-			IOType acc = null, fallback = null;
-			for(var o : l){
-				if(o == null) continue;
-				var t = makeType(o);
-				if(acc == null){
-					if(o instanceof Collection<?> col && col.isEmpty()) fallback = t;
-					else acc = t;
-				}else if(!acc.equals(t)){
-					if(o instanceof Collection<?> col && col.isEmpty()) continue;
-					acc = IOType.of(Object.class);
-				}
-			}
-			var el = acc != null? acc : fallback != null? fallback : IOType.of(Object.class);
+			var el = elementType(l);
 			Class<?> baseType = switch(obj){
 				case List<?> ignore -> List.class;
 				case Set<?> ignore -> Set.class;
@@ -979,7 +968,30 @@ public sealed interface IOTypeDB{
 				return IOType.of(baseType, el);
 			}
 		}
+		if(obj.getClass().isArray()){
+			Class<?> baseType = obj.getClass().getComponentType();
+			if(SupportedPrimitive.isAny(baseType)){
+				return IOType.of(obj.getClass());
+			}
+			var el = elementType(Arrays.asList((Object[])obj));
+			return el.asArrayType(this);
+		}
 		return IOType.of(obj.getClass());
+	}
+	private IOType elementType(Iterable<?> l){
+		IOType type = null, fallback = null;
+		for(var o : l){
+			if(o == null) continue;
+			var t = makeType(o);
+			if(type == null){
+				if(o instanceof Collection<?> col && col.isEmpty()) fallback = t;
+				else type = t;
+			}else if(!type.equals(t)){
+				if(o instanceof Collection<?> col && col.isEmpty()) continue;
+				type = IOType.of(Object.class);
+			}
+		}
+		return type != null? type : fallback != null? fallback : IOType.of(Object.class);
 	}
 	
 	default int toID(Object obj) throws IOException{

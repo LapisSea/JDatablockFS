@@ -91,22 +91,22 @@ public abstract class DynamicSupport{
 		
 		var constType = res.constantType();
 		
+		var nullBufferBytes = res.hasNulls()? BitUtils.bitsToBytes(len) : 0;
+		
 		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
-			long sum = infoBytes;
-			for(var e : CollectionInfo.iter(res.type(), val)){
+			long sum = infoBytes + nullBufferBytes;
+			for(var el : CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)){
 				int id;
 				try{
-					id = prov.getTypeDb().toID(e, false).val();
+					id = prov.getTypeDb().toID(el, false).val();
 				}catch(IOException ex){
 					throw new UncheckedIOException("Failed to compute type ID", ex);
 				}
 				sum += 1 + NumberSize.bySizeSigned(id).bytes;
-				sum += calcSize(prov, e);
+				sum += calcSize(prov, el);
 			}
 			return sum;
 		}
-		
-		var nullBufferBytes = res.hasNulls()? BitUtils.bitsToBytes(len) : 0;
 		
 		var primitiveO = SupportedPrimitive.get(res.constantType());
 		if(primitiveO.isPresent()){
@@ -198,7 +198,7 @@ public abstract class DynamicSupport{
 		nestedCollection:
 		{
 			long sum = infoBytes + nullBufferBytes;
-			for(var e : CollectionInfo.iter(res.type(), val)){
+			for(var e : CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)){
 				var eRes = CollectionInfo.analyze(e);
 				if(eRes == null) break nestedCollection;
 				sum += calcCollectionSize(prov, e, eRes);
@@ -272,10 +272,10 @@ public abstract class DynamicSupport{
 		
 		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
 			var db = provider.getTypeDb();
-			for(var e : CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)){
-				var id = db.toID(e);
+			for(var el : CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)){
+				var id = db.toID(el);
 				dest.writeUnsignedInt4Dynamic(id);
-				writeValue(provider, dest, e);
+				writeValue(provider, dest, el);
 			}
 			return;
 		}
@@ -333,7 +333,7 @@ public abstract class DynamicSupport{
 			return;
 		}
 		
-		for(var e : CollectionInfo.iter(res.type(), val)){
+		for(var e : CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)){
 			var eRes = CollectionInfo.analyze(e);
 			if(eRes == null) throw new ShouldNeverHappenError("Case not handled for " + res + " with " + val);
 			writeCollection(provider, dest, e, eRes);
@@ -432,7 +432,7 @@ public abstract class DynamicSupport{
 			}
 			case LONG -> {
 				var nums = array.map(Long.class::cast);
-				var siz  = NumberSize.bySizeSigned(nums.reduce(Math::max).orElse(0L));
+				var siz  = nums.map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
@@ -445,7 +445,7 @@ public abstract class DynamicSupport{
 			}
 			case INT -> {
 				var nums = array.map(Integer.class::cast);
-				var siz  = NumberSize.bySizeSigned(nums.reduce(Math::max).orElse(0));
+				var siz  = nums.map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
@@ -633,7 +633,11 @@ public abstract class DynamicSupport{
 		if(res.layout() != CollectionInfo.Layout.DYNAMIC){
 			if(typ.isArray()){
 				componentType = typ.getComponentType();
-				componentIOType = IOType.of(componentType);
+				if(typDef instanceof IOType.RawAndArg raaaa){
+					componentIOType = raaaa.withRaw(typDef.getTypeClass(provider.getTypeDb()).componentType());
+				}else{
+					throw new NotImplementedException(typDef + "could not be array unwrapped");
+				}
 			}else{
 				var args = IOType.getArgs(typDef);
 				var arg  = args.getFirst();

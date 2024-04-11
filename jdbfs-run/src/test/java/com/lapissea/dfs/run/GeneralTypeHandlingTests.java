@@ -24,6 +24,7 @@ import com.lapissea.dfs.tools.utils.ToolUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
@@ -53,8 +54,14 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
@@ -64,18 +71,13 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.dfs.type.field.annotations.IOCompression.Type.RLE;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
+import static com.lapissea.util.UtilL.async;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class GeneralTypeHandlingTests{
-	static{
-		Thread.startVirtualThread(() -> {
-			try{
-				Cluster.emptyMem();
-			}catch(IOException ignored){ }
-		});
-	}
+	static{ Thread.startVirtualThread(Cluster::emptyMem); }
 	
 	@IOValue
 	public static class Deps extends IOInstance.Managed<Deps>{
@@ -797,7 +799,7 @@ public class GeneralTypeHandlingTests{
 		var name = gen.name + (nulls? "?" : "");
 		var lGen = new Gen<>((r, d) -> {
 			var s = r.nextInt(maxLen);
-			var l = new ArrayList<>(s);
+			var l = new ArrayList<Object>(s);
 			for(int i = 0; i<s; i++){
 				l.add(nulls && r.nextBoolean()? null : gen.gen.apply(r, d));
 			}
@@ -817,22 +819,101 @@ public class GeneralTypeHandlingTests{
 		return Stream.of(lGen);
 	}
 	
+	private static <T> void generateSequences(List<T> elements, Consumer<List<T>> use){
+		generateSequences(elements, 0, new ArrayList<>(), use);
+	}
+	private static <T> void generateSequences(List<T> elements, int startIndex, List<T> currentSequence, Consumer<List<T>> use){
+		if(startIndex == elements.size()){
+			use.accept(currentSequence);
+			return;
+		}
+		
+		currentSequence.add(elements.get(startIndex));
+		generateSequences(elements, startIndex + 1, new ArrayList<>(currentSequence), use);
+		currentSequence.removeLast();
+		
+		generateSequences(elements, startIndex + 1, currentSequence, use);
+	}
+	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
 	void genericCollectionStore(Gen<?> generator) throws IOException{
-		TestUtils.testCluster(TestInfo.of(generator), d -> {
-			var r = new RawRandom(generator.name.hashCode());
-			try{
-				for(int i = 0; i<100; i++){
-					var value = generator.gen.apply(r, d);
-					LogUtil.println("Writing - iter", i, "Type:", generator.name, "value:", value);
-					d.roots().provide("obj", new GenericContainer<>(value));
-					var generic = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
-					Assert.assertEquals(generic.value, value);
+		var oErrSeed = new RawRandom(generator.name.hashCode()).longs().limit(100).mapToObj(r -> {
+			return async(() -> {
+				var    d = Cluster.emptyMem();
+				Object value;
+				try{
+					value = generator.gen.apply(new RawRandom(r), d);
+				}catch(IOException e){
+					throw new RuntimeException(e);
 				}
-			}catch(Throwable e){
-				int a = 0;
-				throw e;
+				try{
+//					LogUtil.println("Writing - iter", i, "Type:", generator.name, "value:\n", value);
+					var wrapVal = new GenericContainer<>(value);
+					d.roots().provide("obj", wrapVal);
+					var read = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
+					Assert.assertEquals(read, wrapVal);
+					return null;
+				}catch(Throwable e){
+					return r;
+				}
+			});
+		}).toList().stream().map(CompletableFuture::join).filter(Objects::nonNull).findFirst();
+		
+		if(oErrSeed.isEmpty()){
+			return;
+		}
+		
+		var errSeed = oErrSeed.get();
+		var d       = Cluster.emptyMem();
+		var value   = generator.gen.apply(new RawRandom(errSeed), d);
+		
+		if(value instanceof List<?> l && l.stream().noneMatch(e -> e instanceof IOInstance.Unmanaged)){
+			record siz(long siz, Object val, Throwable e){ }
+			var res = new siz[1];
+			
+			try(var exec = new ThreadPoolExecutor(
+				Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors(),
+				10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(Runtime.getRuntime().availableProcessors()*2))
+			){
+				generateSequences(l, 0, new ArrayList<>(), a -> {
+					if(a.size() == l.size()) return;
+					var arr = new ArrayList<>(a);
+					exec.submit(() -> {
+						var val = new GenericContainer<>(arr);
+						var cl  = Cluster.emptyMem();
+						var siz = StandardStructPipe.sizeOfUnknown(cl, val, WordSpace.BYTE);
+						try{
+							cl.roots().provide("obj", val);
+							var generic = (GenericContainer<?>)cl.roots().request("obj", GenericContainer.class);
+							Assert.assertEquals(generic, val);
+						}catch(Throwable e1){
+							synchronized(res){
+								if(res[0] == null || res[0].siz>siz){
+									res[0] = new siz(siz, arr, e1);
+								}
+							}
+						}
+					});
+				});
 			}
-		});
+			
+			if(res[0] != null){
+				var val = res[0].val;
+				LogUtil.println("Found minified error:\n", val);
+				res[0].e.printStackTrace();
+				var wrapVal = new GenericContainer<>(val);
+				d.roots().provide("obj", wrapVal);
+				var read = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
+				Assert.assertEquals(read, wrapVal);
+				
+				Assert.fail("Expected to fail minified error");
+			}
+		}
+		
+		d.roots().provide("obj", new GenericContainer<>(value));
+		var generic = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
+		Assert.assertEquals(generic.value, value);
+		
+		Assert.fail("Expected to fail");
 	}
 }

@@ -65,8 +65,7 @@ final class FieldSupport{
 		};
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>, ValueType> boolean instancesEqualObject(IOField<T, ?> field, VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+	private static <T extends IOInstance<T>> boolean instancesEqualObject(IOField<T, ?> field, VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		var acc  = field.getAccessor();
 		var type = acc.getType();
 		
@@ -78,39 +77,75 @@ final class FieldSupport{
 			
 			if(IOInstance.isInstance(type)){
 				var struct = Struct.ofUnknown(type);
-				if(o1 == null) o1 = (ValueType)struct.make();
-				else o2 = (ValueType)struct.make();
+				if(o1 == null) o1 = struct.make();
+				else o2 = struct.make();
 			}else{
 				throw new NotImplementedException(acc.getType() + "");//TODO implement equals of numbers?
 			}
 		}
 		
-		var isArray = type.isArray();
-		if(!isArray && field.typeFlag(DYNAMIC_FLAG)){
-			var obj = o1 != null? o1 : o2;
-			isArray = obj != null && obj.getClass().isArray();
-		}
-		if(isArray){
-			if(o1 == o2) return true;
-			if(o1 == null || o2 == null) return false;
-			int l1 = Array.getLength(o1);
-			int l2 = Array.getLength(o2);
-			if(l1 != l2) return false;
-			return switch(o1){
-				case byte[] arr -> Arrays.equals(arr, (byte[])o2);
-				case short[] arr -> Arrays.equals(arr, (short[])o2);
-				case int[] arr -> Arrays.equals(arr, (int[])o2);
-				case long[] arr -> Arrays.equals(arr, (long[])o2);
-				case float[] arr -> Arrays.equals(arr, (float[])o2);
-				case double[] arr -> Arrays.equals(arr, (double[])o2);
-				case char[] arr -> Arrays.equals(arr, (char[])o2);
-				case boolean[] arr -> Arrays.equals(arr, (boolean[])o2);
-				case Object[] arr -> Arrays.equals(arr, (Object[])o2);
-				default -> throw new NotImplementedException(o1.getClass().getName());
-			};
+		return areEqual(o1, o2);
+	}
+	
+	private static boolean areEqual(Object o1, Object o2){
+		if(o2 != null){
+			if(o2.getClass().isArray()){
+				return areArraysEqual(o1, o2);
+			}
+			if(o2 instanceof Collection<?> c2 && o1 instanceof Collection<?> c1){
+				if(c2.size() != c1.size()) return false;
+				var i1 = c1.iterator();
+				var i2 = c2.iterator();
+				while(i1.hasNext()){
+					var e1 = i1.next();
+					var e2 = i2.next();
+					if(!areEqual(e1, e2)){
+						return false;
+					}
+				}
+				return true;
+			}
 		}
 		
 		return Objects.equals(o1, o2);
+	}
+	
+	private static boolean areArraysEqual(Object o1, Object o2){
+		if(Objects.equals(o1, o2)){
+			return true;
+		}
+		if(null == o2 || null == o1) return false;
+		
+		if(o1 instanceof Object[] arr && o2 instanceof Object[] arr2){
+			int len = arr.length;
+			if(len != arr2.length){
+				return false;
+			}
+			for(int i = 0; i<len; i++){
+				var e1 = arr[i];
+				var e2 = arr2[i];
+				if(!areEqual(e1, e2)){
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		if(o1.getClass() != o2.getClass()){
+			return false;
+		}
+		
+		return switch(o1){
+			case byte[] arr -> Arrays.equals(arr, (byte[])o2);
+			case short[] arr -> Arrays.equals(arr, (short[])o2);
+			case int[] arr -> Arrays.equals(arr, (int[])o2);
+			case long[] arr -> Arrays.equals(arr, (long[])o2);
+			case float[] arr -> Arrays.equals(arr, (float[])o2);
+			case double[] arr -> Arrays.equals(arr, (double[])o2);
+			case char[] arr -> Arrays.equals(arr, (char[])o2);
+			case boolean[] arr -> Arrays.equals(arr, (boolean[])o2);
+			default -> throw new NotImplementedException(o1.getClass().getName());
+		};
 	}
 	
 	private static String rem(int remaining){ return "... " + remaining + " more"; }
