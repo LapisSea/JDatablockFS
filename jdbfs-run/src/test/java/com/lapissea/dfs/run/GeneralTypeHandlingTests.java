@@ -58,9 +58,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.random.RandomGenerator;
@@ -670,7 +668,7 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void genericStore() throws IOException{
+	void genericChildStore() throws IOException{
 		var d = Cluster.emptyMem();
 		var data = d.roots().request(new ObjectID("obj"), () -> {
 			var v = IOInstance.Def.of(GenericArg.class);
@@ -836,7 +834,8 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
-	void genericCollectionStore(Gen<?> generator) throws IOException{
+	void genericStore(Gen<?> generator) throws IOException{
+		record find(long siz, long seed, Throwable e){ }
 		var oErrSeed = new RawRandom(generator.name.hashCode()).longs().limit(100).mapToObj(r -> {
 			return async(() -> {
 				var    d = Cluster.emptyMem();
@@ -846,35 +845,36 @@ public class GeneralTypeHandlingTests{
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
+				var wrapVal = new GenericContainer<>(value);
 				try{
-//					LogUtil.println("Writing - iter", i, "Type:", generator.name, "value:\n", value);
-					var wrapVal = new GenericContainer<>(value);
+//					LogUtil.println("Writing Type:", generator.name, "value:\n", value);
 					d.roots().provide("obj", wrapVal);
 					var read = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
 					Assert.assertEquals(read, wrapVal);
 					return null;
 				}catch(Throwable e){
-					return r;
+					var siz = StandardStructPipe.sizeOfUnknown(d, wrapVal, WordSpace.BYTE);
+					return new find(siz, r, e);
 				}
 			});
-		}).toList().stream().map(CompletableFuture::join).filter(Objects::nonNull).findFirst();
+		}).toList().stream().map(CompletableFuture::join).filter(Objects::nonNull).reduce((a, b) -> a.siz<b.siz? a : b);
 		
 		if(oErrSeed.isEmpty()){
 			return;
 		}
 		
-		var errSeed = oErrSeed.get();
-		var d       = Cluster.emptyMem();
-		var value   = generator.gen.apply(new RawRandom(errSeed), d);
+		var errVal = oErrSeed.get();
+		var d      = Cluster.emptyMem();
+		var value  = generator.gen.apply(new RawRandom(errVal.seed), d);
+		var err    = errVal.e;
+		
+		LogUtil.println("Writing Type:", generator.name, "value:\n", value);
 		
 		if(value instanceof List<?> l && l.stream().noneMatch(e -> e instanceof IOInstance.Unmanaged)){
 			record siz(long siz, Object val, Throwable e){ }
 			var res = new siz[1];
 			
-			try(var exec = new ThreadPoolExecutor(
-				Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors(),
-				10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(Runtime.getRuntime().availableProcessors()*2))
-			){
+			try(var exec = Executors.newWorkStealingPool()){
 				generateSequences(l, 0, new ArrayList<>(), a -> {
 					if(a.size() == l.size()) return;
 					var arr = new ArrayList<>(a);
@@ -882,6 +882,11 @@ public class GeneralTypeHandlingTests{
 						var val = new GenericContainer<>(arr);
 						var cl  = Cluster.emptyMem();
 						var siz = StandardStructPipe.sizeOfUnknown(cl, val, WordSpace.BYTE);
+						synchronized(res){
+							if(res[0] != null && res[0].siz<=siz){
+								return;
+							}
+						}
 						try{
 							cl.roots().provide("obj", val);
 							var generic = (GenericContainer<?>)cl.roots().request("obj", GenericContainer.class);
@@ -898,17 +903,14 @@ public class GeneralTypeHandlingTests{
 			}
 			
 			if(res[0] != null){
-				var val = res[0].val;
-				LogUtil.println("Found minified error:\n", val);
-				res[0].e.printStackTrace();
-				var wrapVal = new GenericContainer<>(val);
-				d.roots().provide("obj", wrapVal);
-				var read = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
-				Assert.assertEquals(read, wrapVal);
-				
-				Assert.fail("Expected to fail minified error");
+				LogUtil.println("Found minified error:\n", res[0].val);
+				err = res[0].e;
+				value = res[0].val;
 			}
 		}
+		
+		err.printStackTrace();
+		LogUtil.println("===================================");
 		
 		d.roots().provide("obj", new GenericContainer<>(value));
 		var generic = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);

@@ -64,8 +64,8 @@ public abstract class DynamicSupport{
 				if(primitiveO.isPresent()){
 					var psiz = primitiveO.get();
 					yield switch(psiz){
-						case LONG -> 1 + NumberSize.bySizeSigned(LongStream.of((long)val).max().orElse(0)).bytes;
-						case INT -> 1 + NumberSize.bySizeSigned(IntStream.of((int)val).max().orElse(0)).bytes;
+						case LONG -> 1 + NumberSize.bySizeSigned((long)val).bytes;
+						case INT -> 1 + NumberSize.bySizeSigned((int)val).bytes;
 						case BOOLEAN, BYTE, DOUBLE, FLOAT, SHORT, CHAR -> psiz.maxSize.get();
 					};
 				}
@@ -120,18 +120,26 @@ public abstract class DynamicSupport{
 				case DOUBLE, FLOAT -> psiz.maxSize.get()*actualElements;
 				case BOOLEAN -> BitUtils.bitsToBytes(actualElements);
 				case LONG -> {
-					long mv;
-					if(val instanceof long[] arr) mv = LongStream.of(arr).max().orElse(0);
-					else mv = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)
-					                        .map(Long.class::cast).reduce(Math::max).orElse(0L);
-					yield 1 + NumberSize.bySizeSigned(mv).bytes*(long)actualElements;
+					int bytesPer;
+					if(val instanceof long[] arr){
+						bytesPer = 0;
+						for(var i : arr){
+							bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
+						}
+					}else bytesPer = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull).map(Long.class::cast)
+					                               .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+					yield 1 + bytesPer*(long)actualElements;
 				}
 				case INT -> {
-					int mv;
-					if(val instanceof int[] arr) mv = IntStream.of(arr).max().orElse(0);
-					else mv = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull)
-					                        .map(Integer.class::cast).reduce(Math::max).orElse(0);
-					yield 1 + NumberSize.bySizeSigned(mv).bytes*(long)actualElements;
+					int bytesPer;
+					if(val instanceof int[] arr){
+						bytesPer = 0;
+						for(var i : arr){
+							bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
+						}
+					}else bytesPer = CollectionInfo.iter(res.type(), val).filtered(Objects::nonNull).map(Integer.class::cast)
+					                               .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+					yield 1 + bytesPer*(long)actualElements;
 				}
 				case SHORT, CHAR -> 2L*actualElements;
 				case BYTE -> actualElements;
