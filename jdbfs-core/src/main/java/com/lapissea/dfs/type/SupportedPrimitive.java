@@ -34,12 +34,19 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	}
 	
 	public static OptionalPP<SupportedPrimitive> get(Type type){
-		if(!(type instanceof Class<?> clazz)) return OptionalPP.empty();
-		return GET_LOOKUP.getOrDefault(type, OptionalPP.empty());
+		if(type instanceof Class<?> clazz) return get(clazz);
+		return OptionalPP.empty();
+	}
+	public static OptionalPP<SupportedPrimitive> get(Class<?> clazz){
+		return GET_LOOKUP.getOrDefault(clazz, OptionalPP.empty());
 	}
 	public static OptionalPP<SupportedPrimitive> getStrict(Type type){
 		if(!(type instanceof Class<?> clazz) || !clazz.isPrimitive()) return OptionalPP.empty();
-		return GET_STRICT_LOOKUP.getOrDefault(type, OptionalPP.empty());
+		return getStrict(clazz);
+	}
+	public static OptionalPP<SupportedPrimitive> getStrict(Class<?> clazz){
+		if(!clazz.isPrimitive()) return OptionalPP.empty();
+		return GET_STRICT_LOOKUP.getOrDefault(clazz, OptionalPP.empty());
 	}
 	
 	public static boolean isAnyStrict(Class<?> clazz){

@@ -31,6 +31,7 @@ import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -207,8 +208,12 @@ public final class Cluster implements DataProvider{
 		return new Cluster(data);
 	}
 	
-	public static Cluster emptyMem() throws IOException{
-		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
+	public static Cluster emptyMem(){
+		try{
+			return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
 	}
 	
 	
