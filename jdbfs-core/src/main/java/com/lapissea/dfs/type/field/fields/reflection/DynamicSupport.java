@@ -844,7 +844,7 @@ public abstract class DynamicSupport{
 			return end.get();
 		}
 		
-		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ);
+		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
 	}
 	
 	public static void skipTyp(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
