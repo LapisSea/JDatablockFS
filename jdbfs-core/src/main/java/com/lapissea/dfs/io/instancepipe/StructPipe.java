@@ -252,7 +252,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
 			setInitState(STATE_SIZE_DESC);
-			generators = Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+			generators = Utils.nullIfEmpty(ioFields.reversed().stream().flatMap(IOField::generatorStream).toList());
+			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
 				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
