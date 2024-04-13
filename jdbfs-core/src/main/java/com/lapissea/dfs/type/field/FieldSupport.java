@@ -249,12 +249,19 @@ final class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(accessor.getType());
+			var typeGen = accessor.getGenericType(null);
+			var type    = accessor.getType();
+			
+			if(type == Optional.class){
+				typeGen = IOFieldTools.unwrapOptionalTypeRequired(typeGen);
+				type = Utils.typeToRaw(typeGen);
+			}
+			
+			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(type);
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}
 			
-			var typeGen = accessor.getGenericType(null);
 			while(true){
 				if(typeGen instanceof Class<?> c){
 					if(c.isArray()){
@@ -273,16 +280,16 @@ final class FieldSupport{
 				break;
 			}
 			
-			var type = Utils.typeToRaw(typeGen);
+			var rawType = Utils.typeToRaw(typeGen);
 			
-			if(IOInstance.isInstance(type)){
+			if(IOInstance.isInstance(rawType)){
 				typeFlags |= IOINSTANCE_FLAG;
 				
-				if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(type)){
+				if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
 					typeFlags |= HAS_NO_POINTERS_FLAG;
 				}
 			}
-			if(SupportedPrimitive.isAny(type) || type.isEnum()){
+			if(SupportedPrimitive.isAny(rawType) || rawType.isEnum()){
 				typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
 			}
 		}

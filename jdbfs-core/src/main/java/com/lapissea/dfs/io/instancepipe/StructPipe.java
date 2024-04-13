@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -251,7 +252,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
 			setInitState(STATE_SIZE_DESC);
-			generators = Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+			generators = Utils.nullIfEmpty(ioFields.reversed().stream().flatMap(IOField::generatorStream).toList());
+			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
 				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
@@ -342,6 +344,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			Class<?> type = accessor.getType();
+			if(type == Optional.class){
+				var genTyp = accessor.getGenericType(null);
+				var valTyp = IOFieldTools.unwrapOptionalTypeRequired(genTyp);
+				type = Utils.typeToRaw(valTyp);
+			}
 			
 			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
 				if(Struct.canUnknownHavePointers(type)){

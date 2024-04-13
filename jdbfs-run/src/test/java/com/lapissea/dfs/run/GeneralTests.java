@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
@@ -18,6 +19,7 @@ import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
@@ -420,5 +422,31 @@ public class GeneralTests{
 					throw new RuntimeException(e + " prev " + v);
 				}
 			});
+	}
+	
+	@Test
+	void optionalValue() throws IOException{
+		TestUtils.testCluster(TestInfo.of(), c -> {
+			interface Foo extends IOInstance.Def<Foo>{
+				Optional<String> val();
+				static Foo of(Optional<String> val){ return IOInstance.Def.of(Foo.class, val); }
+			}
+			ConfigDefs.CLASSGEN_PRINT_BYTECODE.set(JorthLogger.CodeLog.LIVE);
+			try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
+				Foo.of(Optional.empty());
+			}
+			
+			Foo def = c.roots().request("default", Foo.class);
+			assertEquals(def, Foo.of(Optional.empty()));
+			
+			var helloWorld = Optional.of("Hello world! :)");
+			c.roots().provide("some", Foo.of(helloWorld));
+			var read = c.roots().request("some", Foo.class);
+			assertEquals(read, Foo.of(helloWorld));
+			
+			c.roots().provide("none", Foo.of(Optional.empty()));
+			Foo none = c.roots().request("none", Foo.class);
+			assertEquals(none, Foo.of(Optional.empty()));
+		});
 	}
 }

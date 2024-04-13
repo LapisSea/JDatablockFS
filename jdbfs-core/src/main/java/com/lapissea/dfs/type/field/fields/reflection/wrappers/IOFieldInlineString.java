@@ -45,7 +45,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 			nullable()? 0 : desc.getMin(),
 			desc.getMax(),
 			(ioPool, prov, inst) -> {
-				var val = getWrapped(null, inst);
+				var val = getWrapped(ioPool, inst);
 				if(val == null){
 					if(nullable()) return 0;
 					throw new NullPointerException();

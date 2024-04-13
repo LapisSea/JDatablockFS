@@ -189,6 +189,25 @@ public final class ConfigTools{
 		default <U> Supplier<U> map(Function<T, U> mapper){
 			return () -> mapper.apply(resolve());
 		}
+		
+		final class TempConfig<T> implements AutoCloseable{
+			public final  T       oldValue;
+			private final Flag<T> flag;
+			private TempConfig(Flag<T> flag, T oldValue){
+				this.oldValue = oldValue;
+				this.flag = flag;
+			}
+			@Override
+			public void close(){
+				flag.set(oldValue);
+			}
+		}
+		
+		default TempConfig<T> temporarySet(T val){
+			var old = resolve();
+			set(val);
+			return new TempConfig<>(this, old);
+		}
 	}
 	
 	public static Flag.FInt flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.FInt(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal, null); }

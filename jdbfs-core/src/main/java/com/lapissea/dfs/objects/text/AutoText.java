@@ -56,6 +56,15 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	
 	
 	public static final ObjectPipe.NoPool<String> STR_PIPE = new ObjectPipe.NoPool<>(){
+		private final BasicSizeDescriptor<String, Void> sizeDescriptor;
+		
+		{
+			var desc = AutoText.PIPE.getSizeDescriptor();
+			sizeDescriptor = BasicSizeDescriptor.Unknown.of(
+				desc.getWordSpace(), desc.getMin(), desc.getMax(),
+				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
+		}
+		
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, String instance) throws IOException{
 			AutoText.PIPE.write(provider, dest, new AutoText(instance));
@@ -69,12 +78,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			return AutoText.PIPE.readNew(provider, src, null).getData();
 		}
 		@Override
-		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){
-			var desc = AutoText.PIPE.getSizeDescriptor();
-			return BasicSizeDescriptor.Unknown.of(
-				desc.getWordSpace(), desc.getMin(), desc.getMax(),
-				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
-		}
+		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){ return sizeDescriptor; }
 	};
 	
 	private String       data;

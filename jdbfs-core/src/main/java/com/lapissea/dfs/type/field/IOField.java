@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -50,7 +51,7 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger, IOFieldChunkPointer{
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{

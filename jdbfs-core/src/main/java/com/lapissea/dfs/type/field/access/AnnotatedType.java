@@ -1,10 +1,10 @@
 package com.lapissea.dfs.type.field.access;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
@@ -53,6 +53,6 @@ public interface AnnotatedType{
 	
 	default Class<?> getType(){
 		var generic = getGenericType(null);
-		return (Class<?>)(generic instanceof ParameterizedType p? p.getRawType() : generic);
+		return Utils.typeToRaw(generic);
 	}
 }

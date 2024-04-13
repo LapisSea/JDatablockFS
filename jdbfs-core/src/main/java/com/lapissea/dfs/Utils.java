@@ -321,4 +321,11 @@ public final class Utils{
 	public static boolean isInnerClass(Class<?> clazz){
 		return clazz.isMemberClass() && !Modifier.isStatic(clazz.getModifiers());
 	}
+	
+	public static <T> Optional<T> Some(T val){
+		return Optional.of(val);
+	}
+	public static <T> Optional<T> None(){
+		return Optional.empty();
+	}
 }

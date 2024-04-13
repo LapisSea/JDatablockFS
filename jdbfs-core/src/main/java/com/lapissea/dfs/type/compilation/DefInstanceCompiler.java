@@ -576,7 +576,7 @@ public final class DefInstanceCompiler{
 				for(var info : fieldInfo){
 					if(isFieldIncluded(includeNames, info.name)){
 						defineField(writer, info);
-						implementUserAccess(writer, info);
+						implementUserAccess(writer, info, humanName);
 					}else{
 						defineNoField(writer, info);
 					}
@@ -588,9 +588,9 @@ public final class DefInstanceCompiler{
 				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> o.stream().filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
 				
 				generateDefaultConstructor(writer, includedFields);
-				generateDataConstructor(writer, orderedFields, includeNames);//All fields constructor
+				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
 				if(includeNames.isPresent()){
-					generateDataConstructor(writer, includedOrdered, includeNames);//Included only fields constructor
+					generateDataConstructor(writer, includedOrdered, includeNames, humanName);//Included only fields constructor
 				}
 				
 				readOnlyConstructor:
@@ -615,7 +615,7 @@ public final class DefInstanceCompiler{
 						}
 					}
 					
-					generateDataConstructor(writer, Optional.of(dataFields), Optional.empty());
+					generateDataConstructor(writer, Optional.of(dataFields), Optional.empty(), humanName);
 				}
 				
 				if(specials.set.isPresent()){
@@ -636,8 +636,8 @@ public final class DefInstanceCompiler{
 					
 					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("get #arg {!}", info.name);
-						if(info.type == ChunkPointer.class){
-							JorthUtils.nullCheck(writer);
+						if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+							JorthUtils.nullCheckDup(writer, fieldNullMsg(info, humanName));
 						}
 						writer.write("set this {!}", info.name);
 					}
@@ -659,7 +659,7 @@ public final class DefInstanceCompiler{
 						toStrAnn = IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class);
 					}
 					if(toStrAnn != null){
-						generateStandardToString(completion, includeNames, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
+						generateStandardToString(humanName, includeNames, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
 						break stringSaga;
 					}
 				}
@@ -719,14 +719,14 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(CompletionInfo<?> completion, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
 		
 		if(specials.toStr.isEmpty()){
-			generateStandardToString(completion, includeNames, toStrAnn, "toString", fieldInfo, writer);
+			generateStandardToString(classHumanName, includeNames, toStrAnn, "toString", fieldInfo, writer);
 		}
 		if(specials.toShortStr.isEmpty()){
 			if(toStrAnn.name()){
-				generateStandardToString(completion, includeNames, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+				generateStandardToString(classHumanName, includeNames, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
 					"name", false,
 					"curly", toStrAnn.curly(),
 					"fNames", toStrAnn.fNames(),
@@ -842,7 +842,7 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateStandardToString(CompletionInfo<?> completion, Optional<Set<String>> includeNames, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
+	private static void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -855,8 +855,7 @@ public final class DefInstanceCompiler{
 		);
 		
 		if(toStrAnn.name()){
-			var nam = completion.base.getSimpleName();
-			append(writer, w -> w.write("'{}'", nam));
+			append(writer, w -> w.write("'{}'", classHumanName));
 		}
 		if(toStrAnn.curly()){
 			append(writer, w -> w.write("'{'"));
@@ -924,14 +923,18 @@ public final class DefInstanceCompiler{
 				""");
 		
 		for(FieldInfo info : fieldInfo){
-			if(info.type != ChunkPointer.class) continue;
-			writer.write("get #ChunkPointer NULL");
-			writer.write("set this {!}", info.name);
+			if(info.type == ChunkPointer.class){
+				writer.write("get #ChunkPointer NULL");
+				writer.write("set this {!}", info.name);
+			}else if(Utils.typeToRaw(info.type) == Optional.class){
+				writer.write("static call {} empty", Optional.class);
+				writer.write("set this {!}", info.name);
+			}
 		}
 		writer.write("end");
 	}
 	
-	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorth{
+	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
 		if(oOrderedFields.filter(d -> !d.isEmpty()).isEmpty()){
 			return;
 		}
@@ -957,7 +960,7 @@ public final class DefInstanceCompiler{
 			
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
-			else nullCheck = info.type == ChunkPointer.class ||
+			else nullCheck = info.type == ChunkPointer.class || info.type == Optional.class ||
 			                 info.annotations.stream()
 			                                 .filter(a -> a instanceof IONullability)
 			                                 .findAny()
@@ -966,14 +969,14 @@ public final class DefInstanceCompiler{
 			
 			if(!included){
 				if(nullCheck){
-					JorthUtils.nullCheck(writer, "get #arg arg" + i);
+					JorthUtils.nullCheck(writer, "get #arg arg" + i, fieldNullMsg(info, baseClassSimpleName));
 				}
 				continue;
 			}
 			
 			writer.write("get #arg arg" + i);
 			if(nullCheck){
-				JorthUtils.nullCheck(writer);
+				JorthUtils.nullCheckDup(writer, fieldNullMsg(info, baseClassSimpleName));
 			}
 			writer.write("set this {!}", info.name);
 		}
@@ -1041,7 +1044,7 @@ public final class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void implementUserAccess(CodeStream writer, FieldInfo info) throws MalformedJorth{
+	private static void implementUserAccess(CodeStream writer, FieldInfo info, String classHumanName) throws MalformedJorth{
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
 			var setter = info.setter.orElseThrow();
@@ -1086,8 +1089,8 @@ public final class DefInstanceCompiler{
 			info.name
 		);
 		
-		if(info.type == ChunkPointer.class){
-			JorthUtils.nullCheck(writer);
+		if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+			JorthUtils.nullCheckDup(writer, fieldNullMsg(info, classHumanName));
 		}
 		
 		writer.write(
@@ -1097,6 +1100,10 @@ public final class DefInstanceCompiler{
 				""",
 			info.name
 		);
+	}
+	
+	private static String fieldNullMsg(FieldInfo info, String classHumanName){
+		return '"' + classHumanName + "." + info.name + "\" can not be null!";
 	}
 	
 	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorth{
