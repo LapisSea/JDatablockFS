@@ -4,6 +4,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
@@ -19,7 +20,7 @@ import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.compilation.JorthLogger;
+import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
@@ -35,6 +36,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -431,7 +433,6 @@ public class GeneralTests{
 				Optional<String> val();
 				static Foo of(Optional<String> val){ return IOInstance.Def.of(Foo.class, val); }
 			}
-			ConfigDefs.CLASSGEN_PRINT_BYTECODE.set(JorthLogger.CodeLog.LIVE);
 			try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
 				Foo.of(Optional.empty());
 			}
@@ -448,5 +449,14 @@ public class GeneralTests{
 			Foo none = c.roots().request("none", Foo.class);
 			assertEquals(none, Foo.of(Optional.empty()));
 		});
+	}
+	
+	@Test(expectedExceptions = IllegalField.class)
+	void classValue(){
+		interface Foo extends IOInstance.Def<Foo>{
+			@IONullability(NULLABLE)
+			Class<?> val();
+		}
+		Struct.of(Foo.class, Struct.STATE_DONE);
 	}
 }
