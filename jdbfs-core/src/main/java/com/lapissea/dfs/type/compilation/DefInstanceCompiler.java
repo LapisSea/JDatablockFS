@@ -636,7 +636,7 @@ public final class DefInstanceCompiler{
 					
 					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("get #arg {!}", info.name);
-						if(info.type == ChunkPointer.class){
+						if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
 							JorthUtils.nullCheck(writer);
 						}
 						writer.write("set this {!}", info.name);
@@ -924,9 +924,13 @@ public final class DefInstanceCompiler{
 				""");
 		
 		for(FieldInfo info : fieldInfo){
-			if(info.type != ChunkPointer.class) continue;
-			writer.write("get #ChunkPointer NULL");
-			writer.write("set this {!}", info.name);
+			if(info.type == ChunkPointer.class){
+				writer.write("get #ChunkPointer NULL");
+				writer.write("set this {!}", info.name);
+			}else if(Utils.typeToRaw(info.type) == Optional.class){
+				writer.write("static call {} empty", Optional.class);
+				writer.write("set this {!}", info.name);
+			}
 		}
 		writer.write("end");
 	}
@@ -957,7 +961,7 @@ public final class DefInstanceCompiler{
 			
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
-			else nullCheck = info.type == ChunkPointer.class ||
+			else nullCheck = info.type == ChunkPointer.class || info.type == Optional.class ||
 			                 info.annotations.stream()
 			                                 .filter(a -> a instanceof IONullability)
 			                                 .findAny()
@@ -1086,7 +1090,7 @@ public final class DefInstanceCompiler{
 			info.name
 		);
 		
-		if(info.type == ChunkPointer.class){
+		if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
 			JorthUtils.nullCheck(writer);
 		}
 		

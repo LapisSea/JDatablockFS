@@ -60,6 +60,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.dfs.Utils.None;
+import static com.lapissea.dfs.Utils.Some;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
@@ -245,6 +247,9 @@ public final class IOFieldTools{
 	}
 	public static <T extends IOInstance<T>> String makeNullElementsFlagName(FieldAccessor<T> field){
 		return makeVirtualName(field.getName(), "areNull");
+	}
+	public static <T extends IOInstance<T>> String makeCompanionValueFlagName(FieldAccessor<T> field){
+		return makeVirtualName(field.getName(), "value");
 	}
 	
 	public static boolean isNullable(AnnotatedType holder){
@@ -563,6 +568,18 @@ public final class IOFieldTools{
 				yield false;
 			}
 			default -> throw new NotImplementedException(type.getClass().getName());
+		};
+	}
+	
+	public static Type unwrapOptionalTypeRequired(Type optionalType){
+		return unwrapOptionalType(optionalType).orElseThrow(() -> {
+			return new RuntimeException("Failed to unwrap optional type: " + optionalType.getTypeName());
+		});
+	}
+	public static Optional<Type> unwrapOptionalType(Type optionalType){
+		return switch(optionalType){
+			case ParameterizedType typ -> Some(typ.getActualTypeArguments()[0]);
+			default -> None();
 		};
 	}
 }

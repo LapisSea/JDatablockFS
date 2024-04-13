@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -342,6 +343,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			Class<?> type = accessor.getType();
+			if(type == Optional.class){
+				var genTyp = accessor.getGenericType(null);
+				var valTyp = IOFieldTools.unwrapOptionalTypeRequired(genTyp);
+				type = Utils.typeToRaw(valTyp);
+			}
 			
 			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
 				if(Struct.canUnknownHavePointers(type)){
