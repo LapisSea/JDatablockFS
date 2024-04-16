@@ -398,7 +398,7 @@ public final class DefInstanceCompiler{
 					StagedInit.runBaseStageTask(() -> {
 						try{
 							//Eagerly load struct
-							Struct.of(node.impl).waitForStateDone();
+							Struct.of(node.impl, StagedInit.STATE_DONE);
 						}catch(Throwable e){
 							Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e.getMessage());
 						}

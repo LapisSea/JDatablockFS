@@ -151,7 +151,7 @@ public final class FieldCompiler{
 		if(!fails.isEmpty()){
 			throw new IllegalField(
 				"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
-				(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
+				(fails.size()>1? "\n" : "") + fails.stream().map(f -> "\t" + f).collect(joining("\n"))
 			);
 		}
 	}

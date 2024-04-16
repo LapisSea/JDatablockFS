@@ -987,10 +987,10 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		drawIndex.accept(IterablePPs.of(clampedOverflow));
+		drawIndex.accept(IterablePPs.from(clampedOverflow));
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
-		drawIndex.accept(IterablePPs.of(ranges).map(r -> {
+		drawIndex.accept(IterablePPs.from(ranges).map(r -> {
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
