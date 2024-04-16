@@ -34,6 +34,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiFunction;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -853,7 +854,14 @@ public class GeneralTypeHandlingTests{
 					Assert.assertEquals(read, wrapVal);
 					return null;
 				}catch(Throwable e){
-					var siz = StandardStructPipe.sizeOfUnknown(d, wrapVal, WordSpace.BYTE);
+					long siz = -1;
+					try{
+						siz = StandardStructPipe.sizeOfUnknown(d, wrapVal, WordSpace.BYTE);
+					}catch(Throwable ignore){ }
+					if(siz == -1) try{
+						siz = TextUtil.toString(value).length();
+					}catch(Throwable ignore){ }
+					if(siz == -1) siz = Long.MAX_VALUE;
 					return new find(siz, r, e);
 				}
 			});

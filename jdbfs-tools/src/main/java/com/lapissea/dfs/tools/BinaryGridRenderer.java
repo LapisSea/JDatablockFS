@@ -1915,15 +1915,15 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private <T extends IOInstance<T>> int annotateDynamicArrayValueHead(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object arr) throws IOException{
-		CollectionInfo info;
-		var            ref = reference.addOffset(fieldOffset);
+		CollectionInfo.Store info;
+		var                  ref = reference.addOffset(fieldOffset);
 		try{
-			info = ref.ioMap(ctx.provider, CollectionInfo::read);
+			info = ref.ioMap(ctx.provider, io -> CollectionInfo.Store.PIPE.readNew(ctx.provider, io, null));
 		}catch(Throwable e){
 			throw new IOException("Failed to read " + CollectionInfo.class.getSimpleName() + " on " + ref, e);
 		}
-		annotateStruct(ctx, info, ref, CollectionInfo.PIPE, null, true, false);
-		return info.calcIOBytes();
+		annotateStruct(ctx, info, ref, CollectionInfo.Store.PIPE, null, true, false);
+		return (int)info.val().calcIOBytes(ctx.provider);
 	}
 	
 	private <T extends IOInstance<T>> GenericContext generics(T instance, GenericContext parentGenerics){
