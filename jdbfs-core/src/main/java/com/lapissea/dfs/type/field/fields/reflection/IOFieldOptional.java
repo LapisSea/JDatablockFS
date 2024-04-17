@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -65,7 +66,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					
 					return new BehaviourRes<>(List.of(new VirtualFieldDefinition<T, Integer>(
 						IO,
-						IOFieldTools.makeCompanionValueFlagName(field),
+						FieldNames.companionValueFlag(field),
 						type,
 						annotations
 					)), annotations.stream().map(Annotation::annotationType).collect(Collectors.toUnmodifiableSet()));
@@ -86,7 +87,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		//noinspection unchecked
-		valueField = (IOField<T, V>)fields.requireByName(IOFieldTools.makeCompanionValueFlagName(getAccessor()));
+		valueField = (IOField<T, V>)fields.requireByName(FieldNames.companionValueFlag(getAccessor()));
 	}
 	
 	@Override

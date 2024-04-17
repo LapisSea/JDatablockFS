@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -299,7 +300,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var refs = fields.stream()
 		                 .filter(RefField.class::isInstance)
 		                 .map(RefField.class::cast)
-		                 .map(ref -> fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f -> Map.entry(f, ref)))
+		                 .map(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).map(f -> Map.entry(f, ref)))
 		                 .filter(OptionalPP::isPresent)
 		                 .map(OptionalPP::get)
 		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));

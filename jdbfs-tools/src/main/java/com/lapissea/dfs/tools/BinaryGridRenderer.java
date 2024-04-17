@@ -30,9 +30,9 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -1517,7 +1517,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							
 							if(!ref.isNull() && !noPtr){
 								long from, ptrSize = bSize;
-								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(IOFieldTools.makeRefName(acc)) : OptionalPP.<IOField<T, ?>>empty();
+								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(FieldNames.ref(acc)) : OptionalPP.<IOField<T, ?>>empty();
 								if(refContainer.isPresent()){
 									var refF      = refContainer.get();
 									var refOffset = 0L;
@@ -1645,7 +1645,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									if(!noPtrs && inst instanceof Reference &&
 									   pipe.getSpecificFields()
 									       .stream()
-									       .map(f -> IOFieldTools.makeRefName(f.getName()))
+									       .map(f -> FieldNames.ref(FieldNames.name(f.getName())))
 									       .anyMatch(n -> n.equals(acc.getName()))
 									){
 										noPtrs = true;
@@ -1919,8 +1919,8 @@ public class BinaryGridRenderer implements DataRenderer{
 	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
 		var arrayLenSiz = NumberSize.bySize(arr.length);
 		
-		var arrayLenName     = IOFieldTools.makeCollectionLenName(field.getAccessor());
-		var arrayLenSizeName = IOFieldTools.makeNumberSizeName(arrayLenName);
+		var arrayLenName     = FieldNames.collectionLen(field.getAccessor());
+		var arrayLenSizeName = FieldNames.numberSize(FieldNames.name(arrayLenName));
 		
 		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new BasicFieldAccessor<T>(null, arrayLenSizeName, List.of()){
 			@Override

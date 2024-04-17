@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -40,7 +41,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		private static <T extends IOInstance<T>> BehaviourRes<T> idBehaviour(FieldAccessor<T> field){
 			return new BehaviourRes<T>(new VirtualFieldDefinition<>(
-				IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
+				IO, FieldNames.universeID(field), int.class,
 				List.of(
 					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
 					IOValue.Unsigned.INSTANCE
@@ -101,7 +102,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	@Override
 	public void init(FieldSet<CTyp> ioFields){
 		super.init(ioFields);
-		universeID = ioFields.requireExactInt(IOFieldTools.makeUniverseIDFieldName(getAccessor()));
+		universeID = ioFields.requireExactInt(FieldNames.universeID(getAccessor()));
 	}
 	
 	private int getUniverseID(VarPool<CTyp> ioPool, CTyp instance){

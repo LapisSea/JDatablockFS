@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -93,7 +94,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	@Override
 	public void init(FieldSet<CTyp> fields){
 		super.init(fields);
-		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+		typeID = fields.requireExactInt(FieldNames.genericID(getAccessor()));
 	}
 	
 	@Override

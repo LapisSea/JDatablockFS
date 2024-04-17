@@ -7,9 +7,9 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
@@ -80,7 +80,7 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 		@Override
 		public void init(FieldSet<T> fields){
 			super.init(fields);
-			referenceField = getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
+			referenceField = getDependencies().requireExact(Reference.class, FieldNames.ref(getAccessor()));
 		}
 		
 		protected void setRef(T instance, Reference newRef){

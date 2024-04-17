@@ -4,9 +4,9 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteArray;
@@ -44,7 +44,7 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		if(nullable()){
-			isNull = fields.requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+			isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 		}
 	}
 	

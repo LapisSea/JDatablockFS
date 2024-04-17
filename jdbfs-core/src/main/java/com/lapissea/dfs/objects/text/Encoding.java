@@ -6,7 +6,7 @@ import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.util.PairM;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -287,7 +287,7 @@ class Encoding{
 			//Variation of base 64 optimized for storing class names and fields.
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'0', '1', '2', '3', '4', '5', '_', '$', '[', ';', '.', IOFieldTools.GENERATED_FIELD_SEPARATOR
+			'0', '1', '2', '3', '4', '5', '_', '$', '[', ';', '.', FieldNames.GENERATED_FIELD_SEPARATOR
 		)),
 		ASCII(
 			1, String::length,

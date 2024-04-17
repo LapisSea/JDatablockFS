@@ -67,8 +67,6 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public final class IOFieldTools{
 	
-	public static final char GENERATED_FIELD_SEPARATOR = ':';
-	
 	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
 		return list -> map.apply(list.stream()).toList();
 	}
@@ -186,7 +184,7 @@ public final class IOFieldTools{
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(makeNumberSizeName(field))).findAny()
+			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(FieldNames.numberSize(field))).findAny()
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
@@ -223,35 +221,6 @@ public final class IOFieldTools{
 		return acc;
 	}
 	
-	private static String makeVirtualName(String base, String extension){
-		return base + GENERATED_FIELD_SEPARATOR + extension;
-	}
-	
-	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "len");
-	}
-	public static <T extends IOInstance<T>> String makeNumberSizeName(FieldAccessor<T> field){
-		return makeNumberSizeName(field.getName());
-	}
-	public static String makeNumberSizeName(String name){
-		return makeVirtualName(name, "nSiz");
-	}
-	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "typeID");
-	}
-	public static <T extends IOInstance<T>> String makeUniverseIDFieldName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "localID");
-	}
-	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "isNull");
-	}
-	public static <T extends IOInstance<T>> String makeNullElementsFlagName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "areNull");
-	}
-	public static <T extends IOInstance<T>> String makeCompanionValueFlagName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "value");
-	}
-	
 	public static boolean isNullable(AnnotatedType holder){
 		return getNullability(holder) == NULLABLE;
 	}
@@ -260,20 +229,6 @@ public final class IOFieldTools{
 	}
 	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
 		return holder.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
-	}
-	
-	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
-		return makeRefName(accessor.getName());
-	}
-	public static String makeRefName(String baseName){
-		return makeVirtualName(baseName, "ref");
-	}
-	
-	public static <T extends IOInstance<T>> String makePackName(FieldAccessor<T> accessor){
-		return makePackName(accessor.getName());
-	}
-	public static String makePackName(String baseName){
-		return makeVirtualName(baseName, "pack");
 	}
 	
 	public static IONullability makeNullabilityAnn(IONullability.Mode mode){
@@ -396,7 +351,7 @@ public final class IOFieldTools{
 	}
 	
 	public static boolean isGenerated(IOField<?, ?> field){
-		return field.getName().indexOf(GENERATED_FIELD_SEPARATOR) != -1;
+		return field.getName().indexOf(FieldNames.GENERATED_FIELD_SEPARATOR) != -1;
 	}
 	
 	public static boolean isGeneric(AnnotatedType type){
@@ -543,7 +498,7 @@ public final class IOFieldTools{
 	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
 		var nam = size.name();
 		if(nam.isEmpty()){
-			return makeNumberSizeName(field);
+			return FieldNames.numberSize(field);
 		}
 		return nam;
 	}
