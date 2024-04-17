@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
@@ -54,7 +55,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					anns.remove(IONullability.class);
 					
 					var annotations = Stream.concat(
-						Stream.of(IOFieldTools.makeAnnotation(IOValue.class), IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)),
+						Stream.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
 						anns.stream().map(field::getAnnotation).filter(Optional::isPresent).map(Optional::get)
 					).toList();
 					

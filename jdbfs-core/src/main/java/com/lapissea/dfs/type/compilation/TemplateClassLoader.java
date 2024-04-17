@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.TypeDef;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -240,7 +241,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			writer.write("@{}", IOValue.class);
 			
 			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
+				field.isDynamic()? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
 				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());

@@ -11,11 +11,11 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -43,7 +43,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			return new BehaviourRes<T>(new VirtualFieldDefinition<>(
 				IO, FieldNames.universeID(field), int.class,
 				List.of(
-					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
+					Annotations.make(IODependency.VirtualNumSize.class),
 					IOValue.Unsigned.INSTANCE
 				)
 			));

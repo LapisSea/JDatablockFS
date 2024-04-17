@@ -49,7 +49,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.getFilter = getFilter;
 		
 		if(annotations.stream().noneMatch(an -> an instanceof IOValue)){
-			annotations = Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
+			annotations = Stream.concat(annotations.stream(), Stream.of(Annotations.make(IOValue.class))).toList();
 		}
 		this.annotations = annotations.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, a -> a));
 	}

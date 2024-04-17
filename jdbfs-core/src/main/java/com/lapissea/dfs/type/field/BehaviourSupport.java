@@ -42,7 +42,7 @@ public final class BehaviourSupport{
 			INSTANCE,
 			FieldNames.ref(field),
 			Reference.class,
-			List.of(IOFieldTools.makeNullabilityAnn(DEFAULT_IF_NULL))
+			List.of(Annotations.makeNullability(DEFAULT_IF_NULL))
 		));
 	}
 	
@@ -51,7 +51,7 @@ public final class BehaviourSupport{
 			IO,
 			FieldNames.genericID(field),
 			int.class,
-			List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
+			List.of(Annotations.make(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
 		));
 	}
 	
@@ -161,7 +161,7 @@ public final class BehaviourSupport{
 			INSTANCE,
 			FieldNames.ref(field),
 			Reference.class,
-			List.of(IOFieldTools.makeNullabilityAnn(DEFAULT_IF_NULL))
+			List.of(Annotations.makeNullability(DEFAULT_IF_NULL))
 		));
 	}
 	
@@ -194,7 +194,7 @@ public final class BehaviourSupport{
 				return 0;
 			},
 			List.of(
-				IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
+				Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
 				IOValue.Unsigned.INSTANCE
 			));
 		

@@ -20,7 +20,7 @@ import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.Literal
 import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.NOOP;
 import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.OptionalBlock;
 import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.SpecialValue;
-import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
@@ -656,7 +656,7 @@ public final class DefInstanceCompiler{
 					
 					var toStrAnn = interf.getAnnotation(IOInstance.Def.ToString.class);
 					if(toStrAnn == null && includeNames.isPresent()){
-						toStrAnn = IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class);
+						toStrAnn = Annotations.make(IOInstance.Def.ToString.class);
 					}
 					if(toStrAnn != null){
 						generateStandardToString(humanName, includeNames, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
@@ -726,7 +726,7 @@ public final class DefInstanceCompiler{
 		}
 		if(specials.toShortStr.isEmpty()){
 			if(toStrAnn.name()){
-				generateStandardToString(classHumanName, includeNames, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+				generateStandardToString(classHumanName, includeNames, Annotations.make(IOInstance.Def.ToString.class, Map.of(
 					"name", false,
 					"curly", toStrAnn.curly(),
 					"fNames", toStrAnn.fNames(),
@@ -1113,7 +1113,7 @@ public final class DefInstanceCompiler{
 		var anns = new ArrayList<>(info.annotations);
 		anns.removeIf(a -> (a instanceof IOValue v && v.name().isEmpty()) || a instanceof Override);
 		
-		var valAnn = anns.stream().filter(a -> a instanceof IOValue).findAny().orElseGet(() -> IOFieldTools.makeAnnotation(IOValue.class, Map.of("name", info.name)));
+		var valAnn = anns.stream().filter(a -> a instanceof IOValue).findAny().orElseGet(() -> Annotations.make(IOValue.class, Map.of("name", info.name)));
 		
 		if(anns.stream().noneMatch(a -> a instanceof IOValue)) anns.add(valAnn);
 		
@@ -1257,7 +1257,7 @@ public final class DefInstanceCompiler{
 					             throw new MalformedTemplateStruct(gors.varName() + ": @IOValue can not contain a name");
 				             }
 			             }
-			             if(valBack == null) valBack = IOFieldTools.makeAnnotation(IOValue.class);
+			             if(valBack == null) valBack = Annotations.make(IOValue.class);
 			             anns.add(valBack);
 			             
 			             return new FieldInfo(name, type, anns, getter, setter);

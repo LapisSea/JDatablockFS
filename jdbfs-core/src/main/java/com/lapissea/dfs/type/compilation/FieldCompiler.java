@@ -11,6 +11,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -531,6 +532,7 @@ public final class FieldCompiler{
 	public static void init(){ }
 	static{
 		Thread.startVirtualThread(FieldRegistry::init);
+		Thread.startVirtualThread(() -> Annotations.make(IOValue.class));
 	}
 	
 	public static Collection<Class<?>> getWrapperTypes(){
