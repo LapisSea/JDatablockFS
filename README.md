@@ -1,5 +1,7 @@
 # JDatablockFS
 
+[![Java CI with Maven](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml/badge.svg)](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml)
+
 ### Description:
 
 A java library that aims to store arbitrary data in a format that is compact, easily modifiable and flexible.
