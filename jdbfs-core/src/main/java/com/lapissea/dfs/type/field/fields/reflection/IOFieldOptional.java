@@ -96,7 +96,9 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(valueField, new ValueGenerator<>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-				return valueField.isNull(ioPool, instance);
+				V val      = valueField.get(ioPool, instance);
+				V existing = get(ioPool, instance).orElse(null);
+				return val != existing;
 			}
 			@Override
 			public V generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){

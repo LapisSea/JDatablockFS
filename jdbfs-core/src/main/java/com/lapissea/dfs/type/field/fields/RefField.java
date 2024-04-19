@@ -108,6 +108,8 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 			return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
 				@Override
+				public Strictness strictDetermineLevel(){ return Strictness.ON_EXTERNAL_ALWAYS; }
+				@Override
 				public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 					boolean refNull = switch(getNullability()){
 						case NOT_NULL, DEFAULT_IF_NULL -> false;

@@ -411,4 +411,29 @@ public final class IOFieldTools{
 			default -> None();
 		};
 	}
+	
+	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(List<? extends IOField<T, ?>> fields){
+		
+		int count = 0;
+		for(var f : fields){
+			count += f.getGenerators().size();
+		}
+		if(count == 0) return List.of();
+		
+		//noinspection unchecked
+		IOField.ValueGeneratorInfo<T, ?>[] buff = new IOField.ValueGeneratorInfo[count];
+		var                                pos  = 0;
+		/*
+		Reverse fields due to an assumption that they are sorted as to be a valid dependency order.
+		If there are fields [fancy:value:isNull, fancy:value, fancy] ordered by dependency topology (fancy depends on fancy:value, so it is after it)
+		Generators should be executed in reverse order, so it should be [{fancy -> fancy:value}, {fancy:value -> fancy:value:isNull}]
+		If it is not reversed then isNull generator will be called first. At this point fancy:value is not generated and will always be null.
+		*/
+		for(var f : fields.reversed()){
+			for(var g : f.getGenerators()){
+				buff[pos++] = g;
+			}
+		}
+		return List.of(buff);
+	}
 }

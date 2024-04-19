@@ -67,6 +67,7 @@ import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -253,7 +254,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
 			setInitState(STATE_SIZE_DESC);
-			generators = Utils.nullIfEmpty(ioFields.reversed().stream().flatMap(IOField::generatorStream).toList());
+			
+			generators = Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(ioFields));
 			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
@@ -756,6 +758,52 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to generate fields. Problem on " + generator, e);
 			}
+		}
+		
+		if(DEBUG_VALIDATION){
+			checkGenerated(generators, ioPool, provider, instance, allowExternalMod);
+		}
+	}
+	
+	private static <T extends IOInstance<T>> void checkGenerated(List<IOField.ValueGeneratorInfo<T, ?>> generators, VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		enum Status{
+			OK,
+			SKIPPED,
+			ERR
+		}
+		var stat = new Status[generators.size()];
+		var err  = false;
+		for(int i = 0; i<generators.size(); i++){
+			var generator = generators.get(i);
+			var vg        = generator.generator();
+			
+			var shouldSkip = switch(vg.strictDetermineLevel()){
+				case NOT_REALLY -> true;
+				case ON_EXTERNAL_ALWAYS -> !allowExternalMod;
+				case ALWAYS -> false;
+			};
+			if(shouldSkip){
+				stat[i] = Status.SKIPPED;
+				continue;
+			}
+			var errL = vg.shouldGenerate(ioPool, provider, instance);
+			stat[i] = errL? Status.ERR : Status.OK;
+			err |= errL;
+		}
+		if(err){
+			String info;
+			if(stat.length == 1){
+				info = " " + generators.getFirst() + " failed";
+			}else{
+				var table = TextUtil.toTable(
+					IntStream.range(0, stat.length).mapToObj(i -> Map.of("generator", generators.get(i), "status", stat[i])).toList()
+				);
+				table = table.substring(table.indexOf('\n') + 1, table.lastIndexOf('\n'));
+				info = "\n" + table;
+			}
+			throw new IllegalStateException(
+				"Generator(s) have not been satisfied:" + info
+			);
 		}
 	}
 	

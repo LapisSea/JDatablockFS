@@ -506,8 +506,8 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	
 	public static IOType of(Class<?> raw){
 		return new IOType.TypeRaw(raw);
-		
 	}
+	
 	public static IOType of(ParameterizedType parm){
 		var args = parm.getActualTypeArguments();
 		var res  = new ArrayList<IOType>(args.length);

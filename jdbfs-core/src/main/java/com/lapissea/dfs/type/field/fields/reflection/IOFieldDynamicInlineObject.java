@@ -110,7 +110,6 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		var idGenerator = new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
-				if(val == null) return new IOTypeDB.TypeID(-1, false);
 				return provider.getTypeDb().toID(val, record);
 			}
 			@Override
@@ -119,8 +118,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 					var writtenId = typeID.getValue(ioPool, instance);
 					if(writtenId == 0) return true;
 				}
-				var id = getId(ioPool, provider, instance, false);
-				if(!id.stored()) return true;
+				var id        = getId(ioPool, provider, instance, false);
 				var writtenId = typeID.getValue(ioPool, instance);
 				return id.val() != writtenId;
 			}

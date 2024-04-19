@@ -116,11 +116,21 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
 				var val = get(ioPool, instance);
-				if(val == null){
-					var id = getUniverseID(ioPool, instance);
-					return id != 0;
+				var id  = getUniverseID(ioPool, instance);
+				if((val == null) != (id == 0)){
+					return true;
 				}
-				return true;
+				if(val == null){
+					return false;
+				}
+				return doubleCheckId(provider, val, id);
+			}
+			
+			private boolean doubleCheckId(DataProvider provider, ValueType val, int id) throws IOException{
+				var db    = provider.getTypeDb();
+				var type  = (Class<ValueType>)val.getClass();
+				var newId = db.toID(rootType, type, false);
+				return newId != id;
 			}
 			@Override
 			public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
