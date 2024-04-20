@@ -364,7 +364,7 @@ public final class IOFieldTools{
 		if(typ.isPrimitive()) return false;
 		return isGeneric(field) || typ.isArray() ||
 		       Stream.of(
-			       Stream.of(IOInstance.class, Enum.class),
+			       Stream.of(IOInstance.class, Enum.class, Class.class),
 			       FieldCompiler.getWrapperTypes().stream(),
 			       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
 		       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));

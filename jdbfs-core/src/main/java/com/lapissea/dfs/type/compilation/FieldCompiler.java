@@ -27,6 +27,7 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
@@ -525,7 +526,8 @@ public final class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IOCompression.class
+			IOCompression.class,
+			IOUnsafeValue.class
 		);
 	}
 	

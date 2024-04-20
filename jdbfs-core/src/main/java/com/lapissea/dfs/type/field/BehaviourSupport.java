@@ -58,7 +58,7 @@ public final class BehaviourSupport{
 	private static <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 		if(field.hasAnnotation(IOValue.Reference.class)) return false;
 		var typ = field.getType();
-		if(typ.isArray()) return true;
+		if(typ.isArray() || typ == Class.class) return true;
 		if(IOInstance.isInstance(typ)){
 			return IOInstance.isManaged(typ);
 		}

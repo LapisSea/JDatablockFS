@@ -22,6 +22,7 @@ public abstract class FieldNames{
 	
 	public static String collectionLen(Named field)     { return make(field, "len"); }
 	public static String numberSize(Named field)        { return make(field, "nSiz"); }
+	public static String ID(Named field)                { return make(field, "id"); }
 	public static String genericID(Named field)         { return make(field, "typeID"); }
 	public static String universeID(Named field)        { return make(field, "localID"); }
 	public static String nullFlag(Named field)          { return make(field, "isNull"); }

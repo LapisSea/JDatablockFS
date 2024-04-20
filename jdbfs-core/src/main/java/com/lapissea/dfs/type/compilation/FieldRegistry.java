@@ -249,7 +249,7 @@ final class FieldRegistry{
 		}
 		if(UtilL.instanceOf(Utils.typeToRaw(type), Type.class)){
 			throw new IllegalField(
-				"Directly storing types is not allowed as values could not be loaded if a class is not present. " +
+				"Directly storing types should not be done as values will fail to load if a class is not present. " +
 				"Please use " + IOType.class.getTypeName() + " instead."
 			);
 		}
