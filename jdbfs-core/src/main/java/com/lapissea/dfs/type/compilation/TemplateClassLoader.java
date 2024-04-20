@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -251,6 +252,9 @@ public final class TemplateClassLoader extends ClassLoader{
 			}
 			if(field.isUnsigned()){
 				writer.write("@{}", IOValue.Unsigned.class);
+			}
+			if(field.isUnsafe()){
+				writer.write("@{}", IOUnsafeValue.class);
 			}
 			if(field.getReferenceType() != null){
 				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());

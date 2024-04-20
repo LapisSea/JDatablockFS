@@ -6,6 +6,7 @@ import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
+import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.VarPool;
@@ -19,10 +20,12 @@ import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Set;
 
@@ -31,10 +34,7 @@ import static com.lapissea.dfs.type.field.StoragePool.IO;
 public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFlagCompanyField<T, Class<V>>{
 	
 	@SuppressWarnings("unused")
-	private static final class Usage<V> extends FieldUsage.InstanceOf<Class<V>>{
-		public Usage(){
-			super((Class<Class<V>>)(Object)Class.class, Set.of(IOFieldDirectClass.class));
-		}
+	private static final class Usage<V> implements FieldUsage{
 		@Override
 		public <T extends IOInstance<T>> IOField<T, Class<V>> create(FieldAccessor<T> field){
 			return new IOFieldDirectClass<>(field);
@@ -42,19 +42,36 @@ public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFl
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IONullability.class, (field1, ann1) -> {
-					return BehaviourSupport.ioNullability(field1, ann1);
-				}),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
 				Behaviour.of(IOValue.class, (field, ann) -> {
-					return new BehaviourRes<>(new VirtualFieldDefinition<T, Integer>(
-						IO,
-						FieldNames.ID(field),
-						int.class,
-						List.of(Annotations.make(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
-					));
+					return new BehaviourRes<>(
+						List.of(
+							new VirtualFieldDefinition<T, Integer>(
+								IO,
+								FieldNames.ID(field),
+								int.class,
+								List.of(Annotations.make(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
+							)),
+						Set.of(IOUnsafeValue.class)
+					);
 				})
 			);
 		}
+		public Class<Class<V>> getType(){
+			//noinspection unchecked
+			return (Class<Class<V>>)(Object)Class.class;
+		}
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			if(Utils.typeToRaw(type) != Class.class) return false;
+			if(!annotations.isPresent(IOUnsafeValue.class)){
+				return false;
+			}
+			return true;
+		}
+		@Override
+		@SuppressWarnings("rawtypes")
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDirectClass.class); }
 	}
 	
 	private IOFieldPrimitive.FInt<T> id;
