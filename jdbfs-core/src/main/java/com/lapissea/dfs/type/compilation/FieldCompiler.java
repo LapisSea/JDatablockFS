@@ -11,6 +11,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -26,6 +27,7 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
@@ -151,7 +153,7 @@ public final class FieldCompiler{
 		if(!fails.isEmpty()){
 			throw new IllegalField(
 				"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
-				(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
+				(fails.size()>1? "\n" : "") + fails.stream().map(f -> "\t" + f).collect(joining("\n"))
 			);
 		}
 	}
@@ -524,13 +526,15 @@ public final class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IOCompression.class
+			IOCompression.class,
+			IOUnsafeValue.class
 		);
 	}
 	
 	public static void init(){ }
 	static{
 		Thread.startVirtualThread(FieldRegistry::init);
+		Thread.startVirtualThread(() -> Annotations.make(IOValue.class));
 	}
 	
 	public static Collection<Class<?>> getWrapperTypes(){

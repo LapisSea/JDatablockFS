@@ -2,9 +2,11 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotImplementedException;
@@ -43,6 +45,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		private String   name;
 		private boolean  isDynamic;
 		private boolean  unsigned;
+		private boolean  unsafe;
 		private String[] dependencies;
 		
 		@IONullability(NULLABLE)
@@ -58,16 +61,18 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			isDynamic = IOFieldTools.isGeneric(field);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
-			if(field.getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
-			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
+			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
+			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
 			dependencies = deps.toArray(String[]::new);
 			unsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
+			unsafe = field.getAccessor().hasAnnotation(IOUnsafeValue.class);
 		}
 		
 		public IOType getType()    { return type; }
 		public String getName()    { return name; }
 		public boolean isDynamic() { return isDynamic; }
 		public boolean isUnsigned(){ return unsigned; }
+		public boolean isUnsafe()  { return unsafe; }
 		
 		public List<String> getDependencies(){
 			return dependencies == null? List.of() : ArrayViewList.create(dependencies, null);

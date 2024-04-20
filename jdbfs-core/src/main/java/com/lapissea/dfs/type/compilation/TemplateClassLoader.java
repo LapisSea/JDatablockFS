@@ -7,10 +7,12 @@ import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.TypeDef;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -240,7 +242,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			writer.write("@{}", IOValue.class);
 			
 			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
+				field.isDynamic()? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
 				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());
@@ -250,6 +252,9 @@ public final class TemplateClassLoader extends ClassLoader{
 			}
 			if(field.isUnsigned()){
 				writer.write("@{}", IOValue.Unsigned.class);
+			}
+			if(field.isUnsafe()){
+				writer.write("@{}", IOUnsafeValue.class);
 			}
 			if(field.getReferenceType() != null){
 				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());

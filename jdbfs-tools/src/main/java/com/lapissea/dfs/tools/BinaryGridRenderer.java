@@ -31,9 +31,9 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
@@ -987,10 +987,10 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		drawIndex.accept(IterablePPs.of(clampedOverflow));
+		drawIndex.accept(IterablePPs.from(clampedOverflow));
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
-		drawIndex.accept(IterablePPs.of(ranges).map(r -> {
+		drawIndex.accept(IterablePPs.from(ranges).map(r -> {
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
@@ -1515,7 +1515,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							
 							if(!ref.isNull() && !noPtr){
 								long from, ptrSize = bSize;
-								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(IOFieldTools.makeRefName(acc)) : OptionalPP.<IOField<T, ?>>empty();
+								var  refContainer  = bSize == 0? pipe.getSpecificFields().byName(FieldNames.ref(acc)) : OptionalPP.<IOField<T, ?>>empty();
 								if(refContainer.isPresent()){
 									var refF      = refContainer.get();
 									var refOffset = 0L;
@@ -1643,7 +1643,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									if(!noPtrs && inst instanceof Reference &&
 									   pipe.getSpecificFields()
 									       .stream()
-									       .map(f -> IOFieldTools.makeRefName(f.getName()))
+									       .map(f -> FieldNames.ref(FieldNames.name(f.getName())))
 									       .anyMatch(n -> n.equals(acc.getName()))
 									){
 										noPtrs = true;

@@ -13,9 +13,9 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -137,7 +137,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
-		collectionLength = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		collectionLength = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));
 	}
 	
 	@Override

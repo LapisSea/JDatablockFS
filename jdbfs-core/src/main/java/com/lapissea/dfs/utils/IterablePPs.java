@@ -25,7 +25,7 @@ public final class IterablePPs{
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
 		return () -> new Iterator<T>(){
 			private final Supplier<T> src = supplier.get();
-			private T next;
+			private       T           next;
 			
 			void calcNext(){
 				next = src.get();
@@ -79,7 +79,7 @@ public final class IterablePPs{
 			};
 		};
 	}
-	public static <T> IterablePP<T> of(Collection<T> data){
+	public static <T> IterablePP<T> from(Collection<T> data){
 		return data::iterator;
 	}
 	

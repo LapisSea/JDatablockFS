@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
@@ -147,7 +148,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	
 	private static class IndexAccessor<T> extends BasicFieldAccessor<ContiguousIOList<T>>{
 		
-		private static final List<Annotation> NULLABLE_ANNS = List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE));
+		private static final List<Annotation> NULLABLE_ANNS = List.of(Annotations.makeNullability(IONullability.Mode.NULLABLE));
 		
 		private final Type     elementType;
 		private final boolean  genericTypeHasArgs;

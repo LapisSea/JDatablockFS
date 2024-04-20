@@ -9,6 +9,8 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -53,7 +55,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					anns.remove(IONullability.class);
 					
 					var annotations = Stream.concat(
-						Stream.of(IOFieldTools.makeAnnotation(IOValue.class), IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)),
+						Stream.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
 						anns.stream().map(field::getAnnotation).filter(Optional::isPresent).map(Optional::get)
 					).toList();
 					
@@ -65,7 +67,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					
 					return new BehaviourRes<>(List.of(new VirtualFieldDefinition<T, Integer>(
 						IO,
-						IOFieldTools.makeCompanionValueFlagName(field),
+						FieldNames.companionValueFlag(field),
 						type,
 						annotations
 					)), annotations.stream().map(Annotation::annotationType).collect(Collectors.toUnmodifiableSet()));
@@ -86,7 +88,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		//noinspection unchecked
-		valueField = (IOField<T, V>)fields.requireByName(IOFieldTools.makeCompanionValueFlagName(getAccessor()));
+		valueField = (IOField<T, V>)fields.requireByName(FieldNames.companionValueFlag(getAccessor()));
 	}
 	
 	@Override
@@ -94,7 +96,9 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(valueField, new ValueGenerator<>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-				return valueField.isNull(ioPool, instance);
+				V val      = valueField.get(ioPool, instance);
+				V existing = get(ioPool, instance).orElse(null);
+				return val != existing;
 			}
 			@Override
 			public V generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){

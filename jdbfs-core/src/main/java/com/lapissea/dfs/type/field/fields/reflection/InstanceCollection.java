@@ -19,9 +19,9 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -138,7 +138,7 @@ public class InstanceCollection{
 		@Override
 		public void init(FieldSet<T> fields){
 			super.init(fields);
-			collectionSize = fields.requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
+			collectionSize = fields.requireExact(int.class, FieldNames.collectionLen(getAccessor()));
 		}
 		
 		@Override

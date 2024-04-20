@@ -243,56 +243,60 @@ final class FieldSupport{
 	static int typeFlags(IOField<?, ?> field){
 		int typeFlags = 0;
 		var accessor  = field.getAccessor();
+		if(accessor == null) return typeFlags;
 		
-		if(accessor != null){
-			if(IOFieldTools.isGenerated(field)){
-				typeFlags |= HAS_GENERATED_NAME;
-			}
-			
-			var typeGen = accessor.getGenericType(null);
-			var type    = accessor.getType();
-			
-			if(type == Optional.class){
-				typeGen = IOFieldTools.unwrapOptionalTypeRequired(typeGen);
-				type = Utils.typeToRaw(typeGen);
-			}
-			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(type);
-			if(isDynamic){
-				typeFlags |= DYNAMIC_FLAG;
-			}
-			
-			while(true){
-				if(typeGen instanceof Class<?> c){
-					if(c.isArray()){
-						typeGen = c.componentType();
-						continue;
-					}
-				}
-				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
-					typeGen = switch(typeGen){
-						case Class<?> c -> Object.class;
-						case ParameterizedType t -> t.getActualTypeArguments()[0];
-						default -> throw new NotImplementedException(typeGen.getClass() + "");
-					};
+		if(IOFieldTools.isGenerated(field)){
+			typeFlags |= HAS_GENERATED_NAME;
+		}
+		
+		var typeGen = accessor.getGenericType(null);
+		var type    = accessor.getType();
+		
+		if(type == Optional.class){
+			typeGen = IOFieldTools.unwrapOptionalTypeRequired(typeGen);
+			type = Utils.typeToRaw(typeGen);
+		}
+		
+		boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(type);
+		if(isDynamic){
+			typeFlags |= DYNAMIC_FLAG;
+		}
+		
+		while(true){
+			if(typeGen instanceof Class<?> c){
+				if(c.isArray()){
+					typeGen = c.componentType();
 					continue;
 				}
-				break;
 			}
-			
-			var rawType = Utils.typeToRaw(typeGen);
-			
-			if(IOInstance.isInstance(rawType)){
-				typeFlags |= IOINSTANCE_FLAG;
-				
-				if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
-					typeFlags |= HAS_NO_POINTERS_FLAG;
-				}
+			if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
+				typeGen = switch(typeGen){
+					case Class<?> c -> Object.class;
+					case ParameterizedType t -> t.getActualTypeArguments()[0];
+					default -> throw new NotImplementedException(typeGen.getClass() + "");
+				};
+				continue;
 			}
-			if(SupportedPrimitive.isAny(rawType) || rawType.isEnum()){
-				typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+			break;
+		}
+		
+		var rawType = Utils.typeToRaw(typeGen);
+		
+		if(IOInstance.isInstance(rawType)){
+			typeFlags |= IOINSTANCE_FLAG;
+			
+			if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
+				typeFlags |= HAS_NO_POINTERS_FLAG;
 			}
 		}
+		if(SupportedPrimitive.isAny(rawType) || rawType.isEnum()){
+			typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+		}
+		
+		if(rawType == Class.class){
+			typeFlags |= HAS_NO_POINTERS_FLAG;
+		}
+		
 		return typeFlags;
 	}
 }

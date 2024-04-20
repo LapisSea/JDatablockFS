@@ -282,6 +282,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
+		enum Strictness{
+			NOT_REALLY, ON_EXTERNAL_ALWAYS, ALWAYS
+		}
+		default Strictness strictDetermineLevel(){ return Strictness.ALWAYS; }
+		
 		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
 		ValType generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
@@ -307,13 +312,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	@Nullable
+	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		var gens = getGenerators();
-		return gens == null? Stream.of() : gens.stream();
+		return getGenerators().stream();
 	}
 	
 	

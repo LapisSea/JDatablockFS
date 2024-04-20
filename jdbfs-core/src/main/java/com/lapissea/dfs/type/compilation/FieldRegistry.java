@@ -8,6 +8,7 @@ import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOField.FieldUsage;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
@@ -245,6 +246,12 @@ final class FieldRegistry{
 	static void requireCanCreate(Type type, GetAnnotation annotations){
 		if(canCreate(type, annotations)){
 			return;
+		}
+		if(UtilL.instanceOf(Utils.typeToRaw(type), Type.class)){
+			throw new IllegalField(
+				"Directly storing types should not be done as values will fail to load if a class is not present. " +
+				"Please use " + IOType.class.getTypeName() + " instead."
+			);
 		}
 		throw fail(type.getTypeName());
 	}

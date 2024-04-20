@@ -10,9 +10,9 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -63,7 +63,7 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
 				Behaviour.of(IOValue.class, (field, ann) -> {
 					return new BehaviourRes<>(new VirtualFieldDefinition<T, NumberSize>(
-						IO, IOFieldTools.makeNumberSizeName(field), NumberSize.class
+						IO, FieldNames.numberSize(field), NumberSize.class
 					));
 				})
 			);
@@ -95,7 +95,7 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
 				Behaviour.of(IOValue.class, (field, ann) -> {
 					return new BehaviourRes<>(new VirtualFieldDefinition<T, NumberSize>(
-						IO, IOFieldTools.makeNumberSizeName(field), NumberSize.class
+						IO, FieldNames.numberSize(field), NumberSize.class
 					));
 				})
 			);
@@ -163,8 +163,8 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
-		collectionSize = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
-		numSize = fields.requireExact(NumberSize.class, IOFieldTools.makeNumberSizeName(getAccessor()));
+		collectionSize = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));
+		numSize = fields.requireExact(NumberSize.class, FieldNames.numberSize(getAccessor()));
 	}
 	
 	@Override

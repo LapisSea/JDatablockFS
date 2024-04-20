@@ -103,6 +103,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
+				if(type == null) return new TypeID(0, true);
 				return toID(IOType.of(type), recordNew);
 			}
 			
@@ -113,6 +114,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(IOType type, boolean recordNew){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
 				return newID(type, recordNew);
@@ -120,10 +122,12 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public int toID(Class<?> type){
+				if(type == null) return 0;
 				return toID(IOType.of(type));
 			}
 			@Override
 			public int toID(IOType type){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return id;
 				return newID(type, true).requireStored();
@@ -1005,6 +1009,7 @@ public sealed interface IOTypeDB{
 	}
 	
 	default int toID(Class<?> type) throws IOException{
+		if(type == null) return 0;
 		return toID(IOType.of(type), true).requireStored();
 	}
 	default int toID(IOType type) throws IOException{
@@ -1012,6 +1017,7 @@ public sealed interface IOTypeDB{
 	}
 	
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
 		return toID(IOType.of(type), recordNew);
 	}
 	
