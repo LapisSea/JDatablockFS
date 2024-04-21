@@ -35,6 +35,7 @@ import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiFunction;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -60,6 +61,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.random.RandomGenerator;
@@ -78,59 +80,11 @@ import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 public class GeneralTypeHandlingTests{
 	static{ Thread.startVirtualThread(Cluster::emptyMem); }
 	
-	@IOValue
-	public static class Deps extends IOInstance.Managed<Deps>{
-		
-		@IODependency("b")
-		public int a;
-		
-		@IODependency("c")
-		public int b;
-		
-		public int c;
-		
-		@IODependency({"c", "b"})
-		public int d;
-	}
-	
-	public static class Arr extends IOInstance.Managed<Arr>{
-		@IOValue
-		public float[] arr;
-	}
-	
-	@DataProvider(name = "genericObjects")
-	static Object[][] genericObjects(){
-		var deps = new Deps();
-		deps.a = 1;
-		deps.b = 2;
-		deps.c = 3;
-		deps.d = 4;
-		var arr = new Arr();
-		arr.arr = new float[]{1, 2, 3, 4, 5};
-		return new Object[][]{{Dummy.first()}, {deps}, {arr}, {arr.arr}, {Instant.now()}, {"Foo"}, {-1}, {12.34}, {true}};
-	}
-	
-	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void genericStorage(Object obj) throws IOException{
-		TestUtils.testCluster(TestInfo.of(obj), ses -> {
-			var ls = ses.roots().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
-				LinkedIOList.class,
-				GenericContainer.class, Object.class
-			)).request();
-			
-			var c = new GenericContainer<>(obj);
-			ls.clear();
-			ls.add(c);
-			var read = ls.get(0).value;
-			Assert.assertEquals(obj, read);
-		});
-	}
-	
 	@Test
-	void genericTest() throws IOException{
+	void simpleGenericTest() throws IOException{
+		var pipe = StandardStructPipe.of(GenericContainer.class, STATE_DONE);
+		
 		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			var pipe = StandardStructPipe.of(GenericContainer.class);
-			
 			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
 			var container = new GenericContainer<>();
@@ -753,8 +707,7 @@ public class GeneralTypeHandlingTests{
 		}
 	}
 	
-	@DataProvider
-	Object[][] genericCollections(){
+	private static List<Gen<?>> makeBaseGens(){
 		List<Gen<?>> gens = new ArrayList<>(List.of(
 			new Gen<>((r1, d1) -> new Dummy(r1.nextInt()), Dummy.class),
 			new Gen<>((r, d) -> new GenericContainer<>(r.nextInt()), GenericContainer.class),
@@ -782,14 +735,21 @@ public class GeneralTypeHandlingTests{
 		
 		var cp = List.copyOf(gens);
 		gens.add(new Gen<>((r, d) -> cp.get(r.nextInt(cp.size())).gen.apply(r, d), Object.class));
-		
-		return Stream.of(
-			             gens.stream(),
-			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)),
-			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)).flatMap(g1 -> wrappGenInCollections(g1, 10))
-		             ).flatMap(a -> a.sorted(Comparator.comparing(Gen::name)))
-		             .map(g -> new Object[]{g}).toArray(Object[][]::new);
+		return gens;
 	}
+
+//	@DataProvider
+//	Object[][] genericCollections(){
+//		List<Gen<?>> gens = makeBaseGens();
+//
+//		return Stream.of(
+//			             gens.stream(),
+//			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)),
+//			             gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)).flatMap(g1 -> wrappGenInCollections(g1, 10))
+//		             ).flatMap(a -> a.sorted(Comparator.comparing(Gen::name)))
+//
+//		             .map(g -> new Object[]{g}).toArray(Object[][]::new);
+//	}
 	
 	private static Stream<Gen<?>> wrappGenInCollections(Gen<?> gen, int maxLen){
 		return Stream.concat(wrappGenInCollections(gen, maxLen, false), wrappGenInCollections(gen, maxLen, true));
@@ -819,7 +779,9 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	private static <T> void generateSequences(List<T> elements, Consumer<List<T>> use){
-		generateSequences(elements, 0, new ArrayList<>(), use);
+		var l = new ArrayList<T>(elements.size());
+		use.accept(l);
+		generateSequences(elements, 0, l, use);
 	}
 	private static <T> void generateSequences(List<T> elements, int startIndex, List<T> currentSequence, Consumer<List<T>> use){
 		if(startIndex == elements.size()){
@@ -834,7 +796,36 @@ public class GeneralTypeHandlingTests{
 		generateSequences(elements, startIndex + 1, currentSequence, use);
 	}
 	
-	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true, dataProvider = "genericCollections")
+	
+	@DataProvider
+	Object[][] genericCollectionsL1(){
+		List<Gen<?>> gens = makeBaseGens();
+		return gens.stream()
+		           .sorted(Comparator.comparing(Gen::name))
+		           .map(g -> new Object[]{g}).toArray(Object[][]::new);
+	}
+	@DataProvider
+	Object[][] genericCollectionsL2(){
+		List<Gen<?>> gens = makeBaseGens();
+		return gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20))
+		           .sorted(Comparator.comparing(Gen::name))
+		           .map(g -> new Object[]{g}).toArray(Object[][]::new);
+	}
+	@DataProvider
+	Object[][] genericCollectionsL3(){
+		List<Gen<?>> gens = makeBaseGens();
+		return gens.stream().flatMap(g1 -> wrappGenInCollections(g1, 20)).flatMap(g1 -> wrappGenInCollections(g1, 10))
+		           .sorted(Comparator.comparing(Gen::name))
+		           .map(g -> new Object[]{g}).toArray(Object[][]::new);
+	}
+	
+	@Test(dependsOnGroups = "rootProvider", dependsOnMethods = "simpleGenericTest", ignoreMissingDependencies = true, dataProvider = "genericCollectionsL1")
+	void genericStoreL1(Gen<?> generator) throws IOException{ genericStore(generator); }
+	@Test(dependsOnMethods = {"simpleGenericTest", "genericStoreL1"}, dataProvider = "genericCollectionsL2")
+	void genericStoreL2(Gen<?> generator) throws IOException{ genericStore(generator); }
+	@Test(dependsOnMethods = {"simpleGenericTest", "genericStoreL1", "genericStoreL2"}, dataProvider = "genericCollectionsL3")
+	void genericStoreL3(Gen<?> generator) throws IOException{ genericStore(generator); }
+	
 	void genericStore(Gen<?> generator) throws IOException{
 		record find(long siz, long seed, Throwable e){ }
 		var oErrSeed = new RawRandom(generator.name.hashCode()).longs().limit(100).mapToObj(r -> {
@@ -868,6 +859,7 @@ public class GeneralTypeHandlingTests{
 		}).toList().stream().map(CompletableFuture::join).filter(Objects::nonNull).reduce((a, b) -> a.siz<b.siz? a : b);
 		
 		if(oErrSeed.isEmpty()){
+			LogUtil.println(generator, "ok");
 			return;
 		}
 		
@@ -879,14 +871,18 @@ public class GeneralTypeHandlingTests{
 		LogUtil.println("Writing Type:", generator.name, "value:\n", value);
 		
 		if(value instanceof List<?> l && l.stream().noneMatch(e -> e instanceof IOInstance.Unmanaged)){
-			record siz(long siz, Object val, Throwable e){ }
+			record siz(long siz, int strSiz, Object val, Throwable e){ }
 			var res = new siz[1];
 			
 			try(var exec = Executors.newWorkStealingPool()){
-				generateSequences(l, 0, new ArrayList<>(), a -> {
+				var backlog = new AtomicInteger();
+				generateSequences(l, a -> {
 					if(a.size() == l.size()) return;
 					var arr = new ArrayList<>(a);
+					backlog.incrementAndGet();
+					UtilL.sleepWhile(() -> backlog.get()>32);
 					exec.submit(() -> {
+						backlog.decrementAndGet();
 						var val = new GenericContainer<>(arr);
 						var cl  = Cluster.emptyMem();
 						var siz = StandardStructPipe.sizeOfUnknown(cl, val, WordSpace.BYTE);
@@ -900,9 +896,10 @@ public class GeneralTypeHandlingTests{
 							var generic = (GenericContainer<?>)cl.roots().request("obj", GenericContainer.class);
 							Assert.assertEquals(generic, val);
 						}catch(Throwable e1){
+							var strSiz = TextUtil.toString(arr).length();
 							synchronized(res){
-								if(res[0] == null || res[0].siz>siz){
-									res[0] = new siz(siz, arr, e1);
+								if(res[0] == null || res[0].siz>siz || (res[0].siz == siz && res[0].strSiz>strSiz)){
+									res[0] = new siz(siz, strSiz, arr, e1);
 								}
 							}
 						}

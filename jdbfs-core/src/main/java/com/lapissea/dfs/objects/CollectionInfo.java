@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
@@ -26,11 +27,14 @@ public sealed interface CollectionInfo{
 		DYNAMIC,
 		STRIPED,
 		STRUCT_OF_ARRAYS,
+		JUST_NULLS
 	}
 	
 	interface Store extends IOInstance.Def<Store>{
-		StructPipe<Store> PIPE = StandardStructPipe.of(Store.class);
+		
 		CollectionInfo val();
+		
+		StructPipe<Store> PIPE = StandardStructPipe.of(Store.class);
 		static Store of(CollectionInfo val){
 			class Cache{
 				private static final Function<CollectionInfo, Store> make = Def.constrRef(Store.class, CollectionInfo.class);
@@ -56,13 +60,14 @@ public sealed interface CollectionInfo{
 		public IterablePP<?> iter(Object collection){ return IterablePPs.of(); }
 	}
 	
+	@IOValue
 	final class PrimitiveArrayInfo extends IOInstance.Managed<PrimitiveArrayInfo> implements CollectionInfo{
 		
-		@IOValue
 		@IOValue.Unsigned
 		@IODependency.VirtualNumSize
 		private int length;
 		
+		@IOUnsafeValue
 		private Class<?> elementType;
 		
 		public PrimitiveArrayInfo(){ }
@@ -70,9 +75,6 @@ public sealed interface CollectionInfo{
 			this.length = length;
 			this.elementType = elementType;
 		}
-		
-		@IOValue
-		private void elementType(){ elementType = null; }
 		
 		@Override
 		public Class<?> constantType(){ return elementType; }
@@ -98,10 +100,12 @@ public sealed interface CollectionInfo{
 		@IODependency.VirtualNumSize
 		private int      length;
 		@IONullability(NULLABLE)
+		@IOUnsafeValue
 		private Class<?> constantType;
 		private Layout   layout;
 		private boolean  hasNulls;
 		
+		@IOUnsafeValue
 		private Class<?> arrayType;
 		
 		public ArrayInfo(){ }
@@ -138,6 +142,7 @@ public sealed interface CollectionInfo{
 		@IODependency.VirtualNumSize
 		private int      length;
 		@IONullability(NULLABLE)
+		@IOUnsafeValue
 		private Class<?> constantType;
 		private Layout   layout;
 		private boolean  hasNulls;

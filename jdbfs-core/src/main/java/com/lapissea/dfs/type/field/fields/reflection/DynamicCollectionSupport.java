@@ -27,6 +27,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -64,22 +65,28 @@ public abstract class DynamicCollectionSupport{
 		
 		var nullBufferBytes = res.hasNulls()? BitUtils.bitsToBytes(len) : 0;
 		
-		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
-			long sum = infoBytes + nullBufferBytes;
-			for(var el : res.iter(val).filtered(Objects::nonNull)){
-				int id;
-				try{
-					id = prov.getTypeDb().toID(el, false).val();
-				}catch(IOException ex){
-					throw new UncheckedIOException("Failed to compute type ID", ex);
-				}
-				sum += 1 + NumberSize.bySizeSigned(id).bytes;
-				sum += DynamicSupport.calcSize(prov, el);
+		switch(res.layout()){
+			case JUST_NULLS -> {
+				return infoBytes;
 			}
-			return sum;
+			case DYNAMIC -> {
+				long sum = infoBytes + nullBufferBytes;
+				for(var el : res.iter(val).filtered(Objects::nonNull)){
+					int id;
+					try{
+						id = prov.getTypeDb().toID(el, false).val();
+					}catch(IOException ex){
+						throw new UncheckedIOException("Failed to compute type ID", ex);
+					}
+					sum += 1 + NumberSize.bySizeSigned(id).bytes;
+					sum += DynamicSupport.calcSize(prov, el);
+				}
+				return sum;
+			}
 		}
 		
-		var primitiveO = SupportedPrimitive.get(res.constantType());
+		
+		OptionalPP<SupportedPrimitive> primitiveO = constType != null? SupportedPrimitive.get(constType) : OptionalPP.empty();
 		if(primitiveO.isPresent()){
 			var psiz = primitiveO.get();
 			int actualElements;
@@ -190,7 +197,7 @@ public abstract class DynamicCollectionSupport{
 	
 	static void writeCollection(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
 		res.write(provider, dest);
-		if(res.length() == 0) return;
+		if(res.length() == 0 || res.layout() == CollectionInfo.Layout.JUST_NULLS) return;
 		
 		var constType       = res.constantType();
 		int nonNullElements = res.length();
@@ -221,11 +228,11 @@ public abstract class DynamicCollectionSupport{
 		var pTypO = SupportedPrimitive.get(constType);
 		if(pTypO.isPresent()){
 			if(res instanceof CollectionInfo.PrimitiveArrayInfo){
-				var iter = res.iter(val).filtered(Objects::nonNull);
-				writePrimitiveCollection(dest, iter, nonNullElements, pTypO.get());
+				writePrimitiveArray(dest, val, res.length(), pTypO.get());
 				return;
 			}
-			writePrimitiveArray(dest, val, res.length(), pTypO.get());
+			var iter = res.iter(val).filtered(Objects::nonNull);
+			writePrimitiveCollection(dest, iter, nonNullElements, pTypO.get());
 			return;
 		}
 		
@@ -426,9 +433,11 @@ public abstract class DynamicCollectionSupport{
 			return readPrimitiveArray(src, len, pTypO);
 		}
 		
+		var layout = res.layout();
+		
 		Class<?> componentType;
 		IOType   componentIOType;
-		if(res.layout() != CollectionInfo.Layout.DYNAMIC){
+		if(layout != CollectionInfo.Layout.DYNAMIC && layout != CollectionInfo.Layout.JUST_NULLS){
 			if(typ.isArray()){
 				componentType = typ.getComponentType();
 				if(typDef instanceof IOType.RawAndArg raaaa){
@@ -449,7 +458,7 @@ public abstract class DynamicCollectionSupport{
 		
 		BitInputStream nullBuffer;
 		byte[]         nullBufferBytes;
-		if(res.hasNulls() && res.length()>0 && !(componentType != null && componentType.isEnum())){
+		if(layout != CollectionInfo.Layout.JUST_NULLS && res.hasNulls() && res.length()>0 && !(componentType != null && componentType.isEnum())){
 			var bytes = BitUtils.bitsToBytes(len);
 			nullBufferBytes = src.readInts1(bytes);
 			nullBuffer = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
@@ -500,15 +509,15 @@ public abstract class DynamicCollectionSupport{
 		}
 		
 		if(res.length() == 0) return end.get();
-
-//		if(res.layout() == CollectionInfo.Layout.NO_VALUES){
-//			for(int i = 0; i<res.length(); i++){
-//				dest.accept(null);
-//			}
-//			return end.get();
-//		}
 		
-		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
+		if(layout == CollectionInfo.Layout.JUST_NULLS){
+			for(int i = 0, l = res.length(); i<l; i++){
+				dest.accept(null);
+			}
+			return end.get();
+		}
+		
+		if(layout == CollectionInfo.Layout.DYNAMIC){
 			var db = provider.getTypeDb();
 			for(int i = 0; i<len; i++){
 				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
@@ -633,21 +642,24 @@ public abstract class DynamicCollectionSupport{
 			case DOUBLE -> src.readFloats8(len);
 			case FLOAT -> src.readFloats4(len);
 			case BOOLEAN -> {
+				if(len == 0) yield new boolean[0];
 				try(var bitIn = new BitInputStream(src, len)){
 					yield bitIn.readBits(new boolean[len]);
 				}
 			}
 			case LONG -> {
-				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr = new long[len];
+				if(len == 0) yield arr;
+				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<arr.length; i++){
 					arr[i] = siz.read(src);
 				}
 				yield arr;
 			}
 			case INT -> {
-				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr = new int[len];
+				if(len == 0) yield arr;
+				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<arr.length; i++){
 					arr[i] = siz.readInt(src);
 				}

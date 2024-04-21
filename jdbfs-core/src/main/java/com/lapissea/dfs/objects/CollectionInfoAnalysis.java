@@ -113,6 +113,7 @@ public abstract class CollectionInfoAnalysis{
 			
 		}else if(layout != Layout.DYNAMIC){
 			assert data.filtered(Objects::nonNull).isEmpty();
+			layout = Layout.JUST_NULLS;
 		}
 		
 		return new ElementsResult(constType, hasNulls, layout);
