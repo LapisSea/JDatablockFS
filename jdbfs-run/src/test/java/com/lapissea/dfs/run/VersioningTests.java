@@ -73,7 +73,7 @@ public class VersioningTests{
 	
 	static byte[] makeData(Class<?> type) throws IOException{
 		var data = Cluster.emptyMem();
-		data.roots().request("obj", type);
+		data.roots().request(1, type);
 		return data.getSource().readAll();
 	}
 	
@@ -90,7 +90,7 @@ public class VersioningTests{
 		
 		var data = versionedCl(type, bb);
 		return data.roots()
-		           .require("obj", type);
+		           .require(1, type);
 	}
 	
 	private static byte[] makeCLDataRaw(Class<?> type) throws ReflectiveOperationException{
@@ -112,7 +112,7 @@ public class VersioningTests{
 		
 		//noinspection unchecked
 		T obj = (T)cl.roots()
-		             .require("obj", IOInstance.class);
+		             .require(1, IOInstance.class);
 		
 		var type  = obj.getThisStruct();
 		var names = type.getFields().map(IOField::getName).collectToSet();

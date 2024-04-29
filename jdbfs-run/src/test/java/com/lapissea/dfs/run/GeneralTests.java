@@ -230,23 +230,23 @@ public class GeneralTests{
 	@Test(groups = {"rootProvider"})
 	void rootIntProvide() throws IOException{
 		var cl = Cluster.init(MemoryData.empty());
-		cl.roots().provide("val", -123);
-		int val = cl.roots().require("val", int.class);
+		cl.roots().provide(1, -123);
+		int val = cl.roots().require(1, int.class);
 		assertEquals(val, -123);
 	}
 	
 	@Test(groups = {"rootProvider"})
 	void rootIntegerProvide() throws IOException{
 		var cl = Cluster.init(MemoryData.empty());
-		cl.roots().provide("val", -123);
-		Integer val = cl.roots().require("val", Integer.class);
+		cl.roots().provide(1, -123);
+		Integer val = cl.roots().require(1, Integer.class);
 		assertEquals(val, -123);
 	}
 	
 	@Test(groups = {"rootProvider"})
 	void rootIntRequest() throws IOException{
 		var cl  = Cluster.init(MemoryData.empty());
-		var val = cl.roots().request("val", int.class);
+		var val = cl.roots().request(1, int.class);
 		assertEquals(val, 0);
 	}
 	

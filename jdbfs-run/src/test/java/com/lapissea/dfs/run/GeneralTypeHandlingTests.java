@@ -12,7 +12,6 @@ import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -226,8 +225,8 @@ public class GeneralTypeHandlingTests{
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
-			provider.roots().provide(new ObjectID("obj"), blob);
-			var read = provider.roots().request("obj", NamedBlob.class);
+			provider.roots().provide(1, blob);
+			var read = provider.roots().request(1, NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			
@@ -544,10 +543,6 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void orderTestType() throws IOException{
-		
-		var cluster = Cluster.emptyMem();
-		var roots   = cluster.roots();
-		
 		var typ = new OrderTestType();
 		typ.commands = List.of(OrderTestType.EnumThing.SET_CLASS_NAME, OrderTestType.EnumThing.SET_METHOD_NAME);
 		typ.sizes = List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.VOID);
@@ -556,7 +551,10 @@ public class GeneralTypeHandlingTests{
 		typ.ignoredFrames = 0;
 		typ.diffBottomCount = 10_000;
 		
-		roots.provide("foo", typ);
+		var cluster = Cluster.emptyMem();
+		cluster.roots().provide(1, typ);
+		var read = cluster.roots().require(1, OrderTestType.class);
+		assertEquals(typ, read);
 	}
 	
 	
@@ -652,7 +650,7 @@ public class GeneralTypeHandlingTests{
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void genericStore() throws IOException{
 		var d = Cluster.emptyMem();
-		var data = d.roots().request(new ObjectID("obj"), () -> {
+		var data = d.roots().request(1, () -> {
 			var v = IOInstance.Def.of(GenericArg.class);
 			v.allocateNulls(d, null);
 			return v;

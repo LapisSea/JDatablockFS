@@ -5,7 +5,6 @@ import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.collections.IOMap;
-import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
@@ -44,15 +43,13 @@ public interface RootProvider extends DataProvider.Holder{
 		}
 		
 		
-		public Builder<T> withId(AutoText id){
-			return withId(new ObjectID(id.getData()));
-		}
-		public Builder<T> withId(String id){
-			return withId(new ObjectID(id));
-		}
+		public Builder<T> withId(byte id)  { return withId(ObjectID.of(id)); }
+		public Builder<T> withId(long id)  { return withId(ObjectID.of(id)); }
+		public Builder<T> withId(String id){ return withId(ObjectID.of(id)); }
 		public Builder<T> withId(ObjectID id){
 			return new Builder<>(provider, id, objectGenerator);
 		}
+		
 		@SuppressWarnings("unchecked")
 		public <CT> Builder<? extends CT> withType(Class<CT> genericType, Type... args){ return (Builder<CT>)withType(IOType.of(genericType, args)); }
 		@SuppressWarnings("unchecked")
@@ -130,12 +127,15 @@ public interface RootProvider extends DataProvider.Holder{
 		}
 	}
 	
+	default <T> Builder<T> builder(String id)  { return builder(ObjectID.of(id)); }
+	default <T> Builder<T> builder(long id)    { return builder(ObjectID.of(id)); }
+	default <T> Builder<T> builder(byte id)    { return builder(ObjectID.of(id)); }
+	default <T> Builder<T> builder(ObjectID id){ return new Builder<T>(this).withId(id); }
 	default <T> Builder<T> builder(){
 		return new Builder<>(this);
 	}
-	default <T> Builder<T> builder(String id){ return new Builder<T>(this).withId(id); }
 	
-	default <T extends IOInstance.Unmanaged<T>> T require(String id, Class<T> type, Class<?>... typeArgs) throws IOException{
+	default <T extends IOInstance.Unmanaged<T>> T require(ObjectID id, Class<T> type, Class<?>... typeArgs) throws IOException{
 		var val        = require(id, type);
 		var typeDef    = val.getTypeDef();
 		var actualArgs = IOType.getArgs(typeDef);
@@ -153,7 +153,10 @@ public interface RootProvider extends DataProvider.Holder{
 		return val;
 	}
 	
-	default <T> T require(String id, Class<T> type) throws IOException{
+	default <T> T require(long id, Class<T> type) throws IOException  { return require(ObjectID.of(id), type); }
+	default <T> T require(byte id, Class<T> type) throws IOException  { return require(ObjectID.of(id), type); }
+	default <T> T require(String id, Class<T> type) throws IOException{ return require(ObjectID.of(id), type); }
+	default <T> T require(ObjectID id, Class<T> type) throws IOException{
 		var val = builder(id).withGenerator(() -> {
 			throw new MissingRoot(id + " does not exist!");
 		}).request();
@@ -164,21 +167,36 @@ public interface RootProvider extends DataProvider.Holder{
 		return t.cast(val);
 	}
 	
-	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }
-	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException{ return this.builder(id).withType(type.getType()).request(); }
-	default <T> T request(String id, Class<T> type) throws IOException                       { return this.builder(id).withType(type).request(); }
+	default <T> T request(long id, Class<?> raw, Class<?>... args) throws IOException                  { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(byte id, Class<?> raw, Class<?>... args) throws IOException                  { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException                { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(ObjectID id, Class<?> raw, Class<?>... args) throws IOException              { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }
 	
+	default <T extends IOInstance<T>> T request(long id, Struct<T> type) throws IOException            { return request(ObjectID.of(id), type); }
+	default <T extends IOInstance<T>> T request(byte id, Struct<T> type) throws IOException            { return request(ObjectID.of(id), type); }
+	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException          { return request(ObjectID.of(id), type); }
+	default <T extends IOInstance<T>> T request(ObjectID id, Struct<T> type) throws IOException        { return this.builder(id).withType(type.getType()).request(); }
+	
+	default <T> T request(long id, Class<T> type) throws IOException                                   { return request(ObjectID.of(id), type); }
+	default <T> T request(byte id, Class<T> type) throws IOException                                   { return request(ObjectID.of(id), type); }
+	default <T> T request(String id, Class<T> type) throws IOException                                 { return request(ObjectID.of(id), type); }
+	default <T> T request(ObjectID id, Class<T> type) throws IOException                               { return this.builder(id).withType(type).request(); }
+	
+	default <T> T request(long id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException  { return request(ObjectID.of(id), objectGenerator); }
+	default <T> T request(byte id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException  { return request(ObjectID.of(id), objectGenerator); }
+	default <T> T request(String id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{ return request(ObjectID.of(id), objectGenerator); }
 	<T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException;
-	default <T> void provide(String id, T obj) throws IOException{
-		provide(new ObjectID(id), obj);
-	}
+	
+	default <T> void provide(long id, T obj) throws IOException                                        { provide(ObjectID.of(id), obj); }
+	default <T> void provide(byte id, T obj) throws IOException                                        { provide(ObjectID.of(id), obj); }
+	default <T> void provide(String id, T obj) throws IOException                                      { provide(ObjectID.of(id), obj); }
 	<T> void provide(ObjectID id, T obj) throws IOException;
 	
 	
 	IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll();
 	
 	default void drop(String id) throws IOException{
-		drop(new ObjectID(id));
+		drop(ObjectID.of(id));
 	}
 	void drop(ObjectID id) throws IOException;
 }
