@@ -99,7 +99,8 @@ public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFl
 			@Override
 			public Integer generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 				var clazz = get(ioPool, instance);
-				var cid   = provider.getTypeDb().toID(clazz, allowExternalMod);
+				if(clazz == null && nullable()) throw new NullPointerException(IOFieldDirectClass.this + " is null");
+				var cid = provider.getTypeDb().toID(clazz, allowExternalMod);
 				return cid.val();
 			}
 		}));
