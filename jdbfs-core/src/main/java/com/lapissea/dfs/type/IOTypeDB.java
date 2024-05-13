@@ -27,6 +27,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -732,6 +733,13 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
+			if(typeName.typeName.startsWith("java.")){
+				for(IOType arg : IOType.getArgs(type)){
+					recordType(builtIn, arg, newDefs);
+				}
+				return;
+			}
+			
 			var def    = new TypeDef(typ);
 			var parent = def.getSealedParent();
 			if(parent != null){
@@ -986,6 +994,10 @@ public sealed interface IOTypeDB{
 		return toID(type, recordNew);
 	}
 	
+	default int toID(Type type) throws IOException{
+		if(type == null) return 0;
+		return toID(IOType.of(type), true).requireStored();
+	}
 	default int toID(Class<?> type) throws IOException{
 		if(type == null) return 0;
 		return toID(IOType.of(type), true).requireStored();
@@ -994,6 +1006,10 @@ public sealed interface IOTypeDB{
 		return toID(type, true).requireStored();
 	}
 	
+	default TypeID toID(Type type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
+		return toID(IOType.of(type), recordNew);
+	}
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
 		if(type == null) return new TypeID(0, true);
 		return toID(IOType.of(type), recordNew);

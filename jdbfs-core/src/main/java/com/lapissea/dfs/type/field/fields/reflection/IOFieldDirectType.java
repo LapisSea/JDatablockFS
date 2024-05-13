@@ -8,7 +8,6 @@ import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.BehaviourSupport;
@@ -23,6 +22,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -31,18 +31,21 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFlagCompanyField<T, Class<V>>{
+@IOUnsafeValue.Mark
+public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type>{
 	
 	@SuppressWarnings("unused")
-	private static final class Usage<V> implements FieldUsage{
+	private static final class Usage implements FieldUsage{
 		@Override
-		public <T extends IOInstance<T>> IOField<T, Class<V>> create(FieldAccessor<T> field){
-			return new IOFieldDirectClass<>(field);
+		public <T extends IOInstance<T>> IOField<T, Type> create(FieldAccessor<T> field){
+			return new IOFieldDirectType<>(field);
 		}
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
+				Behaviour.of(IONullability.class, (field1, ann1) -> {
+					return BehaviourSupport.ioNullability(field1, ann1);
+				}),
 				Behaviour.of(IOValue.class, (field, ann) -> {
 					return new BehaviourRes<>(
 						List.of(
@@ -57,26 +60,25 @@ public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFl
 				})
 			);
 		}
-		public Class<Class<V>> getType(){
-			//noinspection unchecked
-			return (Class<Class<V>>)(Object)Class.class;
+		public Class<Type> getType(){
+			return Type.class;
 		}
 		@Override
 		public boolean isCompatible(Type type, GetAnnotation annotations){
-			if(Utils.typeToRaw(type) != Class.class) return false;
 			if(!annotations.isPresent(IOUnsafeValue.class)){
 				return false;
 			}
+			if(!UtilL.instanceOf(Utils.typeToRaw(type), Type.class)) return false;
 			return true;
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
-		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDirectClass.class); }
+		public Set<Class<? extends IOField>> listFieldTypes(){ return Set.of(IOFieldDirectType.class); }
 	}
 	
 	private IOFieldPrimitive.FInt<T> id;
 	
-	public IOFieldDirectClass(FieldAccessor<T> accessor){
+	public IOFieldDirectType(FieldAccessor<T> accessor){
 		super(accessor);
 		initSizeDescriptor(SizeDescriptor.Fixed.empty());
 	}
@@ -98,9 +100,9 @@ public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFl
 			}
 			@Override
 			public Integer generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-				var clazz = get(ioPool, instance);
-				if(clazz == null && nullable()) throw new NullPointerException(IOFieldDirectClass.this + " is null");
-				var cid = provider.getTypeDb().toID(clazz, allowExternalMod);
+				var type = get(ioPool, instance);
+				if(type == null && nullable()) throw new NullPointerException(IOFieldDirectType.this + " is null");
+				var cid = provider.getTypeDb().toID(type, allowExternalMod);
 				return cid.val();
 			}
 		}));
@@ -109,20 +111,17 @@ public final class IOFieldDirectClass<T extends IOInstance<T>, V> extends NullFl
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{ }
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		Class<V> data;
-		var      cid = id.getValue(ioPool, instance);
+		Type data;
+		var  cid = id.getValue(ioPool, instance);
 		if(cid == 0){
 			if(nullable()) data = null;
 			else{
 				throw new MalformedObject(this + " is null");
 			}
 		}else{
-			var typ = provider.getTypeDb().fromID(cid);
-			if(!(typ instanceof IOType.TypeRaw roo)){
-				throw new MalformedObject(this + " has an invalid type of: " + typ);
-			}
-			//noinspection unchecked
-			data = (Class<V>)roo.getTypeClass(provider.getTypeDb());
+			var db  = provider.getTypeDb();
+			var typ = db.fromID(cid);
+			data = typ.generic(db);
 		}
 		set(ioPool, instance, data);
 	}

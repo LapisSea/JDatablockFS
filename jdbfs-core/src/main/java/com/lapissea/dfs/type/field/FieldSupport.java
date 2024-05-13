@@ -14,6 +14,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -258,7 +259,7 @@ final class FieldSupport{
 			typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
 		}
 		
-		if(rawType == Class.class){
+		if(UtilL.instanceOf(rawType, Type.class)){
 			typeFlags |= HAS_NO_POINTERS_FLAG;
 		}
 		

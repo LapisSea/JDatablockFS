@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
@@ -27,6 +28,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -478,6 +480,32 @@ public class GeneralTests{
 			assertEquals(def, Foo.of(null));
 			
 			var helloWorld = String.class;
+			c.roots().provide("some", Foo.of(helloWorld));
+			var read = c.roots().request("some", Foo.class);
+			assertEquals(read, Foo.of(helloWorld));
+			
+			c.roots().provide("none", Foo.of(null));
+			Foo none = c.roots().request("none", Foo.class);
+			assertEquals(none, Foo.of(null));
+		});
+	}
+	
+	@Test()
+	void typeValueWithOk() throws IOException{
+		interface Foo extends IOInstance.Def<Foo>{
+			@IONullability(NULLABLE)
+			@IOUnsafeValue
+			Type val();
+			static Foo of(Type val){ return IOInstance.Def.of(Foo.class, val); }
+		}
+		
+		Struct.of(Foo.class, Struct.STATE_DONE);
+		
+		TestUtils.testCluster(TestInfo.of(), c -> {
+			Foo def = c.roots().request("default", Foo.class);
+			assertEquals(def, Foo.of(null));
+			
+			var helloWorld = SyntheticParameterizedType.of(List.class, List.of(Integer.class));
 			c.roots().provide("some", Foo.of(helloWorld));
 			var read = c.roots().request("some", Foo.class);
 			assertEquals(read, Foo.of(helloWorld));
