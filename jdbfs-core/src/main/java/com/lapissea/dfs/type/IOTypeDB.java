@@ -976,11 +976,11 @@ public sealed interface IOTypeDB{
 		return IOType.of(obj.getClass());
 	}
 	
-	default int toID(Object obj) throws IOException{
+	default int objToID(Object obj) throws IOException{
 		if(obj == null) return 0;
 		return toID(makeType(obj));
 	}
-	default TypeID toID(Object obj, boolean recordNew) throws IOException{
+	default TypeID objToID(Object obj, boolean recordNew) throws IOException{
 		if(obj == null) return new TypeID(0, true);
 		var type = makeType(obj);
 		return toID(type, recordNew);
