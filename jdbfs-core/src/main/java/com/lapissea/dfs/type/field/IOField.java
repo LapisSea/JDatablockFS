@@ -55,17 +55,17 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
-			private final Class<Typ>                    typ;
+			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
 			@SuppressWarnings("rawtypes")
-			public InstanceOf(Class<Typ> typ, Set<Class<? extends IOField>> fieldTypes){
-				this.typ = typ;
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
 			}
 			
-			public Class<Typ> getType(){
-				return typ;
+			public final Class<Typ> getType(){
+				return type;
 			}
 			
 			@Override
