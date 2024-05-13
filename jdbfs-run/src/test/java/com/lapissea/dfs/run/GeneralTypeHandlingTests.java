@@ -760,6 +760,9 @@ public class GeneralTypeHandlingTests{
 			for(int i = 0; i<s; i++){
 				l.add(nulls && r.nextBoolean()? null : gen.gen.apply(r, d));
 			}
+			if(!nulls && r.nextBoolean()){
+				return List.copyOf(l);
+			}
 			return l;
 		}, List.class, "List<" + name + ">");
 		if(!nulls || !gen.type.isPrimitive()){
@@ -825,6 +828,9 @@ public class GeneralTypeHandlingTests{
 	void genericStoreL3(Gen<?> generator) throws IOException{ genericStore(generator); }
 	
 	void genericStore(Gen<?> generator) throws IOException{
+		//noinspection unchecked
+		var pip = StandardStructPipe.of((Class<GenericContainer<Object>>)(Object)GenericContainer.class);
+		
 		record find(long siz, long seed, Throwable e){ }
 		var oErrSeed = new RawRandom(generator.name.hashCode()).longs().limit(100).mapToObj(r -> {
 			return async(() -> {
@@ -837,9 +843,9 @@ public class GeneralTypeHandlingTests{
 				}
 				var wrapVal = new GenericContainer<>(value);
 				try{
-//					LogUtil.println("Writing Type:", generator.name, "value:\n", value);
-					d.roots().provide("obj", wrapVal);
-					var read = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
+					var ch = AllocateTicket.bytes(128).submit(d);
+					pip.write(ch, wrapVal);
+					var read = pip.readNew(ch, null);
 					Assert.assertEquals(read, wrapVal);
 					return null;
 				}catch(Throwable e){
@@ -881,7 +887,7 @@ public class GeneralTypeHandlingTests{
 					UtilL.sleepWhile(() -> backlog.get()>32);
 					exec.submit(() -> {
 						backlog.decrementAndGet();
-						var val = new GenericContainer<>(arr);
+						var val = new GenericContainer<Object>(arr);
 						var cl  = Cluster.emptyMem();
 						var siz = StandardStructPipe.sizeOfUnknown(cl, val, WordSpace.BYTE);
 						synchronized(res){
@@ -890,8 +896,9 @@ public class GeneralTypeHandlingTests{
 							}
 						}
 						try{
-							cl.roots().provide("obj", val);
-							var generic = (GenericContainer<?>)cl.roots().request("obj", GenericContainer.class);
+							var ch = AllocateTicket.bytes(128).submit(cl);
+							pip.write(ch, val);
+							var generic = pip.readNew(ch, null);
 							Assert.assertEquals(generic, val);
 						}catch(Throwable e1){
 							var strSiz = TextUtil.toString(arr).length();
@@ -915,8 +922,10 @@ public class GeneralTypeHandlingTests{
 		err.printStackTrace();
 		LogUtil.println("===================================");
 		
-		d.roots().provide("obj", new GenericContainer<>(value));
-		var generic = (GenericContainer<?>)d.roots().request("obj", GenericContainer.class);
+		var ch = AllocateTicket.bytes(128).submit(d);
+		var c  = new GenericContainer<>(value);
+		pip.write(ch, c);
+		var generic = pip.readNew(ch, null);
 		Assert.assertEquals(generic.value, value);
 		
 		Assert.fail("Expected to fail");

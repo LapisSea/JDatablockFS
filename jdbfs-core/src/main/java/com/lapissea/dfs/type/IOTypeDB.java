@@ -22,6 +22,7 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -962,26 +963,69 @@ public sealed interface IOTypeDB{
 		}
 		
 		if(obj instanceof Collection<?> l){
-			var el = elementType(l);
+//			var el = elementType(l);
 			Class<?> baseType = switch(obj){
 				case List<?> ignore -> List.class;
+				case Map<?, ?> ignore -> Map.class;
 				case Set<?> ignore -> Set.class;
 				default -> null;
 			};
 			if(baseType != null){
-				return IOType.of(baseType, el);
+				return IOType.of(baseType);
+//				return IOType.of(baseType, el);
 			}
 		}
-		if(obj.getClass().isArray()){
-			Class<?> baseType = obj.getClass().getComponentType();
-			if(SupportedPrimitive.isAny(baseType)){
-				return IOType.of(obj.getClass());
+		
+		var cls = obj.getClass();
+		if(cls.isArray()){
+			Class<?> baseType = cls.getComponentType();
+			if(Modifier.isFinal(baseType.getModifiers())){
+				if(SupportedPrimitive.isAny(baseType)){
+					return IOType.of(cls);
+				}
+				if(baseType.getTypeParameters().length == 0){
+					return IOType.of(cls);
+				}
 			}
 			var el = elementType(Arrays.asList((Object[])obj));
 			return el.asArrayType(this);
 		}
-		return IOType.of(obj.getClass());
+		return IOType.of(cls);
 	}
+	private IOType tryMergeGeneric(IOType.TypeGeneric t1, IOType.TypeGeneric t2){
+		if(!t1.getRaw().equals(t2.getRaw())){
+			return IOType.of(Object.class);
+		}
+		
+		var a1 = new ArrayList<>(t1.getArgs());
+		var a2 = t2.getArgs();
+		if(a1.size() != a2.size()){
+			return IOType.of(Object.class);
+		}
+		for(int i = 0; i<a1.size(); i++){
+			var arg1 = a1.get(i);
+			var arg2 = a2.get(i);
+			if(arg1.getClass() != arg2.getClass()){
+				a1.set(i, IOType.of(Object.class));
+				continue;
+			}
+			a1.set(i, switch(arg1){
+				case IOType.TypeGeneric typeGeneric -> {
+					yield tryMergeGeneric(typeGeneric, (IOType.TypeGeneric)arg2);
+				}
+				case IOType.TypeRaw typeRaw -> {
+					var c1  = typeRaw.getTypeClass(null);
+					var c2  = arg2.getTypeClass(null);
+					var cls = UtilL.findClosestCommonSuper(c1, c2);
+					yield IOType.of(cls);
+				}
+				default -> IOType.of(Object.class);
+			});
+		}
+		
+		return new IOType.TypeGeneric(t1.getRaw(), a1);
+	}
+	
 	private IOType elementType(Iterable<?> l){
 		IOType type = null, fallback = null;
 		for(var o : l){
@@ -992,7 +1036,12 @@ public sealed interface IOTypeDB{
 				else type = t;
 			}else if(!type.equals(t)){
 				if(o instanceof Collection<?> col && col.isEmpty()) continue;
-				type = IOType.of(Object.class);
+				
+				if(type instanceof IOType.TypeGeneric t1 && t instanceof IOType.TypeGeneric t2){
+					type = tryMergeGeneric(t1, t2);
+				}else{
+					type = IOType.of(Object.class);
+				}
 			}
 		}
 		return type != null? type : fallback != null? fallback : IOType.of(Object.class);

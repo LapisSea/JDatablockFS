@@ -1,6 +1,5 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="GeneralTests" type="TestNG">
-    <module name="jdbfs-run" />
     <shortenClasspath name="NONE" />
     <option name="SUITE_NAME" value="" />
     <option name="PACKAGE_NAME" value="com.lapissea.dfs.run" />

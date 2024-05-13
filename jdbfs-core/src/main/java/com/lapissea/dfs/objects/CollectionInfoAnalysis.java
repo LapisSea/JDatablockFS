@@ -13,7 +13,6 @@ import com.lapissea.util.UtilL;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
@@ -24,8 +23,8 @@ public abstract class CollectionInfoAnalysis{
 	private static final Set<Class<?>> UNMODIFIABLE_LISTS;
 	
 	static{
-		Set<Class<?>> ul = new HashSet<>();
-		var           l  = new ArrayList<>(20);
+		List<Class<?>> ul = new ArrayList<>(22);
+		var            l  = new ArrayList<>(20);
 		for(int i = 0; i<20; i++){
 			ul.add(List.copyOf(l).getClass());
 			l.add(i);
@@ -99,12 +98,16 @@ public abstract class CollectionInfoAnalysis{
 		}
 		
 		if(constType != null){
-			layout = Struct.tryOf(constType).filter(s -> !(s instanceof Struct.Unmanaged)).map(s -> {
-				return switch(IOFieldTools.minWordSpace(s.getFields())){
-					case BIT -> Layout.STRUCT_OF_ARRAYS;
-					case BYTE -> Layout.STRIPED;
-				};
-			}).orElse(layout);
+			if(UtilL.instanceOf(constType, List.class)){
+				constType = List.class;
+			}else{
+				layout = Struct.tryOf(constType).filter(s -> !(s instanceof Struct.Unmanaged)).map(s -> {
+					return switch(IOFieldTools.minWordSpace(s.getFields())){
+						case BIT -> Layout.STRUCT_OF_ARRAYS;
+						case BYTE -> Layout.STRIPED;
+					};
+				}).orElse(layout);
+			}
 			
 			if(layout == Layout.STRUCT_OF_ARRAYS){
 //				Log.warn("{}#red for type of {}#red is not implemented yet!", layout, constType);

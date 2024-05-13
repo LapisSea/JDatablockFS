@@ -423,6 +423,11 @@ public abstract class DynamicCollectionSupport{
 	
 	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
+		if(!CollectionInfoAnalysis.isTypeCollection(typ)){
+			throw new IllegalArgumentException(typ + " is not a collection like");
+		}
+		
+		
 		var res = CollectionInfo.read(provider, src);
 		int len = res.length();
 		
@@ -438,19 +443,8 @@ public abstract class DynamicCollectionSupport{
 		Class<?> componentType;
 		IOType   componentIOType;
 		if(layout != CollectionInfo.Layout.DYNAMIC && layout != CollectionInfo.Layout.JUST_NULLS){
-			if(typ.isArray()){
-				componentType = typ.getComponentType();
-				if(typDef instanceof IOType.RawAndArg raaaa){
-					componentIOType = raaaa.withRaw(typDef.getTypeClass(provider.getTypeDb()).componentType());
-				}else{
-					throw new NotImplementedException(typDef + "could not be array unwrapped");
-				}
-			}else{
-				var args = IOType.getArgs(typDef);
-				var arg  = args.getFirst();
-				componentIOType = arg;
-				componentType = arg.getTypeClass(provider.getTypeDb());
-			}
+			componentType = res.constantType();
+			componentIOType = IOType.of(componentType);//TODO make constant type a generic
 		}else{
 			componentType = null;
 			componentIOType = null;
