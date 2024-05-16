@@ -74,7 +74,7 @@ public abstract class DynamicCollectionSupport{
 				for(var el : res.iter(val).filtered(Objects::nonNull)){
 					int id;
 					try{
-						id = prov.getTypeDb().toID(el, false).val();
+						id = prov.getTypeDb().objToID(el, false).val();
 					}catch(IOException ex){
 						throw new UncheckedIOException("Failed to compute type ID", ex);
 					}
@@ -217,7 +217,7 @@ public abstract class DynamicCollectionSupport{
 		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
 			var db = provider.getTypeDb();
 			for(var el : res.iter(val).filtered(Objects::nonNull)){
-				var id = db.toID(el);
+				var id = db.objToID(el);
 				dest.writeUnsignedInt4Dynamic(id);
 				DynamicSupport.writeValue(provider, dest, el);
 			}
