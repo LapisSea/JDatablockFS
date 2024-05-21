@@ -31,7 +31,6 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -39,8 +38,6 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -56,6 +53,103 @@ import java.util.stream.LongStream;
 
 public abstract class DynamicCollectionSupport{
 	
+	private static long primitiveSiz(Object val, CollectionInfo info, SupportedPrimitive pTyp){
+		int actualElements;
+		if(!info.hasNulls()) actualElements = info.length();
+		else{
+			actualElements = info.iter(val).filtered(Objects::nonNull).count();
+		}
+		
+		return calcNullBufferSize(info) + switch(pTyp){
+			case DOUBLE, FLOAT -> pTyp.maxSize.get()*actualElements;
+			case BOOLEAN -> BitUtils.bitsToBytes(actualElements);
+			case LONG -> {
+				int bytesPer;
+				if(val instanceof long[] arr){
+					bytesPer = 0;
+					for(var i : arr){
+						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
+					}
+				}else bytesPer = info.iter(val).filtered(Objects::nonNull).map(Long.class::cast)
+				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+				yield 1 + bytesPer*(long)actualElements;
+			}
+			case INT -> {
+				int bytesPer;
+				if(val instanceof int[] arr){
+					bytesPer = 0;
+					for(var i : arr){
+						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
+					}
+				}else bytesPer = info.iter(val).filtered(Objects::nonNull).map(Integer.class::cast)
+				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+				yield 1 + bytesPer*(long)actualElements;
+			}
+			case SHORT, CHAR -> 2L*actualElements;
+			case BYTE -> actualElements;
+		};
+	}
+	
+	private static Object primitiveRead(ContentReader src, CollectionInfo info, SupportedPrimitive pTyp, byte[] nullBufferBytes) throws IOException{
+		
+		if(info instanceof CollectionInfo.PrimitiveArrayInfo primitive){
+			var pTypO = SupportedPrimitive.getStrict(primitive.constantType()).orElseThrow(() -> {
+				return new IllegalStateException("primitive array must have a primitive type");
+			});
+			return readPrimitiveArray(src, primitive.length(), pTypO);
+		}
+		
+		int len = info.length();
+		
+		if(!info.hasNulls()){
+			var gen = createGenerator(info, null);
+			readPrimitiveCollection(src, len, pTyp, gen);
+			return gen.export();
+		}
+		
+		var nullBuffer = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+		
+		var generator = createGenerator(info, nullBuffer);
+		
+		var eCount = 0;
+		var lm1    = nullBufferBytes.length - 1;
+		for(int i = 0; i<lm1; i++){
+			eCount += Integer.bitCount(Byte.toUnsignedInt(nullBufferBytes[i]));
+		}
+		var endBits = len - lm1*8;
+		try(var f = new FlagReader(nullBufferBytes[lm1], endBits)){
+			for(int i = 0; i<endBits; i++){
+				if(f.readBoolBit()) eCount++;
+			}
+		}
+		
+		var tmp = new ArrayList<>(eCount);//TODO: remove tmp arraylist
+		readPrimitiveCollection(src, eCount, pTyp, new Generator(){
+			@Override
+			public void add(Object element){ tmp.add(element); }
+			@Override
+			public Object export(){ return null; }
+		});
+		for(int i = 0, j = 0; i<len; i++){
+			var hasVal = nullBuffer.readBoolBit();
+			generator.add(hasVal? tmp.get(j++) : null);
+		}
+		return generator.export();
+	}
+	
+	private static void primitiveWrite(ContentWriter dest, Object val, CollectionInfo info, SupportedPrimitive pTyp) throws IOException{
+		if(info instanceof CollectionInfo.PrimitiveArrayInfo){
+			writePrimitiveArray(dest, val, info.length(), pTyp);
+		}else{
+			if(info.hasNulls()){
+				var iter = info.iter(val).filtered(Objects::nonNull);
+				writePrimitiveCollection(dest, iter, iter.count(), pTyp);
+			}else{
+				writePrimitiveCollection(dest, info.iter(val), info.length(), pTyp);
+			}
+		}
+	}
+	
 	static long calcCollectionSize(DataProvider prov, Object val, CollectionInfo res){
 		var infoBytes = res.calcIOBytes(prov);
 		var len       = res.length();
@@ -63,14 +157,13 @@ public abstract class DynamicCollectionSupport{
 		
 		var constType = res.constantType();
 		
-		var nullBufferBytes = res.hasNulls()? BitUtils.bitsToBytes(len) : 0;
 		
 		switch(res.layout()){
 			case JUST_NULLS -> {
 				return infoBytes;
 			}
 			case DYNAMIC -> {
-				long sum = infoBytes + nullBufferBytes;
+				long sum = infoBytes + calcNullBufferSize(res);
 				for(var el : res.iter(val).filtered(Objects::nonNull)){
 					int id;
 					try{
@@ -86,42 +179,9 @@ public abstract class DynamicCollectionSupport{
 		}
 		
 		
-		OptionalPP<SupportedPrimitive> primitiveO = constType != null? SupportedPrimitive.get(constType) : OptionalPP.empty();
+		OptionalPP<SupportedPrimitive> primitiveO = SupportedPrimitive.get(constType);
 		if(primitiveO.isPresent()){
-			var psiz = primitiveO.get();
-			int actualElements;
-			if(!res.hasNulls()) actualElements = len;
-			else{
-				actualElements = res.iter(val).filtered(Objects::nonNull).count();
-			}
-			return infoBytes + nullBufferBytes + switch(psiz){
-				case DOUBLE, FLOAT -> psiz.maxSize.get()*actualElements;
-				case BOOLEAN -> BitUtils.bitsToBytes(actualElements);
-				case LONG -> {
-					int bytesPer;
-					if(val instanceof long[] arr){
-						bytesPer = 0;
-						for(var i : arr){
-							bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
-						}
-					}else bytesPer = res.iter(val).filtered(Objects::nonNull).map(Long.class::cast)
-					                    .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
-					yield 1 + bytesPer*(long)actualElements;
-				}
-				case INT -> {
-					int bytesPer;
-					if(val instanceof int[] arr){
-						bytesPer = 0;
-						for(var i : arr){
-							bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
-						}
-					}else bytesPer = res.iter(val).filtered(Objects::nonNull).map(Integer.class::cast)
-					                    .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
-					yield 1 + bytesPer*(long)actualElements;
-				}
-				case SHORT, CHAR -> 2L*actualElements;
-				case BYTE -> actualElements;
-			};
+			return infoBytes + primitiveSiz(val, res, primitiveO.get());
 		}
 		
 		if(constType.isEnum()){
@@ -129,6 +189,8 @@ public abstract class DynamicCollectionSupport{
 			var info = EnumUniverse.of((Class<Enum>)constType);
 			return infoBytes + BitUtils.bitsToBytes(info.getBitSize(res.hasNulls())*(long)len);
 		}
+		
+		var nullBufferBytes = calcNullBufferSize(res);
 		
 		if(IOInstance.isInstance(constType)){
 			var struct = Struct.ofUnknown(constType);
@@ -194,20 +256,20 @@ public abstract class DynamicCollectionSupport{
 		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + TextUtil.toString(val));
 	}
+	private static int calcNullBufferSize(CollectionInfo res){
+		return res.hasNulls()? BitUtils.bitsToBytes(res.length()) : 0;
+	}
 	
 	static void writeCollection(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
 		res.write(provider, dest);
 		if(res.length() == 0 || res.layout() == CollectionInfo.Layout.JUST_NULLS) return;
 		
-		var constType       = res.constantType();
-		int nonNullElements = res.length();
+		var constType = res.constantType();
 		if(res.hasNulls() && !(constType != null && constType.isEnum())){
 			var buf = new ContentOutputBuilder();
 			try(var stream = new BitOutputStream(buf)){
-				nonNullElements = 0;
 				for(var e : res.iter(val)){
 					var b = e != null;
-					nonNullElements += b? 1 : 0;
 					stream.writeBoolBit(b);
 				}
 			}
@@ -227,12 +289,8 @@ public abstract class DynamicCollectionSupport{
 		
 		var pTypO = SupportedPrimitive.get(constType);
 		if(pTypO.isPresent()){
-			if(res instanceof CollectionInfo.PrimitiveArrayInfo){
-				writePrimitiveArray(dest, val, res.length(), pTypO.get());
-				return;
-			}
-			var iter = res.iter(val).filtered(Objects::nonNull);
-			writePrimitiveCollection(dest, iter, nonNullElements, pTypO.get());
+			var pTyp = pTypO.get();
+			primitiveWrite(dest, val, res, pTyp);
 			return;
 		}
 		
@@ -283,6 +341,7 @@ public abstract class DynamicCollectionSupport{
 			writeCollection(provider, dest, e, eRes);
 		}
 	}
+	
 	private static void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
 		switch(pTyp){
 			case null -> throw new NullPointerException();
@@ -421,6 +480,12 @@ public abstract class DynamicCollectionSupport{
 		}
 	}
 	
+	
+	private interface Generator{
+		void add(Object element);
+		Object export() throws IOException;
+	}
+	
 	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
 		if(!CollectionInfoAnalysis.isTypeCollection(typ)){
@@ -430,13 +495,6 @@ public abstract class DynamicCollectionSupport{
 		
 		var res = CollectionInfo.read(provider, src);
 		int len = res.length();
-		
-		if(res instanceof CollectionInfo.PrimitiveArrayInfo info){
-			var pTypO = SupportedPrimitive.getStrict(info.constantType()).orElseThrow(() -> {
-				return new IllegalStateException("primitive array must have a primitive type");
-			});
-			return readPrimitiveArray(src, len, pTypO);
-		}
 		
 		var layout = res.layout();
 		
@@ -461,54 +519,14 @@ public abstract class DynamicCollectionSupport{
 			nullBufferBytes = null;
 		}
 		
-		Consumer<Object> dest;
-		Supplier<Object> end;
-		switch(res){
-			case CollectionInfo.ListInfo v -> {
-				var list = new ArrayList<>(len);
-				dest = list::add;
-				boolean fin = v.isUnmodifiable();
-				end = () -> {
-					try{
-						if(nullBuffer != null){
-							nullBuffer.close();
-						}
-					}catch(IOException ex){ throw UtilL.uncheckedThrow(ex); }
-					
-					if(fin){
-						return List.copyOf(list);
-					}
-					return list;
-				};
-			}
-			case CollectionInfo.ArrayInfo v -> {
-				var ct  = v.getArrayType().componentType();
-				var arr = (Object[])Array.newInstance(ct, len);
-				dest = new Consumer<>(){
-					private int i;
-					@Override
-					public void accept(Object o){
-						arr[i++] = o;
-					}
-				};
-				end = () -> {
-					try{
-						if(nullBuffer != null) nullBuffer.close();
-					}catch(IOException ex){ throw UtilL.uncheckedThrow(ex); }
-					return arr;
-				};
-			}
-			case CollectionInfo.NullValue ignore -> { return null; }
-			case CollectionInfo.PrimitiveArrayInfo ignore -> { throw new ShouldNeverHappenError(); }
-		}
-		
-		if(res.length() == 0) return end.get();
+		Generator generator = createGenerator(res, nullBuffer);
+		if(res.length() == 0) return generator.export();
 		
 		if(layout == CollectionInfo.Layout.JUST_NULLS){
 			for(int i = 0, l = res.length(); i<l; i++){
-				dest.accept(null);
+				generator.add(null);
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		if(layout == CollectionInfo.Layout.DYNAMIC){
@@ -522,41 +540,17 @@ public abstract class DynamicCollectionSupport{
 					var type = db.fromID(id);
 					element = DynamicSupport.readTyp(type, provider, src, genericContext);
 				}
-				dest.accept(element);
+				generator.add(element);
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		assert componentType != null;
 		
 		var pTypO = SupportedPrimitive.get(componentType);
 		if(pTypO.isPresent()){
-			int eCount;
-			if(nullBufferBytes == null) eCount = len;
-			else{
-				eCount = 0;
-				var lm1 = nullBufferBytes.length - 1;
-				for(int i = 0; i<lm1; i++){
-					eCount += Integer.bitCount(Byte.toUnsignedInt(nullBufferBytes[i]));
-				}
-				var endBits = len - lm1*8;
-				try(var f = new FlagReader(nullBufferBytes[lm1], endBits)){
-					for(int i = 0; i<endBits; i++){
-						if(f.readBoolBit()) eCount++;
-					}
-				}
-			}
-			if(nullBufferBytes != null){
-				var tmp = new ArrayList<>(eCount);
-				readPrimitiveCollection(src, eCount, pTypO.get(), tmp::add);
-				for(int i = 0, j = 0; i<len; i++){
-					var hasVal = nullBuffer.readBoolBit();
-					dest.accept(hasVal? tmp.get(j++) : null);
-				}
-			}else{
-				readPrimitiveCollection(src, eCount, pTypO.get(), dest);
-			}
-			return end.get();
+			var pTyp = pTypO.get();
+			return primitiveRead(src, res, pTyp, nullBufferBytes);
 		}
 		
 		if(componentType.isEnum()){
@@ -564,10 +558,10 @@ public abstract class DynamicCollectionSupport{
 			var nullable = res.hasNulls();
 			try(var bits = new BitInputStream(src, universe.getBitSize(nullable)*(long)len)){
 				for(int i = 0; i<len; i++){
-					dest.accept(bits.readEnum(universe, nullable));
+					generator.add(bits.readEnum(universe, nullable));
 				}
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		if(IOInstance.isInstance(componentType)){
@@ -582,9 +576,9 @@ public abstract class DynamicCollectionSupport{
 						var ch  = ptr.dereference(provider);
 						element = u.make(provider, ch, componentIOType);
 					}
-					dest.accept(element);
+					generator.add(element);
 				}
-				return end.get();
+				return generator.export();
 			}
 			
 			var pip = StandardStructPipe.of(struct);
@@ -595,9 +589,9 @@ public abstract class DynamicCollectionSupport{
 				else{
 					element = pip.readNew(provider, src, genericContext);
 				}
-				dest.accept(element);
+				generator.add(element);
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		//noinspection unchecked
@@ -611,9 +605,9 @@ public abstract class DynamicCollectionSupport{
 				else{
 					element = pip.readNew(provider, src, genericContext).get();
 				}
-				dest.accept(element);
+				generator.add(element);
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
@@ -624,13 +618,59 @@ public abstract class DynamicCollectionSupport{
 				else{
 					element = readCollection(componentIOType, provider, src, genericContext);
 				}
-				dest.accept(element);
+				generator.add(element);
 			}
-			return end.get();
+			return generator.export();
 		}
 		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
 	}
+	
+	private static Generator createGenerator(CollectionInfo res, BitInputStream toClose){
+		return switch(res){
+			case CollectionInfo.ListInfo v -> {
+				var     list = new ArrayList<>(res.length());
+				boolean fin  = v.isUnmodifiable();
+				yield new Generator(){
+					@Override
+					public void add(Object element){ list.add(element); }
+					@Override
+					public Object export() throws IOException{
+						if(toClose != null){
+							toClose.close();
+						}
+						
+						if(fin){
+							return List.copyOf(list);
+						}
+						return list;
+					}
+				};
+			}
+			case CollectionInfo.ArrayInfo v -> {
+				var ct  = v.getArrayType().componentType();
+				var arr = (Object[])Array.newInstance(ct, res.length());
+				yield new Generator(){
+					private int i;
+					@Override
+					public void add(Object element){ arr[i++] = element; }
+					@Override
+					public Object export() throws IOException{
+						if(toClose != null) toClose.close();
+						return arr;
+					}
+				};
+			}
+			case CollectionInfo.NullValue ignore -> new Generator(){
+				@Override
+				public void add(Object element){ throw new UnsupportedOperationException(); }
+				@Override
+				public Object export(){ return null; }
+			};
+			case CollectionInfo.PrimitiveArrayInfo ignore -> { throw new ShouldNeverHappenError(); }
+		};
+	}
+	
 	private static Object readPrimitiveArray(ContentReader src, int len, SupportedPrimitive pTyp) throws IOException{
 		return switch(pTyp){
 			case DOUBLE -> src.readFloats8(len);
@@ -664,52 +704,52 @@ public abstract class DynamicCollectionSupport{
 			case BYTE -> src.readInts1(len);
 		};
 	}
-	private static void readPrimitiveCollection(ContentReader src, int len, SupportedPrimitive pTyp, Consumer<Object> dest) throws IOException{
+	private static void readPrimitiveCollection(ContentReader src, int len, SupportedPrimitive pTyp, Generator dest) throws IOException{
 		switch(pTyp){
 			case null -> throw new NullPointerException();
 			case DOUBLE -> {
 				for(double v : src.readFloats8(len)){
-					dest.accept(v);
+					dest.add(v);
 				}
 			}
 			case FLOAT -> {
 				for(float v : src.readFloats4(len)){
-					dest.accept(v);
+					dest.add(v);
 				}
 			}
 			case BOOLEAN -> {
 				try(var bitIn = new BitInputStream(src, len)){
 					for(boolean b : bitIn.readBits(new boolean[len])){
-						dest.accept(b);
+						dest.add(b);
 					}
 				}
 			}
 			case LONG -> {
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<len; i++){
-					dest.accept(siz.read(src));
+					dest.add(siz.read(src));
 				}
 			}
 			case INT -> {
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr = new int[len];
 				for(int i = 0; i<arr.length; i++){
-					dest.accept(siz.readInt(src));
+					dest.add(siz.readInt(src));
 				}
 			}
 			case SHORT -> {
 				for(short i : src.readInts2(len)){
-					dest.accept(i);
+					dest.add(i);
 				}
 			}
 			case CHAR -> {
 				for(char c : src.readChars2(len)){
-					dest.accept(c);
+					dest.add(c);
 				}
 			}
 			case BYTE -> {
 				for(byte b : src.readInts1(len)){
-					dest.accept(b);
+					dest.add(b);
 				}
 			}
 		}
