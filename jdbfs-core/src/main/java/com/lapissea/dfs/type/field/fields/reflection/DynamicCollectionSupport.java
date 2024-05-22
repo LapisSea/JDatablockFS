@@ -9,7 +9,6 @@ import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentInputStream;
-import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -27,7 +26,6 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -38,6 +36,7 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -52,6 +51,16 @@ import java.util.stream.LongStream;
 
 
 public abstract class DynamicCollectionSupport{
+	
+	private interface Generator{
+		void add(Object element);
+		Object export() throws IOException;
+	}
+	
+	private static int calcNullBufferSize(CollectionInfo res){
+		return res.hasNulls()? BitUtils.bitsToBytes(res.length()) : 0;
+	}
+	
 	
 	private static long primitiveSiz(Object val, CollectionInfo info, SupportedPrimitive pTyp){
 		int actualElements;
@@ -89,7 +98,6 @@ public abstract class DynamicCollectionSupport{
 			case BYTE -> actualElements;
 		};
 	}
-	
 	private static Object primitiveRead(ContentReader src, CollectionInfo info, SupportedPrimitive pTyp, byte[] nullBufferBytes) throws IOException{
 		
 		if(info instanceof CollectionInfo.PrimitiveArrayInfo primitive){
@@ -136,7 +144,6 @@ public abstract class DynamicCollectionSupport{
 		}
 		return generator.export();
 	}
-	
 	private static void primitiveWrite(ContentWriter dest, Object val, CollectionInfo info, SupportedPrimitive pTyp) throws IOException{
 		if(info instanceof CollectionInfo.PrimitiveArrayInfo){
 			writePrimitiveArray(dest, val, info.length(), pTyp);
@@ -147,6 +154,236 @@ public abstract class DynamicCollectionSupport{
 			}else{
 				writePrimitiveCollection(dest, info.iter(val), info.length(), pTyp);
 			}
+		}
+	}
+	
+	private static long dynamicSiz(DataProvider prov, Object val, CollectionInfo res){
+		long sum = calcNullBufferSize(res);
+		for(var el : res.iter(val).filtered(Objects::nonNull)){
+			int id;
+			try{
+				id = prov.getTypeDb().objToID(el, false).val();
+			}catch(IOException ex){
+				throw new UncheckedIOException("Failed to compute type ID", ex);
+			}
+			sum += 1 + NumberSize.bySizeSigned(id).bytes;
+			sum += DynamicSupport.calcSize(prov, el);
+		}
+		return sum;
+	}
+	private static Object dynamicRead(DataProvider provider, ContentReader src, GenericContext genericContext, CollectionInfo info, byte[] nullBufferBytes) throws IOException{
+		var len        = info.length();
+		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+		var generator  = createGenerator(info, nullBuffer);
+		
+		var db = provider.getTypeDb();
+		for(int i = 0; i<len; i++){
+			boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+			Object  element;
+			if(!hasVal) element = null;
+			else{
+				var id   = src.readUnsignedInt4Dynamic();
+				var type = db.fromID(id);
+				element = DynamicSupport.readTyp(type, provider, src, genericContext);
+			}
+			generator.add(element);
+		}
+		return generator.export();
+	}
+	private static void dynamicWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo info) throws IOException{
+		var db = provider.getTypeDb();
+		for(var el : info.iter(val).filtered(Objects::nonNull)){
+			var id = db.objToID(el);
+			dest.writeUnsignedInt4Dynamic(id);
+			DynamicSupport.writeValue(provider, dest, el);
+		}
+	}
+	
+	private static long enumSiz(CollectionInfo res){
+		//noinspection unchecked,rawtypes
+		var info = EnumUniverse.of((Class<Enum>)res.constantType());
+		return BitUtils.bitsToBytes(info.getBitSize(res.hasNulls())*(long)res.length());
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static Object enumRead(ContentReader src, CollectionInfo res) throws IOException{
+		var universe  = EnumUniverse.of((Class<Enum>)res.constantType());
+		var nullable  = res.hasNulls();
+		var len       = res.length();
+		var generator = createGenerator(res, null);
+		try(var bits = new BitInputStream(src, universe.getBitSize(nullable)*(long)len)){
+			for(int i = 0; i<len; i++){
+				generator.add(bits.readEnum(universe, nullable));
+			}
+		}
+		return generator.export();
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void enumWrite(ContentWriter dest, Object val, CollectionInfo res) throws IOException{
+		var info = EnumUniverse.of((Class<Enum>)res.constantType());
+		try(var stream = new BitOutputStream(dest)){
+			var nullable = res.hasNulls();
+			for(var e : (Iterable<Enum>)res.iter(val)){
+				stream.writeEnum(info, e, nullable);
+			}
+		}
+	}
+	
+	private static long instanceSiz(DataProvider prov, Object val, CollectionInfo res){
+		var struct = Struct.ofUnknown(res.constantType());
+		
+		var nullBufferBytes = calcNullBufferSize(res);
+		
+		if(struct instanceof Struct.Unmanaged){
+			long sum = nullBufferBytes;
+			for(var uInst : (IterablePP<IOInstance.Unmanaged<?>>)res.iter(val)){
+				if(uInst == null) continue;
+				sum += ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, uInst.getPointer(), WordSpace.BYTE);
+			}
+			return sum;
+		}
+		
+		if(res.layout() == CollectionInfo.Layout.STRUCT_OF_ARRAYS){
+			throw new NotImplementedException("SOA not implemented yet");//TODO
+		}
+		
+		StructPipe pip = StandardStructPipe.of(struct);
+		
+		if(pip.getSizeDescriptor().hasFixed()){
+			int nnCount;
+			if(res.hasNulls()){
+				nnCount = 0;
+				for(var inst : res.iter(val)){
+					if(inst == null) continue;
+					nnCount++;
+				}
+			}else nnCount = res.length();
+			
+			return nullBufferBytes + pip.getSizeDescriptor().requireFixed(WordSpace.BYTE)*nnCount;
+		}
+		
+		long sum = nullBufferBytes;
+		for(var inst : res.iter(val)){
+			if(inst == null) continue;
+			sum += pip.calcUnknownSize(prov, inst, WordSpace.BYTE);
+		}
+		return sum;
+	}
+	private static Object instanceRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, GenericContext genericContext) throws IOException{
+		var componentIOType = IOType.of(res.constantType());
+		
+		var len        = res.length();
+		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+		var generator  = createGenerator(res, nullBuffer);
+		var struct     = Struct.ofUnknown(res.constantType());
+		if(struct instanceof Struct.Unmanaged<?> u){
+			for(int i = 0; i<len; i++){
+				boolean                 hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+				IOInstance.Unmanaged<?> element;
+				if(!hasVal) element = null;
+				else{
+					var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
+					var ch  = ptr.dereference(provider);
+					element = u.make(provider, ch, componentIOType);
+				}
+				generator.add(element);
+			}
+			return generator.export();
+		}
+		
+		var pip = StandardStructPipe.of(struct);
+		for(int i = 0; i<len; i++){
+			boolean       hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+			IOInstance<?> element;
+			if(!hasVal) element = null;
+			else{
+				element = pip.readNew(provider, src, genericContext);
+			}
+			generator.add(element);
+		}
+		return generator.export();
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void instanceWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
+		var iter   = res.iter(val).filtered(Objects::nonNull);
+		var struct = Struct.ofUnknown(res.constantType());
+		if(struct instanceof Struct.Unmanaged){
+			for(var uInst : (Iterable<IOInstance.Unmanaged<?>>)iter){
+				ChunkPointer.DYN_PIPE.write(provider, dest, uInst.getPointer());
+			}
+			return;
+		}
+		
+		StructPipe pip = StandardStructPipe.of(struct);
+		for(var inst : (Iterable<IOInstance<?>>)iter){
+			pip.write(provider, dest, inst);
+		}
+	}
+	
+	private static long wrapperSiz(DataProvider provider, Object val, CollectionInfo res, WrapperStructs.WrapperRes<Object> wrapperType){
+		var  pip  = StandardStructPipe.of(wrapperType.struct());
+		var  ctor = wrapperType.constructor();
+		long sum  = calcNullBufferSize(res);
+		for(var inst : res.iter(val)){
+			if(inst == null) continue;
+			sum += pip.calcUnknownSize(provider, ctor.apply(inst), WordSpace.BYTE);
+		}
+		return sum;
+	}
+	private static Object wrapperRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, WrapperStructs.WrapperRes<Object> wrapperType) throws IOException{
+		var len        = res.length();
+		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+		var generator  = createGenerator(res, nullBuffer);
+		var pip        = StandardStructPipe.of(wrapperType.struct());
+		for(int i = 0; i<len; i++){
+			boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+			Object  element;
+			if(!hasVal) element = null;
+			else{
+				element = pip.readNew(provider, src, null).get();
+			}
+			generator.add(element);
+		}
+		return generator.export();
+	}
+	private static void wrapperWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res, WrapperStructs.WrapperRes<Object> wrapperType) throws IOException{
+		var pip  = StandardStructPipe.of(wrapperType.struct());
+		var ctor = wrapperType.constructor();
+		for(var inst : res.iter(val).filtered(Objects::nonNull)){
+			pip.write(provider, dest, ctor.apply(inst));
+		}
+	}
+	
+	private static OptionalLong collectionSiz(DataProvider provider, Object val, CollectionInfo res){
+		long sum = calcNullBufferSize(res);
+		for(var e : res.iter(val).filtered(Objects::nonNull)){
+			var eRes = CollectionInfoAnalysis.analyze(e);
+			if(eRes == null) return OptionalLong.empty();
+			sum += calcCollectionSize(provider, e, eRes);
+		}
+		return OptionalLong.of(sum);
+	}
+	private static Object collectionRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, GenericContext genericContext) throws IOException{
+		var componentIOType = IOType.of(res.constantType());
+		
+		var len        = res.length();
+		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
+		var generator  = createGenerator(res, nullBuffer);
+		for(int i = 0; i<len; i++){
+			boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
+			Object  element;
+			if(!hasVal) element = null;
+			else{
+				element = readCollection(componentIOType, provider, src, genericContext);
+			}
+			generator.add(element);
+		}
+		return generator.export();
+	}
+	private static void collectionWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
+		for(var e : res.iter(val).filtered(Objects::nonNull)){
+			var eRes = CollectionInfoAnalysis.analyze(e);
+			Objects.requireNonNull(eRes);
+			writeCollection(provider, dest, e, eRes);
 		}
 	}
 	
@@ -163,101 +400,35 @@ public abstract class DynamicCollectionSupport{
 				return infoBytes;
 			}
 			case DYNAMIC -> {
-				long sum = infoBytes + calcNullBufferSize(res);
-				for(var el : res.iter(val).filtered(Objects::nonNull)){
-					int id;
-					try{
-						id = prov.getTypeDb().objToID(el, false).val();
-					}catch(IOException ex){
-						throw new UncheckedIOException("Failed to compute type ID", ex);
-					}
-					sum += 1 + NumberSize.bySizeSigned(id).bytes;
-					sum += DynamicSupport.calcSize(prov, el);
-				}
-				return sum;
+				return infoBytes + dynamicSiz(prov, val, res);
 			}
 		}
 		
-		
-		OptionalPP<SupportedPrimitive> primitiveO = SupportedPrimitive.get(constType);
-		if(primitiveO.isPresent()){
-			return infoBytes + primitiveSiz(val, res, primitiveO.get());
+		var primitiveType = SupportedPrimitive.get(constType);
+		if(primitiveType.isPresent()){
+			return infoBytes + primitiveSiz(val, res, primitiveType.get());
 		}
 		
 		if(constType.isEnum()){
-			//noinspection rawtypes
-			var info = EnumUniverse.of((Class<Enum>)constType);
-			return infoBytes + BitUtils.bitsToBytes(info.getBitSize(res.hasNulls())*(long)len);
+			return infoBytes + enumSiz(res);
 		}
 		
-		var nullBufferBytes = calcNullBufferSize(res);
-		
 		if(IOInstance.isInstance(constType)){
-			var struct = Struct.ofUnknown(constType);
-			if(struct instanceof Struct.Unmanaged){
-				long sum = infoBytes + nullBufferBytes;
-				for(var uInst : (IterablePP<IOInstance.Unmanaged<?>>)res.iter(val)){
-					if(uInst == null) continue;
-					sum += ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, uInst.getPointer(), WordSpace.BYTE);
-				}
-				return sum;
-			}
-			
-			if(res.layout() == CollectionInfo.Layout.STRUCT_OF_ARRAYS){
-				throw new NotImplementedException("SOA not implemented yet");//TODO
-			}
-			
-			StructPipe pip = StandardStructPipe.of(struct);
-			
-			if(pip.getSizeDescriptor().hasFixed()){
-				int nnCount;
-				if(res.hasNulls()){
-					nnCount = 0;
-					for(var inst : res.iter(val)){
-						if(inst == null) continue;
-						nnCount++;
-					}
-				}else nnCount = len;
-				
-				return infoBytes + nullBufferBytes + pip.getSizeDescriptor().requireFixed(WordSpace.BYTE)*nnCount;
-			}
-			
-			long sum = infoBytes + nullBufferBytes;
-			for(var inst : res.iter(val)){
-				if(inst == null) continue;
-				sum += pip.calcUnknownSize(prov, inst, WordSpace.BYTE);
-			}
-			return sum;
+			return infoBytes + instanceSiz(prov, val, res);
 		}
 		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
 		if(wrapperType != null){
-			var  pip  = StandardStructPipe.of(wrapperType.struct());
-			var  ctor = wrapperType.constructor();
-			long sum  = infoBytes + nullBufferBytes;
-			for(var inst : res.iter(val)){
-				if(inst == null) continue;
-				sum += pip.calcUnknownSize(prov, ctor.apply(inst), WordSpace.BYTE);
-			}
-			return sum;
+			return infoBytes + wrapperSiz(prov, val, res, wrapperType);
 		}
 		
-		nestedCollection:
-		{
-			long sum = infoBytes + nullBufferBytes;
-			for(var e : res.iter(val).filtered(Objects::nonNull)){
-				var eRes = CollectionInfoAnalysis.analyze(e);
-				if(eRes == null) break nestedCollection;
-				sum += calcCollectionSize(prov, e, eRes);
-			}
-			return sum;
+		var siz = collectionSiz(prov, val, res);
+		if(siz.isPresent()){
+			return infoBytes + siz.getAsLong();
 		}
 		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + TextUtil.toString(val));
-	}
-	private static int calcNullBufferSize(CollectionInfo res){
-		return res.hasNulls()? BitUtils.bitsToBytes(res.length()) : 0;
 	}
 	
 	static void writeCollection(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
@@ -266,25 +437,19 @@ public abstract class DynamicCollectionSupport{
 		
 		var constType = res.constantType();
 		if(res.hasNulls() && !(constType != null && constType.isEnum())){
-			var buf = new ContentOutputBuilder();
-			try(var stream = new BitOutputStream(buf)){
+			try(var stream = new BitOutputStream(dest)){
 				for(var e : res.iter(val)){
 					var b = e != null;
 					stream.writeBoolBit(b);
 				}
 			}
-			buf.writeTo(dest);
 		}
 		
 		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
-			var db = provider.getTypeDb();
-			for(var el : res.iter(val).filtered(Objects::nonNull)){
-				var id = db.objToID(el);
-				dest.writeUnsignedInt4Dynamic(id);
-				DynamicSupport.writeValue(provider, dest, el);
-			}
+			dynamicWrite(provider, dest, val, res);
 			return;
 		}
+		
 		assert constType != null;
 		
 		var pTypO = SupportedPrimitive.get(constType);
@@ -295,51 +460,23 @@ public abstract class DynamicCollectionSupport{
 		}
 		
 		if(constType.isEnum()){
-			//noinspection rawtypes
-			var info = EnumUniverse.of((Class<Enum>)constType);
-			try(var stream = new BitOutputStream(dest)){
-				var nullable = res.hasNulls();
-				for(var e : (Iterable<Enum>)res.iter(val).filtered(Objects::nonNull)){
-					stream.writeEnum(info, e, nullable);
-				}
-			}
+			enumWrite(dest, val, res);
 			return;
 		}
 		
 		if(IOInstance.isInstance(constType)){
-			var iter   = res.iter(val).filtered(Objects::nonNull);
-			var struct = Struct.ofUnknown(constType);
-			if(struct instanceof Struct.Unmanaged){
-				for(var uInst : (Iterable<IOInstance.Unmanaged<?>>)iter){
-					ChunkPointer.DYN_PIPE.write(provider, dest, uInst.getPointer());
-				}
-				return;
-			}
-			
-			StructPipe pip = StandardStructPipe.of(struct);
-			for(var inst : (Iterable<IOInstance<?>>)iter){
-				pip.write(provider, dest, inst);
-			}
+			instanceWrite(provider, dest, val, res);
 			return;
 		}
 		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
 		if(wrapperType != null){
-			var pip  = StandardStructPipe.of(wrapperType.struct());
-			var ctor = wrapperType.constructor();
-			for(var inst : res.iter(val)){
-				if(inst == null) continue;
-				pip.write(provider, dest, ctor.apply(inst));
-			}
+			wrapperWrite(provider, dest, val, res, wrapperType);
 			return;
 		}
 		
-		for(var e : res.iter(val).filtered(Objects::nonNull)){
-			var eRes = CollectionInfoAnalysis.analyze(e);
-			if(eRes == null) throw new ShouldNeverHappenError("Case not handled for " + res + " with " + val);
-			writeCollection(provider, dest, e, eRes);
-		}
+		collectionWrite(provider, dest, val, res);
 	}
 	
 	private static void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
@@ -481,11 +618,6 @@ public abstract class DynamicCollectionSupport{
 	}
 	
 	
-	private interface Generator{
-		void add(Object element);
-		Object export() throws IOException;
-	}
-	
 	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
 		if(!CollectionInfoAnalysis.isTypeCollection(typ)){
@@ -519,10 +651,9 @@ public abstract class DynamicCollectionSupport{
 			nullBufferBytes = null;
 		}
 		
-		Generator generator = createGenerator(res, nullBuffer);
-		if(res.length() == 0) return generator.export();
 		
 		if(layout == CollectionInfo.Layout.JUST_NULLS){
+			var generator = createGenerator(res, null);
 			for(int i = 0, l = res.length(); i<l; i++){
 				generator.add(null);
 			}
@@ -530,97 +661,32 @@ public abstract class DynamicCollectionSupport{
 		}
 		
 		if(layout == CollectionInfo.Layout.DYNAMIC){
-			var db = provider.getTypeDb();
-			for(int i = 0; i<len; i++){
-				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
-				Object  element;
-				if(!hasVal) element = null;
-				else{
-					var id   = src.readUnsignedInt4Dynamic();
-					var type = db.fromID(id);
-					element = DynamicSupport.readTyp(type, provider, src, genericContext);
-				}
-				generator.add(element);
-			}
-			return generator.export();
+			return dynamicRead(provider, src, genericContext, res, nullBufferBytes);
 		}
 		
 		assert componentType != null;
 		
 		var pTypO = SupportedPrimitive.get(componentType);
 		if(pTypO.isPresent()){
-			var pTyp = pTypO.get();
-			return primitiveRead(src, res, pTyp, nullBufferBytes);
+			return primitiveRead(src, res, pTypO.get(), nullBufferBytes);
 		}
 		
 		if(componentType.isEnum()){
-			var universe = EnumUniverse.ofUnknown(componentType);
-			var nullable = res.hasNulls();
-			try(var bits = new BitInputStream(src, universe.getBitSize(nullable)*(long)len)){
-				for(int i = 0; i<len; i++){
-					generator.add(bits.readEnum(universe, nullable));
-				}
-			}
-			return generator.export();
+			return enumRead(src, res);
 		}
 		
 		if(IOInstance.isInstance(componentType)){
-			var struct = Struct.ofUnknown(componentType);
-			if(struct instanceof Struct.Unmanaged<?> u){
-				for(int i = 0; i<len; i++){
-					boolean                 hasVal = nullBuffer == null || nullBuffer.readBoolBit();
-					IOInstance.Unmanaged<?> element;
-					if(!hasVal) element = null;
-					else{
-						var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
-						var ch  = ptr.dereference(provider);
-						element = u.make(provider, ch, componentIOType);
-					}
-					generator.add(element);
-				}
-				return generator.export();
-			}
-			
-			var pip = StandardStructPipe.of(struct);
-			for(int i = 0; i<len; i++){
-				boolean       hasVal = nullBuffer == null || nullBuffer.readBoolBit();
-				IOInstance<?> element;
-				if(!hasVal) element = null;
-				else{
-					element = pip.readNew(provider, src, genericContext);
-				}
-				generator.add(element);
-			}
-			return generator.export();
+			return instanceRead(provider, src, res, nullBufferBytes, genericContext);
 		}
 		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)componentType);
 		if(wrapperType != null){
-			var pip = StandardStructPipe.of(wrapperType.struct());
-			for(int i = 0; i<len; i++){
-				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
-				Object  element;
-				if(!hasVal) element = null;
-				else{
-					element = pip.readNew(provider, src, genericContext).get();
-				}
-				generator.add(element);
-			}
-			return generator.export();
+			return wrapperRead(provider, src, res, nullBufferBytes, wrapperType);
 		}
 		
 		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
-			for(int i = 0; i<len; i++){
-				boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
-				Object  element;
-				if(!hasVal) element = null;
-				else{
-					element = readCollection(componentIOType, provider, src, genericContext);
-				}
-				generator.add(element);
-			}
-			return generator.export();
+			return collectionRead(provider, src, res, nullBufferBytes, genericContext);
 		}
 		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
