@@ -29,7 +29,6 @@ import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
@@ -39,6 +38,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayDeque;
@@ -385,7 +385,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					if(runNow) lock.getLock().lock();
 				}
 				
-				STRUCT_CACHE.put(instanceClass, struct);
+				var old = STRUCT_CACHE.put(instanceClass, struct);
+				assert old == null;
 			}catch(MalformedStruct e){
 				e.addSuppressed(new MalformedStruct("Failed to compile " + instanceClass.getName()));
 				throw e;
@@ -400,7 +401,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				var impl = struct.getConcreteType();
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					STRUCT_CACHE.put(impl, struct);
+					var old = STRUCT_CACHE.put(impl, struct);
+					assert old == null;
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
 				}
 			}catch(Throwable ignored){ }
@@ -424,20 +426,35 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return struct;
 	}
 	
+	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE     = Map.of();
+	private static int                                          stableCacheCount = 0;
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		class StableCache{
-			private static Map<Class<?>, Struct<?>> CACHE = new WeakValueHashMap<>();
+		var stableRefs = STABLE_CACHE.get(instanceClass.hashCode());
+		if(stableRefs != null){
+			for(var ref : stableRefs){
+				Struct<?> val = ref.get();
+				if(val == null) continue;
+				if(val.getType() == instanceClass || val.getConcreteType() == instanceClass){
+					return (Struct<T>)val;
+				}
+			}
 		}
-		
-		Struct<T> stable = (Struct<T>)StableCache.CACHE.get(instanceClass);
-		if(stable != null) return stable;
 		
 		Struct<T> cached;
 		try(var lock = STRUCT_CACHE_LOCK.read()){
 			cached = getCachedUnsafe(instanceClass, lock.getLock());
 			if(cached == null) return null;
 			
-			if(Rand.b(0.2F)) StableCache.CACHE = new WeakValueHashMap<>(STRUCT_CACHE);
+			if((stableCacheCount++>=200)){
+				stableCacheCount = 0;
+				STABLE_CACHE =
+					STRUCT_CACHE.entrySet().stream().collect(Collectors.groupingBy(e -> e.getKey().hashCode()))
+					            .entrySet().stream().collect(Collectors.toUnmodifiableMap(
+						            Map.Entry::getKey,
+						            e -> List.copyOf(e.getValue().stream().map(Map.Entry::getValue)
+						                              .<WeakReference<Struct<?>>>map(WeakReference::new).collect(Collectors.toList()))
+					            ));
+			}
 		}
 		return cached;
 	}
