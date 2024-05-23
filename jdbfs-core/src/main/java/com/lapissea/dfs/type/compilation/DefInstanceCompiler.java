@@ -9,7 +9,6 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.CompilationTools.FieldStub;
 import com.lapissea.dfs.type.compilation.CompilationTools.Style;
@@ -394,16 +393,6 @@ public final class DefInstanceCompiler{
 				case null -> throw new ShouldNeverHappenError();
 				case NEW -> {
 					compileNode(node);
-					
-					StagedInit.runBaseStageTask(() -> {
-						try{
-							//Eagerly load struct
-							Struct.of(node.impl, StagedInit.STATE_DONE);
-						}catch(Throwable e){
-							Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e.getMessage());
-						}
-					});
-					
 					yield node;
 				}
 				case COMPILING -> throw new MalformedStruct("Type requires itself to compile");

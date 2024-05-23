@@ -199,9 +199,47 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private boolean wait = true;
 	}
 	
-	private static final ReadWriteClosableLock STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
+	private static final ReadWriteClosableLock    STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
+	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE      = new WeakValueHashMap<Class<?>, Struct<?>>().defineStayAlivePolicy(Log.TRACE? 5 : 0);
 	
-	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<Class<?>, Struct<?>>().defineStayAlivePolicy(Log.TRACE? 5 : 0);
+	static{
+		/*
+		var name        = "Break glass in case of deadlock emergency";
+		var panicTimeMs = 5000;
+		Thread.ofPlatform().name(name).start(() -> {
+			UtilL.sleep(panicTimeMs);
+			record info(String name, String trace){ }
+			var relevantPackageScope = Arrays.stream(Struct.class.getPackageName().split("\\.")).limit(2).map(p -> p + ".").collect(Collectors.joining());
+			LogUtil.println(
+				jdk.internal.vm.ThreadContainers
+					.root()
+					.threads().filter(t -> !t.getName().equals(name))
+					.map(t -> new info(
+						(t.isVirtual()? "V-" : "P-") + t.getName(),
+						Arrays.stream(t.getStackTrace()).map(l -> "\t" + l).collect(Collectors.joining("\n"))
+					))
+					.filter(i -> i.trace.contains(relevantPackageScope))
+					.collect(Collectors.groupingBy(i -> i.trace))
+					.values().stream()
+					.sorted(Comparator.comparing(l -> l.getFirst().name))
+					.map(t -> t.stream().map(i -> i.name).collect(Collectors.joining(", ")) + "\n" + t.getFirst().trace)
+					.collect(Collectors.joining("\n\n"))
+			);
+		});
+		*/
+		
+		Thread.ofVirtual().name("Struct.cache-flush").start(() -> {
+			try{
+				while(true){
+					Thread.sleep(500);
+					try(var lock = STRUCT_CACHE_LOCK.write()){
+						STRUCT_CACHE.remove(null);
+					}
+				}
+			}catch(InterruptedException ignore){ }
+		});
+	}
+	
 	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
 	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG = new HashMap<>();
 	
@@ -355,8 +393,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		boolean needsImpl = IOInstance.Def.isDefinition(instanceClass);
 		
-		if(!needsImpl && Modifier.isAbstract(instanceClass.getModifiers())){
-			throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
+		if(!needsImpl){
+			if(Modifier.isAbstract(instanceClass.getModifiers())){
+				throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
+			}
+			if(instanceClass.getName().endsWith(IOInstance.Def.IMPL_NAME_POSTFIX) && UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+				var unmapped = IOInstance.Def.unmap((Class<? extends IOInstance.Def<?>>)instanceClass);
+				if(unmapped.isPresent()){
+					return compile((Class<T>)unmapped.get(), newStruct, runNow);
+				}
+			}
 		}
 		
 		S struct;
@@ -401,9 +447,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				var impl = struct.getConcreteType();
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					var old = STRUCT_CACHE.put(impl, struct);
-					assert old == null;
+					var hadOld = STRUCT_CACHE.put(impl, struct) != null;
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
+					if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 				}
 			}catch(Throwable ignored){ }
 		}, null);
