@@ -83,7 +83,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Target({ElementType.TYPE})
 	public @interface Special{ }
 	
-	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
+	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
 		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
 			P make(Struct<T> type, boolean runNow);

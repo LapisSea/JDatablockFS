@@ -460,10 +460,12 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			io.trim();
 		}
-		if(DEBUG_VALIDATION){
-			T v;
-			assert Objects.equals(value, v = getValue()) :
-				"\n" + value + " != \n" + v;
+		if(DEBUG_VALIDATION) checkSetValue(value);
+	}
+	private void checkSetValue(T value) throws IOException{
+		T v = getValue();
+		if(!Objects.equals(value, v)){
+			throw new AssertionError("\n" + value + " != \n" + v);
 		}
 	}
 	

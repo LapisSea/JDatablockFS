@@ -3,12 +3,13 @@ package com.lapissea.dfs.io.bit;
 import com.lapissea.dfs.exceptions.IllegalBitValue;
 import com.lapissea.dfs.io.content.ContentReader;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 import static com.lapissea.dfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.dfs.io.bit.BitUtils.makeMask;
 
-public class BitInputStream implements BitReader, AutoCloseable{
+public class BitInputStream implements BitReader, Closeable{
 	
 	private final ContentReader source;
 	

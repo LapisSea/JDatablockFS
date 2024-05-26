@@ -305,16 +305,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
-		@SuppressWarnings("unchecked")
 		public boolean equals(Object o){
-			if(this == o) return true;
+			if(o == null || o.getClass() != this.getClass()){
+				return false;
+			}
 			
-			if(!(o instanceof IOInstance<?> that)) return false;
-			var struct = getThisStruct();
-			if(that.getThisStruct() != struct) return false;
+			//noinspection unchecked
+			SELF dis = (SELF)this, that = (SELF)o;
 			
-			for(var field : struct.getRealFields()){
-				if(!field.instancesEqual(null, self(), null, (SELF)that)) return false;
+			for(var field : getThisStruct().getRealFields()){
+				if(!field.instancesEqual(null, dis, null, that)){
+					return false;
+				}
 			}
 			
 			return true;
