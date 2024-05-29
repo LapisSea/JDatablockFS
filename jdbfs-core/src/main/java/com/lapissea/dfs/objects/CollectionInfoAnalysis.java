@@ -1,9 +1,11 @@
 package com.lapissea.dfs.objects;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.CollectionInfo.ArrayInfo;
 import com.lapissea.dfs.objects.CollectionInfo.Layout;
 import com.lapissea.dfs.objects.CollectionInfo.ListInfo;
 import com.lapissea.dfs.objects.CollectionInfo.PrimitiveArrayInfo;
+import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.IterablePP;
@@ -11,6 +13,7 @@ import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -20,7 +23,7 @@ import java.util.Set;
 
 public abstract class CollectionInfoAnalysis{
 	
-	private static final Set<Class<?>> UNMODIFIABLE_LISTS;
+	private static final Set<Type> UNMODIFIABLE_LISTS;
 	
 	static{
 		List<Class<?>> ul = new ArrayList<>(22);
@@ -69,24 +72,31 @@ public abstract class CollectionInfoAnalysis{
 		return new ListInfo(list.size(), result.constType(), result.layout(), result.hasNulls(), unMod);
 	}
 	
-	private record ElementsResult(Class<?> constType, boolean hasNulls, Layout layout){ }
+	private record ElementsResult(Type constType, boolean hasNulls, Layout layout){ }
 	private static ElementsResult analyseElements(IterablePP<?> data){
-		Class<?> constType = null;
-		boolean  hasNulls  = false;
-		var      layout    = Layout.STRIPED;
-		boolean  uModList  = false;
+		Type    constType = null;
+		boolean hasNulls  = false;
+		var     layout    = Layout.STRIPED;
+		boolean uModList  = false;
 		
 		for(var el : data){
 			if(el == null){
 				hasNulls = true;
 				continue;
 			}
-			var eTyp = el.getClass();
+			
+			Type eTyp;
+			if(el instanceof IOInstance.Unmanaged<?> u){
+				eTyp = u.getTypeDef().generic(u.getDataProvider().getTypeDb());
+			}else{
+				eTyp = el.getClass();
+			}
+			
 			if(layout != Layout.DYNAMIC){
 				if(constType == null){
 					constType = eTyp;
 					uModList = UNMODIFIABLE_LISTS.contains(eTyp);
-				}else if(constType != eTyp){
+				}else if(!constType.equals(eTyp)){
 					if(uModList && UNMODIFIABLE_LISTS.contains(eTyp)){//Ignore class difference for ulist
 						constType = eTyp;
 						continue;
@@ -98,10 +108,11 @@ public abstract class CollectionInfoAnalysis{
 		}
 		
 		if(constType != null){
-			if(UtilL.instanceOf(constType, List.class)){
+			var constClass = Utils.typeToRaw(constType);
+			if(UtilL.instanceOf(constClass, List.class)){
 				constType = List.class;
 			}else{
-				layout = Struct.tryOf(constType).filter(s -> !(s instanceof Struct.Unmanaged)).map(s -> {
+				layout = Struct.tryOf(constClass).filter(s -> !(s instanceof Struct.Unmanaged)).map(s -> {
 					return switch(IOFieldTools.minWordSpace(s.getFields())){
 						case BIT -> Layout.STRUCT_OF_ARRAYS;
 						case BYTE -> Layout.STRIPED;
@@ -115,7 +126,7 @@ public abstract class CollectionInfoAnalysis{
 			}
 			
 		}else if(layout != Layout.DYNAMIC){
-			assert data.filtered(Objects::nonNull).isEmpty();
+			assert data.allMatch(Objects::isNull);
 			layout = Layout.JUST_NULLS;
 		}
 		

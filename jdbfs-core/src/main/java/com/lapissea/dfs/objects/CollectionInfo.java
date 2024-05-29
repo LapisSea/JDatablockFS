@@ -19,6 +19,7 @@ import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.function.Function;
 
@@ -52,7 +53,7 @@ public sealed interface CollectionInfo{
 		static final NullValue INSTANCE = new NullValue();
 		
 		@Override
-		public Class<?> constantType(){ return null; }
+		public Type constantType(){ return null; }
 		@Override
 		public int length(){ return 0; }
 		@Override
@@ -115,18 +116,18 @@ public sealed interface CollectionInfo{
 		
 		@IOValue.Unsigned
 		@IODependency.VirtualNumSize
-		private int      length;
+		private int     length;
 		@IONullability(NULLABLE)
 		@IOUnsafeValue
-		private Class<?> constantType;
-		private Layout   layout;
-		private boolean  hasNulls;
+		private Type    constantType;
+		private Layout  layout;
+		private boolean hasNulls;
 		
 		@IOUnsafeValue
 		private Class<?> arrayType;
 		
 		public ArrayInfo(){ }
-		public ArrayInfo(Class<?> arrayType, int length, Class<?> constantType, Layout layout, boolean hasNulls){
+		public ArrayInfo(Class<?> arrayType, int length, Type constantType, Layout layout, boolean hasNulls){
 			this.length = length;
 			this.constantType = constantType;
 			this.layout = layout;
@@ -135,7 +136,7 @@ public sealed interface CollectionInfo{
 		}
 		
 		@Override
-		public Class<?> constantType(){ return constantType; }
+		public Type constantType(){ return constantType; }
 		@Override
 		public int length(){ return length; }
 		@Override
@@ -166,17 +167,17 @@ public sealed interface CollectionInfo{
 		
 		@IOValue.Unsigned
 		@IODependency.VirtualNumSize
-		private int      length;
+		private int     length;
 		@IONullability(NULLABLE)
 		@IOUnsafeValue
-		private Class<?> constantType;
-		private Layout   layout;
-		private boolean  hasNulls;
+		private Type    constantType;
+		private Layout  layout;
+		private boolean hasNulls;
 		
 		private boolean unmodifiable;
 		
 		public ListInfo(){ }
-		public ListInfo(int length, Class<?> constantType, Layout layout, boolean hasNulls, boolean unmodifiable){
+		public ListInfo(int length, Type constantType, Layout layout, boolean hasNulls, boolean unmodifiable){
 			this.length = length;
 			this.constantType = constantType;
 			this.layout = layout;
@@ -185,7 +186,7 @@ public sealed interface CollectionInfo{
 		}
 		
 		@Override
-		public Class<?> constantType(){ return constantType; }
+		public Type constantType(){ return constantType; }
 		@Override
 		public int length(){ return length; }
 		@Override
@@ -209,7 +210,7 @@ public sealed interface CollectionInfo{
 		}
 	}
 	
-	Class<?> constantType();
+	Type constantType();
 	int length();
 	Layout layout();
 	boolean hasNulls();

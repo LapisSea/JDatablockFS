@@ -1,5 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
@@ -63,9 +64,6 @@ public abstract class DynamicCollectionSupport{
 		var len       = info.length();
 		if(len == 0) return infoBytes;
 		
-		var constType = info.constantType();
-		
-		
 		switch(info.layout()){
 			case JUST_NULLS -> {
 				return infoBytes;
@@ -74,6 +72,8 @@ public abstract class DynamicCollectionSupport{
 				return infoBytes + dynamicSiz(prov, info, val);
 			}
 		}
+		
+		var constType = Utils.typeToRaw(info.constantType());
 		
 		var primitiveType = SupportedPrimitive.get(constType);
 		if(primitiveType.isPresent()){
@@ -110,8 +110,7 @@ public abstract class DynamicCollectionSupport{
 			return;
 		}
 		
-		var constType = info.constantType();
-		assert constType != null;
+		var constType = Utils.typeToRaw(info.constantType());
 		
 		if(constType.isEnum()){
 			enumWrite(dest, info, val);
@@ -160,7 +159,7 @@ public abstract class DynamicCollectionSupport{
 			}
 		}
 		
-		var componentType = res.constantType();
+		var componentType = Utils.typeToRaw(res.constantType());
 		
 		if(componentType.isEnum()){
 			return enumRead(src, res);
