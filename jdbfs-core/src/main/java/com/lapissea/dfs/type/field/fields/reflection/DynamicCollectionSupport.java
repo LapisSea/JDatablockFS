@@ -57,12 +57,140 @@ public abstract class DynamicCollectionSupport{
 		Object export() throws IOException;
 	}
 	
-	private static int calcNullBufferSize(CollectionInfo res){
-		return res.hasNulls()? BitUtils.bitsToBytes(res.length()) : 0;
+	
+	static long calcCollectionSize(DataProvider prov, CollectionInfo info, Object val){
+		var infoBytes = info.calcIOBytes(prov);
+		var len       = info.length();
+		if(len == 0) return infoBytes;
+		
+		var constType = info.constantType();
+		
+		
+		switch(info.layout()){
+			case JUST_NULLS -> {
+				return infoBytes;
+			}
+			case DYNAMIC -> {
+				return infoBytes + dynamicSiz(prov, info, val);
+			}
+		}
+		
+		var primitiveType = SupportedPrimitive.get(constType);
+		if(primitiveType.isPresent()){
+			return infoBytes + primitiveSiz(info, primitiveType.get(), val);
+		}
+		
+		if(constType.isEnum()){
+			return infoBytes + enumSiz(info);
+		}
+		
+		if(IOInstance.isInstance(constType)){
+			return infoBytes + instanceSiz(prov, info, val);
+		}
+		
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
+		if(wrapperType != null){
+			return infoBytes + wrapperSiz(prov, info, wrapperType, val);
+		}
+		
+		var siz = collectionSiz(prov, info, val);
+		if(siz.isPresent()){
+			return infoBytes + siz.getAsLong();
+		}
+		
+		throw new ShouldNeverHappenError("Case not handled for " + info + " with " + TextUtil.toString(val));
+	}
+	static void writeCollection(DataProvider provider, ContentWriter dest, CollectionInfo info, Object val) throws IOException{
+		info.write(provider, dest);
+		if(info.length() == 0 || info.layout() == CollectionInfo.Layout.JUST_NULLS) return;
+		
+		if(info.layout() == CollectionInfo.Layout.DYNAMIC){
+			dynamicWrite(provider, dest, info, val);
+			return;
+		}
+		
+		var constType = info.constantType();
+		assert constType != null;
+		
+		if(constType.isEnum()){
+			enumWrite(dest, info, val);
+			return;
+		}
+		
+		var pTypO = SupportedPrimitive.get(constType);
+		if(pTypO.isPresent()){
+			var pTyp = pTypO.get();
+			primitiveWrite(dest, info, pTyp, val);
+			return;
+		}
+		
+		if(IOInstance.isInstance(constType)){
+			instanceWrite(provider, dest, info, val);
+			return;
+		}
+		
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
+		if(wrapperType != null){
+			wrapperWrite(provider, dest, info, wrapperType, val);
+			return;
+		}
+		
+		collectionWrite(provider, dest, info, val);
+	}
+	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var typ = typDef.getTypeClass(provider.getTypeDb());
+		if(!CollectionInfoAnalysis.isTypeCollection(typ)){
+			throw new IllegalArgumentException(typ + " is not a collection like");
+		}
+		
+		var res = CollectionInfo.read(provider, src);
+		
+		switch(res.layout()){
+			case JUST_NULLS -> {
+				var generator = createGenerator(res, null);
+				for(int i = 0, l = res.length(); i<l; i++){
+					generator.add(null);
+				}
+				return generator.export();
+			}
+			case DYNAMIC -> {
+				return dynamicRead(provider, src, res, genericContext);
+			}
+		}
+		
+		var componentType = res.constantType();
+		
+		if(componentType.isEnum()){
+			return enumRead(src, res);
+		}
+		
+		
+		var pTypO = SupportedPrimitive.get(componentType);
+		if(pTypO.isPresent()){
+			return primitiveRead(src, res, pTypO.get());
+		}
+		
+		if(IOInstance.isInstance(componentType)){
+			return instanceRead(provider, src, res, genericContext);
+		}
+		
+		//noinspection unchecked
+		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)componentType);
+		if(wrapperType != null){
+			return wrapperRead(provider, src, res, wrapperType);
+		}
+		
+		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
+			return collectionRead(provider, src, res, genericContext);
+		}
+		
+		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
 	}
 	
 	
-	private static long primitiveSiz(Object val, CollectionInfo info, SupportedPrimitive pTyp){
+	private static long primitiveSiz(CollectionInfo info, SupportedPrimitive pTyp, Object val){
 		int actualElements;
 		if(!info.hasNulls()) actualElements = info.length();
 		else{
@@ -98,7 +226,7 @@ public abstract class DynamicCollectionSupport{
 			case BYTE -> actualElements;
 		};
 	}
-	private static Object primitiveRead(ContentReader src, CollectionInfo info, SupportedPrimitive pTyp, byte[] nullBufferBytes) throws IOException{
+	private static Object primitiveRead(ContentReader src, CollectionInfo info, SupportedPrimitive pTyp) throws IOException{
 		
 		if(info instanceof CollectionInfo.PrimitiveArrayInfo primitive){
 			var pTypO = SupportedPrimitive.getStrict(primitive.constantType()).orElseThrow(() -> {
@@ -115,6 +243,8 @@ public abstract class DynamicCollectionSupport{
 			return gen.export();
 		}
 		
+		var nullBufferBytes = readNullBuffer(src, info);
+		Objects.requireNonNull(nullBufferBytes);
 		var nullBuffer = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
 		
 		var generator = createGenerator(info, nullBuffer);
@@ -144,11 +274,12 @@ public abstract class DynamicCollectionSupport{
 		}
 		return generator.export();
 	}
-	private static void primitiveWrite(ContentWriter dest, Object val, CollectionInfo info, SupportedPrimitive pTyp) throws IOException{
+	private static void primitiveWrite(ContentWriter dest, CollectionInfo info, SupportedPrimitive pTyp, Object val) throws IOException{
 		if(info instanceof CollectionInfo.PrimitiveArrayInfo){
 			writePrimitiveArray(dest, val, info.length(), pTyp);
 		}else{
 			if(info.hasNulls()){
+				writeNullBuffer(dest, val, info);
 				var iter = info.iter(val).filtered(Objects::nonNull);
 				writePrimitiveCollection(dest, iter, iter.count(), pTyp);
 			}else{
@@ -157,9 +288,10 @@ public abstract class DynamicCollectionSupport{
 		}
 	}
 	
-	private static long dynamicSiz(DataProvider prov, Object val, CollectionInfo res){
-		long sum = calcNullBufferSize(res);
-		for(var el : res.iter(val).filtered(Objects::nonNull)){
+	
+	private static long dynamicSiz(DataProvider prov, CollectionInfo info, Object val){
+		long sum = calcNullBufferSize(info);
+		for(var el : info.iter(val).filtered(Objects::nonNull)){
 			int id;
 			try{
 				id = prov.getTypeDb().objToID(el, false).val();
@@ -171,10 +303,11 @@ public abstract class DynamicCollectionSupport{
 		}
 		return sum;
 	}
-	private static Object dynamicRead(DataProvider provider, ContentReader src, GenericContext genericContext, CollectionInfo info, byte[] nullBufferBytes) throws IOException{
-		var len        = info.length();
-		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
-		var generator  = createGenerator(info, nullBuffer);
+	private static Object dynamicRead(DataProvider provider, ContentReader src, CollectionInfo info, GenericContext genericContext) throws IOException{
+		var nullBuffer = readNullBufferStream(src, info);
+		
+		var len       = info.length();
+		var generator = createGenerator(info, nullBuffer);
 		
 		var db = provider.getTypeDb();
 		for(int i = 0; i<len; i++){
@@ -190,7 +323,9 @@ public abstract class DynamicCollectionSupport{
 		}
 		return generator.export();
 	}
-	private static void dynamicWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo info) throws IOException{
+	private static void dynamicWrite(DataProvider provider, ContentWriter dest, CollectionInfo info, Object val) throws IOException{
+		writeNullBuffer(dest, val, info);
+		
 		var db = provider.getTypeDb();
 		for(var el : info.iter(val).filtered(Objects::nonNull)){
 			var id = db.objToID(el);
@@ -199,17 +334,18 @@ public abstract class DynamicCollectionSupport{
 		}
 	}
 	
-	private static long enumSiz(CollectionInfo res){
+	
+	private static long enumSiz(CollectionInfo info){
 		//noinspection unchecked,rawtypes
-		var info = EnumUniverse.of((Class<Enum>)res.constantType());
-		return BitUtils.bitsToBytes(info.getBitSize(res.hasNulls())*(long)res.length());
+		var universe = EnumUniverse.of((Class<Enum>)info.constantType());
+		return BitUtils.bitsToBytes(universe.getBitSize(info.hasNulls())*(long)info.length());
 	}
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static Object enumRead(ContentReader src, CollectionInfo res) throws IOException{
-		var universe  = EnumUniverse.of((Class<Enum>)res.constantType());
-		var nullable  = res.hasNulls();
-		var len       = res.length();
-		var generator = createGenerator(res, null);
+	private static Object enumRead(ContentReader src, CollectionInfo info) throws IOException{
+		var universe  = EnumUniverse.of((Class<Enum>)info.constantType());
+		var nullable  = info.hasNulls();
+		var len       = info.length();
+		var generator = createGenerator(info, null);
 		try(var bits = new BitInputStream(src, universe.getBitSize(nullable)*(long)len)){
 			for(int i = 0; i<len; i++){
 				generator.add(bits.readEnum(universe, nullable));
@@ -218,31 +354,32 @@ public abstract class DynamicCollectionSupport{
 		return generator.export();
 	}
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static void enumWrite(ContentWriter dest, Object val, CollectionInfo res) throws IOException{
-		var info = EnumUniverse.of((Class<Enum>)res.constantType());
+	private static void enumWrite(ContentWriter dest, CollectionInfo info, Object val) throws IOException{
+		var universe = EnumUniverse.of((Class<Enum>)info.constantType());
 		try(var stream = new BitOutputStream(dest)){
-			var nullable = res.hasNulls();
-			for(var e : (Iterable<Enum>)res.iter(val)){
-				stream.writeEnum(info, e, nullable);
+			var nullable = info.hasNulls();
+			for(var e : (Iterable<Enum>)info.iter(val)){
+				stream.writeEnum(universe, e, nullable);
 			}
 		}
 	}
 	
-	private static long instanceSiz(DataProvider prov, Object val, CollectionInfo res){
-		var struct = Struct.ofUnknown(res.constantType());
+	
+	private static long instanceSiz(DataProvider prov, CollectionInfo info, Object val){
+		var struct = Struct.ofUnknown(info.constantType());
 		
-		var nullBufferBytes = calcNullBufferSize(res);
+		var nullBufferBytes = calcNullBufferSize(info);
 		
 		if(struct instanceof Struct.Unmanaged){
 			long sum = nullBufferBytes;
-			for(var uInst : (IterablePP<IOInstance.Unmanaged<?>>)res.iter(val)){
+			for(var uInst : (IterablePP<IOInstance.Unmanaged<?>>)info.iter(val)){
 				if(uInst == null) continue;
 				sum += ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, uInst.getPointer(), WordSpace.BYTE);
 			}
 			return sum;
 		}
 		
-		if(res.layout() == CollectionInfo.Layout.STRUCT_OF_ARRAYS){
+		if(info.layout() == CollectionInfo.Layout.STRUCT_OF_ARRAYS){
 			throw new NotImplementedException("SOA not implemented yet");//TODO
 		}
 		
@@ -250,31 +387,32 @@ public abstract class DynamicCollectionSupport{
 		
 		if(pip.getSizeDescriptor().hasFixed()){
 			int nnCount;
-			if(res.hasNulls()){
+			if(info.hasNulls()){
 				nnCount = 0;
-				for(var inst : res.iter(val)){
+				for(var inst : info.iter(val)){
 					if(inst == null) continue;
 					nnCount++;
 				}
-			}else nnCount = res.length();
+			}else nnCount = info.length();
 			
 			return nullBufferBytes + pip.getSizeDescriptor().requireFixed(WordSpace.BYTE)*nnCount;
 		}
 		
 		long sum = nullBufferBytes;
-		for(var inst : res.iter(val)){
+		for(var inst : info.iter(val)){
 			if(inst == null) continue;
 			sum += pip.calcUnknownSize(prov, inst, WordSpace.BYTE);
 		}
 		return sum;
 	}
-	private static Object instanceRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, GenericContext genericContext) throws IOException{
-		var componentIOType = IOType.of(res.constantType());
+	private static Object instanceRead(DataProvider provider, ContentReader src, CollectionInfo info, GenericContext genericContext) throws IOException{
+		var componentIOType = IOType.of(info.constantType());
 		
-		var len        = res.length();
-		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
-		var generator  = createGenerator(res, nullBuffer);
-		var struct     = Struct.ofUnknown(res.constantType());
+		var nullBuffer = readNullBufferStream(src, info);
+		
+		var len       = info.length();
+		var generator = createGenerator(info, nullBuffer);
+		var struct    = Struct.ofUnknown(info.constantType());
 		if(struct instanceof Struct.Unmanaged<?> u){
 			for(int i = 0; i<len; i++){
 				boolean                 hasVal = nullBuffer == null || nullBuffer.readBoolBit();
@@ -303,7 +441,9 @@ public abstract class DynamicCollectionSupport{
 		return generator.export();
 	}
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static void instanceWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
+	private static void instanceWrite(DataProvider provider, ContentWriter dest, CollectionInfo res, Object val) throws IOException{
+		writeNullBuffer(dest, val, res);
+		
 		var iter   = res.iter(val).filtered(Objects::nonNull);
 		var struct = Struct.ofUnknown(res.constantType());
 		if(struct instanceof Struct.Unmanaged){
@@ -319,20 +459,21 @@ public abstract class DynamicCollectionSupport{
 		}
 	}
 	
-	private static long wrapperSiz(DataProvider provider, Object val, CollectionInfo res, WrapperStructs.WrapperRes<Object> wrapperType){
+	
+	private static long wrapperSiz(DataProvider provider, CollectionInfo info, WrapperStructs.WrapperRes<Object> wrapperType, Object val){
 		var  pip  = StandardStructPipe.of(wrapperType.struct());
 		var  ctor = wrapperType.constructor();
-		long sum  = calcNullBufferSize(res);
-		for(var inst : res.iter(val)){
+		long sum  = calcNullBufferSize(info);
+		for(var inst : info.iter(val)){
 			if(inst == null) continue;
 			sum += pip.calcUnknownSize(provider, ctor.apply(inst), WordSpace.BYTE);
 		}
 		return sum;
 	}
-	private static Object wrapperRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, WrapperStructs.WrapperRes<Object> wrapperType) throws IOException{
-		var len        = res.length();
-		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
-		var generator  = createGenerator(res, nullBuffer);
+	private static Object wrapperRead(DataProvider provider, ContentReader src, CollectionInfo info, WrapperStructs.WrapperRes<Object> wrapperType) throws IOException{
+		var nullBuffer = readNullBufferStream(src, info);
+		var len        = info.length();
+		var generator  = createGenerator(info, nullBuffer);
 		var pip        = StandardStructPipe.of(wrapperType.struct());
 		for(int i = 0; i<len; i++){
 			boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
@@ -345,29 +486,32 @@ public abstract class DynamicCollectionSupport{
 		}
 		return generator.export();
 	}
-	private static void wrapperWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res, WrapperStructs.WrapperRes<Object> wrapperType) throws IOException{
+	private static void wrapperWrite(DataProvider provider, ContentWriter dest, CollectionInfo info, WrapperStructs.WrapperRes<Object> wrapperType, Object val) throws IOException{
+		writeNullBuffer(dest, val, info);
 		var pip  = StandardStructPipe.of(wrapperType.struct());
 		var ctor = wrapperType.constructor();
-		for(var inst : res.iter(val).filtered(Objects::nonNull)){
+		for(var inst : info.iter(val).filtered(Objects::nonNull)){
 			pip.write(provider, dest, ctor.apply(inst));
 		}
 	}
 	
-	private static OptionalLong collectionSiz(DataProvider provider, Object val, CollectionInfo res){
-		long sum = calcNullBufferSize(res);
-		for(var e : res.iter(val).filtered(Objects::nonNull)){
+	
+	private static OptionalLong collectionSiz(DataProvider provider, CollectionInfo info, Object val){
+		long sum = calcNullBufferSize(info);
+		for(var e : info.iter(val).filtered(Objects::nonNull)){
 			var eRes = CollectionInfoAnalysis.analyze(e);
 			if(eRes == null) return OptionalLong.empty();
-			sum += calcCollectionSize(provider, e, eRes);
+			sum += calcCollectionSize(provider, eRes, e);
 		}
 		return OptionalLong.of(sum);
 	}
-	private static Object collectionRead(DataProvider provider, ContentReader src, CollectionInfo res, byte[] nullBufferBytes, GenericContext genericContext) throws IOException{
-		var componentIOType = IOType.of(res.constantType());
+	private static Object collectionRead(DataProvider provider, ContentReader src, CollectionInfo info, GenericContext genericContext) throws IOException{
+		var componentIOType = IOType.of(info.constantType());
 		
-		var len        = res.length();
-		var nullBuffer = nullBufferBytes == null? null : new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
-		var generator  = createGenerator(res, nullBuffer);
+		var nullBuffer = readNullBufferStream(src, info);
+		
+		var len       = info.length();
+		var generator = createGenerator(info, nullBuffer);
 		for(int i = 0; i<len; i++){
 			boolean hasVal = nullBuffer == null || nullBuffer.readBoolBit();
 			Object  element;
@@ -379,104 +523,87 @@ public abstract class DynamicCollectionSupport{
 		}
 		return generator.export();
 	}
-	private static void collectionWrite(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
-		for(var e : res.iter(val).filtered(Objects::nonNull)){
+	private static void collectionWrite(DataProvider provider, ContentWriter dest, CollectionInfo info, Object val) throws IOException{
+		writeNullBuffer(dest, val, info);
+		for(var e : info.iter(val).filtered(Objects::nonNull)){
 			var eRes = CollectionInfoAnalysis.analyze(e);
-			Objects.requireNonNull(eRes);
-			writeCollection(provider, dest, e, eRes);
+			Objects.requireNonNull(eRes, "Element could not be interpreted as a collection");
+			writeCollection(provider, dest, eRes, e);
 		}
 	}
 	
-	static long calcCollectionSize(DataProvider prov, Object val, CollectionInfo res){
-		var infoBytes = res.calcIOBytes(prov);
-		var len       = res.length();
-		if(len == 0) return infoBytes;
-		
-		var constType = res.constantType();
-		
-		
-		switch(res.layout()){
-			case JUST_NULLS -> {
-				return infoBytes;
-			}
-			case DYNAMIC -> {
-				return infoBytes + dynamicSiz(prov, val, res);
+	
+	private static void writeNullBuffer(ContentWriter dest, Object val, CollectionInfo res) throws IOException{
+		if(!res.hasNulls()){
+			return;
+		}
+		try(var stream = new BitOutputStream(dest)){
+			for(var e : res.iter(val)){
+				var b = e != null;
+				stream.writeBoolBit(b);
 			}
 		}
-		
-		var primitiveType = SupportedPrimitive.get(constType);
-		if(primitiveType.isPresent()){
-			return infoBytes + primitiveSiz(val, res, primitiveType.get());
-		}
-		
-		if(constType.isEnum()){
-			return infoBytes + enumSiz(res);
-		}
-		
-		if(IOInstance.isInstance(constType)){
-			return infoBytes + instanceSiz(prov, val, res);
-		}
-		
-		//noinspection unchecked
-		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
-		if(wrapperType != null){
-			return infoBytes + wrapperSiz(prov, val, res, wrapperType);
-		}
-		
-		var siz = collectionSiz(prov, val, res);
-		if(siz.isPresent()){
-			return infoBytes + siz.getAsLong();
-		}
-		
-		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + TextUtil.toString(val));
+	}
+	private static BitInputStream readNullBufferStream(ContentReader src, CollectionInfo info) throws IOException{
+		var nullBufferBytes = readNullBuffer(src, info);
+		if(nullBufferBytes == null) return null;
+		return new BitInputStream(new ContentInputStream.BA(nullBufferBytes), info.length());
+	}
+	private static byte[] readNullBuffer(ContentReader src, CollectionInfo info) throws IOException{
+		var len = info.length();
+		if(len == 0 || !info.hasNulls()) return null;
+		var bytes = BitUtils.bitsToBytes(len);
+		return src.readInts1(bytes);
 	}
 	
-	static void writeCollection(DataProvider provider, ContentWriter dest, Object val, CollectionInfo res) throws IOException{
-		res.write(provider, dest);
-		if(res.length() == 0 || res.layout() == CollectionInfo.Layout.JUST_NULLS) return;
-		
-		var constType = res.constantType();
-		if(res.hasNulls() && !(constType != null && constType.isEnum())){
-			try(var stream = new BitOutputStream(dest)){
-				for(var e : res.iter(val)){
-					var b = e != null;
-					stream.writeBoolBit(b);
-				}
+	
+	private static int calcNullBufferSize(CollectionInfo res){
+		return res.hasNulls()? BitUtils.bitsToBytes(res.length()) : 0;
+	}
+	
+	private static Generator createGenerator(CollectionInfo info, BitInputStream toClose){
+		return switch(info){
+			case CollectionInfo.ListInfo v -> {
+				var     list = new ArrayList<>(info.length());
+				boolean fin  = v.isUnmodifiable();
+				yield new Generator(){
+					@Override
+					public void add(Object element){ list.add(element); }
+					@Override
+					public Object export() throws IOException{
+						if(toClose != null){
+							toClose.close();
+						}
+						
+						if(fin){
+							return List.copyOf(list);
+						}
+						return list;
+					}
+				};
 			}
-		}
-		
-		if(res.layout() == CollectionInfo.Layout.DYNAMIC){
-			dynamicWrite(provider, dest, val, res);
-			return;
-		}
-		
-		assert constType != null;
-		
-		var pTypO = SupportedPrimitive.get(constType);
-		if(pTypO.isPresent()){
-			var pTyp = pTypO.get();
-			primitiveWrite(dest, val, res, pTyp);
-			return;
-		}
-		
-		if(constType.isEnum()){
-			enumWrite(dest, val, res);
-			return;
-		}
-		
-		if(IOInstance.isInstance(constType)){
-			instanceWrite(provider, dest, val, res);
-			return;
-		}
-		
-		//noinspection unchecked
-		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
-		if(wrapperType != null){
-			wrapperWrite(provider, dest, val, res, wrapperType);
-			return;
-		}
-		
-		collectionWrite(provider, dest, val, res);
+			case CollectionInfo.ArrayInfo v -> {
+				var ct  = v.getArrayType().componentType();
+				var arr = (Object[])Array.newInstance(ct, info.length());
+				yield new Generator(){
+					private int i;
+					@Override
+					public void add(Object element){ arr[i++] = element; }
+					@Override
+					public Object export() throws IOException{
+						if(toClose != null) toClose.close();
+						return arr;
+					}
+				};
+			}
+			case CollectionInfo.NullValue ignore -> new Generator(){
+				@Override
+				public void add(Object element){ throw new UnsupportedOperationException(); }
+				@Override
+				public Object export(){ return null; }
+			};
+			case CollectionInfo.PrimitiveArrayInfo ignore -> { throw new ShouldNeverHappenError(); }
+		};
 	}
 	
 	private static void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
@@ -615,126 +742,6 @@ public abstract class DynamicCollectionSupport{
 				dest.writeInts1(bb);
 			}
 		}
-	}
-	
-	
-	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		var typ = typDef.getTypeClass(provider.getTypeDb());
-		if(!CollectionInfoAnalysis.isTypeCollection(typ)){
-			throw new IllegalArgumentException(typ + " is not a collection like");
-		}
-		
-		
-		var res = CollectionInfo.read(provider, src);
-		int len = res.length();
-		
-		var layout = res.layout();
-		
-		Class<?> componentType;
-		IOType   componentIOType;
-		if(layout != CollectionInfo.Layout.DYNAMIC && layout != CollectionInfo.Layout.JUST_NULLS){
-			componentType = res.constantType();
-			componentIOType = IOType.of(componentType);//TODO make constant type a generic
-		}else{
-			componentType = null;
-			componentIOType = null;
-		}
-		
-		BitInputStream nullBuffer;
-		byte[]         nullBufferBytes;
-		if(layout != CollectionInfo.Layout.JUST_NULLS && res.hasNulls() && res.length()>0 && !(componentType != null && componentType.isEnum())){
-			var bytes = BitUtils.bitsToBytes(len);
-			nullBufferBytes = src.readInts1(bytes);
-			nullBuffer = new BitInputStream(new ContentInputStream.BA(nullBufferBytes), len);
-		}else{
-			nullBuffer = null;
-			nullBufferBytes = null;
-		}
-		
-		
-		if(layout == CollectionInfo.Layout.JUST_NULLS){
-			var generator = createGenerator(res, null);
-			for(int i = 0, l = res.length(); i<l; i++){
-				generator.add(null);
-			}
-			return generator.export();
-		}
-		
-		if(layout == CollectionInfo.Layout.DYNAMIC){
-			return dynamicRead(provider, src, genericContext, res, nullBufferBytes);
-		}
-		
-		assert componentType != null;
-		
-		var pTypO = SupportedPrimitive.get(componentType);
-		if(pTypO.isPresent()){
-			return primitiveRead(src, res, pTypO.get(), nullBufferBytes);
-		}
-		
-		if(componentType.isEnum()){
-			return enumRead(src, res);
-		}
-		
-		if(IOInstance.isInstance(componentType)){
-			return instanceRead(provider, src, res, nullBufferBytes, genericContext);
-		}
-		
-		//noinspection unchecked
-		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)componentType);
-		if(wrapperType != null){
-			return wrapperRead(provider, src, res, nullBufferBytes, wrapperType);
-		}
-		
-		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
-			return collectionRead(provider, src, res, nullBufferBytes, genericContext);
-		}
-		
-		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
-	}
-	
-	private static Generator createGenerator(CollectionInfo res, BitInputStream toClose){
-		return switch(res){
-			case CollectionInfo.ListInfo v -> {
-				var     list = new ArrayList<>(res.length());
-				boolean fin  = v.isUnmodifiable();
-				yield new Generator(){
-					@Override
-					public void add(Object element){ list.add(element); }
-					@Override
-					public Object export() throws IOException{
-						if(toClose != null){
-							toClose.close();
-						}
-						
-						if(fin){
-							return List.copyOf(list);
-						}
-						return list;
-					}
-				};
-			}
-			case CollectionInfo.ArrayInfo v -> {
-				var ct  = v.getArrayType().componentType();
-				var arr = (Object[])Array.newInstance(ct, res.length());
-				yield new Generator(){
-					private int i;
-					@Override
-					public void add(Object element){ arr[i++] = element; }
-					@Override
-					public Object export() throws IOException{
-						if(toClose != null) toClose.close();
-						return arr;
-					}
-				};
-			}
-			case CollectionInfo.NullValue ignore -> new Generator(){
-				@Override
-				public void add(Object element){ throw new UnsupportedOperationException(); }
-				@Override
-				public Object export(){ return null; }
-			};
-			case CollectionInfo.PrimitiveArrayInfo ignore -> { throw new ShouldNeverHappenError(); }
-		};
 	}
 	
 	private static Object readPrimitiveArray(ContentReader src, int len, SupportedPrimitive pTyp) throws IOException{

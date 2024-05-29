@@ -53,7 +53,7 @@ public abstract class DynamicSupport{
 				}
 				
 				var res = CollectionInfoAnalysis.analyze(val);
-				if(res != null) yield DynamicCollectionSupport.calcCollectionSize(prov, val, res);
+				if(res != null) yield DynamicCollectionSupport.calcCollectionSize(prov, res, val);
 				
 				var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(val.getClass());
 				if(wrapper != null){
@@ -92,7 +92,7 @@ public abstract class DynamicSupport{
 			default -> {
 				var res = CollectionInfoAnalysis.analyze(val);
 				if(res != null){
-					DynamicCollectionSupport.writeCollection(provider, dest, val, res);
+					DynamicCollectionSupport.writeCollection(provider, dest, res, val);
 					break;
 				}
 				
