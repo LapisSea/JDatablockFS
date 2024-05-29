@@ -41,6 +41,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -710,7 +711,7 @@ public class GeneralTypeHandlingTests{
 			new Gen<>((r1, d1) -> new Dummy(r1.nextInt()), Dummy.class),
 			new Gen<>((r, d) -> new GenericContainer<>(r.nextInt()), GenericContainer.class),
 			new Gen<>((r, d) -> {
-				var l = new ContiguousIOList<Integer>(d, AllocateTicket.bytes(64).submit(d), IOType.of(ContiguousIOList.class, int.class));
+				var l = new ContiguousIOList<Integer>(d, AllocateTicket.bytes(16).submit(d), IOType.of(ContiguousIOList.class, int.class));
 				l.addAll(r.ints().limit(r.nextInt(20)).boxed().toList());
 				return l;
 			}, ContiguousIOList.class),
@@ -827,6 +828,31 @@ public class GeneralTypeHandlingTests{
 	@Test(dependsOnMethods = {"simpleGenericTest", "genericStoreL1", "genericStoreL2"}, dataProvider = "genericCollectionsL3")
 	void genericStoreL3(Gen<?> generator) throws IOException{ genericStore(generator); }
 	
+	private static final ThreadLocal<WeakReference<Cluster>> STRUCT_CACHE = ThreadLocal.withInitial(() -> new WeakReference<>(Cluster.emptyMem()));
+	static               Cluster                             a;
+	private static Cluster getCluster(){
+		var d = STRUCT_CACHE.get().get();
+		if(d == null){
+			d = Cluster.emptyMem();
+			STRUCT_CACHE.set(new WeakReference<>(d));
+		}
+		return d;
+	}
+
+//
+//	private static final LateInit<DataLogger, RuntimeException> LOGGER       = LoggedMemoryUtils.createLoggerFromConfig();
+//	private static final ThreadLocal<Cluster>                   STRUCT_CACHE = ThreadLocal.withInitial(() -> {
+//		IOInterface mem = LoggedMemoryUtils.newLoggedMemory(Thread.currentThread().getName(), LOGGER);
+//		try{
+//			return Cluster.init(mem);
+//		}catch(IOException e){
+//			throw new RuntimeException(e);
+//		}
+//	});
+//	private static Cluster getCluster(){
+//		return STRUCT_CACHE.get();
+//	}
+	
 	void genericStore(Gen<?> generator) throws IOException{
 		//noinspection unchecked
 		var pip = StandardStructPipe.of((Class<GenericContainer<Object>>)(Object)GenericContainer.class);
@@ -834,7 +860,8 @@ public class GeneralTypeHandlingTests{
 		record find(long siz, long seed, Throwable e){ }
 		var oErrSeed = new RawRandom(generator.name.hashCode()).longs().limit(100).mapToObj(r -> {
 			return async(() -> {
-				var    d = Cluster.emptyMem();
+				var d = getCluster();
+				
 				Object value;
 				try{
 					value = generator.gen.apply(new RawRandom(r), d);
@@ -842,8 +869,8 @@ public class GeneralTypeHandlingTests{
 					throw new RuntimeException(e);
 				}
 				var wrapVal = new GenericContainer<>(value);
-				try{
-					var ch = AllocateTicket.bytes(128).submit(d);
+				try(var chD = AllocateTicket.bytes(64).submitAsTempMem(d)){
+					var ch = chD.chunk();
 					pip.write(ch, wrapVal);
 					var read = pip.readNew(ch, null);
 					Assert.assertEquals(read, wrapVal);
@@ -868,9 +895,10 @@ public class GeneralTypeHandlingTests{
 		}
 		
 		var errVal = oErrSeed.get();
-		var d      = Cluster.emptyMem();
-		var value  = generator.gen.apply(new RawRandom(errVal.seed), d);
-		var err    = errVal.e;
+		var d      = getCluster();
+		
+		var value = generator.gen.apply(new RawRandom(errVal.seed), d);
+		var err   = errVal.e;
 		
 		LogUtil.println("Writing Type:", generator.name, "value:\n", value);
 		
@@ -888,15 +916,15 @@ public class GeneralTypeHandlingTests{
 					exec.submit(() -> {
 						backlog.decrementAndGet();
 						var val = new GenericContainer<Object>(arr);
-						var cl  = Cluster.emptyMem();
+						var cl  = getCluster();
 						var siz = StandardStructPipe.sizeOfUnknown(cl, val, WordSpace.BYTE);
 						synchronized(res){
 							if(res[0] != null && res[0].siz<=siz){
 								return;
 							}
 						}
-						try{
-							var ch = AllocateTicket.bytes(128).submit(cl);
+						try(var chD = AllocateTicket.bytes(64).submitAsTempMem(cl)){
+							var ch = chD.chunk();
 							pip.write(ch, val);
 							var generic = pip.readNew(ch, null);
 							Assert.assertEquals(generic, val);
@@ -922,12 +950,14 @@ public class GeneralTypeHandlingTests{
 		err.printStackTrace();
 		LogUtil.println("===================================");
 		
-		var ch = AllocateTicket.bytes(128).submit(d);
-		var c  = new GenericContainer<>(value);
-		pip.write(ch, c);
-		var generic = pip.readNew(ch, null);
-		Assert.assertEquals(generic.value, value);
-		
-		Assert.fail("Expected to fail");
+		try(var chD = AllocateTicket.bytes(64).submitAsTempMem(d)){
+			var ch = chD.chunk();
+			var c  = new GenericContainer<>(value);
+			pip.write(ch, c);
+			var generic = pip.readNew(ch, null);
+			Assert.assertEquals(generic.value, value);
+			
+			Assert.fail("Expected to fail");
+		}
 	}
 }
