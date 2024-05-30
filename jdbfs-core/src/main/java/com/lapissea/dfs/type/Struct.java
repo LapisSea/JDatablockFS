@@ -886,8 +886,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.stream().map(fieldMapper)
-		                .filter(Optional::isPresent).map(Optional::get)
+		var str = fields.stream().map(fieldMapper).flatMap(Optional::stream)
 		                .collect(Collectors.joining(fieldSeparator, prefix, end));
 		
 		if(!doShort){
