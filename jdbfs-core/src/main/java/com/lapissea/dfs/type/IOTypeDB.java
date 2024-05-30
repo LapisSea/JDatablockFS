@@ -20,9 +20,9 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -30,6 +30,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -968,20 +969,90 @@ public sealed interface IOTypeDB{
 		if(obj instanceof IOInstance.Def<?> u){
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
-		if(obj instanceof List<?> l){
-			IOType acc = null;
-			for(var o : l){
-				if(o == null) continue;
-				var t = makeType(o);
-				if(acc == null) acc = t;
-				else if(!acc.equals(t)){
-					throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
+		
+		if(obj instanceof Collection<?> l){
+//			var el = elementType(l);
+			Class<?> baseType = switch(obj){
+				case List<?> ignore -> List.class;
+				case Map<?, ?> ignore -> Map.class;
+				case Set<?> ignore -> Set.class;
+				default -> null;
+			};
+			if(baseType != null){
+				return IOType.of(baseType);
+//				return IOType.of(baseType, el);
+			}
+		}
+		
+		var cls = obj.getClass();
+		if(cls.isArray()){
+			Class<?> baseType = cls.getComponentType();
+			if(Modifier.isFinal(baseType.getModifiers())){
+				if(SupportedPrimitive.isAny(baseType)){
+					return IOType.of(cls);
+				}
+				if(baseType.getTypeParameters().length == 0){
+					return IOType.of(cls);
 				}
 			}
-			var el = acc != null? acc : IOType.of(Object.class);
-			return IOType.of(List.class, el);
+			var el = elementType(Arrays.asList((Object[])obj));
+			return el.asArrayType(this);
 		}
-		return IOType.of(obj.getClass());
+		return IOType.of(cls);
+	}
+	private IOType tryMergeGeneric(IOType.TypeGeneric t1, IOType.TypeGeneric t2){
+		if(!t1.getRaw().equals(t2.getRaw())){
+			return IOType.of(Object.class);
+		}
+		
+		var a1 = new ArrayList<>(t1.getArgs());
+		var a2 = t2.getArgs();
+		if(a1.size() != a2.size()){
+			return IOType.of(Object.class);
+		}
+		for(int i = 0; i<a1.size(); i++){
+			var arg1 = a1.get(i);
+			var arg2 = a2.get(i);
+			if(arg1.getClass() != arg2.getClass()){
+				a1.set(i, IOType.of(Object.class));
+				continue;
+			}
+			a1.set(i, switch(arg1){
+				case IOType.TypeGeneric typeGeneric -> {
+					yield tryMergeGeneric(typeGeneric, (IOType.TypeGeneric)arg2);
+				}
+				case IOType.TypeRaw typeRaw -> {
+					var c1  = typeRaw.getTypeClass(null);
+					var c2  = arg2.getTypeClass(null);
+					var cls = UtilL.findClosestCommonSuper(c1, c2);
+					yield IOType.of(cls);
+				}
+				default -> IOType.of(Object.class);
+			});
+		}
+		
+		return new IOType.TypeGeneric(t1.getRaw(), a1);
+	}
+	
+	private IOType elementType(Iterable<?> l){
+		IOType type = null, fallback = null;
+		for(var o : l){
+			if(o == null) continue;
+			var t = makeType(o);
+			if(type == null){
+				if(o instanceof Collection<?> col && col.isEmpty()) fallback = t;
+				else type = t;
+			}else if(!type.equals(t)){
+				if(o instanceof Collection<?> col && col.isEmpty()) continue;
+				
+				if(type instanceof IOType.TypeGeneric t1 && t instanceof IOType.TypeGeneric t2){
+					type = tryMergeGeneric(t1, t2);
+				}else{
+					type = IOType.of(Object.class);
+				}
+			}
+		}
+		return type != null? type : fallback != null? fallback : IOType.of(Object.class);
 	}
 	
 	default int objToID(Object obj) throws IOException{

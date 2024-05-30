@@ -107,6 +107,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			return (Class<?>)super.generic(db);
 		}
 		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
+		}
+		@Override
 		protected Class<?> makeGeneric(IOTypeDB db){ return getTypeClass(db); }
 		@Override
 		public boolean equals(Object o){
@@ -241,6 +245,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			return SyntheticParameterizedType.of(raw.getTypeClass(db), args);
 		}
 		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
+		}
+		@Override
 		public int hashCode(){
 			int result = getTypeName().hashCode();
 			result = 31*result + args.hashCode();
@@ -308,6 +316,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			Type bound = this.bound == null? Object.class : this.bound.generic(db);
 			return new SyntheticWildcardType(List.of(bound), isLower);
 		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
+		}
+		
 		@Override
 		public int hashCode(){
 			int result = Objects.hashCode(bound);
@@ -415,6 +428,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			Type[] bounds      = findBounds(declaration, name);
 			return new GenTypeVariable(name, bounds, declaration);
 		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
+		}
 		
 		public Type[] findBounds(IOTypeDB db){
 			var name        = this.name;
@@ -498,7 +515,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			case WildcardType wild -> of(wild);
 			case GenericArrayType a -> {
 				var comp = of(a.getGenericComponentType());
-				yield ((RawAndArg)comp).withRaw(comp.getRaw().typeClassCache.arrayType());
+				yield comp.asArrayType(null);
 			}
 			default -> throw new NotImplementedException(genericType.getClass().getName());
 		};
@@ -607,6 +624,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		};
 	}
 	
+	public abstract IOType asArrayType(IOTypeDB db);
 	
 	private static boolean argsEqual(List<IOType> a, List<IOType> b){
 		if(a.size() != b.size()){

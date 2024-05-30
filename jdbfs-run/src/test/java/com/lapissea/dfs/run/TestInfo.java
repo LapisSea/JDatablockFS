@@ -9,7 +9,10 @@ import java.util.stream.Collectors;
 public class TestInfo{
 	
 	public static TestInfo of(Object... args){
-		var           f  = Utils.getFrame(1);
+		return ofDepth(2, args);
+	}
+	public static TestInfo ofDepth(int stackDepth, Object... args){
+		var           f  = Utils.getFrame(stackDepth);
 		StringBuilder sb = new StringBuilder();
 		Utils.frameToStr(sb, f, false);
 		if(args.length>0){

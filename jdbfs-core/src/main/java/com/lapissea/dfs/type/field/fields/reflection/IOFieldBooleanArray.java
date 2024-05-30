@@ -48,7 +48,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
-			if(siz>0) return siz;
+			if(siz>0) return BitUtils.bitsToBytes(siz);
 			var arr = get(ioPool, inst);
 			return arr == null? 0 : BitUtils.bitsToBytes(arr.length);
 		}));
@@ -70,7 +70,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		boolean[] data;
-		if(getIsNull(ioPool, instance)) data = null;
+		if(nullable() && getIsNull(ioPool, instance)) data = null;
 		else{
 			int size = arraySize.getValue(ioPool, instance);
 			data = new boolean[size];
