@@ -37,7 +37,6 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -88,15 +87,14 @@ public abstract class DynamicCollectionSupport{
 			return infoBytes + instanceSiz(prov, info, val);
 		}
 		
+		if(CollectionInfoAnalysis.isTypeCollection(constType)){
+			return infoBytes + collectionSiz(prov, info, val);
+		}
+		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
 		if(wrapperType != null){
 			return infoBytes + wrapperSiz(prov, info, wrapperType, val);
-		}
-		
-		var siz = collectionSiz(prov, info, val);
-		if(siz.isPresent()){
-			return infoBytes + siz.getAsLong();
 		}
 		
 		throw new ShouldNeverHappenError("Case not handled for " + info + " with " + TextUtil.toString(val));
@@ -129,6 +127,11 @@ public abstract class DynamicCollectionSupport{
 			return;
 		}
 		
+		if(CollectionInfoAnalysis.isTypeCollection(constType)){
+			collectionWrite(provider, dest, info, val);
+			return;
+		}
+		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)constType);
 		if(wrapperType != null){
@@ -136,7 +139,7 @@ public abstract class DynamicCollectionSupport{
 			return;
 		}
 		
-		collectionWrite(provider, dest, info, val);
+		throw new ShouldNeverHappenError("Case not handled for " + info + " with " + TextUtil.toString(val));
 	}
 	static Object readCollection(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
@@ -175,14 +178,14 @@ public abstract class DynamicCollectionSupport{
 			return instanceRead(provider, src, res, genericContext);
 		}
 		
+		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
+			return collectionRead(provider, src, res, genericContext);
+		}
+		
 		//noinspection unchecked
 		var wrapperType = WrapperStructs.getWrapperStruct((Class<Object>)componentType);
 		if(wrapperType != null){
 			return wrapperRead(provider, src, res, wrapperType);
-		}
-		
-		if(CollectionInfoAnalysis.isTypeCollection(componentType)){
-			return collectionRead(provider, src, res, genericContext);
 		}
 		
 		throw new ShouldNeverHappenError("Case not handled for " + res + " with " + typ.getTypeName());
@@ -495,14 +498,14 @@ public abstract class DynamicCollectionSupport{
 	}
 	
 	
-	private static OptionalLong collectionSiz(DataProvider provider, CollectionInfo info, Object val){
+	private static long collectionSiz(DataProvider provider, CollectionInfo info, Object val){
 		long sum = calcNullBufferSize(info);
 		for(var e : info.iter(val).filtered(Objects::nonNull)){
 			var eRes = CollectionInfoAnalysis.analyze(e);
-			if(eRes == null) return OptionalLong.empty();
+			if(eRes == null) throw new IllegalStateException(e + " not a collection");
 			sum += calcCollectionSize(provider, eRes, e);
 		}
-		return OptionalLong.of(sum);
+		return sum;
 	}
 	private static Object collectionRead(DataProvider provider, ContentReader src, CollectionInfo info, GenericContext genericContext) throws IOException{
 		var componentIOType = IOType.of(info.constantType());
@@ -758,7 +761,7 @@ public abstract class DynamicCollectionSupport{
 				if(len == 0) yield arr;
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<arr.length; i++){
-					arr[i] = siz.read(src);
+					arr[i] = siz.readSigned(src);
 				}
 				yield arr;
 			}
@@ -767,7 +770,7 @@ public abstract class DynamicCollectionSupport{
 				if(len == 0) yield arr;
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<arr.length; i++){
-					arr[i] = siz.readInt(src);
+					arr[i] = siz.readIntSigned(src);
 				}
 				yield arr;
 			}
