@@ -180,7 +180,7 @@ public class AtlasFont extends DrawFont{
 		
 		Map<Integer, List<StringDraw>> sizeGropus = strings.stream().collect(Collectors.groupingBy(draw -> (int)(draw.pixelHeight()*100)));
 		for(var draws : sizeGropus.values()){
-			var scale = (draws.get(0).pixelHeight()*fsScale);
+			var scale = (draws.getFirst().pixelHeight()*fsScale);
 			
 			
 			if(!isMask()){

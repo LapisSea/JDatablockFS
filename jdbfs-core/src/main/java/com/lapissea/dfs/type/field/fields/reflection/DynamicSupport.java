@@ -1,6 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -13,8 +13,8 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -29,6 +29,8 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -37,10 +39,6 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class DynamicSupport{
-	
-	private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
-	
-	
 	@SuppressWarnings({"unchecked"})
 	public static long calcSize(DataProvider prov, Object val){
 		return switch(val){
@@ -56,7 +54,7 @@ public abstract class DynamicSupport{
 			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
-					yield REF_PIPE.calcUnknownSize(prov, u.getReference(), WordSpace.BYTE);
+					yield ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, u.getPointer(), WordSpace.BYTE);
 				}else{
 					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
@@ -64,9 +62,12 @@ public abstract class DynamicSupport{
 			case Enum<?> e -> BitUtils.bitsToBytes(EnumUniverse.of(e.getClass()).bitSize);
 			default -> {
 				var type = val.getClass();
-				if(type.isArray()){
-					var e   = type.getComponentType();
-					var len = Array.getLength(val);
+				if(type.isArray() || val instanceof List){
+					Class<?> e = getComponent(val);
+					int      len;
+					if(val instanceof List<?> l){
+						len = l.size();
+					}else len = Array.getLength(val);
 					
 					var lenSize = NumberSize.bySize(len).bytes + 1;
 					
@@ -83,7 +84,7 @@ public abstract class DynamicSupport{
 					if(IOInstance.isInstance(e)){
 						var struct = Struct.ofUnknown(e);
 						if(struct instanceof Struct.Unmanaged){
-							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> REF_PIPE.calcUnknownSize(prov, i.getReference(), WordSpace.BYTE)).sum();
+							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i -> ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, i.getPointer(), WordSpace.BYTE)).sum();
 						}
 						
 						StructPipe pip = StandardStructPipe.of(struct);
@@ -95,11 +96,12 @@ public abstract class DynamicSupport{
 						yield Stream.of((IOInstance<?>[])val).mapToLong(i -> pip.calcUnknownSize(prov, i, WordSpace.BYTE)).sum() + lenSize;
 					}
 					
-					long sum = 0;
+					List<?> l   = val instanceof List<?> l1? l1 : Arrays.asList((Object[])val);
+					long    sum = 0;
 					for(int i = 0; i<len; i++){
-						sum += calcSize(prov, Array.get(val, i));
+						sum += calcSize(prov, l.get(i));
 					}
-					yield sum;
+					yield sum + lenSize;
 				}
 				
 				var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(type);
@@ -111,6 +113,15 @@ public abstract class DynamicSupport{
 				throw new NotImplementedException(val.getClass() + "");
 			}
 		};
+	}
+	private static Class<?> getComponent(Object val){
+		if(!(val instanceof List<?> l)){
+			return val.getClass().getComponentType();
+		}
+		return l.stream().<Class<?>>map(Object::getClass).reduce((a, b) -> {
+			if(a != b) throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
+			return a;
+		}).orElse(int.class);
 	}
 	@SuppressWarnings("unchecked")
 	public static void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
@@ -131,21 +142,20 @@ public abstract class DynamicSupport{
 				num.write(dest, array.length);
 				dest.writeInts1(array);
 			}
-			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
+			case IOInstance.Unmanaged inst -> ChunkPointer.DYN_PIPE.write(provider, dest, inst.getPointer());
 			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
 			
 			default -> {
 				var type = val.getClass();
-				if(type.isArray()){
-					var len = Array.getLength(val);
+				if(type.isArray() || val instanceof List){
+					Class<?> e   = getComponent(val);
+					var      len = val instanceof List<?> l? l.size() : Array.getLength(val);
 					{
 						var num = NumberSize.bySize(len);
 						FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, num);
 						num.write(dest, len);
 					}
-					
-					var e = type.getComponentType();
 					
 					var pTypO = SupportedPrimitive.get(e);
 					if(pTypO.isPresent()){
@@ -159,7 +169,7 @@ public abstract class DynamicSupport{
 						if(struct instanceof Struct.Unmanaged){
 							var b = new ContentOutputBuilder();
 							for(var i : (IOInstance.Unmanaged<?>[])val){
-								REF_PIPE.write(provider, b, i.getReference());
+								ChunkPointer.DYN_PIPE.write(provider, b, i.getPointer());
 							}
 							b.writeTo(dest);
 							break;
@@ -175,8 +185,9 @@ public abstract class DynamicSupport{
 						break;
 					}
 					
+					List<?> l = val instanceof List<?> l1? l1 : Arrays.asList((Object[])val);
 					for(int i = 0; i<len; i++){
-						writeValue(provider, dest, Array.get(val, i));
+						writeValue(provider, dest, l.get(i));
 					}
 					break;
 				}
@@ -281,7 +292,8 @@ public abstract class DynamicSupport{
 		};
 	}
 	private static void ensureInt(Class<?> tyo){
-		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo)) throw new AssertionError(tyo + " is not an integer");
+		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo))
+			throw new AssertionError(tyo + " is not an integer");
 	}
 	
 	public static Object readTyp(IOType typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
@@ -304,8 +316,9 @@ public abstract class DynamicSupport{
 		
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
-			var ref     = REF_PIPE.readNew(provider, src, genericContext);
-			return uStruct.make(provider, ref, typDef);
+			var ptr     = ChunkPointer.DYN_PIPE.readNew(provider, src, null);
+			var ch      = ptr.dereference(provider);
+			return uStruct.make(provider, ch, typDef);
 		}
 		if(IOInstance.isInstance(typ)){
 			var struct = Struct.ofUnknown(typ);
@@ -317,13 +330,23 @@ public abstract class DynamicSupport{
 			return FlagReader.readSingle(src, universe);
 		}
 		
-		if(typ.isArray()){
+		if(typ.isArray() || UtilL.instanceOf(typ, List.class)){
 			int len = Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO).read(src));
 			
-			var e = typ.getComponentType();
+			Class<?> e;
+			IOType   eTyp;
+			if(typ.isArray()){
+				e = typ.getComponentType();
+				eTyp = IOType.of(e);
+			}else{
+				var arg = IOType.getArgs(typDef).getFirst();
+				e = arg.getTypeClass(provider.getTypeDb());
+				eTyp = arg;
+			}
 			
 			var pTypO = SupportedPrimitive.get(e);
 			if(pTypO.isPresent()){
+				if(!typ.isArray()) throw new NotImplementedException("List of primitives not implemented yet");//TODO
 				var pTyp = pTypO.get();
 				return readPrimitiveArray(src, len, pTyp);
 			}
@@ -333,10 +356,11 @@ public abstract class DynamicSupport{
 				if(struct instanceof Struct.Unmanaged<?> u){
 					var arr = (IOInstance.Unmanaged<?>[])Array.newInstance(e, len);
 					for(int i = 0; i<arr.length; i++){
-						var ref = REF_PIPE.readNew(provider, src, null);
-						arr[i] = u.make(provider, ref, typDef);
+						var ptr = ChunkPointer.DYN_PIPE.readNew(provider, src, genericContext);
+						var ch  = ptr.dereference(provider);
+						arr[i] = u.make(provider, ch, typDef);
 					}
-					return arr;
+					return typ.isArray()? arr : new ArrayList<>(Arrays.asList(arr));
 				}
 				
 				var pip = StandardStructPipe.of(struct);
@@ -345,8 +369,15 @@ public abstract class DynamicSupport{
 				for(int i = 0; i<arr.length; i++){
 					arr[i] = pip.readNew(provider, src, genericContext);
 				}
-				return arr;
+				return typ.isArray()? arr : new ArrayList<>(Arrays.asList(arr));
 			}
+			
+			var arr = Array.newInstance(e, len);
+			for(int i = 0; i<len; i++){
+				var el = readTyp(eTyp, provider, src, genericContext);
+				Array.set(arr, i, el);
+			}
+			return typ.isArray()? arr : new ArrayList<>(Arrays.asList((Object[])arr));
 		}
 		
 		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
@@ -377,12 +408,65 @@ public abstract class DynamicSupport{
 			AutoText.PIPE.skip(provider, src, genericContext);
 			return;
 		}
+		if(typ == byte[].class){
+			var bytes = src.readUnsignedInt4Dynamic();
+			src.skipExact(bytes);
+			return;
+		}
 		if(IOInstance.isInstance(typ)){
 			if(IOInstance.isUnmanaged(typ)){
-				REF_PIPE.skip(provider, src, genericContext);
+				ChunkPointer.DYN_PIPE.skip(provider, src, null);
 			}else{
 				skipStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
+			return;
+		}
+		
+		if(typ.isEnum()){
+			var universe = EnumUniverse.ofUnknown(typ);
+			universe.numSize(false).skip(src);
+			return;
+		}
+		
+		if(typ.isArray()){
+			int len = Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO).read(src));
+			
+			var e = typ.getComponentType();
+			
+			var pTypO = SupportedPrimitive.get(e);
+			if(pTypO.isPresent()){
+				var  pTyp = pTypO.get();
+				long bytes;
+				if(pTyp == SupportedPrimitive.BOOLEAN){
+					bytes = BitUtils.bitsToBytes(len);
+				}else{
+					bytes = len*pTyp.maxSize.get(WordSpace.BYTE);
+				}
+				src.skipExact(bytes);
+				return;
+			}
+			
+			if(IOInstance.isInstance(e)){
+				var struct = Struct.ofUnknown(e);
+				if(struct instanceof Struct.Unmanaged<?> u){
+					for(int i = 0; i<len; i++){
+						ChunkPointer.DYN_PIPE.skip(provider, src, null);
+					}
+					return;
+				}
+				
+				var pip = StandardStructPipe.of(struct);
+				for(int i = 0; i<len; i++){
+					pip.skip(provider, src, genericContext);
+				}
+				return;
+			}
+		}
+		
+		var wrapper = (WrapperStructs.WrapperRes<Object>)WrapperStructs.getWrapperStruct(typ);
+		if(wrapper != null){
+			var pip = StandardStructPipe.of(wrapper.struct());
+			pip.skip(provider, src, genericContext);
 			return;
 		}
 		

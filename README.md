@@ -1,5 +1,7 @@
 # JDatablockFS
 
+[![Java CI with Maven](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml/badge.svg)](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml)
+
 ### Description:
 
 A java library that aims to store arbitrary data in a format that is compact, easily modifiable and flexible.
@@ -173,7 +175,7 @@ ___Note: Documentation is unfinished!!___
 
 - `Cluster`: This acts like the root for a file. It takes an `IOInterface` and provides access to objects inside. Use `Cluster.init(...)` to create a new empty cluster on an IOInterface
 - `IOInterface`: An interface that provides the lowest level interactions that are required for functioning of this library.
-- `MemoryData`: An in memory implementation of IOInterface. Creation example: `MemoryData.builder().withRaw(new byte[]{1,2,3}).build()`
+- `MemoryData`: An in memory implementation of IOInterface. Creation example: `MemoryData.of(new byte[]{1,2,3})`
 - `IOFileData`: An implementation of IOInterface. Maps to `java.io.File` (WARNING: This is unfinished, please use MemoryData for now)
 
 

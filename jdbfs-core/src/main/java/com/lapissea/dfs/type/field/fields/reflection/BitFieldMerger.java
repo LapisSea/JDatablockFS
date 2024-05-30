@@ -1,7 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
@@ -27,6 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -127,6 +127,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		private final int        oneBits;
 		private final NumberSize numSize;
 		
+		private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
+		
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
 			this.numSize = numSize;
@@ -140,17 +142,36 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			for(var fi : group){
 				fi.writeBits(ioPool, writer, instance);
 			}
-			writer.fillNOne(oneBits);
+			if(oneBits>1){
+				var integrityDiv = INTEGRITY_DIVS[oneBits];
+				var rem          = writer.getBuffer()%integrityDiv;
+				var remRaw       = integrityDiv - rem;
+				writer.writeBits(remRaw, oneBits);
+			}else{
+				writer.fillNOne(oneBits);
+			}
 			writer.export(dest);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var reader = FlagReader.read(src, numSize);
+			var raw    = numSize.read(src);
+			var reader = new FlagReader(raw, numSize);
 			for(var fi : group){
 				fi.readBits(ioPool, reader, instance);
 			}
-			reader.checkNOneAndThrow(oneBits);
+			if(oneBits>1){
+				var integrityDiv = INTEGRITY_DIVS[oneBits];
+				var remRaw       = reader.readBits(oneBits);
+				var remStored    = integrityDiv - remRaw;
+				var payload      = raw&BitUtils.makeMask(numSize.bits() - oneBits);
+				var rem          = payload%integrityDiv;
+				if(rem != remStored){
+					throw new IOException("Bit integrity failed");
+				}
+			}else{
+				reader.checkNOneAndThrow(oneBits);
+			}
 		}
 		
 		@Override
@@ -216,7 +237,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			));
 		}
 		initLateData(-1, FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
-		generators = Utils.nullIfEmpty(streamUnpackedFields().flatMap(IOField::generatorStream).toList());
+		generators = IOFieldTools.fieldsToGenerators(group);
 	}
 	
 	@Override

@@ -9,6 +9,8 @@ import java.net.URL;
 import java.util.Objects;
 
 import static com.lapissea.dfs.config.ConfigTools.*;
+import static com.lapissea.dfs.config.FreedMemoryPurgeType.ONLY_HEADER_BYTES;
+import static com.lapissea.dfs.config.FreedMemoryPurgeType.ZERO_OUT;
 import static com.lapissea.dfs.logging.Log.LogLevel.INFO;
 import static com.lapissea.dfs.logging.Log.LogLevel.SMALL_TRACE;
 import static com.lapissea.dfs.logging.Log.LogLevel.WARN;
@@ -33,14 +35,15 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool             LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
 	Flag.FInt              LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
 	Flag.FBool             TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
-	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
+	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
 	Flag.FBool             COSTLY_STACK_TRACE        = flagB("tweaks.costlyStackTrace", deb());
 	
 	Flag.FBool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
 	Flag.FBool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
 	Flag.FBool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
 	
-	Flag.FBool PURGE_ACCIDENTAL_CHUNK_HEADERS = flagB("purgeAccidentalChunkHeaders", deb());
+	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE(
+		"purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	
 	Flag.FBool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
 	

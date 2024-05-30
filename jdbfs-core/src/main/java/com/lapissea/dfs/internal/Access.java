@@ -69,7 +69,7 @@ public final class Access{
 			match = Arrays.stream(type.getDeclaredMethods()).filter(m -> m.getName().equals(name)).limit(2).toList();
 		}
 		if(match.size()>1) throw new IllegalArgumentException("Ambiguous method name");
-		return makeLambda(match.get(0), functionalInterface);
+		return makeLambda(match.getFirst(), functionalInterface);
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
@@ -126,7 +126,7 @@ public final class Access{
 		if(methods.size() != 1){
 			throw new IllegalArgumentException(functionalInterface + " is not a functional interface!");
 		}
-		return methods.get(0);
+		return methods.getFirst();
 	}
 	
 	public static MethodHandles.Lookup privateLookupIn(Class<?> clazz) throws IllegalAccessException{

@@ -132,7 +132,7 @@ public interface TokenSource{
 					for(var part : c){
 						listener.accept(part);
 					}
-					listener.accept(new Token.SmolWord(c.isEmpty()? b.line() : c.get(c.size() - 1).line(), b.type().close));
+					listener.accept(new Token.SmolWord(c.isEmpty()? b.line() : c.getLast().line(), b.type().close));
 				}, () -> listener.accept(t));
 				return t;
 			}

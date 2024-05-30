@@ -1,8 +1,8 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -58,7 +58,7 @@ import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.lapissea.dfs.chunk.DefragmentManager.FreeFoundAction.ERROR;
+import static com.lapissea.dfs.core.DefragmentManager.FreeFoundAction.ERROR;
 import static com.lapissea.dfs.logging.Log.info;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
@@ -115,7 +115,7 @@ public class SlowTests{
 						chunks.set(bi, a);
 					}
 					
-					head = chunks.get(0);
+					head = chunks.getFirst();
 					var last = head;
 					for(int i = 1; i<chunks.size(); i++){
 						var next = chunks.get(i);
@@ -357,7 +357,7 @@ public class SlowTests{
 		}
 	}
 	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
-		var set = provider.roots().<IOSet<Integer>>request("hi", type, Integer.class);
+		var set = provider.roots().<IOSet<Integer>>request(1, type, Integer.class);
 		session.accept(provider, new CheckSet<>(set));
 		provider.scanGarbage(ERROR);
 	}
@@ -369,8 +369,8 @@ public class SlowTests{
 				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Serial
 				private Object readResolve() throws IOException{
-					var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
-					return new State(cluster, new CheckSet<>(cluster.roots().require("hi", IOSet.class)));
+					var cluster = new Cluster(MemoryData.of(data));
+					return new State(cluster, new CheckSet<>(cluster.roots().require(1, IOSet.class)));
 				}
 			}
 			
@@ -390,22 +390,22 @@ public class SlowTests{
 		var rnr = new FuzzingStateEnv.Marked<State, Action, IOException>(){
 			@Override
 			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
-				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "map-fuzz" + sequenceIndex);
-				return new State(cluster, new CheckSet<>(cluster.roots().request("hi", type, Integer.class)));
+				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "set-fuzz" + sequenceIndex);
+				return new State(cluster, new CheckSet<>(cluster.roots().request(1, type, Integer.class)));
 			}
 			@Override
 			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
 				if(mark.action(actionIndex)){
-//					LogUtil.println(action);
 					int a = 0;
 				}
+				
 				switch(action.type){
 					case ADD -> state.set.add(action.num);
 					case REMOVE -> state.set.remove(action.num);
 					case CONTAINS -> state.set.contains(action.num);
 					case CLEAR -> state.set.clear();
 				}
-				if(List.of(Type.REMOVE, Type.CLEAR).contains(action.type)){
+				if(List.of(Type.REMOVE, Type.CLEAR, Type.ADD).contains(action.type)){
 					state.cluster.scanGarbage(ERROR);
 				}
 			}
@@ -460,7 +460,7 @@ public class SlowTests{
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void fuzzIOSet(){
+	void fuzzIOHashSet(){
 		runSetFuzz(100000, IOHashSet.class);
 	}
 	
@@ -529,7 +529,7 @@ public class SlowTests{
 	Object[][] listMakers(){
 		return new Object[][]{
 			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
-			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40))},
+			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40, 20))},
 			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().roots().request("list", ContiguousIOList.class, Integer.class))},
 			{new ListMaker("linked list", 0.1, () -> Cluster.emptyMem().roots().request("list", LinkedIOList.class, Integer.class))},
 			};
@@ -731,7 +731,7 @@ public class SlowTests{
 		if(fails.isEmpty()) return;
 		LogUtil.printlnEr(FuzzFail.report(fails));
 		
-		var stability = runner.establishFailStability(fails.get(0), 15);
+		var stability = runner.establishFailStability(fails.getFirst(), 15);
 		runner.runStable(stability);
 		fail("There were fails!");
 	}
@@ -754,12 +754,7 @@ public class SlowTests{
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
-		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv<>(){
-			
-			@Override
-			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
-				return true;
-			}
+		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			
 			@Override
 			public void applyAction(BlobState state, long actionIndex, BlobAction action, RunMark mark) throws IOException{
@@ -799,7 +794,7 @@ public class SlowTests{
 				var blob = cl.roots().request("blob", Blob.class);
 				blob.write(true, initial);
 				
-				return new BlobState(blob, MemoryData.builder().withRaw(initial).build());
+				return new BlobState(blob, MemoryData.of(initial));
 			}
 		}, RNGType.<BlobAction>of(List.of(
 			r -> {

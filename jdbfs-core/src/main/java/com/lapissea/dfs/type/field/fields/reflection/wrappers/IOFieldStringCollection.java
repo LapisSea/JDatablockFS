@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.text.AutoText;
@@ -11,9 +11,9 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -133,7 +133,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
-		collectionSize = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		collectionSize = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));
 	}
 	
 	@Override

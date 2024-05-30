@@ -10,9 +10,36 @@ import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition.GetterFilter;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
-public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
+public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
+	
+	public sealed interface TypeOff{
+		final class Ptr implements TypeOff{
+			public final int index;
+			public Ptr(int index){
+				if(index<0){
+					throw new IllegalArgumentException("index must be positive but is " + index);
+				}
+				this.index = index;
+			}
+		}
+		
+		final class Primitive implements TypeOff{
+			public final int offset, size;
+			public Primitive(int offset, int size){
+				if(offset<0){
+					throw new IllegalArgumentException("offset must be positive but is " + offset);
+				}
+				if(size<0){
+					throw new IllegalArgumentException("size must be positive but is " + size);
+				}
+				this.offset = offset;
+				this.size = size;
+			}
+		}
+	}
 	
 	private static final Function<IOInstance.Managed<?>, VarPool<?>> GETTER = Access.makeLambda(IOInstance.Managed.class, "getVirtualPool", Function.class);
 	
@@ -29,44 +56,14 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	private final GetterFilter<CTyp, Object>           filter;
 	private       List<FieldAccessor<CTyp>>            dependencies;
 	
-	private final int ptrIndex;
-	private final int primitiveOffset;
-	private final int primitiveSize;
+	public final TypeOff typeOff;
 	
-	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int ptrIndex, int primitiveOffset, int primitiveSize){
+	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, TypeOff typeOff){
 		super(struct, type.name, type.type, type.annotations);
-		
-		boolean noPtr = ptrIndex<0;
-		boolean noOff = primitiveOffset<0;
-		if(noPtr){
-			if(ptrIndex != -1) throw new IllegalArgumentException("ptrIndex = " + ptrIndex);
-		}
-		if(noOff){
-			if(primitiveOffset != -1) throw new IllegalArgumentException("primitiveOffset = " + primitiveOffset);
-		}
-		
-		if(noPtr == noOff){
-			throw new IllegalStateException("Must provide ptr index or primitive offset");
-		}
-		
 		this.type = type;
-		this.ptrIndex = ptrIndex;
-		this.primitiveOffset = primitiveOffset;
-		this.primitiveSize = primitiveSize;
+		this.typeOff = Objects.requireNonNull(typeOff);
 		
 		filter = type.getFilter;
-	}
-	
-	public int getPtrIndex(){
-		return ptrIndex;
-	}
-	
-	public int getPrimitiveOffset(){
-		return primitiveOffset;
-	}
-	
-	public int getPrimitiveSize(){
-		return primitiveSize;
 	}
 	
 	public StoragePool getStoragePool(){
@@ -168,9 +165,10 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	@Override
 	protected String strName(){
-		String index;
-		if(getPtrIndex() != -1) index = getPtrIndex() + "*";
-		else index = primitiveOffset + "P";
+		var index = switch(typeOff){
+			case TypeOff.Primitive primitive -> primitive.offset + "P";
+			case TypeOff.Ptr ptr -> ptr.index + "*";
+		};
 		return getStoragePool().shortName + index + "(" + getName() + ")";
 	}
 }

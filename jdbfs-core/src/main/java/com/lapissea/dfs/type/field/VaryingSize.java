@@ -1,6 +1,6 @@
 package com.lapissea.dfs.type.field;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
@@ -161,7 +161,7 @@ public final class VaryingSize implements Stringify{
 			public void reset(int id){
 				var size = marks.get(id);
 				while(data.size()>size){
-					data.remove(data.size() - 1);
+					data.removeLast();
 				}
 				marks.entrySet().removeIf(e -> e.getKey()>=id);
 			}

@@ -2,15 +2,17 @@ package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.type.DataOrder;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
+import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.TypeDef;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -22,7 +24,10 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.annotation.Annotation;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +52,39 @@ public final class TemplateClassLoader extends ClassLoader{
 	public TemplateClassLoader(IOTypeDB db, ClassLoader parent){
 		super(TemplateClassLoader.class.getSimpleName() + "{" + db + "}", parent);
 		this.db = db;
+	}
+	
+	@Override
+	protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+		synchronized(getClassLoadingLock(name)){
+			// First, check if the class has already been loaded
+			Class<?> c1 = findLoadedClass(name);
+			if(c1 == null){
+				var parent = getParent();
+				try{
+					var c2 = c1 = parent.loadClass(name);
+					
+					if(!name.startsWith("java.")) try{
+						var builtIn = db.getDefinitionFromClassName(name);
+						if(builtIn.map(stored -> !new TypeDef(c2).equals(stored)).orElse(false)){
+							c1 = null;//Discard mismatching built in class
+						}
+					}catch(IOException e){
+						throw new UncheckedIOException("Failed to fetch data from database", e);
+					}
+				}catch(ClassNotFoundException ignored){ }
+				
+				if(c1 == null){
+					// If still not found, then invoke findClass in order
+					// to find the class.
+					c1 = findClass(name);
+				}
+			}
+			if(resolve){
+				resolveClass(c1);
+			}
+			return c1;
+		}
 	}
 	
 	@Override
@@ -136,6 +174,17 @@ public final class TemplateClassLoader extends ClassLoader{
 		writer.write("end");
 	}
 	
+	private static void stringsAnnotation(CodeStream code, Class<? extends Annotation> type, Collection<String> values) throws MalformedJorth{
+		code.write(
+			"""
+				@{0} start value [
+					template-for #val in {1} start '#val' end
+				] end
+				""",
+			type, values
+		);
+	}
+	
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
 		
@@ -159,13 +208,8 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		if(!fields.isEmpty()){
 			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).toList();
-			try(var ignored = writer.codePart()){
-				writer.write(" @{} start value [", DataOrder.class);
-				for(String dependency : order){
-					writer.write("'{}'", dependency);
-				}
-				writer.write("] end");
-			}
+			//noinspection deprecation
+			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}
 		
 		if(extend) writer.write("extends {}<#genClassName>", IOInstance.Managed.class);
@@ -198,7 +242,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			writer.write("@{}", IOValue.class);
 			
 			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
+				field.isDynamic()? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
 				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());
@@ -209,17 +253,14 @@ public final class TemplateClassLoader extends ClassLoader{
 			if(field.isUnsigned()){
 				writer.write("@{}", IOValue.Unsigned.class);
 			}
+			if(field.isUnsafe()){
+				writer.write("@{}", IOUnsafeValue.class);
+			}
 			if(field.getReferenceType() != null){
 				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
-				try(var ignored = writer.codePart()){
-					writer.write(" @{} start value [", IODependency.class);
-					for(String dependency : field.getDependencies()){
-						writer.write("'{}'", dependency);
-					}
-					writer.write("] end");
-				}
+				stringsAnnotation(writer, IODependency.class, field.getDependencies());
 			}
 			
 			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));

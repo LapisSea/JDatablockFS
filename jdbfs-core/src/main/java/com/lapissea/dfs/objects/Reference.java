@@ -1,8 +1,8 @@
 package com.lapissea.dfs.objects;
 
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -297,6 +297,17 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		var cursorOffset = localPos - cursorStart;
 		return cursor.dataStart() + cursorOffset;
 	}
+	
+	public ChunkPointer asJustPointer(){
+		if(offset != 0){
+			throw new IllegalStateException("Reference " + this + " has an offset");
+		}
+		return ptr;
+	}
+	public Chunk asJustChunk(DataProvider provider) throws IOException{
+		return provider.getChunk(asJustPointer());
+	}
+	
 	public String infoString(DataProvider provider) throws IOException{
 		return this + " / " + calcGlobalOffset(provider);
 	}

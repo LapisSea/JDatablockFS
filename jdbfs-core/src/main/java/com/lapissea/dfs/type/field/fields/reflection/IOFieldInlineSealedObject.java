@@ -2,7 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -11,10 +11,11 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -40,9 +41,9 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		private static <T extends IOInstance<T>> BehaviourRes<T> idBehaviour(FieldAccessor<T> field){
 			return new BehaviourRes<T>(new VirtualFieldDefinition<>(
-				IO, IOFieldTools.makeUniverseIDFieldName(field), int.class,
+				IO, FieldNames.universeID(field), int.class,
 				List.of(
-					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class),
+					Annotations.make(IODependency.VirtualNumSize.class),
 					IOValue.Unsigned.INSTANCE
 				)
 			));
@@ -101,7 +102,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	@Override
 	public void init(FieldSet<CTyp> ioFields){
 		super.init(ioFields);
-		universeID = ioFields.requireExactInt(IOFieldTools.makeUniverseIDFieldName(getAccessor()));
+		universeID = ioFields.requireExactInt(FieldNames.universeID(getAccessor()));
 	}
 	
 	private int getUniverseID(VarPool<CTyp> ioPool, CTyp instance){
@@ -115,11 +116,21 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
 				var val = get(ioPool, instance);
-				if(val == null){
-					var id = getUniverseID(ioPool, instance);
-					return id != 0;
+				var id  = getUniverseID(ioPool, instance);
+				if((val == null) != (id == 0)){
+					return true;
 				}
-				return true;
+				if(val == null){
+					return false;
+				}
+				return doubleCheckId(provider, val, id);
+			}
+			
+			private boolean doubleCheckId(DataProvider provider, ValueType val, int id) throws IOException{
+				var db    = provider.getTypeDb();
+				var type  = (Class<ValueType>)val.getClass();
+				var newId = db.toID(rootType, type, false);
+				return newId != id;
 			}
 			@Override
 			public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{

@@ -9,6 +9,9 @@ import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -24,6 +27,7 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
@@ -149,7 +153,7 @@ public final class FieldCompiler{
 		if(!fails.isEmpty()){
 			throw new IllegalField(
 				"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
-				(fails.size()>1? "\n" : "") + fails.stream().map(Object::toString).collect(joining("\n"))
+				(fails.size()>1? "\n" : "") + fails.stream().map(f -> "\t" + f).collect(joining("\n"))
 			);
 		}
 	}
@@ -216,28 +220,22 @@ public final class FieldCompiler{
 						continue;
 					}
 					
-					int primitiveSize, off, ptrIndex;
+					VirtualAccessor.TypeOff typeOff;
 					
-					if(!(s.type instanceof Class<?> c) || !c.isPrimitive()){
-						primitiveSize = off = -1;
-						ptrIndex = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
+					var primitive = SupportedPrimitive.get(s.type);
+					
+					if(primitive.isEmpty()){
+						var index = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
+						typeOff = new VirtualAccessor.TypeOff.Ptr(index);
 					}else{
-						if(List.of(long.class, double.class).contains(s.type)){
-							primitiveSize = 8;
-						}else if(List.of(byte.class, boolean.class).contains(s.type)){
-							primitiveSize = 1;
-						}else{
-							primitiveSize = 4;
-						}
-						off = primitiveOffset.getOrDefault(s.storagePool, 0);
-						int offEnd = off + primitiveSize;
-						primitiveOffset.put(s.storagePool, offEnd);
-						
-						ptrIndex = -1;
+						int size = (int)primitive.get().maxSize.get(WordSpace.BYTE);
+						var off  = primitiveOffset.getOrDefault(s.storagePool, 0);
+						typeOff = new VirtualAccessor.TypeOff.Primitive(off, size);
+						primitiveOffset.put(s.storagePool, off + size);
 					}
 					
 					//noinspection unchecked
-					FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
+					FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, typeOff);
 					virtualData.put(s.name, accessor);
 					newVirtualData.put(s.name, accessor);
 				}
@@ -528,13 +526,15 @@ public final class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IOCompression.class
+			IOCompression.class,
+			IOUnsafeValue.class
 		);
 	}
 	
 	public static void init(){ }
 	static{
 		Thread.startVirtualThread(FieldRegistry::init);
+		Thread.startVirtualThread(() -> Annotations.make(IOValue.class));
 	}
 	
 	public static Collection<Class<?>> getWrapperTypes(){

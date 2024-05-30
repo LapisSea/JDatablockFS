@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.dfs.io.IO;
@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -34,6 +35,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -47,21 +51,21 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger, IOFieldChunkPointer{
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
-			private final Class<Typ>                    typ;
+			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
 			@SuppressWarnings("rawtypes")
-			public InstanceOf(Class<Typ> typ, Set<Class<? extends IOField>> fieldTypes){
-				this.typ = typ;
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
 			}
 			
-			public Class<Typ> getType(){
-				return typ;
+			public final Class<Typ> getType(){
+				return type;
 			}
 			
 			@Override
@@ -163,8 +167,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int typeFlags   = -1;
-	private int inStructUID = -1;
+	private int     typeFlags   = -1;
+	private int     inStructUID = -1;
+	private Boolean needsIOPool;
 	
 	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
 		this.accessor = accessor;
@@ -277,6 +282,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
+		enum Strictness{
+			NOT_REALLY, ON_EXTERNAL_ALWAYS, ALWAYS
+		}
+		default Strictness strictDetermineLevel(){ return Strictness.ALWAYS; }
+		
 		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
 		ValType generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
@@ -302,13 +312,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	@Nullable
+	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		var gens = getGenerators();
-		return gens == null? Stream.of() : gens.stream();
+		return getGenerators().stream();
 	}
 	
 	
@@ -363,10 +373,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return getAccessor() instanceof VirtualAccessor<?> acc &&
 		       (pool == null || acc.getStoragePool() == pool);
 	}
-	public final VirtualAccessor<T> getVirtual(StoragePool pool){
-		return getAccessor() instanceof VirtualAccessor<T> acc &&
-		       (pool == null || acc.getStoragePool() == pool)
-		       ? acc : null;
+	public final Optional<VirtualAccessor<T>> getVirtual(StoragePool pool){
+		if(getAccessor() instanceof VirtualAccessor<T> acc){
+			if(pool == null || acc.getStoragePool() == pool){
+				return Optional.of(acc);
+			}
+		}
+		return Optional.empty();
 	}
 	
 	public GenericContext makeContext(GenericContext parent){
@@ -465,7 +478,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return nullability;
 	}
 	private void calcNullability(){
-		nullability = accessor == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(accessor);
+		nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
 	}
 	
 	public final boolean nullable(){
@@ -506,5 +519,35 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	@Override
 	public final int hashCode(){
 		return getName().hashCode();
+	}
+	
+	public boolean needsIOPool(){
+		if(needsIOPool == null) needsIOPool = calcNeedsIOPool();
+		return needsIOPool;
+	}
+	private boolean calcNeedsIOPool(){
+		final var depSet  = new HashSet<IOField<T, ?>>(Set.of(this));
+		final var scanned = new HashSet<IOField<T, ?>>();
+		final var toAdd   = new ArrayList<Collection<IOField<T, ?>>>();
+		var       change  = true;
+		while(change){
+			change = false;
+			for(var dep : depSet){
+				if(scanned.contains(dep)) continue;
+				
+				if(dep.isVirtual(StoragePool.IO)){
+					return true;
+				}
+				if(dep.hasDependencies()){
+					toAdd.add(dep.getDependencies());
+				}
+				scanned.add(dep);
+			}
+			for(var col : toAdd){
+				change |= depSet.addAll(col);
+			}
+			toAdd.clear();
+		}
+		return false;
 	}
 }

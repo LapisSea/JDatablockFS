@@ -3,12 +3,18 @@ package com.lapissea.dfs.utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import java.util.stream.Collector;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -28,10 +34,36 @@ public interface IterablePP<T> extends Iterable<T>{
 		return OptionalPP.empty();
 	}
 	
+	default <Accumulator, Result> Result collect(Collector<? super T, Accumulator, Result> collector){
+		var acc = collector.supplier().get();
+		var add = collector.accumulator();
+		for(T t : this){
+			add.accept(acc, t);
+		}
+		return collector.finisher().apply(acc);
+	}
 	default List<T> collectToList(){
 		var res = new ArrayList<T>();
 		for(T t : this){
 			res.add(t);
+		}
+		return res;
+	}
+	
+	default Set<T> collectToSet(){
+		var res = new HashSet<T>();
+		for(T t : this){
+			res.add(t);
+		}
+		return res;
+	}
+	default <K, V> Map<K, V> collectToMap(Function<T, K> key, Function<T, V> value){
+		var res = new HashMap<K, V>();
+		for(T t : this){
+			var k = key.apply(t);
+			if(res.put(k, value.apply(t)) != null){
+				throw new IllegalStateException("Duplicate key of: " + k);
+			}
 		}
 		return res;
 	}
@@ -207,4 +239,128 @@ public interface IterablePP<T> extends Iterable<T>{
 		return reduce(BinaryOperator.maxBy(comparator));
 	}
 	
+	interface Enumerator<T, R>{
+		R enumerate(int index, T value);
+	}
+	
+	interface EnumeratorL<T, R>{
+		R enumerate(long index, T value);
+	}
+	
+	record IdxValue<T>(int index, T val) implements Map.Entry<Integer, T>{
+		@Override
+		public Integer getKey(){ return index; }
+		@Override
+		public T getValue(){ return val; }
+		@Override
+		public T setValue(T value){ throw new UnsupportedOperationException(); }
+	}
+	
+	record LdxValue<T>(long index, T val) implements Map.Entry<Long, T>{
+		@Override
+		public Long getKey(){ return index; }
+		@Override
+		public T getValue(){ return val; }
+		@Override
+		public T setValue(T value){ throw new UnsupportedOperationException(); }
+	}
+	
+	default IterablePP<IdxValue<T>> enumerate(){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private int index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public IdxValue<T> next(){
+					preIncrementInt(index);
+					return new IdxValue<>(index++, src.next());
+				}
+			};
+		};
+	}
+	
+	default IterablePP<LdxValue<T>> enumerateL(){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private long index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public LdxValue<T> next(){
+					preIncrementLong(index);
+					return new LdxValue<>(index++, src.next());
+				}
+			};
+		};
+	}
+	
+	default <R> IterablePP<R> enumerate(Enumerator<T, R> enumerator){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private int index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public R next(){
+					preIncrementInt(index);
+					return enumerator.enumerate(index++, src.next());
+				}
+			};
+		};
+	}
+	default <R> IterablePP<R> enumerateL(EnumeratorL<T, R> enumerator){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iterator<>(){
+				private long index;
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public R next(){
+					preIncrementLong(index);
+					return enumerator.enumerate(index++, src.next());
+				}
+			};
+		};
+	}
+	
+	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
+		return collectToList().toArray(ctor);
+	}
+	default int count(){
+		int num = 0;
+		for(var ignore : this){
+			preIncrementInt(num);
+			num++;
+		}
+		return num;
+	}
+	
+	default long countL(){
+		long num = 0;
+		for(var ignore : this){
+			preIncrementLong(num);
+			num++;
+		}
+		return num;
+	}
+	
+	private static void preIncrementLong(long index){
+		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	private static void preIncrementInt(int num){
+		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
 }

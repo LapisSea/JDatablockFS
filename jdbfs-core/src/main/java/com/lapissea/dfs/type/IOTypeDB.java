@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
@@ -20,12 +20,14 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -37,6 +39,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -100,6 +104,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
+				if(type == null) return new TypeID(0, true);
 				return toID(IOType.of(type), recordNew);
 			}
 			
@@ -110,6 +115,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(IOType type, boolean recordNew){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
 				return newID(type, recordNew);
@@ -117,10 +123,12 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public int toID(Class<?> type){
+				if(type == null) return 0;
 				return toID(IOType.of(type));
 			}
 			@Override
 			public int toID(IOType type){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return id;
 				return newID(type, true).requireStored();
@@ -418,10 +426,12 @@ public sealed interface IOTypeDB{
 		}
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
-		private static       int                               FIRST_ID = -1;
-		private static final LateInit.Safe<MemoryOnlyDB.Fixed> BUILT_IN = new LateInit.Safe<>(() -> {
+		private static       int                               FIRST_ID      = -1;
+		private static final Lock                              BUILT_IN_LOCK = new ReentrantLock();
+		private static final LateInit.Safe<MemoryOnlyDB.Fixed> BUILT_IN      = new LateInit.Safe<>(() -> {
 			//TODO: there is a deadlock of some sort involving virtual threads and a low core count. Investigate
 			var db = new MemoryOnlyDB.Basic();
+			BUILT_IN_LOCK.lock();
 			try{
 				for(var c : new Class<?>[]{
 					byte.class,
@@ -461,10 +471,12 @@ public sealed interface IOTypeDB{
 			}catch(Throwable e){
 				e.printStackTrace();
 				throw new RuntimeException("Failed to initialize built in type IDs", e);
+			}finally{
+				BUILT_IN_LOCK.unlock();
 			}
 			FIRST_ID = db.maxID();
 			return db.bake();
-		});
+		}, e -> Thread.ofPlatform().name("BUILT_IN init").daemon().start(e));
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
 			builtIn.toID(c);
@@ -508,7 +520,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(IOType type, boolean recordNew) throws IOException{
-			var builtIn = BUILT_IN.get();
+			var builtIn = getBuiltIn();
 			var id      = builtIn.toID(type, false);
 			if(id.stored()) return id;
 			
@@ -557,9 +569,16 @@ public sealed interface IOTypeDB{
 			}
 			return new TypeID(newID, true);
 		}
+		private static MemoryOnlyDB.Fixed getBuiltIn(){
+			if(!BUILT_IN.isInitialized()){
+				BUILT_IN_LOCK.lock();
+				BUILT_IN_LOCK.unlock();
+			}
+			return BUILT_IN.get();
+		}
 		
 		private void recordType(List<IOType> types) throws IOException{
-			var builtIn = BUILT_IN.get();
+			var builtIn = getBuiltIn();
 			var newDefs = new HashMap<TypeName, TypeDef>();
 			for(var type : types){
 				recordType(builtIn, type, newDefs);
@@ -714,6 +733,13 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
+			if(typeName.typeName.startsWith("java.")){
+				for(IOType arg : IOType.getArgs(type)){
+					recordType(builtIn, arg, newDefs);
+				}
+				return;
+			}
+			
 			var def    = new TypeDef(typ);
 			var parent = def.getSealedParent();
 			if(parent != null){
@@ -747,7 +773,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public IOType fromID(int id) throws IOException{
-			var builtIn = BUILT_IN.get();
+			var builtIn = getBuiltIn();
 			if(builtIn.hasID(id)){
 				return builtIn.fromID(id);
 			}
@@ -780,7 +806,7 @@ public sealed interface IOTypeDB{
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
 			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 			
-			var builtIn = BUILT_IN.get();
+			var builtIn = getBuiltIn();
 			var bcls    = builtIn.fromID(rootType, id);
 			if(bcls != null) return bcls;
 			
@@ -805,7 +831,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
-			var builtIn = BUILT_IN.get();
+			var builtIn = getBuiltIn();
 			var bid     = builtIn.toID(rootType, type, false);
 			if(bid != -1) return bid;
 			
@@ -876,10 +902,10 @@ public sealed interface IOTypeDB{
 			var sm = this.sealedMultiverse;
 			return sm.computeIfAbsent(rootTypeName, () -> {
 				var ch = AllocateTicket.bytes(16)
-				                       .withPositionMagnet(sm.getReference().getPtr().getValue())
+				                       .withPositionMagnet(sm.getPointer().getValue())
 				                       .submit(sm);
 				var type = IOType.of(ContiguousIOList.class, String.class);
-				return new ContiguousIOList<>(sm.getDataProvider(), ch.getPtr().makeReference(), type);
+				return new ContiguousIOList<>(sm.getDataProvider(), ch, type);
 			});
 		}
 		
@@ -906,7 +932,7 @@ public sealed interface IOTypeDB{
 		@Override
 		public OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException{
 			if(className == null || className.isEmpty()) return OptionalPP.empty();
-			return BUILT_IN.get().getDefinitionFromClassName(className).or(() -> {
+			return getBuiltIn().getDefinitionFromClassName(className).or(() -> {
 				return OptionalPP.ofNullable(defs.get(new TypeName(className)));
 			});
 		}
@@ -942,27 +968,50 @@ public sealed interface IOTypeDB{
 		if(obj instanceof IOInstance.Def<?> u){
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
+		if(obj instanceof List<?> l){
+			IOType acc = null;
+			for(var o : l){
+				if(o == null) continue;
+				var t = makeType(o);
+				if(acc == null) acc = t;
+				else if(!acc.equals(t)){
+					throw new NotImplementedException("Lists of varying types not implemented yet");//TODO
+				}
+			}
+			var el = acc != null? acc : IOType.of(Object.class);
+			return IOType.of(List.class, el);
+		}
 		return IOType.of(obj.getClass());
 	}
 	
-	default int toID(Object obj) throws IOException{
+	default int objToID(Object obj) throws IOException{
 		if(obj == null) return 0;
 		return toID(makeType(obj));
 	}
-	default TypeID toID(Object obj, boolean recordNew) throws IOException{
+	default TypeID objToID(Object obj, boolean recordNew) throws IOException{
 		if(obj == null) return new TypeID(0, true);
 		var type = makeType(obj);
 		return toID(type, recordNew);
 	}
 	
+	default int toID(Type type) throws IOException{
+		if(type == null) return 0;
+		return toID(IOType.of(type), true).requireStored();
+	}
 	default int toID(Class<?> type) throws IOException{
+		if(type == null) return 0;
 		return toID(IOType.of(type), true).requireStored();
 	}
 	default int toID(IOType type) throws IOException{
 		return toID(type, true).requireStored();
 	}
 	
+	default TypeID toID(Type type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
+		return toID(IOType.of(type), recordNew);
+	}
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
 		return toID(IOType.of(type), recordNew);
 	}
 	

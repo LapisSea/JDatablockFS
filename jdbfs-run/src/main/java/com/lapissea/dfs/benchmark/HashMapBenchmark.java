@@ -1,6 +1,6 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.utils.RawRandom;
@@ -42,7 +42,7 @@ public class HashMapBenchmark{
 		range = Math.max(initSize, 1)*rangeMul;
 		
 		var provider = Cluster.emptyMem();
-		map = provider.roots().request("hi", HashIOMap.class, Integer.class, Integer.class);
+		map = provider.roots().request(1, HashIOMap.class, Integer.class, Integer.class);
 		
 		var rand = new RawRandom();
 		map.putAll(

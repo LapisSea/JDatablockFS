@@ -1,6 +1,6 @@
 package com.lapissea.dfs.io.instancepipe;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -12,6 +12,13 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.IOException;
 
 public interface ObjectPipe<T, PoolType>{
+	
+	abstract class NoPool<T> implements ObjectPipe<T, Void>{
+		@Override
+		public final Void makeIOPool(){
+			return null;
+		}
+	}
 	
 	void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;

@@ -1,10 +1,10 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.IOType;
@@ -22,15 +22,13 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.OptionalLong;
 
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE_MANAGED;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 
 @SuppressWarnings("unchecked")
-public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
+public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	
 	private class LinkedListIterator extends IOListIterator.AbstractIndex<T>{
 		
@@ -103,7 +101,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	);
 	
 	private static final LateInit.Safe<IOField<?, ?>> HEAD_FIELD = Runner.async(
-		() -> Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow()
+		() -> Struct.Unmanaged.thisClass().getFields().requireByName("head")
 	);
 	
 	@IOValue
@@ -118,15 +116,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private final ValueStorage<T> valueStorage;
 	private final IOType          nodeType;
 	
-	private final boolean      readOnly;
-	private final Map<Long, T> cache;
-	
-	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, typeDef, LIST_TYPE_CHECK);
-		readOnly = getDataProvider().isReadOnly();
-		cache = readOnly? new HashMap<>() : null;
+	public LinkedIOList(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, typeDef, LIST_TYPE_CHECK);
 		
 		nodeType = ((IOType.RawAndArg)typeDef).withRaw(IONode.class);
 		
@@ -176,19 +168,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	@Override
 	public T get(long index) throws IOException{
 		checkSize(index);
-		if(readOnly){
-			return getCached(index);
-		}
 		return getNode(index).getValue();
-	}
-	
-	private T getCached(long index) throws IOException{
-		if(cache.containsKey(index)){
-			return cache.get(index);
-		}
-		var val = getNode(index).getValue();
-		cache.put(index, val);
-		return val;
 	}
 	
 	@Override
@@ -198,7 +178,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	private IONode<T> allocNode(T value, IONode<T> next) throws IOException{
-		var mag = OptionalLong.of((next == null? this : next).getReference().getPtr().getValue());
+		var mag = OptionalLong.of((next == null? this : next).getPointer().getValue());
 		return IONode.allocValNode(value, next, valueStorage.getSizeDescriptor(), nodeType, getDataProvider(), mag);
 	}
 	
@@ -298,31 +278,6 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	@Override
 	public IOIterator.Iter<T> iterator(){
-		if(readOnly){
-			return new IOIterator.Iter<>(){
-				LinkedListIterator src;
-				long index;
-				@Override
-				public boolean hasNext(){
-					return index<size();
-				}
-				@Override
-				public T ioNext() throws IOException{
-					try{
-						if(cache.containsKey(index)){
-							return cache.get(index);
-						}
-						if(src == null) src = new LinkedListIterator(index);
-						var e = src.getElement(index);
-						cache.put(index, e);
-						return e;
-					}finally{
-						index++;
-					}
-				}
-			};
-		}
-		
 		try{
 			var head = getHead();
 			if(head == null) return IOIterator.Iter.emptyIter();

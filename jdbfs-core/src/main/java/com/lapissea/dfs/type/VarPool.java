@@ -4,10 +4,12 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.access.VirtualAccessor;
+import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -58,8 +60,14 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		@Override
 		public void set(VirtualAccessor<T> accessor, Object value){
-			int index = accessor.getPtrIndex();
-			if(index == -1){
+			if(accessor.typeOff instanceof VirtualAccessor.TypeOff.Ptr off){
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				if(pool == null){
+					if(value == null) return;
+					pool = new Object[objectsSize];
+				}
+				pool[off.index] = value;
+			}else{
 				Objects.requireNonNull(value);
 				var typ = accessor.getType();
 				if(typ == long.class) setLong(accessor, switch(value){
@@ -79,14 +87,14 @@ public interface VarPool<T extends IOInstance<T>>{
 				else if(typ == boolean.class) setBoolean(accessor, (Boolean)value);
 				else throw new NotImplementedException(typ.getName());
 			}
-			if(DEBUG_VALIDATION) protectAccessor(accessor);
-			if(pool == null) pool = new Object[objectsSize];
-			pool[index] = value;
 		}
 		@Override
 		public Object get(VirtualAccessor<T> accessor){
-			int index = accessor.getPtrIndex();
-			if(index == -1){
+			if(accessor.typeOff instanceof VirtualAccessor.TypeOff.Ptr ptr){
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				if(pool == null) return null;
+				return pool[ptr.index];
+			}else{
 				var typ = accessor.getType();
 				if(typ == long.class) return getLong(accessor);
 				if(typ == int.class) return getInt(accessor);
@@ -94,9 +102,6 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(typ == byte.class) return getByte(accessor);
 				throw new NotImplementedException(typ.getName());
 			}
-			if(DEBUG_VALIDATION) protectAccessor(accessor);
-			if(pool == null) return null;
-			return pool[index];
 		}
 		
 		@Override
@@ -104,10 +109,10 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(DEBUG_VALIDATION) protectAccessor(accessor, long.class, int.class);
 			
 			if(primitives == null) return 0;
-			
-			return switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> BBView.readInt8(primitives, accessor.getPrimitiveOffset());
-				case Integer.BYTES -> BBView.readInt4(primitives, accessor.getPrimitiveOffset());
+			var off = (Primitive)accessor.typeOff;
+			return switch(off.size){
+				case Long.BYTES -> BBView.readInt8(primitives, off.offset);
+				case Integer.BYTES -> BBView.readInt4(primitives, off.offset);
 				default -> throw new IllegalStateException();
 			};
 		}
@@ -119,7 +124,8 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			BBView.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
+			var off = (Primitive)accessor.typeOff;
+			BBView.writeInt8(primitives, off.offset, value);
 		}
 		
 		@Override
@@ -127,7 +133,8 @@ public interface VarPool<T extends IOInstance<T>>{
 			if(DEBUG_VALIDATION) protectAccessor(accessor, int.class);
 			
 			if(primitives == null) return 0;
-			return BBView.readInt4(primitives, accessor.getPrimitiveOffset());
+			var off = (Primitive)accessor.typeOff;
+			return BBView.readInt4(primitives, off.offset);
 		}
 		@Override
 		public void setInt(VirtualAccessor<T> accessor, int value){
@@ -137,10 +144,10 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			
-			switch(accessor.getPrimitiveSize()){
-				case Long.BYTES -> BBView.writeInt8(primitives, accessor.getPrimitiveOffset(), value);
-				case Integer.BYTES -> BBView.writeInt4(primitives, accessor.getPrimitiveOffset(), value);
+			var off = (Primitive)accessor.typeOff;
+			switch(off.size){
+				case Long.BYTES -> BBView.writeInt8(primitives, off.offset, value);
+				case Integer.BYTES -> BBView.writeInt4(primitives, off.offset, value);
 				default -> throw new IllegalStateException();
 			}
 		}
@@ -169,14 +176,16 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		private byte getByte0(VirtualAccessor<T> accessor){
 			if(primitives == null) return 0;
-			return primitives[accessor.getPrimitiveOffset()];
+			var off = (Primitive)accessor.typeOff;
+			return primitives[off.offset];
 		}
 		private void setByte0(VirtualAccessor<T> accessor, byte value){
 			if(primitives == null){
 				if(value == 0) return;
 				primitives = new byte[primitivesSize];
 			}
-			primitives[accessor.getPrimitiveOffset()] = value;
+			var off = (Primitive)accessor.typeOff;
+			primitives[off.offset] = value;
 		}
 		
 		
@@ -185,9 +194,9 @@ public interface VarPool<T extends IOInstance<T>>{
 			return typ.getFields()
 			          .stream()
 			          .map(f -> f.getVirtual(StoragePool.values()[poolId]))
-			          .filter(Objects::nonNull)
+			          .flatMap(Optional::stream)
 			          .map(c -> c.getName() + ": " + Utils.toShortString(get(c)))
-			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getFullName(), false) + "{", "}"));
+			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getFullName()) + "{", "}"));
 		}
 	}
 	

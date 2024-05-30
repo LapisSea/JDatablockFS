@@ -1,6 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -136,7 +136,7 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 		if(nullable()){
 			if(val == null){
 				if(fixed){
-					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

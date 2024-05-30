@@ -16,7 +16,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Optional;
 
-public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
@@ -65,8 +65,8 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 		getter.ifPresent(get -> validateGetter(genericType, get));
 		setter.ifPresent(set -> validateSetter(genericType, set));
 		
-		this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-		this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.getter = getter.map(ExactFieldAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.setter = setter.map(ExactFieldAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 	}
 	
 	@Override

@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -139,7 +139,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		if(nullable()){
 			if(val == null){
 				if(fixed){
-					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

@@ -2,9 +2,11 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotImplementedException;
@@ -32,7 +34,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String name();
 		IOType bound();
 		
-		static ClassArgDef of(String name, IOType bound){
+		public static ClassArgDef of(String name, IOType bound){
 			return Def.of(ClassArgDef.class, name, bound);
 		}
 	}
@@ -43,6 +45,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		private String   name;
 		private boolean  isDynamic;
 		private boolean  unsigned;
+		private boolean  unsafe;
 		private String[] dependencies;
 		
 		@IONullability(NULLABLE)
@@ -58,16 +61,18 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			isDynamic = IOFieldTools.isGeneric(field);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
-			if(field.getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
-			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
+			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
+			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
 			dependencies = deps.toArray(String[]::new);
 			unsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
+			unsafe = field.getAccessor().hasAnnotation(IOUnsafeValue.class);
 		}
 		
 		public IOType getType()    { return type; }
 		public String getName()    { return name; }
 		public boolean isDynamic() { return isDynamic; }
 		public boolean isUnsigned(){ return unsigned; }
+		public boolean isUnsafe()  { return unsafe; }
 		
 		public List<String> getDependencies(){
 			return dependencies == null? List.of() : ArrayViewList.create(dependencies, null);
@@ -78,7 +83,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		
 		@Override
 		public String toString(){
-			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type.toString() + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
+			if(type == null) return getClass().getSimpleName() + "<uninitialized>";
+			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
 		}
 		@Override
 		public String toShortString(){
@@ -104,7 +110,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			JUST_INTERFACE
 		}
 		
-		private static SealedParent of(String name, Type type){
+		public static SealedParent of(String name, Type type){
 			return IOInstance.Def.of(SealedParent.class, name, type);
 		}
 		
@@ -134,7 +140,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		unmanaged = IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
-				var structFields = Struct.ofUnknown(type).getFields();
+				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
 				fields = structFields.stream().map(FieldDef::new).toArray(FieldDef[]::new);
 				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
 			}
@@ -248,7 +254,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 					startsPos--;
 				}
 				for(int i = 0; i<permits.length; i++){
-					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i], false);
+					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i]);
 				}
 			}
 			sb.append(Arrays.stream(permits).collect(Collectors.joining(", ", "->[", "]")));

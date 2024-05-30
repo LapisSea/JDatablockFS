@@ -26,7 +26,7 @@ public class CharJoin implements CharSequence{
 		this.size = sum;
 		
 		if(!data.isEmpty()){
-			lastAccessed = data.get(0);
+			lastAccessed = data.getFirst();
 			lastEnd = lastAccessed.length();
 		}
 	}
@@ -86,7 +86,7 @@ public class CharJoin implements CharSequence{
 			
 			off += size;
 		}
-		if(result.size() == 1) return result.get(0);
+		if(result.size() == 1) return result.getFirst();
 		return new CharJoin(result);
 	}
 	

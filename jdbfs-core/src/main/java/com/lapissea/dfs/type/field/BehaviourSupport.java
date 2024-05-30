@@ -17,6 +17,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,7 +33,7 @@ public final class BehaviourSupport{
 	public static <T extends IOInstance<T>> BehaviourRes<T> packCompanion(FieldAccessor<T> field){
 		return new BehaviourRes<T>(new VirtualFieldDefinition<>(
 			StoragePool.IO,
-			IOFieldTools.makePackName(field),
+			FieldNames.pack(field),
 			byte[].class
 		));
 	}
@@ -40,25 +41,25 @@ public final class BehaviourSupport{
 	public static <T extends IOInstance<T>> BehaviourRes<T> referenceCompanion(FieldAccessor<T> field){
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Reference>(
 			INSTANCE,
-			IOFieldTools.makeRefName(field),
+			FieldNames.ref(field),
 			Reference.class,
-			List.of(IOFieldTools.makeNullabilityAnn(DEFAULT_IF_NULL))
+			List.of(Annotations.makeNullability(DEFAULT_IF_NULL))
 		));
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> genericID(FieldAccessor<T> field){
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Integer>(
 			IO,
-			IOFieldTools.makeGenericIDFieldName(field),
+			FieldNames.genericID(field),
 			int.class,
-			List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
+			List.of(Annotations.make(IODependency.VirtualNumSize.class), IOValue.Unsigned.INSTANCE)
 		));
 	}
 	
 	private static <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 		if(field.hasAnnotation(IOValue.Reference.class)) return false;
 		var typ = field.getType();
-		if(typ.isArray()) return true;
+		if(typ.isArray() || UtilL.instanceOf(typ, Type.class)) return true;
 		if(IOInstance.isInstance(typ)){
 			return IOInstance.isManaged(typ);
 		}
@@ -77,7 +78,7 @@ public final class BehaviourSupport{
 		
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Boolean>(
 			StoragePool.IO,
-			IOFieldTools.makeNullFlagName(field),
+			FieldNames.nullFlag(field),
 			boolean.class
 		));
 	}
@@ -159,9 +160,9 @@ public final class BehaviourSupport{
 		assert field.hasAnnotation(IOValue.Reference.class);
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Reference>(
 			INSTANCE,
-			IOFieldTools.makeRefName(field),
+			FieldNames.ref(field),
 			Reference.class,
-			List.of(IOFieldTools.makeNullabilityAnn(DEFAULT_IF_NULL))
+			List.of(Annotations.makeNullability(DEFAULT_IF_NULL))
 		));
 	}
 	
@@ -178,12 +179,12 @@ public final class BehaviourSupport{
 		arrayLenSize.map(Annotation::annotationType).ifPresent(annotationTouch::add);
 		
 		var arrayLengthSizeName = arrayLenSize.map(IODependency.ArrayLenSize::name)
-		                                      .orElseGet(() -> IOFieldTools.makeNumberSizeName(IOFieldTools.makeCollectionLenName(field)));
+		                                      .orElseGet(() -> FieldNames.numberSize(FieldNames.name(FieldNames.collectionLen(field))));
 		
 		boolean needsNumSize = type == int[].class;
 		
 		var lenField = new VirtualFieldDefinition<>(
-			IO, IOFieldTools.makeCollectionLenName(field), int.class,
+			IO, FieldNames.collectionLen(field), int.class,
 			(VirtualFieldDefinition.GetterFilter<T, Integer>)(ioPool, instance, dependencies, value) -> {
 				if(value>0) return value;
 				var collection = instance == null? null : field.get(ioPool, instance);
@@ -194,14 +195,14 @@ public final class BehaviourSupport{
 				return 0;
 			},
 			List.of(
-				IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
+				Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
 				IOValue.Unsigned.INSTANCE
 			));
 		
 		
 		
 		if(needsNumSize){
-			var numSizField = new VirtualFieldDefinition<T, NumberSize>(IO, IOFieldTools.makeNumberSizeName(field), NumberSize.class);
+			var numSizField = new VirtualFieldDefinition<T, NumberSize>(IO, FieldNames.numberSize(field), NumberSize.class);
 			return new BehaviourRes<>(List.of(lenField, numSizField), annotationTouch);
 		}
 		

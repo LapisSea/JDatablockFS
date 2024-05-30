@@ -1,9 +1,9 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.MagicID;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Cluster;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.collections.IOList;
@@ -18,12 +18,27 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.NewUnmanaged;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.compilation.JorthLogger;
+import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.dfs.logging.Log.trace;
@@ -98,9 +113,8 @@ public final class TestUtils{
 	) throws IOException{
 		UnsafeConsumer<DataProvider, IOException> ses = provider -> {
 			var chunk = AllocateTicket.bytes(initalCapacity).submit(provider);
-			var ref   = chunk.getPtr().makeReference(0);
 			
-			T obj = constr.make(provider, ref, typeDef);
+			T obj = constr.make(provider, chunk, typeDef);
 			
 			var actualSize = StandardStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
@@ -116,7 +130,7 @@ public final class TestUtils{
 			
 			T read;
 			try{
-				read = constr.make(provider, ref, typeDef);
+				read = constr.make(provider, chunk, typeDef);
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to read object with data", e);
 			}
@@ -163,10 +177,148 @@ public final class TestUtils{
 	}
 	
 	public static void randomBatch(int totalTasks, int batch, Task task){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
+		randomBatch(name, totalTasks, batch, task);
+	}
+	
+	public static void randomBatch(String name, int totalTasks, int batch, Task task){
 		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
-		), r -> null);
+		), FuzzingRunner::noopAction);
 		
-		fuz.runAndAssert(69, totalTasks, batch);
+		fuz.runAndAssert(new FuzzConfig().withName(name), 69, totalTasks, batch);
+	}
+	
+	
+	public record Prop(String name, Type type, Object val){ }
+	
+	public static Class<?> generateIOManagedClass(String className, List<Prop> props){
+		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
+			@Override
+			protected Class<?> findClass(String name) throws ClassNotFoundException{
+				if(!className.equals(name)) return super.findClass(name);
+				
+				var l = JorthLogger.make();
+				var j = new Jorth(this, l == null? null : l::log);
+				
+				try(var code = j.writer()){
+					writeIOManagedClass(code, name, props);
+				}catch(MalformedJorth e){
+					throw new RuntimeException("Failed to generate: " + name, e);
+				}finally{
+					if(l != null) LogUtil.println(l.output());
+				}
+				var bb = j.getClassFile(name);
+				return defineClass(name, bb, 0, bb.length);
+			}
+		};
+		try{
+			return loader.loadClass(className);
+		}catch(ClassNotFoundException e){
+			throw new RuntimeException("Failed to load: " + className, e);
+		}
+	}
+	
+	public static void writeIOManagedClass(CodeStream code, String className, List<Prop> props) throws MalformedJorth{
+		code.addImports(IOInstance.Managed.class, IOValue.class);
+		code.write(
+			"""
+				extends #IOInstance.Managed<{0}>
+				public class {0} start
+					
+					template-for #val in {1} start
+						@ #IOValue
+						public field #val.name #val.type
+					end
+					
+					public function <init> start
+						super start end
+				""",
+			className, props
+		);
+		for(Prop prop : props){
+			if(prop.val != null){
+				code.write("{} set this {!}", prop.val, prop.name);
+			}
+		}
+		code.write(
+			"""
+					end
+				end
+				"""
+		);
+	}
+	
+	public static <T> T callWithClassLoader(ClassLoader classLoader, String sesName) throws ReflectiveOperationException{
+		Class<?> cl = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+		var      fn = cl.getDeclaredMethod(sesName);
+		fn.setAccessible(true);
+		return callWithClassLoader(classLoader, fn);
+	}
+	@SuppressWarnings("unchecked")
+	public static <T> T callWithClassLoader(ClassLoader classLoader, Method session) throws ReflectiveOperationException{
+		
+		var orgClass = session.getDeclaringClass();
+		var cname    = orgClass.getName();
+		var fname    = session.getName();
+		
+		var cl = classLoader.loadClass(cname);
+		var fn = cl.getDeclaredMethod(fname);
+		fn.setAccessible(true);
+		var res = fn.invoke(null);
+		return (T)res;
+	}
+	
+	public static ClassLoader makeShadowClassLoader(Map<String, UnsafeFunction<String, byte[], Exception>> shadowingTypes){
+		var mapping = Map.copyOf(shadowingTypes);
+		
+		class ShadowClassLoader extends ClassLoader{
+			static{ registerAsParallelCapable(); }
+			
+			private final Map<Object, Lock> lockMap = new ConcurrentHashMap<>();
+			static        long              ay;
+			
+			@Override
+			protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+				if(name.startsWith("java.lang")) return getParent().loadClass(name);
+				{
+					Class<?> c = findLoadedClass(name);
+					if(c != null) return c;
+				}
+				var lock = lockMap.computeIfAbsent(getClassLoadingLock(name), o -> new ReentrantLock());
+				lock.lock();
+				try{
+					Class<?> c = findLoadedClass(name);
+					if(c != null) return c;
+					
+					var fn = mapping.get(name);
+					if(fn == null){
+						var cls1 = super.loadClass(name, resolve);
+						if(cls1.getClassLoader() == getParent()){
+							var r = getParent().getResourceAsStream(name.replace('.', '/') + ".class");
+							if(r == null) return getParent().loadClass(name);
+							try(r){
+								var bb = r.readAllBytes();
+								return defineClass(name, bb, 0, bb.length);
+							}catch(IOException e){
+								throw new RuntimeException(e);
+							}
+						}
+						return cls1;
+					}
+					
+					try{
+						var bytecode = fn.apply(name);
+						return defineClass(name, bytecode, 0, bytecode.length);
+					}catch(Exception e){
+						throw new RuntimeException("Failed to generate shadow class", e);
+					}
+				}finally{
+					lock.unlock();
+				}
+			}
+		}
+		
+		return new ShadowClassLoader();
 	}
 }

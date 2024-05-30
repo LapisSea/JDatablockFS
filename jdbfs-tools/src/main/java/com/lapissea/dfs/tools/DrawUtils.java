@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools;
 
-import com.lapissea.dfs.chunk.ChunkChainIO;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.render.RenderBackend;
 import com.lapissea.dfs.utils.IterablePP;

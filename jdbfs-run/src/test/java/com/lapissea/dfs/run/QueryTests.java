@@ -1,6 +1,6 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.IOList;

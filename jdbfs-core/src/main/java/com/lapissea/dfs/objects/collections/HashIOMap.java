@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.internal.HashCommons;
 import com.lapissea.dfs.io.IOTransaction;
@@ -10,7 +11,7 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
@@ -42,7 +43,7 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
+public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	@SuppressWarnings({"unchecked"})
 	@Def.ToString.Format("[!!className]{@key: @value}")
@@ -198,12 +199,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private int datasetID;
 	
-	private final Map<K, IOEntry.Modifiable<K, V>>    readOnlyCache;
 	private final Map<Integer, BucketContainer<K, V>> hotBuckets = new ConcurrentHashMap<>();
 	
-	public HashIOMap(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, typeDef);
-		readOnlyCache = readOnly? new HashMap<>() : null;
+	public HashIOMap(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, typeDef);
 		
 		if(!readOnly && isSelfDataEmpty()){
 			newBuckets();
@@ -346,8 +345,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			//noinspection unchecked
 			keyVar = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
 			               .getFields()
-			               .byName("key")
-			               .orElseThrow();
+			               .requireByName("key");
 		}
 		
 		var be = BucketEntry.<K, V>of();
@@ -436,12 +434,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
-		if(readOnly){
-			if(readOnlyCache.containsKey(key)){
-				return readOnlyCache.get(key);
-			}
-		}
-		
 		for(int smallHash : new SmallHashes(bucketPO2, key)){
 			var bucket = getBucket(hotBuckets, buckets, smallHash);
 			
@@ -450,15 +442,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			var entry = bucket.entry(key);
 			if(entry == null) continue;
 			
-			if(readOnly){
-				var e = entry.unsupported();
-				readOnlyCache.put(key, e);
-				return e;
-			}
 			return new ModifiableIOEntry(bucket, entry);
 		}
-		
-		if(readOnly) readOnlyCache.put(key, null);
 		return null;
 	}
 	
@@ -693,7 +678,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			var bucket = getBucket(hotBuckets, buckets, smallHash);
 			
 			if(bucket.node == null){
-				bucket.node = allocNewNode(newEntry, ((Unmanaged<?>)buckets).getReference());
+				bucket.node = allocNewNode(newEntry, ((Unmanaged<?>)buckets).getPointer());
 				setBucket(buckets, smallHash, bucket);
 				return PutAction.OVERWRITE_EMPTY;
 			}
@@ -714,7 +699,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			last = node;
 		}
 		
-		last.setNext(allocNewNode(newEntry, last.getReference()));
+		last.setNext(allocNewNode(newEntry, last.getPointer()));
 		
 		return PutAction.BUCKET_APPEND;
 	}
@@ -727,14 +712,14 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, Reference magnet) throws IOException{
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, ChunkPointer magnet) throws IOException{
 		return IONode.allocValNode(
 			newEntry,
 			null,
 			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
 			buckedNodeType(),
 			getDataProvider(),
-			OptionalLong.of(magnet.calcGlobalOffset(getDataProvider()))
+			OptionalLong.of(magnet.getValue())
 		);
 	}
 	private IONode<BucketEntry<K, V>> allocNewNode(RandomIO.Creator entryBytes, IOInstance.Unmanaged<?> magnet) throws IOException{
@@ -744,7 +729,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				null,
 				buckedNodeType(),
 				getDataProvider(),
-				OptionalLong.of(magnet.getReference().getPtr().getValue())
+				OptionalLong.of(magnet.getPointer().getValue())
 			);
 		}
 	}

@@ -1,6 +1,6 @@
 package com.lapissea.dfs.objects.text;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -55,7 +55,16 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
 	
 	
-	public static final ObjectPipe<String, Object> STR_PIPE = new ObjectPipe<>(){
+	public static final ObjectPipe.NoPool<String> STR_PIPE = new ObjectPipe.NoPool<>(){
+		private final BasicSizeDescriptor<String, Void> sizeDescriptor;
+		
+		{
+			var desc = AutoText.PIPE.getSizeDescriptor();
+			sizeDescriptor = BasicSizeDescriptor.Unknown.of(
+				desc.getWordSpace(), desc.getMin(), desc.getMax(),
+				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
+		}
+		
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, String instance) throws IOException{
 			AutoText.PIPE.write(provider, dest, new AutoText(instance));
@@ -69,16 +78,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			return AutoText.PIPE.readNew(provider, src, null).getData();
 		}
 		@Override
-		public BasicSizeDescriptor<String, Object> getSizeDescriptor(){
-			var desc = AutoText.PIPE.getSizeDescriptor();
-			return BasicSizeDescriptor.Unknown.of(
-				desc.getWordSpace(), desc.getMin(), desc.getMax(),
-				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
-		}
-		@Override
-		public Object makeIOPool(){
-			return null;
-		}
+		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){ return sizeDescriptor; }
 	};
 	
 	private String       data;

@@ -272,7 +272,7 @@ public class Log{
 					i += 1 + col.name.length();
 					continue;
 				}else if(c == '#' && message.charAt(i + 1) == '}'){
-					var col = colorStack.remove(colorStack.size() - 1);
+					var col = colorStack.removeLast();
 					formatted.append(col);
 					last = col;
 					i++;
@@ -297,7 +297,7 @@ public class Log{
 				if(formatted.length()>i + 2){
 					var c3 = formatted.charAt(i + 2);
 					if(c3 == '~'){
-						var replace = arg instanceof Type typ? Utils.typeToHuman(typ, false) : Utils.toShortString(arg);
+						var replace = arg instanceof Type typ? Utils.typeToHuman(typ) : Utils.toShortString(arg);
 						formatted.replace(i, i + 3, replace);
 						return i + replace.length();
 					}else if(c3 == '#'){
@@ -343,7 +343,16 @@ public class Log{
 			}
 		}
 		
-		throw new IllegalArgumentException();
+		throw new IllegalArgumentException(
+			"Could not find {} / {}~ / {}#<color_name> in:\n" +
+			formatted.substring(start) + (
+				start == 0?
+				"" :
+				"\n" +
+				"Full formatted string:\n" +
+				formatted
+			)
+		);
 	}
 	
 	private static Optional<Tag> findColor(CharSequence formatted, int hStart){

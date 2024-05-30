@@ -15,19 +15,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.stream.LongStream;
 
-public class LoggedMemoryUtils{
+public final class LoggedMemoryUtils{
 	
-	private static WeakReference<MemoryLogConfig> CONFIG = new WeakReference<>(null);
+	private static MemoryLogConfig CONFIG;
 	
 	public static synchronized MemoryLogConfig readConfig(){
-		MemoryLogConfig config = CONFIG.get();
-		if(config != null) return config;
+		var c = CONFIG;
+		if(c != null) return c;
 		
 		Map<String, Object> data;
 		var                 f = new File("config.json").getAbsoluteFile();
@@ -36,15 +35,13 @@ public class LoggedMemoryUtils{
 			Log.info("Loaded config from {}", f);
 		}catch(FileNotFoundException e){
 			data = Map.of();
-			Log.trace("Config does not exist", e);
+			Log.trace("Config does not exist! {}", e);
 		}catch(Exception e){
 			data = Map.of();
 			Log.warn("Unable to load config: {}", e);
 		}
 		
-		var newConf = new MemoryLogConfig(data);
-		CONFIG = new WeakReference<>(newConf);
-		return newConf;
+		return CONFIG = new MemoryLogConfig(data);
 	}
 	
 	public static void simpleLoggedMemorySession(UnsafeConsumer<IOInterface, IOException> session) throws IOException{
@@ -80,7 +77,7 @@ public class LoggedMemoryUtils{
 		}, Thread::startVirtualThread);
 	}
 	
-	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger){
+	public static MemoryData newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger){
 		var    hasFallback = readConfig().loggerFallbackType != MemoryLogConfig.LoggerType.NONE;
 		IOHook proxyLogger = adaptToHook(sessionName, hasFallback, logger);
 		
@@ -110,7 +107,7 @@ public class LoggedMemoryUtils{
 			try(var ignored = lock.open()){
 				var ses = logger.get().getSession(sessionName);
 				while(!preBuf.isEmpty()){
-					ses.log(preBuf.remove(0));
+					ses.log(preBuf.removeFirst());
 				}
 			}catch(DataLogger.Closed ignored){
 			}
@@ -128,7 +125,7 @@ public class LoggedMemoryUtils{
 				if(asyncLoad || logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
-						ses.log(preBuf.remove(0));
+						ses.log(preBuf.removeFirst());
 					}
 					ses.log(memFrame);
 				}else{

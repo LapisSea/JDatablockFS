@@ -1,7 +1,11 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.SyntheticParameterizedType;
+import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
@@ -17,17 +21,25 @@ import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -217,6 +229,29 @@ public class GeneralTests{
 		);
 	}
 	
+	@Test(groups = {"rootProvider"})
+	void rootIntProvide() throws IOException{
+		var cl = Cluster.init(MemoryData.empty());
+		cl.roots().provide(1, -123);
+		int val = cl.roots().require(1, int.class);
+		assertEquals(val, -123);
+	}
+	
+	@Test(groups = {"rootProvider"})
+	void rootIntegerProvide() throws IOException{
+		var cl = Cluster.init(MemoryData.empty());
+		cl.roots().provide(1, -123);
+		Integer val = cl.roots().require(1, Integer.class);
+		assertEquals(val, -123);
+	}
+	
+	@Test(groups = {"rootProvider"})
+	void rootIntRequest() throws IOException{
+		var cl  = Cluster.init(MemoryData.empty());
+		var val = cl.roots().request(1, int.class);
+		assertEquals(val, 0);
+	}
+	
 	@Test
 	void stringTest() throws IOException{
 		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
@@ -236,33 +271,42 @@ public class GeneralTests{
 	}
 	
 	
-	@org.testng.annotations.DataProvider(name = "strings")
+	@org.testng.annotations.DataProvider
 	public static Object[][] strings(){
-		return new Object[][]{
-			{""},
-			{"ABC123"},
-			{"this works"},
-			{"hey does this work"},
-			{"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds"},
-			{"I ❤️ you"},
-			{"\u00ff"},
-			{IntStream.range(0, 1000).mapToObj(i -> "loong string!? (" + i + ")").collect(Collectors.joining(", "))},
-			};
+		var rr = new RawRandom(123);
+		return Stream.concat(
+			Stream.of(
+				"",
+				"ABC123",
+				"this works",
+				"hey does this work",
+				"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds",
+				"I ❤️ you",
+				"\u00ff",
+				IntStream.range(0, 1000).mapToObj(i -> "loong string!? (" + i + ")").collect(Collectors.joining(", "))
+			),
+			Stream.generate(
+				() -> IntStream.range(0, rr.nextInt(20))
+				               .mapToObj(i1 -> ((char)rr.nextInt(300)) + "")
+				               .collect(Collectors.joining(""))
+			).filter(StandardCharsets.UTF_8.newEncoder()::canEncode).limit(15)
+		).map(o -> new Object[]{o}).toArray(Object[][]::new);
 	}
 	
 	@Test(dataProvider = "strings")
 	void autoTextTest(String data) throws IOException{
 		TestUtils.testChunkProvider(TestInfo.of(data), provider -> {
-			StructPipe<AutoText> pipe = StandardStructPipe.of(AutoText.class);
 			
 			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
 			var text = new AutoText(data);
 			
-			pipe.write(provider, chunk, text);
-			var read = pipe.readNew(chunk, null);
+			AutoText.PIPE.write(chunk, text);
+			var read = AutoText.PIPE.readNew(chunk, null);
 			
-			assertEquals(text, read);
+			if(Objects.equals(text, read)) return;
+			assertEquals(text, read, "Text bytes: " + data.chars().mapToObj(Integer::toString)
+			                                              .collect(Collectors.joining(", ", "[", "]")));
 		});
 	}
 	
@@ -383,5 +427,92 @@ public class GeneralTests{
 					throw new RuntimeException(e + " prev " + v);
 				}
 			});
+	}
+	
+	@Test
+	void optionalValue() throws IOException{
+		interface Foo extends IOInstance.Def<Foo>{
+			Optional<String> val();
+			static Foo of(Optional<String> val){ return IOInstance.Def.of(Foo.class, val); }
+		}
+		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
+			Foo.of(Optional.empty());
+		}
+		
+		TestUtils.testCluster(TestInfo.of(), c -> {
+			Foo def = c.roots().request("default", Foo.class);
+			assertEquals(def, Foo.of(Optional.empty()));
+			
+			var helloWorld = Optional.of("Hello world! :)");
+			c.roots().provide("some", Foo.of(helloWorld));
+			var read = c.roots().request("some", Foo.class);
+			assertEquals(read, Foo.of(helloWorld));
+			
+			c.roots().provide("none", Foo.of(Optional.empty()));
+			Foo none = c.roots().request("none", Foo.class);
+			assertEquals(none, Foo.of(Optional.empty()));
+		});
+	}
+	
+	@Test(expectedExceptions = IllegalField.class)
+	void classValue(){
+		interface Foo extends IOInstance.Def<Foo>{
+			@IONullability(NULLABLE)
+			Class<?> val();
+		}
+		Struct.of(Foo.class, Struct.STATE_DONE);
+	}
+	
+	@Test()
+	void classValueWithOk() throws IOException{
+		interface Foo extends IOInstance.Def<Foo>{
+			@IONullability(NULLABLE)
+			@IOUnsafeValue
+			Class<?> val();
+			static Foo of(Class<?> val){ return IOInstance.Def.of(Foo.class, val); }
+		}
+		
+		Struct.of(Foo.class, Struct.STATE_DONE);
+		
+		
+		TestUtils.testCluster(TestInfo.of(), c -> {
+			Foo def = c.roots().request("default", Foo.class);
+			assertEquals(def, Foo.of(null));
+			
+			var helloWorld = String.class;
+			c.roots().provide("some", Foo.of(helloWorld));
+			var read = c.roots().request("some", Foo.class);
+			assertEquals(read, Foo.of(helloWorld));
+			
+			c.roots().provide("none", Foo.of(null));
+			Foo none = c.roots().request("none", Foo.class);
+			assertEquals(none, Foo.of(null));
+		});
+	}
+	
+	@Test()
+	void typeValueWithOk() throws IOException{
+		interface Foo extends IOInstance.Def<Foo>{
+			@IONullability(NULLABLE)
+			@IOUnsafeValue
+			Type val();
+			static Foo of(Type val){ return IOInstance.Def.of(Foo.class, val); }
+		}
+		
+		Struct.of(Foo.class, Struct.STATE_DONE);
+		
+		TestUtils.testCluster(TestInfo.of(), c -> {
+			Foo def = c.roots().request("default", Foo.class);
+			assertEquals(def, Foo.of(null));
+			
+			var helloWorld = SyntheticParameterizedType.of(List.class, List.of(Integer.class));
+			c.roots().provide("some", Foo.of(helloWorld));
+			var read = c.roots().request("some", Foo.class);
+			assertEquals(read, Foo.of(helloWorld));
+			
+			c.roots().provide("none", Foo.of(null));
+			Foo none = c.roots().request("none", Foo.class);
+			assertEquals(none, Foo.of(null));
+		});
 	}
 }

@@ -1,8 +1,8 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.util.LogUtil;
@@ -76,7 +76,7 @@ public class MemoryManagementBenchmark{
 	
 	@Setup(Level.Invocation)
 	public void initData(){
-		mem = MemoryData.builder().withRaw(src).build();
+		mem = MemoryData.of(src);
 		try{
 			cls = new Cluster(mem);
 		}catch(IOException e){

@@ -718,7 +718,7 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	void free(long index) throws IOException;
 	
-	default IOList<T> cachedView(int maxCacheSize){
-		return new IOListCached<>(this, maxCacheSize);
+	default IOList<T> cachedView(int maxCacheSize, int maxLinearCache){
+		return new IOListCached<>(this, maxCacheSize, maxLinearCache);
 	}
 }

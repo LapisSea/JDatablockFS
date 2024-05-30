@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 
 import java.util.ArrayList;
@@ -40,12 +41,12 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
-		return getDeps(FieldSet.of(names.stream().map(n -> allFields.byName(n).orElseThrow())));
+		return getDeps(FieldSet.of(names.stream().map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()) return emptyTicket();
 		if(selectedFields.size() == 1){
-			return getDeps(selectedFields.get(0));
+			return getDeps(selectedFields.getFirst());
 		}
 		
 		try(var ignored = multiDependencyCacheLock.read()){
@@ -168,7 +169,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	private static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> collectGenerators(Collection<IOField<T, ?>> writeFields){
-		return Utils.nullIfEmpty(writeFields.stream().flatMap(IOField::generatorStream).toList());
+		return Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(List.copyOf(writeFields)));
 	}
 	
 	private FieldSet<T> fieldSetToOrderedList(FieldSet<T> source, Set<IOField<T, ?>> fieldsSet){

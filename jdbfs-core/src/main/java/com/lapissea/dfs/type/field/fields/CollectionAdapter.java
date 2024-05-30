@@ -2,7 +2,7 @@ package com.lapissea.dfs.type.field.fields;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -233,15 +233,19 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 		
 		for(ElementType el : asListView(arr)){
 			if(DEBUG_VALIDATION){
-				var siz = elementIO.calcByteSize(provider, el);
-				
-				try(var buff = dest.writeTicket(siz).requireExact().submit()){
+				try(var buff = makeSizedBuff(provider, dest, el)){
 					elementIO.write(provider, buff, el);
 				}
 			}else{
 				elementIO.write(provider, dest, el);
 			}
 		}
+	}
+	
+	private ContentWriter.BufferTicket.WriteArrayBuffer makeSizedBuff(DataProvider provider, ContentWriter dest, ElementType el){
+		var fixed = elementIO.getFixedByteSize();
+		var siz   = fixed.isPresent()? fixed.getAsLong() : elementIO.calcByteSize(provider, el);
+		return dest.writeTicket(siz).requireExact().submit();
 	}
 	
 	public CollectionType read(int size, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{

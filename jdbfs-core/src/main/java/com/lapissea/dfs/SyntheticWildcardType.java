@@ -32,7 +32,7 @@ public record SyntheticWildcardType(List<Type> lower, List<Type> upper) implemen
 	public String toString(){
 		var args = lower.isEmpty()? upper : lower;
 		
-		if(args.size() == 0 || args.get(0).getTypeName().equals(Object.class.getName())){
+		if(args.size() == 0 || args.getFirst().getTypeName().equals(Object.class.getName())){
 			return "?";
 		}
 		

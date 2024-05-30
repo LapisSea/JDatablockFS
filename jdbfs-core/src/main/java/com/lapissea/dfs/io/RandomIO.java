@@ -567,7 +567,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			@Override
 			public void fillZero(long requestedMemory) throws IOException{
 				var pos = this.pos;
-				IOUtils.zeroFill(this::write, requestedMemory);
+				IOUtils.zeroFill(this, requestedMemory);
 				this.pos = pos;
 			}
 			

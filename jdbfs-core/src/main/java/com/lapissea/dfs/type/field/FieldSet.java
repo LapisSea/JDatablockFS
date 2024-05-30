@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -272,7 +273,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		var size = data.size();
 		if(size == 1 && data instanceof List<IOField<T, ?>> l){
-			return new FieldSet<>(new IOField[]{l.get(0)});
+			return new FieldSet<>(new IOField[]{l.getFirst()});
 		}
 		
 		var safeData = new SetBuilder<T>(size);
@@ -444,6 +445,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	@Override
+	public <T> T[] toArray(IntFunction<T[]> generator){
+		return super.toArray(generator);
+	}
+	
+	@Override
 	public IOField<T, ?> get(int index){
 		return data[index];
 	}
@@ -455,6 +461,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	public OptionalPP<IOField<T, ?>> byName(String name){
 		return OptionalPP.ofNullable(getNameLookup().get(name)).map(this::get);
+	}
+	
+	public IOField<T, ?> requireByName(String name){
+		return byName(name).orElseThrow();
 	}
 	
 	private Map<String, Integer> getNameLookup(){

@@ -45,7 +45,7 @@ public interface CodeStream extends AutoCloseable{
 			parts.add(new CharSubview(code, start, code.length()));
 		}
 		
-		if(parts.size() == 1) return parts.get(0);
+		if(parts.size() == 1) return parts.getFirst();
 		return new CharJoin(parts);
 	}
 	

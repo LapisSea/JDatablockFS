@@ -1,7 +1,8 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Cluster;
+import com.lapissea.dfs.SyntheticParameterizedType;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
@@ -11,7 +12,6 @@ import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -34,13 +34,16 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.LongFunction;
@@ -188,12 +191,12 @@ public class GeneralTypeHandlingTests{
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{
-		var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
+		var cluster = new Cluster(MemoryData.of(data));
 		
 		var r         = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
 		var container = (IOInstance<?>)r.request();
 		
-		IOField f = container.getThisStruct().getFields().byName("r").orElseThrow();
+		IOField f = container.getThisStruct().getFields().requireByName("r");
 		assertEquals(f.instanceToString(null, container, false).orElse(null), "A");
 	}
 	
@@ -222,8 +225,8 @@ public class GeneralTypeHandlingTests{
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
-			provider.roots().provide(new ObjectID("obj"), blob);
-			var read = provider.roots().request("obj", NamedBlob.class);
+			provider.roots().provide(1, blob);
+			var read = provider.roots().request(1, NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			
@@ -318,7 +321,7 @@ public class GeneralTypeHandlingTests{
 		var r    = new Random(69420);
 		var info = EnumUniverse.of(eType);
 		var pip  = StandardStructPipe.of(type);
-		var data = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var data = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		for(int i = 0; i<1000; i++){
 			
 			var set = IOInstance.Def.of(
@@ -540,10 +543,6 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void orderTestType() throws IOException{
-		
-		var cluster = Cluster.emptyMem();
-		var roots   = cluster.roots();
-		
 		var typ = new OrderTestType();
 		typ.commands = List.of(OrderTestType.EnumThing.SET_CLASS_NAME, OrderTestType.EnumThing.SET_METHOD_NAME);
 		typ.sizes = List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.VOID);
@@ -552,7 +551,10 @@ public class GeneralTypeHandlingTests{
 		typ.ignoredFrames = 0;
 		typ.diffBottomCount = 10_000;
 		
-		roots.provide("foo", typ);
+		var cluster = Cluster.emptyMem();
+		cluster.roots().provide(1, typ);
+		var read = cluster.roots().require(1, OrderTestType.class);
+		assertEquals(typ, read);
 	}
 	
 	
@@ -591,7 +593,7 @@ public class GeneralTypeHandlingTests{
 		a.list = List.of("idk");
 		a.ints = new int[1];
 		
-		var prov = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var prov = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var val  = AllocateTicket.bytes(128).submit(prov);
 		aPipe.write(val, a);
 		
@@ -635,7 +637,7 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void genericPropagation() throws IOException{
-		var d    = com.lapissea.dfs.chunk.DataProvider.newVerySimpleProvider();
+		var d    = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
 		var data = IOInstance.Def.of(GenericArg.class);
 		data.allocateNulls(d, null);
 		var strings = data.strings().list();
@@ -648,7 +650,7 @@ public class GeneralTypeHandlingTests{
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void genericStore() throws IOException{
 		var d = Cluster.emptyMem();
-		var data = d.roots().request(new ObjectID("obj"), () -> {
+		var data = d.roots().request(1, () -> {
 			var v = IOInstance.Def.of(GenericArg.class);
 			v.allocateNulls(d, null);
 			return v;
@@ -675,5 +677,48 @@ public class GeneralTypeHandlingTests{
 	@Test(timeOut = 2000)
 	void recursiveSeal(){
 		StandardStructPipe.of(RecursiveSeal.B.class).waitForStateDone();
+	}
+	
+	@DataProvider
+	Object[][] intCollections(){
+		return new Object[][]{
+			{int[].class, new int[]{}},
+			{int[].class, new int[]{-1}},
+			{int[].class, new int[]{0, 1, 412531253}},
+			{Integer[].class, new Integer[]{}},
+			{Integer[].class, new Integer[]{0}},
+			{Integer[].class, new Integer[]{10, -156245, Integer.MAX_VALUE}},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of()},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of(0)},
+			{SyntheticParameterizedType.of(List.class, List.of(Integer.class)), List.of(10, -156245, Integer.MAX_VALUE)},
+			};
+	}
+	
+	Map<Type, Class<?>> intCollectionsTypes = new HashMap<>();
+	
+	@SuppressWarnings("unchecked")
+	@Test(dataProvider = "intCollections")
+	<T extends IOInstance<T>> void intCollections(Type typ, Object val) throws IOException{
+		var type = (Class<T>)intCollectionsTypes.computeIfAbsent(
+			typ,
+			t -> TestUtils.generateIOManagedClass("IntCollectionsType_" + t.getTypeName().hashCode(), List.of(
+				new TestUtils.Prop("val", t, null)
+			))
+		);
+		
+		var struct = Struct.of(type);
+		var pipe   = StandardStructPipe.of(struct);
+		
+		var instance = struct.make();
+		((IOField<T, Object>)struct.getFields().requireByName("val")).set(null, instance, val);
+		
+		var prov  = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
+		var chunk = AllocateTicket.bytes(64).submit(prov);
+		
+		pipe.write(chunk, instance);
+		
+		var read = pipe.readNew(chunk, null);
+		
+		Assert.assertEquals(read, instance);
 	}
 }

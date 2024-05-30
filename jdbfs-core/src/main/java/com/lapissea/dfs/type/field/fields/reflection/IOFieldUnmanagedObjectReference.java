@@ -1,15 +1,17 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
+import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -17,6 +19,7 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.RefField;
@@ -31,9 +34,9 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT
 public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType>{
 	
 	
-	private final Struct.Unmanaged<ValueType> struct;
-	private final StructPipe<ValueType>       instancePipe;
-	private final StructPipe<Reference>       referencePipe;
+	private final Struct.Unmanaged<ValueType>     struct;
+	private final StructPipe<ValueType>           instancePipe;
+	private final ObjectPipe.NoPool<ChunkPointer> ptrPipe;
 	
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
 		this(accessor, null);
@@ -45,12 +48,16 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 		}
 		
 		if(varProvider != null){
-			var pip = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varProvider);
-			referencePipe = pip;
-			initSizeDescriptor(pip.getFixedDescriptor());
+			ptrPipe = ChunkPointer.varSizePipe(varProvider);
+			initSizeDescriptor(SizeDescriptor.Fixed.of(ptrPipe.getSizeDescriptor()));
 		}else{
-			referencePipe = Reference.standardPipe();
-			initSizeDescriptor(referencePipe.getSizeDescriptor().map(this::getReference));
+			ptrPipe = ChunkPointer.DYN_PIPE;
+			initSizeDescriptor(SizeDescriptor.UnknownNum.of(
+				WordSpace.BYTE, 0, NumberSize.LONG.optionalBytesLong,
+				(ioPool, prov, value) -> {
+					var ptr = getPointer(ioPool, value);
+					return ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, ptr, WordSpace.BYTE);
+				}));
 		}
 		
 		struct = Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getType());
@@ -71,17 +78,17 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 			t = AllocateTicket.bytes((min*2 + max)/3);
 		}
 		Chunk chunk = t.submit(provider);
-		var   val   = makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
+		var   val   = makeValueObject(provider, chunk, genericContext);
 		set(null, instance, val);
 	}
 	
 	@Override
-	public void setReference(T instance, Reference newRef){
+	public void setReference(T instance, Reference newRef) throws IOException{
 		var old = get(null, instance);
 		if(old == null) throw new NotImplementedException();
 		
-		old.notifyReferenceMovement(newRef);
-		assert old.getReference().equals(newRef);
+		old.notifyReferenceMovement(newRef.asJustChunk(old.getDataProvider()));
+		assert old.getPointer().equals(newRef.getPtr());
 	}
 	
 	@Override
@@ -100,7 +107,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	
 	@Override
 	public Reference getReference(T instance){
-		return getReference(get(null, instance));
+		return getPointer(null, instance).makeReference();
 	}
 	@Override
 	public StructPipe<ValueType> getReferencedPipe(T instance){
@@ -112,45 +119,50 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varProvider == null? VaryingSize.Provider.ALL_MAX : varProvider);
 	}
 	
-	private Reference getReference(ValueType val){
+	private ChunkPointer getPointer(VarPool<T> pool, T instance){
+		var val = get(pool, instance);
 		if(val == null){
-			if(nullable()) return new Reference();
+			if(nullable()) return ChunkPointer.NULL;
 			throw new NullPointerException();
 		}
-		return val.getReference();
+		return val.getPointer();
 	}
-	private ValueType makeValueObject(DataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
+	
+	private ValueType makeValueObject(DataProvider provider, Chunk identity, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION && genericContext != null){
 			var struct = declaringStruct();
-			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner()) :
-				genericContext.owner().getName() + " != " + struct.getType();
+			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner) :
+				genericContext.owner.getName() + " != " + struct.getType();
 		}
-		if(readNew.isNull()){
+		if(identity == null){
 			if(nullable()) return null;
 			throw new NullPointerException();
 		}
 		var type = IOType.of(getAccessor().getGenericType(genericContext));
-		return struct.make(provider, readNew, type);
+		return struct.make(provider, identity, type);
 	}
 	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		referencePipe.write(provider, dest, getReference(instance));
+		var ptr = getPointer(ioPool, instance);
+		ptrPipe.write(provider, dest, ptr);
 	}
 	
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var ref = referencePipe.readNew(provider, src, null);
-		var val = makeValueObject(provider, ref, genericContext);
+		var       ptr = ptrPipe.readNew(provider, src, null);
+		ValueType val;
+		if(ptr.isNull()){
+			val = null;
+		}else{
+			var ch = ptr.dereference(provider);
+			val = makeValueObject(provider, ch, genericContext);
+		}
 		set(ioPool, instance, val);
 	}
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		if(src.optionallySkipExact(referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
-			return;
-		}
-		
-		referencePipe.skip(provider, src, makeContext(genericContext));
+		ptrPipe.skip(provider, src, null);
 	}
 }

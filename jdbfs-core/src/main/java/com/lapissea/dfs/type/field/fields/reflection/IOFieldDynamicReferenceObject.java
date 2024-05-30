@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -63,7 +64,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
-	private final ObjectPipe<ValueType, ?> valuePipe = new ObjectPipe<>(){
+	private final ObjectPipe.NoPool<ValueType> valuePipe = new ObjectPipe.NoPool<>(){
 		
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, ValueType instance){
@@ -78,12 +79,8 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			throw NotImplementedException.infer();//TODO: implement .readNew()
 		}
 		@Override
-		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
+		public BasicSizeDescriptor<ValueType, Void> getSizeDescriptor(){
 			return BasicSizeDescriptor.Unknown.of((pool, prov, value) -> DynamicSupport.calcSize(prov, value));
-		}
-		@Override
-		public Object makeIOPool(){
-			return null;
 		}
 	};
 	
@@ -98,7 +95,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	@Override
 	public void init(FieldSet<CTyp> fields){
 		super.init(fields);
-		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+		typeID = fields.requireExactInt(FieldNames.genericID(getAccessor()));
 	}
 	
 	@Override
@@ -114,7 +111,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		var idGenerator = new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
-				return provider.getTypeDb().toID(val, record);
+				return provider.getTypeDb().objToID(val, record);
 			}
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{

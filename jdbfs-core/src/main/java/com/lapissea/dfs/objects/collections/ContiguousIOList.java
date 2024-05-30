@@ -1,19 +1,19 @@
 package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.chunk.AllocateTicket;
-import com.lapissea.dfs.chunk.ChainWalker;
-import com.lapissea.dfs.chunk.Chunk;
-import com.lapissea.dfs.chunk.ChunkBuilder;
-import com.lapissea.dfs.chunk.ChunkChainIO;
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.AllocateTicket;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.ChainWalker;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.ChunkBuilder;
+import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.ValueStorage.StorageRule;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
+import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
@@ -29,16 +29,18 @@ import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
-import com.lapissea.dfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -56,9 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.LongStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
@@ -66,7 +65,8 @@ import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings("unchecked")
-public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
+public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOList<T>>
+	implements RandomAccess, IOInstance.Unmanaged.DynamicFields<ContiguousIOList<T>>{
 	
 	private static final TypeCheck TYPE_CHECK = new TypeCheck(
 		ContiguousIOList.class,
@@ -86,14 +86,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private ValueStorage<T> storage;
 	private int             headSize;
 	
-	private final        Map<Long, T> cache;
-	private static final Object       NULL_VAL = new Object();
 	
-	
-	public ContiguousIOList(DataProvider provider, Reference reference, IOType typeDef) throws IOException{
-		super(provider, reference, typeDef, TYPE_CHECK);
-		cache = readOnly? new ConcurrentHashMap<>() : null;
-		
+	public ContiguousIOList(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
+		super(provider, identity, typeDef, TYPE_CHECK);
 		//read data needed for proper function such as number of elements and varying sizes
 		if(!isSelfDataEmpty()){
 			readManagedFields();
@@ -129,7 +124,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private DataProvider makeMagnetProvider(){
 		return getDataProvider().withRouter(t -> {
 			if(t.positionMagnet().isPresent()) return t;
-			return t.withPositionMagnet(getReference().getPtr().getValue());
+			return t.withPositionMagnet(getPointer().getValue());
 		});
 	}
 	
@@ -151,9 +146,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		};
 	}
 	
-	private static class IndexAccessor<T> extends AbstractFieldAccessor<ContiguousIOList<T>>{
+	private static class IndexAccessor<T> extends BasicFieldAccessor<ContiguousIOList<T>>{
 		
-		private static final List<Annotation> NULLABLE_ANNS = List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE));
+		private static final List<Annotation> NULLABLE_ANNS = List.of(Annotations.makeNullability(IONullability.Mode.NULLABLE));
 		
 		private final Type     elementType;
 		private final boolean  genericTypeHasArgs;
@@ -210,13 +205,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static class UnmanagedField<T extends IOInstance.Unmanaged<T>> extends RefField.NoIO<ContiguousIOList<T>, T>{
 		
-		private       long                           index;
-		private final BaseFixedStructPipe<Reference> refPipe;
+		private       long                        index;
+		private final ObjectPipe<ChunkPointer, ?> refPipe;
 		
 		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ValueStorage.UnmanagedInstance<T> storage){
 			super(accessor, SizeDescriptor.Fixed.of(storage.getSizeDescriptor()));
 			this.index = index;
-			refPipe = (BaseFixedStructPipe<Reference>)storage.getRefPipe();
+			refPipe = storage.getPtrPipe();
 		}
 		
 		@Override
@@ -232,7 +227,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public void setReference(ContiguousIOList<T> instance, Reference newRef){
 			try{
 				try(var io = instance.ioAtElement(index)){
-					refPipe.write(instance.getDataProvider(), io, newRef);
+					refPipe.write(instance.getDataProvider(), io, newRef.asJustPointer());
 				}
 			}catch(IOException e){
 				throw new RuntimeException(e);
@@ -243,7 +238,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public Reference getReference(ContiguousIOList<T> instance){
 			try{
 				try(var io = instance.ioAtElement(index)){
-					return refPipe.readNew(instance.getDataProvider(), io, null);
+					return refPipe.readNew(instance.getDataProvider(), io, null).makeReference();
 				}
 			}catch(IOException e){
 				throw new RuntimeException(e);
@@ -257,7 +252,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	@NotNull
 	@Override
-	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
+	public Iterable<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typeDatabase = getDataProvider().getTypeDb();
 		var genericType  = IOType.getArg(getTypeDef(), 0).generic(typeDatabase);
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
@@ -281,13 +276,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
-			return LongStream.range(0, size()).mapToObj(
+			return IterablePPs.rangeMap(
+				0, size(),
 				index -> {
 					indexAccessor.index = index;
 					f.index = index;
 					return f;
-				}
-			);
+				});
 		}
 		
 		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
@@ -303,11 +298,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
 		
-		return LongStream.range(0, size()).mapToObj(index -> {
-			indexAccessor.index = index;
-			ioAt.index = index;
-			return indexField;
-		});
+		return IterablePPs.rangeMap(
+			0, size(),
+			index -> {
+				indexAccessor.index = index;
+				ioAt.index = index;
+				return indexField;
+			});
 	}
 	
 	private static final CommandSet END_SET  = CommandSet.builder(CommandSet.Builder::endFlow);
@@ -414,7 +411,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			varyingBuffer = newVarying;
 			writeManagedFields();
 			
-			try(var io = getReference().addOffset(headSiz).io(getDataProvider())){
+			try(var io = getPointer().makeReference().addOffset(headSiz).io(getDataProvider())){
 				
 				for(long i = 0; i<size(); i++){
 					var newDataStart = i*newElemenSize;
@@ -476,29 +473,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@Override
 	public T get(long index) throws IOException{
 		checkSize(index);
-		if(readOnly){
-			return getCached(index);
-		}
 		return readAt(index);
-	}
-	
-	private T getCached(long index) throws IOException{
-		if(cache.containsKey(index)){
-			return cacheGet(index);
-		}
-		var val = readAt(index);
-		cachePut(index, val);
-		return val;
-	}
-	
-	private void cachePut(long index, T val){
-		cache.put(index, val == null? (T)NULL_VAL : val);
-	}
-	
-	private T cacheGet(long index){
-		var val = cache.get(index);
-		if(val == NULL_VAL) return null;
-		return val;
 	}
 	
 	@Override
@@ -696,7 +671,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	private void defragData(long extraSlots) throws IOException{
-		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, 8);
+		defragData(getPointer().dereference(getDataProvider()), extraSlots, 8);
 	}
 	private void defragData(Chunk ch, long extraSlots, int max) throws IOException{
 		if(max<=2) return;
@@ -820,7 +795,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var prov = getDataProvider();
 		
-		var endRef  = getReference().addOffset(siz);
+		var endRef  = getPointer().makeReference().addOffset(siz);
 		var ptr     = ChunkPointer.of(endRef.calcGlobalOffset(prov));
 		var builder = new ChunkBuilder(prov, ptr).withCapacity(totalFree);
 		
@@ -828,7 +803,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var headerSize = ch.getHeaderSize();
 		if(headerSize>=totalFree) return;
 		
-		Chunk chRem   = getReference().getPtr().dereference(prov);
+		Chunk chRem   = getPointer().dereference(prov);
 		var   sizeRem = siz;
 		while(chRem.hasNextPtr()){
 			sizeRem -= chRem.getSize();
@@ -884,9 +859,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					var index = cursor++;
 					return full -> {
 						checkSize(index);
-						if(readOnly){
-							return getCached(index);
-						}
 						try(var io = ioAtElement(index)){
 							if(!full && depTicket != null && storage instanceof ValueStorage.InstanceBased i){
 								return (T)i.readNewSelective(io, depTicket, true);

@@ -17,7 +17,7 @@ public sealed interface FuzzFail<State, Act>{
 	static <Act, Stat> String report(List<? extends FuzzFail<Stat, Act>> fails){
 		if(fails.isEmpty()) return "";
 		if(fails.size() == 1){
-			return fails.get(0).trace();
+			return fails.getFirst().trace();
 		}
 		
 		var sb = new StringBuilder("Multiple fails:\n");
@@ -25,7 +25,7 @@ public sealed interface FuzzFail<State, Act>{
 			sb.append('\t').append(fail.note()).append('\n');
 		}
 		sb.append("\nFirst fail:\n");
-		sb.append(fails.get(0).trace());
+		sb.append(fails.getFirst().trace());
 		return sb.toString();
 	}
 	
@@ -51,7 +51,7 @@ public sealed interface FuzzFail<State, Act>{
 			                          .values().stream()
 			                          .map(l -> sortFails(l, FailOrder.LEAST_ACTION))
 			                          .sorted(Comparator.<List<F>>comparingInt(f -> -f.size()).thenComparingInt(f -> {
-				                          return switch(f.get(0)){
+				                          return switch(f.getFirst()){
 					                          case FuzzFail.Action<?, ?> a -> a.localIndex();
 					                          case FuzzFail.Create<?, ?> c -> -1;
 				                          };
@@ -100,7 +100,6 @@ public sealed interface FuzzFail<State, Act>{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
-			Objects.requireNonNull(action);
 			if(actionIndex<0) throw new IllegalArgumentException("actionIndex must be positive");
 			Objects.requireNonNull(timeToFail);
 			Objects.requireNonNull(badState);
@@ -144,7 +143,7 @@ public sealed interface FuzzFail<State, Act>{
 			
 			return actionIndex == actionIndex2 &&
 			       sequence.equals(sequence2) &&
-			       action.equals(action2);
+			       Objects.equals(action, action2);
 		}
 		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
 		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }

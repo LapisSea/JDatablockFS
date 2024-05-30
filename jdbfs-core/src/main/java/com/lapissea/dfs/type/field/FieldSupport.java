@@ -14,6 +14,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -21,7 +22,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.IOField.*;
@@ -138,20 +138,32 @@ final class FieldSupport{
 		if(val.getClass().isArray()){
 			var res    = new StringJoiner(", ", "[", "]");
 			int resLen = 0, len = Array.getLength(val), remaining = len;
+			
+			var comp      = val.getClass().componentType();
+			var primitive = comp.isPrimitive();
+			
+			var oArr = primitive? null : (Object[])val;
 			for(int i = 0; i<len; i++){
-				var e = Utils.toShortString(Array.get(val, i));
-				resLen += 2 + e.length();
+				var element = oArr != null? oArr[i] : Array.get(val, i);
+				var elStr   = primitive? element + "" : Utils.toShortString(element);
+				resLen += 2 + elStr.length();
 				var lenNow = resLen + rem(remaining).length();
 				if(doShort && lenNow>=200){
-					var type = UtilL.findClosestCommonSuper(
-						IntStream.range(0, len)
-						         .mapToObj(j -> Array.get(val, j))
-						         .filter(Objects::nonNull)
-						         .map(Object::getClass));
+					Class<?> type;
+					if(comp.isPrimitive()) type = comp;
+					else{
+						type = null;
+						for(Object o : oArr){
+							if(o == null) continue;
+							var c = o.getClass();
+							if(type == null) type = c;
+							else type = UtilL.findClosestCommonSuper(type, c);
+						}
+					}
 					return Optional.of(type.getSimpleName() + "[" + len + "]");
 				}
 				if(lenNow<(doShort? 100 : 200)){
-					res.add(e);
+					res.add(elStr);
 					remaining--;
 				}
 			}
@@ -197,49 +209,60 @@ final class FieldSupport{
 	static int typeFlags(IOField<?, ?> field){
 		int typeFlags = 0;
 		var accessor  = field.getAccessor();
+		if(accessor == null) return typeFlags;
 		
-		if(accessor != null){
-			if(IOFieldTools.isGenerated(field)){
-				typeFlags |= HAS_GENERATED_NAME;
-			}
-			
-			boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(accessor.getType());
-			if(isDynamic){
-				typeFlags |= DYNAMIC_FLAG;
-			}
-			
-			var typeGen = accessor.getGenericType(null);
-			while(true){
-				if(typeGen instanceof Class<?> c){
-					if(c.isArray()){
-						typeGen = c.componentType();
-						continue;
-					}
-				}
-				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
-					typeGen = switch(typeGen){
-						case Class<?> c -> Object.class;
-						case ParameterizedType t -> t.getActualTypeArguments()[0];
-						default -> throw new NotImplementedException(typeGen.getClass() + "");
-					};
+		if(IOFieldTools.isGenerated(field)){
+			typeFlags |= HAS_GENERATED_NAME;
+		}
+		
+		var typeGen = accessor.getGenericType(null);
+		var type    = accessor.getType();
+		
+		if(type == Optional.class){
+			typeGen = IOFieldTools.unwrapOptionalTypeRequired(typeGen);
+			type = Utils.typeToRaw(typeGen);
+		}
+		
+		boolean isDynamic = IOFieldTools.isGeneric(accessor) || isSealedCached(type);
+		if(isDynamic){
+			typeFlags |= DYNAMIC_FLAG;
+		}
+		
+		while(true){
+			if(typeGen instanceof Class<?> c){
+				if(c.isArray()){
+					typeGen = c.componentType();
 					continue;
 				}
-				break;
 			}
-			
-			var type = Utils.typeToRaw(typeGen);
-			
-			if(IOInstance.isInstance(type)){
-				typeFlags |= IOINSTANCE_FLAG;
-				
-				if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(type)){
-					typeFlags |= HAS_NO_POINTERS_FLAG;
-				}
+			if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
+				typeGen = switch(typeGen){
+					case Class<?> c -> Object.class;
+					case ParameterizedType t -> t.getActualTypeArguments()[0];
+					default -> throw new NotImplementedException(typeGen.getClass() + "");
+				};
+				continue;
 			}
-			if(SupportedPrimitive.isAny(type) || type.isEnum()){
-				typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+			break;
+		}
+		
+		var rawType = Utils.typeToRaw(typeGen);
+		
+		if(IOInstance.isInstance(rawType)){
+			typeFlags |= IOINSTANCE_FLAG;
+			
+			if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
+				typeFlags |= HAS_NO_POINTERS_FLAG;
 			}
 		}
+		if(SupportedPrimitive.isAny(rawType) || rawType.isEnum()){
+			typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+		}
+		
+		if(UtilL.instanceOf(rawType, Type.class)){
+			typeFlags |= HAS_NO_POINTERS_FLAG;
+		}
+		
 		return typeFlags;
 	}
 }

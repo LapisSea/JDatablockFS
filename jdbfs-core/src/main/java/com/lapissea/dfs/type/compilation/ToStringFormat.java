@@ -139,7 +139,7 @@ public class ToStringFormat{
 		
 		return switch(roots.size()){
 			case 0 -> new ToStringFragment.NOOP();
-			case 1 -> roots.get(0);
+			case 1 -> roots.getFirst();
 			default -> new ToStringFragment.Concat(List.copyOf(roots));
 		};
 	}

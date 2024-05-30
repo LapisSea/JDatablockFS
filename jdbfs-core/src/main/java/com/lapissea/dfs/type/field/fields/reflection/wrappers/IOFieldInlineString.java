@@ -1,6 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
-import com.lapissea.dfs.chunk.DataProvider;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.text.AutoText;
@@ -45,7 +45,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 			nullable()? 0 : desc.getMin(),
 			desc.getMax(),
 			(ioPool, prov, inst) -> {
-				var val = getWrapped(null, inst);
+				var val = getWrapped(ioPool, inst);
 				if(val == null){
 					if(nullable()) return 0;
 					throw new NullPointerException();
