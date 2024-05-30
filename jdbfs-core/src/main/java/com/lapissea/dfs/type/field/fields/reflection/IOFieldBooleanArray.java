@@ -48,7 +48,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
-			if(siz>0) return siz;
+			if(siz>0) return BitUtils.bitsToBytes(siz);
 			var arr = get(ioPool, inst);
 			return arr == null? 0 : BitUtils.bitsToBytes(arr.length);
 		}));
