@@ -316,6 +316,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	public ClassType type(){
 		return type;
 	}
+	@Override
+	public boolean isPrimitive(){
+		return false;
+	}
 	
 	@Override
 	public boolean isFinal(){

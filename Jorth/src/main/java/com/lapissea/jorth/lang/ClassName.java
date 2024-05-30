@@ -46,6 +46,15 @@ public final class ClassName{
 		if(this.equals(right)){
 			return true;
 		}
+		var info = source.byName(this);
+		if(info.isPrimitive()){
+			return false;
+		}
+		
+		if(source.byName(right).isPrimitive()){
+			return false;
+		}
+		
 		if(right.dotted().equals(Object.class.getName())){
 			return true;
 		}
@@ -53,7 +62,6 @@ public final class ClassName{
 			return false;
 		}
 		
-		var info      = source.byName(this);
 		var superType = info.superType();
 		if(superType != null && superType.name().instanceOf(source, right)) return true;
 		var interfaces = info.interfaces();
