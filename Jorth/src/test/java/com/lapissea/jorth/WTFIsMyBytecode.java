@@ -8,6 +8,10 @@ import java.util.List;
  */
 public class WTFIsMyBytecode<ARG>{
 	
+	static class InnerStaticClass{
+		int hi;
+	}
+	
 	byte[] bArr;
 	
 	List<String> strs;

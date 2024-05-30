@@ -29,11 +29,6 @@ import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class JorthTests{
 	
-	public static void main(String[] args) throws Throwable{
-		new JorthTests().simpleEnum();
-	}
-	
-	
 	static{
 		Thread.startVirtualThread(() -> new Jorth(null, null));
 	}
