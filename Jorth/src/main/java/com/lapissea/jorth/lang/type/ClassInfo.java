@@ -65,6 +65,10 @@ public interface ClassInfo{
 			return ClassType.CLASS;
 		}
 		@Override
+		public boolean isPrimitive(){
+			return false;
+		}
+		@Override
 		public boolean isFinal(){
 			throw NotImplementedException.infer();//TODO: implement OfArray.isFinal()
 		}
@@ -287,6 +291,10 @@ public interface ClassInfo{
 			return ClassType.CLASS;
 		}
 		@Override
+		public boolean isPrimitive(){
+			return clazz.isPrimitive();
+		}
+		@Override
 		public boolean isFinal(){
 			return Modifier.isFinal(clazz.getModifiers());
 		}
@@ -319,6 +327,8 @@ public interface ClassInfo{
 	ClassName name();
 	ClassInfo superType() throws MalformedJorth;
 	ClassType type();
+	
+	boolean isPrimitive();
 	
 	boolean isFinal();
 	List<GenericType> interfaces();
