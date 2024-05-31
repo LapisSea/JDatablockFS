@@ -31,7 +31,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
-		var pip = StandardStructPipe.of(instance.getThisStruct());
+		var pip = StandardStructPipe.of(instance.getThisStruct(), StructPipe.STATE_DONE);
 		return pip.calcUnknownSize(provider, instance, wordSpace);
 	}
 	

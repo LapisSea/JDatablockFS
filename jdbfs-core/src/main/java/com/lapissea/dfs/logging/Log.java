@@ -297,7 +297,7 @@ public class Log{
 				if(formatted.length()>i + 2){
 					var c3 = formatted.charAt(i + 2);
 					if(c3 == '~'){
-						var replace = arg instanceof Type typ? Utils.typeToHuman(typ, false) : Utils.toShortString(arg);
+						var replace = arg instanceof Type typ? Utils.typeToHuman(typ) : Utils.toShortString(arg);
 						formatted.replace(i, i + 3, replace);
 						return i + replace.length();
 					}else if(c3 == '#'){

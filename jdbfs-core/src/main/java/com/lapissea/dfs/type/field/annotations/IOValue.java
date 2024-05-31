@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.field.annotations;
 
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.Annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -83,7 +83,7 @@ public @interface IOValue{
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Unsigned{
-		Unsigned INSTANCE = IOFieldTools.makeAnnotation(Unsigned.class);
+		Unsigned INSTANCE = Annotations.make(Unsigned.class);
 	}
 	
 	/**

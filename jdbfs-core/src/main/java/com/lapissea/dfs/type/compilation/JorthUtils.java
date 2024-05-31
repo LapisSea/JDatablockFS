@@ -78,8 +78,11 @@ public class JorthUtils{
 		}
 	}
 	
-	static void nullCheck(CodeStream writer) throws MalformedJorth{
+	static void nullCheckDup(CodeStream writer) throws MalformedJorth{
 		nullCheck(writer, "dup");
+	}
+	static void nullCheckDup(CodeStream writer, String message) throws MalformedJorth{
+		nullCheck(writer, "dup", message);
 	}
 	static void nullCheck(CodeStream writer, CharSequence getFragment) throws MalformedJorth{
 		writer.write(
@@ -90,6 +93,17 @@ public class JorthUtils{
 				pop
 				""",
 			getFragment
+		);
+	}
+	static void nullCheck(CodeStream writer, CharSequence getFragment, String message) throws MalformedJorth{
+		writer.write(
+			"""
+				static call #Objects requireNonNull start
+					{} '{}'
+				end
+				pop
+				""",
+			getFragment, message
 		);
 	}
 	

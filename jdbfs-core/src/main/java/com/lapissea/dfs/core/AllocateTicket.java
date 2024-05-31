@@ -14,6 +14,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
@@ -115,6 +116,24 @@ public record AllocateTicket(
 	public AllocateTicket withPositionMagnet(long positionMagnet){ return withPositionMagnet(OptionalLong.of(positionMagnet)); }
 	public AllocateTicket withPositionMagnet(OptionalLong positionMagnet){
 		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
+	}
+	
+	public record TempMem(Chunk chunk) implements Closeable{
+		public TempMem{ Objects.requireNonNull(chunk); }
+		@Override
+		public void close() throws IOException{
+			chunk.freeChaining();
+		}
+	}
+	
+	public TempMem submitAsTempMem(DataProvider provider) throws IOException{
+		return new TempMem(submit(provider));
+	}
+	public TempMem submitAsTempMem(DataProvider.Holder provider) throws IOException{
+		return new TempMem(submit(provider));
+	}
+	public TempMem submitAsTempMem(MemoryManager manager) throws IOException{
+		return new TempMem(submit(manager));
 	}
 	
 	public Chunk submit(DataProvider provider) throws IOException{

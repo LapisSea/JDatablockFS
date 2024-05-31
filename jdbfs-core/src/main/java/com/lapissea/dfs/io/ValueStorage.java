@@ -723,7 +723,7 @@ public sealed interface ValueStorage<T>{
 			return BasicSizeDescriptor.Unknown.of(WordSpace.BYTE, 1, OptionalLong.empty(), (pool, provider, src) -> {
 				int id;
 				try{
-					id = provider.getTypeDb().toID(src, false).val();
+					id = provider.getTypeDb().objToID(src, false).val();
 				}catch(IOException e){
 					throw UtilL.uncheckedThrow(e);
 				}
@@ -741,7 +741,7 @@ public sealed interface ValueStorage<T>{
 		}
 		@Override
 		public void write(RandomIO dest, Object src) throws IOException{
-			var id = provider.getTypeDb().toID(src);
+			var id = provider.getTypeDb().objToID(src);
 			dest.writeUnsignedInt4Dynamic(id);
 			if(src == null) return;
 			
@@ -802,7 +802,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			var id     = provider.getTypeDb().toID(src);
+			var id     = provider.getTypeDb().objToID(src);
 			var orgPos = dest.getPos();
 			var refId  = dest.remaining() == 0? new TypedReference() : readInline(dest);
 			if(refId.isNull()){

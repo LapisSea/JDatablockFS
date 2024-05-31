@@ -88,6 +88,9 @@ public final class TestUtils{
 		});
 	}
 	
+	static void testCluster(UnsafeConsumer<Cluster, IOException> session) throws IOException{
+		testCluster(TestInfo.ofDepth(2), session);
+	}
 	static void testCluster(TestInfo info, UnsafeConsumer<Cluster, IOException> session) throws IOException{
 		testRawMem(info, mem -> {
 			var c = Cluster.init(mem);

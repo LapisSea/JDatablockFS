@@ -20,28 +20,22 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -60,12 +54,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.dfs.Utils.None;
+import static com.lapissea.dfs.Utils.Some;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public final class IOFieldTools{
-	
-	public static final char GENERATED_FIELD_SEPARATOR = ':';
 	
 	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
 		return list -> map.apply(list.stream()).toList();
@@ -184,7 +178,7 @@ public final class IOFieldTools{
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(makeNumberSizeName(field))).findAny()
+			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(FieldNames.numberSize(field))).findAny()
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
@@ -212,39 +206,13 @@ public final class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
-		var acc = WordSpace.BIT;
+		var acc = WordSpace.BYTE;
 		for(IOField<T, ?> field : fields){
 			var descriptor = field.getSizeDescriptor();
 			var wordSpace  = descriptor.getWordSpace();
 			acc = acc.min(wordSpace);
 		}
 		return acc;
-	}
-	
-	private static String makeVirtualName(String base, String extension){
-		return base + GENERATED_FIELD_SEPARATOR + extension;
-	}
-	
-	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "len");
-	}
-	public static <T extends IOInstance<T>> String makeNumberSizeName(FieldAccessor<T> field){
-		return makeNumberSizeName(field.getName());
-	}
-	public static String makeNumberSizeName(String name){
-		return makeVirtualName(name, "nSiz");
-	}
-	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "typeID");
-	}
-	public static <T extends IOInstance<T>> String makeUniverseIDFieldName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "localID");
-	}
-	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "isNull");
-	}
-	public static <T extends IOInstance<T>> String makeNullElementsFlagName(FieldAccessor<T> field){
-		return makeVirtualName(field.getName(), "areNull");
 	}
 	
 	public static boolean isNullable(AnnotatedType holder){
@@ -257,141 +225,8 @@ public final class IOFieldTools{
 		return holder.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
 	
-	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
-		return makeRefName(accessor.getName());
-	}
-	public static String makeRefName(String baseName){
-		return makeVirtualName(baseName, "ref");
-	}
-	
-	public static <T extends IOInstance<T>> String makePackName(FieldAccessor<T> accessor){
-		return makePackName(accessor.getName());
-	}
-	public static String makePackName(String baseName){
-		return makeVirtualName(baseName, "pack");
-	}
-	
-	public static IONullability makeNullabilityAnn(IONullability.Mode mode){
-		return makeAnnotation(IONullability.class, Map.of("value", mode));
-	}
-	
-	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){ return makeAnnotation(annotationType, Map.of()); }
-	@SuppressWarnings("unchecked")
-	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){
-		Objects.requireNonNull(values);
-		Class<?>[] interfaces = annotationType.getInterfaces();
-		if(!annotationType.isAnnotation() || interfaces.length != 1 || interfaces[0] != Annotation.class){
-			throw new IllegalArgumentException(annotationType.getName() + " not an annotation");
-		}
-		
-		var safeValues = Arrays.stream(annotationType.getDeclaredMethods()).map(element -> {
-			String elementName = element.getName();
-			if(values.containsKey(elementName)){
-				Class<?> returnType = element.getReturnType();
-				
-				if(returnType.isPrimitive()){
-					if(returnType == boolean.class) returnType = Boolean.class;
-					else if(returnType == char.class) returnType = Character.class;
-					else if(returnType == float.class) returnType = Float.class;
-					else if(returnType == double.class) returnType = Double.class;
-					else if(returnType == byte.class) returnType = Byte.class;
-					else if(returnType == short.class) returnType = Short.class;
-					else if(returnType == int.class) returnType = Integer.class;
-					else if(returnType == long.class) returnType = Long.class;
-					else throw new ShouldNeverHappenError(returnType.toString());
-				}
-				
-				if(returnType.isInstance(values.get(elementName))){
-					return Map.entry(elementName, values.get(elementName));
-				}else{
-					throw new IllegalArgumentException("Incompatible type for " + elementName);
-				}
-			}else{
-				if(element.getDefaultValue() != null){
-					return Map.entry(elementName, element.getDefaultValue());
-				}else{
-					throw new IllegalArgumentException("Missing value " + elementName);
-				}
-			}
-		}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-		
-		int hash = values.entrySet().stream().mapToInt(element -> {
-			int    res;
-			Object val = element.getValue();
-			if(val.getClass().isArray()){
-				res = 1;
-				for(int i = 0; i<Array.getLength(val); i++){
-					var el = Array.get(val, i);
-					res = 31*res + Objects.hashCode(el);
-				}
-			}else res = Objects.hashCode(val);
-			return (127*element.getKey().hashCode())^res;
-		}).sum();
-		
-		class FakeAnnotation implements Annotation, InvocationHandler{
-			
-			private static final Map<Class<?>, Annotation> NO_ARG_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
-			
-			@Override
-			public Object invoke(Object proxy, Method method, Object[] args) throws Throwable{
-				if(safeValues.containsKey(method.getName())){
-					return safeValues.get(method.getName());
-				}
-				return method.invoke(this, args);
-			}
-			
-			@Override
-			public Class<? extends Annotation> annotationType(){
-				return annotationType;
-			}
-			
-			@Override
-			public boolean equals(Object other){
-				if(this == other) return true;
-				if(!annotationType.isInstance(other)) return false;
-				
-				var that    = annotationType.cast(other);
-				var thatAnn = that.annotationType();
-				
-				return safeValues.entrySet().stream().allMatch(element -> {
-					try{
-						var thatVal = thatAnn.getMethod(element.getKey()).invoke(that);
-						return Objects.deepEquals(element.getValue(), thatVal);
-					}catch(ReflectiveOperationException e){
-						throw new RuntimeException(e);
-					}
-				});
-			}
-			
-			@Override
-			public int hashCode(){
-				return hash;
-			}
-			
-			@Override
-			public String toString(){
-				return '@' + annotationType.getName() + TextUtil.toString(safeValues);
-			}
-		}
-		
-		if(values.isEmpty()){
-			var cached = FakeAnnotation.NO_ARG_CACHE.get(annotationType);
-			if(cached != null) return (E)cached;
-		}
-		
-		var proxy = (E)Proxy.newProxyInstance(annotationType.getClassLoader(),
-		                                      new Class[]{annotationType},
-		                                      new FakeAnnotation());
-		
-		if(values.isEmpty()){
-			FakeAnnotation.NO_ARG_CACHE.put(annotationType, proxy);
-		}
-		
-		return proxy;
-	}
-	
 	public static boolean isGenerated(IOField<?, ?> field){
-		return field.getName().indexOf(GENERATED_FIELD_SEPARATOR) != -1;
+		return field.getName().indexOf(FieldNames.GENERATED_FIELD_SEPARATOR) != -1;
 	}
 	
 	public static boolean isGeneric(AnnotatedType type){
@@ -400,7 +235,6 @@ public final class IOFieldTools{
 	public static boolean isGeneric(GetAnnotation type){
 		return type.isPresent(IOValue.Generic.class);
 	}
-	
 	
 	public static <T extends IOInstance<T>> void requireFieldsEquals(T a, T b){
 		requireFieldsEquals(a, b, "Instances required to be equal but");
@@ -530,7 +364,7 @@ public final class IOFieldTools{
 		if(typ.isPrimitive()) return false;
 		return isGeneric(field) || typ.isArray() ||
 		       Stream.of(
-			       Stream.of(IOInstance.class, Enum.class),
+			       Stream.of(IOInstance.class, Enum.class, Type.class),
 			       FieldCompiler.getWrapperTypes().stream(),
 			       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
 		       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));
@@ -538,7 +372,7 @@ public final class IOFieldTools{
 	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
 		var nam = size.name();
 		if(nam.isEmpty()){
-			return makeNumberSizeName(field);
+			return FieldNames.numberSize(field);
 		}
 		return nam;
 	}
@@ -564,5 +398,42 @@ public final class IOFieldTools{
 			}
 			default -> throw new NotImplementedException(type.getClass().getName());
 		};
+	}
+	
+	public static Type unwrapOptionalTypeRequired(Type optionalType){
+		return unwrapOptionalType(optionalType).orElseThrow(() -> {
+			return new RuntimeException("Failed to unwrap optional type: " + optionalType.getTypeName());
+		});
+	}
+	public static Optional<Type> unwrapOptionalType(Type optionalType){
+		return switch(optionalType){
+			case ParameterizedType typ -> Some(typ.getActualTypeArguments()[0]);
+			default -> None();
+		};
+	}
+	
+	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(List<? extends IOField<T, ?>> fields){
+		
+		int count = 0;
+		for(var f : fields){
+			count += f.getGenerators().size();
+		}
+		if(count == 0) return List.of();
+		
+		//noinspection unchecked
+		IOField.ValueGeneratorInfo<T, ?>[] buff = new IOField.ValueGeneratorInfo[count];
+		var                                pos  = 0;
+		/*
+		Reverse fields due to an assumption that they are sorted as to be a valid dependency order.
+		If there are fields [fancy:value:isNull, fancy:value, fancy] ordered by dependency topology (fancy depends on fancy:value, so it is after it)
+		Generators should be executed in reverse order, so it should be [{fancy -> fancy:value}, {fancy:value -> fancy:value:isNull}]
+		If it is not reversed then isNull generator will be called first. At this point fancy:value is not generated and will always be null.
+		*/
+		for(var f : fields.reversed()){
+			for(var g : f.getGenerators()){
+				buff[pos++] = g;
+			}
+		}
+		return List.of(buff);
 	}
 }

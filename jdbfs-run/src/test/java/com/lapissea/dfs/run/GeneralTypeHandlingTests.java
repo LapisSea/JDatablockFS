@@ -12,7 +12,6 @@ import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -58,80 +57,7 @@ import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class GeneralTypeHandlingTests{
-	
-	@IOValue
-	public static class Deps extends IOInstance.Managed<Deps>{
-		
-		@IODependency("b")
-		public int a;
-		
-		@IODependency("c")
-		public int b;
-		
-		public int c;
-		
-		@IODependency({"c", "b"})
-		public int d;
-	}
-	
-	public static class Arr extends IOInstance.Managed<Arr>{
-		@IOValue
-		public float[] arr;
-	}
-	
-	@DataProvider(name = "genericObjects")
-	static Object[][] genericObjects(){
-		var deps = new Deps();
-		deps.a = 1;
-		deps.b = 2;
-		deps.c = 3;
-		deps.d = 4;
-		var arr = new Arr();
-		arr.arr = new float[]{1, 2, 3, 4, 5};
-		return new Object[][]{{Dummy.first()}, {deps}, {arr}, {arr.arr}, {Instant.now()}, {"Foo"}, {-1}, {12.34}, {true}};
-	}
-	
-	@Test(dataProvider = "genericObjects", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void genericStorage(Object obj) throws IOException{
-		TestUtils.testCluster(TestInfo.of(obj), ses -> {
-			var ls = ses.roots().<IOList<GenericContainer<?>>>builder("list").withType(IOType.ofFlat(
-				LinkedIOList.class,
-				GenericContainer.class, Object.class
-			)).request();
-			
-			var c = new GenericContainer<>(obj);
-			ls.clear();
-			ls.add(c);
-			var read = ls.get(0).value;
-			Assert.assertEquals(obj, read);
-		});
-	}
-	
-	@Test
-	void genericTest() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			var pipe = StandardStructPipe.of(GenericContainer.class);
-			
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			
-			var container = new GenericContainer<>();
-			
-			container.value = new Dummy(123);
-			
-			pipe.write(chunk, container);
-			var read = pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-			
-			
-			container.value = "This is a test.";
-			
-			pipe.write(chunk, container);
-			read = pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-		});
-	}
+	static{ Thread.startVirtualThread(Cluster::emptyMem); }
 	
 	@Test(dataProvider = "types")
 	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
@@ -226,8 +152,8 @@ public class GeneralTypeHandlingTests{
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
-			provider.roots().provide(new ObjectID("obj"), blob);
-			var read = provider.roots().request("obj", NamedBlob.class);
+			provider.roots().provide(1, blob);
+			var read = provider.roots().request(1, NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			
@@ -544,10 +470,6 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void orderTestType() throws IOException{
-		
-		var cluster = Cluster.emptyMem();
-		var roots   = cluster.roots();
-		
 		var typ = new OrderTestType();
 		typ.commands = List.of(OrderTestType.EnumThing.SET_CLASS_NAME, OrderTestType.EnumThing.SET_METHOD_NAME);
 		typ.sizes = List.of(NumberSize.BYTE, NumberSize.LONG, NumberSize.VOID);
@@ -556,7 +478,10 @@ public class GeneralTypeHandlingTests{
 		typ.ignoredFrames = 0;
 		typ.diffBottomCount = 10_000;
 		
-		roots.provide("foo", typ);
+		var cluster = Cluster.emptyMem();
+		cluster.roots().provide(1, typ);
+		var read = cluster.roots().require(1, OrderTestType.class);
+		assertEquals(typ, read);
 	}
 	
 	
@@ -650,9 +575,9 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void genericStore() throws IOException{
+	void genericChildStore() throws IOException{
 		var d = Cluster.emptyMem();
-		var data = d.roots().request(new ObjectID("obj"), () -> {
+		var data = d.roots().request(1, () -> {
 			var v = IOInstance.Def.of(GenericArg.class);
 			v.allocateNulls(d, null);
 			return v;
@@ -723,4 +648,5 @@ public class GeneralTypeHandlingTests{
 		
 		Assert.assertEquals(read, instance);
 	}
+	
 }

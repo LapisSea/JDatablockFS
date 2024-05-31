@@ -31,7 +31,8 @@ public interface ObjectPipe<T, PoolType>{
 	}
 	default <Prov extends DataProvider.Holder & RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		try(var io = dest.io()){
-			write(dest.getDataProvider(), io, instance);
+			var prov = dest.getDataProvider();
+			write(prov, io, instance);
 		}
 	}
 	default void write(DataProvider provider, RandomIO.Creator dest, T instance) throws IOException{

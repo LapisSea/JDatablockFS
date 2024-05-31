@@ -189,6 +189,25 @@ public final class ConfigTools{
 		default <U> Supplier<U> map(Function<T, U> mapper){
 			return () -> mapper.apply(resolve());
 		}
+		
+		final class TempConfig<T> implements AutoCloseable{
+			public final  T       oldValue;
+			private final Flag<T> flag;
+			private TempConfig(Flag<T> flag, T oldValue){
+				this.oldValue = oldValue;
+				this.flag = flag;
+			}
+			@Override
+			public void close(){
+				flag.set(oldValue);
+			}
+		}
+		
+		default TempConfig<T> temporarySet(T val){
+			var old = resolve();
+			set(val);
+			return new TempConfig<>(this, old);
+		}
 	}
 	
 	public static Flag.FInt flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.FInt(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal, null); }
@@ -299,8 +318,13 @@ public final class ConfigTools{
 			var name = val.name();
 			return ConfEntry.checked(name, switch(val){
 				case Flag.FEnum<?> enumFlag -> {
-					var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
-					var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
+					var enums = enumFlag.defaultValue().value().getClass().getEnumConstants();
+					var enumStr = Arrays.stream(enums).map(e -> {
+						if(e instanceof NamedEnum ne){
+							return String.join(" / ", ne.names());
+						}
+						return e.toString();
+					}).collect(Collectors.joining(", ", "[", "]"));
 					yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
 				}
 				case Flag.FBool bool -> BLUE + bool.resolve() + RESET;

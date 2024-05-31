@@ -9,6 +9,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericArrayType;
@@ -105,6 +107,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			return (Class<?>)super.generic(db);
 		}
 		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
+		}
+		@Override
 		protected Class<?> makeGeneric(IOTypeDB db){ return getTypeClass(db); }
 		@Override
 		public boolean equals(Object o){
@@ -118,9 +124,9 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public int hashCode(){ return name.hashCode(); }
 		@Override
-		public String toString(){ return Utils.classNameToHuman(getName(), false); }
+		public String toString(){ return Utils.classNameToHuman(getName()); }
 		@Override
-		public String toShortString(){ return Utils.classNameToHuman(getName(), true); }
+		public String toShortString(){ return Utils.classNameToHuman(getName()); }
 		@Override
 		public IOType withArgs(IOType... args){ return new TypeGeneric(this, List.of(args)); }
 		@Override
@@ -161,16 +167,29 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		
 		private Class<?> loadClass(IOTypeDB db){
+			Objects.requireNonNull(db);
 			if(isPrimitive()){
 				return PRIMITIVE_NAMES.get(name);
 			}
 			var name = getTypeName();
 			try{
-				return Class.forName(name);
-			}catch(ClassNotFoundException e){
-				if(db == null){
-					throw new RuntimeException(name + " was unable to be resolved and there is no db provided");
+				var builtIn = Class.forName(name);
+				try{
+					var storedO = db.getDefinitionFromClassName(name);
+					if(storedO.map(stored -> !new TypeDef(builtIn).equals(stored)).orElse(false)){
+						Log.trace("{#yellowBuilt in and stored classes are not the same for: #}{}#red\n" +
+						          "\t{#redBuilt in:#} {}\n" +
+						          "\t{#redStored  :#} {}", () -> {
+							return List.of(name, storedO.get(), new TypeDef(builtIn));
+						});
+						throw new ClassNotFoundException();
+					}
+				}catch(IOException e){
+					throw new UncheckedIOException("Failed to fetch data from database", e);
 				}
+				
+				return builtIn;
+			}catch(ClassNotFoundException e){
 				Log.trace("Loading template: {}#yellow", name);
 				try{
 					return Class.forName(name, true, db.getTemplateLoader());
@@ -224,6 +243,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				args = List.of(arr);
 			}
 			return SyntheticParameterizedType.of(raw.getTypeClass(db), args);
+		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
 		}
 		@Override
 		public int hashCode(){
@@ -293,6 +316,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			Type bound = this.bound == null? Object.class : this.bound.generic(db);
 			return new SyntheticWildcardType(List.of(bound), isLower);
 		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
+		}
+		
 		@Override
 		public int hashCode(){
 			int result = Objects.hashCode(bound);
@@ -388,7 +416,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			@Override
 			public String toString(){
-				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t, false)).collect(Collectors.joining(" & "));
+				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t)).collect(Collectors.joining(" & "));
 			}
 		}
 		
@@ -399,6 +427,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			var    declaration = parent.getTypeClass(db);
 			Type[] bounds      = findBounds(declaration, name);
 			return new GenTypeVariable(name, bounds, declaration);
+		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
 		}
 		
 		public Type[] findBounds(IOTypeDB db){
@@ -483,7 +515,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			case WildcardType wild -> of(wild);
 			case GenericArrayType a -> {
 				var comp = of(a.getGenericComponentType());
-				yield ((RawAndArg)comp).withRaw(comp.getRaw().typeClassCache.arrayType());
+				yield comp.asArrayType(null);
 			}
 			default -> throw new NotImplementedException(genericType.getClass().getName());
 		};
@@ -491,8 +523,8 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	
 	public static IOType of(Class<?> raw){
 		return new IOType.TypeRaw(raw);
-		
 	}
+	
 	public static IOType of(ParameterizedType parm){
 		var args = parm.getActualTypeArguments();
 		var res  = new ArrayList<IOType>(args.length);
@@ -592,6 +624,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		};
 	}
 	
+	public abstract IOType asArrayType(IOTypeDB db);
 	
 	private static boolean argsEqual(List<IOType> a, List<IOType> b){
 		if(a.size() != b.size()){

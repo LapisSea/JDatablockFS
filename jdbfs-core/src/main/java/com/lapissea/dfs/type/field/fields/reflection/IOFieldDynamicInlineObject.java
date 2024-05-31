@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -93,7 +94,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	@Override
 	public void init(FieldSet<CTyp> fields){
 		super.init(fields);
-		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+		typeID = fields.requireExactInt(FieldNames.genericID(getAccessor()));
 	}
 	
 	@Override
@@ -109,13 +110,15 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		var idGenerator = new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
-				if(val == null) return new IOTypeDB.TypeID(-1, false);
-				return provider.getTypeDb().toID(val, record);
+				return provider.getTypeDb().objToID(val, record);
 			}
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
-				var id = getId(ioPool, provider, instance, false);
-				if(!id.stored()) return true;
+				if(!isNull(ioPool, instance)){
+					var writtenId = typeID.getValue(ioPool, instance);
+					if(writtenId == 0) return true;
+				}
+				var id        = getId(ioPool, provider, instance, false);
 				var writtenId = typeID.getValue(ioPool, instance);
 				return id.val() != writtenId;
 			}

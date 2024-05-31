@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
-import com.lapissea.dfs.core.versioning.VersionExecutor;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
@@ -30,7 +29,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandle;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -307,16 +305,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
-		@SuppressWarnings("unchecked")
 		public boolean equals(Object o){
-			if(this == o) return true;
+			if(o == null || o.getClass() != this.getClass()){
+				return false;
+			}
 			
-			if(!(o instanceof IOInstance<?> that)) return false;
-			var struct = getThisStruct();
-			if(that.getThisStruct() != struct) return false;
+			//noinspection unchecked
+			SELF dis = (SELF)this, that = (SELF)o;
 			
-			for(var field : struct.getRealFields()){
-				if(!field.instancesEqual(null, self(), null, (SELF)that)) return false;
+			for(var field : getThisStruct().getRealFields()){
+				if(!field.instancesEqual(null, dis, null, that)){
+					return false;
+				}
 			}
 			
 			return true;
@@ -502,7 +502,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		public final GenericContext getGenerics(){
 			if(genericCtx == null){
-				genericCtx = getThisStruct().describeGenerics(typeDef);
+				genericCtx = getThisStruct().describeGenerics(typeDef, getDataProvider().getTypeDb());
 			}
 			return genericCtx;
 		}
@@ -654,20 +654,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		protected final void allocateNulls() throws IOException{
 			allocateNulls(getDataProvider(), getGenerics());
-		}
-		
-		public sealed interface VersioningType{
-			VersioningType NOOP = new NOOP(), IN_PLACE = new InPlace();
-			
-			record NOOP() implements VersioningType{ }
-			
-			record InPlace() implements VersioningType{ }
-			
-			record Reallocate(Unmanaged<?> newValue, List<ChunkPointer> chainsToFree) implements VersioningType{ }
-		}
-		
-		public VersioningType versionForward(VersionExecutor executor, Set<ChunkPointer> chainsToFree) throws IOException{
-			return VersioningType.NOOP;
 		}
 		
 		@Override

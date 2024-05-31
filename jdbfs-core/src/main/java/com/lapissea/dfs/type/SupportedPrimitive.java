@@ -7,6 +7,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 
 public enum SupportedPrimitive implements RuntimeType<Object>{
@@ -34,12 +35,21 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	}
 	
 	public static OptionalPP<SupportedPrimitive> get(Type type){
-		if(!(type instanceof Class<?> clazz)) return OptionalPP.empty();
-		return GET_LOOKUP.getOrDefault(type, OptionalPP.empty());
+		Objects.requireNonNull(type);
+		if(type instanceof Class<?> clazz) return get(clazz);
+		return OptionalPP.empty();
+	}
+	public static OptionalPP<SupportedPrimitive> get(Class<?> clazz){
+		Objects.requireNonNull(clazz);
+		return GET_LOOKUP.getOrDefault(clazz, OptionalPP.empty());
 	}
 	public static OptionalPP<SupportedPrimitive> getStrict(Type type){
 		if(!(type instanceof Class<?> clazz) || !clazz.isPrimitive()) return OptionalPP.empty();
-		return GET_STRICT_LOOKUP.getOrDefault(type, OptionalPP.empty());
+		return getStrict(clazz);
+	}
+	public static OptionalPP<SupportedPrimitive> getStrict(Class<?> clazz){
+		if(!clazz.isPrimitive()) return OptionalPP.empty();
+		return GET_STRICT_LOOKUP.getOrDefault(clazz, OptionalPP.empty());
 	}
 	
 	public static boolean isAnyStrict(Class<?> clazz){

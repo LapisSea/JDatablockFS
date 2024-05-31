@@ -29,7 +29,6 @@ import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
@@ -39,6 +38,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayDeque;
@@ -199,9 +199,47 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private boolean wait = true;
 	}
 	
-	private static final ReadWriteClosableLock STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
+	private static final ReadWriteClosableLock    STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
+	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE      = new WeakValueHashMap<Class<?>, Struct<?>>().defineStayAlivePolicy(Log.TRACE? 5 : 0);
 	
-	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<Class<?>, Struct<?>>().defineStayAlivePolicy(Log.TRACE? 5 : 0);
+	static{
+		/*
+		var name        = "Break glass in case of deadlock emergency";
+		var panicTimeMs = 5000;
+		Thread.ofPlatform().name(name).start(() -> {
+			UtilL.sleep(panicTimeMs);
+			record info(String name, String trace){ }
+			var relevantPackageScope = Arrays.stream(Struct.class.getPackageName().split("\\.")).limit(2).map(p -> p + ".").collect(Collectors.joining());
+			LogUtil.println(
+				jdk.internal.vm.ThreadContainers
+					.root()
+					.threads().filter(t -> !t.getName().equals(name))
+					.map(t -> new info(
+						(t.isVirtual()? "V-" : "P-") + t.getName(),
+						Arrays.stream(t.getStackTrace()).map(l -> "\t" + l).collect(Collectors.joining("\n"))
+					))
+					.filter(i -> i.trace.contains(relevantPackageScope))
+					.collect(Collectors.groupingBy(i -> i.trace))
+					.values().stream()
+					.sorted(Comparator.comparing(l -> l.getFirst().name))
+					.map(t -> t.stream().map(i -> i.name).collect(Collectors.joining(", ")) + "\n" + t.getFirst().trace)
+					.collect(Collectors.joining("\n\n"))
+			);
+		});
+		*/
+		
+		Thread.ofVirtual().name("Struct.cache-flush").start(() -> {
+			try{
+				while(true){
+					Thread.sleep(500);
+					try(var lock = STRUCT_CACHE_LOCK.write()){
+						STRUCT_CACHE.remove(null);
+					}
+				}
+			}catch(InterruptedException ignore){ }
+		});
+	}
+	
 	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
 	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG = new HashMap<>();
 	
@@ -355,8 +393,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		boolean needsImpl = IOInstance.Def.isDefinition(instanceClass);
 		
-		if(!needsImpl && Modifier.isAbstract(instanceClass.getModifiers())){
-			throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
+		if(!needsImpl){
+			if(Modifier.isAbstract(instanceClass.getModifiers())){
+				throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
+			}
+			if(instanceClass.getName().endsWith(IOInstance.Def.IMPL_NAME_POSTFIX) && UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+				var unmapped = IOInstance.Def.unmap((Class<? extends IOInstance.Def<?>>)instanceClass);
+				if(unmapped.isPresent()){
+					return compile((Class<T>)unmapped.get(), newStruct, runNow);
+				}
+			}
 		}
 		
 		S struct;
@@ -385,7 +431,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					if(runNow) lock.getLock().lock();
 				}
 				
-				STRUCT_CACHE.put(instanceClass, struct);
+				var old = STRUCT_CACHE.put(instanceClass, struct);
+				assert old == null;
 			}catch(MalformedStruct e){
 				e.addSuppressed(new MalformedStruct("Failed to compile " + instanceClass.getName()));
 				throw e;
@@ -400,8 +447,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				var impl = struct.getConcreteType();
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					STRUCT_CACHE.put(impl, struct);
+					var hadOld = STRUCT_CACHE.put(impl, struct) != null;
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
+					if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 				}
 			}catch(Throwable ignored){ }
 		}, null);
@@ -424,20 +472,35 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return struct;
 	}
 	
+	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE     = Map.of();
+	private static int                                          stableCacheCount = 0;
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		class StableCache{
-			private static Map<Class<?>, Struct<?>> CACHE = new WeakValueHashMap<>();
+		var stableRefs = STABLE_CACHE.get(instanceClass.hashCode());
+		if(stableRefs != null){
+			for(var ref : stableRefs){
+				Struct<?> val = ref.get();
+				if(val == null) continue;
+				if(val.getType() == instanceClass || val.getConcreteType() == instanceClass){
+					return (Struct<T>)val;
+				}
+			}
 		}
-		
-		Struct<T> stable = (Struct<T>)StableCache.CACHE.get(instanceClass);
-		if(stable != null) return stable;
 		
 		Struct<T> cached;
 		try(var lock = STRUCT_CACHE_LOCK.read()){
 			cached = getCachedUnsafe(instanceClass, lock.getLock());
 			if(cached == null) return null;
 			
-			if(Rand.b(0.2F)) StableCache.CACHE = new WeakValueHashMap<>(STRUCT_CACHE);
+			if((stableCacheCount++>=200)){
+				stableCacheCount = 0;
+				STABLE_CACHE =
+					STRUCT_CACHE.entrySet().stream().collect(Collectors.groupingBy(e -> e.getKey().hashCode()))
+					            .entrySet().stream().collect(Collectors.toUnmodifiableMap(
+						            Map.Entry::getKey,
+						            e -> List.copyOf(e.getValue().stream().map(Map.Entry::getValue)
+						                              .<WeakReference<Struct<?>>>map(WeakReference::new).collect(Collectors.toList()))
+					            ));
+			}
 		}
 		return cached;
 	}
@@ -823,8 +886,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.stream().map(fieldMapper)
-		                .filter(Optional::isPresent).map(Optional::get)
+		var str = fields.stream().map(fieldMapper).flatMap(Optional::stream)
 		                .collect(Collectors.joining(fieldSeparator, prefix, end));
 		
 		if(!doShort){
@@ -889,8 +951,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return hasPools != null && hasPools[pool.ordinal()];
 	}
 	
-	public GenericContext describeGenerics(IOType def){
-		return GenericContext.of(getType(), def.generic(null));
+	public GenericContext describeGenerics(IOType def, IOTypeDB db){
+		return GenericContext.of(getType(), def.generic(db));
 	}
 	
 	@Override

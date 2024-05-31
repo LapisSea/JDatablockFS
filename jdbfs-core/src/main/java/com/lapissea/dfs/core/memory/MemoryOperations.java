@@ -1,6 +1,7 @@
 package com.lapissea.dfs.core.memory;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.config.FreedMemoryPurgeType;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.MemoryManager;
@@ -262,8 +263,7 @@ public final class MemoryOperations{
 		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
-	
-	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolveVal();
+	private static final FreedMemoryPurgeType PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();
@@ -300,7 +300,7 @@ public final class MemoryOperations{
 			writeChunks.add(chunk.writeHeaderToBuf());
 		}
 		
-		var purgeTransaction = PURGE_ACCIDENTAL? provider.getSource().openIOTransaction() : null;
+		var purgeTransaction = PURGE_ACCIDENTAL != FreedMemoryPurgeType.NO_OP? provider.getSource().openIOTransaction() : null;
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
@@ -325,35 +325,48 @@ public final class MemoryOperations{
 				io.writeAtOffsets(writeChunks);
 			}
 		}
-		
-		if(PURGE_ACCIDENTAL){
-			assert purgeTransaction != null;
-			ExecutorService service = null;
-			try{
-				for(Chunk chunk : oks){
-					if(chunk.getCapacity()>3000){
-						if(service == null) service = Executors.newWorkStealingPool();
-						service.execute(() -> {
-							try{
-								purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
-							}catch(IOException e){
-								throw new RuntimeException(e);
+		ExecutorService service = null;
+		if(PURGE_ACCIDENTAL != FreedMemoryPurgeType.NO_OP) try{
+			for(Chunk chunk : oks){
+				switch(PURGE_ACCIDENTAL){
+					case ONLY_HEADER_BYTES -> {
+						if(chunk.getCapacity()>3000){
+							if(service == null) service = Executors.newVirtualThreadPerTaskExecutor();
+							service.execute(() -> {
+								try{
+									purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+								}catch(IOException e){
+									throw new RuntimeException(e);
+								}
+							});
+						}else{
+							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+						}
+					}
+					case ZERO_OUT -> {
+						try(var io = chunk.getDataProvider().getSource().io()){
+							var start = chunk.dataStart();
+							if(io.getSize()>=start){
+								io.setPos(start);
+								if(io.getPos() != start){
+									throw new IOException("Failed to zero out " + chunk + " : " + io.getPos() + " -> " + start + " size: " + io.getSize());
+								}
+								IOUtils.zeroFill(io, chunk.getCapacity());
 							}
-						});
-					}else{
-						purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
-					}
-					if(service == null && (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>BATCH_BYTES){
-						purgeTransaction.close();
-						purgeTransaction = provider.getSource().openIOTransaction();
+						}
 					}
 				}
-			}finally{
-				if(service != null){
-					service.close();
+				if(service == null && purgeTransaction != null &&
+				   (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>BATCH_BYTES){
+					purgeTransaction.close();
+					purgeTransaction = provider.getSource().openIOTransaction();
 				}
-				purgeTransaction.close();
 			}
+		}finally{
+			if(service != null){
+				service.close();
+			}
+			if(purgeTransaction != null) purgeTransaction.close();
 		}
 		
 		return oks;

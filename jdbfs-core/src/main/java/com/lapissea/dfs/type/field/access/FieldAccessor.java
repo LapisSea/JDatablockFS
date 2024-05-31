@@ -3,15 +3,17 @@ package com.lapissea.dfs.type.field.access;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.util.NotNull;
 
-public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>{
+public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>, FieldNames.Named{
 	
 	int getTypeID();
 	boolean genericTypeHasArgs();
 	
 	Struct<CTyp> getDeclaringStruct();
 	
+	@Override
 	@NotNull
 	String getName();
 	

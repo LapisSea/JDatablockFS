@@ -29,13 +29,13 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			private       int          size;
 			@Override
 			public Iterable<LdxValue<T>> entrySet(){
-				return IterablePPs.of(cache)
+				return IterablePPs.from(cache)
 				                  .enumerateL()
 				                  .filtered(e -> e.getValue() != null);
 			}
 			@Override
 			public Iterable<T> values(){
-				return IterablePPs.of(cache)
+				return IterablePPs.from(cache)
 				                  .filtered(Objects::nonNull);
 			}
 			@Override
@@ -149,7 +149,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			public Iterable<Map.Entry<Long, T>> entrySet(){
 				return new Iterable<>(){
 					final Iterator<? extends Map.Entry<Long, T>> testI = test.entrySet().iterator();
-					final Iterator<? extends Map.Entry<Long, T>> refI = test.entrySet().iterator();
+					final Iterator<? extends Map.Entry<Long, T>> refI  = test.entrySet().iterator();
 					@Override
 					public Iterator<Map.Entry<Long, T>> iterator(){
 						return new Iterator<>(){
@@ -172,7 +172,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			public Iterable<T> values(){
 				return new Iterable<>(){
 					final Iterator<T> testI = test.values().iterator();
-					final Iterator<T> refI = test.values().iterator();
+					final Iterator<T> refI  = test.values().iterator();
 					@Override
 					public Iterator<T> iterator(){
 						return new Iterator<>(){

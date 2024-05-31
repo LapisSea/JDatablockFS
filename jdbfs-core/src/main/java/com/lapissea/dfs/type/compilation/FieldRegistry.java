@@ -8,15 +8,18 @@ import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOField.FieldUsage;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.AnnotationUsage;
 import com.lapissea.dfs.type.field.annotations.IODependency;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -202,6 +205,9 @@ final class FieldRegistry{
 						.orElseThrow()
 						.universe().stream()
 						.<Optional<Class<?>>>map((Class<NullFlagCompanyField> fieldType) -> {
+							if(fieldType.isAnnotationPresent(IOUnsafeValue.Mark.class)){
+								return Optional.empty();
+							}
 							var superC = (ParameterizedType)fieldType.getGenericSuperclass();
 							if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
 								return Optional.empty();
@@ -246,6 +252,12 @@ final class FieldRegistry{
 		if(canCreate(type, annotations)){
 			return;
 		}
+		if(UtilL.instanceOf(Utils.typeToRaw(type), Type.class)){
+			throw new IllegalField(
+				"Directly storing types should not be done as values will fail to load if a class is not present. " +
+				"Please use " + IOType.class.getTypeName() + " instead."
+			);
+		}
 		throw fail(type.getTypeName());
 	}
 	
@@ -266,6 +278,12 @@ final class FieldRegistry{
 		}
 		var res = compatible.create(field);
 		if(DEBUG_VALIDATION){
+			var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
+			var makedUnsafe = res.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
+			if(usesUnsafe != makedUnsafe){
+				throw new ShouldNeverHappenError(res.getClass() + " has IOUnsafeValue but is not marked as such");
+			}
+			
 			var typs = compatible.listFieldTypes();
 			if(!typs.contains(res.getClass())){
 				throw new RuntimeException(

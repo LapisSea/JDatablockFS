@@ -9,7 +9,7 @@ module JDatablockFS.tools {
 	requires org.lwjgl.opengl;
 	requires com.google.gson;
 	requires com.esotericsoftware.kryo;
-	requires RoaringBitmap;
+	requires roaringbitmap;
 	
 	requires imgui.lwjgl3;
 	requires imgui.binding;

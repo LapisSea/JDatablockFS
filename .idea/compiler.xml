@@ -12,6 +12,12 @@
         <outputRelativeToContentRoot value="true" />
         <module name="Jorth" />
       </profile>
+      <profile name="Annotation profile for JDatablockFS" enabled="true">
+        <sourceOutputDir name="../target/Fuzzer/generated-sources/annotations" />
+        <sourceTestOutputDir name="../target/Fuzzer/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="Fuzzer" />
+      </profile>
       <profile name="Annotation profile for core" enabled="true">
         <sourceOutputDir name="../target/core/generated-sources/annotations" />
         <sourceTestOutputDir name="../target/core/generated-test-sources/test-annotations" />
@@ -35,12 +41,6 @@
         <sourceTestOutputDir name="../target/tools/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="tools" />
-      </profile>
-      <profile name="Annotation profile for JDatablockFS" enabled="true">
-        <sourceOutputDir name="../target/Fuzzer/generated-sources/annotations" />
-        <sourceTestOutputDir name="../target/Fuzzer/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <module name="Fuzzer" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="21">

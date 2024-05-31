@@ -357,7 +357,7 @@ public class SlowTests{
 		}
 	}
 	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
-		var set = provider.roots().<IOSet<Integer>>request("hi", type, Integer.class);
+		var set = provider.roots().<IOSet<Integer>>request(1, type, Integer.class);
 		session.accept(provider, new CheckSet<>(set));
 		provider.scanGarbage(ERROR);
 	}
@@ -370,7 +370,7 @@ public class SlowTests{
 				@Serial
 				private Object readResolve() throws IOException{
 					var cluster = new Cluster(MemoryData.of(data));
-					return new State(cluster, new CheckSet<>(cluster.roots().require("hi", IOSet.class)));
+					return new State(cluster, new CheckSet<>(cluster.roots().require(1, IOSet.class)));
 				}
 			}
 			
@@ -391,7 +391,7 @@ public class SlowTests{
 			@Override
 			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				var cluster = optionallyLogged(mark.sequence(sequenceIndex), "set-fuzz" + sequenceIndex);
-				return new State(cluster, new CheckSet<>(cluster.roots().request("hi", type, Integer.class)));
+				return new State(cluster, new CheckSet<>(cluster.roots().request(1, type, Integer.class)));
 			}
 			@Override
 			public void applyAction(State state, long actionIndex, Action action, RunMark mark) throws IOException{
@@ -754,12 +754,7 @@ public class SlowTests{
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
-		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv<>(){
-			
-			@Override
-			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
-				return true;
-			}
+		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			
 			@Override
 			public void applyAction(BlobState state, long actionIndex, BlobAction action, RunMark mark) throws IOException{

@@ -1,39 +1,24 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.core.Cluster;
-import com.lapissea.dfs.core.versioning.Versioning;
-import com.lapissea.dfs.core.versioning.VersioningOptions;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.objects.Reference;
-import com.lapissea.dfs.objects.collections.ContiguousIOList;
-import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.objects.collections.UnmanagedIOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.TypeDef;
-import com.lapissea.dfs.type.field.FieldSet;
+import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class VersioningTests{
 	
@@ -71,71 +56,46 @@ public class VersioningTests{
 				));
 			});
 		},
-		ABC.class.getName(), name -> {
+		TestNames.class.getName(), name -> {
 			return Jorth.generateClass(null, name, code -> {
-				writeIOManagedClass(code, name, List.of(
-					new Prop("a", int.class, 1),
-					new Prop("b", int.class, 2),
-					new Prop("c", int.class, 3)
-				));
-			});
-		},
-		IntVal.class.getName(), name -> {
-			return Jorth.generateClass(null, name, code -> {
-				writeIOManagedClass(code, name, List.of(
-					new Prop("val", int.class, 1)
-				));
+				code.write(
+					"""
+						public enum {!} start
+							enum FOO
+							enum John
+							enum BAR
+						end
+						""",
+					name);
 			});
 		}
 	));
 	
 	static byte[] makeData(Class<?> type) throws IOException{
 		var data = Cluster.emptyMem();
-		data.roots().request("obj", type);
+		data.roots().request(1, type);
 		return data.getSource().readAll();
 	}
 	
 	private static final LateInit<DataLogger, RuntimeException> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
 	
-	private static final Versioning VERSIONING =
-		new Versioning(
-			EnumSet.allOf(VersioningOptions.class),
-			List.of()
-		);
-	
 	private static <T> Cluster versionedCl(Class<T> type, byte[] bb) throws IOException{
 		IOInterface mem = LoggedMemoryUtils.newLoggedMemory(type.getName(), LOGGER);
 		mem.write(0, true, bb);
-		return new Cluster(mem, VERSIONING);
+		return new Cluster(mem);
 	}
 	
 	static <T> T makeNGetRoot(Class<T> type) throws Exception{
-		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
+		byte[] bb = makeCLDataRaw(type);
 		
 		var data = versionedCl(type, bb);
 		return data.roots()
-		           .require("obj", type);
+		           .require(1, type);
 	}
 	
-	@BeforeTest
-	void before() throws IOException{
-		Log.info("Started VersioningTests");
-		makeData(Reference.class);
+	private static byte[] makeCLDataRaw(Class<?> type) throws ReflectiveOperationException{
+		return TestUtils.callWithClassLoader(SHADOW_CL, "make" + type.getSimpleName() + "Data");
 	}
-	
-	@Test
-	void ensureClassShadowing() throws Exception{
-		byte[] bb   = TestUtils.callWithClassLoader(SHADOW_CL, VersioningTests.class.getDeclaredMethod("makeAData"));
-		var    data = new Cluster(MemoryData.builder().withRaw(bb).build(), VERSIONING);
-		
-		var d     = Objects.requireNonNull(data.getTypeDb());
-		var dn    = d.listStoredTypeDefinitionNames();
-		var cName = dn.stream().filter(n -> n.startsWith(A.class.getName() + "€old")).findAny().orElseThrow();
-		var def   = d.getDefinitionFromClassName(cName).orElseThrow();
-		var names = def.getFields().stream().map(TypeDef.FieldDef::getName).collect(Collectors.toSet());
-		Assert.assertEquals(names, Set.of("a"));
-	}
-	
 	
 	@IOValue
 	public static class A extends IOInstance.Managed<A>{
@@ -144,75 +104,44 @@ public class VersioningTests{
 	}
 	
 	static byte[] makeAData() throws IOException{ return makeData(A.class); }
+	
 	@Test
-	void newField() throws Exception{
-		var val = makeNGetRoot(A.class);
+	<T extends IOInstance<T>> void loadCorrectClass() throws Exception{
+		var bb = makeCLDataRaw(A.class);
+		var cl = new Cluster(MemoryData.viewOf(bb));
 		
-		var expected = new A();
-		expected.a = 1;
-		Assert.assertEquals(val, expected);
+		//noinspection unchecked
+		T obj = (T)cl.roots()
+		             .require(1, IOInstance.class);
+		
+		var type  = obj.getThisStruct();
+		var names = type.getFields().map(IOField::getName).collectToSet();
+		Assert.assertEquals(names, Set.of("a"));
+		var aField = type.getFields().requireExact(int.class, "a");
+		Assert.assertEquals(aField.get(null, obj), 1);
 	}
 	
-	
-	@IOValue
-	public static class ABC extends IOInstance.Managed<ABC>{
-		int a = 69;
-		int c = 420;
-	}
-	static byte[] makeABCData() throws IOException{ return makeData(ABC.class); }
-	@Test
-	void removedField() throws Exception{
-		var val = makeNGetRoot(ABC.class);
-		
-		var expected = new ABC();
-		expected.a = 1;
-		expected.c = 3;
-		Assert.assertEquals(val, expected);
+	public enum TestNames{
+		FOO, BAR
 	}
 	
-	@IOValue
-	public static class IntVal extends IOInstance.Managed<IntVal>{
-		List<Integer> val = new ArrayList<>();
-	}
-	static byte[] makeIntValData() throws IOException{ return makeData(IntVal.class); }
-	@Test
-	void changedTypeFieldIntToList() throws Exception{
-		var val = makeNGetRoot(IntVal.class);
-		
-		var expected = new IntVal();
-		expected.val.add(1);
-		Assert.assertEquals(val, expected);
-	}
-	
-	static byte[] makeListOfIntVal() throws IOException{
-		var            data = Cluster.emptyMem();
-		IOList<IntVal> list = data.roots().request("obj", ContiguousIOList.class, IntVal.class);
-		int[]          arr  = new int[1];
-		list.addMultipleNew(4, v -> {
-			FieldSet<IntVal>              s = v.getThisStruct().getFields();
-			IOFieldPrimitive.FInt<IntVal> f = s.requireExactInt("val");
-			var                           i = ++arr[0];
-			f.setValue(null, v, i == 3? Integer.MAX_VALUE : i);
-		});
-		
-		LogUtil.println(list);
+	static byte[] makeTestNamesData() throws IOException{
+		var data = Cluster.emptyMem();
+		data.roots().provide("names", new GenericContainer<>(List.of(TestNames.FOO, TestNames.BAR)));
 		return data.getSource().readAll();
 	}
 	
 	@Test
-	void changedTypeInList() throws Exception{
-		byte[] bb = TestUtils.callWithClassLoader(SHADOW_CL, "makeListOfIntVal");
+	<T extends IOInstance<T>> void loadCorrectEnum() throws Exception{
+		var bb = makeCLDataRaw(TestNames.class);
+		var cl = new Cluster(MemoryData.viewOf(bb));
 		
-		var data = versionedCl(IntVal.class, bb);
 		//noinspection unchecked
-		List<IntVal> val = data.roots()
-		                       .require("obj", UnmanagedIOList.class, IntVal.class)
-		                       .collectToList();
+		var obj = (List<Enum<?>>)cl.roots()
+		                           .require("names", GenericContainer.class).value;
 		
-		var iv = new IntVal();
-		iv.val.add(1);
-		var expected = List.of(iv, iv, iv, iv);
-		Assert.assertEquals(val, expected);
+		var names = obj.stream().map(Enum::name).toList();
+		Assert.assertEquals(names, List.of("FOO", "BAR"));
 	}
 	
 }

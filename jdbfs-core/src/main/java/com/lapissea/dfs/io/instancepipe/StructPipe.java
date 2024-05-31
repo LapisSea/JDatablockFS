@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -60,11 +61,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -80,7 +83,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Target({ElementType.TYPE})
 	public @interface Special{ }
 	
-	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
+	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
 		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
 			P make(Struct<T> type, boolean runNow);
@@ -251,7 +254,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
 			setInitState(STATE_SIZE_DESC);
-			generators = Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+			
+			generators = Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(ioFields));
+			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
 				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
@@ -297,7 +302,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var refs = fields.stream()
 		                 .filter(RefField.class::isInstance)
 		                 .map(RefField.class::cast)
-		                 .map(ref -> fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f -> Map.entry(f, ref)))
+		                 .map(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).map(f -> Map.entry(f, ref)))
 		                 .filter(OptionalPP::isPresent)
 		                 .map(OptionalPP::get)
 		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -342,6 +347,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			Class<?> type = accessor.getType();
+			if(type == Optional.class){
+				var genTyp = accessor.getGenericType(null);
+				var valTyp = IOFieldTools.unwrapOptionalTypeRequired(genTyp);
+				type = Utils.typeToRaw(valTyp);
+			}
 			
 			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
 				if(Struct.canUnknownHavePointers(type)){
@@ -527,7 +537,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var wordSpace      = report.wordSpace;
 		var knownFixed     = report.knownFixed;
-		var genericUnknown = report.genericUnknown;
+		var genericUnknown = Utils.nullIfEmpty(report.genericUnknown);
 		
 		FieldAccessor<T>[] unkownNumAcc;
 		int[]              unkownNumAccMul;
@@ -556,9 +566,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException(e);
 			}
 			
-			var unkownSum = IOFieldTools.sumVars(genericUnknown, d -> {
-				return d.calcUnknown(ioPool, prov, inst, wordSpace);
-			});
+			long unkownSum;
+			if(genericUnknown != null){
+				unkownSum = IOFieldTools.sumVars(genericUnknown, d -> {
+					return d.calcUnknown(ioPool, prov, inst, wordSpace);
+				});
+			}else unkownSum = 0;
 			
 			if(unkownNumAcc != null){
 				for(int i = 0; i<unkownNumAcc.length; i++){
@@ -672,7 +685,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			target = dest;
 		}
 		
-		generateAll(ioPool, provider, instance, true);
+		if(!DEBUG_VALIDATION){
+			generateAll(ioPool, provider, instance, true);
+		}
 		
 		try{
 			for(IOField<T, ?> field : fields){
@@ -695,9 +710,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		if(instance instanceof IOInstance.Unmanaged) return null;
-		
 		generateAll(ioPool, provider, instance, true);
+		if(instance instanceof IOInstance.Unmanaged) return null;
 		var siz = getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 		
 		var sum = 0L;
@@ -744,6 +758,52 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to generate fields. Problem on " + generator, e);
 			}
+		}
+		
+		if(DEBUG_VALIDATION){
+			checkGenerated(generators, ioPool, provider, instance, allowExternalMod);
+		}
+	}
+	
+	private static <T extends IOInstance<T>> void checkGenerated(List<IOField.ValueGeneratorInfo<T, ?>> generators, VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		enum Status{
+			OK,
+			SKIPPED,
+			ERR
+		}
+		var stat = new Status[generators.size()];
+		var err  = false;
+		for(int i = 0; i<generators.size(); i++){
+			var generator = generators.get(i);
+			var vg        = generator.generator();
+			
+			var shouldSkip = switch(vg.strictDetermineLevel()){
+				case NOT_REALLY -> true;
+				case ON_EXTERNAL_ALWAYS -> !allowExternalMod;
+				case ALWAYS -> false;
+			};
+			if(shouldSkip){
+				stat[i] = Status.SKIPPED;
+				continue;
+			}
+			var errL = vg.shouldGenerate(ioPool, provider, instance);
+			stat[i] = errL? Status.ERR : Status.OK;
+			err |= errL;
+		}
+		if(err){
+			String info;
+			if(stat.length == 1){
+				info = " " + generators.getFirst() + " failed";
+			}else{
+				var table = TextUtil.toTable(
+					IntStream.range(0, stat.length).mapToObj(i -> Map.of("generator", generators.get(i), "status", stat[i])).toList()
+				);
+				table = table.substring(table.indexOf('\n') + 1, table.lastIndexOf('\n'));
+				info = "\n" + table;
+			}
+			throw new IllegalStateException(
+				"Generator(s) have not been satisfied:" + info
+			);
 		}
 	}
 	

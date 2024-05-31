@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -50,21 +51,21 @@ import java.util.stream.Stream;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits NullFlagCompanyField, IOFieldPrimitive, BitField, NoIOField, RefField, BitFieldMerger, IOFieldChunkPointer{
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
-			private final Class<Typ>                    typ;
+			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
 			@SuppressWarnings("rawtypes")
-			public InstanceOf(Class<Typ> typ, Set<Class<? extends IOField>> fieldTypes){
-				this.typ = typ;
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
 			}
 			
-			public Class<Typ> getType(){
-				return typ;
+			public final Class<Typ> getType(){
+				return type;
 			}
 			
 			@Override
@@ -281,6 +282,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
+		enum Strictness{
+			NOT_REALLY, ON_EXTERNAL_ALWAYS, ALWAYS
+		}
+		default Strictness strictDetermineLevel(){ return Strictness.ALWAYS; }
+		
 		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
 		ValType generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
@@ -306,13 +312,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	@Nullable
+	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		var gens = getGenerators();
-		return gens == null? Stream.of() : gens.stream();
+		return getGenerators().stream();
 	}
 	
 	

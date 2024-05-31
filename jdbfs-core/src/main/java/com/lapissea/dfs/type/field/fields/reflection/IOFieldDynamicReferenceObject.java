@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -94,7 +95,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	@Override
 	public void init(FieldSet<CTyp> fields){
 		super.init(fields);
-		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+		typeID = fields.requireExactInt(FieldNames.genericID(getAccessor()));
 	}
 	
 	@Override
@@ -110,7 +111,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		var idGenerator = new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
-				return provider.getTypeDb().toID(val, record);
+				return provider.getTypeDb().objToID(val, record);
 			}
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{

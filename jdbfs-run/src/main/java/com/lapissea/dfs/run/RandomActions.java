@@ -109,7 +109,7 @@ public final class RandomActions{
 	
 	private static void treeSet() throws IOException{
 		var provider = Cluster.emptyMem();
-		var set      = provider.roots().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
+		var set      = provider.roots().<IOTreeSet<Integer>>request(1, IOTreeSet.class, Integer.class);
 		
 		
 		var r    = new RawRandom(420);
@@ -171,7 +171,7 @@ public final class RandomActions{
 	private static void hashSet() throws IOException{
 		var provider = Cluster.emptyMem();
 		
-		var set = provider.roots().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var set = provider.roots().<IOHashSet<Object>>request(1, IOHashSet.class);
 		
 		var r = new RawRandom(69);
 		runIter(50000000, 50000000/200, () -> {
@@ -187,7 +187,7 @@ public final class RandomActions{
 	private static void hashMap() throws IOException{
 		var provider = Cluster.emptyMem();
 		
-		var map = provider.roots().<HashIOMap<Integer, Integer>>request("hi", HashIOMap.class, Integer.class, Integer.class);
+		var map = provider.roots().<HashIOMap<Integer, Integer>>request(1, HashIOMap.class, Integer.class, Integer.class);
 		
 		var r = new RawRandom(69);
 		runIter(200000000, 1000000, () -> {
@@ -204,7 +204,7 @@ public final class RandomActions{
 	private static void hashMapThreadGet() throws IOException{
 		var provider = Cluster.emptyMem();
 		
-		var map = provider.roots().<HashIOMap<Integer, Integer>>request("hi", HashIOMap.class, Integer.class, Integer.class);
+		var map = provider.roots().<HashIOMap<Integer, Integer>>request(1, HashIOMap.class, Integer.class, Integer.class);
 		var ref = new HashMap<Integer, Integer>();
 		
 		var r = new Random(69);

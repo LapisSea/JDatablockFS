@@ -22,12 +22,15 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -102,6 +105,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(Class<?> type, boolean recordNew){
+				if(type == null) return new TypeID(0, true);
 				return toID(IOType.of(type), recordNew);
 			}
 			
@@ -112,6 +116,7 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public TypeID toID(IOType type, boolean recordNew){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
 				return newID(type, recordNew);
@@ -119,10 +124,12 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public int toID(Class<?> type){
+				if(type == null) return 0;
 				return toID(IOType.of(type));
 			}
 			@Override
 			public int toID(IOType type){
+				Objects.requireNonNull(type);
 				var id = typToID.get(type);
 				if(id != null) return id;
 				return newID(type, true).requireStored();
@@ -727,6 +734,13 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
+			if(typeName.typeName.startsWith("java.")){
+				for(IOType arg : IOType.getArgs(type)){
+					recordType(builtIn, arg, newDefs);
+				}
+				return;
+			}
+			
 			var def    = new TypeDef(typ);
 			var parent = def.getSealedParent();
 			if(parent != null){
@@ -946,98 +960,6 @@ public sealed interface IOTypeDB{
 			if(data == null) return "{uninitialized}";
 			return "{" + data.size() + " " + TextUtil.plural("link", (int)data.size()) + ", " + defs.size() + " class " + TextUtil.plural("definition", (int)defs.size()) + "}";
 		}
-		
-		public void rename(Set<String> nameSet, Function<String, String> transformName) throws IOException{
-			try(var transaction = sealedMultiverse.getDataProvider().getSource().openIOTransaction()){
-				rename0(nameSet, transformName);
-			}
-		}
-		private void rename0(Set<String> nameSet, Function<String, String> transformName) throws IOException{
-			for(var e : defs.stream().filter(e -> nameSet.contains(e.getKey().typeName)).toList()){
-				var def   = e.getValue();
-				var clone = def.clone();
-				rename(nameSet, transformName, def);
-				
-				var newName = new TypeName(rename(nameSet, transformName, e.getKey().typeName));
-				if(!newName.equals(e.getKey()) || !clone.equals(def)){
-					defs.remove(e.getKey());
-					defs.put(newName, def);
-				}
-			}
-			
-			for(var e : data.stream().filter(e -> !rename(nameSet, transformName, e.getValue()).equals(e.getValue())).toList()){
-				var typ = rename(nameSet, transformName, e.getValue());
-				data.put(e.getKey(), typ);
-			}
-			
-			for(var e : sealedMultiverse){
-				var name = rename(nameSet, transformName, e.getKey());
-				if(!name.equals(e.getKey())){
-					sealedMultiverse.put(e.getKey(), null);
-					sealedMultiverse.remove(e.getKey());
-					sealedMultiverse.put(name, e.getValue());
-				}
-				var ls = e.getValue().listIterator();
-				while(ls.hasNext()){
-					var val = ls.ioNext();
-					if(nameSet.contains(val)){
-						ls.ioSet(rename(nameSet, transformName, val));
-					}
-				}
-			}
-			
-			sealedMultiverseTouch.clear();
-			templateLoader = new WeakReference<>(null);
-			reverseDataCache = null;
-			dataCache.clear();
-		}
-		
-		private void rename(Set<String> nameSet, Function<String, String> transformName, TypeDef def){
-			var fields = def.getFields();
-			for(var f : fields){
-				var typ = rename(nameSet, transformName, f.getType());
-				f.getThisStruct().getFields().requireExact(IOType.class, "type").set(null, f, typ);
-			}
-			var res = def.getPermittedSubclasses().stream().map(n -> rename(nameSet, transformName, n)).toArray(String[]::new);
-			if(res.length>0){
-				def.getThisStruct().getFields().requireExact(String[].class, "permits").set(null, def, res);
-			}
-			
-			var sealedP = def.getSealedParent();
-			if(sealedP != null){
-				sealedP = TypeDef.SealedParent.of(rename(nameSet, transformName, sealedP.name()), sealedP.type());
-				def.getThisStruct().getFields().requireExact(TypeDef.SealedParent.class, "sealedParent").set(null, def, sealedP);
-			}
-			
-			var args = def.getTypeArgs().stream().map(s -> TypeDef.ClassArgDef.of(s.name(), rename(nameSet, transformName, s.bound()))).toList();
-			def.getThisStruct().getFields().requireExact(List.class, "typeArgs").set(null, def, args);
-		}
-		private IOType rename(Set<String> nameSet, Function<String, String> transformName, IOType type){
-			return switch(type){
-				case IOType.TypeGeneric typ -> {
-					var raw  = (IOType.TypeRaw)rename(nameSet, transformName, typ.getRaw());
-					var args = typ.getArgs().stream().map(n -> rename(nameSet, transformName, n)).toList();
-					yield new IOType.TypeGeneric(raw, args);
-				}
-				case IOType.TypeNameArg typ -> {
-					yield new IOType.TypeNameArg((IOType.TypeRaw)rename(nameSet, transformName, typ.getParent()), typ.getName());
-				}
-				case IOType.TypeRaw typ -> {
-					var name = rename(nameSet, transformName, typ.getName());
-					yield new IOType.TypeRaw(name);
-				}
-				case IOType.TypeWildcard typ -> {
-					yield new IOType.TypeWildcard(rename(nameSet, transformName, typ.getBound()), typ.isLower());
-				}
-			};
-		}
-		private String rename(Set<String> nameSet, Function<String, String> transformName, String val){
-			if(nameSet.contains(val)){
-				return transformName.apply(val);
-			}
-			return val;
-		}
-		
 	}
 	
 	private IOType makeType(Object obj){
@@ -1047,27 +969,120 @@ public sealed interface IOTypeDB{
 		if(obj instanceof IOInstance.Def<?> u){
 			return IOType.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
 		}
-		return IOType.of(obj.getClass());
+		
+		if(obj instanceof Collection<?> l){
+//			var el = elementType(l);
+			Class<?> baseType = switch(obj){
+				case List<?> ignore -> List.class;
+				case Map<?, ?> ignore -> Map.class;
+				case Set<?> ignore -> Set.class;
+				default -> null;
+			};
+			if(baseType != null){
+				return IOType.of(baseType);
+//				return IOType.of(baseType, el);
+			}
+		}
+		
+		var cls = obj.getClass();
+		if(cls.isArray()){
+			Class<?> baseType = cls.getComponentType();
+			if(Modifier.isFinal(baseType.getModifiers())){
+				if(SupportedPrimitive.isAny(baseType)){
+					return IOType.of(cls);
+				}
+				if(baseType.getTypeParameters().length == 0){
+					return IOType.of(cls);
+				}
+			}
+			var el = elementType(Arrays.asList((Object[])obj));
+			return el.asArrayType(this);
+		}
+		return IOType.of(cls);
+	}
+	private IOType tryMergeGeneric(IOType.TypeGeneric t1, IOType.TypeGeneric t2){
+		if(!t1.getRaw().equals(t2.getRaw())){
+			return IOType.of(Object.class);
+		}
+		
+		var a1 = new ArrayList<>(t1.getArgs());
+		var a2 = t2.getArgs();
+		if(a1.size() != a2.size()){
+			return IOType.of(Object.class);
+		}
+		for(int i = 0; i<a1.size(); i++){
+			var arg1 = a1.get(i);
+			var arg2 = a2.get(i);
+			if(arg1.getClass() != arg2.getClass()){
+				a1.set(i, IOType.of(Object.class));
+				continue;
+			}
+			a1.set(i, switch(arg1){
+				case IOType.TypeGeneric typeGeneric -> {
+					yield tryMergeGeneric(typeGeneric, (IOType.TypeGeneric)arg2);
+				}
+				case IOType.TypeRaw typeRaw -> {
+					var c1  = typeRaw.getTypeClass(null);
+					var c2  = arg2.getTypeClass(null);
+					var cls = UtilL.findClosestCommonSuper(c1, c2);
+					yield IOType.of(cls);
+				}
+				default -> IOType.of(Object.class);
+			});
+		}
+		
+		return new IOType.TypeGeneric(t1.getRaw(), a1);
 	}
 	
-	default int toID(Object obj) throws IOException{
+	private IOType elementType(Iterable<?> l){
+		IOType type = null, fallback = null;
+		for(var o : l){
+			if(o == null) continue;
+			var t = makeType(o);
+			if(type == null){
+				if(o instanceof Collection<?> col && col.isEmpty()) fallback = t;
+				else type = t;
+			}else if(!type.equals(t)){
+				if(o instanceof Collection<?> col && col.isEmpty()) continue;
+				
+				if(type instanceof IOType.TypeGeneric t1 && t instanceof IOType.TypeGeneric t2){
+					type = tryMergeGeneric(t1, t2);
+				}else{
+					type = IOType.of(Object.class);
+				}
+			}
+		}
+		return type != null? type : fallback != null? fallback : IOType.of(Object.class);
+	}
+	
+	default int objToID(Object obj) throws IOException{
 		if(obj == null) return 0;
 		return toID(makeType(obj));
 	}
-	default TypeID toID(Object obj, boolean recordNew) throws IOException{
+	default TypeID objToID(Object obj, boolean recordNew) throws IOException{
 		if(obj == null) return new TypeID(0, true);
 		var type = makeType(obj);
 		return toID(type, recordNew);
 	}
 	
+	default int toID(Type type) throws IOException{
+		if(type == null) return 0;
+		return toID(IOType.of(type), true).requireStored();
+	}
 	default int toID(Class<?> type) throws IOException{
+		if(type == null) return 0;
 		return toID(IOType.of(type), true).requireStored();
 	}
 	default int toID(IOType type) throws IOException{
 		return toID(type, true).requireStored();
 	}
 	
+	default TypeID toID(Type type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
+		return toID(IOType.of(type), recordNew);
+	}
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
+		if(type == null) return new TypeID(0, true);
 		return toID(IOType.of(type), recordNew);
 	}
 	

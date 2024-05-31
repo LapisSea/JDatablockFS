@@ -295,18 +295,18 @@ public enum NumberSize{
 		}
 	}
 	private void validateSigned(int value){
+		try{
+			ensureCanFitSigned(value);
+		}catch(OutOfBitDepth e){
+			throw new RuntimeException(e);
+		}
+		
 		if(this != VOID){
 			var un = toUnsigned(value);
 			if(this != INT) validateUnsigned(un);
 			if(this != INT && un<0) throw new AssertionError(un + "<0");
 			var back = toSigned(un);
 			if(value != back) throw new AssertionError(value + "!=" + back);
-		}
-		
-		try{
-			ensureCanFitSigned(value);
-		}catch(OutOfBitDepth e){
-			throw new RuntimeException(e);
 		}
 	}
 	

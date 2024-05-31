@@ -6,20 +6,12 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
-import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
-import com.lapissea.dfs.core.versioning.ClassVersionDiff;
-import com.lapissea.dfs.core.versioning.VersionExecutor;
-import com.lapissea.dfs.core.versioning.VersionTransformer;
-import com.lapissea.dfs.core.versioning.Versioning;
-import com.lapissea.dfs.exceptions.IncompatibleVersionTransform;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
-import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
@@ -36,11 +28,10 @@ import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -49,10 +40,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -110,6 +99,9 @@ public final class Cluster implements DataProvider{
 		@Override
 		public <T> void provide(ObjectID id, T obj) throws IOException{
 			Objects.requireNonNull(obj);
+			if(ROOT_PROVIDER_WARMUP_COUNT>0){
+				cache.remove(id);
+			}
 			metadata.rootObjects.put(id, obj);
 		}
 		
@@ -216,8 +208,12 @@ public final class Cluster implements DataProvider{
 		return new Cluster(data);
 	}
 	
-	public static Cluster emptyMem() throws IOException{
-		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
+	public static Cluster emptyMem(){
+		try{
+			return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
 	}
 	
 	
@@ -231,12 +227,8 @@ public final class Cluster implements DataProvider{
 	
 	private final RootProvider roots = new Roots();
 	
-	private final Versioning versioning;
-	
-	public Cluster(IOInterface source) throws IOException{ this(source, Versioning.JUST_FAIL); }
-	public Cluster(IOInterface source, Versioning versioning) throws IOException{
+	public Cluster(IOInterface source) throws IOException{
 		this.source = source;
-		this.versioning = versioning;
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
@@ -259,71 +251,6 @@ public final class Cluster implements DataProvider{
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
 		}
-		
-		versionForward();
-	}
-	
-	private static String oldName(String base, String rid, long uid){
-		return base + "€old_" + rid + (uid == 0? "" : "_" + uid);
-	}
-	
-	private void versionForward() throws IOException{
-		var db               = metadata.db;
-		var storedClassNames = db.listStoredTypeDefinitionNames();
-		if(storedClassNames.isEmpty()) return;
-		
-		var transformers =
-			storedClassNames
-				.stream()
-				.map(className -> Runner.async(() -> ClassVersionDiff.of(className, db)))
-				.toList()
-				.stream()
-				.map(LateInit::get)
-				.flatMap(Optional::stream)
-				.<VersionTransformer<?>>map(versioning::createTransformer)
-				.toList();
-		
-		if(transformers.isEmpty()) return;
-		
-		if(isReadOnly()){
-			throw new IncompatibleVersionTransform("Can not update read only database");
-		}
-		
-		var nameSet = transformers.stream().map(e -> e.newClassName).collect(Collectors.toSet());
-		
-		var rid = Long.toHexString(Math.abs(new RawRandom().nextLong()));
-		
-		var index = 0L;
-		while(true){
-			var fi = index;
-			if(nameSet.stream().noneMatch(name -> storedClassNames.contains(oldName(name, rid, fi)))){
-				break;
-			}else{
-				index++;
-			}
-		}
-		
-		var fi = index;
-		var executor = new VersionExecutor(
-			transformers.stream().<VersionTransformer<?>>map(t -> t.withOldName(oldName(t.newClassName, rid, fi))).toList()
-		);
-		
-		db.rename(nameSet, name -> oldName(name, rid, fi));
-		
-		Log.debug("Replacing:\n{}", (Supplier<?>)() -> {
-			StringJoiner sj = new StringJoiner("\n");
-			for(var transformer : transformers){
-				sj.add(transformer.transformReport);
-			}
-			return sj;
-		});
-		
-		var chainsToFree = new ChunkSet();
-		var newRoot      = executor.versionForward(this, root, chainsToFree);
-		
-		ROOT_PIPE.write(getFirstChunk(), (RootRef)newRoot);
-		
-		getMemoryManager().freeChains(chainsToFree);
 	}
 	
 	private void scanTypeDB(){

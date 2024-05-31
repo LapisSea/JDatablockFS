@@ -79,7 +79,15 @@ public final class ConfigUtils{
 		Objects.requireNonNull(defaultValue);
 		return value.map(
 			s -> Arrays.stream(defaultValue.getClass().getEnumConstants())
-			           .filter(e -> e.name().equalsIgnoreCase(s))
+			           .filter(e -> {
+				           if(e instanceof NamedEnum ne){
+					           for(var name : ne.names()){
+						           if(name.equalsIgnoreCase(s)) return true;
+					           }
+					           return false;
+				           }
+				           return e.name().equalsIgnoreCase(s);
+			           })
 			           .findAny()
 			           .map(e -> new FuzzyResult<>((T)e))
 			           .orElse(new FuzzyResult<>(defaultValue, s))
