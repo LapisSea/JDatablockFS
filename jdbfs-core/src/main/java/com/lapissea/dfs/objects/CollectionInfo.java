@@ -6,8 +6,6 @@ import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.IOType;
-import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -15,7 +13,6 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -60,11 +57,6 @@ public sealed interface CollectionInfo{
 		public Layout layout(){ return Layout.STRIPED; }
 		@Override
 		public boolean hasNulls(){ return false; }
-		
-		@Override
-		public IOType getElementType(IOTypeDB db, IOType type){
-			throw new UnsupportedOperationException();
-		}
 		@Override
 		public IterablePP<?> iter(Object collection){ return IterablePPs.of(); }
 	}
@@ -93,18 +85,6 @@ public sealed interface CollectionInfo{
 		public Layout layout(){ return Layout.STRUCT_OF_ARRAYS; }
 		@Override
 		public boolean hasNulls(){ return false; }
-		
-		@Override
-		public IOType getElementType(IOTypeDB db, IOType type){
-			if(type instanceof IOType.RawAndArg raaaa){
-				return raaaa.withRaw(type.getTypeClass(db).componentType());
-			}else{
-				throw new NotImplementedException(type + "could not be array unwrapped");
-			}
-		}
-		
-		public static final StructPipe<PrimitiveArrayInfo> PIPE = StandardStructPipe.of(PrimitiveArrayInfo.class);
-		
 		@Override
 		public IterablePP<?> iter(Object collection){
 			return IterablePPs.rangeMap(0, Array.getLength(collection), (int i) -> Array.get(collection, i));
@@ -143,23 +123,14 @@ public sealed interface CollectionInfo{
 		public Layout layout(){ return layout; }
 		@Override
 		public boolean hasNulls(){ return hasNulls; }
-		
-		@Override
-		public IOType getElementType(IOTypeDB db, IOType type){
-			if(type instanceof IOType.RawAndArg raaaa){
-				return raaaa.withRaw(type.getTypeClass(db).componentType());
-			}else{
-				throw new NotImplementedException(type + "could not be array unwrapped");
-			}
-		}
-		
-		public Class<?> getArrayType(){ return arrayType; }
-		
 		@Override
 		public IterablePP<?> iter(Object collection){
 			var arr = (Object[])collection;
 			return IterablePPs.rangeMap(0, arr.length, (int i) -> arr[i]);
 		}
+		
+		public Class<?> getArrayType(){ return arrayType; }
+		
 	}
 	
 	@IOValue
@@ -194,12 +165,6 @@ public sealed interface CollectionInfo{
 		@Override
 		public boolean hasNulls(){ return hasNulls; }
 		
-		@Override
-		public IOType getElementType(IOTypeDB db, IOType type){
-			var args = IOType.getArgs(type);
-			return args.getFirst();
-		}
-		
 		public boolean isUnmodifiable(){ return unmodifiable; }
 		
 		@Override
@@ -214,8 +179,6 @@ public sealed interface CollectionInfo{
 	int length();
 	Layout layout();
 	boolean hasNulls();
-	
-	IOType getElementType(IOTypeDB db, IOType type);
 	
 	IterablePP<?> iter(Object collection);
 	
