@@ -64,6 +64,12 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 		}));
 	}
 	
+	private static final int[] DEFAULT_VAL = new int[0];
+	@Override
+	public int[] get(VarPool<T> ioPool, T instance){
+		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+	}
+	
 	private NumberSize getNumSize(VarPool<T> pool, T inst){
 		return numSize.get(pool, inst);
 	}

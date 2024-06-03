@@ -53,6 +53,13 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 			return arr == null? 0 : BitUtils.bitsToBytes(arr.length);
 		}));
 	}
+	
+	private static final boolean[] DEFAULT_VAL = new boolean[0];
+	@Override
+	public boolean[] get(VarPool<T> ioPool, T instance){
+		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+	}
+	
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);

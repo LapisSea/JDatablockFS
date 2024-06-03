@@ -14,6 +14,8 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -335,11 +337,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException{
 			var ctx = genericContext;
 			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
+			
 			var s = getThisStruct();
-			for(var ref : s.getRealFields().onlyRefs()){
-				if(!ref.isNull(null, self()))
+			for(var field : s.getRealFields()){
+				if(!field.isNull(null, self())){
+					if(field.getNullability() == IONullability.Mode.DEFAULT_IF_NULL){
+						field.get(null, self());
+					}
 					continue;
-				ref.allocate(self(), provider, genericContext);
+				}
+				if(field instanceof RefField<SELF, ?> ref){
+					ref.allocate(self(), provider, ctx);
+				}
 			}
 			
 			for(var pair : s.getNullContainInstances()){
@@ -349,7 +358,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				}
 				var struct = pair.struct();
 				var val    = struct.make();
-				val.allocateNulls(provider, field.makeContext(genericContext));
+				val.allocateNulls(provider, field.makeContext(ctx));
 				//noinspection rawtypes,unchecked
 				((IOField)field).set(null, self(), val);
 			}

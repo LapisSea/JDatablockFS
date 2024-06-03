@@ -57,6 +57,12 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 		arraySize = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));
 	}
 	
+	private static final float[] DEFAULT_VAL = new float[0];
+	@Override
+	public float[] get(VarPool<T> ioPool, T instance){
+		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+	}
+	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr = get(ioPool, instance);
