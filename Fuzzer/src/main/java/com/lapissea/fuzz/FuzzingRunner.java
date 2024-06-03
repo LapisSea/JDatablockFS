@@ -109,7 +109,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			return new Stability.DidntFail(reruns, fails.size());
 		}
 		return fails.stream()
-		            .filter(f -> !failShort.equals(f))
+		            .filter(f -> {
+			            return !failShort.equals(f);
+		            })
 		            .<Stability>map(f -> new Stability.FailsNotSame(failShort, f))
 		            .findAny().orElse(new Stability.Ok(sequence, mark.optAction()));
 	}
