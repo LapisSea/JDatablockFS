@@ -60,9 +60,11 @@ import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.core.DefragmentManager.FreeFoundAction.ERROR;
 import static com.lapissea.dfs.logging.Log.info;
+import static com.lapissea.dfs.run.FuzzingUtils.stableRun;
+import static com.lapissea.dfs.run.FuzzingUtils.stableRunAndSave;
+import static com.lapissea.dfs.run.TestUtils.optionallyLogged;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
-
 
 public class SlowTests{
 	
@@ -422,26 +424,6 @@ public class SlowTests{
 			Plan.start(runner, 69, iterations, 2000),
 			"run" + type.getSimpleName()
 		);
-	}
-	
-	private static <State, Action> void stableRun(Plan<State, Action> plan, String name){
-		plan.configMod(c -> c.withName(name))
-		    .runAll().report()
-		    .stableFail(8)
-		    .runMark()
-		    .assertFail();
-	}
-	private static <State, Action> void stableRunAndSave(Plan<State, Action> plan, String name){
-		plan.loadFail(new File("FailCache/" + name))
-		    .configMod(c -> c.withName(name))
-		    .ifHasFail(p -> p.stableFail(8).report()
-		                     .clearUnstable()
-		                     .runMark()
-		                     .assertFail())
-		    .runAll().report()
-		    .stableFail(8)
-		    .saveFail().runMark()
-		    .assertFail();
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
@@ -812,14 +794,4 @@ public class SlowTests{
 		);
 	}
 	
-	private static Cluster optionallyLogged(boolean logged, String name) throws IOException{
-		if(!logged) return Cluster.emptyMem();
-		class Lazy{
-			private static final LateInit.Safe<DataLogger> data = LoggedMemoryUtils.createLoggerFromConfig();
-			
-			static{ LogUtil.println("DataLogger made"); }
-		}
-		var data = LoggedMemoryUtils.newLoggedMemory(name, Lazy.data);
-		return Cluster.init(data);
-	}
 }
