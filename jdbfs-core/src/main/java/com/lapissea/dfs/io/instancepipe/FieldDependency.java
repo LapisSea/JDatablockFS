@@ -2,11 +2,9 @@ package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.utils.ReadWriteClosableLock;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,17 +25,13 @@ public class FieldDependency<T extends IOInstance<T>>{
 	){ }
 	
 	
-	private final Ticket<T>[] singleDependencyCache;
-	
-	private final Map<FieldSet<T>, Ticket<T>> multiDependencyCache     = new HashMap<>();
-	private final ReadWriteClosableLock       multiDependencyCacheLock = ReadWriteClosableLock.reentrant();
+	private Map<IOField<T, ?>, Ticket<T>> singleDependencyCache = Map.of();
+	private Map<FieldSet<T>, Ticket<T>>   multiDependencyCache  = Map.of();
 	
 	private final FieldSet<T> allFields;
 	
-	public FieldDependency(Struct<T> struct, FieldSet<T> allFields){
+	public FieldDependency(FieldSet<T> allFields){
 		this.allFields = allFields;
-		//noinspection unchecked
-		singleDependencyCache = new Ticket[struct.getFields().size()];
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
@@ -49,29 +43,29 @@ public class FieldDependency<T extends IOInstance<T>>{
 			return getDeps(selectedFields.getFirst());
 		}
 		
-		try(var ignored = multiDependencyCacheLock.read()){
-			var cached = multiDependencyCache.get(selectedFields);
-			if(cached != null) return cached;
-		}
-		try(var ignored = multiDependencyCacheLock.write()){
-			var cached = multiDependencyCache.get(selectedFields);
-			if(cached != null) return cached;
-			
-			var field = generateFieldsDependency(selectedFields);
-			multiDependencyCache.put(selectedFields, field);
-			return field;
-		}
+		var cached = multiDependencyCache.get(selectedFields);
+		if(cached != null) return cached;
+		
+		var tmp   = new HashMap<>(multiDependencyCache);
+		var field = generateFieldsDependency(selectedFields);
+		tmp.put(selectedFields, field);
+		multiDependencyCache = Map.copyOf(tmp);
+		return field;
 	}
 	private Ticket<T> emptyTicket(){
 		return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
-		var cached = singleDependencyCache[selectedField.getInStructUID()];
+		var cached = singleDependencyCache.get(selectedField);
 		if(cached != null) return cached;
 		
 		var ticket = generateFieldDependency(selectedField);
-		singleDependencyCache[selectedField.getInStructUID()] = ticket;
+		
+		var tmp = new HashMap<>(singleDependencyCache);
+		tmp.put(selectedField, ticket);
+		singleDependencyCache = Map.copyOf(tmp);
+		
 		return ticket;
 	}
 	
@@ -83,14 +77,14 @@ public class FieldDependency<T extends IOInstance<T>>{
 		if(selectedFields.size() == allFields.size()){
 			return new Ticket<>(true, true, allFields, allFields, collectGenerators(allFields));
 		}
-		var writeFields = new HashSet<IOField<T, ?>>();
-		var readFields  = new HashSet<IOField<T, ?>>();
+		var writeFields = new ArrayList<IOField<T, ?>>();
+		var readFields  = new ArrayList<IOField<T, ?>>();
 		for(IOField<T, ?> selectedField : selectedFields){
 			var part = getDeps(selectedField);
-			writeFields.addAll(part.writeFields);
-			readFields.addAll(part.readFields);
+			part.writeFields.stream().filter(f -> writeFields.stream().flatMap(IOField::streamUnpackedFields).noneMatch(ef -> ef == f)).forEach(writeFields::add);
+			part.readFields.stream().filter(f -> readFields.stream().flatMap(IOField::streamUnpackedFields).noneMatch(ef -> ef == f)).forEach(readFields::add);
 		}
-		return makeTicket(writeFields, readFields);
+		return makeTicket(new HashSet<>(writeFields), new HashSet<>(readFields));
 	}
 	
 	private Ticket<T> generateFieldDependency(IOField<T, ?> selectedField){

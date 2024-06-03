@@ -186,9 +186,8 @@ public final class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
 		var mapFields = fields.stream().collect(Collectors.toMap(IOField::getName, identity()));
-		for(int i = 0; i<fields.size(); i++){
-			var field = fields.get(i);
-			field.initLateData(i, generateDependencies(mapFields, field));
+		for(var field : fields){
+			field.initLateData(generateDependencies(mapFields, field));
 		}
 	}
 	

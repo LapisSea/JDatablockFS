@@ -249,7 +249,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
-			fieldDependency = new FieldDependency<>(getType(), ioFields);
+			fieldDependency = new FieldDependency<>(ioFields);
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
@@ -883,6 +883,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(fields.isEmpty()){
 			return;
 		}
+		var ioFields = this.ioFields;
 		if(fields.size() == ioFields.size()){
 			readIOFields(ioFields, ioPool, provider, src, instance, genericContext);
 			return;
