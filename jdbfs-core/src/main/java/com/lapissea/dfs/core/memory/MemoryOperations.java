@@ -749,11 +749,8 @@ public final class MemoryOperations{
 		var ptr = firstChunk.getPtr();
 		
 		var prev = new PhysicalChunkWalker(context.getFirstChunk())
-			           .stream()
-			           .filter(Chunk::hasNextPtr)
 			           .map(Chunk::getNextPtr)
-			           .filter(p -> p.equals(ptr))
-			           .findAny();
+			           .firstMatching(ptr::equals);
 		
 		if(prev.isPresent()){
 			var ch = context.getChunk(prev.get());

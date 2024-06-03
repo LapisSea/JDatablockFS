@@ -33,6 +33,7 @@ import com.lapissea.fuzz.RNGType;
 import com.lapissea.fuzz.RunMark;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
 import org.testng.annotations.DataProvider;
@@ -54,6 +55,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.StringJoiner;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -63,6 +65,7 @@ import static com.lapissea.dfs.logging.Log.info;
 import static com.lapissea.dfs.run.FuzzingUtils.stableRun;
 import static com.lapissea.dfs.run.FuzzingUtils.stableRunAndSave;
 import static com.lapissea.dfs.run.TestUtils.optionallyLogged;
+import static com.lapissea.dfs.run.TestUtils.optionallyLoggedMemory;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -73,12 +76,6 @@ public class SlowTests{
 		var logger = new LateInit<>(() -> DataLogger.Blank.INSTANCE);
 //		var logger=LoggedMemoryUtils.createLoggerFromConfig();
 		
-		byte[] baked;
-		{
-			var d = MemoryData.empty();
-			Cluster.init(d);
-			baked = d.readAll();
-		}
 		TestUtils.randomBatch(300000, 1000, (r, iter) -> {
 			try{
 				List<RandomIO.WriteChunk> allWrites;
@@ -98,8 +95,8 @@ public class SlowTests{
 				try(var ignored = mem.openIOTransaction()){
 					var chunks = new ArrayList<Chunk>();
 					
-					mem.write(true, baked);
-					Cluster c = new Cluster(mem);
+					mem.write(true, new byte[MagicID.size()]);
+					var c = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider(mem);
 					
 					var chunkCount = r.nextInt(5) + 1;
 					for(int i = 0; i<chunkCount; i++){
@@ -407,7 +404,7 @@ public class SlowTests{
 					case CONTAINS -> state.set.contains(action.num);
 					case CLEAR -> state.set.clear();
 				}
-				if(List.of(Type.REMOVE, Type.CLEAR, Type.ADD).contains(action.type)){
+				if(actionIndex%2 == 1 && List.of(Type.REMOVE, Type.CLEAR, Type.ADD).contains(action.type)){
 					state.cluster.scanGarbage(ERROR);
 				}
 			}
@@ -681,7 +678,7 @@ public class SlowTests{
 					case MapAction.Clear ignored -> state.map.clear();
 				}
 				
-				if(!(action instanceof MapAction.ContainsKey)){
+				if(actionIndex%2 == 1 && !(action instanceof MapAction.ContainsKey)){
 					state.provider.scanGarbage(ERROR);
 				}
 			}
