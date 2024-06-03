@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
@@ -114,5 +115,12 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 	protected void throwInformativeFixedSizeError(){
 		//TODO
 		throw new RuntimeException("Strings do not support fixed size yet. In future a max string size will be defined by the user if they wish for it to be fixed size compatible.");
+	}
+	
+	@Override
+	public Optional<String> instanceToString(VarPool<CTyp> ioPool, CTyp instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		var val = get(ioPool, instance);
+		if(val == null || val.length() == 0) return Optional.empty();
+		return Optional.of('"' + val + '"');
 	}
 }

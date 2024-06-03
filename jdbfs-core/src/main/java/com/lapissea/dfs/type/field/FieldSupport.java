@@ -171,9 +171,10 @@ final class FieldSupport{
 		}
 		
 		if(val.getClass().isArray()){
-			var res    = new StringJoiner(", ", "[", "]");
 			int resLen = 0, len = Array.getLength(val), remaining = len;
+			if(len == 0) return Optional.empty();
 			
+			var res       = new StringJoiner(", ", "[", "]");
 			var comp      = val.getClass().componentType();
 			var primitive = comp.isPrimitive();
 			
@@ -206,8 +207,10 @@ final class FieldSupport{
 			return Optional.of(res.toString());
 		}
 		if(val instanceof Collection<?> data){
-			var res    = new StringJoiner(", ", "[", "]");
 			int resLen = 0, remaining = data.size();
+			if(remaining == 0) return Optional.empty();
+			
+			var res = new StringJoiner(", ", "[", "]");
 			for(var o : data){
 				var e = Utils.toShortString(o);
 				resLen += 2 + e.length();
