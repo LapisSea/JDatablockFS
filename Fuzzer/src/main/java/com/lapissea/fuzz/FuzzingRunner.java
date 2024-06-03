@@ -92,6 +92,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		Objects.requireNonNull(fail);
 		if(reruns<1) throw new IllegalArgumentException("Rerun count must be at least 1");
 		
+		ensureActionEquality(fail.sequence());
+		
 		var failShort = shortenFail(fail);
 		
 		var sequence = failShort.sequence();
@@ -107,9 +109,19 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			return new Stability.DidntFail(reruns, fails.size());
 		}
 		return fails.stream()
-		            .filter(f -> !failShort.equals(f))
+		            .filter(f -> {
+			            return !failShort.equals(f);
+		            })
 		            .<Stability>map(f -> new Stability.FailsNotSame(failShort, f))
 		            .findAny().orElse(new Stability.Ok(sequence, mark.optAction()));
+	}
+	
+	public void ensureActionEquality(FuzzSequence sequence){
+		var a = actionFactory.apply(new SimpleRandom(sequence.seed()));
+		var b = actionFactory.apply(new SimpleRandom(sequence.seed()));
+		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
+			throw new RuntimeException("Faulty action equality! 2 actions generated from the same random should always be equal!");
+		}
 	}
 	
 	private FuzzFail<State, Action> shortenFail(FuzzFail<State, Action> fail){
