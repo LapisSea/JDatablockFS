@@ -78,13 +78,22 @@ public final class Plan<TState, TAction>{
 		return new Plan<>(runner, runInfo, state);
 	}
 	
+	public Plan<TState, TAction> requireStableAction(){
+		for(var sequence : runInfo.seed.all().limit(5).toList()){
+			runner.ensureActionEquality(sequence);
+		}
+		return this;
+	}
+	
 	public Plan<TState, TAction> runAll(){
 		var fails = runner.run(runInfo.config, RunMark.NONE, runInfo.seed);
 		return withState(state.withFails(fails));
 	}
 	
 	public Plan<TState, TAction> runMark(){
-		if(!state.mark.hasSequence() || state.fails instanceof Fails.StableFail(var f, var stability) && !(stability instanceof FuzzingRunner.Stability.Ok)){
+		if(!state.mark.hasSequence() || state.fails instanceof Fails.StableFail(
+			var f, var stability
+		) && !(stability instanceof FuzzingRunner.Stability.Ok)){
 			return this;
 		}
 		
