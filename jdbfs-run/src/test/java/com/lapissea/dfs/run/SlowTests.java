@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.MagicID;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -55,7 +56,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.StringJoiner;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -789,6 +789,104 @@ public class SlowTests{
 			Plan.start(runner, 69, 2000000, 10000),
 			"runFuzzBlobIO"
 		);
+	}
+	
+	
+	sealed interface AllocAction{
+		record Alloc(byte[] data, int rootID) implements AllocAction{
+			@Override
+			public String toString(){
+				return TextUtil.toString("Alloc{", data, rootID, "}");
+			}
+			@Override
+			public boolean equals(Object o){
+				return o instanceof Alloc alloc &&
+				       rootID == alloc.rootID && Arrays.equals(data, alloc.data);
+			}
+		}
+		
+		record Dealloc(int bytes, int rootID) implements AllocAction{ }
+		
+		int rootID();
+	}
+	
+	@Test
+	void fuzzChainResize(){
+		
+		var rootCount    = 10;
+		var allocMaxSize = 20;
+		
+		record State(com.lapissea.dfs.core.DataProvider dp, List<Chunk> roots, List<MemoryData> reference, long sequenceIndex){ }
+		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<State, AllocAction, IOException>(){
+			@Override
+			public void applyAction(State state, long actionIndex, AllocAction action, RunMark mark) throws IOException{
+				var root = state.roots.get(action.rootID());
+				var ref  = state.reference.get(action.rootID());
+				if(mark.action(actionIndex) && mark.sequence(state.sequenceIndex)){
+					int i = 0;
+				}
+				switch(action){
+					case AllocAction.Alloc alloc -> {
+						if(root == null){
+							state.roots.set(
+								alloc.rootID,
+								AllocateTicket.bytes(alloc.data.length)
+								              .withDataPopulated(c -> c.write(false, alloc.data))
+								              .submit(state.dp)
+							);
+						}else{
+							try(var io = root.io()){
+								io.skipExact(root.chainSize());
+								io.write(alloc.data);
+							}
+						}
+						ref.write(ref.getIOSize(), false, alloc.data);
+					}
+					case AllocAction.Dealloc dealloc -> {
+						if(root != null){
+							if(root.chainSize()<=dealloc.bytes){
+								state.roots.set(dealloc.rootID, null);
+								root.freeChaining();
+							}else{
+								try(var io = root.io()){
+									io.setCapacity(root.chainSize() - dealloc.bytes);
+								}
+							}
+							ref.setIOSize(Math.max(0, ref.getIOSize() - dealloc.bytes));
+						}
+					}
+				}
+				
+				var expected = ref.readAll();
+				var r        = state.roots.get(action.rootID());
+				var actual   = r == null? new byte[0] : r.readAll();
+				if(!Arrays.equals(actual, expected)){
+					assertEquals(actual, expected, TextUtil.toString("\n", actual, "\n", expected));
+				}
+			}
+			@Override
+			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
+				var data      = optionallyLoggedMemory(mark.sequence(sequenceIndex) || sequenceIndex == 10, "fuzzChainResize");
+				var dp        = random.nextBoolean()? com.lapissea.dfs.core.DataProvider.newVerySimpleProvider(data) : Cluster.init(data);
+				var roots     = new ArrayList<Chunk>(rootCount);
+				var reference = new ArrayList<MemoryData>(rootCount);
+				for(int i = 0; i<10; i++){
+					roots.add(null);
+					reference.add(MemoryData.empty());
+				}
+				return new State(dp, roots, reference, sequenceIndex);
+			}
+		}, RNGType.<AllocAction>of(List.of(
+			r -> {
+				var bytes = new byte[r.nextInt(allocMaxSize)];
+				r.nextBytes(bytes);
+				return new AllocAction.Alloc(bytes, r.nextInt(rootCount));
+			},
+			r -> new AllocAction.Dealloc(r.nextInt(allocMaxSize), r.nextInt(rootCount))
+		)).chanceFor(AllocAction.Dealloc.class, 1F/4));
+		
+		stableRun(Plan.start(runner, 69420, 100_000, 500), "fuzzChainResize");
+		
 	}
 	
 }

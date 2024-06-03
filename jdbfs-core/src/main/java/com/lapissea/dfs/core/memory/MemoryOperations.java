@@ -547,19 +547,15 @@ public final class MemoryOperations{
 		
 		IOInterface source = target.getDataProvider().getSource();
 		
-		int shiftSize = Math.toIntExact(Math.min(target.getCapacity() - growth, target.getSize()));
-		if(shiftSize<0){
-			shiftSize = 0;
-		}
+		int shiftSize = Math.max(Math.toIntExact(Math.min(target.getCapacity() - growth, target.getSize())), 0);
+		
 		byte[] toShift;
-		if(shiftSize>0){
-			try(var io = target.io()){
-				toShift = io.readInts1(shiftSize);
-				try(var pio = toPin.io()){
-					io.transferTo(pio);
-				}
+		try(var io = target.io()){
+			toShift = shiftSize>0? io.readInts1(shiftSize) : ZeroArrays.ZERO_BYTE;
+			try(var pio = toPin.io()){
+				io.transferTo(pio);
 			}
-		}else toShift = ZeroArrays.ZERO_BYTE;
+		}
 		
 		var oldCapacity = target.getCapacity();
 		var dataEnd     = target.dataEnd();
