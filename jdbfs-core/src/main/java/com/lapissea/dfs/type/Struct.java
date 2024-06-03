@@ -874,14 +874,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 			
 			Optional<String> valStr;
-			if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
-				valStr = Optional.of("<UNINITIALIZED>");
-			}else{
-				try{
+			try{
+				if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
+					valStr = Optional.of("<UNINITIALIZED>");
+				}else{
 					valStr = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS, start, end, fieldValueSeparator, fieldSeparator);
-				}catch(Throwable e){
-					valStr = Optional.of("CORRUPTED: " + e.getMessage());
 				}
+			}catch(Throwable e){
+				valStr = Optional.of("CORRUPTED: " + e.getMessage());
 			}
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);

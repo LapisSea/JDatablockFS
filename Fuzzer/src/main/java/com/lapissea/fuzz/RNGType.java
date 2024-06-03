@@ -62,7 +62,10 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 	
 	public RNGType<E> chanceFor(Class<? extends E> val, float chance){
 		var fn = universe.get(Objects.requireNonNull(val));
-		if(fn == null) throw new IllegalArgumentException("Invalid type: " + val.getName() + " available types:\n" + universe.keySet().stream().map(Class::getName).collect(Collectors.joining("\n")));
+		if(fn == null){
+			var types = universe.keySet().stream().map(Class::getName).collect(Collectors.joining("\n"));
+			throw new IllegalArgumentException("Invalid type: " + val.getName() + " available types:\n" + types);
+		}
 		
 		chances.add(new Chance<>(fn, chance));
 		randomPick.remove(fn);

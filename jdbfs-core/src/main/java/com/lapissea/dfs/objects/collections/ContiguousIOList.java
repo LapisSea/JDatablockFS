@@ -290,7 +290,8 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			@Override
 			public RandomIO get() throws IOException{
 				var io = selfIO();
-				io.setPos(calcElementOffset(index));
+				assert io.getPos() == 0;
+				io.skipExact(calcElementOffset(index));
 				return io;
 			}
 		};

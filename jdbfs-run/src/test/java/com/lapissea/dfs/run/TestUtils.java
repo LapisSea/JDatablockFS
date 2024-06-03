@@ -59,7 +59,7 @@ public final class TestUtils{
 		}catch(Throwable ignored){ }
 		
 		
-		String sessionName = getSessionName(info);
+		String sessionName = info.getName();
 		
 		IOInterface mem      = LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
 		boolean     deleting = false;
@@ -101,10 +101,6 @@ public final class TestUtils{
 			}
 			c.rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 		});
-	}
-	
-	private static String getSessionName(TestInfo info){
-		return info.getName();
 	}
 	
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(

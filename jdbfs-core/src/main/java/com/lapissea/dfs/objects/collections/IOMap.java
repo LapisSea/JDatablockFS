@@ -126,6 +126,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	long size();
 	
+	@Override
 	default boolean isEmpty(){
 		return size() == 0;
 	}
