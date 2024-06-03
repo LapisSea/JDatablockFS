@@ -517,7 +517,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public <E> OptionalPP<IOField<T, E>> exact(Class<E> type, String name){
-		return byType(type).filtered(f -> f.getName().equals(name)).first();
+		return byType(type).firstMatching(f -> f.getName().equals(name));
 	}
 	
 	public <E extends IOField<T, ?>> OptionalPP<? extends E> exactFieldType(Class<E> type, String name){

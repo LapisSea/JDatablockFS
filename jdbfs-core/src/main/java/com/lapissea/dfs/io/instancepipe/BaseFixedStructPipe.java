@@ -62,8 +62,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 				       var size = getType().getFields().streamDependentOn(sizingField)
 				                           .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
 				                           .distinct()
-				                           .mapToObj(l -> NumberSize.FLAG_INFO.filtered(s -> s.bytes == l)
-				                                                              .first().orElseThrow())
+				                           .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
 				                           .reduce((a, b) -> {
 					                           if(a != b){
 						                           throw new MalformedStruct("inconsistent dependency sizes" + sizingField);

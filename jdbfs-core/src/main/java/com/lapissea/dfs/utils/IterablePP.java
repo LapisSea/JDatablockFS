@@ -1,5 +1,8 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.dfs.utils.function.FunctionOL;
+import com.lapissea.util.function.UnsafePredicate;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -31,6 +34,15 @@ public interface IterablePP<T> extends Iterable<T>{
 	default OptionalPP<T> first(){
 		var iter = iterator();
 		if(iter.hasNext()) return OptionalPP.ofNullable(iter.next());
+		return OptionalPP.empty();
+	}
+	
+	default <E extends Throwable> OptionalPP<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
+		for(T t : this){
+			if(predicate.test(t)){
+				return OptionalPP.of(t);
+			}
+		}
 		return OptionalPP.empty();
 	}
 	
@@ -69,10 +81,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	
-	default boolean noneMatch(Predicate<T> predicate){
+	default <E extends Throwable> boolean noneMatch(UnsafePredicate<T, E> predicate) throws E{
 		return !anyMatch(predicate);
 	}
-	default boolean anyMatch(Predicate<T> predicate){
+	default <E extends Throwable> boolean anyMatch(UnsafePredicate<T, E> predicate) throws E{
 		for(T t : this){
 			if(predicate.test(t)){
 				return true;
@@ -80,7 +92,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return false;
 	}
-	default boolean allMatch(Predicate<T> predicate){
+	default <E extends Throwable> boolean allMatch(UnsafePredicate<T, E> predicate) throws E{
 		for(T t : this){
 			if(!predicate.test(t)){
 				return false;
@@ -93,7 +105,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		return () -> new Iterator<T>(){
 			private final Iterator<T> src = IterablePP.this.iterator();
 			
-			T next;
+			T       next;
 			boolean hasData;
 			
 			void calcNext(){
@@ -140,7 +152,7 @@ public interface IterablePP<T> extends Iterable<T>{
 			
 			Iterator<L> flat;
 			
-			private L next;
+			private L       next;
 			private boolean hasData;
 			
 			void doNext(){
@@ -191,7 +203,25 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		};
 	}
+	
+	default IterableLongPP mapToLong(FunctionOL<T> mapper){
+		return () -> {
+			var iter = iterator();
+			return new LongIterator(){
+				@Override
+				public boolean hasNext(){
+					return iter.hasNext();
+				}
+				@Override
+				public long nextLong(){
+					return mapper.apply(iter.next());
+				}
+			};
+		};
+	}
+	
 	default IterablePP<T> skip(int count){
+		if(count<0) throw new IllegalArgumentException("count cannot be negative");
 		var that = this;
 		return () -> {
 			var iter = that.iterator();
@@ -204,9 +234,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterablePP<T> limit(int maxLen){
+		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
 		return () -> new Iterator<>(){
 			private final Iterator<T> src = IterablePP.this.iterator();
-			private int count;
+			private       int         count;
 			
 			@Override
 			public boolean hasNext(){

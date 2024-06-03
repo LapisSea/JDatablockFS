@@ -571,7 +571,7 @@ public final class MemoryOperations{
 		if(oldCapacity == growth){
 			var numSizShrink     = bodyNum.bytes*2;
 			var ptrSizeCandidate = nextSiz.bytes + numSizShrink;
-			var newPtrSizeO      = NumberSize.FLAG_INFO.stream().filter(n -> n.bytes == ptrSizeCandidate).findAny();
+			var newPtrSizeO      = NumberSize.FLAG_INFO.firstMatching(n -> n.bytes == ptrSizeCandidate);
 			if(newPtrSizeO.isPresent()){
 				nextSiz = newPtrSizeO.get();
 				bodyNum = NumberSize.VOID;
@@ -619,7 +619,7 @@ public final class MemoryOperations{
 		var before = freeChunks.listIterator(index);
 		
 		return new IOIterator<>(){
-			private boolean toggle;
+			private boolean                             toggle;
 			private IOList.IOListIterator<ChunkPointer> lastRet;
 			@Override
 			public boolean hasNext(){
