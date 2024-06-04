@@ -52,6 +52,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -382,7 +383,17 @@ public class SlowTests{
 				return new StateForm(State.this.cluster.getSource().readAll());
 			}
 			
+			@Override
+			public boolean equals(Object obj){
+				try{
+					return obj instanceof State that &&
+					       Arrays.equals(this.cluster.getSource().readAll(), that.cluster.getSource().readAll());
+				}catch(IOException e){
+					throw new UncheckedIOException(e);
+				}
+			}
 		}
+		
 		enum Type{ADD, REMOVE, CONTAINS, CLEAR}
 		record Action(Type type, int num) implements Serializable{
 			@Override
