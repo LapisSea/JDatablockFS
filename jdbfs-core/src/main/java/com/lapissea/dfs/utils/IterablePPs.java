@@ -57,6 +57,21 @@ public final class IterablePPs{
 		return (IterablePP<T>)EMPTY;
 	}
 	
+	public static IterableLongPP ofLongs(long... data){
+		if(data.length == 0) return IterableLongPP.empty();
+		return () -> new LongIterator(){
+			int i = 0;
+			@Override
+			public boolean hasNext(){
+				return i<data.length;
+			}
+			@Override
+			public long nextLong(){
+				return data[i++];
+			}
+		};
+	}
+	
 	@SafeVarargs
 	public static <T> IterablePP<T> of(T... data){
 		if(data.length == 0) return of();

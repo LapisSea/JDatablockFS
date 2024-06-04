@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
@@ -37,7 +38,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -69,7 +69,7 @@ public final class MemoryOperations{
 			
 			
 			//test unknowns
-			var iter = (noTrim? LongStream.of(possibleHeaders.last().getValue()) : possibleHeaders.longStream()).iterator();
+			var iter = (noTrim? IterablePPs.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
 			while(iter.hasNext()){
 				var headIndex = iter.nextLong();
 				
@@ -105,7 +105,7 @@ public final class MemoryOperations{
 			
 			noTrim = true;
 			//pop alone headers, no change will make them valid
-			iter = possibleHeaders.longStream().iterator();
+			iter = possibleHeaders.longIter().iterator();
 			long lastIndex = -maxHeaderSize*2L;
 			var  index     = iter.nextLong();
 			while(iter.hasNext()){
@@ -459,7 +459,7 @@ public final class MemoryOperations{
 			var stranglers = strangler.collectNext();
 			var toMove     = 0;
 			for(var c : stranglers){
-				toMove += c.getCapacity();
+				toMove = Math.addExact(toMove, Math.toIntExact(c.getCapacity()));
 			}
 			if(toMove>0){
 				try(var src = strangler.io();
