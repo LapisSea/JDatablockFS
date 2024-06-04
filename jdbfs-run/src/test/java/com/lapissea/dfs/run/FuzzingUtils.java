@@ -17,6 +17,7 @@ public final class FuzzingUtils{
 	public static <State, Action> void stableRunAndSave(Plan<State, Action> plan, String name){
 		plan.loadFail(new File("FailCache/" + name))
 		    .requireStableAction()
+		    .requireSerializable()
 		    .configMod(c -> c.withName(name))
 		    .ifHasFail(p -> p.stableFail(8).report()
 		                     .clearUnstable()
