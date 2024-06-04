@@ -1,5 +1,10 @@
 package com.lapissea.fuzz;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.NotSerializableException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
@@ -121,6 +126,66 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		var b = actionFactory.apply(new SimpleRandom(sequence.seed()));
 		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
 			throw new RuntimeException("Faulty action equality! 2 actions generated from the same random should always be equal!");
+		}
+	}
+	
+	public void ensureSerializability(FuzzSequence sequence){
+		ensureActionSerializability(sequence);
+		ensureStateSerializability(sequence);
+	}
+	public void ensureStateSerializability(FuzzSequence sequence){
+		
+		State a;
+		try{
+			a = stateEnv.create(new SimpleRandom(sequence.seed()), sequence.index(), RunMark.NONE);
+		}catch(Throwable e){
+			throw new RuntimeException("Failed to create state", e);
+		}
+		Objects.requireNonNull(a, "State can not be null");
+		State b;
+		try{
+			byte[] aData;
+			{
+				var buff = new ByteArrayOutputStream();
+				try(var out = new ObjectOutputStream(buff)){
+					out.writeObject(a);
+				}
+				aData = buff.toByteArray();
+			}
+			try(var in = new ObjectInputStream(new ByteArrayInputStream(aData))){
+				//noinspection unchecked
+				b = (State)in.readObject();
+			}
+		}catch(NotSerializableException e){
+			throw new RuntimeException("State is required to be serializable", e);
+		}catch(Throwable e){
+			throw new RuntimeException("State is required to be serializable but failed", e);
+		}
+		
+		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
+			throw new RuntimeException("Faulty state equality or serializability! A state that is serialized should always be deserialized in to an equal object!");
+		}
+	}
+	public void ensureActionSerializability(FuzzSequence sequence){
+		Action a = actionFactory.apply(new SimpleRandom(sequence.seed()));
+		Action b;
+		try{
+			var buff = new ByteArrayOutputStream();
+			try(var out = new ObjectOutputStream(buff)){
+				out.writeObject(a);
+			}
+			try(var in = new ObjectInputStream(new ByteArrayInputStream(buff.toByteArray()))){
+				//noinspection unchecked
+				b = (Action)in.readObject();
+			}
+		}catch(NotSerializableException e){
+			throw new RuntimeException("Action is required to be serializable", e);
+		}catch(Throwable e){
+			throw new RuntimeException("Action is required to be serializable but failed", e);
+		}
+		
+		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
+			throw new RuntimeException("Faulty action equality or serializability! An action that is serialized should always be deserialized in to an equal object!");
 		}
 	}
 	
