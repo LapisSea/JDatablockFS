@@ -808,12 +808,18 @@ public final class MemoryOperations{
 			}
 			if(safeToAllocate == 0) continue;
 			
+			// Edge-case: List wants to grow the data size and may consume the currently to be freed chunk.
+			// We solve this by first removing the chunk, so the freeing mechanism is not aware of it.
+			// We can then finally add the chunk back by using the free mechanism
+			var growEdgecase = NumberSize.bySize(ch.getPtr()).greaterThan(NumberSize.bySize(freePtr));
+			
 			try(var ignored = provider.getSource().openIOTransaction()){
+				if(growEdgecase){
+					iter.ioRemove();
+				}
+				
 				ch.writeHeader();
-				ch = ch.getPtr().dereference(provider);
-				
-				iter.ioSet(ch.getPtr());
-				
+				provider.getChunkCache().add(ch);
 				
 				try{
 					target.setCapacity(newCapacity);
@@ -821,7 +827,16 @@ public final class MemoryOperations{
 					throw new ShouldNeverHappenError(e);
 				}
 				target.syncStruct();
+				
+				if(growEdgecase){
+					manager.free(ch);
+				}else{
+					iter.ioSet(ch.getPtr());
+				}
+				
 			}
+			
+			
 			if(safeToAllocate<freeChunk.getHeaderSize()){
 				try(var io = provider.getSource().ioAt(freeChunk.getPtr().getValue())){
 					IOUtils.zeroFill(io, safeToAllocate);
