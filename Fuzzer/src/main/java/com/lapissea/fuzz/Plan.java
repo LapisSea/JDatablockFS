@@ -84,6 +84,12 @@ public final class Plan<TState, TAction>{
 		}
 		return this;
 	}
+	public Plan<TState, TAction> requireSerializable(){
+		for(var sequence : runInfo.seed.all().limit(5).toList()){
+			runner.ensureSerializability(sequence);
+		}
+		return this;
+	}
 	
 	public Plan<TState, TAction> runAll(){
 		var fails = runner.run(runInfo.config, RunMark.NONE, runInfo.seed);
