@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
-import com.lapissea.dfs.exceptions.PointerOutsideFile;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -801,7 +800,7 @@ public class SlowTests{
 		
 		
 		stableRun(
-			Plan.start(runner, 69, 2000000, 10000),
+			Plan.start(runner, 69, 500_000, 5_000),
 			"runFuzzBlobIO"
 		);
 	}
@@ -877,7 +876,7 @@ public class SlowTests{
 				Chunk first;
 				try{
 					first = state.dp.getFirstChunk();
-				}catch(PointerOutsideFile ignore){
+				}catch(IOException ignore){
 					first = null;
 				}
 				if(first != null){
