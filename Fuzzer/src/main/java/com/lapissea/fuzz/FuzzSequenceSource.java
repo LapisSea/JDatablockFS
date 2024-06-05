@@ -7,6 +7,14 @@ public interface FuzzSequenceSource{
 	Stream<FuzzSequence> all();
 	
 	record LenSeed(long seed, long totalIterations, int sequenceLength) implements FuzzSequenceSource{
+		public LenSeed{
+			if(totalIterations<=0){
+				throw new IllegalArgumentException("Total iterations must be greater than zero");
+			}
+			if(sequenceLength<=0){
+				throw new IllegalArgumentException("Sequence length must be greater than zero");
+			}
+		}
 		@Override
 		public Stream<FuzzSequence> all(){
 			var sequenceEntropy   = new SimpleRandom(seed);
