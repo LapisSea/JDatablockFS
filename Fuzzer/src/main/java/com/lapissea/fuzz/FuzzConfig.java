@@ -11,7 +11,8 @@ import java.util.function.Consumer;
 public record FuzzConfig(
 	boolean shouldLog, Optional<Consumer<LogState>> logFunct, Duration logTimeout,
 	Optional<String> name, int maxWorkers,
-	Duration errorDelay, Optional<FailOrder> failOrder
+	Duration errorDelay, Optional<FailOrder> failOrder,
+	OptionalInt maxErrorsTracked
 ){
 	public record LogState(
 		double progress,
@@ -43,15 +44,18 @@ public record FuzzConfig(
 		this(
 			true, none(), Duration.ofMillis(900),
 			none(), Math.max(1, Runtime.getRuntime().availableProcessors() + 1),
-			Duration.ofSeconds(2), none()
+			Duration.ofSeconds(2), none(),
+			some(100)
 		);
 	}
 	
-	public FuzzConfig dontLog()                           { return new FuzzConfig(false, none(), logTimeout, name, maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig logWith(Consumer<LogState> logFunct){ return new FuzzConfig(true, some(logFunct), logTimeout, name, maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig withLogTimeout(Duration logTimeout) { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig withName(String name)               { return new FuzzConfig(shouldLog, logFunct, logTimeout, some(name), maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig withMaxWorkers(int maxWorkers)      { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig withErrorDelay(Duration errorDelay) { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder); }
-	public FuzzConfig withFailOrder(FailOrder failOrder)  { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, some(failOrder)); }
+	public FuzzConfig dontLog()                           { return new FuzzConfig(false, none(), logTimeout, name, maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig logWith(Consumer<LogState> logFunct){ return new FuzzConfig(true, some(logFunct), logTimeout, name, maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig withLogTimeout(Duration logTimeout) { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig withName(String name)               { return new FuzzConfig(shouldLog, logFunct, logTimeout, some(name), maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig withMaxWorkers(int maxWorkers)      { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig withErrorDelay(Duration errorDelay) { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder, maxErrorsTracked); }
+	public FuzzConfig withFailOrder(FailOrder failOrder)  { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, some(failOrder), maxErrorsTracked); }
+	public FuzzConfig withMaxErrorsTracked(int maxCount)  { return new FuzzConfig(shouldLog, logFunct, logTimeout, name, maxWorkers, errorDelay, failOrder, some(maxCount)); }
+	
 }

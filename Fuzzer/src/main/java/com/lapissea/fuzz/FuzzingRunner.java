@@ -272,7 +272,12 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				int nThreads = (int)Math.max(Math.min(conf.maxWorkers(), sequencesToRun) - 1, 1);
 				var progress = new FuzzProgress(conf, totalIterations);
 				
-				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>());
+				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>(){
+					@Override
+					public boolean add(FuzzFail<State, Action> f){
+						return (conf.maxErrorsTracked().isEmpty() || conf.maxErrorsTracked().getAsInt()>this.size()) && super.add(f);
+					}
+				});
 				
 				ScheduledExecutorService          delayExec;
 				Consumer<FuzzFail<State, Action>> reportFail;
