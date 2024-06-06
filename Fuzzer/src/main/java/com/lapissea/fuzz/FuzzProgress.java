@@ -6,6 +6,7 @@ import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.OptionalDouble;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -20,9 +21,13 @@ public final class FuzzProgress{
 	private       boolean    hasErr;
 	private       boolean    errMark;
 	
-	private final FuzzConfig config;
-	private final long       totalIterations;
+	private final FuzzConfig              config;
+	private final CompletableFuture<Long> totalIterations;
+	
 	public FuzzProgress(FuzzConfig config, long totalIterations){
+		this(config, CompletableFuture.completedFuture(totalIterations));
+	}
+	public FuzzProgress(FuzzConfig config, CompletableFuture<Long> totalIterations){
 		this.config = config;
 		this.totalIterations = totalIterations;
 	}
@@ -52,13 +57,14 @@ public final class FuzzProgress{
 		var progressI = calcProgressI(count);
 		
 		if(progressI == last) return;
+		
 		synchronized(this){
 			logInc(count, progressI);
 		}
 	}
 	
 	private int calcProgressI(long count){
-		return (int)((count*1000)/totalIterations);
+		return (int)((count*1000)/totalIterations.getNow(Long.MAX_VALUE));
 	}
 	
 	private void logInc(long count, int progressI){
@@ -67,7 +73,10 @@ public final class FuzzProgress{
 			lastLog = now;
 			last = progressI;
 			
-			BigDecimal progress = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalIterations), MathContext.DECIMAL128);
+			BigDecimal progress;
+			if(totalIterations.isDone()){
+				progress = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalIterations.join()), MathContext.DECIMAL128);
+			}else progress = BigDecimal.ZERO;
 			log(count, progress);
 		}
 	}
