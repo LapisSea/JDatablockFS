@@ -266,7 +266,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	public List<FuzzFail<State, Action>> run(FuzzConfig config, RunMark mark, FuzzSequenceSource source){
 		final var conf = config == null? new FuzzConfig() : config;
 		
-		return switch(RunType.of(source, stateEnv, mark)){
+		return switch(RunType.of(source, stateEnv, mark, conf.maxWorkers()<=1)){
 			case RunType.Noop ignored -> List.of();
 			case RunType.Single(var sequence) -> {
 				var fail = runSequence(mark, sequence, new FuzzProgress(conf, sequence.iterations()));
@@ -312,12 +312,24 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					};
 				}
 				
+				if(nThreads == 1){
+					try{
+						source.all().sequential().filter(seq -> stateEnv.shouldRun(seq, mark)).forEach(sequence -> {
+							if(progress.hasErr()) throw new HasErr();
+							runSequence(mark, sequence, progress).ifPresent(reportFail);
+						});
+					}catch(HasErr ignore){ }
+					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
+					Thread.startVirtualThread(System::gc);
+					yield res;
+				}
+				
 				try(var worker = new ThreadPoolExecutor(nThreads, nThreads, 500, MILLISECONDS,
 				                                        new LinkedBlockingQueue<>(), new RunnerFactory(nThreads, name))){
 					
 					if(data instanceof ManyData.Async async) async.compute.accept(worker);
 					
-					var desiredBuffer = Math.max(nThreads*2, 4);
+					var desiredBuffer = Math.max(nThreads*2, 8);
 					var splits        = new ArrayList<>(List.of(source.all().spliterator()));
 					while(splits.size()<desiredBuffer){
 						var res = splits.stream().map(Spliterator::trySplit).filter(Objects::nonNull).toList();
@@ -367,11 +379,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 						}
 					}
 					
-					if(nThreads>1){
-						Runnable task;
-						while((task = worker.getQueue().poll()) != null){
-							task.run();
-						}
+					Runnable task;
+					while((task = worker.getQueue().poll()) != null){
+						task.run();
 					}
 					
 					if(data instanceof ManyData.Async async){
@@ -388,15 +398,15 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					}
 				}
 				
+				var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
 				Thread.startVirtualThread(System::gc);
-				
-				yield FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
+				yield res;
 			}
 		};
 	}
 	
 	private sealed interface RunType{
-		static RunType of(FuzzSequenceSource source, FuzzingStateEnv<?, ?, ?> stateEnv, RunMark mark){
+		static RunType of(FuzzSequenceSource source, FuzzingStateEnv<?, ?, ?> stateEnv, RunMark mark, boolean alwaysFull){
 			instant:
 			{
 				var start = Instant.now();
@@ -404,9 +414,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				
 				long sequencesToRun = 0, totalIterations = 0;
 				var  sequence       = (FuzzSequence)null;
-				int  i              = 0;
+				long count          = 0;
 				while(iter.hasNext()){
-					if(((++i)%5 == 0) && Duration.between(start, Instant.now()).toMillis()>100){
+					if(!alwaysFull && ((++count)%5 == 0) && Duration.between(start, Instant.now()).toMillis()>100){
 						break instant;
 					}
 					var seq = iter.next();
@@ -471,6 +481,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		                              .orElseThrow()
 		                              .getMethodName());
 	}
+	
+	private static final class HasErr extends RuntimeException{ }
 	
 	private static final class RunnerFactory implements ThreadFactory{
 		private       int    threadIndex;
