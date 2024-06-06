@@ -15,6 +15,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static com.lapissea.fuzz.FuzzConfig.none;
+
 public final class Plan<TState, TAction>{
 	
 	private record RunInfo(FuzzConfig config, FuzzSequenceSource seed){ }
@@ -60,7 +62,7 @@ public final class Plan<TState, TAction>{
 		return new Plan<>(
 			runner,
 			new RunInfo(config, source),
-			new State<>(new Fails.FailList<>(List.of()), false, RunMark.NONE, Optional.empty())
+			new State<>(new Fails.FailList<>(List.of()), false, RunMark.NONE, none())
 		);
 	}
 	
@@ -79,13 +81,13 @@ public final class Plan<TState, TAction>{
 	}
 	
 	public Plan<TState, TAction> requireStableAction(){
-		for(var sequence : runInfo.seed.all().limit(5).toList()){
+		for(var sequence : runInfo.seed.all().sequential().limit(5).toList()){
 			runner.ensureActionEquality(sequence);
 		}
 		return this;
 	}
 	public Plan<TState, TAction> requireSerializable(){
-		for(var sequence : runInfo.seed.all().limit(5).toList()){
+		for(var sequence : runInfo.seed.all().sequential().limit(5).toList()){
 			runner.ensureSerializability(sequence);
 		}
 		return this;

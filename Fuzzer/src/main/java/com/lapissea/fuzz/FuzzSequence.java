@@ -3,7 +3,14 @@ package com.lapissea.fuzz;
 import java.io.Serializable;
 
 public record FuzzSequence(long startIndex, long index, long seed, int iterations) implements Serializable{
-	
+	public FuzzSequence{
+		if(startIndex<0){
+			throw new IllegalArgumentException("startIndex must be non-negative");
+		}
+		if(iterations<=0){
+			throw new IllegalArgumentException("iterations must be positive");
+		}
+	}
 	public long endIndex(){ return startIndex + iterations; }
 	
 	@Override
