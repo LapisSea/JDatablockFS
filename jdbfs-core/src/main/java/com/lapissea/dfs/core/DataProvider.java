@@ -70,7 +70,7 @@ public interface DataProvider{
 	static DataProvider newVerySimpleProvider(IOHook onWrite){
 		var data = new MemoryData.Builder()
 			           .withOnWrite(onWrite)
-			           .withInitial(MagicID::write)
+			           .withRaw(new byte[MagicID.size()])
 			           .build();
 		return newVerySimpleProvider(data);
 	}

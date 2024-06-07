@@ -3,6 +3,7 @@ package com.lapissea.dfs.core;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
+import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
@@ -84,7 +85,9 @@ public interface MemoryManager extends DataProvider.Holder{
 				throw new IllegalArgumentException();
 			}
 			
-			if(DEBUG_VALIDATION) MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+			if(DEBUG_VALIDATION){
+				MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+			}
 			
 			var last = target;
 			
@@ -99,7 +102,14 @@ public interface MemoryManager extends DataProvider.Holder{
 					if(DEBUG_VALIDATION){
 						checkChainData(firstChunk);
 						
-						if(last.dirty()) throw new RuntimeException(last + " is dirty");
+						if(last.dirty()){
+							try{
+								last.requireReal();
+								throw new RuntimeException(last + " is dirty");
+							}catch(CacheOutOfSync ignore){
+								//Do not check dirty. Only real chunks need to be synced
+							}
+						}
 						if(allocated<0){
 							throw new IllegalStateException();
 						}

@@ -161,7 +161,8 @@ public sealed interface FuzzFail<State, Act>{
 			}
 		}
 		
-		try{
+		//TODO figure why last frame matches the "in fuzzing code" in very rare case
+		if(end>0) try{
 			var el  = stack[end - 1];
 			var typ = Class.forName(el.getClassName());
 			if(Arrays.stream(typ.getDeclaredMethods()).filter(Method::isSynthetic)

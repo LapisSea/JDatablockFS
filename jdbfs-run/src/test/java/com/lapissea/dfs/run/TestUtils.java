@@ -325,13 +325,15 @@ public final class TestUtils{
 	public static Cluster optionallyLogged(boolean logged, String name) throws IOException{
 		return Cluster.init(optionallyLoggedMemory(logged, name));
 	}
-	public static IOInterface optionallyLoggedMemory(boolean logged, String name){
-		if(!logged) return MemoryData.builder().withRaw(MagicID.get()).build();
+	public static IOInterface optionallyLoggedMemory(boolean logged, String name) throws IOException{
+		if(!logged) return MemoryData.builder().withRaw(new byte[MagicID.size()]).build();
 		class Lazy{
 			private static final LateInit.Safe<DataLogger> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
 			
 			static{ LogUtil.println("DataLogger made"); }
 		}
-		return LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
+		var mem = LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
+		mem.write(true, new byte[MagicID.size()]);
+		return mem;
 	}
 }

@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class MagicID{
+public final class MagicID{
 	
 	private static final ByteBuffer MAGIC_ID = ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	

@@ -384,7 +384,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	
 	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
 		var newBuffer = new ArrayList<>(varyingBuffer);
-		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.getId(), s));
+		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.id, s));
 		var newVarying = List.copyOf(newBuffer);
 		
 		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), IOType.getArg(getTypeDef(), 0));
