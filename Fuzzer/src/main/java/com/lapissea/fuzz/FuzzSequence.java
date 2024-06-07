@@ -58,7 +58,7 @@ public record FuzzSequence(long startIndex, long index, long seed, int iteration
 		return bb.getLong();
 	}
 	
-	private String makeDataStick(){
+	public String makeDataStick(){
 		try{
 			var startIndexSize = numObytes(startIndex());
 			var indexSize      = numObytes(index());
