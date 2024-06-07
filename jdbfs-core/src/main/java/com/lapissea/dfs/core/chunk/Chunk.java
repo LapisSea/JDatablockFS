@@ -219,7 +219,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(!earlyCheckChunkAt(provider, pointer)) throw new MalformedPointer("Invalid chunk at " + pointer);
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointer(pointer + " points outside of available data");
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE)))
+			throw new MalformedPointer(pointer + " points outside of available data");
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
@@ -284,7 +285,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		this.provider = Objects.requireNonNull(provider);
 		this.ptr = Objects.requireNonNull(ptr);
 		this.bodyNumSize = Objects.requireNonNull(bodyNumSize);
-		this.capacity = capacity;
+		this.capacity = requireCapacityPositive(capacity);
 		this.size = size;
 		this.nextSize = Objects.requireNonNull(nextSize);
 		try{
@@ -457,13 +458,22 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		forbidReadOnly();
 		if(this.capacity == newCapacity) return;
 		getBodyNumSize().ensureCanFit(newCapacity);
-		this.capacity = newCapacity;
+		this.capacity = requireCapacityPositive(newCapacity);
 		markDirty();
 	}
 	
-	public void setCapacityAndModifyNumSize(long newCapacity){
+	public boolean setCapacityAndModifyNumSize(long newCapacity){
+		if(!clone().setCapacityAndModifyNumSize0(newCapacity)){
+			return false;
+		}
+		var ok = setCapacityAndModifyNumSize0(newCapacity);
+		assert ok;
+		return true;
+	}
+	private boolean setCapacityAndModifyNumSize0(long newCapacity){
 		forbidReadOnly();
-		if(this.capacity == newCapacity) return;
+		if(this.capacity == newCapacity) return true;
+		requireCapacityPositive(newCapacity);
 		
 		var end = dataEnd();
 		
@@ -478,6 +488,10 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		var start  = dataStart();
 		
 		var cap = end - start + growth;
+		if(cap<0){
+			return false;
+		}
+		
 		if(!bodyNumSize.canFit(cap)){
 			bodyNumSize = bodyNumSize.next();
 			refreshHeaderSize();
@@ -486,9 +500,17 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			cap = end - start + growth;
 		}
 		
-		this.capacity = cap;
+		this.capacity = requireCapacityPositive(cap);
 		this.size = Math.min(this.size, this.capacity);
 		markDirty();
+		return true;
+	}
+	
+	private static long requireCapacityPositive(long capacity){
+		if(capacity<0){
+			throw new IllegalArgumentException("capacity must be positive");
+		}
+		return capacity;
 	}
 	
 	/**

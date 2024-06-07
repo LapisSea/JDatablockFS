@@ -828,7 +828,7 @@ public class SlowTests{
 	void fuzzChainResize(){
 		
 		var rootCount    = 10;
-		var allocMaxSize = 20;
+		var allocMaxSize = 100;
 		
 		record State(
 			com.lapissea.dfs.core.DataProvider dp, List<Chunk> roots, List<MemoryData> reference, long sequenceIndex
@@ -872,20 +872,21 @@ public class SlowTests{
 						}
 					}
 				}
-				
-				Chunk first;
-				try{
-					first = state.dp.getFirstChunk();
-				}catch(IOException ignore){
-					first = null;
-				}
-				if(first != null){
-					var set = new PhysicalChunkWalker(first).collectToSet();
-					for(var ch : set){
-						if(!ch.hasNextPtr()) continue;
-						var next = ch.requireNext();
-						if(!set.contains(next)){
-							throw new IllegalStateException("Corrupt chunk at " + next.getPtr());
+				if(actionIndex%50 == 0){
+					Chunk first;
+					try{
+						first = state.dp.getFirstChunk();
+					}catch(IOException ignore){
+						first = null;
+					}
+					if(first != null){
+						var set = new PhysicalChunkWalker(first).collectToSet();
+						for(var ch : set){
+							if(!ch.hasNextPtr()) continue;
+							var next = ch.requireNext();
+							if(!set.contains(next)){
+								throw new IllegalStateException("Corrupt chunk at " + next.getPtr());
+							}
 						}
 					}
 				}
@@ -916,13 +917,12 @@ public class SlowTests{
 				return new AllocAction.Alloc(bytes, r.nextInt(rootCount));
 			},
 			r -> new AllocAction.Dealloc(r.nextInt(allocMaxSize), r.nextInt(rootCount))
-		)).chanceFor(AllocAction.Dealloc.class, 1F/4));
+		)).chanceFor(AllocAction.Dealloc.class, 1F/3));
 		
 		stableRun(Plan.start(
 			runner, new FuzzConfig(),
-			() -> new FuzzSequenceSource.LenSeed(42069, 100_000, 500)
-				      .all()
-			//.filter(s -> s.index() == 36608)
+			new FuzzSequenceSource.LenSeed(42069, 1000_000, 500)
+//			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
 		), "fuzzChainResize");
 	}
 	
