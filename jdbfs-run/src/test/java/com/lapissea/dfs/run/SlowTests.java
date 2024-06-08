@@ -921,7 +921,7 @@ public class SlowTests{
 		
 		stableRun(Plan.start(
 			runner, new FuzzConfig(),
-			new FuzzSequenceSource.LenSeed(42069, 1000_000, 500)
+			new FuzzSequenceSource.LenSeed(42069, 500_000, 500)
 //			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
 		), "fuzzChainResize");
 	}

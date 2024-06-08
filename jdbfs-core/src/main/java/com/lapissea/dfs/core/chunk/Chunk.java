@@ -825,6 +825,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		var sb = new StringBuilder(32).append("Chunk{");
 		if(provider.getChunkCached(getPtr()) != this){
 			sb.append("NOT_REAL ");
+		}else if(dirty){
+			sb.append("DIRTY ");
 		}
 		sb.append(getPtr());
 		if(bodyNumSize != NumberSize.VOID) sb.append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
