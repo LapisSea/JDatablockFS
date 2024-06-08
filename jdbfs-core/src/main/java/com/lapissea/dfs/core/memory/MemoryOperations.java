@@ -265,8 +265,15 @@ public final class MemoryOperations{
 	
 	private static void mergeFreeChunks(Chunk prev, Chunk next) throws IOException{
 		prepareFreeChunkMerge(prev, next);
-		prev.syncStruct();
-		next.destroy(true);
+		if(prev.dataStart()>next.getPtr().getValue()){
+			try(var ignore = next.getDataProvider().getSource().openIOTransaction()){
+				next.destroy(true);
+				prev.syncStruct();
+			}
+		}else{
+			prev.syncStruct();
+			next.destroy(true);
+		}
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
