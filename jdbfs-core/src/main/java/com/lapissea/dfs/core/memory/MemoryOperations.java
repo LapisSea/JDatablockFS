@@ -175,15 +175,16 @@ public final class MemoryOperations{
 					existing = tmp;
 				}
 				if(next.isNextPhysical(existing)){
-					freeListReplace(data, 0, newCh);
-					mergeFreeChunks(next, existing);
-					//check if the next element in free list is now next physical and merge+remove from the list
-					if(data.size()>1){
-						var ptr = data.get(1);
-						if(existing.isNextPhysical(ptr)){
-							var ch = ptr.dereference(provider);
-							data.remove(1);
-							mergeFreeChunks(existing, ch);
+					if(freeListReplace(provider, data, 0, newCh)){
+						mergeFreeChunks(next, existing);
+						//check if the next element in free list is now next physical and merge+remove from the list
+						if(data.size()>1){
+							var ptr = data.get(1);
+							if(existing.isNextPhysical(ptr)){
+								var ch = ptr.dereference(provider);
+								data.remove(1);
+								mergeFreeChunks(existing, ch);
+							}
 						}
 					}
 					continue;
@@ -209,8 +210,9 @@ public final class MemoryOperations{
 					var next = data.get(insertIndex).dereference(provider);
 					
 					if(newCh.isNextPhysical(next)){
-						freeListReplace(data, insertIndex, newCh);
-						mergeFreeChunks(newCh, next);
+						if(freeListReplace(provider, data, insertIndex, newCh)){
+							mergeFreeChunks(newCh, next);
+						}
 						continue;
 					}
 				}
@@ -220,9 +222,19 @@ public final class MemoryOperations{
 		if(DEBUG_VALIDATION) checkOptimal(provider, data);
 	}
 	
-	private static void freeListReplace(IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
+	private static boolean freeListReplace(DataProvider provider, IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
 		clearFree(newCh);
+		
+		var old = data.get(replaceIndex);
+		if(NumberSize.bySize(newCh.getPtr()).greaterThan(NumberSize.bySize(old))){
+			data.remove(replaceIndex);
+			data.add(replaceIndex, newCh.getPtr());
+			provider.getMemoryManager().free(old.dereference(provider));
+			return false;
+		}
+		
 		data.set(replaceIndex, newCh.getPtr());
+		return true;
 	}
 	private static void freeListAdd(IOList<ChunkPointer> data, long insertIndex, Chunk newCh) throws IOException{
 		clearFree(newCh);
@@ -253,13 +265,22 @@ public final class MemoryOperations{
 	
 	private static void mergeFreeChunks(Chunk prev, Chunk next) throws IOException{
 		prepareFreeChunkMerge(prev, next);
-		prev.syncStruct();
-		next.destroy(true);
+		if(prev.dataStart()>next.getPtr().getValue()){
+			try(var ignore = next.getDataProvider().getSource().openIOTransaction()){
+				next.destroy(true);
+				prev.syncStruct();
+			}
+		}else{
+			prev.syncStruct();
+			next.destroy(true);
+		}
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
 		var wholeSize = next.getHeaderSize() + next.getCapacity();
-		prev.setCapacityAndModifyNumSize(prev.getCapacity() + wholeSize);
+		if(!prev.setCapacityAndModifyNumSize(prev.getCapacity() + wholeSize)){
+			throw new ShouldNeverHappenError("The chunk should have enough space. This is a bug");
+		}
 		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
@@ -705,7 +726,9 @@ public final class MemoryOperations{
 		
 		reallocate.writeHeader();
 		
-		ch.setCapacityAndModifyNumSize(ch.getCapacity() - reallocate.totalSize());
+		if(!ch.setCapacityAndModifyNumSize(ch.getCapacity() - reallocate.totalSize())){
+			return null;
+		}
 		ch.writeHeader();
 		context.getChunkCache().add(reallocate);
 		return reallocate;
@@ -760,6 +783,7 @@ public final class MemoryOperations{
 	
 	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate, boolean allowRemove) throws IOException{
 		var end = target.dataEnd();
+		freeIter:
 		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
 			ChunkPointer freePtr = iter.ioNext();
 			if(!freePtr.equals(end)){
@@ -797,7 +821,25 @@ public final class MemoryOperations{
 			long  newCapacity;
 			while(true){
 				ch = new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
-				ch.setCapacityAndModifyNumSize(size - ch.getHeaderSize() - safeToAllocate);
+				var chCap = size - ch.getHeaderSize() - safeToAllocate;
+				
+				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap)){
+					newCapacity = target.getCapacity() + size;
+					if(!target.getBodyNumSize().canFit(newCapacity)){
+						continue freeIter;
+					}
+					try(var ignored = provider.getSource().openIOTransaction()){
+						iter.ioRemove();
+						
+						try{
+							target.setCapacity(newCapacity);
+						}catch(OutOfBitDepth e){
+							throw new ShouldNeverHappenError(e);
+						}
+						target.syncStruct();
+					}
+					return size;
+				}
 				
 				newCapacity = target.getCapacity() + safeToAllocate;
 				if(!target.getBodyNumSize().canFit(newCapacity)){
@@ -806,7 +848,7 @@ public final class MemoryOperations{
 				}
 				break;
 			}
-			if(safeToAllocate == 0) continue;
+			if(safeToAllocate<=0) continue;
 			
 			// Edge-case: List wants to grow the data size and may consume the currently to be freed chunk.
 			// We solve this by first removing the chunk, so the freeing mechanism is not aware of it.

@@ -24,12 +24,27 @@ public final class FuzzProgress{
 	private final FuzzConfig              config;
 	private final CompletableFuture<Long> totalIterations;
 	
+	private final Consumer<FuzzConfig.LogState> logger;
+	
 	public FuzzProgress(FuzzConfig config, long totalIterations){
 		this(config, CompletableFuture.completedFuture(totalIterations));
 	}
 	public FuzzProgress(FuzzConfig config, CompletableFuture<Long> totalIterations){
 		this.config = config;
 		this.totalIterations = totalIterations;
+		logger = config.shouldLog()? config.logFunct().orElseGet(() -> new Consumer<>(){
+			private boolean first = true;
+			@Override
+			public void accept(FuzzConfig.LogState state){
+				if(first){
+					first = false;
+					config.name().ifPresent(name -> {
+						System.out.println("Fuzzing of \033[0;92m" + name + "\033[0m started");
+					});
+				}
+				TO_CONSOLE.accept(state);
+			}
+		}) : null;
 	}
 	
 	synchronized void err(){
@@ -148,7 +163,7 @@ public final class FuzzProgress{
 		var totalTimeEstimated = progressZero? null : elapsedTimeNs.divide(progress, MathContext.DECIMAL32);
 		var timeRemaining      = progressZero? null : totalTimeEstimated.subtract(elapsedTimeNs);
 		
-		config.logFunct().orElse(TO_CONSOLE).accept(new FuzzConfig.LogState(
+		logger.accept(new FuzzConfig.LogState(
 			progress.doubleValue(),
 			count<100? null : bigToDuration(totalTimeEstimated),
 			count<100? null : bigToDuration(timeRemaining),
