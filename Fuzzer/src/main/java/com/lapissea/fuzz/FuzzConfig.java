@@ -21,11 +21,20 @@ public record FuzzConfig(
 		boolean hasFail
 	){
 		public static String stdTime(Duration tim){
-			if(tim == null) return "-:--:--";
-			return String.format("%d:%02d:%02d",
-			                     tim.toHoursPart(),
-			                     tim.toMinutesPart(),
-			                     tim.toSecondsPart());
+			if(tim == null) return "--:--:--";
+			var days = tim.toDays();
+			if(days == 0){
+				return String.format("%02d:%02d:%02d",
+				                     tim.toHoursPart(),
+				                     tim.toMinutesPart(),
+				                     tim.toSecondsPart());
+			}else{
+				return String.format("%d:%02d:%02d:%02d",
+				                     days,
+				                     tim.toHoursPart(),
+				                     tim.toMinutesPart(),
+				                     tim.toSecondsPart());
+			}
 		}
 	}
 	
