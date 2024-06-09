@@ -12,10 +12,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.nio.file.Files;
 
 public class PrefixTreeTest{
 	
@@ -39,12 +37,11 @@ public class PrefixTreeTest{
 	}
 	
 	@AfterMethod
-	void teardownCluster(Method method) throws IOException{
+	void tearDownCluster(Method method) throws IOException{
 		var s = testCluster.getSource();
 		s.write(false, s.read(0, 1));
 		var ses = LOGGER.get().getSession(method.getName());
 		ses.finish();
-		Files.write(new File("C:\\Programming\\Java\\JDatablockFS project\\JDatablockFS\\runDir\\main\\sessions.dfs").toPath(), s.readAll());
 	}
 	
 	private CheckSet<String> makeChecked() throws IOException{
@@ -57,7 +54,6 @@ public class PrefixTreeTest{
 		var checked = makeChecked();
 		checked.add("AA-1");
 		checked.add("AA-2");
-		if(true) throw new RuntimeException();
 		checked.add("AA-3");
 		checked.add("AB-1");
 		checked.add("");
