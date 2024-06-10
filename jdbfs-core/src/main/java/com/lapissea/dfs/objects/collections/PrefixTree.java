@@ -7,7 +7,6 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -17,6 +16,7 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class PrefixTree extends UnmanagedIOSet<String>{
 	
@@ -39,6 +39,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	private static final TypeCheck TYPE_CHECK = new TypeCheck(PrefixTree.class);
 	
 	@IOValue
+	@IONullability(NULLABLE)
 	private ContiguousIOList<Node> nodes;
 	@IOValue
 	private boolean                hasNullVal;
@@ -46,11 +47,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	public PrefixTree(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, typeDef, TYPE_CHECK);
 		if(isSelfDataEmpty()){
-			getDataProvider().getSource().openIOTransaction(() -> {
-				allocateNulls();
-				writeManagedFields();
-				nodes.addNew();
-			});
+			writeManagedFields();
 		}
 		readManagedFields();
 	}
@@ -69,12 +66,13 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			return true;
 		}
 		
+		requireNodes();
 		var root = nodes.get(0);
 		var res  = insert(value, 0, root);
-		if((res&INSERT_IO_MASK) == INSERT_SAVE_NODE){
+		if((res&IO_MASK) == IO_SAVE_NODE){
 			nodes.set(0, root);
 		}
-		LogUtil.println(this);
+		
 		return switch(res&INSERT_MASK){
 			case INSERT_NEW -> {
 				deltaSize(1);
@@ -89,6 +87,13 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			}
 		};
 	}
+	
+	private void requireNodes() throws IOException{
+		allocateNulls();
+		writeManagedFields();
+		nodes.addNew();
+	}
+	
 	private record nn(Node node, int index){ }
 	
 	private nn allocNode(String value, int[] children, boolean real) throws IOException{
@@ -111,8 +116,8 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		INSERT_NO     = 0b010,
 		INSERT_MASK   = 0b011;
 	private static final int
-		INSERT_SAVE_NODE = 0b100,
-		INSERT_IO_MASK   = 0b100;
+		IO_SAVE_NODE = 0b100,
+		IO_MASK      = 0b100;
 	
 	
 	private int insert(String value, int pos, Node node) throws IOException{
@@ -135,7 +140,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 				node.children(new int[]{nn.index, nnCh.index});
 				node.value(v1);
 				node.real(false);
-				return INSERT_NEW|INSERT_SAVE_NODE;
+				return INSERT_NEW|IO_SAVE_NODE;
 			}
 			return INSERT_NO;
 		}
@@ -148,7 +153,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		for(var childIndex : node.children()){
 			var child = nodes.get(childIndex);
 			var res   = insert(value, newPos, child);
-			if((res&INSERT_IO_MASK) == INSERT_SAVE_NODE){
+			if((res&IO_MASK) == IO_SAVE_NODE){
 				nodes.set(childIndex, child);
 			}
 			switch(res&INSERT_MASK){
@@ -164,11 +169,11 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			if(nodeVal.isEmpty()){
 				node.value(valuePart);
 				node.real(true);
-				return INSERT_NEW|INSERT_SAVE_NODE;
+				return INSERT_NEW|IO_SAVE_NODE;
 			}
 			var nn = allocNode(valuePart, new int[0], true);
 			node.children(addChild(node.children(), nn.index));
-			return INSERT_NEW|INSERT_SAVE_NODE;
+			return INSERT_NEW|IO_SAVE_NODE;
 		}
 		
 		throw new NotImplementedException();
@@ -183,10 +188,17 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	public boolean remove(String value) throws IOException{
 		throw NotImplementedException.infer();//TODO: implement PrefixTree.remove()
 	}
+	
 	@Override
 	public void clear() throws IOException{
-		throw NotImplementedException.infer();//TODO: implement PrefixTree.clear()
+		var oldNodes = nodes;
+		nodes = null;
+		hasNullVal = false;
+		setSizeDirty(0);
+		writeManagedFields();
+		oldNodes.free();
 	}
+	
 	@Override
 	public IOIterator<String> iterator(){
 		return new IOIterator<>(){
@@ -215,6 +227,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 					}
 				}
 				if(nodeIters == null){
+					if(nodes == null) return;
 					nodeIters = new ArrayList<>(8);
 					var root = nodes.get(0);
 					nodeIters.add(new NodeWalk(root.value(), root));
@@ -263,8 +276,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			}
 		};
 	}
+	
 	@Override
-	public void requestCapacity(long capacity) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement PrefixTree.requestCapacity()
-	}
+	public void requestCapacity(long capacity) throws IOException{ }
 }

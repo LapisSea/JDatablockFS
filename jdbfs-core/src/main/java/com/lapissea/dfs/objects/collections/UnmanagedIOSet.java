@@ -39,6 +39,9 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 		size = 0;
 		writeSize();
 	}
+	protected void setSizeDirty(long size){
+		this.size = size;
+	}
 	private void writeSize() throws IOException{
 		if(readOnly) throw new UnsupportedOperationException();
 		if(sizeField == null) sizeField = getThisStruct().getFields().requireExactLong("size");
