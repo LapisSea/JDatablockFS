@@ -822,9 +822,11 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Override
 	public String toString(){
-		var sb = new StringBuilder(32).append("Chunk{");
-		if(provider.getChunkCached(getPtr()) != this){
-			sb.append("NOT_REAL ");
+		var sb     = new StringBuilder(32).append("Chunk{");
+		var cached = provider.getChunkCached(getPtr());
+		if(cached != this){
+			if(cached != null) sb.append("CONFLICTING ");
+			else sb.append("NOT_REAL ");
 		}else if(dirty){
 			sb.append("DIRTY ");
 		}
