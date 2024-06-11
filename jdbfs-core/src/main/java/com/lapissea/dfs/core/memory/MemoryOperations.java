@@ -837,6 +837,8 @@ public final class MemoryOperations{
 							throw new ShouldNeverHappenError(e);
 						}
 						target.syncStruct();
+						
+						freeChunk.destroy(false);
 					}
 					return size;
 				}

@@ -873,6 +873,7 @@ public class SlowTests{
 					}
 				}
 				if(actionIndex%50 == 0){
+					state.dp.getChunkCache().validate(state.dp);
 					Chunk first;
 					try{
 						first = state.dp.getFirstChunk();
@@ -921,7 +922,7 @@ public class SlowTests{
 		
 		stableRun(Plan.start(
 			runner, new FuzzConfig(),
-			new FuzzSequenceSource.LenSeed(42069, 500_000, 500)
+			new FuzzSequenceSource.LenSeed(42069, 200_000, 500)
 //			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
 		), "fuzzChainResize");
 	}

@@ -255,6 +255,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	private final IOList<T> data;
 	private final int       maxCacheSize, maxLinearCache;
 	private CacheLayer<T> cache = new CacheLayer.Array<>();
+	private int           modCount;
 	
 	public IOListCached(IOList<T> data, int maxCacheSize, int maxLinearCache){
 		if(maxCacheSize<=0) throw new IllegalStateException("{maxCacheSize > 0} not satisfied");
@@ -266,6 +267,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 		}
 	}
 	
+	private void clearCache(){ cache = new CacheLayer.Array<>(); }
 	private void checkOpt(){
 //		try{
 //			checkCache();
@@ -330,18 +332,25 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	
 	@Override
 	public void set(long index, T value) throws IOException{
+		var expected = ++modCount;
 		data.set(index, value);
-		setC(index, value);
-		checkOpt();
+		if(expected != modCount) clearCache();
+		else{
+			setC(index, value);
+			checkOpt();
+		}
 	}
 	
 	@Override
 	public void add(long index, T value) throws IOException{
+		var expected = ++modCount;
 		data.add(index, value);
-		
-		shiftIds(index - 1, 1);
-		setC(index, value);
-		checkOpt();
+		if(expected != modCount) clearCache();
+		else{
+			shiftIds(index - 1, 1);
+			setC(index, value);
+			checkOpt();
+		}
 	}
 	
 	private void shiftIds(long greaterThan, int offset){
@@ -350,14 +359,20 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	
 	@Override
 	public void add(T value) throws IOException{
+		var expected = ++modCount;
 		data.add(value);
-		setC(data.size() - 1, value);
-		checkOpt();
+		if(expected != modCount) clearCache();
+		else{
+			setC(data.size() - 1, value);
+			checkOpt();
+		}
 	}
 	@Override
 	public void remove(long index) throws IOException{
 		cacheRemoveElement(index);
+		var expected = ++modCount;
 		data.remove(index);
+		if(expected != modCount) clearCache();
 		checkOpt();
 	}
 	private void cacheRemoveElement(long index){
@@ -367,20 +382,26 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	
 	@Override
 	public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-		var idx = data.size();
-		var gnu = data.addNew(initializer);
-		setC(idx, gnu);
-		checkOpt();
+		var expected = ++modCount;
+		var idx      = data.size();
+		var gnu      = data.addNew(initializer);
+		if(expected != modCount) clearCache();
+		else{
+			setC(idx, gnu);
+			checkOpt();
+		}
 		return gnu;
 	}
 	@Override
 	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
+		var expected = ++modCount;
 		data.addMultipleNew(count, initializer);
+		if(expected != modCount) clearCache();
 		checkOpt();
 	}
 	@Override
 	public void clear() throws IOException{
-		cache = new CacheLayer.Array<>();
+		clearCache();
 		data.clear();
 	}
 	@Override
@@ -397,8 +418,10 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	}
 	@Override
 	public void free(long index) throws IOException{
+		var expected = ++modCount;
 		data.free(index);
-		cache.remove(index);
+		if(expected != modCount) clearCache();
+		else cache.remove(index);
 	}
 	
 	@Override
@@ -415,6 +438,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 				var index = lastRet = iter.nextIndex();
 				var c     = getC(index);
 				if(c != null){
+					if(GlobalConfig.DEBUG_VALIDATION) checkElement(index, c);
 					iter.skipNext();
 					return c;
 				}
@@ -425,7 +449,9 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			@Override
 			public void ioRemove() throws IOException{
 				cacheRemoveElement(lastRet);
+				var expected = ++modCount;
 				iter.ioRemove();
+				if(expected != modCount) clearCache();
 			}
 		};
 	}
@@ -443,6 +469,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 				var index = lastRet = iter.nextIndex();
 				var c     = getC(index);
 				if(c != null){
+					if(GlobalConfig.DEBUG_VALIDATION) checkElement(index, c);
 					iter.skipNext();
 					return c;
 				}
@@ -491,12 +518,14 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			}
 			@Override
 			public void ioSet(T t) throws IOException{
+				var expected = ++modCount;
 				iter.ioSet(t);
+				if(expected != modCount) clearCache();
 				setC(lastRet, t);
 			}
 			@Override
 			public void ioAdd(T t) throws IOException{
-				cache = new CacheLayer.Array<>();
+				clearCache();
 				iter.ioAdd(t);
 			}
 		};
