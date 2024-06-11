@@ -249,7 +249,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private boolean   popping;
 	private MoveState badMoveState;
 	private void tryPopFree() throws IOException{
-		if(allowFreeRemove || popping) return;
+		if(!allowFreeRemove || popping) return;
 		popping = true;
 		try{
 			boolean anyPopped;
