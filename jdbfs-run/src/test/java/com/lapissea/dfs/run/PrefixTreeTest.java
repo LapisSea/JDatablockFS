@@ -69,7 +69,7 @@ public class PrefixTreeTest{
 		checked.remove("Test");
 	}
 	
-	@Test(dependsOnMethods = "simpleAdd")
+	@Test(dependsOnMethods = {"simpleAdd", "simpleRemove"})
 	void simpleContains() throws IOException{
 		var checked = makeChecked();
 		
@@ -78,6 +78,8 @@ public class PrefixTreeTest{
 		checked.add("Hello there");
 		
 		checked.contains("Hi...?");
+		checked.contains("Hello there");
+		checked.remove("Hello there");
 		checked.contains("Hello there");
 	}
 	

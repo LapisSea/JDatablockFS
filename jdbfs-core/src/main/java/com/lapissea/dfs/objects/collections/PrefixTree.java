@@ -243,7 +243,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		}
 		
 		var newPos = pos + val.length();
-		if(node.real() && val.length() == newPos){
+		if(node.real() && value.length() == newPos){
 			return ACTION_POP_ME;
 		}
 		
@@ -271,6 +271,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		
 		return ACTION_FAILED;
 	}
+	
 	private int[] removeChild(int[] children, int childIndex){
 		int[] res = new int[children.length - 1];
 		System.arraycopy(children, 0, res, 0, childIndex);
