@@ -2,15 +2,14 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
-import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -32,8 +31,11 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		
 		boolean real();
 		void real(boolean real);
-
-//		static Node of(String value, int[] children){ return Def.of(Node.class, value, children); }
+		
+		MethodHandle CTOR = Def.dataConstructor(Node.class);
+		static Node of(String value, int[] children, boolean real){
+			try{ return (Node)CTOR.invoke(value, children, real); }catch(Throwable e){ throw new RuntimeException(e); }
+		}
 	}
 	
 	private static final TypeCheck TYPE_CHECK = new TypeCheck(PrefixTree.class);
@@ -73,17 +75,30 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			nodes.set(0, root);
 		}
 		
-		return switch(res&INSERT_MASK){
-			case INSERT_NEW -> {
+		return switch(res&ACTION_MASK){
+			case ACTION_NEW_VAL -> {
 				deltaSize(1);
 				yield true;
 			}
-			case INSERT_EXISTS -> false;
-			case INSERT_NO -> {
-				throw new ShouldNeverHappenError("Refused??");
+			case ACTION_VAL_EXISTS -> false;
+			case ACTION_FAILED -> {
+				//need to uproot root
+				var nodeVal       = root.value();
+				int matchingChars = countMatchingChars(value, 0, nodeVal);
+				var v1            = nodeVal.substring(0, matchingChars);
+				var v2            = nodeVal.substring(matchingChars);
+				var movedRoot     = allocNode(v2, root.children(), root.real());
+				
+				var valuePt2  = value.substring(matchingChars);
+				var valueNode = allocNode(valuePt2, new int[0], true);
+				
+				var newRoot = Node.of(v1, new int[]{movedRoot.index, valueNode.index}, false);
+				nodes.set(0, newRoot);
+				deltaSize(1);
+				yield true;
 			}
 			default -> {
-				throw new IllegalStateException("Unexpected value: " + (res&INSERT_MASK));
+				throw new IllegalStateException("Unexpected value: " + (res&ACTION_MASK));
 			}
 		};
 	}
@@ -101,35 +116,29 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 		int  index = (int)li;
 		if(index != li) throw new OutOfMemoryError("Too many nodes");
 		
-		var node = IOInstance.Def.of(Node.class);
-		node.value(value);
-		node.children(children);
-		node.real(real);
+		var node = Node.of(value, children, real);
 		
 		nodes.add(node);
 		return new nn(node, index);
 	}
 	
 	private static final int
-		INSERT_NEW    = 0b000,
-		INSERT_EXISTS = 0b001,
-		INSERT_NO     = 0b010,
-		INSERT_MASK   = 0b011;
-	private static final int
-		IO_SAVE_NODE = 0b100,
-		IO_MASK      = 0b100;
+		ACTION_NEW_VAL     = 0b0001,
+		ACTION_VAL_EXISTS  = 0b0010,
+		ACTION_FAILED      = 0b0011,
+		ACTION_VAL_REMOVED = 0b0100,
+		ACTION_POP_ME      = 0b0101,
+		ACTION_MASK        = 0b0111,
+		IO_SAVE_NODE       = 0b1000,
+		IO_MASK            = 0b1000;
 	
 	
 	private int insert(String value, int pos, Node node) throws IOException{
 		var nodeVal = node.value();
 		
 		if(!value.regionMatches(pos, nodeVal, 0, nodeVal.length())){
-			int matchingChars = 0;
-			while(nodeVal.length()>matchingChars && value.length()>pos + matchingChars &&
-			      nodeVal.charAt(matchingChars) == value.charAt(pos + matchingChars)){
-				matchingChars++;
-			}
-			if(matchingChars>0 || value.length() == 0){
+			int matchingChars = countMatchingChars(value, pos, nodeVal);
+			if(matchingChars>0 || (value.length() == 0 && node.children().length != 0)){
 				var v1 = nodeVal.substring(0, matchingChars);
 				var v2 = nodeVal.substring(matchingChars);
 				var nn = allocNode(v2, node.children(), node.real());
@@ -140,14 +149,14 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 				node.children(new int[]{nn.index, nnCh.index});
 				node.value(v1);
 				node.real(false);
-				return INSERT_NEW|IO_SAVE_NODE;
+				return ACTION_NEW_VAL|IO_SAVE_NODE;
 			}
-			return INSERT_NO;
+			return ACTION_FAILED;
 		}
 		
 		var newPos = pos + nodeVal.length();
 		if(newPos == value.length()){
-			return INSERT_EXISTS;
+			return ACTION_VAL_EXISTS;
 		}
 		
 		for(var childIndex : node.children()){
@@ -156,11 +165,11 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			if((res&IO_MASK) == IO_SAVE_NODE){
 				nodes.set(childIndex, child);
 			}
-			switch(res&INSERT_MASK){
-				case INSERT_NEW -> { return INSERT_NEW; }
-				case INSERT_EXISTS -> { return INSERT_EXISTS; }
-				case INSERT_NO -> { }
-				default -> throw new NotImplementedException((res&INSERT_MASK) + "");
+			switch(res&ACTION_MASK){
+				case ACTION_NEW_VAL -> { return ACTION_NEW_VAL; }
+				case ACTION_VAL_EXISTS -> { return ACTION_VAL_EXISTS; }
+				case ACTION_FAILED -> { continue; }
+				default -> throw new NotImplementedException((res&ACTION_MASK) + "");
 			}
 		}
 		
@@ -169,14 +178,22 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 			if(nodeVal.isEmpty()){
 				node.value(valuePart);
 				node.real(true);
-				return INSERT_NEW|IO_SAVE_NODE;
+				return ACTION_NEW_VAL|IO_SAVE_NODE;
 			}
 			var nn = allocNode(valuePart, new int[0], true);
 			node.children(addChild(node.children(), nn.index));
-			return INSERT_NEW|IO_SAVE_NODE;
+			return ACTION_NEW_VAL|IO_SAVE_NODE;
 		}
 		
 		throw new NotImplementedException();
+	}
+	private static int countMatchingChars(String value, int pos, String nodeVal){
+		int count = 0;
+		while(nodeVal.length()>count && value.length()>pos + count &&
+		      nodeVal.charAt(count) == value.charAt(pos + count)){
+			count++;
+		}
+		return count;
 	}
 	private int[] addChild(int[] children, int newChild){
 		var res = Arrays.copyOf(children, children.length + 1);
@@ -186,7 +203,79 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	
 	@Override
 	public boolean remove(String value) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement PrefixTree.remove()
+		if(value == null){
+			if(!hasNullVal) return false;
+			hasNullVal = false;
+			deltaSizeDirty(-1);
+			writeManagedFields();
+			return true;
+		}
+		
+		if(nodes == null) return false;
+		var root = nodes.get(0);
+		int res  = remove(value, 0, root);
+		
+		if((res&IO_MASK) == IO_SAVE_NODE){
+			nodes.set(0, root);
+		}
+		
+		return switch(res&ACTION_MASK){
+			case ACTION_FAILED -> false;
+			case ACTION_VAL_REMOVED -> {
+				deltaSize(-1);
+				yield true;
+			}
+			case ACTION_POP_ME -> {
+				nodes.set(0, Node.of("", new int[0], false));
+				if(root.real()){
+					deltaSize(-1);
+				}
+				yield true;
+			}
+			default -> throw new IllegalStateException("Illegal action: " + (res&ACTION_MASK));
+		};
+	}
+	
+	private int remove(String value, int pos, Node node) throws IOException{
+		var val = node.value();
+		if(!value.regionMatches(pos, val, 0, val.length())){
+			return ACTION_FAILED;
+		}
+		
+		var newPos = pos + val.length();
+		if(node.real() && val.length() == newPos){
+			return ACTION_POP_ME;
+		}
+		
+		var children = node.children();
+		for(int i = 0; i<children.length; i++){
+			var childIndex = children[i];
+			var child      = nodes.get(childIndex);
+			var res        = remove(value, newPos, child);
+			
+			if((res&IO_MASK) == IO_SAVE_NODE){
+				nodes.set(childIndex, child);
+			}
+			
+			switch(res&ACTION_MASK){
+				case ACTION_FAILED -> { }
+				case ACTION_VAL_REMOVED -> { return ACTION_VAL_REMOVED; }
+				case ACTION_POP_ME -> {
+					node.children(removeChild(children, i));
+					nodes.remove(childIndex);
+					return IO_SAVE_NODE|ACTION_VAL_REMOVED;
+				}
+				default -> throw new IllegalStateException("Illegal action: " + (res&ACTION_MASK));
+			}
+		}
+		
+		return ACTION_FAILED;
+	}
+	private int[] removeChild(int[] children, int childIndex){
+		int[] res = new int[children.length - 1];
+		System.arraycopy(children, 0, res, 0, childIndex);
+		System.arraycopy(children, childIndex + 1, res, childIndex, children.length - childIndex - 1);
+		return res;
 	}
 	
 	@Override

@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
@@ -18,6 +19,7 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 	private IOField<UnmanagedIOSet<T>, ?> sizeField;
 	
 	@IOValue
+	@IODependency.VirtualNumSize
 	private long size;
 	
 	protected UnmanagedIOSet(DataProvider provider, Chunk identity, IOType typeDef, TypeCheck check){
@@ -34,6 +36,9 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 	protected void deltaSize(int delta) throws IOException{
 		size += delta;
 		writeSize();
+	}
+	protected void deltaSizeDirty(int delta){
+		size += delta;
 	}
 	protected void zeroSize() throws IOException{
 		size = 0;
