@@ -93,6 +93,7 @@ public final class LoggedMemoryUtils{
 				return (data, changeIds) -> { };
 			}else{
 				return (data, changeIds) -> {
+					if(logger.isInitialized() && !logger.get().isActive()) return;
 					var memFrame = makeFrame(frameId, data, changeIds);
 					logger.get().getSession(sessionName).log(memFrame);
 				};
