@@ -1,15 +1,17 @@
 package com.lapissea.dfs.core.chunk;
 
+import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public final class ChunkBuilder{
 	
 	private DataProvider provider;
-	private ChunkPointer ptr;
+	private ChunkPointer pos;
 	
 	private NumberSize bodyNumSize;
 	private long       capacity;
@@ -18,17 +20,20 @@ public final class ChunkBuilder{
 	private NumberSize   nextSize;
 	private ChunkPointer nextPtr = ChunkPointer.NULL;
 	
-	public ChunkBuilder(DataProvider provider, ChunkPointer ptr){
+	public ChunkBuilder(DataProvider provider, ChunkPointer pos, AllocateTicket ticket){
 		this.provider = provider;
-		this.ptr = ptr;
+		this.pos = pos;
+		withCapacity(ticket.bytes());
+		withExplicitNextSize(ticket.calcNextSize());
+		withNext(ticket.next());
+	}
+	public ChunkBuilder(DataProvider provider, ChunkPointer pos){
+		this.provider = provider;
+		this.pos = pos;
 	}
 	
-	public ChunkBuilder withProvider(DataProvider provider){
-		this.provider = provider;
-		return this;
-	}
-	public ChunkBuilder withPtr(ChunkPointer ptr){
-		this.ptr = ptr;
+	public ChunkBuilder move(ChunkPointer newPos){
+		this.pos = newPos;
 		return this;
 	}
 	public ChunkBuilder withCapacity(long capacity){
@@ -52,9 +57,9 @@ public final class ChunkBuilder{
 		this.nextPtr = Objects.requireNonNull(next);
 		return this;
 	}
-	public ChunkBuilder withNext(Chunk next){
-		withNext(next == null? null : next.getPtr());
-		return this;
+	
+	public Optional<NumberSize> getExplicitBodyNumSize(){
+		return Optional.ofNullable(bodyNumSize);
 	}
 	
 	public Chunk create(){
@@ -64,6 +69,14 @@ public final class ChunkBuilder{
 		var nextSize = this.nextSize;
 		if(nextSize == null) nextSize = NumberSize.bySize(nextPtr);
 		
-		return new Chunk(provider, ptr, bodyNumSize, capacity, size, nextSize, nextPtr);
+		return new Chunk(provider, pos, bodyNumSize, capacity, size, nextSize, nextPtr);
+	}
+	
+	public ChunkBuilder ensureMinSize(){
+		if(create().totalSize()>=Chunk.minSafeSize()) return this;
+		if(bodyNumSize != null) bodyNumSize = bodyNumSize.max(NumberSize.BYTE);
+		var headSize = create().getHeaderSize();
+		withCapacity(Chunk.minSafeSize() - headSize);
+		return this;
 	}
 }
