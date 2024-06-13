@@ -142,11 +142,6 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public Chunk alloc(AllocateTicket ticket) throws IOException{
-			long minSize = minAllocationCapacity();
-			if(ticket.bytes()<minSize){
-				ticket = ticket.withBytes(minSize);
-			}
-			
 			Chunk chunk;
 			
 			tryStrategies:
@@ -172,11 +167,6 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public boolean canAlloc(AllocateTicket ticket) throws IOException{
-			long minSize = minAllocationCapacity();
-			if(ticket.bytes()<minSize){
-				ticket = ticket.withBytes(minSize);
-			}
-			
 			for(var alloc : allocs){
 				var chunk = alloc.alloc(context, ticket, true);
 				if(chunk != null){
@@ -265,10 +255,6 @@ public interface MemoryManager extends DataProvider.Holder{
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 	
 	boolean canAlloc(AllocateTicket ticket) throws IOException;
-	
-	default long minAllocationCapacity(){
-		return 1;
-	}
 	
 	void notifyStart(ChunkChainIO chain);
 	void notifyEnd(ChunkChainIO chain);

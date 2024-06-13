@@ -189,12 +189,14 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
+	public static final byte FLAGS_SIZE = 1;
 	
 	private static final int  CHECK_BYTE_OFF;
 	private static final byte CHECK_BIT_MASK;
 	
 	static{
 		if(PIPE.getSpecificFields().getFirst() instanceof BitFieldMerger<?> bf){
+			if(bf.getSizeDescriptor().requireFixed(WordSpace.BYTE) != FLAGS_SIZE) throw new AssertionError("flag size not " + FLAGS_SIZE);
 			var layout = bf.getSafetyBits().orElseThrow();
 			
 			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);
@@ -208,6 +210,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 	}
 	
+	public static byte minSafeSize(){
+		return FLAGS_SIZE + Long.BYTES;
+	}
 	
 	public static ChunkPointer getPtrNullable(Chunk chunk){
 		return chunk == null? ChunkPointer.NULL : chunk.getPtr();
@@ -463,14 +468,14 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	public boolean setCapacityAndModifyNumSize(long newCapacity){
-		if(!clone().setCapacityAndModifyNumSize0(newCapacity)){
+		if(!clone().setCapacityAndModifyNumSizeInPlace(newCapacity)){
 			return false;
 		}
-		var ok = setCapacityAndModifyNumSize0(newCapacity);
-		assert ok;
+		var ok = setCapacityAndModifyNumSizeInPlace(newCapacity);
+		if(!ok) throw new ShouldNeverHappenError();
 		return true;
 	}
-	private boolean setCapacityAndModifyNumSize0(long newCapacity){
+	public boolean setCapacityAndModifyNumSizeInPlace(long newCapacity){
 		forbidReadOnly();
 		if(this.capacity == newCapacity) return true;
 		requireCapacityPositive(newCapacity);
@@ -478,7 +483,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		var end = dataEnd();
 		
 		var newNum     = NumberSize.bySize(newCapacity);
-		var prevNum    = newNum.prev();
+		var prevNum    = newNum == NumberSize.VOID? NumberSize.VOID : newNum.prev();
 		var diff       = newNum.bytes - prevNum.bytes;
 		var safeTarget = newCapacity + diff;
 		

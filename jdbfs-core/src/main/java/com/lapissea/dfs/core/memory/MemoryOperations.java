@@ -679,9 +679,9 @@ public final class MemoryOperations{
 			
 			var freeSpace = effectiveCapacity - ticket.bytes();
 			
-			var potentialChunk = chBuilderFromTicket(context, c.getPtr(), ticket).create();
+			var potentialChunk = chBuilderFromTicketSafeSize(context, c.getPtr(), ticket).create();
 			if(freeSpace>c.getHeaderSize() + potentialChunk.getHeaderSize()){
-				Chunk reallocate = chipEndProbe(context, ticket, c, dryRun);
+				Chunk reallocate = tryChipEnd(context, ticket, c, dryRun);
 				if(reallocate != null) return reallocate;
 			}
 			
@@ -706,38 +706,43 @@ public final class MemoryOperations{
 		return null;
 	}
 	
-	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch, boolean dryRun) throws IOException{
+	private static Chunk tryChipEnd(DataProvider context, AllocateTicket ticket, Chunk ch, boolean dryRun) throws IOException{
 		var ptr     = ch.getPtr();
-		var builder = chBuilderFromTicket(context, ptr, ticket);
+		var builder = chBuilderFromTicketSafeSize(context, ptr, ticket);
 		
-		var reallocate = builder.create();
+		var siz   = builder.create().totalSize();
+		var end   = ch.dataEnd();
+		var chunk = builder.move(ChunkPointer.of(end - siz)).create();
 		
-		var siz = reallocate.totalSize();
-		var end = ch.dataEnd();
-		builder.withPtr(ChunkPointer.of(end - siz));
-		reallocate = builder.create();
+		if(chunk.dataEnd() != ch.dataEnd()){
+			throw new IllegalStateException();
+		}
 		
-		if(reallocate.dataEnd() != ch.dataEnd()) throw new IllegalStateException();
-		
-		if(!ticket.approve(reallocate)){
+		var newCap = ch.getCapacity() - chunk.totalSize();
+		if(newCap<0){
 			return null;
 		}
-		if(dryRun) return reallocate;
 		
-		reallocate.writeHeader();
-		
-		if(!ch.setCapacityAndModifyNumSize(ch.getCapacity() - reallocate.totalSize())){
+		var chc = ch.clone();
+		if(!chc.setCapacityAndModifyNumSizeInPlace(newCap) || chc.totalSize()<Chunk.minSafeSize()){
 			return null;
 		}
+		
+		if(!ticket.approve(chunk)){
+			return null;
+		}
+		if(dryRun) return chunk;
+		
+		ch.setCapacityAndModifyNumSizeInPlace(newCap);
+		
+		chunk.writeHeader();
 		ch.writeHeader();
-		context.getChunkCache().add(reallocate);
-		return reallocate;
+		
+		context.getChunkCache().add(chunk);
+		return chunk;
 	}
-	private static ChunkBuilder chBuilderFromTicket(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
-		return new ChunkBuilder(context, ptr)
-			       .withCapacity(ticket.bytes())
-			       .withExplicitNextSize(ticket.calcNextSize())
-			       .withNext(ticket.next());
+	private static ChunkBuilder chBuilderFromTicketSafeSize(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
+		return new ChunkBuilder(context, ptr, ticket).ensureMinSize();
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException{
@@ -745,9 +750,7 @@ public final class MemoryOperations{
 		var src   = context.getSource();
 		var ioSiz = src.getIOSize();
 		
-		ChunkBuilder builder = chBuilderFromTicket(context, ChunkPointer.of(ioSiz), ticket);
-		
-		var chunk = builder.create();
+		var chunk = chBuilderFromTicketSafeSize(context, ChunkPointer.of(ioSiz), ticket).create();
 		if(!ticket.approve(chunk)) return null;
 		
 		if(dryRun) return chunk;
