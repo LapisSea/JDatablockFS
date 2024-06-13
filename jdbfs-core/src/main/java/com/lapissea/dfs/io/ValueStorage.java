@@ -332,6 +332,7 @@ public sealed interface ValueStorage<T>{
 			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
 			if(ref.isNull()){
 				dest.setPos(pos);
+				dest.ensureCapacity(pos + refPipe.getFixedDescriptor().get(WordSpace.BYTE));
 				writeNew(dest, AllocateTicket.withData(pipe, provider, src), provider, refPipe);
 			}else{
 				ref.write(provider, true, pipe, src);
@@ -741,7 +742,13 @@ public sealed interface ValueStorage<T>{
 		}
 		@Override
 		public void write(RandomIO dest, Object src) throws IOException{
-			var id = provider.getTypeDb().objToID(src);
+			var db  = provider.getTypeDb();
+			var idV = db.objToID(src, false);
+			int id;
+			if(!idV.stored()){
+				dest.ensureCapacity(dest.getPos() + NumberSize.bySize(idV.val()).bytes + 1);
+				id = db.objToID(src);
+			}else id = idV.val();
 			dest.writeUnsignedInt4Dynamic(id);
 			if(src == null) return;
 			
