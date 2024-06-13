@@ -297,8 +297,7 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		}
 		if(val.isEmpty()){
 			var min = getMin();
-			var siz = Math.max(min, 32);
-			return mapSize(wordSpace, siz);
+			return mapSize(wordSpace, min);
 		}
 		
 		return mapSize(wordSpace, val.getAsLong());
