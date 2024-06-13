@@ -276,7 +276,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				var name = conf.name().orElseGet(FuzzingRunner::getTaskName);
 				int nThreads = Math.max(1, switch(data){
 					case ManyData.Async ignore -> conf.maxWorkers();
-					case ManyData.Instant d -> (int)Math.min(conf.maxWorkers(), d.sequencesToRun) - 1;
+					case ManyData.Instant d -> (int)Math.min(conf.maxWorkers(), d.sequencesToRun);
 				});
 				var progress = switch(data){
 					case ManyData.Async d -> new FuzzProgress(conf, d.totalIterations);
@@ -324,7 +324,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					yield res;
 				}
 				
-				try(var worker = new ThreadPoolExecutor(nThreads, nThreads, 500, MILLISECONDS,
+				try(var worker = new ThreadPoolExecutor(nThreads - 1, nThreads - 1, 500, MILLISECONDS,
 				                                        new LinkedBlockingQueue<>(), new RunnerFactory(nThreads, name))){
 					
 					if(data instanceof ManyData.Async async) async.compute.accept(worker);
