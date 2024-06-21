@@ -153,7 +153,12 @@ final class FieldSupport{
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		var val = field.get(ioPool, instance);
+		Object val;
+		try{
+			val = field.get(ioPool, instance);
+		}catch(Throwable e){
+			return Optional.of("CORRUPTED: " + e);
+		}
 		if(val == null){
 			if(field.getNullability() == IONullability.Mode.NOT_NULL){
 				throw new FieldIsNull(field);

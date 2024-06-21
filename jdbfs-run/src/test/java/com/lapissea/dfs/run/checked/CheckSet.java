@@ -30,7 +30,9 @@ public class CheckSet<T> implements IOSet<T>{
 	private void copyData(Set<T> copy) throws IOException{
 		var iter = testData.iterator();
 		while(iter.hasNext()){
-			copy.add(iter.ioNext());
+			if(!copy.add(iter.ioNext())){
+				throw new AssertionError("Duplicate element in test data");
+			}
 		}
 	}
 	

@@ -2,12 +2,14 @@ package com.lapissea.dfs.utils;
 
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeFunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -69,6 +71,15 @@ public final class OptionalPP<T>{
 			return empty();
 		}else{
 			return OptionalPP.ofNullable(mapper.apply(value));
+		}
+	}
+	
+	public <E extends Throwable> OptionalLong mapToLong(UnsafeFunctionOL<? super T, E> mapper) throws E{
+		Objects.requireNonNull(mapper);
+		if(!isPresent()){
+			return OptionalLong.empty();
+		}else{
+			return OptionalLong.of(mapper.apply(value));
 		}
 	}
 	

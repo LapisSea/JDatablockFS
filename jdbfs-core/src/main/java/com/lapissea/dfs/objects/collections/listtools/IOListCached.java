@@ -294,6 +294,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	private void setC(Long index, T value){
 		if(value == null) cache.remove(index);
 		else{
+			if(cache.size()>=maxCacheSize) cache.yeet();
 			cache.put(index, value);
 			if(cache.size()>maxLinearCache && cache instanceof CacheLayer.Array){
 				var c = new CacheLayer.Sparse<T>();
