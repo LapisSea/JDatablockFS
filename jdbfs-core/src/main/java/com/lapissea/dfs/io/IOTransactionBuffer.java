@@ -2,16 +2,21 @@ package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.dfs.utils.IntHashSet;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
-import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -188,8 +193,11 @@ public final class IOTransactionBuffer{
 				break;
 			}
 			
-			byte[] buf = new byte[len];
-			read0(base, offset, buf, 0, len);
+			byte[] buf  = new byte[len];
+			var    read = read0(base, offset, buf, 0, len);
+			if(read == -1){
+				throw new EOFException();
+			}
 			return WordIO.getWord(buf, 0, len);
 		}
 	}
@@ -579,7 +587,7 @@ public final class IOTransactionBuffer{
 		return false;
 	}
 	
-	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){
+	public record TransactionExport(OptionalPP<Long> setCapacity, List<RandomIO.WriteChunk> writes) implements Serializable{
 		
 		public void apply(RandomIO io) throws IOException{
 			switch(writes.size()){
@@ -591,7 +599,7 @@ public final class IOTransactionBuffer{
 				default -> io.writeAtOffsets(writes);
 			}
 			if(setCapacity.isPresent()){
-				io.setCapacity(setCapacity.getAsLong());
+				io.setCapacity(setCapacity.get());
 			}
 		}
 		
@@ -608,9 +616,9 @@ public final class IOTransactionBuffer{
 			writes.add(new RandomIO.WriteChunk(e.offset, e.data));
 		}
 		
-		var setCapacity = OptionalLong.empty();
+		var setCapacity = OptionalPP.<Long>empty();
 		if(modifiedCapacity != -1){
-			setCapacity = OptionalLong.of(modifiedCapacity);
+			setCapacity = OptionalPP.of(modifiedCapacity);
 		}
 		reset();
 		
@@ -650,7 +658,7 @@ public final class IOTransactionBuffer{
 		transactionOpenVar.set(target, true);
 		
 		return new IOTransaction(){
-			private final int startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
+			private final int  startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
 			private final long startingTotalBytes = DEBUG_VALIDATION && oldTransactionOpen? getTotalBytes() : 0;
 			
 			@Override
@@ -662,12 +670,39 @@ public final class IOTransactionBuffer{
 				return IOTransactionBuffer.this.getTotalBytes();
 			}
 			
-			@Override
-			public void close() throws IOException{
+			private void exportData() throws IOException{
 				transactionOpenVar.set(target, oldTransactionOpen);
 				if(!oldTransactionOpen){
 					var data = export();
 					target.io(data::apply);
+				}
+			}
+			
+			private void exportDataDeb() throws IOException{
+				if(oldTransactionOpen){
+					transactionOpenVar.set(target, true);
+					return;
+				}
+				var expected = target.readAll();
+				var data     = export();
+				transactionOpenVar.set(target, false);
+				target.io(data::apply);
+				var actual = target.readAll();
+				if(!Arrays.equals(expected, actual)){
+					var baos = new ByteArrayOutputStream();
+					try(var oos = new ObjectOutputStream(baos)){ oos.writeObject(data); }
+					throw new AssertionError("Transaction before and after apply differs!\n" +
+					                         "Expected: " + Arrays.toString(expected) + "\n" +
+					                         "Actual:   " + Arrays.toString(actual) + "\n" +
+					                         "Transaction:\n" + Base64.getEncoder().encodeToString(baos.toByteArray()));
+				}
+			}
+			
+			@Override
+			public void close() throws IOException{
+				try(var ignore = lock.write()){
+					if(DEBUG_VALIDATION) exportDataDeb();
+					else exportData();
 				}
 			}
 			
