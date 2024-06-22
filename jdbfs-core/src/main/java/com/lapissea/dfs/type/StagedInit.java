@@ -18,6 +18,7 @@ import java.io.ObjectOutputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -28,9 +29,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
 public abstract class StagedInit{
 	
@@ -266,6 +269,7 @@ public abstract class StagedInit{
 			try(var ignored = rLock.open()){
 				checkErr();
 				if(this.state>=state) break;
+				else if(RELEASE_MODE) reportPossibleLock(start);
 				try{
 					condition.await(1, TimeUnit.SECONDS);
 				}catch(InterruptedException ignored1){ }
@@ -275,6 +279,16 @@ public abstract class StagedInit{
 		checkErr();
 		
 		if(DO_TIMESTAMPS) logLongWait(state, start);
+	}
+	
+	private void reportPossibleLock(Instant start){
+		var t = initThread;
+		if(t == null || !Log.WARN) return;
+		if(Duration.between(start, Instant.now()).toMillis()<LONG_WAIT_THRESHOLD) return;
+		Log.warn(
+			"possible lock at {}#yellow on thread {}#yellow\n{}",
+			this, t.getName(), Arrays.stream(t.getStackTrace()).map(s -> "\t" + s).collect(Collectors.joining("\n"))
+		);
 	}
 	
 	private void logLongWait(int state, Instant start){

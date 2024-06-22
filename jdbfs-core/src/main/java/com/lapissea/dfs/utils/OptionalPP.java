@@ -6,6 +6,7 @@ import com.lapissea.util.function.UnsafeFunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.Serializable;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,7 +14,7 @@ import java.util.OptionalLong;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-public final class OptionalPP<T>{
+public final class OptionalPP<T> implements Serializable{
 	private static final OptionalPP<?> EMPTY = new OptionalPP<>(null);
 	
 	private final T value;

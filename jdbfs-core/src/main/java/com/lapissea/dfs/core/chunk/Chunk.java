@@ -239,7 +239,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Quickly checks if a chunk start is possible at all at a certain pointer.
 	 */
 	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
-		try(var io = provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
+		var src = provider.getSource();
+		if(src.getIOSize()<=pointer.getValue()) return false;
+		try(var io = src.ioAt(pointer.add(CHECK_BYTE_OFF))){
 			return earlyCheckChunkAt(io);
 		}
 	}

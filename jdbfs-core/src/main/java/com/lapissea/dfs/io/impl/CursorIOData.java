@@ -92,7 +92,9 @@ public abstract class CursorIOData implements IOInterface{
 			}
 			
 			var remaining = getSize() - getPos();
-			if(remaining<=0) return -1;
+			if(remaining<=0){
+				return -1;
+			}
 			return Byte.toUnsignedInt(read1(pos++));
 		}
 		
@@ -100,7 +102,7 @@ public abstract class CursorIOData implements IOInterface{
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
 				int read = transactionBuff.read(readAt(), pos, b, off, len);
-				pos += read;
+				if(read != -1) pos += read;
 				return read;
 			}
 			
@@ -135,7 +137,9 @@ public abstract class CursorIOData implements IOInterface{
 		
 		private int readAt(long pos, byte[] b, int off, int len) throws IOException{
 			long remaining = getSize() - pos;
-			if(remaining<=0) return -1;
+			if(remaining<=0){
+				return -1;
+			}
 			
 			int clampedLen = (int)Math.min(remaining, len);
 			readN(pos, b, off, clampedLen);

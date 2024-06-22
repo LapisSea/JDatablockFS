@@ -38,7 +38,9 @@ public interface ContentReader extends AutoCloseable{
 	
 	default int tryRead() throws IOException{
 		var b = read();
-		if(b<0) throw new EOFException();
+		if(b<0){
+			throw new EOFException();
+		}
 		return b;
 	}
 	
@@ -412,7 +414,9 @@ public interface ContentReader extends AutoCloseable{
 					if(count>utfLen) throw new UTFDataFormatException("malformed input: partial character at end");
 					char2 = byteArr[count - 2];
 					char3 = byteArr[count - 1];
-					if(((char2&0xC0) != 0x80) || ((char3&0xC0) != 0x80)) throw new UTFDataFormatException("malformed input around byte " + (count - 1));
+					if(((char2&0xC0) != 0x80) || ((char3&0xC0) != 0x80)){
+						throw new UTFDataFormatException("malformed input around byte " + (count - 1));
+					}
 					charArr[charArrCount++] = (char)(((c&0x0F)<<12)|((char2&0x3F)<<6)|((char3&0x3F)<<0));
 				}
 				default -> throw new UTFDataFormatException("malformed input around byte " + count);
