@@ -275,7 +275,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
-			return IterablePPs.rangeMap(
+			return IterablePPs.rangeMapL(
 				0, size(),
 				index -> {
 					indexAccessor.index = index;
@@ -298,7 +298,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
 		
-		return IterablePPs.rangeMap(
+		return IterablePPs.rangeMapL(
 			0, size(),
 			index -> {
 				indexAccessor.index = index;

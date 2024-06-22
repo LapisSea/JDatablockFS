@@ -7,6 +7,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
@@ -267,11 +268,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public String toString(){
 			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
-			return raw + args.stream().map(IOType::toString).collect(Collectors.joining(", ", "<", ">"));
+			return raw + IterablePPs.from(args).joinAsStrings(", ", "<", ">");
 		}
 		@Override
 		public String toShortString(){
-			return raw.toShortString() + args.stream().map(IOType::toShortString).collect(Collectors.joining(", ", "<", ">"));
+			return raw.toShortString() + IterablePPs.from(args).map(IOType::toShortString).joinAsStrings(", ", "<", ">");
 		}
 		@Override
 		public IOType withArgs(IOType... args){

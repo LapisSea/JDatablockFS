@@ -144,7 +144,7 @@ public final class IterablePPs{
 		return () -> new RangeMapIIter<>(fromInclusive, toExclusive, mapping);
 	}
 	
-	public static <T> IterablePP<T> rangeMap(long fromInclusive, long toExclusive, LongFunction<T> mapping){
+	public static <T> IterablePP<T> rangeMapL(long fromInclusive, long toExclusive, LongFunction<T> mapping){
 		if(fromInclusive>toExclusive) throw new IllegalArgumentException(fromInclusive + " > " + toExclusive);
 		return () -> new RangeMapLIter<>(fromInclusive, toExclusive, mapping);
 	}

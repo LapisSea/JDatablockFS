@@ -3,6 +3,7 @@ package com.lapissea.dfs.type;
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
+import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
@@ -10,8 +11,6 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public final class GenericContext implements Stringify{
 	
@@ -103,16 +102,14 @@ public final class GenericContext implements Stringify{
 	@Override
 	public String toString(){
 		return Utils.typeToHuman(owner) +
-		       IntStream.range(0, actualTypes.size())
-		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                .collect(Collectors.joining(", ", "<", ">"));
+		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
+		                  .joinAsStrings(", ", "<", ">");
 	}
 	@Override
 	public String toShortString(){
 		return Utils.typeToHuman(owner) +
-		       IntStream.range(0, actualTypes.size())
-		                .mapToObj(i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                .collect(Collectors.joining(", ", "<", ">"));
+		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
+		                  .joinAsStrings(", ", "<", ">");
 	}
 	private String strName(int i){
 		if(typeNames != null){
