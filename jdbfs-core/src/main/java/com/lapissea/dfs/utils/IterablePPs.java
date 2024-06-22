@@ -8,7 +8,6 @@ import java.util.NoSuchElementException;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public final class IterablePPs{
 	
@@ -19,7 +18,7 @@ public final class IterablePPs{
 	}
 	
 	public static String toString(IterablePP<?> inst){
-		return inst.map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
+		return inst.map(TextUtil::toShortString).joinAsStrings(", ", "[", "]");
 	}
 	
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
