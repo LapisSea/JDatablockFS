@@ -52,7 +52,7 @@ public record FuzzConfig(
 	public FuzzConfig(){
 		this(
 			true, none(), Duration.ofMillis(900),
-			none(), Math.max(1, Runtime.getRuntime().availableProcessors() + 1),
+			none(), Runtime.getRuntime().availableProcessors() == 1? 1 : Runtime.getRuntime().availableProcessors() + 1,
 			Duration.ofSeconds(2), none(),
 			some(100)
 		);
