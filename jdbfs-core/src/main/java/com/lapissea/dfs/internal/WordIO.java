@@ -14,7 +14,7 @@ public final class WordIO{
 	
 	public static void setWord(long v, byte[] writeBuffer, int off, int len){
 		if(IS_LITTLE_ENDIAN) setWordLE(v, writeBuffer, off, len);
-		setWordLoopBE(v, writeBuffer, off, len);
+		else setWordLoopBE(v, writeBuffer, off, len);
 	}
 	
 	private static long getWordLE(byte[] data, int off, int len){
