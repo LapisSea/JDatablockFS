@@ -1,6 +1,6 @@
 package com.lapissea.dfs.benchmark;
 
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.dfs.utils.RawRandom;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;

@@ -1,6 +1,4 @@
-package com.lapissea.dfs.internal;
-
-import com.lapissea.dfs.io.content.BBView;
+package com.lapissea.dfs.io.content;
 
 public final class WordIO{
 	
@@ -35,6 +33,6 @@ public final class WordIO{
 	}
 	
 	private static RuntimeException fail(int len){
-		throw new IllegalArgumentException("The length of a word must be in the range of 0-8" + len);
+		return new IllegalArgumentException("The length of a word must be in the range of 0-8" + len);
 	}
 }

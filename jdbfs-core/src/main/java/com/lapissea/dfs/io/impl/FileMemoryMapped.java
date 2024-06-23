@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io.impl;
 
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 
 import java.io.Closeable;
 import java.io.File;

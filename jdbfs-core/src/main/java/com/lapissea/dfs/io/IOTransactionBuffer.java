@@ -1,6 +1,6 @@
 package com.lapissea.dfs.io;
 
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;

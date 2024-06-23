@@ -1,7 +1,6 @@
 package com.lapissea.dfs.io.content;
 
 import com.lapissea.dfs.BufferErrorSupplier;
-import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.util.MathUtil;
