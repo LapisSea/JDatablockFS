@@ -470,6 +470,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	public boolean setCapacityAndModifyNumSize(long newCapacity){
+		forbidReadOnly();
+		if(this.capacity == newCapacity) return true;
 		if(!clone().setCapacityAndModifyNumSizeInPlace(newCapacity)){
 			return false;
 		}

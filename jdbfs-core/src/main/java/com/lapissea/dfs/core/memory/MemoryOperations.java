@@ -828,7 +828,7 @@ public final class MemoryOperations{
 				ch = new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
 				var chCap = size - ch.getHeaderSize() - safeToAllocate;
 				
-				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap)){
+				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap) || ch.totalSize()<Chunk.minSafeSize()){
 					newCapacity = target.getCapacity() + size;
 					if(!target.getBodyNumSize().canFit(newCapacity)){
 						continue freeIter;
