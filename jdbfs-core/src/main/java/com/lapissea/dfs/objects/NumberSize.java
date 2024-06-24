@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.utils.OptionalPP;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -51,7 +52,7 @@ public enum NumberSize{
 	
 	static{
 		for(NumberSize ns : values()){
-			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes));
 			ns.next = FLAG_INFO.filtered(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
 		}
 	}
@@ -104,8 +105,8 @@ public enum NumberSize{
 		return BYTE_MAP[bytes];
 	}
 	
-	private NumberSize next;
-	private NumberSize prev;
+	private NumberSize             next;
+	private OptionalPP<NumberSize> prev;
 	
 	public final int  bytes;
 	public final long maxSize;
@@ -322,8 +323,8 @@ public enum NumberSize{
 		writeInt(out, toUnsigned(value));
 	}
 	
-	public NumberSize prev(){ return prev; }
-	public NumberSize next(){ return next; }
+	public OptionalPP<NumberSize> prev(){ return prev; }
+	public NumberSize next()            { return next; }
 	
 	///////////
 	

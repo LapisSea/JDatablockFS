@@ -1,7 +1,5 @@
 package com.lapissea.dfs.io.content;
 
-import com.lapissea.dfs.internal.WordIO;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 

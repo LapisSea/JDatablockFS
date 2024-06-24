@@ -1,6 +1,6 @@
 package com.lapissea.dfs.io.compress;
 
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.dfs.objects.NumberSize;
 
 import java.util.Arrays;

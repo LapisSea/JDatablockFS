@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -514,6 +515,8 @@ public sealed interface IOTypeDB{
 		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
+		private final ReadWriteClosableLock defsLock = ReadWriteClosableLock.reentrant();
+		
 		@Override
 		public long typeLinkCount(){ return data.size(); }
 		@Override
@@ -584,14 +587,13 @@ public sealed interface IOTypeDB{
 			for(var type : types){
 				recordType(builtIn, type, newDefs);
 			}
-			
-			defs.putAll(newDefs);
+			defsLock.write(() -> defs.putAll(newDefs));
 			
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 		}
 		
 		public Set<String> listStoredTypeDefinitionNames(){
-			return defs.stream().map(k -> k.getKey().typeName).collect(Collectors.toSet());
+			return defsLock.read(() -> defs.stream().map(k -> k.getKey().typeName).collect(Collectors.toSet()));
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
@@ -645,7 +647,7 @@ public sealed interface IOTypeDB{
 			
 			
 			Set<String> containedKeys;
-			try{
+			try(var ignore = defsLock.read()){
 				containedKeys = defs.stream().map(IOMap.IOEntry::getKey).map(t -> t.typeName).collect(Collectors.toUnmodifiableSet());
 			}catch(Throwable e1){
 				throw new IOException("Failed to read def keys", e1);
@@ -719,7 +721,7 @@ public sealed interface IOTypeDB{
 			var typeName = new TypeName(type.getTypeName());
 			
 			var added   = newDefs.containsKey(typeName);
-			var defined = defs.containsKey(typeName);
+			var defined = defsLock.read(() -> defs.containsKey(typeName));
 			
 			if(added || defined) return;
 			
@@ -934,7 +936,7 @@ public sealed interface IOTypeDB{
 		public OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException{
 			if(className == null || className.isEmpty()) return OptionalPP.empty();
 			return getBuiltIn().getDefinitionFromClassName(className).or(() -> {
-				return OptionalPP.ofNullable(defs.get(new TypeName(className)));
+				return OptionalPP.ofNullable(defsLock.read(() -> defs.get(new TypeName(className))));
 			});
 		}
 		

@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -60,7 +61,7 @@ public final class VaryingSize implements Stringify{
 				}
 			}
 		}catch(IOException e){
-			throw new RuntimeException(e);
+			throw new UncheckedIOException(e);
 		}
 		return new TooSmall(tooSmallIdMap);
 	}
@@ -311,8 +312,8 @@ public final class VaryingSize implements Stringify{
 		}
 	}
 	
-	public final  NumberSize size;
-	private final int        id;
+	public final NumberSize size;
+	public final int        id;
 	
 	public VaryingSize(NumberSize size, int id){
 		if(id<0 && id != -1) throw new IllegalArgumentException();
@@ -329,10 +330,6 @@ public final class VaryingSize implements Stringify{
 			throw new TooSmall(this, neededSize);
 		}
 		return size;
-	}
-	
-	public int getId(){
-		return id;
 	}
 	
 	@Override

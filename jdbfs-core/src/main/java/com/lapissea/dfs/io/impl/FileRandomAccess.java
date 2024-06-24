@@ -1,8 +1,8 @@
 package com.lapissea.dfs.io.impl;
 
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.util.MathUtil;
 
 import java.io.Closeable;

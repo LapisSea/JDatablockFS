@@ -389,7 +389,12 @@ public class DisplayManager implements DataLogger{
 								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
 							case DataRenderer.FieldVal<?> inst -> {
-								String str = inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
+								String str;
+								try{
+									str = inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
+								}catch(Throwable e){
+									str = "<CORRUPT :" + e + ">";
+								}
 								
 								var col = msg.color();
 								if(col == null) col = new Color(100, 255, 100);

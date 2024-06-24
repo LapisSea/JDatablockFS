@@ -3,6 +3,7 @@ package com.lapissea.dfs.core;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
+import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
@@ -84,7 +85,9 @@ public interface MemoryManager extends DataProvider.Holder{
 				throw new IllegalArgumentException();
 			}
 			
-			if(DEBUG_VALIDATION) MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+			if(DEBUG_VALIDATION){
+				MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+			}
 			
 			var last = target;
 			
@@ -96,14 +99,7 @@ public interface MemoryManager extends DataProvider.Holder{
 				for(AllocToStrategy allocTo : allocTos){
 					long allocated = allocTo.allocTo(firstChunk, last, remaining);
 					
-					if(DEBUG_VALIDATION){
-						checkChainData(firstChunk);
-						
-						if(last.dirty()) throw new RuntimeException(last + " is dirty");
-						if(allocated<0){
-							throw new IllegalStateException();
-						}
-					}
+					if(DEBUG_VALIDATION) validateAlloc(firstChunk, last, allocated);
 					if(allocated == 0) continue;
 					
 					remaining -= allocated;
@@ -112,9 +108,31 @@ public interface MemoryManager extends DataProvider.Holder{
 					}
 				}
 				
-				throw new UnknownAllocationMethod("Tried to allocate " + toAllocate + " bytes to " + last.getPtr() + " but there is no known way to do that");
+				throw failAlloc(toAllocate, last);
 			}
 			
+		}
+		
+		private void validateAlloc(Chunk firstChunk, Chunk last, long allocated) throws IOException{
+			checkChainData(firstChunk);
+			
+			if(last.dirty()){
+				try{
+					last.requireReal();
+					throw new RuntimeException(last + " is dirty");
+				}catch(CacheOutOfSync ignore){
+					//Do not check dirty. Only real chunks need to be synced
+				}
+			}
+			if(allocated<0){
+				throw new IllegalStateException("Allocated less than 0 bytes??");
+			}
+		}
+		private static IOException failAlloc(long toAllocate, Chunk last){
+			return new UnknownAllocationMethod(
+				"Tried to allocate " + toAllocate + " bytes to " + last + " but there is no known way to do that" +
+				(last.totalSize()<Chunk.minSafeSize()? ". WARNING: the chunk is smaller than the minimum safe size" : "")
+			);
 		}
 		
 		private void checkChainData(Chunk firstChunk) throws IOException{
@@ -132,11 +150,6 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public Chunk alloc(AllocateTicket ticket) throws IOException{
-			long minSize = minAllocationCapacity();
-			if(ticket.bytes()<minSize){
-				ticket = ticket.withBytes(minSize);
-			}
-			
 			Chunk chunk;
 			
 			tryStrategies:
@@ -162,11 +175,6 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public boolean canAlloc(AllocateTicket ticket) throws IOException{
-			long minSize = minAllocationCapacity();
-			if(ticket.bytes()<minSize){
-				ticket = ticket.withBytes(minSize);
-			}
-			
 			for(var alloc : allocs){
 				var chunk = alloc.alloc(context, ticket, true);
 				if(chunk != null){
@@ -255,10 +263,6 @@ public interface MemoryManager extends DataProvider.Holder{
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 	
 	boolean canAlloc(AllocateTicket ticket) throws IOException;
-	
-	default long minAllocationCapacity(){
-		return 1;
-	}
 	
 	void notifyStart(ChunkChainIO chain);
 	void notifyEnd(ChunkChainIO chain);

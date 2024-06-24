@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
@@ -319,5 +320,20 @@ public final class TestUtils{
 		}
 		
 		return new ShadowClassLoader();
+	}
+	
+	public static Cluster optionallyLogged(boolean logged, String name) throws IOException{
+		return Cluster.init(optionallyLoggedMemory(logged, name));
+	}
+	public static IOInterface optionallyLoggedMemory(boolean logged, String name) throws IOException{
+		if(!logged) return MemoryData.builder().withRaw(new byte[MagicID.size()]).build();
+		class Lazy{
+			private static final LateInit.Safe<DataLogger> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
+			
+			static{ LogUtil.println("DataLogger made"); }
+		}
+		var mem = LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
+		mem.write(true, new byte[MagicID.size()]);
+		return mem;
 	}
 }

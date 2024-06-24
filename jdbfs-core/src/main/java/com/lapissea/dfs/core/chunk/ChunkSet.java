@@ -2,6 +2,10 @@ package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.utils.IterableLongPP;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.LongIterator;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
@@ -16,15 +20,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "unused"})
 public final class ChunkSet implements Set<ChunkPointer>{
-	
 	
 	private sealed interface Index{
 		final class Bitmap32 implements Index{
@@ -68,10 +69,28 @@ public final class ChunkSet implements Set<ChunkPointer>{
 				var d = ((Bitmap32)other).data;
 				data.andNot(d);
 			}
-			@Override
-			public LongStream stream(){
-				return data.stream().mapToLong(i -> i);
+			
+			private static IterableLongPP iter(RoaringBitmap data){
+				return () -> {
+					var iter = data.getIntIterator();
+					return new LongIterator(){
+						@Override
+						public boolean hasNext(){
+							return iter.hasNext();
+						}
+						@Override
+						public long nextLong(){
+							return iter.next();
+						}
+					};
+				};
 			}
+			
+			@Override
+			public IterableLongPP iter(){
+				return iter(data);
+			}
+			
 			@Override
 			public long calcEnd(){
 				return data.getReverseIntIterator().next() + 1;
@@ -121,10 +140,28 @@ public final class ChunkSet implements Set<ChunkPointer>{
 				var d = ((Bitmap64)other).data;
 				data.andNot(d);
 			}
-			@Override
-			public LongStream stream(){
-				return data.stream();
+			
+			private static IterableLongPP iter(Roaring64NavigableMap data){
+				return () -> {
+					var iter = data.getLongIterator();
+					return new LongIterator(){
+						@Override
+						public boolean hasNext(){
+							return iter.hasNext();
+						}
+						@Override
+						public long nextLong(){
+							return iter.next();
+						}
+					};
+				};
 			}
+			
+			@Override
+			public IterableLongPP iter(){
+				return iter(data);
+			}
+			
 			@Override
 			public long calcEnd(){
 				return data.getReverseLongIterator().next() + 1;
@@ -146,8 +183,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		void and(Index other);
 		void andNot(Index other);
 		
-		LongStream stream();
-		
+		IterableLongPP iter();
 		
 		long calcEnd();
 		long calcStart();
@@ -225,25 +261,30 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	}
 	@Override
 	public boolean containsAll(@NotNull Collection<?> c){
-		return ptrStream(c).allMatch(this::contains);
+		return ptrs(c).allMatch(this::contains);
 	}
-	private Stream<ChunkPointer> ptrStream(Collection<?> c){
-		return c.stream().map(o -> o instanceof ChunkPointer ptr? ptr : o instanceof Chunk ch? ch.getPtr() : null).filter(Objects::nonNull);
+	private IterablePP<ChunkPointer> ptrs(Collection<?> c){
+		return IterablePPs.from(c).map(o -> switch(o){
+			case ChunkPointer p -> p;
+			case Chunk ch -> ch.getPtr();
+			default -> null;
+		}).filtered(Objects::nonNull);
 	}
 	@Override
 	public boolean addAll(Collection<? extends ChunkPointer> c){
 		if(c.isEmpty()) return false;
 		
-		var toAdd = ptrsToIndex(c.stream());
+		var toAdd = ptrsToIndex(c);
 		
 		boolean change = calcStart(toAdd)<start || calcEnd(toAdd)>end;
 		
 		if(!change){
-			change = index == null || toAdd.stream().anyMatch(i -> !index.contains(i));
+			change = index == null || toAdd.iter().anyMatch(i -> !index.contains(i));
 		}
 		if(!change) return false;
 		if(index == null) index = toAdd;
 		else index.or(toAdd);
+		
 		return true;
 	}
 	
@@ -257,24 +298,27 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			case Index.Bitmap64 b64 -> b64;
 		};
 	}
-	private Index ptrsToIndex(Stream<? extends ChunkPointer> c){
+	
+	private Index ptrsToIndex(Iterable<? extends ChunkPointer> c){
 		return switch(index){
 			case Index.Bitmap32 ignored -> {
 				Index bitmap = new Index.Bitmap32();
-				var   iter   = c.iterator();
-				while(iter.hasNext()){
-					var v = iter.next().getValue();
+				for(var ptr : c){
+					var v = ptr.getValue();
 					if(v>Integer.MAX_VALUE){
 						bitmap = to64(bitmap);
-						index = to64(index);
 					}
 					bitmap.add(v);
 				}
 				yield bitmap;
 			}
 			case Index.Bitmap64 ignored -> {
-				var bitmap = new Index.Bitmap64();
-				c.mapToLong(ChunkPointer::getValue).forEach(bitmap::add);
+				var  bitmap = new Index.Bitmap64();
+				long count  = 0;
+				for(var ptr : c){
+					bitmap.add(ptr.getValue());
+					count++;
+				}
 				yield bitmap;
 			}
 		};
@@ -289,7 +333,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	private void recalcInfo(){
 		calcStart();
 		calcEnd();
-		start = index == null? 0 : index.stream().count();
+		start = index == null? 0 : index.iter().count();
 	}
 	
 	@Override
@@ -301,7 +345,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			return hadData;
 		}
 		
-		var toRetain = ptrsToIndex(ptrStream(c));
+		var toRetain = ptrsToIndex(ptrs(c));
 		
 		if(toRetain.isEmpty()){
 			return retainAll(List.of());
@@ -320,7 +364,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	public boolean removeAll(@NotNull Collection<?> c){
 		if(index == null || c.isEmpty()) return false;
 		
-		var toRemove = ptrsToIndex(ptrStream(c));
+		var toRemove = ptrsToIndex(ptrs(c));
 		
 		if(toRemove.isEmpty()) return false;
 		
@@ -361,7 +405,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@SuppressWarnings({"ReplaceInefficientStreamCount"})
 	private void checkData(){
-		if(size() != longStream().count()){
+		if(size() != longIter().count()){
 			throw new IllegalStateException(size() + " " + stream().count());
 		}
 		if(!isEmpty()){
@@ -448,15 +492,15 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		var last = lastIndex();
 		if(ptr<start || last<ptr) return false;
 		if(ptr == start || ptr == last) return true;
-		return index.contains(Math.toIntExact(ptr));
+		return index.contains(ptr);
 	}
 	
-	public LongStream longStream(){
-		return index == null? LongStream.empty() : index.stream();
+	public IterableLongPP longIter(){
+		return index == null? IterableLongPP.empty() : index.iter();
 	}
 	@Override
 	public Stream<ChunkPointer> stream(){
-		return longStream().mapToObj(ChunkPointer::of);
+		return longIter().mapToObj(ChunkPointer::of).stream();
 	}
 	
 	public OptionalLong optionalMin(){
@@ -502,6 +546,6 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@Override
 	public String toString(){
-		return longStream().limit(50).mapToObj(Long::toString).collect(Collectors.joining(", ", "*[", size()>50? "...]" : "]"));
+		return longIter().limit(50).joinAsStrings(", ", "*[", size()>50? "...]" : "]");
 	}
 }

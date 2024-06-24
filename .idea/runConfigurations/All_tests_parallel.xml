@@ -9,7 +9,7 @@
     <option name="TEST_OBJECT" value="PACKAGE" />
     <option name="VM_PARAMETERS" value="-DdeleteOk=true -Ddfs.log.level=WARN" />
     <option name="PARAMETERS" value="-parallel methods -threadcount 12" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/test" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/runDir/test" />
     <option name="OUTPUT_DIRECTORY" value="" />
     <option name="PROPERTIES_FILE" value="" />
     <properties />

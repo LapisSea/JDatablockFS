@@ -3,7 +3,6 @@ package com.lapissea.dfs.objects.collections;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.core.chunk.ChainWalker;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
@@ -276,7 +275,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
-			return IterablePPs.rangeMap(
+			return IterablePPs.rangeMapL(
 				0, size(),
 				index -> {
 					indexAccessor.index = index;
@@ -299,7 +298,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
 		
-		return IterablePPs.rangeMap(
+		return IterablePPs.rangeMapL(
 			0, size(),
 			index -> {
 				indexAccessor.index = index;
@@ -384,7 +383,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	
 	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
 		var newBuffer = new ArrayList<>(varyingBuffer);
-		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.getId(), s));
+		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.id, s));
 		var newVarying = List.copyOf(newBuffer);
 		
 		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), IOType.getArg(getTypeDef(), 0));
@@ -496,13 +495,14 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			writeAt(index, value);
 			deltaSize(1);
 		}
+		defragData(0);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		defragData(1);
 		writeAt(size(), value);
 		deltaSize(1);
+		defragData(0);
 	}
 	
 	@Override
@@ -641,8 +641,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	
 	private void forwardDup(long index) throws IOException{
-		defragData(1);
-		
 		try(var io = selfIO()){
 			var  size              = size();
 			long remainingElements = size - index;
@@ -679,10 +677,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var nextCount = ch.chainLength(max + 1);
 		if(nextCount<max) return;
 		if(nextCount == max){
-			var cap = 0L;
-			for(Chunk chunk : new ChainWalker(ch)){
-				cap += chunk.hasNextPtr()? chunk.getSize() : chunk.getCapacity();
-			}
+			var cap       = ch.walkNext().mapToLong(chunk -> chunk.hasNextPtr()? chunk.getSize() : chunk.getCapacity()).sum();
 			var neededCap = calcElementOffset(size() + extraSlots);
 			if(cap>=neededCap){
 				return;
@@ -734,7 +729,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		try{
 			point.target.setNextPtr(newNext.getPtr());
 		}catch(OutOfBitDepth e){
-			throw new RuntimeException(e);
+			throw new ShouldNeverHappenError(e);//target fit has been checked in the alloc ticket
 		}
 		point.target.syncStruct();
 		

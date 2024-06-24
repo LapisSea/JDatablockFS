@@ -2,16 +2,20 @@ package com.lapissea.dfs.utils;
 
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeFunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.Serializable;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-public final class OptionalPP<T>{
+public final class OptionalPP<T> implements Serializable{
 	private static final OptionalPP<?> EMPTY = new OptionalPP<>(null);
 	
 	private final T value;
@@ -44,6 +48,9 @@ public final class OptionalPP<T>{
 	public boolean isPresent(){
 		return value != null;
 	}
+	public boolean isPresentAnd(Predicate<T> test){
+		return value != null && test.test(value);
+	}
 	
 	public boolean isEmpty(){
 		return value == null;
@@ -69,6 +76,15 @@ public final class OptionalPP<T>{
 			return empty();
 		}else{
 			return OptionalPP.ofNullable(mapper.apply(value));
+		}
+	}
+	
+	public <E extends Throwable> OptionalLong mapToLong(UnsafeFunctionOL<? super T, E> mapper) throws E{
+		Objects.requireNonNull(mapper);
+		if(!isPresent()){
+			return OptionalLong.empty();
+		}else{
+			return OptionalLong.of(mapper.apply(value));
 		}
 	}
 	

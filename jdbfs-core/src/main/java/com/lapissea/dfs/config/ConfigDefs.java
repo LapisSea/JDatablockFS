@@ -34,7 +34,6 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.FBool             LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
 	Flag.FInt              LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
-	Flag.FBool             TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
 	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
 	Flag.FBool             COSTLY_STACK_TRACE        = flagB("tweaks.costlyStackTrace", deb());
 	

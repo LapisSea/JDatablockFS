@@ -403,8 +403,7 @@ public class GeneralTests{
 				if(v.signedMinValue>e || e>v.signedMaxValue){
 					throw new RuntimeException(e + " " + v);
 				}
-				var p = v.prev();
-				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+				if(v.prev().isPresentAnd(p -> p.signedMinValue<=e && e<=p.signedMaxValue)){
 					throw new RuntimeException(e + " prev " + v);
 				}
 			});
@@ -422,8 +421,7 @@ public class GeneralTests{
 				if(v.signedMinValue>e || e>v.signedMaxValue){
 					throw new RuntimeException(e + " " + v);
 				}
-				var p = v.prev();
-				if(p != null && p.signedMinValue<=e && e<=p.signedMaxValue){
+				if(v.prev().isPresentAnd(p -> p.signedMinValue<=e && e<=p.signedMaxValue)){
 					throw new RuntimeException(e + " prev " + v);
 				}
 			});

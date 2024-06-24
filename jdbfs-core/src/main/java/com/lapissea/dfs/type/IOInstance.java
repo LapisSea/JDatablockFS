@@ -703,7 +703,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	
 	static boolean isInstance(SealedUtil.SealedUniverse<?> universe){
-		return universe.universe().stream().allMatch(IOInstance::isInstance);
+		return IterablePPs.from(universe.universe()).allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);

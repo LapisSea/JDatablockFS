@@ -218,6 +218,8 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		freeChunksLock.lock();
 		adding = true;
+		var oldAllowFreeRemove = allowFreeRemove;
+		allowFreeRemove = false;
 		try{
 			addQueue(toAdd);
 			do{
@@ -236,6 +238,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		}finally{
 			adding = false;
 			freeChunksLock.unlock();
+			allowFreeRemove = oldAllowFreeRemove;
 		}
 		
 		tryPopFree();
@@ -246,7 +249,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private boolean   popping;
 	private MoveState badMoveState;
 	private void tryPopFree() throws IOException{
-		if(adding || popping) return;
+		if(!allowFreeRemove || popping) return;
 		popping = true;
 		try{
 			boolean anyPopped;
@@ -287,7 +290,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								return;
 							}
 						}
-						
+						var oldAllowFreeRemove = allowFreeRemove;
 						try{
 							drainThread = Thread.currentThread();
 							drainIO = true;
@@ -325,7 +328,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								}
 							}else badMoveState = new MoveState(lastFree.clone(), toMove.clone());
 						}finally{
-							allowFreeRemove = true;
+							allowFreeRemove = oldAllowFreeRemove;
 							drainIO = false;
 						}
 					}

@@ -189,12 +189,14 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
+	public static final byte FLAGS_SIZE = 1;
 	
 	private static final int  CHECK_BYTE_OFF;
 	private static final byte CHECK_BIT_MASK;
 	
 	static{
 		if(PIPE.getSpecificFields().getFirst() instanceof BitFieldMerger<?> bf){
+			if(bf.getSizeDescriptor().requireFixed(WordSpace.BYTE) != FLAGS_SIZE) throw new AssertionError("flag size not " + FLAGS_SIZE);
 			var layout = bf.getSafetyBits().orElseThrow();
 			
 			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);
@@ -208,6 +210,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 	}
 	
+	public static byte minSafeSize(){
+		return FLAGS_SIZE + Long.BYTES;
+	}
 	
 	public static ChunkPointer getPtrNullable(Chunk chunk){
 		return chunk == null? ChunkPointer.NULL : chunk.getPtr();
@@ -219,7 +224,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(!earlyCheckChunkAt(provider, pointer)) throw new MalformedPointer("Invalid chunk at " + pointer);
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointer(pointer + " points outside of available data");
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE)))
+			throw new MalformedPointer(pointer + " points outside of available data");
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
@@ -233,7 +239,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * Quickly checks if a chunk start is possible at all at a certain pointer.
 	 */
 	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
-		try(var io = provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
+		var src = provider.getSource();
+		if(src.getIOSize()<=pointer.getValue()) return false;
+		try(var io = src.ioAt(pointer.add(CHECK_BYTE_OFF))){
 			return earlyCheckChunkAt(io);
 		}
 	}
@@ -284,7 +292,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		this.provider = Objects.requireNonNull(provider);
 		this.ptr = Objects.requireNonNull(ptr);
 		this.bodyNumSize = Objects.requireNonNull(bodyNumSize);
-		this.capacity = capacity;
+		this.capacity = requireCapacityPositive(capacity);
 		this.size = size;
 		this.nextSize = Objects.requireNonNull(nextSize);
 		try{
@@ -457,18 +465,29 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		forbidReadOnly();
 		if(this.capacity == newCapacity) return;
 		getBodyNumSize().ensureCanFit(newCapacity);
-		this.capacity = newCapacity;
+		this.capacity = requireCapacityPositive(newCapacity);
 		markDirty();
 	}
 	
-	public void setCapacityAndModifyNumSize(long newCapacity){
+	public boolean setCapacityAndModifyNumSize(long newCapacity){
 		forbidReadOnly();
-		if(this.capacity == newCapacity) return;
+		if(this.capacity == newCapacity) return true;
+		if(!clone().setCapacityAndModifyNumSizeInPlace(newCapacity)){
+			return false;
+		}
+		var ok = setCapacityAndModifyNumSizeInPlace(newCapacity);
+		if(!ok) throw new ShouldNeverHappenError();
+		return true;
+	}
+	public boolean setCapacityAndModifyNumSizeInPlace(long newCapacity){
+		forbidReadOnly();
+		if(this.capacity == newCapacity) return true;
+		requireCapacityPositive(newCapacity);
 		
 		var end = dataEnd();
 		
 		var newNum     = NumberSize.bySize(newCapacity);
-		var prevNum    = newNum.prev();
+		var prevNum    = newNum.prev().orElse(NumberSize.VOID);
 		var diff       = newNum.bytes - prevNum.bytes;
 		var safeTarget = newCapacity + diff;
 		
@@ -478,6 +497,10 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		var start  = dataStart();
 		
 		var cap = end - start + growth;
+		if(cap<0){
+			return false;
+		}
+		
 		if(!bodyNumSize.canFit(cap)){
 			bodyNumSize = bodyNumSize.next();
 			refreshHeaderSize();
@@ -486,9 +509,17 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			cap = end - start + growth;
 		}
 		
-		this.capacity = cap;
+		this.capacity = requireCapacityPositive(cap);
 		this.size = Math.min(this.size, this.capacity);
 		markDirty();
+		return true;
+	}
+	
+	private static long requireCapacityPositive(long capacity){
+		if(capacity<0){
+			throw new IllegalArgumentException("capacity must be positive");
+		}
+		return capacity;
 	}
 	
 	/**
@@ -800,9 +831,13 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Override
 	public String toString(){
-		var sb = new StringBuilder(32).append("Chunk{");
-		if(provider.getChunkCached(getPtr()) != this){
-			sb.append("NOT_REAL ");
+		var sb     = new StringBuilder(32).append("Chunk{");
+		var cached = provider.getChunkCached(getPtr());
+		if(cached != this){
+			if(cached != null) sb.append("CONFLICTING ");
+			else sb.append("NOT_REAL ");
+		}else if(dirty){
+			sb.append("DIRTY ");
 		}
 		sb.append(getPtr());
 		if(bodyNumSize != NumberSize.VOID) sb.append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);

@@ -370,8 +370,9 @@ public class DefragmentManager{
 			Chunk fragmentData;
 			try(var ignored = cluster.getSource().openIOTransaction()){
 				
-				remainingData.setCapacityAndModifyNumSize(remainingSpace - remainingData.getHeaderSize());
-				if(remainingData.getCapacity()<=0) throw new AssertionError(remainingData);
+				if(!remainingData.setCapacityAndModifyNumSize(remainingSpace - remainingData.getHeaderSize())){
+					throw new AssertionError("Failed to set chunk size: " + remainingData);
+				}
 				
 				remainingData.writeHeader();
 				remainingData = cluster.getChunk(remainingData.getPtr());

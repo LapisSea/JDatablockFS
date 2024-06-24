@@ -101,22 +101,19 @@ public class FieldDependency<T extends IOInstance<T>>{
 			
 			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(field.getDependencies().stream().filter(allFields::contains).toList())){
+					if(selectedWriteFieldsSet.addAll(allFields.filtered(f -> f.streamUnpackedFields().anyMatch(field::isDependency)).asCollection())){
 						shouldRun = true;
 					}
 				}
-				var gens = field.getGenerators();
-				if(gens != null){
-					for(var gen : gens){
-						if(allFields.contains(gen.field()) && selectedWriteFieldsSet.add(gen.field())){
-							shouldRun = true;
-						}
+				for(var gen : field.getGenerators()){
+					if(allFields.contains(gen.field()) && selectedWriteFieldsSet.add(gen.field())){
+						shouldRun = true;
 					}
 				}
 			}
 			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(field.getDependencies().stream().filter(allFields::contains).toList())){
+					if(selectedReadFieldsSet.addAll(allFields.filtered(f -> f.streamUnpackedFields().anyMatch(field::isDependency)).asCollection())){
 						shouldRun = true;
 					}
 				}
