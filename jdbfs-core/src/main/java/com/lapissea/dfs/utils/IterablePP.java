@@ -12,7 +12,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -21,6 +23,20 @@ import java.util.stream.Collector;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+/**
+ * An expanded version of {@link Iterable} that replaces use of {@link Stream}
+ * for simple/common use cases. It differs from the Stream api in the following ways:
+ * <ul>
+ *   <li>
+ *       It is a reusable computation. Aka, you can compute the result multiple times.
+ *       It is less of a data processor and more of a data view or transformer.
+ *   </li>
+ *   <li>
+ *       It has very low overhead. While it does create lambda objects, they are very
+ *       simple and most of the time will get inlined by the JIT.
+ *   </li>
+ * </ul>
+ */
 public interface IterablePP<T> extends Iterable<T>{
 	
 	default Stream<T> stream(){
@@ -80,6 +96,20 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
+	
+	default IterablePPs.PPCollection<T> asCollection(){
+		return new IterablePPs.PPCollection<>(this);
+	}
+	
+	default String joinAsStrings()                      { return joinAsStrings(""); }
+	default String joinAsStrings(CharSequence delimiter){ return joinAsStrings(delimiter, "", ""); }
+	default String joinAsStrings(CharSequence delimiter, CharSequence prefix, CharSequence suffix){
+		var res = new StringJoiner(delimiter, prefix, suffix);
+		for(T t : this){
+			res.add(Objects.toString(t));
+		}
+		return res.toString();
+	}
 	
 	default <E extends Throwable> boolean noneMatch(UnsafePredicate<T, E> predicate) throws E{
 		return !anyMatch(predicate);

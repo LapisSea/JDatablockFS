@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.StringJoiner;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 
@@ -99,6 +100,17 @@ public interface IterableLongPP{
 		}
 		res = Arrays.copyOf(res, (int)nextSizeL);
 		return res;
+	}
+	
+	default String joinAsStrings()                      { return joinAsStrings(""); }
+	default String joinAsStrings(CharSequence delimiter){ return joinAsStrings(delimiter, "", ""); }
+	default String joinAsStrings(CharSequence delimiter, CharSequence prefix, CharSequence suffix){
+		var res  = new StringJoiner(delimiter, prefix, suffix);
+		var iter = this.iterator();
+		while(iter.hasNext()){
+			res.add(Long.toString(iter.nextLong()));
+		}
+		return res.toString();
 	}
 	
 	default int count(){

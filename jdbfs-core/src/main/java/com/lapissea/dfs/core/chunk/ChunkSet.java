@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -547,6 +546,6 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@Override
 	public String toString(){
-		return longIter().limit(50).mapToObj(Long::toString).collect(Collectors.joining(", ", "*[", size()>50? "...]" : "]"));
+		return longIter().limit(50).joinAsStrings(", ", "*[", size()>50? "...]" : "]");
 	}
 }

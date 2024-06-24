@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io.impl;
 
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 
 import java.io.Closeable;
 import java.io.File;
@@ -121,13 +121,13 @@ public final class FileMemoryMapped extends CursorIOData implements Closeable{
 	
 	@Override
 	protected long readWord(long fileOffset, int len) throws IOException{
-		byte[] buff = new byte[len];
+		byte[] buff = new byte[len];//TODO: write 0 allocation impl
 		readN(fileOffset, buff, 0, len);
 		return WordIO.getWord(buff, 0, len);
 	}
 	@Override
 	protected void writeWord(long fileOffset, long value, int len) throws IOException{
-		byte[] buff = new byte[len];
+		byte[] buff = new byte[len];//TODO: write 0 allocation impl
 		WordIO.setWord(value, buff, 0, len);
 		writeN(fileOffset, buff, 0, len);
 	}

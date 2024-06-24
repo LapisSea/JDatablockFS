@@ -2,10 +2,9 @@ package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
-import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.objects.text.AutoText;
 import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
@@ -18,19 +17,19 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 
-@Warmup(iterations = 6, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 6, time = 5000, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations = 6, time = 1500, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 6, time = 4000, timeUnit = TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class TextBench{
 	
-	private final AutoText      t  = new AutoText();
-	private final byte[]        bb;
+	private final AutoText t = new AutoText();
+	private final byte[]   bb, dst;
 	private final StringBuilder sb = new StringBuilder();
 	
 	public TextBench(){
 		try{
-			byte[] b = new byte[1000];
+			byte[] b = new byte[81];
 			
 			var    arr = "0123456789ABCDEF".getBytes(StandardCharsets.UTF_8);
 			Random r   = new Random(100);
@@ -40,10 +39,10 @@ public class TextBench{
 //			b[0]='+';
 			
 			t.setData(new String(b));
-			ContentOutputBuilder buff = new ContentOutputBuilder();
+			var buff = new ContentOutputBuilder();
 			t.writeTextBytes(buff);
 			bb = buff.toByteArray();
-			
+			dst = new byte[bb.length];
 		}catch(Throwable e){
 			throw new RuntimeException(e);
 		}
@@ -51,12 +50,7 @@ public class TextBench{
 	
 	@Benchmark
 	public void write() throws IOException{
-		t.writeTextBytes(new ContentWriter(){
-			@Override
-			public void write(int b){ }
-			@Override
-			public void write(byte[] b, int off, int len){ }
-		});
+		t.writeTextBytes(new ContentOutputStream.BA(dst));
 	}
 	
 	@Benchmark
@@ -64,23 +58,4 @@ public class TextBench{
 		sb.setLength(0);
 		t.readTextBytes(new ContentInputStream.BA(bb), sb);
 	}
-	
-	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.abBenchmark.disableBlockCoding=true")
-	public void writeNoBulk() throws IOException{
-		t.writeTextBytes(new ContentWriter(){
-			@Override
-			public void write(int b){ }
-			@Override
-			public void write(byte[] b, int off, int len){ }
-		});
-	}
-	
-	@Benchmark
-	@Fork(jvmArgsAppend = "-Ddfs.abBenchmark.disableBlockCoding=true")
-	public void readNoBulk() throws IOException{
-		sb.setLength(0);
-		t.readTextBytes(new ContentInputStream.BA(bb), sb);
-	}
-	
 }

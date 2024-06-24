@@ -87,7 +87,7 @@ public sealed interface CollectionInfo{
 		public boolean hasNulls(){ return false; }
 		@Override
 		public IterablePP<?> iter(Object collection){
-			return IterablePPs.rangeMap(0, Array.getLength(collection), (int i) -> Array.get(collection, i));
+			return IterablePPs.rangeMap(0, Array.getLength(collection), i -> Array.get(collection, i));
 		}
 	}
 	
@@ -126,7 +126,7 @@ public sealed interface CollectionInfo{
 		@Override
 		public IterablePP<?> iter(Object collection){
 			var arr = (Object[])collection;
-			return IterablePPs.rangeMap(0, arr.length, (int i) -> arr[i]);
+			return IterablePPs.rangeMap(0, arr.length, i -> arr[i]);
 		}
 		
 		public Class<?> getArrayType(){ return arrayType; }

@@ -1,6 +1,5 @@
 package com.lapissea.dfs.io.content;
 
-import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.util.NotNull;
 
 import java.io.EOFException;

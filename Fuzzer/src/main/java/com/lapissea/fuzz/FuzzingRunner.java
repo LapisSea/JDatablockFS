@@ -325,11 +325,11 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				}
 				
 				try(var worker = new ThreadPoolExecutor(nThreads - 1, nThreads - 1, 500, MILLISECONDS,
-				                                        new LinkedBlockingQueue<>(), new RunnerFactory(nThreads, name))){
+				                                        new LinkedBlockingQueue<>(), new RunnerFactory(nThreads - 1, name))){
 					
 					if(data instanceof ManyData.Async async) async.compute.accept(worker);
 					
-					var desiredBuffer = Math.max(nThreads*2, 8);
+					var desiredBuffer = Math.max(nThreads*4, 8);
 					var splits        = new ArrayList<>(List.of(source.all().spliterator()));
 					while(splits.size()<desiredBuffer){
 						var res = splits.stream().map(Spliterator::trySplit).filter(Objects::nonNull).toList();
@@ -344,6 +344,17 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					
 					var work = new ArrayList<CompletableFuture<Spliterator<FuzzSequence>>>();
 					while(!progress.hasErr() && (!splits.isEmpty() || !work.isEmpty())){
+						var anyDone = work.removeIf(f -> {
+							if(f.isDone()){
+								var split = f.join();
+								if(split != null){
+									splits.add(split);
+								}
+								return true;
+							}
+							return false;
+						});
+						
 						splits.stream().map(split -> CompletableFuture.supplyAsync(new Supplier<Spliterator<FuzzSequence>>(){
 							private FuzzSequence sequence;
 							@Override
@@ -357,17 +368,6 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 							}
 						}, worker)).forEach(work::add);
 						splits.clear();
-						
-						var anyDone = work.removeIf(f -> {
-							if(f.isDone()){
-								var res = f.join();
-								if(res != null){
-									splits.add(res);
-								}
-								return true;
-							}
-							return false;
-						});
 						
 						if(anyDone){
 							continue;

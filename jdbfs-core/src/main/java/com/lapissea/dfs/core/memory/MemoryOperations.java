@@ -532,7 +532,9 @@ public final class MemoryOperations{
 				
 				overflow:
 				if(target.getCapacity()<growth){
-					var prevBodyNum = bodyNum.prev();
+					var prevBodyNumO = bodyNum.prev();
+					if(prevBodyNumO.isEmpty()) break;
+					var prevBodyNum = prevBodyNumO.get();
 					bodyShrink = (bodyNum.bytes - prevBodyNum.bytes)*2;
 					growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
 					while(true){
@@ -826,7 +828,7 @@ public final class MemoryOperations{
 				ch = new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
 				var chCap = size - ch.getHeaderSize() - safeToAllocate;
 				
-				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap)){
+				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap) || ch.totalSize()<Chunk.minSafeSize()){
 					newCapacity = target.getCapacity() + size;
 					if(!target.getBodyNumSize().canFit(newCapacity)){
 						continue freeIter;
