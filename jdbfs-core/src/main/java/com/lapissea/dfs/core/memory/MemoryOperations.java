@@ -532,7 +532,9 @@ public final class MemoryOperations{
 				
 				overflow:
 				if(target.getCapacity()<growth){
-					var prevBodyNum = bodyNum.prev();
+					var prevBodyNumO = bodyNum.prev();
+					if(prevBodyNumO.isEmpty()) break;
+					var prevBodyNum = prevBodyNumO.get();
 					bodyShrink = (bodyNum.bytes - prevBodyNum.bytes)*2;
 					growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
 					while(true){

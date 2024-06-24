@@ -485,7 +485,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		var end = dataEnd();
 		
 		var newNum     = NumberSize.bySize(newCapacity);
-		var prevNum    = newNum == NumberSize.VOID? NumberSize.VOID : newNum.prev();
+		var prevNum    = newNum.prev().orElse(NumberSize.VOID);
 		var diff       = newNum.bytes - prevNum.bytes;
 		var safeTarget = newCapacity + diff;
 		
