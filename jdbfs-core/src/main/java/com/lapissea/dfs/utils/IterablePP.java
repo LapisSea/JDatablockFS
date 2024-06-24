@@ -5,7 +5,6 @@ import com.lapissea.util.function.UnsafePredicate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -97,71 +96,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
-	default Collection<T> asCollection(){
-		return new Collection<>(){
-			private List<T> computed;
-			private Set<T>  computedSet;
-			private Boolean empty;
-			
-			private List<T> compute(){
-				var c = computed;
-				if(c != null) return c;
-				return computed = collectToList();
-			}
-			
-			private Set<T> computeSet(){
-				var c = computedSet;
-				if(c != null) return c;
-				return computedSet = collectToSet();
-			}
-			
-			@Override
-			public Iterator<T> iterator(){
-				var c = computed;
-				if(c != null) return c.iterator();
-				return IterablePP.this.iterator();
-			}
-			@Override
-			public Object[] toArray(){
-				return compute().toArray();
-			}
-			@Override
-			public <T1> T1[] toArray(T1[] a){
-				return compute().toArray(a);
-			}
-			@Override
-			public boolean add(T t){ throw new UnsupportedOperationException(); }
-			@Override
-			public boolean remove(Object o){ throw new UnsupportedOperationException(); }
-			@Override
-			public boolean addAll(Collection<? extends T> c){ throw new UnsupportedOperationException(); }
-			@Override
-			public boolean removeAll(Collection<?> c){ throw new UnsupportedOperationException(); }
-			@Override
-			public boolean retainAll(Collection<?> c){ throw new UnsupportedOperationException(); }
-			@Override
-			public void clear(){ throw new UnsupportedOperationException(); }
-			@Override
-			public int size(){
-				if(empty != null && empty) return 0;
-				return compute().size();
-			}
-			@Override
-			public boolean isEmpty(){
-				if(empty != null) return empty;
-				if(computed != null) return empty = computed.isEmpty();
-				if(computedSet != null) return empty = computedSet.isEmpty();
-				return empty = IterablePP.this.iterator().hasNext();
-			}
-			@Override
-			public boolean containsAll(Collection<?> c){
-				return computeSet().containsAll(c);
-			}
-			@Override
-			public boolean contains(Object o){
-				return computeSet().contains(o);
-			}
-		};
+	
+	default IterablePPs.PPCollection<T> asCollection(){
+		return new IterablePPs.PPCollection<>(this);
 	}
 	
 	default String joinAsStrings()                      { return joinAsStrings(""); }

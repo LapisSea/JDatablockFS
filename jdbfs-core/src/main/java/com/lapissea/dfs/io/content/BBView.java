@@ -1,12 +1,12 @@
 package com.lapissea.dfs.io.content;
 
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 
 import java.lang.invoke.VarHandle;
 import java.util.Objects;
 
+import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.byteArrayViewVarHandle;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
@@ -14,37 +14,37 @@ public final class BBView{
 	
 	private static final class UnsafeView{
 		
-		private static final int ARRAY_BYTE_BASE_OFFSET = MyUnsafe.UNSAFE.arrayBaseOffset(byte[].class);
+		private static final int ARRAY_BYTE_BASE_OFFSET = UNSAFE.arrayBaseOffset(byte[].class);
 		
 		private static long mem(byte[] ba, int index, int size){
 			return Objects.checkIndex(index, ba.length - (size - 1)) + ARRAY_BYTE_BASE_OFFSET;
 		}
 		
 		private static void putByte_(byte[] byteBuffer, long memOff, int localOff, long v){
-			MyUnsafe.UNSAFE.putByte(byteBuffer, memOff + localOff, (byte)(v >>> (localOff*8)));
+			UNSAFE.putByte(byteBuffer, memOff + localOff, (byte)(v >>> (localOff*8)));
 		}
 		private static int getByte_(byte[] byteBuffer, long memOff){
-			return MyUnsafe.UNSAFE.getByte(byteBuffer, memOff)&0xFF;
+			return UNSAFE.getByte(byteBuffer, memOff)&0xFF;
 		}
 		private static long getByte_(byte[] byteBuffer, long memOff, int localOff){
 			return ((long)getByte_(byteBuffer, memOff + localOff))<<(localOff*8);
 		}
 		
 		private static void putShort(byte[] byteBuffer, long memOff, int localOff, long v){
-			MyUnsafe.UNSAFE.putChar(byteBuffer, memOff + localOff, (char)(v >>> (localOff*8)));
+			UNSAFE.putChar(byteBuffer, memOff + localOff, (char)(v >>> (localOff*8)));
 		}
 		private static char getShort(byte[] byteBuffer, long memOff){
-			return MyUnsafe.UNSAFE.getChar(byteBuffer, memOff);
+			return UNSAFE.getChar(byteBuffer, memOff);
 		}
 		private static long getShort(byte[] byteBuffer, long memOff, int localOff){
-			return ((long)MyUnsafe.UNSAFE.getChar(byteBuffer, memOff + localOff))<<(localOff*8);
+			return ((long)getShort(byteBuffer, memOff + localOff))<<(localOff*8);
 		}
 		
 		private static void putInt__(byte[] byteBuffer, long memOff, int localOff, long v){
-			MyUnsafe.UNSAFE.putInt(byteBuffer, memOff + localOff, (int)(v >>> (localOff*8)));
+			UNSAFE.putInt(byteBuffer, memOff + localOff, (int)(v >>> (localOff*8)));
 		}
 		private static long getInt__(byte[] byteBuffer, long memOff, int localOff){
-			return Integer.toUnsignedLong(MyUnsafe.UNSAFE.getInt(byteBuffer, memOff + localOff))<<(localOff*8);
+			return Integer.toUnsignedLong(UNSAFE.getInt(byteBuffer, memOff + localOff))<<(localOff*8);
 		}
 		
 		private static void writeInt3(byte[] byteBuffer, int off, int v){

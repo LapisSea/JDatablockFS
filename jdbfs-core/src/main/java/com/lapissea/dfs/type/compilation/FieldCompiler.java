@@ -55,8 +55,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -274,10 +272,10 @@ public final class FieldCompiler{
 		
 		var usedFields = new HashSet<Method>();
 		
-		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).toList();
+		var ioMethods = allMethods(cl).filtered(IOFieldTools::isIOField).asCollection();
 		var fields    = collectAccessors(struct, ioMethods, usedFields::add);
 		
-		var hangingMethods = ioMethods.stream().filter(method -> !usedFields.contains(method)).collect(Collectors.toList());
+		var hangingMethods = ioMethods.filtered(method -> !usedFields.contains(method)).collectToList();
 		
 		Map<String, PairM<Method, Method>> functionFields = new HashMap<>();
 		BiConsumer<String, Method>         pushGetter     = (name, m) -> functionFields.computeIfAbsent(name, n -> new PairM<>()).obj1 = m;
@@ -370,45 +368,22 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> collectAccessors(
-		Struct<T> struct, List<Method> ioMethods, Consumer<Method> reportField
+		Struct<T> struct, IterablePP<Method> ioMethods, Consumer<Method> reportField
 	){
 		var cl     = struct.getConcreteType();
 		var fields = new ArrayList<FieldAccessor<T>>();
 		
 		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
 			try{
-				Type type = getType(field);
-				
-				field.setAccessible(true);
-				
-				String fieldName = getFieldName(field);
-				
-				Optional<Method> getter, setter;
-				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
-					IntFunction<Optional<Method>> getMethod = count -> {
-						var res = ioMethods.stream().filter(
-							m -> m.getParameterCount() == count &&
-							     m.getAnnotation(IOValue.class).name().equals(fieldName)
-						).toList();
-						if(res.size()>1) throw new IllegalField('"' + fieldName + "\" is an illegal field name");
-						return res.stream().findAny();
-					};
-					getter = getMethod.apply(0);
-					setter = getMethod.apply(1);
-				}else{
-					Function<String, Optional<Method>> getMethod =
-						prefix -> ioMethods.stream().filter(m -> {
-							if(!IOFieldTools.isIOField(m)) return false;
-							var name = getMethodFieldName(prefix, m);
-							return name.isPresent() && name.get().equals(fieldName);
-						}).findFirst();
-					getter = calcGetPrefixes(field).map(getMethod)
-					                               .filter(Optional::isPresent).map(Optional::get).findAny();
-					setter = getMethod.apply("set");
-				}
+				var getter = pickGSMethod(ioMethods, field, false);
+				var setter = pickGSMethod(ioMethods, field, true);
 				
 				getter.ifPresent(reportField);
 				setter.ifPresent(reportField);
+				
+				Type   type      = getType(field);
+				String fieldName = getFieldName(field);
+				field.setAccessible(true);
 				
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
@@ -420,6 +395,14 @@ public final class FieldCompiler{
 			}
 		}
 		return fields;
+	}
+	private static Optional<Method> pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean setter){
+		return ioMethods.firstMatching(m -> {
+			if(!IOFieldTools.isIOField(m)) return false;
+			var stub = setter? CompilationTools.asSetterStub(m) : CompilationTools.asGetterStub(m);
+			var name = stub.map(CompilationTools.FieldStub::varName);
+			return name.filter(n -> n.equals(getFieldName(field))).isPresent();
+		}).toOptional();
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, PairM<Method, Method>> functionFields, Class<T> cl){
@@ -438,7 +421,6 @@ public final class FieldCompiler{
 		);
 	}
 	
-	private static Stream<String> calcGetPrefixes(Field field)  { return calcGetPrefixes(field.getType()); }
 	private static Stream<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }
 	private static Stream<String> calcGetPrefixes(Class<?> typ){
 		var isBool = typ == boolean.class || typ == Boolean.class;
@@ -503,9 +485,9 @@ public final class FieldCompiler{
 		return type;
 	}
 	
-	private static Stream<Method> allMethods(Class<?> clazz){
-		return Stream.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
-		             .flatMap(c -> Arrays.stream(c.getDeclaredMethods()));
+	private static IterablePP<Method> allMethods(Class<?> clazz){
+		return IterablePPs.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
+		                  .flatArray(Class::getDeclaredMethods);
 	}
 	
 	@SuppressWarnings("unchecked")
