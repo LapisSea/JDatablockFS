@@ -11,6 +11,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -46,6 +47,9 @@ public final class OptionalPP<T> implements Serializable{
 	
 	public boolean isPresent(){
 		return value != null;
+	}
+	public boolean isPresentAnd(Predicate<T> test){
+		return value != null && test.test(value);
 	}
 	
 	public boolean isEmpty(){

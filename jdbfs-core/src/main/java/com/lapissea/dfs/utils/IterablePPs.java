@@ -21,21 +21,27 @@ public final class IterablePPs{
 		private final IterablePP<T> source;
 		private       List<T>       computed;
 		private       Set<T>        computedSet;
-		private       Boolean       empty;
+		private       byte          empty = UNKNOWN;
+		
+		private static final byte TRUE = 1, FALSE = 0, UNKNOWN = 2;
 		
 		public PPCollection(IterablePP<T> source){ this.source = source; }
 		
 		private List<T> compute(){
 			var c = computed;
 			if(c != null) return c;
-			if(empty != null && empty) computed = List.of();
-			return computed = collectToList();
+			if(empty == TRUE) return computed = List.of();
+			c = collectToList();
+			if(emp(c.isEmpty())){
+				c = List.of();
+			}
+			return computed = c;
 		}
 		
 		private Set<T> computeSet(){
 			var c = computedSet;
 			if(c != null) return c;
-			if(empty != null && empty) computed = List.of();
+			if(empty == TRUE) return computedSet = Set.of();
 			return computedSet = collectToSet();
 		}
 		
@@ -43,8 +49,9 @@ public final class IterablePPs{
 		public Iterator<T> iterator(){
 			var c = computed;
 			if(c != null) return c.iterator();
+			if(empty == TRUE) return (Iterator<T>)EMPTY_ITER;
 			var iter = source.iterator();
-			if(empty == null) empty = !iter.hasNext();
+			if(empty == UNKNOWN) emp(!iter.hasNext());
 			return iter;
 		}
 		@Override
@@ -69,7 +76,7 @@ public final class IterablePPs{
 		public void clear(){ throw new UnsupportedOperationException(); }
 		@Override
 		public int size(){
-			if(empty != null && empty) return 0;
+			if(empty == TRUE) return 0;
 			return compute().size();
 		}
 		@Override
@@ -79,10 +86,14 @@ public final class IterablePPs{
 		}
 		@Override
 		public boolean isEmpty(){
-			if(empty != null) return empty;
-			if(computed != null) return empty = computed.isEmpty();
-			if(computedSet != null) return empty = computedSet.isEmpty();
-			return empty = source.iterator().hasNext();
+			if(empty != UNKNOWN) return empty == TRUE;
+			if(computed != null) return emp(computed.isEmpty());
+			if(computedSet != null) return emp(computedSet.isEmpty());
+			return emp(!source.iterator().hasNext());
+		}
+		private boolean emp(boolean empty){
+			this.empty = empty? TRUE : FALSE;
+			return empty;
 		}
 		@Override
 		public <T1> T1[] toArray(IntFunction<T1[]> ctor){
@@ -98,8 +109,8 @@ public final class IterablePPs{
 		}
 		@Override
 		public String toString(){
+			if(empty == TRUE) return "[]";
 			if(computed != null) return TextUtil.toString(computed);
-			if(empty != null) return "[]";
 			return "[<?>]";
 		}
 	}
@@ -169,7 +180,17 @@ public final class IterablePPs{
 		};
 	}
 	
-	private static final IterablePP<?> EMPTY = of0();
+	private static final IterablePP<?> EMPTY      = of0();
+	private static final Iterator<?>   EMPTY_ITER = new Iterator<>(){
+		@Override
+		public boolean hasNext(){
+			return false;
+		}
+		@Override
+		public Object next(){
+			return null;
+		}
+	};
 	
 	public static <T> IterablePP<T> of(){
 		return (IterablePP<T>)EMPTY;
