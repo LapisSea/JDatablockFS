@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.text;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -13,15 +14,21 @@ import com.lapissea.dfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.access.VirtualAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Objects;
 import java.util.OptionalLong;
+
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 @StructPipe.Special
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
@@ -32,6 +39,51 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		public AutoTextPipe(){
 			super(STRUCT, true);
 		}
+		
+		private static final EnumUniverse<CharEncoding> CHAR_ENCODING_UNIVERSE = EnumUniverse.of(CharEncoding.class);
+		
+		static{
+			if(CHAR_ENCODING_UNIVERSE.bitSize != 3) throw new AssertionError();
+		}
+		
+		private static final VirtualAccessor<AutoText> NUM_SIZE =
+			(VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(NumberSize.class, "numSize").getAccessor();
+		private static final VirtualAccessor<AutoText> TEXT_LEN =
+			(VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(int.class, "textBytes:len").getAccessor();
+		
+		@Override
+		protected AutoText doRead(VarPool<AutoText> ioPool, DataProvider provider, ContentReader src, AutoText instance, GenericContext g) throws IOException{
+			var raw     = src.readUnsignedInt1();
+			var numSize = NumberSize.FLAG_INFO.get(raw&0b111);
+			ioPool.set(NUM_SIZE, numSize);
+			instance.setEncoding(CHAR_ENCODING_UNIVERSE.get((raw >>> 3)&0b111));
+			
+			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			
+			var textBytes_len = numSize.readInt(src);
+			ioPool.set(TEXT_LEN, textBytes_len);
+			
+			instance.setCharCount(numSize.readInt(src));
+			instance.setTextBytes(src.readInts1(textBytes_len));
+			return instance;
+		}
+		@Override
+		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<AutoText> ioPool, AutoText value) throws IOException{
+			var    charCount     = value.charCount;
+			byte[] textBytes     = value.getTextBytes();
+			int    textBytes_len = textBytes.length;
+			
+			var numSize = NumberSize.bySize(Math.max(charCount, textBytes_len));
+			
+			var data = numSize.ordinal()|(value.encoding.ordinal()<<3);
+			data |= ((int)BitFieldMerger.calcIntegrityBits(data, 2))<<6;
+			dest.writeInt1(data);
+			
+			numSize.writeInt(dest, textBytes_len);
+			numSize.writeInt(dest, charCount);
+			dest.writeInts1(textBytes);
+		}
+		
 		@Override
 		protected SizeDescriptor<AutoText> createSizeDescriptor(){
 			return SizeDescriptor.UnknownLambda.of(1, OptionalLong.empty(), (ioPool, prov, value) -> {
@@ -40,20 +92,31 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 				if(value.dataSrc != null) textBytesCount = value.dataSrc.length;
 				else textBytesCount = value.encoding.calcSize(value.data);
 				
-				var numSize      = NumberSize.bySize(charCount);
-				var textBytesLen = NumberSize.bySize(textBytesCount);
+				var numSize = NumberSize.bySize(Math.max(charCount, textBytesCount));
 				
-				return 1L + numSize.bytes + textBytesLen.bytes + textBytesCount;
+				return 1L + numSize.bytes + numSize.bytes + textBytesCount;
 			});
 		}
 	}
 	
-	static{
-		StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new);
-	}
+	static{ StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new); }
 	
 	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
 	
+	static{
+		if(DEBUG_VALIDATION){
+			var check = "numSize + encoding 1 byte textBytes:len NS(numSize): 0-4 bytes charCount NS(numSize): 0-4 bytes textBytes ? bytes ";
+			var sb    = new StringBuilder(check.length());
+			var p     = StandardStructPipe.of(STRUCT, StructPipe.STATE_DONE);
+			for(var specificField : p.getSpecificFields()){
+				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
+			}
+			var res = sb.toString();
+			if(!check.equals(res)){
+				throw UtilL.exitWithErrorMsg(check + "\n" + res);
+			}
+		}
+	}
 	
 	public static final ObjectPipe.NoPool<String> STR_PIPE = new ObjectPipe.NoPool<>(){
 		private final BasicSizeDescriptor<String, Void> sizeDescriptor;
