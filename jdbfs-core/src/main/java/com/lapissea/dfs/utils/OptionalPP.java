@@ -51,6 +51,16 @@ public final class OptionalPP<T> implements Serializable{
 	public boolean isPresentAnd(Predicate<T> test){
 		return value != null && test.test(value);
 	}
+	public boolean isPresentAndNot(Predicate<T> test){
+		return value != null && test.test(value);
+	}
+	
+	public boolean isEmptyOr(Predicate<T> test){
+		return value == null || test.test(value);
+	}
+	public boolean isEmptyOrNot(Predicate<T> test){
+		return value == null || test.test(value);
+	}
 	
 	public boolean isEmpty(){
 		return value == null;
