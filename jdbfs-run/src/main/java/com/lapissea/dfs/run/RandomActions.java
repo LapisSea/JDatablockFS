@@ -8,6 +8,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
 import com.lapissea.dfs.objects.collections.IOTreeSet;
+import com.lapissea.dfs.objects.collections.PrefixTree;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -123,6 +124,24 @@ public final class RandomActions{
 				case 2 -> set.contains(num);
 			}
 		});
+	}
+	private static void prefixTree() throws IOException{
+		var provider = Cluster.emptyMem();
+		var set      = provider.roots().request(1, PrefixTree.class);
+		
+		var r    = new RawRandom(420);
+		var iter = 50_000;
+		for(int i = 0; i<iter; i++){
+			if((i%(iter/200)) == 0) LogUtil.println(i/(double)iter);
+			
+			String num = r.ints(r.nextInt(50), 'a', 'a' + 4).mapToObj(n -> ((char)n) + "").collect(Collectors.joining());
+			
+			switch(r.nextInt(3)){
+				case 0 -> set.add(num);
+				case 1 -> set.remove(num);
+				case 2 -> set.contains(num);
+			}
+		}
 	}
 	
 	private static int idx(RawRandom r, List<Chunk> ch){

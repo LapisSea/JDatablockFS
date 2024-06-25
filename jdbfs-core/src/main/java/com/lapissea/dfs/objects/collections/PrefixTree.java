@@ -6,7 +6,6 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
@@ -60,6 +59,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	@IOValue
 	@IONullability(NULLABLE)
 	private ContiguousIOList<Node> nodes;
+	
 	@IOValue
 	private boolean hasNullVal, hasEmptyVal;
 	
@@ -72,10 +72,10 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	}
 	
 	private Node getNode(long index) throws IOException{
-		return nodes.get(index).clone();
+		return nodes.get(index);
 	}
 	private void writeNode(long index, Node node) throws IOException{
-		nodes.set(index, node.clone());
+		nodes.set(index, node);
 	}
 	
 	private BitSet nullCache;
@@ -107,19 +107,21 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	}
 	
 	private int allocNode(String value, int[] children, boolean real) throws IOException{
-		long li    = nodes.size();
-		int  index = (int)li;
-		if(index != li) throw new OutOfMemoryError("Too many nodes");
-		
 		var node = Node.of(value, children, real);
-		var nv   = nodes.enumerateL().firstMatching(l -> l.val().nullMark()).mapToLong(IterablePP.LdxValue::index);
-		if(nv.isPresent()){
-			var i = nv.getAsLong();
-			writeNode(i, node);
-			return Math.toIntExact(i);
-		}else{
-			nodes.add(node);
+		
+		var nv = nullCache().nextSetBit(0);
+		if(nv != -1){
+			nullCache.clear(nv);
+			writeNode(nv, node);
+			return Math.toIntExact(nv);
 		}
+		
+		long idxL  = nodes.size();
+		int  index = (int)idxL;
+		if(index != idxL) throw new OutOfMemoryError("Too many nodes");
+		
+		nodes.add(node);
+		
 		return index;
 	}
 	
@@ -442,6 +444,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	public void clear() throws IOException{
 		var oldNodes = nodes;
 		nodes = null;
+		nullCache = null;
 		hasEmptyVal = hasNullVal = false;
 		setSizeDirty(0);
 		writeManagedFields();
@@ -502,7 +505,7 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 							return;
 						}
 						var childIndex = children[walk.pos];
-						var child = getNode(childIndex);
+						var child      = getNode(childIndex);
 						
 						nodeIters.add(new NodeWalk(walk.wholeVal + child.value(), child));
 					}finally{
@@ -556,7 +559,12 @@ public class PrefixTree extends UnmanagedIOSet<String>{
 	}
 	
 	private void validate() throws IOException{
-		if(DEBUG_VALIDATION && nodes == null) return;
+		if(!DEBUG_VALIDATION || nodes == null) return;
+		for(int i : nullCache().stream().toArray()){
+			if(!nodes.get(i).nullMark()){
+				throw new AssertionError("not null at " + i);
+			}
+		}
 		try{
 			validate(getNode(0), getNode(0).value());
 		}catch(Throwable e){
