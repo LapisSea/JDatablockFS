@@ -340,7 +340,7 @@ public final class MemoryOperations{
 				}
 			}
 			
-			for(Chunk chunk : toDestroy){ provider.getChunkCache().notifyDestroyed(chunk); }
+			provider.getChunkCache().notifyDestroyed(toDestroy);
 		}else{
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(writeChunks);

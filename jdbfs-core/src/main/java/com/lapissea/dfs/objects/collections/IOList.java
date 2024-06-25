@@ -10,7 +10,6 @@ import com.lapissea.dfs.query.QueryCheck;
 import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
@@ -42,10 +41,10 @@ public interface IOList<T> extends IterablePP<T>{
 		var iter = data.iterator();
 		
 		var push = new Consumer<String>(){
-			private String repeatBuff = null;
-			private int repeatCount = 0;
-			private long repeatIndexStart;
-			private long count = 0;
+			private String repeatBuff  = null;
+			private int    repeatCount = 0;
+			private long   repeatIndexStart;
+			private long   count       = 0;
 			
 			@Override
 			public void accept(String str){
@@ -153,11 +152,11 @@ public interface IOList<T> extends IterablePP<T>{
 			return 0;
 		}
 		
-		if(value.compareTo(list.peekLast().orElseThrow())<0){
-			list.pushFirst(value);
+		if(value.compareTo(list.getLast())<0){
+			list.add(0, value);
 			return 0;
 		}
-		if(value.compareTo(list.peekLast().orElseThrow())>0){
+		if(value.compareTo(list.getLast())>0){
 			var index = list.size();
 			list.add(value);
 			return index;
@@ -605,48 +604,28 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	@Override
-	default OptionalPP<T> first(){
-		if(isEmpty()) return OptionalPP.empty();
-		return OptionalPP.of(getUnsafe(0));
+	default T getFirst(){
+		if(isEmpty()) throw new IndexOutOfBoundsException(0);
+		return getUnsafe(0);
 	}
 	
-	default OptionalPP<T> peekFirst() throws IOException{
-		if(isEmpty()) return OptionalPP.empty();
-		return OptionalPP.of(get(0));
+	default T getLast() throws IOException{
+		if(isEmpty()) throw new IndexOutOfBoundsException(0);
+		return get(size() - 1);
 	}
-	default OptionalPP<T> popFirst() throws IOException{
-		if(isEmpty()) return OptionalPP.empty();
-		var first = get(0);
-		remove(0);
-		return OptionalPP.of(first);
+	default boolean removeLast() throws IOException{
+		if(isEmpty()) return false;
+		var index = size() - 1;
+		remove(index);
+		return true;
 	}
-	
-	default void pushFirst(T newFirst) throws IOException{
-		if(isEmpty()){
-			add(newFirst);
-		}else{
-			add(0, newFirst);
-		}
-	}
-	
-	default OptionalPP<T> peekLast() throws IOException{
-		if(isEmpty()) return OptionalPP.empty();
-		return OptionalPP.of(get(size() - 1));
-	}
-	default OptionalPP<T> popLast() throws IOException{
-		if(isEmpty()) return OptionalPP.empty();
+	default boolean popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
+		if(isEmpty()) return false;
 		var index = size() - 1;
 		var val   = get(index);
+		if(!check.test(val)) return false;
 		remove(index);
-		return OptionalPP.of(val);
-	}
-	default OptionalPP<T> popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
-		if(isEmpty()) return OptionalPP.empty();
-		var index = size() - 1;
-		var val   = get(index);
-		if(!check.test(val)) return OptionalPP.empty();
-		remove(index);
-		return OptionalPP.of(val);
+		return true;
 	}
 	
 	default void pushLast(T newLast) throws IOException{

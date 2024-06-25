@@ -74,11 +74,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void flush() throws IOException{ data.flush(); }
 		
 		
-		private IOTransactionBuffer.BaseAccess readAt;
-		private IOTransactionBuffer.BaseAccess readAt(){
-			if(readAt == null) readAt = this::readAt;
-			return readAt;
-		}
+		private final IOTransactionBuffer.BaseAccess readAt = this::readAt;
 		
 		private int readAt(long pos, byte[] b, int off, int len) throws IOException{
 			return readAt((int)pos, b, off, len);
@@ -95,7 +91,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				int b = transactionBuff.readByte(readAt(), pos);
+				int b = transactionBuff.readByte(readAt, pos);
 				if(b>=0){
 					this.pos++;
 				}
@@ -110,7 +106,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				int read = transactionBuff.read(readAt(), pos, b, off, len);
+				int read = transactionBuff.read(readAt, pos, b, off, len);
 				pos += read;
 				return read;
 			}
@@ -123,7 +119,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public long readWord(int len) throws IOException{
 			if(transactionOpen){
-				var word = transactionBuff.readWord(readAt(), pos, len);
+				var word = transactionBuff.readWord(readAt, pos, len);
 				pos += len;
 				return word;
 			}
@@ -141,7 +137,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void write(int b) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.writeByte(pos, b);
+				transactionBuff.writeByte(readAt, pos, b);
 				pos++;
 				return;
 			}
@@ -154,7 +150,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void write(byte[] b, int off, int len) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.write(pos, b, off, len);
+				transactionBuff.write(readAt, pos, b, off, len);
 				pos += len;
 				return;
 			}
@@ -170,7 +166,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				transactionBuff.writeChunks(writeData);
+				transactionBuff.writeChunks(readAt, writeData);
 				return;
 			}
 			data.writeAtOffsets(writeData);
@@ -180,7 +176,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void writeWord(long v, int len) throws IOException{
 			if(len == 0) return;
 			if(transactionOpen){
-				transactionBuff.writeWord(pos, v, len);
+				transactionBuff.writeWord(readAt, pos, v, len);
 			}else{
 				data.setPos(pos).writeWord(v, len);
 			}

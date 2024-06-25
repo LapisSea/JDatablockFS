@@ -63,6 +63,12 @@ public final class ChunkCache{
 		return data.get(pointer);
 	}
 	
+	public synchronized void notifyDestroyed(Iterable<Chunk> chunks){
+		for(Chunk chunk : chunks){
+			if(DEBUG_VALIDATION) validateDestroyed(chunk);
+			data.remove(chunk.getPtr());
+		}
+	}
 	public synchronized void notifyDestroyed(Chunk chunk){
 		if(DEBUG_VALIDATION) validateDestroyed(chunk);
 		data.remove(chunk.getPtr());

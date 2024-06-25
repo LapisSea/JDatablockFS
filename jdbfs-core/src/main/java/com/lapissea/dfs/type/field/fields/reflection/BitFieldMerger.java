@@ -127,7 +127,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		private final int        oneBits;
 		private final NumberSize numSize;
 		
-		private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
 		
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
@@ -143,9 +142,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				fi.writeBits(ioPool, writer, instance);
 			}
 			if(oneBits>1){
-				var integrityDiv = INTEGRITY_DIVS[oneBits];
-				var rem          = writer.getBuffer()%integrityDiv;
-				var remRaw       = integrityDiv - rem;
+				var remRaw = calcIntegrityBits(writer.getBuffer(), oneBits);
 				writer.writeBits(remRaw, oneBits);
 			}else{
 				writer.fillNOne(oneBits);
@@ -161,14 +158,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				fi.readBits(ioPool, reader, instance);
 			}
 			if(oneBits>1){
-				var integrityDiv = INTEGRITY_DIVS[oneBits];
-				var remRaw       = reader.readBits(oneBits);
-				var remStored    = integrityDiv - remRaw;
-				var payload      = raw&BitUtils.makeMask(numSize.bits() - oneBits);
-				var rem          = payload%integrityDiv;
-				if(rem != remStored){
-					throw new IOException("Bit integrity failed");
-				}
+				var remRaw = reader.readBits(oneBits);
+				readIntegrityBits(remRaw, raw, numSize, oneBits);
 			}else{
 				reader.checkNOneAndThrow(oneBits);
 			}
@@ -178,6 +169,22 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			src.skipExact(bytes);
 		}
+	}
+	
+	private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
+	public static void readIntegrityBits(long remainingBits, long raw, NumberSize numSize, int oneBits) throws IOException{
+		var integrityDiv = INTEGRITY_DIVS[oneBits];
+		var remStored    = integrityDiv - remainingBits;
+		var payload      = raw&BitUtils.makeMask(numSize.bits() - oneBits);
+		var rem          = payload%integrityDiv;
+		if(rem != remStored){
+			throw new IOException("Bit integrity failed");
+		}
+	}
+	public static long calcIntegrityBits(long writtenData, int oneBits){
+		var integrityDiv = INTEGRITY_DIVS[oneBits];
+		var rem          = writtenData%integrityDiv;
+		return integrityDiv - rem;
 	}
 	
 	public static <T extends IOInstance<T>> BitFieldMerger<T> of(List<BitField<T, ?>> group){

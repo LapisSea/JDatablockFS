@@ -11,6 +11,7 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -20,8 +21,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -205,7 +208,6 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
-			tryPopFree();
 			return;
 		}
 		
@@ -255,11 +257,11 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			boolean anyPopped;
 			do{
 				anyPopped = false;
-				var lastFreeO = freeChunks.peekLast().map(p -> p.dereference(context));
+				var lastFreeO = freeChunks.isEmpty()? OptionalPP.<Chunk>empty() : OptionalPP.of(freeChunks.getLast().dereference(context));
 				if(lastFreeO.filter(Chunk::checkLastPhysical).isPresent()){
 					var lastCh = lastFreeO.get();
 					
-					freeChunks.popLast();
+					freeChunks.removeLast();
 					if(lastCh.checkLastPhysical()){
 						try(var io = context.getSource().io()){
 							io.setCapacity(lastCh.getPtr().getValue());
@@ -344,9 +346,13 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		boolean           dirty  = true;
 		
 		if(toFree.isEmpty()) return toFree;
-		var end = toFree.iterator().next().getDataProvider().getSource().getIOSize();
+		var end = context.getSource().getIOSize();
 		
 		List<Chunk> toNotify = new ArrayList<>();
+		boolean     any      = false;
+		
+		Map<ChunkPointer, Chunk> nextMap = null;
+		Set<Chunk>               toClear = null;
 		
 		wh:
 		while(true){
@@ -359,28 +365,58 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 					result = new ArrayList<>(result);
 					continue wh;
 				}
+				any = true;
 				end = chunk.getPtr().getValue();
 				var ptr = chunk.getPtr();
 				
 				i.remove();
+				if(toClear != null) toClear.remove(chunk);
 				toNotify.add(chunk);
 				
-				for(Chunk c : result){
-					if(c.getNextPtr().equals(ptr)){
-						c.modifyAndSave(Chunk::clearNextPtr);
+				if(nextMap == null){
+					nextMap = new HashMap<>();
+					for(var c : result){
+						var next = c.getNextPtr();
+						if(!next.isNull()) nextMap.put(next, c);
 					}
+				}
+				
+				var prev = nextMap.get(ptr);
+				if(prev != null){
+					if(toClear == null) toClear = new HashSet<>();
+					toClear.add(prev);
 				}
 				continue wh;
 			}
-			if(!dirty){
-				try(var io = context.getSource().io()){
-					io.setCapacity(end);
-				}
-				for(Chunk chunk : toNotify){
-					context.getChunkCache().notifyDestroyed(chunk);
-				}
+			
+			if(!any){
+				return result;
 			}
-			return result;
+			any = false;
+			
+			try(var io = context.getSource().io()){
+				if(toClear != null) for(var c : toClear){
+					if(c.getPtr().compareTo(end)>=0) continue;
+					c.setSize(0);
+					c.clearAndCompressHeader();
+					if(!c.dirty()) continue;
+					var b = c.writeHeaderToBuf();
+					io.setPos(b.ioOffset()).write(b.data(), b.dataOffset(), b.dataLength());
+				}
+				io.setCapacity(end);
+			}
+			
+			context.getChunkCache().notifyDestroyed(toNotify);
+			toNotify.clear();
+			
+			var before = context.getSource().getIOSize();
+			tryPopFree();
+			var after = context.getSource().getIOSize();
+			if(after>=before){
+				return result;
+			}
+			end = after;
+			if(toClear != null) toClear.clear();
 		}
 	}
 }

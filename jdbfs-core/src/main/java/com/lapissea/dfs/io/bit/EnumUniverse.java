@@ -252,6 +252,10 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 		return Arrays.spliterator(universe);
 	}
 	@Override
+	public T getFirst(){
+		return universe[0];
+	}
+	@Override
 	public Stream<T> stream(){
 		return super.stream();
 	}

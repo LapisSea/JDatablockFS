@@ -2,7 +2,6 @@ package com.lapissea.dfs.run.checked;
 
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -284,50 +283,29 @@ public class CheckIOList<T> implements IOList<T>{
 		return a;
 	}
 	@Override
-	public OptionalPP<T> first(){
-		var a = data.first();
-		var b = base.first();
+	public T getFirst(){
+		var a = data.getFirst();
+		var b = base.getFirst();
 		assertEquals(a, b);
 		return a;
 	}
 	@Override
-	public OptionalPP<T> peekFirst() throws IOException{
-		var a = data.peekFirst();
-		var b = base.peekFirst();
+	public T getLast() throws IOException{
+		var a = data.getLast();
+		var b = base.getLast();
 		assertEquals(a, b);
 		return a;
 	}
 	@Override
-	public OptionalPP<T> popFirst() throws IOException{
-		var a = data.popFirst();
-		var b = base.popFirst();
-		assertEquals(a, b);
-		dataEquality();
-		return a;
-	}
-	@Override
-	public void pushFirst(T newFirst) throws IOException{
-		data.pushFirst(newFirst);
-		base.pushFirst(newFirst);
-		dataEquality();
-	}
-	@Override
-	public OptionalPP<T> peekLast() throws IOException{
-		var a = data.peekLast();
-		var b = base.peekLast();
-		assertEquals(a, b);
-		return a;
-	}
-	@Override
-	public OptionalPP<T> popLast() throws IOException{
-		var a = data.popLast();
-		var b = base.popLast();
+	public boolean removeLast() throws IOException{
+		var a = data.removeLast();
+		var b = base.removeLast();
 		assertEquals(a, b);
 		dataEquality();
 		return a;
 	}
 	@Override
-	public OptionalPP<T> popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
+	public boolean popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
 		var a = data.popLastIf(check);
 		var b = base.popLastIf(check);
 		assertEquals(a, b);

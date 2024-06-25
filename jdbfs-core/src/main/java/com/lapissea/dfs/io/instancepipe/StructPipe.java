@@ -972,23 +972,27 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var fields = getType().getFields();
 			for(IOField<T, ?> field : fields){
 				if(field.isVirtual()) continue;
-				if(SupportedPrimitive.get(field.getType()).filter(SupportedPrimitive::isInteger).isEmpty()) continue;
+				if(SupportedPrimitive.get(field.getType()).isPresentAnd(SupportedPrimitive::isInteger)){
+					field.getAccessor().getAnnotation(IODependency.class)
+					     .map(IODependency::value).stream().flatMap(Arrays::stream)
+					     .map(fields::requireByName)
+					     .filter(n -> n.getType() == NumberSize.class)
+					     .findAny()//dependency that is a numsize
+					     .filter(not(IOField::isVirtual))
+					     .filter(f -> {
+						     if(f.nullable()) return false;
+						     return f.getAccessor().get(null, inst) == null;
+					     })
+					     .ifPresent(f -> {
+						     var val        = field.get(null, inst);
+						     var isUnsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
+						     ((IOField<T, NumberSize>)f).set(null, inst, NumberSize.bySize(((Number)val).longValue(), isUnsigned));
+					     });
+				}
 				
-				field.getAccessor().getAnnotation(IODependency.class)
-				     .map(IODependency::value).stream().flatMap(Arrays::stream)
-				     .map(fields::byName).map(OptionalPP::orElseThrow)
-				     .filter(n -> n.getType() == NumberSize.class)
-				     .findAny()//dependency that is a numsize
-				     .filter(not(IOField::isVirtual))
-				     .filter(f -> {
-					     if(f.nullable()) return false;
-					     return f.getAccessor().get(null, inst) == null;
-				     })
-				     .ifPresent(f -> {
-					     var val        = field.get(null, inst);
-					     var isUnsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
-					     ((IOField<T, NumberSize>)f).set(null, inst, NumberSize.bySize(((Number)val).longValue(), isUnsigned));
-				     });
+				if(field.getType() == String.class){
+					field.getAccessor().set(null, inst, field + " : this is a test");
+				}
 			}
 			
 			if(inst.getThisStruct().hasInvalidInitialNulls()){
