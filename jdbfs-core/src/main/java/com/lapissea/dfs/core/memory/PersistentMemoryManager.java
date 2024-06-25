@@ -11,6 +11,7 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -256,11 +257,11 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			boolean anyPopped;
 			do{
 				anyPopped = false;
-				var lastFreeO = freeChunks.peekLast().map(p -> p.dereference(context));
+				var lastFreeO = freeChunks.isEmpty()? OptionalPP.<Chunk>empty() : OptionalPP.of(freeChunks.getLast().dereference(context));
 				if(lastFreeO.filter(Chunk::checkLastPhysical).isPresent()){
 					var lastCh = lastFreeO.get();
 					
-					freeChunks.popLast();
+					freeChunks.removeLast();
 					if(lastCh.checkLastPhysical()){
 						try(var io = context.getSource().io()){
 							io.setCapacity(lastCh.getPtr().getValue());

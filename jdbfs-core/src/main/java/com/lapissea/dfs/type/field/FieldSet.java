@@ -438,6 +438,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public Spliterator<IOField<T, ?>> spliterator(){
 		return new FieldSetSpliterator<>(this);
 	}
+	@Override
+	public IOField<T, ?> getFirst(){
+		return data[0];
+	}
 	@NotNull
 	@Override
 	public Iterator<IOField<T, ?>> iterator(){

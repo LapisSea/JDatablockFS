@@ -47,15 +47,15 @@ public interface IterablePP<T> extends Iterable<T>{
 		return !iterator().hasNext();
 	}
 	
-	default OptionalPP<T> first(){
+	default T getFirst(){
 		var iter = iterator();
-		if(iter.hasNext()) return OptionalPP.ofNullable(iter.next());
-		return OptionalPP.empty();
+		if(iter.hasNext()) return iter.next();
+		throw new NoSuchElementException();
 	}
 	
 	default <E extends Throwable> OptionalPP<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(T t : this){
-			if(predicate.test(t)){
+			if(t != null && predicate.test(t)){
 				return OptionalPP.of(t);
 			}
 		}

@@ -343,7 +343,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 		if(idx + 1 == values.size()){
 			values.remove(idx);
 			blankValueIds.remove(idx);
-			while(values.popLastIf(v -> v.val == null).isPresent()){
+			while(values.popLastIf(v -> v.val == null)){
 				blankValueIds.remove(values.size());
 			}
 		}else{
@@ -360,7 +360,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			nodeCache.remove(node.idx);
 			blankNodeIds.remove(node.idx);
 			
-			while(nodes.popLastIf(n -> !n.hasValue()).isPresent()){
+			while(nodes.popLastIf(n -> !n.hasValue())){
 				blankNodeIds.remove(nodes.size());
 				nodeCache.remove(nodes.size());
 			}

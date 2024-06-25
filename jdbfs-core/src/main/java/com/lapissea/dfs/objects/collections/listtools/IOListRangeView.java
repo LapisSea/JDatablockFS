@@ -3,7 +3,6 @@ package com.lapissea.dfs.objects.collections.listtools;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -225,15 +224,6 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	@Override
 	public long indexOf(T value) throws IOException{
 		return IOList.super.indexOf(value);
-	}
-	@Override
-	public OptionalPP<T> first(){
-		if(isEmpty()) return OptionalPP.empty();
-		try{
-			return OptionalPP.of(get(0));
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
 	}
 	@Override
 	public IOList<T> subListView(long from, long to){

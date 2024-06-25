@@ -64,7 +64,7 @@ public class DefragmentManager{
 		
 		var freeChunks = cluster.getMemoryManager().getFreeChunks();
 		while(!freeChunks.isEmpty()){
-			Chunk last = freeChunks.peekLast().orElseThrow().dereference(cluster);
+			Chunk last = freeChunks.getLast().dereference(cluster);
 			while(!last.checkLastPhysical()){
 				last = last.nextPhysical();
 			}
