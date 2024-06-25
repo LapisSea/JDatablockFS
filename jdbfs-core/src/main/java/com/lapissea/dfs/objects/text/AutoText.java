@@ -46,10 +46,9 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			if(CHAR_ENCODING_UNIVERSE.bitSize != 3) throw new AssertionError();
 		}
 		
-		private static final VirtualAccessor<AutoText> NUM_SIZE =
-			(VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(NumberSize.class, "numSize").getAccessor();
-		private static final VirtualAccessor<AutoText> TEXT_LEN =
-			(VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(int.class, "textBytes:len").getAccessor();
+		private static final VirtualAccessor<AutoText>
+			NUM_SIZE = (VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(NumberSize.class, "numSize").getAccessor(),
+			TEXT_LEN = (VirtualAccessor<AutoText>)STRUCT.getFields().requireExact(int.class, "textBytes:len").getAccessor();
 		
 		@Override
 		protected AutoText doRead(VarPool<AutoText> ioPool, DataProvider provider, ContentReader src, AutoText instance, GenericContext g) throws IOException{
@@ -61,7 +60,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
 			
 			var textBytes_len = numSize.readInt(src);
-			ioPool.set(TEXT_LEN, textBytes_len);
+			ioPool.setInt(TEXT_LEN, textBytes_len);
 			
 			instance.setCharCount(numSize.readInt(src));
 			instance.setTextBytes(src.readInts1(textBytes_len));
@@ -69,7 +68,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		}
 		@Override
 		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<AutoText> ioPool, AutoText value) throws IOException{
-			var    charCount     = value.charCount;
+			int    charCount     = value.charCount;
 			byte[] textBytes     = value.getTextBytes();
 			int    textBytes_len = textBytes.length;
 			
@@ -82,6 +81,17 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			numSize.writeInt(dest, textBytes_len);
 			numSize.writeInt(dest, charCount);
 			dest.writeInts1(textBytes);
+		}
+		
+		@Override
+		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			var raw     = src.readUnsignedInt1();
+			var numSize = NumberSize.FLAG_INFO.get(raw&0b111);
+			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			
+			var textBytes_len = numSize.readInt(src);
+			
+			src.skip(numSize.bytes + textBytes_len);
 		}
 		
 		@Override
