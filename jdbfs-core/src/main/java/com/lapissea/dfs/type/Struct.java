@@ -9,6 +9,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -77,8 +78,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	static{
 		//Preload for faster first start
-		Thread.startVirtualThread(DefInstanceCompiler::init);
-		Thread.startVirtualThread(FieldCompiler::init);
+		Preload.preload(DefInstanceCompiler.class);
+		Preload.preload(FieldCompiler.class);
 	}
 	
 	
@@ -408,6 +409,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 		}
 		
+		var wh = needsImpl? new WaitHolder() : null;
+		
 		S struct;
 		
 		try(var lock = STRUCT_CACHE_LOCK.write()){
@@ -417,15 +420,20 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var existing = getCachedUnsafe(instanceClass, lock.getLock());
 			if(existing != null) return (S)existing;
 			
-			Log.trace("Requested struct: {}#green{}#greenBright",
-			          () -> List.of(
-				          instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
-				          instanceClass.getSimpleName()
-			          ));
+			//The struct is being synchronously requested and the lock is released
+			if(STRUCT_THREAD_LOG.get(instanceClass) != null){
+				S cached = waitForDoneCompiling(instanceClass, lock);
+				if(cached != null) return cached;
+			}
+			
+			
+			if(Log.TRACE) Log.trace("Requested struct: {}#green{}#greenBright",
+			                        instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
+			                        instanceClass.getSimpleName());
 			
 			try{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
-				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
+				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, wh);
 				
 				if(runNow) lock.getLock().unlock();
 				try{
@@ -448,12 +456,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		if(needsImpl) struct.runOnState(STATE_CONCRETE_TYPE, () -> {
 			try{
-				var impl = struct.getConcreteType();
+				var     impl = struct.getConcreteType();
+				boolean hadOld;
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					var hadOld = STRUCT_CACHE.put(impl, struct) != null;
+					hadOld = STRUCT_CACHE.put(impl, struct) != null;
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
-					if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 				}
+				if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 			}catch(Throwable ignored){ }
 		}, null);
 		
@@ -482,6 +491,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		return struct;
 	}
+	private static <T extends IOInstance<T>, S extends Struct<T>> S waitForDoneCompiling(Class<T> instanceClass, ReadWriteClosableLock.LockSession lock){
+		lock.getLock().unlock();
+		Thread.yield();
+		while(STRUCT_THREAD_LOG.get(instanceClass) != null){
+			UtilL.sleep(1);
+		}
+		lock.getLock().lock();
+		//noinspection unchecked
+		return (S)getCachedUnsafe(instanceClass, lock.getLock());
+	}
 	
 	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE     = Map.of();
 	private static int                                          stableCacheCount = 0;
@@ -496,13 +515,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				}
 			}
 		}
-		
+		boolean   noNeedForNonConcrete = noNeedForNonConcrete(instanceClass);
 		Struct<T> cached;
 		try(var lock = STRUCT_CACHE_LOCK.read()){
-			cached = getCachedUnsafe(instanceClass, lock.getLock());
+			if(noNeedForNonConcrete){
+				cached = (Struct<T>)STRUCT_CACHE.get(instanceClass);
+			}else{
+				cached = getCachedUnsafe(instanceClass, lock.getLock());
+			}
 			if(cached == null) return null;
 			
-			if((stableCacheCount++>=200)){
+			if((stableCacheCount++>=200) || STABLE_CACHE.isEmpty()){
 				stableCacheCount = 0;
 				STABLE_CACHE =
 					STRUCT_CACHE.entrySet().stream().collect(Collectors.groupingBy(e -> e.getKey().hashCode()))
@@ -523,7 +546,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> void waitNonConcrete(Class<T> instanceClass, Lock lock){
-		if(instanceClass.isInterface() || !UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+		if(noNeedForNonConcrete(instanceClass)){
 			return;
 		}
 		
@@ -549,6 +572,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var sup = cl.getSuperclass();
 			if(sup != null && UtilL.instanceOf(sup, IOInstance.Def.class)) queue.push(sup);
 		}
+	}
+	private static <T extends IOInstance<T>> boolean noNeedForNonConcrete(Class<T> instanceClass){
+		return instanceClass.isInterface() || !UtilL.instanceOf(instanceClass, IOInstance.Def.class);
 	}
 	
 	private static void recursiveCompileCheck(Class<?> interf){
@@ -623,11 +649,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
-			Thread.startVirtualThread(() -> {
-				for(IOField<T, ?> field : fields){
-					field.typeFlags();
-				}
-			});
 		});
 	}
 	

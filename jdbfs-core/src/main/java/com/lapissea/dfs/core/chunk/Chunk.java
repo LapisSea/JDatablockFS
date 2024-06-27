@@ -191,18 +191,26 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	public static final byte FLAGS_SIZE = 1;
 	
-	private static final int  CHECK_BYTE_OFF;
-	private static final byte CHECK_BIT_MASK;
+	private static final int CHECK_BYTE_OFF = 0;
+	private static final int CHECK_BIT_MASK = 0b11000000;
 	
 	static{
+		if(DEBUG_VALIDATION) validateHeaderBitVals();
+	}
+	
+	private static void validateHeaderBitVals(){
 		if(PIPE.getSpecificFields().getFirst() instanceof BitFieldMerger<?> bf){
 			if(bf.getSizeDescriptor().requireFixed(WordSpace.BYTE) != FLAGS_SIZE) throw new AssertionError("flag size not " + FLAGS_SIZE);
 			var layout = bf.getSafetyBits().orElseThrow();
 			
-			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);
+			if(CHECK_BYTE_OFF != (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1)){
+				throw new ShouldNeverHappenError(CHECK_BYTE_OFF + " " + layout);
+			}
 			
 			int offset = (int)(layout.usedBits() - CHECK_BYTE_OFF*Byte.SIZE);
-			CHECK_BIT_MASK = (byte)(BitUtils.makeMask(layout.safetyBits())<<offset);
+			if(CHECK_BIT_MASK != (int)(BitUtils.makeMask(layout.safetyBits())<<offset)){
+				throw new ShouldNeverHappenError(CHECK_BIT_MASK + " " + layout);
+			}
 			
 			if(offset + layout.safetyBits() != 8) throw new AssertionError("not 1 byte");
 		}else{

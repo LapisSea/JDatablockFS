@@ -4,6 +4,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.internal.HashCommons;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
@@ -45,6 +46,8 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
+	static{ Preload.preloadFn(BucketEntry.class, "of", null, null); }
+	
 	@SuppressWarnings({"unchecked"})
 	@Def.ToString.Format("[!!className]{@key: @value}")
 	@Def.Order({"key", "value"})
@@ -59,11 +62,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		static <K, V> BucketEntry<K, V> of(K key, V value){
 			//noinspection rawtypes
-			class Val{
-				private static final BiFunction<Object, Object, BucketEntry> NEW =
-					IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
+			class Cache{
+				private static BiFunction<Object, Object, BucketEntry> make;
 			}
-			return Val.NEW.apply(key, value);
+			var c = Cache.make;
+			if(c == null) c = Cache.make = IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
+			return c.apply(key, value);
 		}
 		
 		@IONullability(NULLABLE)
@@ -450,8 +454,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@Override
 	public Iterator<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
-			private IOIterator<IONode<BucketEntry<K, V>>> bucket;
-			private final IOIterator<Bucket<K, V>> iter = buckets.iterator();
+			private       IOIterator<IONode<BucketEntry<K, V>>> bucket;
+			private final IOIterator<Bucket<K, V>>              iter = buckets.iterator();
 			
 			private boolean has() throws IOException{
 				return bucket != null && bucket.hasNext();

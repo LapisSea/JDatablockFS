@@ -6,9 +6,11 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -28,6 +30,7 @@ import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -162,12 +165,23 @@ public final class Cluster implements DataProvider{
 	
 	
 	static{
-		Thread.startVirtualThread(IOTypeDB.PersistentDB::new);
-		Thread.startVirtualThread(FieldCompiler::init);
+//		Preload.preloadPipe(IOTypeDB.PersistentDB.class, StandardStructPipe.class);
+		Preload.preload(IOTypeDB.PersistentDB.class);
+		Preload.preload(FieldCompiler.class);
+		Preload.preload(Reference.class);
 	}
 	
-	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
-	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	private static ChunkPointer             FIRST_CHUNK_PTR;
+	private static FixedStructPipe<RootRef> ROOT_PIPE;
+	
+	private static FixedStructPipe<RootRef> rootPipe(){
+		if(ROOT_PIPE == null) ROOT_PIPE = FixedStructPipe.of(RootRef.class);
+		return ROOT_PIPE;
+	}
+	private static ChunkPointer firstChunkPtr(){
+		if(FIRST_CHUNK_PTR == null) FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
+		return FIRST_CHUNK_PTR;
+	}
 	
 	private static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
 		var provider = DataProvider.newVerySimpleProvider(data);
@@ -177,16 +191,17 @@ public final class Cluster implements DataProvider{
 			MagicID.write(io);
 		}
 		
-		var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-		                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
-		                               .submit(provider);
+		var firstChunk = MemoryOperations.allocateAppendToFile(provider, AllocateTicket.bytes(16), false);
+		if(!firstChunk.getPtr().equals(firstChunkPtr())) throw new ShouldNeverHappenError();
 		
 		db.init(provider);
 		
-		ROOT_PIPE.modify(firstChunk, root -> {
-			root.metadata.db = db;
-			root.metadata.allocateNulls(provider, null);
-		}, null);
+		var ref = new RootRef();
+		var m   = ref.metadata = new Metadata();
+		m.db = db;
+		m.allocateNulls(provider, null);
+		rootPipe().write(firstChunk, ref);
+		assert firstChunk.chainSize() == 16;
 	}
 	
 	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
@@ -233,12 +248,12 @@ public final class Cluster implements DataProvider{
 		
 		Chunk ch = getFirstChunk();
 		
-		var s = ROOT_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		var s = rootPipe().getFixedDescriptor().get(WordSpace.BYTE);
 		if(s>ch.getSize()){
 			throw new IOException("no valid cluster data " + s + " " + ch.getSize());
 		}
 		
-		root = ROOT_PIPE.readNew(this, ch, null);
+		root = rootPipe().readNew(this, ch, null);
 		metadata = root.metadata;
 		
 		memoryManager = new PersistentMemoryManager(
@@ -297,7 +312,7 @@ public final class Cluster implements DataProvider{
 	@Override
 	public Chunk getFirstChunk() throws IOException{
 		try{
-			return getChunk(FIRST_CHUNK_PTR);
+			return getChunk(firstChunkPtr());
 		}catch(MalformedPointer e){
 			throw new IOException("First chunk does not exist", e);
 		}
@@ -380,9 +395,9 @@ public final class Cluster implements DataProvider{
 	}
 	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot, boolean recordStats) throws IOException{
 		if(refRoot){
-			rec.log(new Reference(), null, null, FIRST_CHUNK_PTR.makeReference());
+			rec.log(new Reference(), null, null, firstChunkPtr().makeReference());
 		}
-		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), ROOT_PIPE, recordStats, rec);
+		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), rootPipe(), recordStats, rec);
 	}
 	
 	public void defragment() throws IOException{

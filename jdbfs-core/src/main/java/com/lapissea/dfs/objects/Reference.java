@@ -3,6 +3,7 @@ package com.lapissea.dfs.objects;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -117,8 +118,8 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	private static StructPipe<Reference>      STANDARD_PIPE;
 	
 	static{
-		Thread.startVirtualThread(Reference::ensureFixed);
-		Thread.startVirtualThread(Reference::ensureStandard);
+		Preload.preloadFn(Reference.class, "ensureFixed");
+		Preload.preloadFn(Reference.class, "ensureStandard");
 	}
 	
 	public static FixedStructPipe<Reference> fixedPipe(){

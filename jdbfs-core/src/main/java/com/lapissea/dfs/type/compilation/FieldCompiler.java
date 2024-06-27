@@ -6,6 +6,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -37,6 +38,7 @@ import com.lapissea.util.UtilL;
 import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -512,10 +514,9 @@ public final class FieldCompiler{
 		);
 	}
 	
-	public static void init(){ }
 	static{
-		Thread.startVirtualThread(FieldRegistry::init);
-		Thread.startVirtualThread(() -> Annotations.make(IOValue.class));
+		Preload.preload(FieldRegistry.class, MethodHandles.lookup());
+		Preload.preloadFn(Annotations.class, "make", IOValue.class);
 	}
 	
 	public static Collection<Class<?>> getWrapperTypes(){

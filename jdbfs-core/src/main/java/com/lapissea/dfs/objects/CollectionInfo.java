@@ -38,9 +38,11 @@ public sealed interface CollectionInfo{
 		StructPipe<Store> PIPE = StandardStructPipe.of(Store.class);
 		static Store of(CollectionInfo val){
 			class Cache{
-				private static final Function<CollectionInfo, Store> make = Def.constrRef(Store.class, CollectionInfo.class);
+				private static Function<CollectionInfo, Store> make;
 			}
-			return Cache.make.apply(val);
+			var c = Cache.make;
+			if(c == null) c = Cache.make = Def.constrRef(Store.class, CollectionInfo.class);
+			return c.apply(val);
 		}
 	}
 	

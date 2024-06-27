@@ -278,9 +278,13 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@SuppressWarnings("unchecked")
+		private Struct<SELF> fetchStruct(){
+			return Struct.of((Class<SELF>)getClass());
+		}
+		
 		private void init(){
-			thisStruct = Struct.of((Class<SELF>)getClass());
-			virtualFields = getThisStruct().allocVirtualVarPool(INSTANCE);
+			thisStruct = fetchStruct();
+			virtualFields = thisStruct.allocVirtualVarPool(INSTANCE);
 		}
 		
 		@Override
@@ -338,7 +342,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var ctx = genericContext;
 			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
 			
-			var s = getThisStruct();
+			var s = thisStruct;
+			if(s == null){
+				s = fetchStruct();
+				if(s.getEstimatedState() == StagedInit.STATE_DONE){
+					s = getThisStruct();
+				}
+			}
+			
 			for(var field : s.getRealFields()){
 				if(!field.isNull(null, self())){
 					if(field.getNullability() == IONullability.Mode.DEFAULT_IF_NULL){

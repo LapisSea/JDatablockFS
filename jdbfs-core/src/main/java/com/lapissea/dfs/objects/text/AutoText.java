@@ -109,7 +109,11 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		}
 	}
 	
-	static{ StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new); }
+	static{
+		if(ConfigDefs.OPTIMIZED_PIPE.resolveVal()){
+			StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new);
+		}
+	}
 	
 	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
 	
@@ -117,7 +121,8 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		if(DEBUG_VALIDATION){
 			var check = "numSize + encoding 1 byte textBytes:len NS(numSize): 0-4 bytes charCount NS(numSize): 0-4 bytes textBytes ? bytes ";
 			var sb    = new StringBuilder(check.length());
-			var p     = StandardStructPipe.of(STRUCT, StructPipe.STATE_DONE);
+			STRUCT.waitForState(Struct.STATE_INIT_FIELDS);
+			var p = StandardStructPipe.of(STRUCT);
 			for(var specificField : p.getSpecificFields()){
 				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
 			}

@@ -236,9 +236,7 @@ final class FieldRegistry{
 		return data;
 	}
 	
-	public static void init(){ }
-	
-	private FieldRegistry()  { }
+	private FieldRegistry(){ }
 	
 	static boolean canCreate(Type type, GetAnnotation annotations){
 		for(var usage : getData()){

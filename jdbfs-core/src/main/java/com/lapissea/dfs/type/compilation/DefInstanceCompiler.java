@@ -74,9 +74,6 @@ public final class DefInstanceCompiler{
 	
 	//////////////////////////////// INIT /////////////////////////////////
 	
-	
-	public static void init(){ }
-	
 	static{
 		if(!Boolean.getBoolean("jorth.noPreload")){
 			Thread.startVirtualThread(() -> {
