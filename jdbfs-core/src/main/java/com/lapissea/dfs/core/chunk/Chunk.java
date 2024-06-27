@@ -8,7 +8,6 @@ import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
-import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
@@ -148,12 +147,11 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		@Override
 		protected Chunk doRead(VarPool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
-			NumberSize bns;
-			NumberSize nns;
-			try(var f = FlagReader.read(src, NumberSize.BYTE)){
-				bns = NumberSize.FLAG_INFO.get((int)f.readBits(3));
-				nns = NumberSize.FLAG_INFO.get((int)f.readBits(3));
-			}
+			var raw = src.readUnsignedInt1();
+			var bns = NumberSize.FLAG_INFO.get(raw&0b111);
+			var nns = NumberSize.FLAG_INFO.get((raw >>> 3)&0b111);
+			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			
 			instance.bodyNumSize = bns;
 			instance.nextSize = nns;
 			try{
@@ -254,9 +252,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 	}
 	public static boolean earlyCheckChunkAt(ContentReader reader) throws IOException{
-		var flags  = reader.readInt1();
-		int masked = flags&CHECK_BIT_MASK;
-		return masked == CHECK_BIT_MASK;
+		var flags        = reader.readUnsignedInt1();
+		var requiredBits = BitFieldMerger.calcIntegrityBits(flags&0b111_111, 2, 6);
+		return requiredBits == (flags&CHECK_BIT_MASK);
 	}
 	
 	@IOValue
@@ -364,7 +362,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 //			.writeBits(nns.ordinal(), 3)
 //			.fillRestAllOne()
 //			.export(destBuff, 0);
-		destBuff[0] = (byte)(bns.ordinal()|(nns.ordinal()<<3)|(0b11<<6));
+		var header = bns.ordinal()|(nns.ordinal()<<3);
+		destBuff[0] = (byte)(header|BitFieldMerger.calcIntegrityBits(header, 2, 6));
 		
 		bns.write(destBuff, 1, getCapacity());
 		bns.write(destBuff, 1 + bns.bytes, getSize());
