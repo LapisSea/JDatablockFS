@@ -181,6 +181,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			throw new IOException("Bit integrity failed");
 		}
 	}
+	public static long calcIntegrityBits(long writtenData, int oneBits, int writtenDataBits){
+		return calcIntegrityBits(writtenData, oneBits)<<writtenDataBits;
+	}
 	public static long calcIntegrityBits(long writtenData, int oneBits){
 		var integrityDiv = INTEGRITY_DIVS[oneBits];
 		var rem          = writtenData%integrityDiv;

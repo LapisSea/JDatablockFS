@@ -467,7 +467,7 @@ public final class IOTransactionBuffer{
 				}
 			}
 			UtilL.addRemainSorted(writeEvents, makeEvent(offset, b, off, len));
-			askMerge(base, offset);
+			markIndexDirty(base, (int)(offset%writeEvents.size()), offset);
 		}finally{
 			if(modifiedCapacity != -1){
 				var last = writeEvents.getLast();
@@ -498,17 +498,12 @@ public final class IOTransactionBuffer{
 	}
 	
 	private final IntHashSet dirty = new IntHashSet();
+	private       boolean    merging;
 	
 	private void markIndexDirty(BaseAccess base, int i, long jitter) throws IOException{
+		if(writeEvents.size()<64 || merging) return;
 		if(i>0) dirty.add(i - 1);
 		dirty.add(i);
-//		if(i+2<writeEvents.size()) dirty.add(i+1);
-		askMerge(base, jitter);
-	}
-	
-	private boolean merging;
-	private void askMerge(BaseAccess base, long jitter) throws IOException{
-		if(writeEvents.size()<64 || merging) return;
 		merging = true;
 		doMerge(base, jitter);
 		merging = false;

@@ -34,7 +34,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String name();
 		IOType bound();
 		
-		public static ClassArgDef of(String name, IOType bound){
+		static ClassArgDef of(String name, IOType bound){
 			return Def.of(ClassArgDef.class, name, bound);
 		}
 	}

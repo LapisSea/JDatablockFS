@@ -75,7 +75,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			var numSize = NumberSize.bySize(Math.max(charCount, textBytes_len));
 			
 			var data = numSize.ordinal()|(value.encoding.ordinal()<<3);
-			data |= ((int)BitFieldMerger.calcIntegrityBits(data, 2))<<6;
+			data |= ((int)BitFieldMerger.calcIntegrityBits(data, 2, 6));
 			dest.writeInt1(data);
 			
 			numSize.writeInt(dest, textBytes_len);
