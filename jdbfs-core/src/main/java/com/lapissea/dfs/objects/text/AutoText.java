@@ -1,5 +1,6 @@
 package com.lapissea.dfs.objects.text;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.content.ContentInputStream;

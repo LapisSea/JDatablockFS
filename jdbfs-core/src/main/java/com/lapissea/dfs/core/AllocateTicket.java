@@ -175,11 +175,6 @@ public record AllocateTicket(
 		return approve.isEmpty() || approve.get().test(chunk);
 	}
 	
-	public void populate(Chunk chunk) throws IOException{
-		if(dataPopulator == null) return;
-		dataPopulator.accept(chunk);
-	}
-	
 	public NumberSize calcNextSize(){
 		return NumberSize.bySize(next).max(explicitNextSize.orElse(NumberSize.VOID));
 	}
