@@ -36,7 +36,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	
 	static{
 		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolveVal()){
-			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields) -> {
+			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
 					f.get(0) instanceof BitFieldMerger<?> m && m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize")) &&
@@ -80,7 +80,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					return instance;
 				}
 			});
-			FixedStructPipe.registerSpecialImpl(STRUCT, () -> new FixedStructPipe<>(STRUCT, (t, structFields) -> {
+			FixedStructPipe.registerSpecialImpl(STRUCT, () -> new FixedStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = FixedStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
 					f.get(0).getName().equals("offset") &&

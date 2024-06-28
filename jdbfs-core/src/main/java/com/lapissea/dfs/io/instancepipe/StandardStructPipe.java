@@ -24,7 +24,7 @@ import static com.lapissea.dfs.type.field.StoragePool.IO;
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields) -> IOFieldTools.stepFinal(structFields, List.of(
+		return (t, structFields, testRun) -> IOFieldTools.stepFinal(structFields, List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
 		));

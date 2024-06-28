@@ -42,17 +42,18 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 		
 		private FixedVaryingStructPipe<T> make(VaryingSize.Provider rule) throws UseFixed{
 			if(steps == null){
-				List<Step> steps = new ArrayList<>();
-				var        sb    = new StringBuilder();
-				var pipe = new FixedVaryingStructPipe<>(
-					type,
-					VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> {
-						steps.add(new Step(max, ptr));
-						sb.append(actual.size.shortName);
-					})
+				record State(List<Step> steps, StringBuilder sb){ }
+				var intercept = VaryingSize.Provider.intercept(
+					rule, (max, ptr, actual, s) -> {
+						s.steps.add(new Step(max, ptr));
+						s.sb.append(actual.size.shortName);
+					}, new State(new ArrayList<>(), new StringBuilder()),
+					s -> new State(new ArrayList<>(s.steps), new StringBuilder(s.sb))
 				);
-				pipe.sizesStr = sb.toString();
-				this.steps = List.copyOf(steps);
+				var pipe  = new FixedVaryingStructPipe<>(type, intercept);
+				var state = intercept.getState();
+				pipe.sizesStr = state.sb.toString();
+				this.steps = List.copyOf(state.steps);
 				return pipe;
 			}
 			
@@ -113,22 +114,23 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	private String sizesStr;
 	
 	private FixedVaryingStructPipe(Struct<T> type, VaryingSize.Provider rule) throws UseFixed{
-		super(type, (t, structFields) -> {
+		super(type, (t, structFields, testRun) -> {
+			if(testRun) throw new DoNotTest();
 			if(rule == VaryingSize.Provider.ALL_MAX){
 				throw new UseFixed();
 			}
 			//noinspection rawtypes,unchecked
 			FieldSet<T> sizeFields = FieldSet.of((Stream)sizeFieldStream(structFields));
 			
-			boolean[] effectivelyAllMax = {true};
-			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> {
-				if(actual.size != max) effectivelyAllMax[0] = false;
-			});
+			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual, state) -> {
+				if(actual.size != max) state[0] = false;
+			}, new boolean[]{true}, boolean[]::clone);
 			
 			var result = fixedFields(t, structFields, sizeFields::contains, f -> {
 				return f.forceMaxAsFixedSize(snitchRule);
 			});
-			if(effectivelyAllMax[0]){
+			boolean effectivelyAllMax = snitchRule.getState()[0];
+			if(effectivelyAllMax){
 				throw new UseFixed();
 			}
 			return result;

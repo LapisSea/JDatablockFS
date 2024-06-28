@@ -44,6 +44,7 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -55,6 +56,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -249,6 +252,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
+			
+			if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
+			
 			fieldDependency = new FieldDependency<>(ioFields);
 			setInitState(STATE_IO_FIELD);
 			
@@ -264,6 +270,28 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			);
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
+	}
+	
+	protected static class DoNotTest extends RuntimeException{ }
+	
+	private void checkOrder(FieldSet<T> ioFields, PipeFieldCompiler<T, ?> compiler, Struct<T> type){
+		if(ioFields.size()<=1) return;
+		try{
+			var ioFCopy = List.copyOf(ioFields);
+			var rr      = new RawRandom(ioFields.hashCode());
+			var fields  = new ArrayList<>(getType().getFields());
+			for(int i = 0; i<100; i++){
+				Collections.shuffle(fields, rr);
+				var f = compiler.compile(type, FieldSet.of(fields), true);
+				if(!ioFCopy.equals(f)){
+					throw new IllegalStateException("Fields with different order do not resolve to the same set!");
+				}
+			}
+		}catch(DoNotTest no){
+			//ok, sorry
+		}catch(Throwable e){
+			throw new RuntimeException("Failed to ensure field stability", e);
+		}
 	}
 	
 	protected void postValidate(){

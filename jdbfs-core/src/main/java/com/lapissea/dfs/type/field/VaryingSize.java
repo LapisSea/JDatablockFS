@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.lapissea.dfs.config.GlobalConfig.COSTLY_STACK_TRACE;
 
@@ -123,11 +124,13 @@ public final class VaryingSize implements Stringify{
 				NumberSize map(NumberSize max, boolean ptr, int id);
 			}
 			
+			record Mark(List<NumberSize> data, Map<String, UIDInfo> uidMap){ }
+			
 			private final List<NumberSize> data = new ArrayList<>();
 			private final Mapper           mapper;
 			
-			private final Map<Integer, Integer> marks = new HashMap<>();
-			private       int                   markIdCount;
+			private final Map<Integer, Mark> marks = new HashMap<>();
+			private       int                markUID;
 			
 			private final Map<String, UIDInfo> uidMap = new HashMap<>();
 			
@@ -154,17 +157,17 @@ public final class VaryingSize implements Stringify{
 			
 			@Override
 			public int mark(){
-				int id = markIdCount++;
-				marks.put(id, data.size());
+				int id = markUID++;
+				marks.put(id, new Mark(List.copyOf(data), Map.copyOf(uidMap)));
 				return id;
 			}
 			@Override
 			public void reset(int id){
-				var size = marks.get(id);
-				while(data.size()>size){
-					data.removeLast();
-				}
-				marks.entrySet().removeIf(e -> e.getKey()>=id);
+				var mark = Objects.requireNonNull(marks.remove(id), "Mark does not exist");
+				data.clear();
+				data.addAll(mark.data);
+				uidMap.clear();
+				uidMap.putAll(mark.uidMap);
 			}
 			
 			public List<NumberSize> export(){
@@ -173,11 +176,14 @@ public final class VaryingSize implements Stringify{
 		}
 		
 		final class Repeater implements Provider{
+			
+			private record Mark(int counter, Map<String, UIDInfo> uidMap){ }
+			
 			private final List<NumberSize> data;
 			private       int              counter;
 			
-			private final Map<Integer, Integer> marks = new HashMap<>();
-			private       int                   markIdCount;
+			private final Map<Integer, Mark> marks = new HashMap<>();
+			private       int                markIdCount;
 			
 			private final Map<String, UIDInfo> uidMap = new HashMap<>();
 			
@@ -204,13 +210,15 @@ public final class VaryingSize implements Stringify{
 			@Override
 			public int mark(){
 				int id = markIdCount++;
-				marks.put(id, counter);
+				marks.put(id, new Mark(counter, Map.copyOf(uidMap)));
 				return id;
 			}
 			@Override
 			public void reset(int id){
-				counter = marks.get(id);
-				marks.entrySet().removeIf(e -> e.getKey()>=id);
+				var mark = Objects.requireNonNull(marks.remove(id), "Mark does not exist");
+				counter = mark.counter;
+				uidMap.clear();
+				uidMap.putAll(mark.uidMap);
 			}
 		}
 		
@@ -246,30 +254,59 @@ public final class VaryingSize implements Stringify{
 			};
 		}
 		
-		interface Intercept{
-			void intercept(NumberSize max, boolean ptr, VaryingSize actual);
+		interface Intercept<T>{
+			void intercept(NumberSize max, boolean ptr, VaryingSize actual, T state);
 		}
 		
-		static Provider intercept(Provider src, Intercept intercept){
-			return new Provider(){
-				private final Set<String> uids = new HashSet<>();
-				@Override
-				public VaryingSize provide(NumberSize max, String uid, boolean ptr){
-					var actual = src.provide(max, uid, ptr);
-					if(uid == null || uids.add(uid)){
-						intercept.intercept(max, ptr, actual);
-					}
-					return actual;
+		class InterceptProvider<T> implements Provider{
+			private final Provider       src;
+			private final Intercept<T>   intercept;
+			private       T              state;
+			private final Function<T, T> cloneState;
+			
+			
+			record Mark<T>(Set<String> uids, T state){ }
+			
+			private final Set<String>           uids  = new HashSet<>();
+			private final Map<Integer, Mark<T>> marks = new HashMap<>();
+			
+			public InterceptProvider(Provider src, Intercept<T> intercept, T initialState, Function<T, T> cloneState){
+				this.src = src;
+				this.intercept = intercept;
+				this.state = initialState;
+				this.cloneState = cloneState;
+			}
+			
+			@Override
+			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+				var actual = src.provide(max, uid, ptr);
+				if(uid == null || uids.add(uid)){
+					intercept.intercept(max, ptr, actual, state);
 				}
-				@Override
-				public int mark(){
-					return src.mark();
-				}
-				@Override
-				public void reset(int id){
-					src.reset(id);
-				}
-			};
+				return actual;
+			}
+			@Override
+			public int mark(){
+				var m = src.mark();
+				marks.put(m, new Mark<>(Set.copyOf(uids), cloneState.apply(state)));
+				return m;
+			}
+			@Override
+			public void reset(int id){
+				src.reset(id);
+				var mark = Objects.requireNonNull(marks.get(id));
+				uids.clear();
+				uids.addAll(mark.uids);
+				state = mark.state;
+			}
+			
+			public T getState(){
+				return cloneState.apply(state);
+			}
+		}
+		
+		static <T> InterceptProvider<T> intercept(Provider src, Intercept<T> intercept, T interceptState, Function<T, T> cloneState){
+			return new InterceptProvider<>(src, intercept, interceptState, cloneState);
 		}
 		VaryingSize provide(NumberSize max, String uid, boolean ptr);
 		

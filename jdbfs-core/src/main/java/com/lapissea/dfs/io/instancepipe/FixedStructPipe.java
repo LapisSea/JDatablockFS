@@ -22,7 +22,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields) -> {
+		return (t, structFields, testRun) -> {
 			Set<IOField<T, ?>> sizeFields = sizeFieldStream(structFields).collect(Collectors.toSet());
 			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
