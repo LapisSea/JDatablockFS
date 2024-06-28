@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.dfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
 
@@ -176,8 +177,9 @@ public final class Cluster implements DataProvider{
 		private VersionTag version = new VersionTag(Version.CURRENT);
 		
 		@IOValue.Reference(dataPipeType = FLEXIBLE)
+		@IONullability(DEFAULT_IF_NULL)
 		@IODependency("version")
-		private Metadata metadata = new Metadata();
+		private Metadata metadata;
 	}
 	
 	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
@@ -248,6 +250,7 @@ public final class Cluster implements DataProvider{
 		db.init(provider);
 		
 		var ref = new RootRef();
+		ref.metadata = new Metadata();
 		ref.metadata.db = db;
 		ref.metadata.allocateNulls(provider, null);
 		
