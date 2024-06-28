@@ -8,6 +8,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
 import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
+import com.lapissea.dfs.exceptions.MalformedClusterData;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Preload;
@@ -27,9 +28,11 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -43,15 +46,58 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
-import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.dfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
 
 public final class Cluster implements DataProvider{
+	
+	public enum Version{
+		INDEV(0, 1), V1_0;
+		
+		public static final Version CURRENT = INDEV;
+		
+		public final short major, minor;
+		
+		Version(){
+			var parts = name().split("\\D+");
+			this.major = Short.parseShort(parts[1]);
+			this.minor = Short.parseShort(parts[2]);
+		}
+		Version(int major, int minor){
+			this.major = (short)major;
+			this.minor = (short)minor;
+		}
+	}
+	
+	@IOValue
+	private static class VersionTag extends IOInstance.Managed<VersionTag>{
+		
+		private short major, minor;
+		
+		public VersionTag(){ }
+		public VersionTag(Version version){
+			this.major = version.major;
+			this.minor = version.minor;
+		}
+		
+		Optional<Version> get(){
+			for(var v : Version.values()){
+				if(v.minor == minor && v.major == major){
+					return Optional.of(v);
+				}
+			}
+			return Optional.empty();
+		}
+		@Override
+		public String toString(){
+			return get().map(Enum::toString).orElse("<unknown>");
+		}
+	}
 	
 	private class Roots implements RootProvider{
 		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
@@ -124,11 +170,14 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
+	@IOValue
 	private static class RootRef extends IOInstance.Managed<RootRef>{
-		@IOValue
+		
+		private VersionTag version = new VersionTag(Version.CURRENT);
+		
 		@IOValue.Reference(dataPipeType = FLEXIBLE)
-		@IONullability(DEFAULT_IF_NULL)
-		private Metadata metadata;
+		@IODependency("version")
+		private Metadata metadata = new Metadata();
 	}
 	
 	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
@@ -191,17 +240,20 @@ public final class Cluster implements DataProvider{
 			MagicID.write(io);
 		}
 		
-		var firstChunk = MemoryOperations.allocateAppendToFile(provider, AllocateTicket.bytes(16), false);
+		var rrSiz = 16 + 4;
+		
+		var firstChunk = MemoryOperations.allocateAppendToFile(provider, AllocateTicket.bytes(rrSiz), false);
 		if(!firstChunk.getPtr().equals(firstChunkPtr())) throw new ShouldNeverHappenError();
 		
 		db.init(provider);
 		
 		var ref = new RootRef();
-		var m   = ref.metadata = new Metadata();
-		m.db = db;
-		m.allocateNulls(provider, null);
+		ref.metadata.db = db;
+		ref.metadata.allocateNulls(provider, null);
+		
 		rootPipe().write(firstChunk, ref);
-		assert firstChunk.chainSize() == 16;
+		
+		assert firstChunk.chainSize() == rrSiz : firstChunk.chainSize() + " != " + rrSiz;
 	}
 	
 	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
@@ -247,13 +299,18 @@ public final class Cluster implements DataProvider{
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
+		var   rp = rootPipe();
 		
-		var s = rootPipe().getFixedDescriptor().get(WordSpace.BYTE);
+		var version = ch.ioMap(io -> rp.readNewSelective(this, io, Set.of("version"), null).version);
+		handleVersion(version);
+		
+		
+		var s = rp.getFixedDescriptor().get(WordSpace.BYTE);
 		if(s>ch.getSize()){
 			throw new IOException("no valid cluster data " + s + " " + ch.getSize());
 		}
 		
-		root = rootPipe().readNew(this, ch, null);
+		root = rp.readNew(this, ch, null);
 		metadata = root.metadata;
 		
 		memoryManager = new PersistentMemoryManager(
@@ -265,6 +322,18 @@ public final class Cluster implements DataProvider{
 		
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
+		}
+	}
+	
+	private void handleVersion(VersionTag ver) throws MalformedClusterData{
+		var v = ver.get();
+		if(v.isEmpty()){
+			throw new MalformedClusterData("No known version found! Listed version number: " + ver.major + "." + ver.minor);
+		}
+		var version = v.get();
+		if(version != Version.CURRENT){
+			throw new NotImplementedException("Cluster version update not implemented yet! " +
+			                                  "Listed version is " + version + " but current is " + Version.CURRENT);
 		}
 	}
 	
