@@ -136,6 +136,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
+		@SuppressWarnings("unchecked")
 		private P createPipe(Struct<T> struct, boolean runNow){
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
@@ -157,7 +158,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				
 				var special = specials.get(struct);
 				if(special != null){
-					created = special.get();
+					var specialInst = special.get();
+					if(DEBUG_VALIDATION){
+						var check = lConstructor.make(struct, runNow);
+						created = switch(check){
+							case StandardStructPipe<?> p ->
+								(P)new CheckedPipe.Standard<>((StandardStructPipe<T>)check, (StandardStructPipe<T>)specialInst);
+							case FixedStructPipe<?> p -> (P)new CheckedPipe.Fixed<>((FixedStructPipe<T>)check, (FixedStructPipe<T>)specialInst);
+							default -> check;
+						};
+					}else{
+						created = specialInst;
+					}
 				}else{
 					created = lConstructor.make(struct, runNow);
 				}

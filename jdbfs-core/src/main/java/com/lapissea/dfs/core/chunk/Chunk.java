@@ -150,7 +150,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			var raw = src.readUnsignedInt1();
 			var bns = NumberSize.FLAG_INFO.get(raw&0b111);
 			var nns = NumberSize.FLAG_INFO.get((raw >>> 3)&0b111);
-			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			BitFieldMerger.readIntegrityBits(raw, 8, 6);
 			
 			instance.bodyNumSize = bns;
 			instance.nextSize = nns;

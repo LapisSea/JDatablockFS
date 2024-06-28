@@ -58,7 +58,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			ioPool.set(NUM_SIZE, numSize);
 			instance.setEncoding(CHAR_ENCODING_UNIVERSE.get((raw >>> 3)&0b111));
 			
-			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			BitFieldMerger.readIntegrityBits(raw, 8, 6);
 			
 			var textBytes_len = numSize.readInt(src);
 			ioPool.setInt(TEXT_LEN, textBytes_len);
@@ -88,7 +88,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 			var raw     = src.readUnsignedInt1();
 			var numSize = NumberSize.FLAG_INFO.get(raw&0b111);
-			BitFieldMerger.readIntegrityBits(raw >>> 6, raw, NumberSize.BYTE, 2);
+			BitFieldMerger.readIntegrityBits(raw, 8, 6);
 			
 			var textBytes_len = numSize.readInt(src);
 			

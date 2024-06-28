@@ -57,20 +57,18 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					var offsetSize = NumberSize.bySize(off);
 					var ptrSize    = NumberSize.bySize(ptr);
 					
-					var flags = offsetSize.ordinal()|(ptrSize.ordinal()<<3)|(0b11<<6);
+					var header = offsetSize.ordinal()|(ptrSize.ordinal()<<3);
 					
-					dest.writeInt1(flags);
+					dest.writeInt1(header|(int)BitFieldMerger.calcIntegrityBits(header, 2, 6));
 					offsetSize.write(dest, off);
 					ptrSize.write(dest, ptr);
 				}
 				@Override
 				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
-					int flags      = src.readInt1()&0xFF;
+					int flags      = src.readUnsignedInt1();
 					var offsetSize = NumberSize.ordinal(flags&0b111);
 					var ptrSize    = NumberSize.ordinal((flags >>> 3)&0b111);
-					if((flags&(0b11<<6)) != (0b11<<6)){
-						throw new IOException("Illegal reference bits");
-					}
+					BitFieldMerger.readIntegrityBits(flags, 8, 6);
 					
 					var off = offsetSize.read(src);
 					var ptr = ChunkPointer.of(ptrSize.read(src));

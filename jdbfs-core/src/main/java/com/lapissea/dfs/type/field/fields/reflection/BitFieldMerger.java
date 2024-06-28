@@ -159,7 +159,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			}
 			if(oneBits>1){
 				var remRaw = reader.readBits(oneBits);
-				readIntegrityBits(remRaw, raw, numSize, oneBits);
+				readIntegrityBits(remRaw, raw, numSize.bits(), oneBits);
 			}else{
 				reader.checkNOneAndThrow(oneBits);
 			}
@@ -172,10 +172,13 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	}
 	
 	private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
-	public static void readIntegrityBits(long remainingBits, long raw, NumberSize numSize, int oneBits) throws IOException{
+	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
+		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
+	}
+	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
 		var integrityDiv = INTEGRITY_DIVS[oneBits];
 		var remStored    = integrityDiv - remainingBits;
-		var payload      = raw&BitUtils.makeMask(numSize.bits() - oneBits);
+		var payload      = raw&BitUtils.makeMask(totalBits - oneBits);
 		var rem          = payload%integrityDiv;
 		if(rem != remStored){
 			throw new IOException("Bit integrity failed");
