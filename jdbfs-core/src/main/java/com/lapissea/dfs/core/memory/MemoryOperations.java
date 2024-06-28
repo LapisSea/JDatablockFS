@@ -757,7 +757,7 @@ public final class MemoryOperations{
 		
 		if(dryRun) return chunk;
 		
-		try(var io = src.ioAt(chunk.getPtr().getValue())){
+		try(var ignore = src.openIOTransaction(); var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
 			IOUtils.zeroFill(io, chunk.getCapacity());
 		}

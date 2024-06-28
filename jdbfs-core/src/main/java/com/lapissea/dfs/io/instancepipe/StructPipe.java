@@ -141,12 +141,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			
-			Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright", () -> {
+			if(Log.TRACE){
 				var name     = struct.cleanFullName();
 				var smolName = struct.cleanName();
-				
-				return List.of(shortPipeName(type), name.substring(0, name.length() - smolName.length()), smolName);
-			});
+				Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright",
+				          shortPipeName(type), name.substring(0, name.length() - smolName.length()), smolName);
+			}
 			
 			P created;
 			try{
