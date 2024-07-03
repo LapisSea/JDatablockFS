@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.utils.IterablePPs;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
@@ -19,8 +20,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiFunction;
-
-import static java.util.stream.Collectors.toUnmodifiableMap;
+import java.util.function.Function;
 
 public final class SealedUtil{
 	
@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, data.universe.stream().collect(toUnmodifiableMap(t -> t, StandardStructPipe::of)));
+			this(data.root, IterablePPs.from(data.universe).collectToMap(Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(

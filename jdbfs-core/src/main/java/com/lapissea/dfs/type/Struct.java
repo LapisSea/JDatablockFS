@@ -480,15 +480,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		return struct;
 	}
-	private static <T extends IOInstance<T>, S extends Struct<T>> S waitForDoneCompiling(Class<T> instanceClass, ReadWriteClosableLock.LockSession lock){
-		lock.getLock().unlock();
-		Thread.yield();
-		while(STRUCT_THREAD_LOG.get(instanceClass) != null){
+	
+	private static <T extends IOInstance<T>, S extends Struct<T>> S waitForDoneCompiling(Class<T> instanceClass, ReadWriteClosableLock.LockSession writeLock){
+		var wl = writeLock.getLock();
+		wl.unlock();
+		while(true){
 			UtilL.sleep(1);
+			try(var ignore = STRUCT_CACHE_LOCK.read()){
+				if(STRUCT_THREAD_LOG.get(instanceClass) == null){
+					break;
+				}
+			}
 		}
-		lock.getLock().lock();
+		wl.lock();
 		//noinspection unchecked
-		return (S)getCachedUnsafe(instanceClass, lock.getLock());
+		return (S)getCachedUnsafe(instanceClass, wl);
 	}
 	
 	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE     = Map.of();
@@ -535,10 +541,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> void waitNonConcrete(Class<T> instanceClass, Lock lock){
-		if(noNeedForNonConcrete(instanceClass)){
-			return;
-		}
-		
+		if(noNeedForNonConcrete(instanceClass)) return;
+		actuallyWaitNonConcrete(instanceClass, lock);
+	}
+	private static <T extends IOInstance<T>> void actuallyWaitNonConcrete(Class<T> instanceClass, Lock lock){
 		var queue = new ArrayDeque<Class<?>>();
 		queue.push(instanceClass);
 		while(!queue.isEmpty()){
@@ -569,7 +575,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static void recursiveCompileCheck(Class<?> interf){
 		Thread thread = STRUCT_THREAD_LOG.get(interf);
 		if(thread != null && thread == Thread.currentThread()){
-			throw new RecursiveSelfCompilation("Recursive struct compilation");
+			throw new RecursiveSelfCompilation("Recursive struct compilation of: " + interf.getTypeName());
 		}
 	}
 	

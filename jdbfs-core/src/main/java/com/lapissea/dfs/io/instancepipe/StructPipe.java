@@ -189,7 +189,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			if(ConfigDefs.PRINT_COMPILATION.resolveVal()){
-				StagedInit.runBaseStageTask(() -> {
+				created.runOnStateDone(() -> {
 					String s = "Compiled: " + struct.getFullName() + "\n" +
 					           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +
 					           "\tSize: " + BLUE_BRIGHT + created.getSizeDescriptor() + CYAN_BRIGHT + "\n" +
@@ -202,7 +202,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					}
 					
 					Log.log(CYAN_BRIGHT + s + RESET);
-				});
+				}, e -> Log.warn("Failed to compile: {}#yellow asynchronously because:\n\t{}#red", created, Utils.errToStackTraceOnDemand(e)));
 			}
 			
 			return created;

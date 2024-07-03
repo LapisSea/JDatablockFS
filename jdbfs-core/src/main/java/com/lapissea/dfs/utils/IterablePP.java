@@ -70,12 +70,16 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return collector.finisher().apply(acc);
 	}
-	default List<T> collectToList(){
+	
+	private ArrayList<T> toArrayList(){
 		var res = new ArrayList<T>();
 		for(T t : this){
 			res.add(t);
 		}
 		return res;
+	}
+	default List<T> collectToList(){
+		return toArrayList();
 	}
 	
 	default Set<T> collectToSet(){
@@ -169,6 +173,22 @@ public interface IterablePP<T> extends Iterable<T>{
 					}
 				}
 			};
+		};
+	}
+	
+	default IterablePP<T> sorted(Comparator<T> comparator){
+		return new IterablePP<>(){
+			private ArrayList<T> sorted;
+			@Override
+			public Iterator<T> iterator(){
+				var l = sorted;
+				if(l == null){
+					l = IterablePP.this.toArrayList();
+					l.sort(comparator);
+					sorted = l;
+				}
+				return l.iterator();
+			}
 		};
 	}
 	
