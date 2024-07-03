@@ -89,6 +89,25 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return res;
 	}
+	
+	default <K, V> Map<K, V> collectUnmodifiableToMap(boolean counting, Function<T, K> key, Function<T, V> value){
+		if(counting){
+			var arr = new Map.Entry[count()];
+			int i   = 0;
+			for(T t : this){
+				arr[i++] = Map.entry(key.apply(t), value.apply(t));
+			}
+			//noinspection unchecked
+			return Map.ofEntries(arr);
+		}
+		
+		var res = new ArrayList<Map.Entry<K, V>>();
+		for(T t : this){
+			res.add(Map.entry(key.apply(t), value.apply(t)));
+		}
+		//noinspection unchecked
+		return Map.ofEntries(res.toArray(Map.Entry[]::new));
+	}
 	default <K, V> Map<K, V> collectToMap(Function<T, K> key, Function<T, V> value){
 		var res = new HashMap<K, V>();
 		for(T t : this){
@@ -176,6 +195,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default <U extends Comparable<? super U>> IterablePP<T> sortedBy(Function<T, U> comparator){
+		return sorted(Comparator.comparing(comparator));
+	}
 	default IterablePP<T> sorted(Comparator<T> comparator){
 		return new IterablePP<>(){
 			private ArrayList<T> sorted;
@@ -190,6 +212,10 @@ public interface IterablePP<T> extends Iterable<T>{
 				return l.iterator();
 			}
 		};
+	}
+	
+	default IterablePP<T> distinct(){
+		return () -> IterablePP.this.filtered(new HashSet<T>()::add).iterator();
 	}
 	
 	default <L> IterablePP<L> flatArray(Function<T, L[]> flatten){

@@ -11,13 +11,13 @@ import com.lapissea.dfs.utils.IterablePPs;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, IterablePPs.from(data.universe).collectToMap(Function.identity(), StandardStructPipe::of));
+			this(data.root, IterablePPs.from(data.universe).collectUnmodifiableToMap(true, Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(
@@ -93,11 +93,12 @@ public final class SealedUtil{
 		}
 	}
 	
-	public record SealedUniverse<T>(Class<T> root, Set<Class<T>> universe){
+	public record SealedUniverse<T>(Class<T> root, Collection<Class<T>> universe){
+		
 		public SealedUniverse{
 			Objects.requireNonNull(root);
 			assert isSealedCached(root);
-			universe = Set.copyOf(universe);
+			universe = List.copyOf(IterablePPs.from(universe).distinct().sortedBy(Class::getName).collectToList());
 		}
 	}
 	
@@ -134,16 +135,9 @@ public final class SealedUtil{
 	
 	private static final class SNode{
 		
-		private static final class Val<T>{
+		private record Val<T>(boolean sealed, WeakReference<List<Class<T>>> permittedSubclasses){
 			private static final Val<?> NON = new Val<>(false, new WeakReference<>(null));
 			
-			private final boolean                       sealed;
-			private final WeakReference<List<Class<T>>> permittedSubclasses;
-			
-			private Val(boolean sealed, WeakReference<List<Class<T>>> permittedSubclasses){
-				this.sealed = sealed;
-				this.permittedSubclasses = permittedSubclasses;
-			}
 			private static <T> Val<T> of(Class<T> clazz){
 				var permittedSubclasses = fetchSubclasses(clazz);
 				if(permittedSubclasses == null){
@@ -185,7 +179,7 @@ public final class SealedUtil{
 		private static <T> List<Class<T>> fetchSubclasses(Class<T> clazz){
 			//noinspection unchecked
 			var sbc = (Class<T>[])clazz.getPermittedSubclasses();
-			return sbc == null? null : List.of(sbc);
+			return sbc == null? null : List.copyOf(IterablePPs.of(sbc).sortedBy(Class::getName).collectToList());
 		}
 	}
 	

@@ -46,6 +46,8 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -937,17 +939,19 @@ public sealed interface ValueStorage<T>{
 	
 	final class SealedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
-		private final GenericContext            ctx;
-		private final DataProvider              provider;
-		private final SealedInstanceUniverse<T> universe;
-		private final boolean                   canHavePointers;
-		private final SizeDescriptor<T>         sizeDescriptor;
-		private final RuntimeType<T>            type;
+		private final GenericContext               ctx;
+		private final DataProvider                 provider;
+		private final SealedInstanceUniverse<T>    universe;
+		private final Map<Class<T>, StructPipe<T>> pipeMap;
+		private final boolean                      canHavePointers;
+		private final SizeDescriptor<T>            sizeDescriptor;
+		private final RuntimeType<T>               type;
 		
 		public SealedInstance(GenericContext ctx, DataProvider provider, SealedInstanceUniverse<T> universe){
 			this.ctx = ctx;
 			this.provider = provider;
 			this.universe = universe;
+			pipeMap = universe.pipeMap();
 			sizeDescriptor = universe.makeSizeDescriptor(true, false, (pool, inst) -> inst);
 			canHavePointers = universe.calcCanHavePointers();
 			
@@ -958,7 +962,7 @@ public sealed interface ValueStorage<T>{
 		public T readNew(ContentReader src) throws IOException{
 			var id   = src.readUnsignedInt4Dynamic();
 			var type = provider.getTypeDb().fromID(universe.root(), id);
-			var pipe = universe.pipeMap().get(type);
+			var pipe = pipeMap.get(type);
 			return pipe.readNew(provider, src, ctx);
 		}
 		
@@ -967,7 +971,7 @@ public sealed interface ValueStorage<T>{
 			@SuppressWarnings("unchecked")
 			var type = (Class<T>)src.getClass();
 			var id   = provider.getTypeDb().toID(universe.root(), type, true);
-			var pipe = universe.pipeMap().get(type);
+			var pipe = pipeMap.get(type);
 			dest.writeUnsignedInt4Dynamic(id);
 			pipe.write(provider, dest, src);
 		}
@@ -980,7 +984,7 @@ public sealed interface ValueStorage<T>{
 			
 			var id   = io.readUnsignedInt4Dynamic();
 			var type = provider.getTypeDb().fromID(universe.root(), id);
-			var pipe = universe.pipeMap().get(type);
+			var pipe = pipeMap.get(type);
 			if(!pipe.getType().getCanHavePointers()){
 				return List.of();
 			}
@@ -1030,7 +1034,8 @@ public sealed interface ValueStorage<T>{
 		
 		private final BaseFixedStructPipe<TypedReference> refPipe;
 		private final long                                size;
-		private final SealedInstanceUniverse<T>           universe;
+		private final Class<T>                            root;
+		private final Map<Class<T>, StructPipe<T>>        pipeMap;
 		private final RuntimeType<T>                      type;
 		
 		public FixedReferenceSealedInstance(
@@ -1041,8 +1046,8 @@ public sealed interface ValueStorage<T>{
 			this.provider = provider;
 			this.refPipe = refPipe;
 			size = refPipe.getFixedDescriptor().get(WordSpace.BYTE);
-			this.universe = universe;
-			
+			root = universe.root();
+			pipeMap = universe.pipeMap();
 			type = new RuntimeType.Lambda<>(true, universe.root(), null);
 		}
 		
@@ -1053,8 +1058,8 @@ public sealed interface ValueStorage<T>{
 				return null;
 			}
 			var ref  = refId.getRef();
-			var type = refId.getType(provider.getTypeDb(), universe.root());
-			var pipe = universe.pipeMap().get(type);
+			var type = refId.getType(provider.getTypeDb(), root);
+			var pipe = pipeMap.get(type);
 			return ref.readNew(provider, pipe, ctx);
 		}
 		
@@ -1063,8 +1068,8 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			//noinspection unchecked
 			var type = (Class<T>)src.getClass();
-			var pipe = universe.pipeMap().get(type);
-			var id   = provider.getTypeDb().toID(universe.root(), type, true);
+			var pipe = pipeMap.get(type);
+			var id   = provider.getTypeDb().toID(root, type, true);
 			
 			var orgPos = dest.getPos();
 			var refId  = dest.remaining() == 0? new TypedReference() : readInline(dest);
@@ -1098,8 +1103,8 @@ public sealed interface ValueStorage<T>{
 			if(dereferenceWrite){
 				writeInline(io.setPos(startPos), new TypedReference());
 			}
-			var type = refId.getType(provider.getTypeDb(), universe.root());
-			var pipe = universe.pipeMap().get(type);
+			var type = refId.getType(provider.getTypeDb(), root);
+			var pipe = pipeMap.get(type);
 			if(pipe.getType().getCanHavePointers()){
 				var ref  = refId.getRef();
 				var ptrs = new ArrayList<ChunkPointer>(4);
@@ -1138,8 +1143,8 @@ public sealed interface ValueStorage<T>{
 				@Override
 				public StructPipe<T> getReferencedPipe(I instance) throws IOException{
 					var refId = readRef();
-					var type  = refId.getType(provider.getTypeDb(), universe.root());
-					return universe.pipeMap().get(type);
+					var type  = refId.getType(provider.getTypeDb(), root);
+					return Objects.requireNonNull(pipeMap.get(type));
 				}
 				private TypedReference readRef() throws IOException{
 					TypedReference refId;
