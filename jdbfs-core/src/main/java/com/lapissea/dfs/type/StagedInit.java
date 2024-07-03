@@ -38,9 +38,8 @@ import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
 public abstract class StagedInit{
 	
-	protected static final boolean ALWAYS_INIT_NOW     = !ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolveVal();
-	private static final   int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
-	private static final   boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
+	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
+	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
 	
 	private static class InitInfo{
 		private Throwable error;
@@ -68,7 +67,7 @@ public abstract class StagedInit{
 		init(runNow, init, null);
 	}
 	protected void init(boolean runNow, Runnable init, Runnable postValidate){
-		if(ALWAYS_INIT_NOW || runNow){
+		if(runNow){
 			if(DEBUG_VALIDATION) validateStates();
 			try{
 				initInfo.ctxThread = Thread.currentThread();
