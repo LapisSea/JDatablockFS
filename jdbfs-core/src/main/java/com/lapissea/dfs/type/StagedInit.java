@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,41 +38,45 @@ import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
 public abstract class StagedInit{
 	
-	private static final boolean DO_ASYNC            = ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolveVal();
-	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
-	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
+	protected static final boolean ALWAYS_INIT_NOW     = !ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolveVal();
+	private static final   int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
+	private static final   boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
 	
-	
-	public static void runBaseStageTask(Runnable task){
-		if(DO_ASYNC){
-			Runner.run(task);
-		}else{
-			task.run();
+	private static class InitInfo{
+		private Throwable error;
+		private Thread    ctxThread;
+		
+		private final Map<Integer, Instant> logCompletion   = DO_TIMESTAMPS? new ConcurrentHashMap<>() : null;
+		private final ClosableLock          stateLock       = ClosableLock.reentrant();
+		private final Condition             conditionChange = stateLock.newCondition();
+		
+		@Override
+		public String toString(){
+			if(error != null) return "Error: " + error;
+			var t = ctxThread;
+			if(t == null) return "Done";
+			return "Running in " + t;
 		}
 	}
 	
 	public static final int STATE_ERROR = -2, STATE_NOT_STARTED = -1, STATE_START = 0, STATE_DONE = Integer.MAX_VALUE;
 	
-	private int       state = STATE_NOT_STARTED;
-	private Throwable e;
-	
-	private final Map<Integer, Instant> logCompletion = DO_TIMESTAMPS? new ConcurrentHashMap<>() : null;
-	
-	private       Thread       initThread;
-	private final ClosableLock rLock     = ClosableLock.reentrant();
-	private final Condition    condition = rLock.newCondition();
+	private int      state    = STATE_NOT_STARTED;
+	private InitInfo initInfo = new InitInfo();
 	
 	protected void init(boolean runNow, Runnable init){
 		init(runNow, init, null);
 	}
 	protected void init(boolean runNow, Runnable init, Runnable postValidate){
-		if(runNow){
+		if(ALWAYS_INIT_NOW || runNow){
 			if(DEBUG_VALIDATION) validateStates();
 			try{
-				initThread = Thread.currentThread();
+				initInfo.ctxThread = Thread.currentThread();
+				
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);
+				
 				if(postValidate != null){
 					try{
 						postValidate.run();
@@ -80,44 +85,48 @@ public abstract class StagedInit{
 					}
 				}
 			}finally{
-				initThread = null;
+				initInfo = null;
 			}
-			
 			return;
 		}
-		runBaseStageTask(() -> {
+		
+		Runner.run(() -> {
 			if(DEBUG_VALIDATION) validateStates();
 			try{
-				initThread = Thread.currentThread();
+				initInfo.ctxThread = Thread.currentThread();
+				
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);
+				
 				if(postValidate != null){
 					postValidate.run();
 				}
+				initInfo = null;
 			}catch(Throwable e){
-				try(var ignored = rLock.open()){
+				try(var ignored = initInfo.stateLock.open()){
 					state = STATE_ERROR;
-					this.e = e;
-					condition.signalAll();
+					initInfo.error = e;
+					initInfo.conditionChange.signalAll();
 				}
-			}finally{
-				initThread = null;
 			}
 		});
 	}
 	
 	protected final void setInitState(int state){
-		try(var ignored = rLock.open()){
-			if(DEBUG_VALIDATION) validateNewState(state);
-			if(DO_TIMESTAMPS) logCompletion.put(state, Instant.now());
+		var i = initInfo;
+		if(i == null || i.error != null) throw new IllegalCallerException("The state must be set only in the init block!");
+		if(i.ctxThread != Thread.currentThread()) throw new IllegalCallerException("The state should be called only by the init thread");
+		if(DEBUG_VALIDATION) validateNewState(state);
+		try(var ignored = i.stateLock.open()){
+			if(DO_TIMESTAMPS) i.logCompletion.put(state, Instant.now());
 			this.state = state;
-			condition.signalAll();
+			i.conditionChange.signalAll();
 		}
 	}
 	
 	private void validateNewState(int state){
-		if(listStates().mapToInt(StateInfo::id).noneMatch(id -> id == state)){
+		if(getStateInfo(state).isEmpty()){
 			throw new IllegalArgumentException("Unknown state: " + state);
 		}
 		if(state<=this.state){
@@ -182,11 +191,13 @@ public abstract class StagedInit{
 		}
 	}
 	
-	protected Throwable getErr(){
-		return e;
+	protected final Throwable getErr(){
+		var i = initInfo;
+		return i != null? i.error : null;
 	}
 	
 	private void checkErr(){
+		var e = getErr();
 		if(e == null) return;
 		var eCopy = cloneE(e);
 		eCopy.addSuppressed(new WaitException("Exception occurred while initializing: " + this));
@@ -217,9 +228,12 @@ public abstract class StagedInit{
 	}
 	
 	protected String stateToString(int state){
-		return listStates().filter(i -> i.id == state).map(StateInfo::name).findAny().orElseGet(() -> "UNKNOWN_STATE_" + state);
+		return getStateInfo(state).map(StateInfo::name).orElseGet(() -> "UNKNOWN_STATE_" + state);
 	}
 	
+	protected Optional<StateInfo> getStateInfo(int stateId){
+		return listStates().filter(i -> i.id == stateId).findFirst();
+	}
 	/***
 	 * This method lists information about all states that this object can be in. This method is only
 	 * called when debugging or calling toString so performance is not of great concern.
@@ -234,7 +248,8 @@ public abstract class StagedInit{
 		List<String>   problems = new ArrayList<>();
 		Set<StateInfo> base     = new HashSet<>(StateInfo.BASE_STATES);
 		
-		listStates().forEach(state -> {
+		var states = listStates().toList();
+		states.forEach(state -> {
 			if(state.id<StateInfo.MIN_ID) problems.add("\t" + state + ": id is too small!");
 			if(!ids.add(state.id)) problems.add("\t" + state + ": has a duplicate id");
 			if(!names.add(state.name)) problems.add("\t" + state + ": has a duplicate name");
@@ -248,7 +263,7 @@ public abstract class StagedInit{
 			StringJoiner str = new StringJoiner("\n");
 			str.add("Issues with state IDs for " + this.getClass().getSimpleName() + ":");
 			problems.forEach(str::add);
-			str.add(TextUtil.toTable(listStates().sorted(Comparator.comparingInt(StateInfo::id))));
+			str.add(TextUtil.toTable(states.stream().sorted(Comparator.comparingInt(StateInfo::id))));
 			throw new ShouldNeverHappenError(str.toString());
 		}
 		
@@ -256,45 +271,46 @@ public abstract class StagedInit{
 	
 	
 	private void actuallyWaitForState(int state){
-		threadCheck();
+		var info = initInfo;
+		if(info == null) return;//If no info, then the object is inited
+		
+		threadCheck(info.ctxThread);
 		var start = DO_TIMESTAMPS? Instant.now() : Instant.EPOCH;
 		
 		var threadCheck = false;
 		while(true){
 			if(!threadCheck && this.state>=STATE_START){
 				threadCheck = true;
-				threadCheck();
+				threadCheck(info.ctxThread);
 			}
-			
-			try(var ignored = rLock.open()){
+			try(var ignored = info.stateLock.open()){
 				checkErr();
 				if(this.state>=state) break;
-				else if(RELEASE_MODE) reportPossibleLock(start);
+				else if(RELEASE_MODE) reportPossibleLock(start, info.ctxThread);
 				try{
-					condition.await(1, TimeUnit.SECONDS);
+					info.conditionChange.await(1, TimeUnit.SECONDS);
 				}catch(InterruptedException ignored1){ }
 			}
 		}
 		
 		checkErr();
 		
-		if(DO_TIMESTAMPS) logLongWait(state, start);
+		if(DO_TIMESTAMPS) logLongWait(state, start, info);
 	}
 	
-	private void reportPossibleLock(Instant start){
-		var t = initThread;
-		if(t == null || !Log.WARN) return;
+	private void reportPossibleLock(Instant start, Thread initThread){
+		if(initThread == null || !Log.WARN) return;
 		if(Duration.between(start, Instant.now()).toMillis()<LONG_WAIT_THRESHOLD) return;
 		Log.warn(
 			"possible lock at {}#yellow on thread {}#yellow\n{}",
-			this, t.getName(), Arrays.stream(t.getStackTrace()).map(s -> "\t" + s).collect(Collectors.joining("\n"))
+			this, initThread.getName(), Arrays.stream(initThread.getStackTrace()).map(s -> "\t" + s).collect(Collectors.joining("\n"))
 		);
 	}
 	
-	private void logLongWait(int state, Instant start){
+	private void logLongWait(int state, Instant start, InitInfo info){
 		var end = Instant.now();
-		if(logCompletion != null){
-			var completionTime = logCompletion.get(state);
+		if(info.logCompletion != null){
+			var completionTime = info.logCompletion.get(state);
 			if(end.isAfter(completionTime) && start.isBefore(completionTime)){
 				end = completionTime;
 			}
@@ -305,7 +321,7 @@ public abstract class StagedInit{
 		}
 	}
 	
-	private void threadCheck(){
+	private void threadCheck(Thread initThread){
 		if(initThread == Thread.currentThread()){
 			throw new RuntimeException("Self deadlock: " + this);
 		}
