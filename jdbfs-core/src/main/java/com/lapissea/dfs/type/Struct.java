@@ -35,8 +35,6 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -54,7 +52,6 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -471,20 +468,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(!ConfigDefs.PRINT_COMPILATION.resolveVal()){
 				struct.runOnStateDone(
 					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), (Supplier<String>)() -> {
-						var sw = new StringWriter();
-						e.printStackTrace(new PrintWriter(sw));
-						return sw.toString();
-					})
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 				);
 			}else{
 				struct.runOnStateDone(
 					() -> Log.log(GREEN_BRIGHT + TextUtil.toTable(struct.cleanFullName(), struct.getFields()) + RESET),
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), (Supplier<String>)() -> {
-						var sw = new StringWriter();
-						e.printStackTrace(new PrintWriter(sw));
-						return sw.toString();
-					})
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 				);
 			}
 		}

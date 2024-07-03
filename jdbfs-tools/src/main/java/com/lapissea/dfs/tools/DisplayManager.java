@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
@@ -363,7 +364,7 @@ public class DisplayManager implements DataLogger{
 			ImGui.newLine();
 			ImGui.text("Full stack trace:");
 			ImGui.separator();
-			showTrace(MemFrame.errorToStr(err), cfWrap, skipImpl);
+			showTrace(Utils.errToStackTrace(err), cfWrap, skipImpl);
 			
 			ImGui.end();
 		});

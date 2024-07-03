@@ -10,6 +10,8 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
@@ -31,6 +33,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.LongBinaryOperator;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -327,5 +330,14 @@ public final class Utils{
 	}
 	public static <T> Optional<T> None(){
 		return Optional.empty();
+	}
+	
+	public static Supplier<String> errToStackTraceOnDemand(Throwable e){
+		return () -> errToStackTrace(e);
+	}
+	public static String errToStackTrace(Throwable e){
+		var sw = new StringWriter();
+		e.printStackTrace(new PrintWriter(sw));
+		return sw.toString();
 	}
 }

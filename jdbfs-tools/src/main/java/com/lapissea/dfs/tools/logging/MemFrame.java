@@ -1,10 +1,9 @@
 package com.lapissea.dfs.tools.logging;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.util.TextUtil;
 
-import java.io.PrintWriter;
 import java.io.Serializable;
-import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -135,22 +134,7 @@ public final class MemFrame implements Serializable{
 	}
 	
 	public MemFrame(long frameId, long timeDelta, byte[] data, long[] ids, Throwable e){
-		this(frameId, timeDelta, data, ids, errorToStr(e));
-	}
-	public static String errorToStr(Throwable e){
-		StringBuffer b = new StringBuffer();
-		
-		e.printStackTrace(new PrintWriter(new Writer(){
-			@Override
-			public void write(char[] cbuf, int off, int len){ b.append(cbuf, off, len); }
-			@Override
-			public void flush(){ }
-			@Override
-			public void close(){ }
-		}));
-		
-		
-		return b.toString();
+		this(frameId, timeDelta, data, ids, Utils.errToStackTrace(e));
 	}
 	
 	private transient WeakReference<byte[]> cachedDiff = new WeakReference<>(null);
