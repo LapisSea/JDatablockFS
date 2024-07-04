@@ -181,7 +181,7 @@ public final class IOFieldTools{
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
 			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(FieldNames.numberSize(field))).findAny()
-		).filter(Optional::isPresent).map(Optional::get).findAny();
+		).flatMap(Optional::stream).findAny();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
 		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());

@@ -84,9 +84,9 @@ public final class CompilationTools{
 	);
 	
 	static Optional<FieldStub> asGetterStub(Method method){
-		return GETTER_PATTERNS.stream().map(f -> f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
+		return GETTER_PATTERNS.stream().map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
 	}
 	static Optional<FieldStub> asSetterStub(Method method){
-		return SETTER_PATTERNS.stream().map(f -> f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
+		return SETTER_PATTERNS.stream().map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
 	}
 }

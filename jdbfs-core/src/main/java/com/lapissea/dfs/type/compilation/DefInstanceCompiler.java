@@ -995,7 +995,7 @@ public final class DefInstanceCompiler{
 			if(its.size() != 1) return Optional.empty();
 			
 			var upper = upperSame(interf);
-			return upper.map(u -> getOrder(u, fieldInfo)).filter(Optional::isPresent).map(Optional::get);
+			return upper.flatMap(u -> getOrder(u, fieldInfo));
 		}
 		
 		var check   = fieldInfo.stream().map(FieldInfo::name).collect(Collectors.toSet());

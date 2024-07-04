@@ -218,7 +218,7 @@ final class FieldRegistry{
 							}
 							return Optional.of(valueType);
 						})
-						.filter(Optional::isPresent).<Class<?>>map(Optional::get)
+						.flatMap(Optional::stream)
 						.distinct()
 						.sorted(Comparator.comparing(Class::getName)).toList()
 				));

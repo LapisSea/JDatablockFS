@@ -292,8 +292,7 @@ public class MSDFAtlas{
 		return getGlyphOptional0(ch).orElseGet(
 			() -> Stream.of('\uFFFD', '?', ' ')
 			            .map(this::getGlyphOptional0)
-			            .filter(Optional::isPresent)
-			            .map(Optional::get)
+			            .flatMap(Optional::stream)
 			            .findFirst()
 			            .orElseThrow()
 		);

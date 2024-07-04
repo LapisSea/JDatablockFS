@@ -263,7 +263,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				str = Optional.of("<UNINITIALIZED>");
 			}
 			return str.map(s -> field.getName() + "=" + s);
-		}).filter(Optional::isPresent).map(Optional::get).collect(Collectors.joining(" + ", "{", "}"));
+		}).flatMap(Optional::stream).collect(Collectors.joining(" + ", "{", "}"));
 		
 		if(res.length() == 2) return Optional.empty();
 		return Optional.of(res);
