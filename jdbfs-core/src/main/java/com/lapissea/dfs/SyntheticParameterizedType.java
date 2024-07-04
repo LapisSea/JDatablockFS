@@ -1,5 +1,6 @@
 package com.lapissea.dfs;
 
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.GenericArrayType;
@@ -10,7 +11,6 @@ import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.Utils.extractBound;
 
@@ -104,6 +104,6 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	}
 	@Override
 	public String toString(){
-		return rawType.getTypeName() + (actualTypeArguments.isEmpty()? "" : actualTypeArguments.stream().map(Type::getTypeName).collect(Collectors.joining(", ", "<", ">")));
+		return rawType.getTypeName() + (actualTypeArguments.isEmpty()? "" : Iters.from(actualTypeArguments).joinAsStr(", ", "<", ">", Type::getTypeName));
 	}
 }

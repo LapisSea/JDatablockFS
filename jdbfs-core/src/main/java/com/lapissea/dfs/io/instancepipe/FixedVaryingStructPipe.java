@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.VaryingSize;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 
 import java.io.IOException;
@@ -20,8 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
@@ -75,7 +74,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
 				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
-				pipe.sizesStr = buff.stream().map(s -> s.shortName + "").collect(Collectors.joining());
+				pipe.sizesStr = Iters.from(buff).joinAsStr(s -> s.shortName + "");
 				cache.put(buff, pipe);
 				
 				return pipe;
@@ -120,7 +119,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				throw new UseFixed();
 			}
 			//noinspection rawtypes,unchecked
-			FieldSet<T> sizeFields = FieldSet.of((Stream)sizeFieldStream(structFields));
+			FieldSet<T> sizeFields = FieldSet.of((Iterable)sizeFieldStream(structFields));
 			
 			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual, state) -> {
 				if(actual.size != max) state[0] = false;

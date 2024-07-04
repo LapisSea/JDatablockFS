@@ -16,7 +16,7 @@ import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -504,7 +504,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var dynamic = ((DynamicFields<SELF>)this).listDynamicUnmanagedFields();
 			if(fs.isEmpty()) return dynamic;
 			
-			return IterablePPs.concat(fs, dynamic);
+			return Iters.concat(fs, dynamic);
 		}
 		
 		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
@@ -714,7 +714,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	
 	static boolean isInstance(SealedUtil.SealedUniverse<?> universe){
-		return IterablePPs.from(universe.universe()).allMatch(IOInstance::isInstance);
+		return Iters.from(universe.universe()).allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);

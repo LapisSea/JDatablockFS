@@ -1,74 +1,75 @@
 package com.lapissea.dfs.utils;
 
+
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalLong;
+import java.util.OptionalInt;
 import java.util.StringJoiner;
-import java.util.function.LongFunction;
-import java.util.function.LongPredicate;
+import java.util.function.IntFunction;
+import java.util.function.IntPredicate;
 
-public interface IterableLongPP{
+public interface IterableIntPP{
 	
-	final class ArrayIterL implements LongIterator{
-		private final long[] data;
-		private       int    i;
-		public ArrayIterL(long[] data){ this.data = data; }
+	final class ArrayIterI implements IntIterator{
+		private final int[] data;
+		private       int   i;
+		public ArrayIterI(int[] data){ this.data = data; }
 		@Override
 		public boolean hasNext(){ return i<data.length; }
 		@Override
-		public long nextLong(){ return data[i++]; }
+		public int nextInt(){ return data[i++]; }
 	}
-	static IterableLongPP empty(){
-		return () -> new LongIterator(){
+	
+	static IterableIntPP empty(){
+		return () -> new IntIterator(){
 			@Override
 			public boolean hasNext(){
 				return false;
 			}
 			@Override
-			public long nextLong(){
+			public int nextInt(){
 				throw new NoSuchElementException();
 			}
 		};
 	}
 	
-	default long sum(){
-		long sum  = 0;
-		var  iter = iterator();
+	default int sum(){
+		int sum  = 0;
+		var iter = iterator();
 		while(iter.hasNext()){
-			sum += iter.nextLong();
+			sum += iter.nextInt();
 		}
 		return sum;
 	}
 	
-	default OptionalLong min(){
+	default OptionalInt min(){
 		var iter = iterator();
-		if(!iter.hasNext()) return OptionalLong.empty();
-		long res = Long.MAX_VALUE;
+		if(!iter.hasNext()) return OptionalInt.empty();
+		int res = Integer.MAX_VALUE;
 		while(iter.hasNext()){
-			res = Math.min(res, iter.nextLong());
+			res = Math.min(res, iter.nextInt());
 		}
-		return OptionalLong.of(res);
+		return OptionalInt.of(res);
 	}
-	default OptionalLong max(){
+	default OptionalInt max(){
 		var iter = iterator();
-		if(!iter.hasNext()) return OptionalLong.empty();
-		long res = Long.MIN_VALUE;
+		if(!iter.hasNext()) return OptionalInt.empty();
+		int res = Integer.MIN_VALUE;
 		while(iter.hasNext()){
-			res = Math.max(res, iter.nextLong());
+			res = Math.max(res, iter.nextInt());
 		}
-		return OptionalLong.of(res);
+		return OptionalInt.of(res);
 	}
 	
-	record Bounds(long min, long max){ }
+	record Bounds(int min, int max){ }
 	default Optional<Bounds> bounds(){
 		var iter = iterator();
 		if(!iter.hasNext()) return Optional.empty();
-		long max = Long.MIN_VALUE, min = Long.MAX_VALUE;
+		int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE;
 		while(iter.hasNext()){
-			var val = iter.nextLong();
+			var val = iter.nextInt();
 			max = Math.max(max, val);
 			min = Math.min(min, val);
 		}
@@ -78,29 +79,29 @@ public interface IterableLongPP{
 	/**
 	 * Use when the count is O(1) or known to be cheap
 	 */
-	default long[] collectToArrayCounting(){
-		var res  = new long[count()];
+	default int[] collectToArrayCounting(){
+		var res  = new int[count()];
 		var iter = iterator();
 		for(int i = 0; i<res.length; i++){
-			res[i] = iter.nextLong();
+			res[i] = iter.nextInt();
 		}
 		return res;
 	}
-	default long[] collectToArray(){
+	default int[] collectToArray(){
 		return collectToArray(8);
 	}
-	default long[] collectToArray(int initialSize){
+	default int[] collectToArray(int initialSize){
 		var iter = iterator();
-		var res  = new long[initialSize];
+		var res  = new int[initialSize];
 		int i    = 0;
 		while(iter.hasNext()){
 			if(i == res.length) res = growArr(res);
-			res[i++] = iter.nextLong();
+			res[i++] = iter.nextInt();
 		}
 		if(res.length != i) return Arrays.copyOf(res, i);
 		return res;
 	}
-	private static long[] growArr(long[] res){
+	private static int[] growArr(int[] res){
 		long nextSizeL = res.length*2L;
 		if(nextSizeL != (int)nextSizeL){
 			if(res.length == Integer.MAX_VALUE){
@@ -118,7 +119,7 @@ public interface IterableLongPP{
 		var res  = new StringJoiner(delimiter, prefix, suffix);
 		var iter = this.iterator();
 		while(iter.hasNext()){
-			res.add(Long.toString(iter.nextLong()));
+			res.add(Integer.toString(iter.nextInt()));
 		}
 		return res.toString();
 	}
@@ -127,17 +128,17 @@ public interface IterableLongPP{
 		int count = 0;
 		var iter  = iterator();
 		while(iter.hasNext()){
-			var ignore = iter.nextLong();
+			var ignore = iter.nextInt();
 			count++;
 		}
 		return count;
 	}
 	
-	LongIterator iterator();
+	IntIterator iterator();
 	
-	default <T> IterablePP<T> mapToObj(LongFunction<T> function){
+	default <T> IterablePP<T> mapToObj(IntFunction<T> function){
 		return () -> {
-			var src = IterableLongPP.this.iterator();
+			var src = IterableIntPP.this.iterator();
 			return new Iterator<>(){
 				@Override
 				public boolean hasNext(){
@@ -145,30 +146,30 @@ public interface IterableLongPP{
 				}
 				@Override
 				public T next(){
-					return function.apply(src.nextLong());
+					return function.apply(src.nextInt());
 				}
 			};
 		};
 	}
 	
 	
-	default IterableLongPP skip(int count){
+	default IterableIntPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
 		return () -> {
-			var iter = IterableLongPP.this.iterator();
+			var iter = IterableIntPP.this.iterator();
 			for(int i = 0; i<count; i++){
 				if(!iter.hasNext()) break;
-				iter.nextLong();
+				iter.nextInt();
 			}
 			return iter;
 		};
 	}
 	
-	default IterableLongPP limit(int maxLen){
+	default IterableIntPP limit(int maxLen){
 		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
 		return () -> {
-			var src = IterableLongPP.this.iterator();
-			return new LongIterator(){
+			var src = IterableIntPP.this.iterator();
+			return new IntIterator(){
 				private int count;
 				
 				@Override
@@ -176,48 +177,45 @@ public interface IterableLongPP{
 					return maxLen>count && src.hasNext();
 				}
 				@Override
-				public long nextLong(){
+				public int nextInt(){
 					count++;
-					return src.nextLong();
+					return src.nextInt();
 				}
 			};
 		};
 	}
 	
-	default boolean noneMatch(LongPredicate predicate){
+	default boolean noneMatch(IntPredicate predicate){
 		return !anyMatch(predicate);
 	}
-	default boolean anyMatch(LongPredicate predicate){
+	default boolean anyMatch(IntPredicate predicate){
 		var iter = iterator();
 		while(iter.hasNext()){
-			var t = iter.nextLong();
+			var t = iter.nextInt();
 			if(predicate.test(t)){
 				return true;
 			}
 		}
 		return false;
 	}
-	default boolean allMatch(LongPredicate predicate){
+	default boolean allMatch(IntPredicate predicate){
 		var iter = iterator();
 		while(iter.hasNext()){
-			var t = iter.nextLong();
+			var t = iter.nextInt();
 			if(!predicate.test(t)){
 				return false;
 			}
 		}
 		return true;
 	}
-	
-	default OptionalDouble average(){
-		long sum = 0, count = 0;
-		
-		var iter = iterator();
+	default int[] toArray(){
+		int[] res  = new int[8];
+		int   size = 0;
+		var   iter = iterator();
 		while(iter.hasNext()){
-			sum += iter.nextLong();
-			count++;
+			if(size == res.length) res = growArr(res);
+			res[size++] = iter.nextInt();
 		}
-		
-		if(count == 0) return OptionalDouble.empty();
-		return OptionalDouble.of((double)sum/count);
+		return Arrays.copyOf(res, size);
 	}
 }

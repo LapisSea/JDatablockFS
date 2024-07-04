@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -45,7 +46,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -138,7 +138,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						return dependencyNames.get().apply(accessor, ann);
 					}
 					var fields = generateFields.apply(accessor, ann).fields;
-					return fields.stream().map(VirtualFieldDefinition::name).collect(Collectors.toSet());
+					return Iters.from(fields).map(VirtualFieldDefinition::name).collectToSet();
 				});
 			}
 		}

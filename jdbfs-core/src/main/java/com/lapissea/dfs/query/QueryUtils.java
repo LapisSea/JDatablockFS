@@ -1,8 +1,8 @@
 package com.lapissea.dfs.query;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.utils.Iters;
 
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
@@ -38,7 +38,7 @@ public enum QueryUtils{
 	private static void deepPromotion(SupportedPrimitive l, Set<SupportedPrimitive> result){
 		result.add(l);
 		while(true){
-			var wave = result.stream().map(PROMOTION_MAP::get).filter(Objects::nonNull).flatMap(Collection::stream).toList();
+			var wave = Iters.from(result).map(PROMOTION_MAP::get).filtered(Objects::nonNull).flatData(e -> e).collectToList();
 			if(!result.addAll(wave)){
 				break;
 			}

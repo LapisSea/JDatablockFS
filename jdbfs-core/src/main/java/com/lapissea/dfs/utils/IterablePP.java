@@ -1,5 +1,6 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.dfs.utils.function.FunctionOI;
 import com.lapissea.dfs.utils.function.FunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 
@@ -13,12 +14,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -37,6 +41,7 @@ import java.util.stream.StreamSupport;
  *   </li>
  * </ul>
  */
+@SuppressWarnings("unused")
 public interface IterablePP<T> extends Iterable<T>{
 	
 	default Stream<T> stream(){
@@ -52,6 +57,11 @@ public interface IterablePP<T> extends Iterable<T>{
 		if(iter.hasNext()) return iter.next();
 		throw new NoSuchElementException();
 	}
+	default Optional<T> findFirst(){
+		var iter = iterator();
+		if(iter.hasNext()) return Optional.of(iter.next());
+		return Optional.empty();
+	}
 	
 	default <E extends Throwable> OptionalPP<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(T t : this){
@@ -60,6 +70,51 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		}
 		return OptionalPP.empty();
+	}
+	
+	default int count(){
+		int num = 0;
+		for(var ignore : this){
+			preIncrementInt(num);
+			num++;
+		}
+		return num;
+	}
+	
+	default long countL(){
+		long num = 0;
+		for(var ignore : this){
+			preIncrementLong(num);
+			num++;
+		}
+		return num;
+	}
+	
+	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
+		final Iterator<T> src = IterablePP.this.iterator();
+		if(!src.hasNext()) return OptionalPP.empty();
+		var result = src.next();
+		while(src.hasNext()){
+			var next = src.next();
+			result = reducer.apply(result, next);
+		}
+		return OptionalPP.of(result);
+	}
+	
+	default OptionalPP<T> min(){
+		//noinspection unchecked
+		return min((a, b) -> ((Comparable<T>)a).compareTo(b));
+	}
+	default OptionalPP<T> min(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.minBy(comparator));
+	}
+	
+	default OptionalPP<T> max(){
+		//noinspection unchecked
+		return max((a, b) -> ((Comparable<T>)a).compareTo(b));
+	}
+	default OptionalPP<T> max(Comparator<? super T> comparator){
+		return reduce(BinaryOperator.maxBy(comparator));
 	}
 	
 	default <Accumulator, Result> Result collect(Collector<? super T, Accumulator, Result> collector){
@@ -85,6 +140,13 @@ public interface IterablePP<T> extends Iterable<T>{
 		return List.copyOf(collectToList());
 	}
 	
+	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
+		return collectToList().toArray(ctor);
+	}
+	
+	default Set<T> collectToFinalSet(){
+		return Set.copyOf(collectToList());
+	}
 	default Set<T> collectToSet(){
 		var res = new HashSet<T>();
 		for(T t : this){
@@ -110,6 +172,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		//noinspection unchecked
 		return Map.ofEntries(res.toArray(Map.Entry[]::new));
+	}
+	default <K, V> Map<K, V> collectToMap(Function<T, Map.Entry<K, V>> entry){
+		return map(entry).collectToMap(Map.Entry::getKey, Map.Entry::getValue);
 	}
 	default <K, V> Map<K, V> collectToMap(Function<T, K> key, Function<T, V> value){
 		var res = new HashMap<K, V>();
@@ -138,8 +203,8 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	
-	default IterablePPs.PPCollection<T> asCollection(){
-		return new IterablePPs.PPCollection<>(this);
+	default PPCollection<T> asCollection(){
+		return new PPCollection<>(this);
 	}
 	
 	default String joinAsStr()                                              { return joinAsStr(""); }
@@ -175,9 +240,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		return true;
 	}
 	
-	default boolean noneIs(T value){
-		return !anyIs(value);
-	}
+	default boolean noneIs(T value){ return !anyIs(value); }
 	default boolean anyIs(T value){
 		for(T t : this){
 			if(t == value){
@@ -186,9 +249,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return false;
 	}
-	default boolean noneEquals(T value){
-		return !anyEquals(value);
-	}
+	default boolean noneEquals(T value){ return !anyEquals(value); }
 	default boolean anyEquals(T value){
 		for(T t : this){
 			if(Objects.equals(t, value)){
@@ -201,44 +262,28 @@ public interface IterablePP<T> extends Iterable<T>{
 	default IterablePP<T> filtered(Predicate<T> filter){
 		return () -> {
 			var src = IterablePP.this.iterator();
-			return new Iterator<T>(){
-				
-				T       next;
-				boolean hasData;
-				
-				void calcNext(){
-					while(src.hasNext()){
+			return new Iters.FindingIter<>(){
+				@Override
+				protected boolean doNext(){
+					while(true){
+						if(!src.hasNext()) return false;
 						T t = src.next();
 						if(filter.test(t)){
-							next = t;
-							hasData = true;
-							return;
+							reportFound(t);
+							return true;
 						}
-					}
-				}
-				
-				@Override
-				public boolean hasNext(){
-					if(!hasData) calcNext();
-					return hasData;
-				}
-				@Override
-				public T next(){
-					if(!hasData){
-						calcNext();
-						if(!hasData) throw new NoSuchElementException();
-					}
-					try{
-						return next;
-					}finally{
-						next = null;
-						hasData = false;
 					}
 				}
 			};
 		};
 	}
 	
+	default IterablePP<T> sortedByI(ToIntFunction<T> comparator){
+		return sorted(Comparator.comparingInt(comparator));
+	}
+	default IterablePP<T> sortedByL(ToLongFunction<T> comparator){
+		return sorted(Comparator.comparingLong(comparator));
+	}
 	default <U extends Comparable<? super U>> IterablePP<T> sortedBy(Function<T, U> comparator){
 		return sorted(Comparator.comparing(comparator));
 	}
@@ -259,7 +304,23 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterablePP<T> distinct(){
-		return () -> IterablePP.this.filtered(new HashSet<T>()::add).iterator();
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iters.FindingIter<>(){
+				private final Set<T> seen = new HashSet<>();
+				@Override
+				protected boolean doNext(){
+					while(true){
+						if(!src.hasNext()) return false;
+						T t = src.next();
+						if(seen.add(t)){
+							reportFound(t);
+							return true;
+						}
+					}
+				}
+			};
+		};
 	}
 	
 	default <L> IterablePP<L> flatArray(Function<T, L[]> flatten){
@@ -268,56 +329,64 @@ public interface IterablePP<T> extends Iterable<T>{
 	default <L> IterablePP<L> flatData(Function<T, Iterable<L>> flatten){
 		return flatMap(e -> flatten.apply(e).iterator());
 	}
+	default <L> IterablePP<L> flatOpt(Function<T, Optional<L>> map){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iters.FindingNonNullIter<>(){
+				@Override
+				protected L doNext(){
+					while(true){
+						if(!src.hasNext()) return null;
+						var o = map.apply(src.next());
+						if(o.isEmpty()) continue;
+						return o.get();
+					}
+				}
+			};
+		};
+	}
 	default <L> IterablePP<L> flatMap(Function<T, Iterator<L>> flatten){
 		return () -> {
 			var src = IterablePP.this.iterator();
-			return new Iterator<L>(){
-				
-				Iterator<L> flat;
-				
-				private L       next;
-				private boolean hasData;
-				
-				void doNext(){
+			return new Iters.FindingIter<>(){
+				private Iterator<L> flat;
+				@Override
+				protected boolean doNext(){
 					while(true){
 						if(flat == null || !flat.hasNext()){
-							if(!src.hasNext()) return;
+							if(!src.hasNext()) return false;
 							flat = flatten.apply(src.next());
 							continue;
 						}
-						next = flat.next();
-						hasData = true;
-						break;
-					}
-				}
-				
-				@Override
-				public boolean hasNext(){
-					if(!hasData) doNext();
-					return hasData;
-				}
-				@Override
-				public L next(){
-					if(!hasData){
-						doNext();
-						if(!hasData) throw new NoSuchElementException();
-					}
-					try{
-						return next;
-					}finally{
-						hasData = false;
-						next = null;
+						reportFound(flat.next());
+						return true;
 					}
 				}
 			};
 		};
 	}
 	
+	default <L> IterablePP<L> instancesOf(Class<L> instance){
+		return () -> {
+			var src = IterablePP.this.iterator();
+			return new Iters.FindingNonNullIter<>(){
+				@Override
+				protected L doNext(){
+					while(true){
+						if(!src.hasNext()) return null;
+						var o = src.next();
+						if(!instance.isInstance(o)) continue;
+						return instance.cast(o);
+					}
+				}
+			};
+		};
+//		return filtered(instance::isInstance).map(instance::cast);
+	}
 	default <L> IterablePP<L> map(Function<T, L> mapper){
 		return () -> {
 			var src = IterablePP.this.iterator();
 			return new Iterator<>(){
-				
 				@Override
 				public boolean hasNext(){
 					return src.hasNext();
@@ -340,6 +409,21 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public long nextLong(){
+					return mapper.apply(iter.next());
+				}
+			};
+		};
+	}
+	default IterableIntPP mapToInt(FunctionOI<T> mapper){
+		return () -> {
+			var iter = IterablePP.this.iterator();
+			return new IntIterator(){
+				@Override
+				public boolean hasNext(){
+					return iter.hasNext();
+				}
+				@Override
+				public int nextInt(){
 					return mapper.apply(iter.next());
 				}
 			};
@@ -371,30 +455,12 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 				@Override
 				public T next(){
+					if(maxLen<=count) throw new NoSuchElementException();
 					count++;
 					return src.next();
 				}
 			};
 		};
-	}
-	
-	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
-		final Iterator<T> src = IterablePP.this.iterator();
-		if(!src.hasNext()) return OptionalPP.empty();
-		var result = src.next();
-		while(src.hasNext()){
-			var next = src.next();
-			result = reducer.apply(result, next);
-		}
-		return OptionalPP.of(result);
-	}
-	
-	default OptionalPP<T> min(Comparator<? super T> comparator){
-		return reduce(BinaryOperator.minBy(comparator));
-	}
-	
-	default OptionalPP<T> max(Comparator<? super T> comparator){
-		return reduce(BinaryOperator.maxBy(comparator));
 	}
 	
 	interface Enumerator<T, R>{
@@ -492,28 +558,6 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 			};
 		};
-	}
-	
-	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
-		return collectToList().toArray(ctor);
-	}
-	
-	default int count(){
-		int num = 0;
-		for(var ignore : this){
-			preIncrementInt(num);
-			num++;
-		}
-		return num;
-	}
-	
-	default long countL(){
-		long num = 0;
-		for(var ignore : this){
-			preIncrementLong(num);
-			num++;
-		}
-		return num;
 	}
 	
 	private static void preIncrementLong(long index){

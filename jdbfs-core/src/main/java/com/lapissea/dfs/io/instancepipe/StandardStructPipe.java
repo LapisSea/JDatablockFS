@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.utils.Iters;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -186,7 +187,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			cmds.add(new CmdBuild.Skip(field.needsIOPool()));
 		}
 		
-		var buff = new byte[cmds.stream().mapToInt(CmdBuild::siz).sum()];
+		var buff = new byte[Iters.from(cmds).mapToInt(CmdBuild::siz).sum()];
 		var pos  = 0;
 		for(var c : cmds){
 			c.write(pos, buff);
@@ -195,12 +196,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		assert pos == buff.length;
 		
-		boolean needsInstance = cmds.stream().anyMatch(c -> switch(c){
+		boolean needsInstance = Iters.from(cmds).anyMatch(c -> switch(c){
 			case CmdBuild.Skip ignored -> false;
 			case CmdBuild.SkipFixed ignored -> false;
 			case CmdBuild.Read read -> read.needsInstance;
 		});
-		boolean needsIOPool = cmds.stream().anyMatch(c -> switch(c){
+		boolean needsIOPool = Iters.from(cmds).anyMatch(c -> switch(c){
 			case CmdBuild.Skip skip -> skip.needsIOPool;
 			case CmdBuild.SkipFixed ignored -> false;
 			case CmdBuild.Read read -> read.needsIOPool;

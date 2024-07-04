@@ -1,11 +1,11 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.type.field.access.FieldAccessor;
+import com.lapissea.dfs.utils.Iters;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public interface GetAnnotation{
 	
@@ -23,7 +23,7 @@ public interface GetAnnotation{
 	}
 	
 	static GetAnnotation from(Collection<? extends Annotation> data){
-		return from(data.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, an -> an)));
+		return from(Iters.from(data).collectToFinalMap(true, Annotation::annotationType, an -> an));
 	}
 	static GetAnnotation from(Map<Class<? extends Annotation>, ? extends Annotation> data){
 		if(data.isEmpty()) return new GetAnnotation(){
@@ -52,7 +52,7 @@ public interface GetAnnotation{
 			}
 			@Override
 			public String toString(){
-				return dataFinal.keySet().stream().map(Class::getSimpleName).collect(Collectors.joining(", ", "{", "}"));
+				return Iters.keys(dataFinal).joinAsStr(", ", "{", "}", Class::getSimpleName);
 			}
 		};
 	}

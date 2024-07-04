@@ -6,6 +6,8 @@ import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.IntHashSet;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -31,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
@@ -223,7 +224,7 @@ public abstract class StagedInit{
 			new StateInfo(STATE_DONE, "DONE")
 		);
 		
-		private static final int MIN_ID = BASE_STATES.stream().mapToInt(StateInfo::id).min().orElseThrow();
+		private static final int MIN_ID = Iters.from(BASE_STATES).mapToInt(StateInfo::id).min().orElseThrow();
 	}
 	
 	protected String stateToString(int state){
@@ -231,14 +232,14 @@ public abstract class StagedInit{
 	}
 	
 	protected Optional<StateInfo> getStateInfo(int stateId){
-		return listStates().filter(i -> i.id == stateId).findFirst();
+		return listStates().filtered(i -> i.id == stateId).findFirst();
 	}
 	/***
 	 * This method lists information about all states that this object can be in. This method is only
 	 * called when debugging or calling toString so performance is not of great concern.
 	 */
-	protected Stream<StateInfo> listStates(){
-		return StateInfo.BASE_STATES.stream();
+	protected IterablePP<StateInfo> listStates(){
+		return Iters.from(StateInfo.BASE_STATES);
 	}
 	
 	protected final void validateStates(){
@@ -247,7 +248,7 @@ public abstract class StagedInit{
 		List<String>   problems = new ArrayList<>();
 		Set<StateInfo> base     = new HashSet<>(StateInfo.BASE_STATES);
 		
-		var states = listStates().toList();
+		var states = listStates().collectToList();
 		states.forEach(state -> {
 			if(state.id<StateInfo.MIN_ID) problems.add("\t" + state + ": id is too small!");
 			if(!ids.add(state.id)) problems.add("\t" + state + ": has a duplicate id");

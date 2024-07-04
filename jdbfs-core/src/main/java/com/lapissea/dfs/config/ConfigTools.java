@@ -1,6 +1,7 @@
 package com.lapissea.dfs.config;
 
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -251,12 +252,12 @@ public final class ConfigTools{
 	public static String configFlagsToTable(List<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
-		var nameLen = values.stream().map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
+		var nameLen = Iters.from(values).map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
 		
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
 		if(grouping){
-			var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
+			var groups = Iters.from(values).collectToGrouping(e -> e.name.split("\\.")[1]);
 			for(var e : groups.entrySet()){
 				if(e.getValue().size() == 1){
 					singles.add(e.getValue().getFirst());

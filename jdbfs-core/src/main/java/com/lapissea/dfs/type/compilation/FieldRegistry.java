@@ -18,6 +18,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -80,8 +81,10 @@ final class FieldRegistry{
 				}
 				if(!any) UtilL.sleep(0.1);
 			}
-			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
-			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
+			
+			var usages = Iters.entries(scanned).sortedBy(e -> e.getKey().getName())
+			                  .flatData(Map.Entry::getValue).collectToFinalList();
+			
 			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
 		}

@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -117,7 +118,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 		@Override
 		public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
-			return new GeneralMerger<>(group.stream().<BitField<T, ?>>map(f -> f.maxAsFixedSize(varProvider)).toList());
+			return new GeneralMerger<>(Iters.from(group).<BitField<T, ?>>map(f -> f.maxAsFixedSize(varProvider)).collectToFinalList());
 		}
 		
 	}

@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.Iters;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -12,8 +13,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * This class holds the necessary information to request the struct compiler
@@ -48,10 +47,10 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.type = Objects.requireNonNull(type);
 		this.getFilter = getFilter;
 		
-		if(annotations.stream().noneMatch(an -> an instanceof IOValue)){
-			annotations = Stream.concat(annotations.stream(), Stream.of(Annotations.make(IOValue.class))).toList();
+		if(Iters.from(annotations).noneMatch(an -> an instanceof IOValue)){
+			annotations = Iters.concatN1(annotations, Annotations.make(IOValue.class)).collectToFinalList();
 		}
-		this.annotations = annotations.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, a -> a));
+		this.annotations = Iters.from(annotations).collectToFinalMap(true, Annotation::annotationType, a -> a);
 	}
 	
 	@Override

@@ -31,7 +31,7 @@ import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import ru.vyarus.java.generics.resolver.GenericsResolver;
@@ -136,9 +136,9 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkIOFieldValidity(List<FieldAccessor<T>> fields){
-		var fails = IterablePPs.from(fields)
-		                       .filtered(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
-		                       .asCollection();
+		var fails = Iters.from(fields)
+		                 .filtered(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
+		                 .asCollection();
 		if(fails.isEmpty()) return;
 		throw new IllegalField(
 			"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " + (fails.size()>1? "\n" : "") +
@@ -161,9 +161,9 @@ public final class FieldCompiler{
 			var dep = fields.get(nam);
 			if(dep == null){
 				throw new IllegalField("Could not find dependencies " +
-				                       IterablePPs.from(depNames)
-				                                  .filtered(name -> !fields.containsKey(name))
-				                                  .joinAsStr(", ") +
+				                       Iters.from(depNames)
+				                            .filtered(name -> !fields.containsKey(name))
+				                            .joinAsStr(", ") +
 				                       " on field " + field.getAccessor());
 			}
 			dependencies.add(dep);
@@ -172,7 +172,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
-		var mapFields = IterablePPs.from(fields).collectToMap(IOField::getName, identity());
+		var mapFields = Iters.from(fields).collectToMap(IOField::getName, identity());
 		for(var field : fields){
 			field.initLateData(generateDependencies(mapFields, field));
 		}
@@ -194,8 +194,8 @@ public final class FieldCompiler{
 				for(var s : toInject){
 					var existing = virtualData.get(s.name);
 					if(existing == null){
-						existing = IterablePPs.from(parsed).map(IOField::getAccessor)
-						                      .firstMatching(a -> a.getName().equals(s.name)).orElse(null);
+						existing = Iters.from(parsed).map(IOField::getAccessor)
+						                .firstMatching(a -> a.getName().equals(s.name)).orElse(null);
 					}
 					if(existing != null){
 						var gTyp = existing.getGenericType(null);
@@ -238,7 +238,7 @@ public final class FieldCompiler{
 	
 	
 	private static IterablePP<Class<?>> deepClasses(Class<?> clazz){
-		return IterablePPs.nullTerminated(() -> new Supplier<>(){
+		return Iters.nullTerminated(() -> new Supplier<>(){
 			Class<?> c = clazz;
 			@Override
 			public Class<?> get(){
@@ -259,7 +259,7 @@ public final class FieldCompiler{
 		private Method getter;
 		private Method setter;
 		
-		private IterablePP<Method> iter(){ return IterablePPs.of(getter, setter); }
+		private IterablePP<Method> iter(){ return Iters.of(getter, setter); }
 	}
 	
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
@@ -304,8 +304,8 @@ public final class FieldCompiler{
 			var    p    = e.getValue();
 			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
-				IterablePPs.of(p.getter, p.setter).flatArray(Method::getAnnotations).distinct()
-				           .collectToFinalMap(true, Annotation::annotationType, identity());
+				Iters.of(p.getter, p.setter).flatArray(Method::getAnnotations).distinct()
+				     .collectToFinalMap(true, Annotation::annotationType, identity());
 			
 			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
 			
@@ -322,11 +322,11 @@ public final class FieldCompiler{
 	private static <T extends IOInstance<T>> void checkForUnusedFunctions(
 		Map<String, GetSet> functionFields, List<Method> hangingMethods, List<FieldAccessor<T>> fields
 	){
-		var gettersSetters = IterablePPs.values(functionFields).flatData(GetSet::iter);
+		var gettersSetters = Iters.values(functionFields).flatData(GetSet::iter);
 		
-		var unusedErr = IterablePPs.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
+		var unusedErr = Iters.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
 			String helpStr = "";
-			if(IterablePPs.from(fields).map(FieldAccessor::getName).anyEquals(method.getName())){
+			if(Iters.from(fields).map(FieldAccessor::getName).anyEquals(method.getName())){
 				helpStr = calcGetPrefixes(method).joinAsStr(" or ", " did you mean ", "?", p -> p + TextUtil.firstToUpperCase(method.getName()));
 			}
 			return method + helpStr;
@@ -378,7 +378,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
-		var errors = IterablePPs.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null)).asCollection();
+		var errors = Iters.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null)).asCollection();
 		if(errors.isEmpty()) return;
 		
 		throw new IllegalField(
@@ -390,8 +390,8 @@ public final class FieldCompiler{
 	
 	private static IterablePP<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }
 	private static IterablePP<String> calcGetPrefixes(Class<?> typ){
-		if(typ == boolean.class || typ == Boolean.class) return IterablePPs.of("is", "get");
-		return IterablePPs.of("get");
+		if(typ == boolean.class || typ == Boolean.class) return Iters.of("is", "get");
+		return Iters.of("get");
 	}
 	
 	private static String getFieldName(Field field){
@@ -435,19 +435,18 @@ public final class FieldCompiler{
 	}
 	
 	private static IterablePP<Method> allMethods(Class<?> clazz){
-		return IterablePPs.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
-		                  .flatArray(Class::getDeclaredMethods);
+		return Iters.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass).flatArray(Class::getDeclaredMethods);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
-		IterablePPs.from(activeAnnotations())
-		           .flatData(ann -> IterablePPs.concat1N(
-			           ann, IterablePPs.of(ann.getClasses())
-			                           .filtered(Class::isAnnotation)
-			                           .map(c -> (Class<? extends Annotation>)c)
-		           ))
-		           .collectToFinalList();
+		Iters.from(activeAnnotations())
+		     .flatData(ann -> Iters.concat1N(
+			     ann, Iters.of(ann.getClasses())
+			               .filtered(Class::isAnnotation)
+			               .map(c -> (Class<? extends Annotation>)c)
+		     ))
+		     .collectToFinalList();
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

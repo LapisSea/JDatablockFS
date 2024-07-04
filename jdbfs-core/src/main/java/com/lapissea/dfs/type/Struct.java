@@ -26,7 +26,7 @@ import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -183,7 +183,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				IterablePPs.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				Iters.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -648,10 +648,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Override
-	protected Stream<StateInfo> listStates(){
-		return Stream.concat(
+	protected IterablePP<StateInfo> listStates(){
+		return Iters.concat(
 			super.listStates(),
-			Stream.of(
+			Iters.of(
 				new StateInfo(STATE_CONCRETE_TYPE, "CONCRETE_TYPE"),
 				new StateInfo(STATE_FIELD_MAKE, "FIELD_MAKE"),
 				new StateInfo(STATE_INIT_FIELDS, "INIT_FIELDS")
@@ -833,12 +833,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private List<FieldStruct<T>> calcNullContainInstances(){
 		return getRealFields()
-			       .map(f -> Struct.tryOf(f.getType())
-			                       .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
-			                       .map(s -> new FieldStruct<>(f, s)))
-			       .filtered(Optional::isPresent)
-			       .map(Optional::get)
-			       .collectToList();
+			       .flatOpt(f -> Struct.tryOf(f.getType())
+			                           .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
+			                           .map(s -> new FieldStruct<>(f, s)))
+			       .collectToFinalList();
 	}
 	
 	public FieldSet<T> getFields(){
@@ -913,8 +911,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.stream().map(fieldMapper).flatMap(Optional::stream)
-		                .collect(Collectors.joining(fieldSeparator, prefix, end));
+		var str = fields.flatOpt(fieldMapper).joinAsStr(fieldSeparator, prefix, end);
 		
 		if(!doShort){
 			if(str.equals(prefix + end)) return name;

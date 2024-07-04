@@ -3,7 +3,7 @@ package com.lapissea.dfs.type;
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
@@ -102,14 +102,14 @@ public final class GenericContext implements Stringify{
 	@Override
 	public String toString(){
 		return Utils.typeToHuman(owner) +
-		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                  .joinAsStr(", ", "<", ">");
+		       Iters.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
+		            .joinAsStr(", ", "<", ">");
 	}
 	@Override
 	public String toShortString(){
 		return Utils.typeToHuman(owner) +
-		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                  .joinAsStr(", ", "<", ">");
+		       Iters.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
+		            .joinAsStr(", ", "<", ">");
 	}
 	private String strName(int i){
 		if(typeNames != null){

@@ -21,7 +21,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
@@ -69,7 +69,7 @@ public final class MemoryOperations{
 			
 			
 			//test unknowns
-			var iter = (noTrim? IterablePPs.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
+			var iter = (noTrim? Iters.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
 			while(iter.hasNext()){
 				var headIndex = iter.nextLong();
 				

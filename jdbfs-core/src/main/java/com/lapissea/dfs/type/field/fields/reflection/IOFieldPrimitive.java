@@ -23,17 +23,16 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.objects.NumberSize.*;
 import static com.lapissea.dfs.type.WordSpace.BIT;
@@ -639,7 +638,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		super.init(fields);
 		var fieldOpt = forceFixed? Optional.<IOField<T, NumberSize>>empty() : IOFieldTools.getDynamicSize(getAccessor());
 		if(fieldOpt.isPresent()){
-			var allowed = EnumSet.copyOf(allowedSizes().stream().filter(s -> s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));
+			var allowed = EnumSet.copyOf(Iters.from(allowedSizes()).filtered(s -> s.lesserThanOrEqual(maxSize.size)).collectToSet());
 			var field   = fieldOpt.get();
 			dynamicSize = (ioPool, instance) -> {
 				var val = field.get(ioPool, instance);
@@ -648,8 +647,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				return val;
 			};
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
-				allowed.stream().min(Comparator.naturalOrder()).orElse(VOID),
-				allowed.stream().max(Comparator.naturalOrder()),
+				Iters.from(allowed).min().orElse(VOID),
+				Iters.from(allowed).max().toOptional(),
 				field.getAccessor()));
 		}else{
 			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));

@@ -13,9 +13,7 @@ import com.lapissea.dfs.type.field.IOField;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -23,7 +21,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
 		return (t, structFields, testRun) -> {
-			Set<IOField<T, ?>> sizeFields = sizeFieldStream(structFields).collect(Collectors.toSet());
+			var sizeFields = sizeFieldStream(structFields).collectToSet();
 			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
 	}

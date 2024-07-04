@@ -1,6 +1,7 @@
 package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.objects.Stringify;
+import com.lapissea.dfs.utils.Iters;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -121,9 +122,9 @@ public final class RangeIO implements RandomIO, Stringify{
 	}
 	@Override
 	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
-		var max = data.stream().mapToLong(WriteChunk::ioEnd).max().orElse(-1);
+		var max = Iters.from(data).mapToLong(WriteChunk::ioEnd).max().orElse(-1);
 		if(maxLength<max) endFail();
-		parent.writeAtOffsets(data.stream().map(d -> d.withOffset(d.ioOffset() + offset)).toList());
+		parent.writeAtOffsets(Iters.from(data).map(d -> d.withOffset(d.ioOffset() + offset)).collectToList());
 	}
 	
 	@Override

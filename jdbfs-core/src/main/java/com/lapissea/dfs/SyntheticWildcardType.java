@@ -1,10 +1,10 @@
 package com.lapissea.dfs;
 
+import com.lapissea.dfs.utils.Iters;
+
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 public record SyntheticWildcardType(List<Type> lower, List<Type> upper) implements WildcardType{
 	
@@ -36,7 +36,6 @@ public record SyntheticWildcardType(List<Type> lower, List<Type> upper) implemen
 			return "?";
 		}
 		
-		return "? " + (!lower.isEmpty()? "super" : "extends") + " " +
-		       args.stream().map(Objects::toString).collect(Collectors.joining(" & "));
+		return "? " + (!lower.isEmpty()? "super" : "extends") + " " + Iters.from(args).joinAsStr(" & ");
 	}
 }

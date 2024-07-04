@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.Method;
@@ -8,7 +9,6 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.SupportedPrimitive.BOOLEAN;
 
@@ -85,13 +85,13 @@ public final class CompilationTools{
 	);
 	
 	static Optional<FieldStub> asStub(Method method){
-		return Stream.concat(GETTER_PATTERNS.stream(), SETTER_PATTERNS.stream()).map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
+		return Iters.concat(GETTER_PATTERNS, SETTER_PATTERNS).flatOpt(f -> f.apply(method)).findFirst();
 	}
 	
 	static Optional<FieldStub> asGetterStub(Method method){
-		return GETTER_PATTERNS.stream().map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
+		return Iters.from(GETTER_PATTERNS).flatOpt(f -> f.apply(method)).findFirst();
 	}
 	static Optional<FieldStub> asSetterStub(Method method){
-		return SETTER_PATTERNS.stream().map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
+		return Iters.from(SETTER_PATTERNS).flatOpt(f -> f.apply(method)).findFirst();
 	}
 }

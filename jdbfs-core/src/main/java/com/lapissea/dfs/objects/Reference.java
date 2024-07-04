@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -39,7 +40,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
-					f.get(0) instanceof BitFieldMerger<?> m && m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize")) &&
+					f.get(0) instanceof BitFieldMerger<?> m && Iters.from(m.fieldGroup()).map(IOField::getName).collectToList().equals(List.of("offsetSize", "ptrSize")) &&
 					f.get(1).getName().equals("offset") &&
 					f.get(2).getName().equals("ptr")
 				){

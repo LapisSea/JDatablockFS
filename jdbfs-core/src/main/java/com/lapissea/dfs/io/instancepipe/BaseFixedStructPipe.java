@@ -15,16 +15,13 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.utils.IterablePP;
 
 import java.io.IOException;
-import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.function.Predicate.not;
 
@@ -52,31 +49,29 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		var badFields = sizeFieldStream(structFields).filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
+		var badFields = sizeFieldStream(structFields).filtered(IOField::hasDependencies).joinAsStr(", ");
 		if(!badFields.isEmpty()){
 			throw new IllegalField(badFields + " should not have dependencies");
 		}
 		
 		return sizeFieldStream(structFields)
-			       .map(sizingField -> {
-				       var size = getType().getFields().streamDependentOn(sizingField)
-				                           .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
-				                           .distinct()
-				                           .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
-				                           .reduce((a, b) -> {
-					                           if(a != b){
-						                           throw new MalformedStruct("inconsistent dependency sizes" + sizingField);
-					                           }
-					                           return a;
-				                           })
-				                           .orElse(NumberSize.LARGEST);
-				       return new AbstractMap.SimpleEntry<>(sizingField, size);
-			       })
-			       .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			       .collectToFinalMap(false, Function.identity(), sizingField -> {
+				       return getType().getFields().streamDependentOn(sizingField)
+				                       .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
+				                       .distinct()
+				                       .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
+				                       .reduce((a, b) -> {
+					                       if(a != b){
+						                       throw new MalformedStruct("inconsistent dependency sizes" + sizingField);
+					                       }
+					                       return a;
+				                       })
+				                       .orElse(NumberSize.LARGEST);
+			       });
 	}
 	
-	protected static <T extends IOInstance<T>> Stream<IOField<T, NumberSize>> sizeFieldStream(FieldSet<T> structFields){
-		return structFields.stream().map(f -> IOFieldTools.getDynamicSize(f.getAccessor())).flatMap(Optional::stream);
+	protected static <T extends IOInstance<T>> IterablePP<IOField<T, NumberSize>> sizeFieldStream(FieldSet<T> structFields){
+		return structFields.flatOpt(f -> IOFieldTools.getDynamicSize(f.getAccessor()));
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){

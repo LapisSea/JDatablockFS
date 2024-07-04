@@ -6,6 +6,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -263,13 +264,13 @@ public class QueryExpressionParser{
 		}
 		private <T extends Enum<T> & Matched> T match(Class<T> toCheck, boolean require){
 			var universe = EnumUniverse.of(toCheck);
-			var result = universe.stream().flatMap(c -> c.matches().stream().map(m -> Map.entry(c, m)))
+			var result = universe.flatData(c -> Iters.from(c.matches()).map(m -> Map.entry(c, m)))
 			                     .sorted(Comparator.comparingInt(e -> -e.getValue().length()))
-			                     .filter(e -> match(e.getValue())).findFirst().map(Map.Entry::getKey);
+			                     .firstMatching(e -> match(e.getValue())).map(Map.Entry::getKey);
 			if(require && result.isEmpty()){
 				throw new InvalidQueryString(
 					"Expected any " + toCheck.getSimpleName() +
-					" (" + universe.stream().flatMap(c -> c.matches().stream()).collect(Collectors.joining(", ")) + ")" +
+					" (" + universe.flatData(Matched::matches).collect(Collectors.joining(", ")) + ")" +
 					atTemplate(pos));
 			}
 			return result.orElse(null);

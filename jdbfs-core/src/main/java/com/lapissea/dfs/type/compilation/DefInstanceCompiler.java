@@ -23,6 +23,8 @@ import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
@@ -114,7 +116,7 @@ public final class DefInstanceCompiler{
 	){ }
 	
 	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
-		Stream<FieldStub> stubs(){ return Stream.concat(getter.stream(), setter.stream()); }
+		IterablePP<FieldStub> stubs(){ return Iters.of(getter, setter).flatOpt(Function.identity()); }
 		@Override
 		public String toString(){
 			return "{" +
@@ -1274,8 +1276,8 @@ public final class DefInstanceCompiler{
 		var problems = fields.stream()
 		                     .map(gs -> {
 			                          var dup = gs.stubs()
-			                                      .flatMap(g -> Arrays.stream(g.method().getAnnotations()))
-			                                      .filter(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+			                                      .flatArray(g -> g.method().getAnnotations())
+			                                      .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
 			                                      .collect(Collectors.groupingBy(Annotation::annotationType))
 			                                      .values().stream()
 			                                      .filter(l -> l.size()>1)

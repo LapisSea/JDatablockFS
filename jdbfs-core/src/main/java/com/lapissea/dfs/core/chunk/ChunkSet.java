@@ -4,7 +4,7 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.utils.IterableLongPP;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.LongIterator;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.IntConsumer;
@@ -264,7 +264,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		return ptrs(c).allMatch(this::contains);
 	}
 	private IterablePP<ChunkPointer> ptrs(Collection<?> c){
-		return IterablePPs.from(c).map(o -> switch(o){
+		return Iters.from(c).map(o -> switch(o){
 			case ChunkPointer p -> p;
 			case Chunk ch -> ch.getPtr();
 			default -> null;

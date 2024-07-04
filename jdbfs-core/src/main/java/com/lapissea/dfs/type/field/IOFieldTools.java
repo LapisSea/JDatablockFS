@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -148,7 +149,7 @@ public final class IOFieldTools{
 			                          "To be used only by " + TemplateClassLoader.class.getName());
 		}
 		var dataOrder    = dataOrderAnn.value();
-		var actualNames  = fields.stream().map(IOField::getName).collect(Collectors.toSet());
+		var actualNames  = Iters.from(fields).map(IOField::getName).collectToSet();
 		var dataOrderSet = Set.of(dataOrder);
 		if(!dataOrderSet.equals(actualNames)){
 			throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);

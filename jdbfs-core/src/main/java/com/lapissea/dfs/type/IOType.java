@@ -7,7 +7,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
@@ -69,14 +69,12 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			PRIMITIVE_MARKER + "V", void.class
 		);
 		
-		private static final int PRIMITIVE_NAMES_MAX_LEN = PRIMITIVE_NAMES.values().stream()
-		                                                                  .map(Class::getName).mapToInt(String::length)
-		                                                                  .max().orElseThrow();
+		private static final int PRIMITIVE_NAMES_MAX_LEN = Iters.values(PRIMITIVE_NAMES)
+		                                                        .map(Class::getName).mapToInt(String::length)
+		                                                        .max().orElseThrow();
 		
 		private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
-			PRIMITIVE_NAMES.entrySet()
-			               .stream()
-			               .collect(Collectors.toUnmodifiableMap(e -> e.getValue().getName(), Map.Entry::getKey));
+			Iters.entries(PRIMITIVE_NAMES).collectToFinalMap(true, e -> e.getValue().getName(), Map.Entry::getKey);
 		
 		@IOValue
 		private String name;
@@ -268,11 +266,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public String toString(){
 			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
-			return raw + IterablePPs.from(args).joinAsStr(", ", "<", ">");
+			return raw + Iters.from(args).joinAsStr(", ", "<", ">");
 		}
 		@Override
 		public String toShortString(){
-			return raw.toShortString() + IterablePPs.from(args).joinAsStr(", ", "<", ">", IOType::toShortString);
+			return raw.toShortString() + Iters.from(args).joinAsStr(", ", "<", ">", IOType::toShortString);
 		}
 		@Override
 		public IOType withArgs(IOType... args){

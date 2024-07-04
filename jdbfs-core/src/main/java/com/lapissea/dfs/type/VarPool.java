@@ -9,7 +9,6 @@ import com.lapissea.util.NotImplementedException;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -192,11 +191,9 @@ public interface VarPool<T extends IOInstance<T>>{
 		@Override
 		public String toString(){
 			return typ.getFields()
-			          .stream()
-			          .map(f -> f.getVirtual(StoragePool.values()[poolId]))
-			          .flatMap(Optional::stream)
+			          .flatOpt(f -> f.getVirtual(StoragePool.values()[poolId]))
 			          .map(c -> c.getName() + ": " + Utils.toShortString(get(c)))
-			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getFullName()) + "{", "}"));
+			          .joinAsStr(", ", Utils.classNameToHuman(typ.getFullName()) + "{", "}");
 		}
 	}
 	

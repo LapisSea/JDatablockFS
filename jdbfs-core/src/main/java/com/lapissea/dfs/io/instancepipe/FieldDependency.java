@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.utils.Iters;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,7 +36,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
-		return getDeps(FieldSet.of(names.stream().map(allFields::requireByName)));
+		return getDeps(FieldSet.of(Iters.from(names).map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()) return emptyTicket();

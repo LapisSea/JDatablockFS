@@ -5,6 +5,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.ConfigTools;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
@@ -17,7 +18,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.Utils.getFrame;
 
@@ -81,7 +81,7 @@ public class Log{
 				ConfigTools.configFlagsToTable(values, 4, true)
 			);
 			
-			var existingNames = values.stream().map(ConfigTools.ConfEntry::name).collect(Collectors.toSet());
+			var existingNames = Iters.from(values).map(ConfigTools.ConfEntry::name).collectToSet();
 			if(scanBadFlags(existingNames)){
 				Thread.startVirtualThread(() -> {
 					UtilL.sleep(1000);
@@ -94,11 +94,11 @@ public class Log{
 	}
 	
 	private static boolean scanBadFlags(Set<String> existingNames){
-		var badValues = System.getProperties().keySet().stream().filter(String.class::isInstance).map(o -> (String)o)
-		                      .filter(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
-		                      .filter(key -> !existingNames.contains(key))
-		                      .map(key -> new ConfigTools.ConfEntry(key, Objects.toString(System.getProperty(key))))
-		                      .toList();
+		var badValues = Iters.keys(System.getProperties()).instancesOf(String.class)
+		                     .filtered(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
+		                     .filtered(key -> !existingNames.contains(key))
+		                     .map(key -> new ConfigTools.ConfEntry(key, Objects.toString(System.getProperty(key))))
+		                     .collectToList();
 		
 		if(!badValues.isEmpty()){
 			var msg = resolveArgs(
@@ -264,7 +264,7 @@ public class Log{
 				if(c == '{' && message.charAt(i + 1) == '#'){
 					var col = findColor(message, i + 2).orElseThrow(
 						() -> new IllegalArgumentException("Illegal log format, opened format block with {#... could not find a valid color. Valid colors: " +
-						                                   COLORS.stream().map(Tag::name).collect(Collectors.joining(", ", "[", "]"))));
+						                                   Iters.from(COLORS).joinAsStr(", ", "[", "]", Tag::name)));
 					var cmd = col.cmd;
 					formatted.append(cmd);
 					colorStack.add(last);

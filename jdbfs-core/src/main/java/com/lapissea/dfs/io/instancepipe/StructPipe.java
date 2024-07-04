@@ -43,7 +43,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
-import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -68,6 +69,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -277,7 +279,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
-				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
+				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
 			//Do not post validate now, will create issues with recursive types. It is called in registration
@@ -334,18 +336,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		getType().waitForStateDone();
 		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
-			fields = FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f -> (IOField<T, ?>)f)).toList());
+			fields = FieldSet.of(Iters.concat(
+				Iters.from(getSpecificFields()),
+				Iters.from(unmanaged.getUnmanagedStaticFields()).map(f -> (IOField<T, ?>)f)
+			));
 		}else{
 			fields = getSpecificFields();
 		}
 		
-		var refs = fields.stream()
-		                 .filter(RefField.class::isInstance)
-		                 .map(RefField.class::cast)
-		                 .map(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).map(f -> Map.entry(f, ref)))
-		                 .filter(OptionalPP::isPresent)
-		                 .map(OptionalPP::get)
-		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+		var refs = fields.instancesOf(RefField.class)
+		                 .flatOpt(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).map(f -> Map.entry(f, ref)).toOptional())
+		                 .collectToMap(Function.identity());
 		
 		for(var field : fields){
 			var refVal = refs.get(field);
@@ -363,7 +364,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			if(field instanceof IOFieldInlineSealedObject<?, ?> seal){
-				if(seal.getTypePipes().stream().anyMatch(p -> p.getType().getCanHavePointers())){
+				if(Iters.from(seal.getTypePipes()).map(StructPipe::getType).anyMatch(Struct::getCanHavePointers)){
 					builder.dynamic();
 				}else{
 					builder.skipField(field);
@@ -450,10 +451,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	@Override
-	protected Stream<StateInfo> listStates(){
-		return Stream.concat(
+	protected IterablePP<StateInfo> listStates(){
+		return Iters.concat(
 			super.listStates(),
-			Stream.of(
+			Iters.of(
 				new StateInfo(STATE_IO_FIELD, "IO_FIELD"),
 				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC")
 			)
@@ -512,7 +513,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			//noinspection unchecked
 			var unmanagedStatic = (FieldSet<T>)u.getUnmanagedStaticFields();
 			if(!unmanagedStatic.isEmpty()){
-				fields = FieldSet.of(Stream.concat(fields.stream(), unmanagedStatic.stream()));
+				fields = FieldSet.of(Iters.concat(fields, unmanagedStatic));
 			}
 		}
 		
@@ -547,23 +548,21 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var max = hasDynamicFields? OptionalLong.empty() : IOFieldTools.sumVarsIfAll(fields, siz -> siz.getMax(wordSpace));
 		
 		
-		var groups = fields.stream()
-		                   .filter(f -> f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
-		                   .collect(Collectors.groupingBy(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
+		var groups = fields.filtered(f -> f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+		                   .collectToGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor())
 		                   .entrySet().stream()
 		                   .filter(e -> e.getValue().size()>=minGroup)
 		                   .map(e -> new SizeGroup<>(e.getKey(), e.getValue()))
 		                   .collect(Collectors.toList());
 		
-		var groupNumberSet = groups.stream().map(e -> e.num).collect(Collectors.toUnmodifiableSet());
+		var groupNumberSet = Iters.from(groups).map(e -> e.num).collectToSet();
 		
 		return new SizeRelationReport<>(
 			fields, wordSpace, knownFixed, min, max, hasDynamicFields,
 			groups,
-			fields.stream()
-			      .filter(f -> !f.getSizeDescriptor().hasFixed())
-			      .filter(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
-			      .toList()
+			fields.filtered(f -> !f.getSizeDescriptor().hasFixed())
+			      .filtered(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
+			      .collectToFinalList()
 		);
 	}
 	

@@ -12,7 +12,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -60,7 +60,7 @@ public sealed interface CollectionInfo{
 		@Override
 		public boolean hasNulls(){ return false; }
 		@Override
-		public IterablePP<?> iter(Object collection){ return IterablePPs.of(); }
+		public IterablePP<?> iter(Object collection){ return Iters.of(); }
 	}
 	
 	@IOValue
@@ -89,7 +89,7 @@ public sealed interface CollectionInfo{
 		public boolean hasNulls(){ return false; }
 		@Override
 		public IterablePP<?> iter(Object collection){
-			return IterablePPs.rangeMap(0, Array.getLength(collection), i -> Array.get(collection, i));
+			return Iters.rangeMap(0, Array.getLength(collection), i -> Array.get(collection, i));
 		}
 	}
 	
@@ -128,7 +128,7 @@ public sealed interface CollectionInfo{
 		@Override
 		public IterablePP<?> iter(Object collection){
 			var arr = (Object[])collection;
-			return IterablePPs.rangeMap(0, arr.length, i -> arr[i]);
+			return Iters.rangeMap(0, arr.length, i -> arr[i]);
 		}
 		
 		public Class<?> getArrayType(){ return arrayType; }

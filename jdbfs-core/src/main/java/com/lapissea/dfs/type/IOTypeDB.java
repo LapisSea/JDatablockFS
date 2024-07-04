@@ -18,6 +18,7 @@ import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
@@ -294,7 +295,7 @@ public sealed interface IOTypeDB{
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
 					this.cl2id = Map.copyOf(cl2id);
-					var maxId = this.cl2id.values().stream().mapToInt(i -> i + 1).max().orElse(0);
+					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max().orElse(0);
 					id2cl = new Class[maxId];
 					this.cl2id.forEach((t, i) -> id2cl[i] = t);
 				}
@@ -304,11 +305,11 @@ public sealed interface IOTypeDB{
 			
 			private Fixed(Map<String, TypeDef> defs, Map<Integer, IOType> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
-				var maxID = idToTyp.keySet().stream().mapToInt(i -> i).max().orElse(0);
+				var maxID = Iters.keys(idToTyp).mapToInt(i -> i).max().orElse(0);
 				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
-				typToID = idToTyp.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
-				this.sealedMultiverse = sealedMultiverse.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id)));
+				typToID = Iters.entries(idToTyp).collectToFinalMap(true, Map.Entry::getValue, Map.Entry::getKey);
+				this.sealedMultiverse = Iters.entries(sealedMultiverse).collectToFinalMap(true, Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
 			}
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
@@ -467,7 +468,7 @@ public sealed interface IOTypeDB{
 				}
 				
 				var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
-				uni.universe().stream().sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
+				Iters.from(uni.universe()).sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
 					db.toID(uni.root(), cls, true);
 				});
 			}catch(Throwable e){
@@ -593,7 +594,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		public Set<String> listStoredTypeDefinitionNames(){
-			return defsLock.read(() -> defs.stream().map(k -> k.getKey().typeName).collect(Collectors.toSet()));
+			return defsLock.read(() -> defs.map(k -> k.getKey().typeName).collectToSet());
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
@@ -606,42 +607,40 @@ public sealed interface IOTypeDB{
 			synchronized(Validated.VALS){
 				newDefs.entrySet().removeIf(e -> Validated.VALS.contains(e.getKey().typeName));
 				if(newDefs.isEmpty()) return;
-				newDefs.keySet().stream().map(n -> n.typeName).forEach(Validated.VALS::add);
+				Iters.keys(newDefs).map(n -> n.typeName).forEach(Validated.VALS::add);
 			}
 			
-			var names = newDefs.entrySet()
-			                   .stream()
-			                   .filter(e -> !e.getValue().isUnmanaged())
-			                   .map(e -> e.getKey().typeName)
-			                   .collect(Collectors.toSet());
+			var names = Iters.entries(newDefs)
+			                 .filtered(e -> !e.getValue().isUnmanaged())
+			                 .map(e -> e.getKey().typeName)
+			                 .collectToSet();
 			
 			Function<StructPipe<?>, List<String>> toNames =
-				pipe -> pipe.getSpecificFields().stream()
-				            .map(IOField::getName)
-				            .toList();
+				pipe -> Iters.from(pipe.getSpecificFields())
+				             .map(IOField::getName)
+				             .collectToList();
 			
 			var fieldMap =
-				newDefs.entrySet()
-				       .stream()
-				       .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
-				       .map(e -> {
-					       Struct<?> typ;
-					       try{
-						       var cls = Class.forName(e.getKey().typeName);
-						       typ = Struct.ofUnknown(cls);
-					       }catch(ClassNotFoundException ex){
-						       throw new RuntimeException(ex);
-					       }catch(IllegalArgumentException ex){
-						       return null;
-					       }
-					       return Map.entry(e.getKey(), typ);
-				       })
-				       .filter(Objects::nonNull)
-				       .collect(Collectors.toMap(e -> e.getKey().typeName, e -> {
-					       var typ  = e.getValue();
-					       var pipe = StandardStructPipe.of(typ);
-					       return toNames.apply(pipe);
-				       }));
+				Iters.entries(newDefs)
+				     .filtered(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
+				     .map(e -> {
+					     Struct<?> typ;
+					     try{
+						     var cls = Class.forName(e.getKey().typeName);
+						     typ = Struct.ofUnknown(cls);
+					     }catch(ClassNotFoundException ex){
+						     throw new RuntimeException(ex);
+					     }catch(IllegalArgumentException ex){
+						     return null;
+					     }
+					     return Map.entry(e.getKey(), typ);
+				     })
+				     .filtered(Objects::nonNull)
+				     .collectToMap(e -> e.getKey().typeName, e -> {
+					     var typ  = e.getValue();
+					     var pipe = StandardStructPipe.of(typ);
+					     return toNames.apply(pipe);
+				     });
 			
 			RuntimeException e = null;
 			
@@ -792,7 +791,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			if(dataCache.size()>64){
-				dataCache.remove(dataCache.keySet().stream().skip(Rand.i(dataCache.size() - 1)).findAny().orElseThrow());
+				dataCache.remove(Iters.keys(dataCache).skip(Rand.i(dataCache.size() - 1)).getFirst());
 			}
 			dataCache.put(id, type);
 			
