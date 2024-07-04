@@ -312,7 +312,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 							{//Disable modification of the list while it is being moved
 								var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 								var freeRef = fch.getPointer();
-								if(freeRef.dereference(context).walkNext().anyMatch(c -> c == toMove)){
+								if(freeRef.dereference(context).walkNext().anyIs(toMove)){
 									allowFreeRemove = false;
 								}
 							}

@@ -3,8 +3,10 @@ package com.lapissea.dfs.utils;
 import com.lapissea.util.TextUtil;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -42,6 +44,7 @@ public final class IterablePPs{
 			var c = computedSet;
 			if(c != null) return c;
 			if(empty == TRUE) return computedSet = Set.of();
+			if(computed != null) return computedSet = new HashSet<>(computed);
 			return computedSet = collectToSet();
 		}
 		
@@ -148,7 +151,7 @@ public final class IterablePPs{
 	}
 	
 	public static String toString(IterablePP<?> inst){
-		return inst.map(TextUtil::toShortString).joinAsStrings(", ", "[", "]");
+		return inst.joinAsStr(", ", "[", "]", TextUtil::toShortString);
 	}
 	
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
@@ -233,8 +236,19 @@ public final class IterablePPs{
 			};
 		};
 	}
+	
 	public static <T> IterablePP<T> from(Collection<T> data){
 		return data::iterator;
+	}
+	
+	public static <V> IterablePP<V> values(Map<?, V> data){
+		return data.values()::iterator;
+	}
+	public static <K> IterablePP<K> keys(Map<K, ?> data){
+		return data.keySet()::iterator;
+	}
+	public static <K, V> IterablePP<Map.Entry<K, V>> entries(Map<K, V> data){
+		return data.entrySet()::iterator;
 	}
 	
 	private static final class RangeMapLIter<T> implements Iterator<T>{
@@ -293,5 +307,8 @@ public final class IterablePPs{
 	@SuppressWarnings("varargs")
 	public static <T> IterablePP<T> concat(Iterable<T>... iterables){
 		return of(iterables).flatMap(Iterable::iterator);
+	}
+	public static <T> IterablePP<T> concat1N(T first, Iterable<T> extra){
+		return concat(IterablePPs.of(first), extra);
 	}
 }

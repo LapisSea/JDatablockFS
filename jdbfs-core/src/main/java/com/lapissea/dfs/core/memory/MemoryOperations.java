@@ -781,7 +781,7 @@ public final class MemoryOperations{
 			throw new IllegalArgumentException(firstChunk + " is not the first chunk! " + ch + " declares it as next.");
 		}
 		
-		if(firstChunk.walkNext().noneMatch(c -> c == target)){
+		if(firstChunk.walkNext().noneIs(target)){
 			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}

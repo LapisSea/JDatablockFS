@@ -81,6 +81,9 @@ public interface IterablePP<T> extends Iterable<T>{
 	default List<T> collectToList(){
 		return toArrayList();
 	}
+	default List<T> collectToFinalList(){
+		return List.copyOf(collectToList());
+	}
 	
 	default Set<T> collectToSet(){
 		var res = new HashSet<T>();
@@ -90,7 +93,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
-	default <K, V> Map<K, V> collectUnmodifiableToMap(boolean counting, Function<T, K> key, Function<T, V> value){
+	default <K, V> Map<K, V> collectToFinalMap(boolean counting, Function<T, K> key, Function<T, V> value){
 		if(counting){
 			var arr = new Map.Entry[count()];
 			int i   = 0;
@@ -118,18 +121,36 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return res;
 	}
+	default <K> Map<K, Integer> collectToGroupingSizes(Function<T, K> key){
+		var res = new HashMap<K, Integer>();
+		for(T t : this){
+			res.compute(key.apply(t), (k, v) -> v == null? 1 : v + 1);
+		}
+		return res;
+	}
+	
+	default <K> Map<K, List<T>> collectToGrouping(Function<T, K> key){
+		var res = new HashMap<K, List<T>>();
+		for(T t : this){
+			res.computeIfAbsent(key.apply(t), k -> new ArrayList<>()).add(t);
+		}
+		return res;
+	}
 	
 	
 	default IterablePPs.PPCollection<T> asCollection(){
 		return new IterablePPs.PPCollection<>(this);
 	}
 	
-	default String joinAsStrings()                      { return joinAsStrings(""); }
-	default String joinAsStrings(CharSequence delimiter){ return joinAsStrings(delimiter, "", ""); }
-	default String joinAsStrings(CharSequence delimiter, CharSequence prefix, CharSequence suffix){
+	default String joinAsStr()                                              { return joinAsStr(""); }
+	default String joinAsStr(String delimiter)                              { return joinAsStr(delimiter, "", ""); }
+	default String joinAsStr(String delimiter, String prefix, String suffix){ return joinAsStr(delimiter, prefix, suffix, Objects::toString); }
+	default String joinAsStr(Function<T, String> toString)                  { return joinAsStr("", toString); }
+	default String joinAsStr(String delimiter, Function<T, String> toString){ return joinAsStr(delimiter, "", "", toString); }
+	default String joinAsStr(String delimiter, String prefix, String suffix, Function<T, String> toString){
 		var res = new StringJoiner(delimiter, prefix, suffix);
 		for(T t : this){
-			res.add(Objects.toString(t));
+			res.add(toString.apply(t));
 		}
 		return res.toString();
 	}
@@ -152,6 +173,29 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		}
 		return true;
+	}
+	
+	default boolean noneIs(T value){
+		return !anyIs(value);
+	}
+	default boolean anyIs(T value){
+		for(T t : this){
+			if(t == value){
+				return true;
+			}
+		}
+		return false;
+	}
+	default boolean noneEquals(T value){
+		return !anyEquals(value);
+	}
+	default boolean anyEquals(T value){
+		for(T t : this){
+			if(Objects.equals(t, value)){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	default IterablePP<T> filtered(Predicate<T> filter){

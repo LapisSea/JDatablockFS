@@ -103,13 +103,13 @@ public final class GenericContext implements Stringify{
 	public String toString(){
 		return Utils.typeToHuman(owner) +
 		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                  .joinAsStrings(", ", "<", ">");
+		                  .joinAsStr(", ", "<", ">");
 	}
 	@Override
 	public String toShortString(){
 		return Utils.typeToHuman(owner) +
 		       IterablePPs.rangeMap(0, actualTypes.size(), i -> strName(i) + "=" + Utils.typeToHuman(actualTypes.get(i)))
-		                  .joinAsStrings(", ", "<", ">");
+		                  .joinAsStr(", ", "<", ">");
 	}
 	private String strName(int i){
 		if(typeNames != null){

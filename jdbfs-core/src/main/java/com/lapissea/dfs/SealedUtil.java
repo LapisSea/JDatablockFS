@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, IterablePPs.from(data.universe).collectUnmodifiableToMap(true, Function.identity(), StandardStructPipe::of));
+			this(data.root, IterablePPs.from(data.universe).collectToFinalMap(true, Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(
@@ -98,7 +98,7 @@ public final class SealedUtil{
 		public SealedUniverse{
 			Objects.requireNonNull(root);
 			assert isSealedCached(root);
-			universe = List.copyOf(IterablePPs.from(universe).distinct().sortedBy(Class::getName).collectToList());
+			universe = IterablePPs.from(universe).distinct().sortedBy(Class::getName).collectToFinalList();
 		}
 	}
 	

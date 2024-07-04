@@ -268,11 +268,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public String toString(){
 			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
-			return raw + IterablePPs.from(args).joinAsStrings(", ", "<", ">");
+			return raw + IterablePPs.from(args).joinAsStr(", ", "<", ">");
 		}
 		@Override
 		public String toShortString(){
-			return raw.toShortString() + IterablePPs.from(args).map(IOType::toShortString).joinAsStrings(", ", "<", ">");
+			return raw.toShortString() + IterablePPs.from(args).joinAsStr(", ", "<", ">", IOType::toShortString);
 		}
 		@Override
 		public IOType withArgs(IOType... args){
