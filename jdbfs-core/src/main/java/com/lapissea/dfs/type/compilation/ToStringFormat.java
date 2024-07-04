@@ -100,7 +100,9 @@ public class ToStringFormat{
 				
 				ToStringFragment val;
 				while(true){
-					if(range.from == range.to) throw new MalformedToStringFormat("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					if(range.from == range.to){
+						throw new MalformedToStringFormat("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					}
 					var name = format.substring(range.from, range.to);
 					if(names.contains(name)){
 						val = new ToStringFragment.FieldValue(name);

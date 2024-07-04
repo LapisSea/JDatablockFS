@@ -54,8 +54,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			var res = new ArrayList<Behaviour<?, T>>(3);
 			
-			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)) res.add(Behaviour.noop(IOValue.Unsigned.class));
-			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)) res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
+			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)){
+				res.add(Behaviour.noop(IOValue.Unsigned.class));
+			}
+			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)){
+				res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
+			}
 			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
 				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
 					throw new MalformedStruct(VirtualNumSize.class.getName() + " is not allowed on " + fieldType.getName());
@@ -639,7 +643,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var field   = fieldOpt.get();
 			dynamicSize = (ioPool, instance) -> {
 				var val = field.get(ioPool, instance);
-				if(!allowed.contains(val)) throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
+				if(!allowed.contains(val))
+					throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
 				return val;
 			};
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
