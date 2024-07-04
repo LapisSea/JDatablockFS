@@ -8,6 +8,7 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.SupportedPrimitive.BOOLEAN;
 
@@ -82,6 +83,10 @@ public final class CompilationTools{
 			return Optional.of(new FieldStub(m, name, type, Style.RAW, false));
 		}
 	);
+	
+	static Optional<FieldStub> asStub(Method method){
+		return Stream.concat(GETTER_PATTERNS.stream(), SETTER_PATTERNS.stream()).map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();
+	}
 	
 	static Optional<FieldStub> asGetterStub(Method method){
 		return GETTER_PATTERNS.stream().map(f -> f.apply(method)).flatMap(Optional::stream).findFirst();

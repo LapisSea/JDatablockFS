@@ -32,7 +32,6 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.IterablePPs;
-import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import ru.vyarus.java.generics.resolver.GenericsResolver;
@@ -44,7 +43,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -55,18 +53,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Comparator.naturalOrder;
 import static java.util.function.Function.identity;
-import static java.util.function.Predicate.not;
-import static java.util.stream.Collectors.joining;
 
 public final class FieldCompiler{
 	
@@ -84,9 +76,8 @@ public final class FieldCompiler{
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var valueDefs = deepClasses(struct.getConcreteType())
 			                .flatArray(Class::getDeclaredMethods)
-			                .stream()
-			                .filter(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
-			                .toList();
+			                .filtered(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
+			                .collectToList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
 		for(Method valueMethod : valueDefs){
@@ -145,22 +136,18 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkIOFieldValidity(List<FieldAccessor<T>> fields){
-		var fails = fields.stream()
-		                  .filter(field -> {
-			                  return !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field));
-		                  })
-		                  .toList();
-		if(!fails.isEmpty()){
-			throw new IllegalField(
-				"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " +
-				(fails.size()>1? "\n" : "") + fails.stream().map(f -> "\t" + f).collect(joining("\n"))
-			);
-		}
+		var fails = IterablePPs.from(fields)
+		                       .filtered(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
+		                       .asCollection();
+		if(fails.isEmpty()) return;
+		throw new IllegalField(
+			"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " + (fails.size()>1? "\n" : "") +
+			fails.joinAsStr("\n", e -> "\t" + e)
+		);
 	}
 	
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
-		var cVal = type.getAnnotation(IOValue.class);
-		if(cVal != null && !cVal.name().isEmpty()){
+		if(valName(type.getAnnotation(IOValue.class)).isPresent()){
 			throw new IllegalAnnotation(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
 		}
 	}
@@ -174,9 +161,9 @@ public final class FieldCompiler{
 			var dep = fields.get(nam);
 			if(dep == null){
 				throw new IllegalField("Could not find dependencies " +
-				                       depNames.stream()
-				                               .filter(name -> !fields.containsKey(name))
-				                               .collect(joining(", ")) +
+				                       IterablePPs.from(depNames)
+				                                  .filtered(name -> !fields.containsKey(name))
+				                                  .joinAsStr(", ") +
 				                       " on field " + field.getAccessor());
 			}
 			dependencies.add(dep);
@@ -185,7 +172,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
-		var mapFields = fields.stream().collect(Collectors.toMap(IOField::getName, identity()));
+		var mapFields = IterablePPs.from(fields).collectToMap(IOField::getName, identity());
 		for(var field : fields){
 			field.initLateData(generateDependencies(mapFields, field));
 		}
@@ -207,9 +194,8 @@ public final class FieldCompiler{
 				for(var s : toInject){
 					var existing = virtualData.get(s.name);
 					if(existing == null){
-						existing = parsed.stream().map(IOField::getAccessor)
-						                 .filter(a -> a.getName().equals(s.name))
-						                 .findAny().orElse(null);
+						existing = IterablePPs.from(parsed).map(IOField::getAccessor)
+						                      .firstMatching(a -> a.getName().equals(s.name)).orElse(null);
 					}
 					if(existing != null){
 						var gTyp = existing.getGenericType(null);
@@ -269,6 +255,13 @@ public final class FieldCompiler{
 		});
 	}
 	
+	private static final class GetSet{
+		private Method getter;
+		private Method setter;
+		
+		private IterablePP<Method> iter(){ return IterablePPs.of(getter, setter); }
+	}
+	
 	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
 		
@@ -279,31 +272,16 @@ public final class FieldCompiler{
 		
 		var hangingMethods = ioMethods.filtered(method -> !usedFields.contains(method)).collectToList();
 		
-		Map<String, PairM<Method, Method>> functionFields = new HashMap<>();
-		BiConsumer<String, Method>         pushGetter     = (name, m) -> functionFields.computeIfAbsent(name, n -> new PairM<>()).obj1 = m;
-		BiConsumer<String, Method>         pushSetter     = (name, m) -> functionFields.computeIfAbsent(name, n -> new PairM<>()).obj2 = m;
-		
-		for(Method hangingMethod : hangingMethods){
-			calcGetPrefixes(hangingMethod).map(p -> getMethodFieldName(p, hangingMethod))
-			                              .filter(Optional::isPresent).map(Optional::get)
-			                              .findFirst().ifPresent(s -> pushGetter.accept(s, hangingMethod));
-			getMethodFieldName("set", hangingMethod).ifPresent(s -> pushSetter.accept(s, hangingMethod));
-		}
+		var functionFields = new HashMap<String, GetSet>();
 		
 		hangingMethods.removeIf(hangingMethod -> {
-			var f = hangingMethod.getAnnotation(IOValue.class);
-			if(f == null || f.name().isEmpty()) return false;
-			
-			if(CompilationTools.asGetterStub(hangingMethod).isPresent()){
-				pushGetter.accept(f.name(), hangingMethod);
-				return true;
-			}
-			if(CompilationTools.asSetterStub(hangingMethod).isPresent()){
-				pushSetter.accept(f.name(), hangingMethod);
-				return true;
-			}
-			
-			return false;
+			var stub = CompilationTools.asStub(hangingMethod);
+			stub.ifPresent(st -> {
+				var p = functionFields.computeIfAbsent(st.varName(), n -> new GetSet());
+				if(st.isGetter()) p.getter = hangingMethod;
+				else p.setter = hangingMethod;
+			});
+			return stub.isPresent();
 		});
 		
 		checkInvalidFunctionOnlyFields(functionFields, cl);
@@ -319,52 +297,45 @@ public final class FieldCompiler{
 		return fields;
 	}
 	
-	private static <T extends IOInstance<T>> List<FieldAccessor<T>> functionFieldsToAccessors(Struct<T> struct, Map<String, PairM<Method, Method>> functionFields){
+	private static <T extends IOInstance<T>> List<FieldAccessor<T>> functionFieldsToAccessors(Struct<T> struct, Map<String, GetSet> functionFields){
 		List<FieldAccessor<T>> fields = new ArrayList<>(functionFields.size());
 		for(var e : functionFields.entrySet()){
 			String name = e.getKey();
 			var    p    = e.getValue();
 			
-			Method getter = p.obj1, setter = p.obj2;
-			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
-				Stream.of(getter.getAnnotations(), setter.getAnnotations())
-				      .flatMap(Arrays::stream)
-				      .distinct()
-				      .collect(Collectors.toUnmodifiableMap(Annotation::annotationType, identity()));
-			Type type = getType(getter.getGenericReturnType(), GetAnnotation.from(annotations));
+				IterablePPs.of(p.getter, p.setter).flatArray(Method::getAnnotations).distinct()
+				           .collectToFinalMap(true, Annotation::annotationType, identity());
 			
-			Type setType = setter.getGenericParameterTypes()[0];
+			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
+			
+			Type setType = p.setter.getGenericParameterTypes()[0];
 			if(!Utils.genericInstanceOf(type, setType)){
-				throw new IllegalField(setType + " is not a valid argument in\n" + setter);
+				throw new IllegalField(setType + " is not a valid argument in\n" + p.setter);
 			}
 			
-			fields.add(FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
+			fields.add(FunctionalReflectionAccessor.make(struct, name, p.getter, p.setter, annotations, type));
 		}
 		return fields;
 	}
 	
 	private static <T extends IOInstance<T>> void checkForUnusedFunctions(
-		Map<String, PairM<Method, Method>> functionFields, List<Method> hangingMethods, List<FieldAccessor<T>> fields
+		Map<String, GetSet> functionFields, List<Method> hangingMethods, List<FieldAccessor<T>> fields
 	){
-		Predicate<Method> isGetterOrSetter =
-			m -> functionFields.values().stream()
-			                   .flatMap(PairM::stream)
-			                   .anyMatch(mt -> mt == m);
+		var gettersSetters = IterablePPs.values(functionFields).flatData(GetSet::iter);
 		
-		var unusedWaning = hangingMethods.stream().filter(not(isGetterOrSetter)).map(method -> {
+		var unusedErr = IterablePPs.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
 			String helpStr = "";
-			if(fields.stream().anyMatch(f -> f.getName().equals(method.getName()))){
-				helpStr = " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName()))
-				                                                    .collect(joining(" or ")) + "?";
+			if(IterablePPs.from(fields).map(FieldAccessor::getName).anyEquals(method.getName())){
+				helpStr = calcGetPrefixes(method).joinAsStr(" or ", " did you mean ", "?", p -> p + TextUtil.firstToUpperCase(method.getName()));
 			}
 			return method + helpStr;
-		}).toList();
+		}).collectToList();
 		
-		if(!unusedWaning.isEmpty()){
+		if(!unusedErr.isEmpty()){
 			throw new MalformedStruct(
 				"There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" +
-				String.join("\n", unusedWaning)
+				String.join("\n", unusedErr)
 			);
 		}
 	}
@@ -377,8 +348,8 @@ public final class FieldCompiler{
 		
 		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
 			try{
-				var getter = pickGSMethod(ioMethods, field, false);
-				var setter = pickGSMethod(ioMethods, field, true);
+				var getter = pickGSMethod(ioMethods, field, true);
+				var setter = pickGSMethod(ioMethods, field, false);
 				
 				getter.ifPresent(reportField);
 				setter.ifPresent(reportField);
@@ -398,61 +369,37 @@ public final class FieldCompiler{
 		}
 		return fields;
 	}
-	private static Optional<Method> pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean setter){
+	private static Optional<Method> pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean getter){
 		return ioMethods.firstMatching(m -> {
 			if(!IOFieldTools.isIOField(m)) return false;
-			var stub = setter? CompilationTools.asSetterStub(m) : CompilationTools.asGetterStub(m);
-			var name = stub.map(CompilationTools.FieldStub::varName);
+			var name = CompilationTools.asStub(m).filter(s -> s.isGetter() == getter).map(CompilationTools.FieldStub::varName);
 			return name.filter(n -> n.equals(getFieldName(field))).isPresent();
 		}).toOptional();
 	}
 	
-	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, PairM<Method, Method>> functionFields, Class<T> cl){
-		var errors = functionFields.entrySet()
-		                           .stream()
-		                           .filter(e -> e.getValue().stream().anyMatch(Objects::isNull))
-		                           .toList();
+	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
+		var errors = IterablePPs.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null)).asCollection();
 		if(errors.isEmpty()) return;
 		
 		throw new IllegalField(
 			"Invalid transient (getter+setter, no field) " + TextUtil.plural("IOField", errors.size()) +
 			" for " + cl.getName() + ":\n" +
-			errors.stream()
-			      .map(e -> "\t" + e.getKey() + ": " + (e.getValue().obj1 == null? "getter" : "setter") + " missing")
-			      .collect(joining("\n"))
+			errors.joinAsStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
 		);
 	}
 	
-	private static Stream<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }
-	private static Stream<String> calcGetPrefixes(Class<?> typ){
-		var isBool = typ == boolean.class || typ == Boolean.class;
-		if(isBool) return Stream.of("is", "get");
-		return Stream.of("get");
-	}
-	
-	private static Optional<String> getMethodFieldName(String prefix, Method m){
-		IOValue ann   = m.getAnnotation(IOValue.class);
-		var     mName = m.getName();
-		if(!mName.startsWith(prefix)) return Optional.empty();
-		
-		if(ann.name().isEmpty()){
-			if(mName.length()<=prefix.length() || Character.isLowerCase(mName.charAt(prefix.length()))) return Optional.empty();
-			StringBuilder name = new StringBuilder(mName.length() - prefix.length());
-			name.append(mName, prefix.length(), mName.length());
-			name.setCharAt(0, Character.toLowerCase(name.charAt(0)));
-			return Optional.of(name.toString());
-		}else{
-			return Optional.of(ann.name());
-		}
+	private static IterablePP<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }
+	private static IterablePP<String> calcGetPrefixes(Class<?> typ){
+		if(typ == boolean.class || typ == Boolean.class) return IterablePPs.of("is", "get");
+		return IterablePPs.of("get");
 	}
 	
 	private static String getFieldName(Field field){
-		String fieldName;
-		{
-			var ann = field.getAnnotation(IOValue.class);
-			fieldName = ann == null || ann.name().isEmpty()? field.getName() : ann.name();
-		}
-		return fieldName;
+		return valName(field.getAnnotation(IOValue.class)).orElse(field.getName());
+	}
+	
+	private static Optional<String> valName(IOValue ann){
+		return Optional.ofNullable(ann).map(IOValue::name).filter(s -> !s.isEmpty());
 	}
 	
 	public static Type getType(Field field){
@@ -494,15 +441,13 @@ public final class FieldCompiler{
 	
 	@SuppressWarnings("unchecked")
 	public static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
-		activeAnnotations()
-			.stream()
-			.flatMap(ann -> Stream.concat(
-				Stream.of(ann),
-				Arrays.stream(ann.getClasses())
-				      .filter(Class::isAnnotation)
-				      .map(c -> (Class<? extends Annotation>)c)
-			))
-			.toList();
+		IterablePPs.from(activeAnnotations())
+		           .flatData(ann -> IterablePPs.concat1N(
+			           ann, IterablePPs.of(ann.getClasses())
+			                           .filtered(Class::isAnnotation)
+			                           .map(c -> (Class<? extends Annotation>)c)
+		           ))
+		           .collectToFinalList();
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

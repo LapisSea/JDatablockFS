@@ -1189,15 +1189,10 @@ public final class DefInstanceCompiler{
 				continue;
 			}
 			
-			var getter = CompilationTools.asGetterStub(method);
-			var setter = CompilationTools.asSetterStub(method);
-			
-			getter.ifPresent(getters::add);
-			setter.ifPresent(setters::add);
-			
-			if(getter.or(() -> setter).isEmpty()){
-				throw new MalformedTemplateStruct(method + " is not a setter or a getter!");
-			}
+			CompilationTools.asStub(method).ifPresentOrElse(
+				st -> (st.isGetter()? getters : setters).add(st),
+				() -> { throw new MalformedTemplateStruct(method + " is not a setter or a getter!"); }
+			);
 		}
 		
 		return new Specials(set, toStr, toShortStr);
