@@ -5,7 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -50,7 +50,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		if(Iters.from(annotations).noneMatch(an -> an instanceof IOValue)){
 			annotations = Iters.concatN1(annotations, Annotations.make(IOValue.class)).collectToFinalList();
 		}
-		this.annotations = Iters.from(annotations).collectToFinalMap(true, Annotation::annotationType, a -> a);
+		this.annotations = Iters.from(annotations).collectToFinalMap(Annotation::annotationType, a -> a);
 	}
 	
 	@Override

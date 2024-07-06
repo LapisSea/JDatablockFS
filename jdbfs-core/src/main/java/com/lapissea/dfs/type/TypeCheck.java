@@ -2,7 +2,7 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.reflect.Modifier;
 import java.util.LinkedList;

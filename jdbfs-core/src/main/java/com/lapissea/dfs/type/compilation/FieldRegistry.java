@@ -18,7 +18,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -83,7 +83,7 @@ final class FieldRegistry{
 			}
 			
 			var usages = Iters.entries(scanned).sortedBy(e -> e.getKey().getName())
-			                  .flatData(Map.Entry::getValue).collectToFinalList();
+			                  .flatMap(Map.Entry::getValue).collectToFinalList();
 			
 			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;

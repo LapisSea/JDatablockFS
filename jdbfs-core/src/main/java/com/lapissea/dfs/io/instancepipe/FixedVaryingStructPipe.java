@@ -12,8 +12,8 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.VaryingSize;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.ArrayList;

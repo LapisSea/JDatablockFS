@@ -26,7 +26,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;

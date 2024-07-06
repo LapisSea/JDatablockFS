@@ -25,9 +25,9 @@ import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
@@ -833,9 +833,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private List<FieldStruct<T>> calcNullContainInstances(){
 		return getRealFields()
-			       .flatOpt(f -> Struct.tryOf(f.getType())
-			                           .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
-			                           .map(s -> new FieldStruct<>(f, s)))
+			       .flatOptionals(f -> Struct.tryOf(f.getType())
+			                                 .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
+			                                 .map(s -> new FieldStruct<>(f, s)))
 			       .collectToFinalList();
 	}
 	
@@ -911,7 +911,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.flatOpt(fieldMapper).joinAsStr(fieldSeparator, prefix, end);
+		var str = fields.flatOptionals(fieldMapper).joinAsStr(fieldSeparator, prefix, end);
 		
 		if(!doShort){
 			if(str.equals(prefix + end)) return name;

@@ -5,7 +5,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.ConfigTools;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;

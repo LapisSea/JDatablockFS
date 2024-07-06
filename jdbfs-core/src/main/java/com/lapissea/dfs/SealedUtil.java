@@ -7,7 +7,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, Iters.from(data.universe).collectToFinalMap(true, Function.identity(), StandardStructPipe::of));
+			this(data.root, Iters.from(data.universe).collectToFinalMap(Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(

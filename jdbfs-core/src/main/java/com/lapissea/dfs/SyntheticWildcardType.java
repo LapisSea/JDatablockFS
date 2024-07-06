@@ -1,6 +1,6 @@
 package com.lapissea.dfs;
 
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;

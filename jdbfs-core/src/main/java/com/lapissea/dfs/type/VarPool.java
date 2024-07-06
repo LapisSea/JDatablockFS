@@ -191,7 +191,7 @@ public interface VarPool<T extends IOInstance<T>>{
 		@Override
 		public String toString(){
 			return typ.getFields()
-			          .flatOpt(f -> f.getVirtual(StoragePool.values()[poolId]))
+			          .flatOptionals(f -> f.getVirtual(StoragePool.values()[poolId]))
 			          .map(c -> c.getName() + ": " + Utils.toShortString(get(c)))
 			          .joinAsStr(", ", Utils.classNameToHuman(typ.getFullName()) + "{", "}");
 		}

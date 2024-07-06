@@ -8,8 +8,8 @@ import com.lapissea.dfs.objects.CollectionInfo.PrimitiveArrayInfo;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;

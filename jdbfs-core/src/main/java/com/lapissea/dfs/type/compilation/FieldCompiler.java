@@ -30,8 +30,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import ru.vyarus.java.generics.resolver.GenericsResolver;
@@ -75,7 +75,7 @@ public final class FieldCompiler{
 	 */
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var valueDefs = deepClasses(struct.getConcreteType())
-			                .flatArray(Class::getDeclaredMethods)
+			                .flatMapArray(Class::getDeclaredMethods)
 			                .filtered(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
 			                .collectToList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
@@ -304,8 +304,8 @@ public final class FieldCompiler{
 			var    p    = e.getValue();
 			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
-				Iters.of(p.getter, p.setter).flatArray(Method::getAnnotations).distinct()
-				     .collectToFinalMap(true, Annotation::annotationType, identity());
+				Iters.of(p.getter, p.setter).flatMapArray(Method::getAnnotations).distinct()
+				     .collectToFinalMap(Annotation::annotationType, identity());
 			
 			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
 			
@@ -322,7 +322,7 @@ public final class FieldCompiler{
 	private static <T extends IOInstance<T>> void checkForUnusedFunctions(
 		Map<String, GetSet> functionFields, List<Method> hangingMethods, List<FieldAccessor<T>> fields
 	){
-		var gettersSetters = Iters.values(functionFields).flatData(GetSet::iter);
+		var gettersSetters = Iters.values(functionFields).flatMap(GetSet::iter);
 		
 		var unusedErr = Iters.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
 			String helpStr = "";
@@ -346,7 +346,7 @@ public final class FieldCompiler{
 		var cl     = struct.getConcreteType();
 		var fields = new ArrayList<FieldAccessor<T>>();
 		
-		for(Field field : deepClasses(cl).flatArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
+		for(Field field : deepClasses(cl).flatMapArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
 			try{
 				var getter = pickGSMethod(ioMethods, field, true);
 				var setter = pickGSMethod(ioMethods, field, false);
@@ -374,7 +374,7 @@ public final class FieldCompiler{
 			if(!IOFieldTools.isIOField(m)) return false;
 			var name = CompilationTools.asStub(m).filter(s -> s.isGetter() == getter).map(CompilationTools.FieldStub::varName);
 			return name.filter(n -> n.equals(getFieldName(field))).isPresent();
-		}).toOptional();
+		});
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
@@ -435,13 +435,13 @@ public final class FieldCompiler{
 	}
 	
 	private static IterablePP<Method> allMethods(Class<?> clazz){
-		return Iters.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass).flatArray(Class::getDeclaredMethods);
+		return Iters.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass).flatMapArray(Class::getDeclaredMethods);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
 		Iters.from(activeAnnotations())
-		     .flatData(ann -> Iters.concat1N(
+		     .flatMap(ann -> Iters.concat1N(
 			     ann, Iters.of(ann.getClasses())
 			               .filtered(Class::isAnnotation)
 			               .map(c -> (Class<? extends Annotation>)c)

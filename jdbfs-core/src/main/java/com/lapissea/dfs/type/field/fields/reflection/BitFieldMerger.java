@@ -20,7 +20,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;

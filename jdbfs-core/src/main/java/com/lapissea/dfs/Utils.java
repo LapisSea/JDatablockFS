@@ -340,4 +340,25 @@ public final class Utils{
 		e.printStackTrace(new PrintWriter(sw));
 		return sw.toString();
 	}
+	
+	public static int[] growArr(int[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	public static long[] growArr(long[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	public static <T> T[] growArr(T[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	private static int calcNextSize(int length){
+		long nextSizeL = length*2L;
+		if(nextSizeL != (int)nextSizeL){
+			if(length == Integer.MAX_VALUE){
+				throw new OutOfMemoryError();
+			}
+			nextSizeL = Integer.MAX_VALUE;
+		}
+		return (int)nextSizeL;
+	}
+	
 }

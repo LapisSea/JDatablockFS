@@ -19,7 +19,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -177,17 +177,17 @@ public final class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
-		Optional<String> dynSiz = Stream.of(
+		Optional<String> dynSiz = Iters.ofPresent(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(FieldNames.numberSize(field))).findAny()
-		).flatMap(Optional::stream).findAny();
+			Iters.from(field.getAnnotation(IODependency.class)).flatMapArray(IODependency::value).firstMatching(name -> name.equals(FieldNames.numberSize(field)))
+		).findFirst();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
 		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("Missing or invalid field should have been checked in annotation logic");
-		return opt.toOptional();
+		return opt;
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){

@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -23,7 +23,7 @@ public interface GetAnnotation{
 	}
 	
 	static GetAnnotation from(Collection<? extends Annotation> data){
-		return from(Iters.from(data).collectToFinalMap(true, Annotation::annotationType, an -> an));
+		return from(Iters.from(data).collectToFinalMap(Annotation::annotationType, an -> an));
 	}
 	static GetAnnotation from(Map<Class<? extends Annotation>, ? extends Annotation> data){
 		if(data.isEmpty()) return new GetAnnotation(){

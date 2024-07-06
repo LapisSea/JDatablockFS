@@ -22,7 +22,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Type;

@@ -18,9 +18,9 @@ import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -308,8 +308,8 @@ public sealed interface IOTypeDB{
 				var maxID = Iters.keys(idToTyp).mapToInt(i -> i).max().orElse(0);
 				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
-				typToID = Iters.entries(idToTyp).collectToFinalMap(true, Map.Entry::getValue, Map.Entry::getKey);
-				this.sealedMultiverse = Iters.entries(sealedMultiverse).collectToFinalMap(true, Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
+				typToID = Iters.entries(idToTyp).collectToFinalMap(Map.Entry::getValue, Map.Entry::getKey);
+				this.sealedMultiverse = Iters.entries(sealedMultiverse).collectToFinalMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
 			}
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);

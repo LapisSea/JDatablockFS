@@ -1,6 +1,6 @@
 package com.lapissea.dfs;
 
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.GenericArrayType;

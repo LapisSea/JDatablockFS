@@ -1,4 +1,4 @@
-package com.lapissea.dfs.utils;
+package com.lapissea.dfs.utils.iterableplus;
 
 import com.lapissea.util.TextUtil;
 
@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
@@ -15,9 +16,17 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 	private       List<T>       computed;
 	private       Set<T>        computedSet;
 	private       byte          empty = UNKNOWN;
+	private       int           size  = -1;
 	
 	private static final byte TRUE = 1, FALSE = 0, UNKNOWN = 2;
 	
+	public PPCollection(IterablePP<T> source, OptionalInt estimatedSize){
+		this(source);
+		if(estimatedSize.isPresent()){
+			size = estimatedSize.getAsInt();
+			empty = size == 0? TRUE : FALSE;
+		}
+	}
 	public PPCollection(IterablePP<T> source){ this.source = source; }
 	
 	private List<T> compute(){
@@ -71,7 +80,8 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 	@Override
 	public int size(){
 		if(empty == TRUE) return 0;
-		return compute().size();
+		if(size != -1) return size;
+		return size = compute().size();
 	}
 	@Override
 	public Stream<T> stream(){

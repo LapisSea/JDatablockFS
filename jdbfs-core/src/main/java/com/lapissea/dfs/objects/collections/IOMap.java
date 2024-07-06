@@ -3,7 +3,7 @@ package com.lapissea.dfs.objects.collections;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -12,10 +12,11 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.stream.Stream;
 
 @IOValue.OverrideType.DefaultImpl(HashIOMap.class)
-public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
+public interface IOMap<K, V> extends IterablePP.SizedPP<IOMap.IOEntry<K, V>>{
 	
 	interface IOEntry<K, V>{
 		
@@ -236,5 +237,10 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 			}
 			sb.append(',').append(' ');
 		}
+	}
+	@Override
+	default OptionalInt calculateSize(){
+		var size = size();
+		return size>Integer.MAX_VALUE? OptionalInt.empty() : OptionalInt.of((int)size);
 	}
 }

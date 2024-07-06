@@ -24,7 +24,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;

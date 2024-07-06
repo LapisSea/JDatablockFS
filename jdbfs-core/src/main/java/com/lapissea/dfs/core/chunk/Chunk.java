@@ -25,7 +25,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;

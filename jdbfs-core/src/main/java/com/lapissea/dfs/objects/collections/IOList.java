@@ -9,7 +9,7 @@ import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.query.QueryCheck;
 import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
@@ -23,6 +23,7 @@ import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.RandomAccess;
 import java.util.Set;
@@ -35,7 +36,7 @@ import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
-public interface IOList<T> extends IterablePP<T>{
+public interface IOList<T> extends IterablePP.SizedPP<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -699,5 +700,11 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	default IOList<T> cachedView(int maxCacheSize, int maxLinearCache){
 		return new IOListCached<>(this, maxCacheSize, maxLinearCache);
+	}
+	
+	@Override
+	default OptionalInt calculateSize(){
+		var size = size();
+		return size>Integer.MAX_VALUE? OptionalInt.empty() : OptionalInt.of((int)size);
 	}
 }

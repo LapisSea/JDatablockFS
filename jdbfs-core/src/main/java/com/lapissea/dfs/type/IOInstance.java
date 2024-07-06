@@ -16,7 +16,7 @@ import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;

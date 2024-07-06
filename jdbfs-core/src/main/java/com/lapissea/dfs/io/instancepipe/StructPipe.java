@@ -43,9 +43,9 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -72,7 +72,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -337,15 +336,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		getType().waitForStateDone();
 		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
 			fields = FieldSet.of(Iters.concat(
-				Iters.from(getSpecificFields()),
-				Iters.from(unmanaged.getUnmanagedStaticFields()).map(f -> (IOField<T, ?>)f)
+				getSpecificFields(),
+				(FieldSet<T>)unmanaged.getUnmanagedStaticFields()
 			));
 		}else{
 			fields = getSpecificFields();
 		}
 		
 		var refs = fields.instancesOf(RefField.class)
-		                 .flatOpt(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).map(f -> Map.entry(f, ref)).toOptional())
+		                 .flatOptionalsPP(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).asKeyWith(ref))
 		                 .collectToMap(Function.identity());
 		
 		for(var field : fields){
@@ -813,7 +812,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			SKIPPED,
 			ERR
 		}
-		var stat = new Status[generators.size()];
+		var stat = new ArrayList<Status>(generators.size());
 		var err  = false;
 		for(int i = 0; i<generators.size(); i++){
 			var generator = generators.get(i);
@@ -825,21 +824,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				case ALWAYS -> false;
 			};
 			if(shouldSkip){
-				stat[i] = Status.SKIPPED;
+				stat.add(Status.SKIPPED);
 				continue;
 			}
 			var errL = vg.shouldGenerate(ioPool, provider, instance);
-			stat[i] = errL? Status.ERR : Status.OK;
+			stat.add(errL? Status.ERR : Status.OK);
 			err |= errL;
 		}
 		if(err){
 			String info;
-			if(stat.length == 1){
+			if(stat.size() == 1){
 				info = " " + generators.getFirst() + " failed";
 			}else{
-				var table = TextUtil.toTable(
-					IntStream.range(0, stat.length).mapToObj(i -> Map.of("generator", generators.get(i), "status", stat[i])).toList()
-				);
+				var table = TextUtil.toTable(Iters.zip(generators, stat, (gen, st) -> Map.of("generator", gen, "status", st)).asCollection());
 				table = table.substring(table.indexOf('\n') + 1, table.lastIndexOf('\n'));
 				info = "\n" + table;
 			}

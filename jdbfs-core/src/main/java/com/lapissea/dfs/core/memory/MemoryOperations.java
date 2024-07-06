@@ -21,7 +21,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;

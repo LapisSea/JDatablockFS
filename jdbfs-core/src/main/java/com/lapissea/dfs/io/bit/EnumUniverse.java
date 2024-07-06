@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io.bit;
 
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -14,12 +14,13 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
-public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP<T>{
+public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP.SizedPP<T>{
 	
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
 	
@@ -258,5 +259,10 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	@Override
 	public Stream<T> stream(){
 		return super.stream();
+	}
+	
+	@Override
+	public OptionalInt calculateSize(){
+		return OptionalInt.of(size());
 	}
 }

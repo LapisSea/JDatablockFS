@@ -5,8 +5,8 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -28,7 +28,7 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			private final ArrayList<T> cache = new ArrayList<>();
 			private       int          size;
 			@Override
-			public Iterable<LdxValue<T>> entrySet(){
+			public Iterable<Ldx<T>> entrySet(){
 				return Iters.from(cache)
 				            .enumerateL()
 				            .filtered(e -> e.getValue() != null);
@@ -213,8 +213,8 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			}
 			
 			private void checkAll(){
-				var a = Iters.concat(ref.entrySet()).collectToMap(e -> e);
-				var b = Iters.concat(test.entrySet()).collectToMap(e -> e);
+				var a = Iters.from(ref.entrySet()).collectToMap(e -> e);
+				var b = Iters.from(test.entrySet()).collectToMap(e -> e);
 				if(!a.equals(b)){
 					LogUtil.println(a + "\n" + b);
 					throw new IllegalStateException("\n" + a + "\n" + b);

@@ -1,4 +1,6 @@
-package com.lapissea.dfs.utils;
+package com.lapissea.dfs.utils.iterableplus;
+
+import com.lapissea.dfs.Utils;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -94,21 +96,10 @@ public interface IterableLongPP{
 		var res  = new long[initialSize];
 		int i    = 0;
 		while(iter.hasNext()){
-			if(i == res.length) res = growArr(res);
+			if(i == res.length) res = Utils.growArr(res);
 			res[i++] = iter.nextLong();
 		}
 		if(res.length != i) return Arrays.copyOf(res, i);
-		return res;
-	}
-	private static long[] growArr(long[] res){
-		long nextSizeL = res.length*2L;
-		if(nextSizeL != (int)nextSizeL){
-			if(res.length == Integer.MAX_VALUE){
-				throw new OutOfMemoryError();
-			}
-			nextSizeL = Integer.MAX_VALUE;
-		}
-		res = Arrays.copyOf(res, (int)nextSizeL);
 		return res;
 	}
 	

@@ -1,7 +1,7 @@
 package com.lapissea.dfs.objects.collections.listtools;
 
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;

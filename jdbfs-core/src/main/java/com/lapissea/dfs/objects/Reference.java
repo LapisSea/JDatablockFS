@@ -20,7 +20,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;

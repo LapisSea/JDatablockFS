@@ -23,9 +23,9 @@ import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.Iters;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -116,7 +116,7 @@ public final class DefInstanceCompiler{
 	){ }
 	
 	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
-		IterablePP<FieldStub> stubs(){ return Iters.of(getter, setter).flatOpt(Function.identity()); }
+		IterablePP<FieldStub> stubs(){ return Iters.ofPresent(getter, setter); }
 		@Override
 		public String toString(){
 			return "{" +
@@ -1273,25 +1273,20 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static void checkAnnotations(List<FieldInfo> fields){
-		var problems = fields.stream()
-		                     .map(gs -> {
-			                          var dup = gs.stubs()
-			                                      .flatArray(g -> g.method().getAnnotations())
-			                                      .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
-			                                      .collect(Collectors.groupingBy(Annotation::annotationType))
-			                                      .values().stream()
-			                                      .filter(l -> l.size()>1)
-			                                      .map(l -> "\t\t" + l.getFirst().annotationType().getName())
-			                                      .collect(Collectors.joining("\n"));
-			                          if(dup.isEmpty()) return "";
-			                          return "\t" + gs.name + ":\n" + dup;
-		                          }
-		                     ).filter(s -> !s.isEmpty())
-		                     .collect(Collectors.joining("\n"));
-		
-		if(!problems.isEmpty()){
+		Iters.from(fields).flatOptionals(
+			gs -> {
+				var typeGroups = gs.stubs()
+				                   .flatMapArray(g -> g.method().getAnnotations())
+				                   .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+				                   .collectToGrouping(Annotation::annotationType);
+				return Iters.values(typeGroups)
+				            .filtered(l -> l.size()>1)
+				            .joinAsOptionalStr("\n", l -> "\t\t" + l.getFirst().annotationType().getName())
+				            .map(names -> "\t" + gs.name + ":\n" + names);
+			}
+		).joinAsOptionalStr("\n").ifPresent(problems -> {
 			throw new MalformedTemplateStruct("Duplicate annotations:\n" + problems);
-		}
+		});
 	}
 	
 	@SuppressWarnings("unchecked")

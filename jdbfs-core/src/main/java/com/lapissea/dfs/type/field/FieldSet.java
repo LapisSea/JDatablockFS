@@ -5,8 +5,8 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.IterablePP;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -21,6 +21,8 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
@@ -28,7 +30,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePP<IOField<T, ?>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePP.SizedPP<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
 		
@@ -520,7 +522,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return exact(type, name).orElseThrow();
 	}
 	
-	public <E> OptionalPP<IOField<T, E>> exact(Class<E> type, String name){
+	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
 		return byType(type).firstMatching(f -> f.getName().equals(name));
 	}
 	
@@ -568,5 +570,9 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	@Override
 	public Stream<IOField<T, ?>> parallelStream(){
 		return stream().parallel();
+	}
+	@Override
+	public OptionalInt calculateSize(){
+		return OptionalInt.of(size());
 	}
 }

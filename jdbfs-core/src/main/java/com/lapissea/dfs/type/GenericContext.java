@@ -3,7 +3,7 @@ package com.lapissea.dfs.type;
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;

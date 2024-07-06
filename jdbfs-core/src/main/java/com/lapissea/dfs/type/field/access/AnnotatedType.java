@@ -2,7 +2,7 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.GenericContext;
-import com.lapissea.dfs.utils.Iters;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;
@@ -21,7 +21,7 @@ public interface AnnotatedType{
 		private final Class<?>                            type;
 		
 		public Simple(Collection<? extends Annotation> annotations, Class<?> type){
-			this.annotations = Iters.from(annotations).collectToFinalMap(true, Annotation::annotationType, identity());
+			this.annotations = Iters.from(annotations).collectToFinalMap(Annotation::annotationType, identity());
 			this.type = type;
 		}
 		
