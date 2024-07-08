@@ -663,7 +663,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected abstract EnumSet<NumberSize> allowedSizes();
 	
 	private NumberSize maxAllowed(){
-		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
+		return Iters.from(allowedSizes()).reduce(NumberSize::max).orElseThrow();
 	}
 	
 	protected final NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){

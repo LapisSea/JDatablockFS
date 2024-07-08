@@ -30,7 +30,7 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public Class<T> elementType(){
-		if(elementType == null) elementType = (Class<T>)data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElseThrow();
+		if(elementType == null) elementType = (Class<T>)Iters.from(data).nonNulls().getFirst().getClass();
 		return elementType;
 	}
 	

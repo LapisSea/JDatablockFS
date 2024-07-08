@@ -58,7 +58,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -71,15 +70,12 @@ import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.util.ConsoleColors.RESET;
-import static java.util.function.Predicate.not;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
@@ -278,8 +274,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
-				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
-				             .toList()
+				getNonNulls().filtered(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
+				             .collectToFinalList()
 			);
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
@@ -460,14 +456,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		);
 	}
 	
-	private Stream<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
+	private IterablePP<IOField<T, ?>> getNonNulls(){
+		return ioFields.unpackedStream().filtered(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
 	}
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
 		SizeDescriptor.UnknownNum<T> num,
 		List<IOField<T, ?>> fields
 	){
+		protected SizeGroup(Map.Entry<SizeDescriptor.UnknownNum<T>, List<IOField<T, ?>>> e){ this(e.getKey(), e.getValue()); }
 		protected SizeGroup(SizeDescriptor.UnknownNum<T> num, List<IOField<T, ?>> fields){
 			this.num = Objects.requireNonNull(num);
 			this.fields = List.copyOf(fields);
@@ -546,13 +543,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var min = IOFieldTools.sumVars(fields, siz -> siz.getMin(wordSpace));
 		var max = hasDynamicFields? OptionalLong.empty() : IOFieldTools.sumVarsIfAll(fields, siz -> siz.getMax(wordSpace));
 		
-		
-		var groups = fields.filtered(f -> f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
-		                   .collectToGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor())
-		                   .entrySet().stream()
-		                   .filter(e -> e.getValue().size()>=minGroup)
-		                   .map(e -> new SizeGroup<>(e.getKey(), e.getValue()))
-		                   .collect(Collectors.toList());
+		var rawGroups = fields.instancesOf(SizeDescriptor.UnknownNum.class, IOField::getSizeDescriptor)
+		                      .collectToGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor());
+		var groups = Iters.entries(rawGroups)
+		                  .filtered(e -> e.getValue().size()>=minGroup)
+		                  .collectToFinalList(SizeGroup::new);
 		
 		var groupNumberSet = Iters.from(groups).map(e -> e.num).collectToSet();
 		
@@ -1012,14 +1007,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			for(IOField<T, ?> field : fields){
 				if(field.isVirtual()) continue;
 				if(SupportedPrimitive.get(field.getType()).isPresentAnd(SupportedPrimitive::isInteger)){
-					field.getAccessor().getAnnotation(IODependency.class)
-					     .map(IODependency::value).stream().flatMap(Arrays::stream)
+					var fieldDeps = field.getAccessor().getAnnotation(IODependency.class).map(IODependency::value).orElse(new String[0]);
+					Iters.from(fieldDeps)
 					     .map(fields::requireByName)
-					     .filter(n -> n.getType() == NumberSize.class)
-					     .findAny()//dependency that is a numsize
-					     .filter(not(IOField::isVirtual))
+					     .firstMatching(n -> n.getType() == NumberSize.class)//dependency that is a numsize
 					     .filter(f -> {
-						     if(f.nullable()) return false;
+						     if(f.isVirtual() || f.nullable()) return false;
 						     return f.getAccessor().get(null, inst) == null;
 					     })
 					     .ifPresent(f -> {

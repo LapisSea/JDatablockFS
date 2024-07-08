@@ -1,11 +1,12 @@
 package com.lapissea.dfs.type.compilation;
 
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.util.AbstractList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.IntStream;
 
 public class Index{
 	
@@ -68,7 +69,7 @@ public class Index{
 	public String toString(){
 		return TextUtil.toString(data);
 	}
-	public IntStream stream(){
-		return IntStream.of(data);
+	public IterableIntPP iterIds(){
+		return Iters.ofInts(data);
 	}
 }

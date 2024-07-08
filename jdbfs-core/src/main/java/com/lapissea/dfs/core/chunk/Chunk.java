@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -671,9 +670,6 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}while(ch != null);
 		
 		return data;
-	}
-	public Stream<Chunk> streamNext(){
-		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
 	public ChainWalker walkNext(){
 		return new ChainWalker(this);

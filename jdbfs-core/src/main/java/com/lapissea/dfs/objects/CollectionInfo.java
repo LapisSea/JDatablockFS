@@ -127,8 +127,7 @@ public sealed interface CollectionInfo{
 		public boolean hasNulls(){ return hasNulls; }
 		@Override
 		public IterablePP<?> iter(Object collection){
-			var arr = (Object[])collection;
-			return Iters.rangeMap(0, arr.length, i -> arr[i]);
+			return Iters.from((Object[])collection);
 		}
 		
 		public Class<?> getArrayType(){ return arrayType; }

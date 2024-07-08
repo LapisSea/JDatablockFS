@@ -6,6 +6,7 @@ import com.lapissea.dfs.exceptions.MissingConstruct;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -64,9 +65,9 @@ public final class Access{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
-		var match = Arrays.stream(type.getMethods()).filter(m -> m.getName().equals(name)).limit(2).toList();
+		var match = Iters.from(type.getMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
 		if(match.isEmpty()){
-			match = Arrays.stream(type.getDeclaredMethods()).filter(m -> m.getName().equals(name)).limit(2).toList();
+			match = Iters.from(type.getDeclaredMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
 		}
 		if(match.size()>1) throw new IllegalArgumentException("Ambiguous method name");
 		return makeLambda(match.getFirst(), functionalInterface);
@@ -122,7 +123,9 @@ public final class Access{
 	
 	
 	public static <FInter> Method getFunctionalMethod(Class<FInter> functionalInterface){
-		var methods = Arrays.stream(functionalInterface.getMethods()).filter(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers())).toList();
+		var methods = Iters.from(functionalInterface.getMethods())
+		                   .filtered(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers()))
+		                   .collectToList();
 		if(methods.size() != 1){
 			throw new IllegalArgumentException(functionalInterface + " is not a functional interface!");
 		}

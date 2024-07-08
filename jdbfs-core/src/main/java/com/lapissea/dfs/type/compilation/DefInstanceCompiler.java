@@ -62,9 +62,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
 import static com.lapissea.dfs.type.compilation.JorthUtils.writeAnnotations;
@@ -166,9 +163,9 @@ public final class DefInstanceCompiler{
 			var missingGetters = new HashSet<String>();
 			var missingSetters = new HashSet<String>();
 			
-			Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).distinct().forEach(name -> {
-				if(getters.stream().noneMatch(s -> s.varName().equals(name))) missingGetters.add(name);
-				if(setters.stream().noneMatch(s -> s.varName().equals(name))) missingSetters.add(name);
+			Iters.concat(getters, setters).map(FieldStub::varName).distinct().forEach(name -> {
+				if(Iters.from(getters).noneMatch(s -> s.varName().equals(name))) missingGetters.add(name);
+				if(Iters.from(setters).noneMatch(s -> s.varName().equals(name))) missingSetters.add(name);
 			});
 			
 			if(missingGetters.isEmpty() && missingSetters.isEmpty()){
@@ -183,8 +180,8 @@ public final class DefInstanceCompiler{
 				              missingSetters.isEmpty()? "" : "missing setters: " + missingSetters
 				));
 			
-			var getterMap = getters.stream().collect(Collectors.toMap(FieldStub::varName, Function.identity()));
-			var setterMap = setters.stream().collect(Collectors.toMap(FieldStub::varName, Function.identity()));
+			var getterMap = Iters.from(getters).collectToMap(FieldStub::varName, Function.identity());
+			var setterMap = Iters.from(setters).collectToMap(FieldStub::varName, Function.identity());
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
@@ -207,8 +204,7 @@ public final class DefInstanceCompiler{
 					
 					String parmsStr;
 					if(parms.length == 0) parmsStr = "";
-					else parmsStr = Arrays.stream(parms).map(TypeVariable::getName)
-					                      .collect(Collectors.joining(" ", "<", ">"));
+					else parmsStr = Iters.from(parms).joinAsStr(" ", "<", ">", TypeVariable::getName);
 					
 					writer.write("implements {!}{}", interf.getName(), parmsStr);
 					writer.write("interface #typ.impl start");
@@ -261,7 +257,7 @@ public final class DefInstanceCompiler{
 					if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
 						try(var ignored = COMPLETION_LOCK.read()){
 							var i      = interf;
-							var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue().completed == i).findAny().map(Map.Entry::getKey);
+							var unfull = Iters.entries(COMPLETION_CACHE).firstMatching(e -> e.getValue().completed == i).map(Map.Entry::getKey);
 							if(unfull.isPresent()){
 								interf = unfull.get();
 							}
@@ -314,10 +310,10 @@ public final class DefInstanceCompiler{
 		private void init(Result<T> result){
 			this.impl = result.impl;
 			if(result.oOrderedFields.isPresent()){
-				var ordered = result.oOrderedFields.get();
+				List<FieldInfo> ordered = result.oOrderedFields.get();
 				
 				try{
-					var ctr = impl.getConstructor(ordered.stream().map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
+					var ctr = impl.getConstructor(Iters.from(ordered).map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
 					dataConstructor = Access.makeMethodHandle(ctr);
 				}catch(NoSuchMethodException e){
 					throw new ShouldNeverHappenError(e);
@@ -328,15 +324,15 @@ public final class DefInstanceCompiler{
 	
 	
 	private static final List<Class<?>> IGNORE_TYPES =
-		Stream.concat(
-			Stream.<Class<?>>iterate(
+		Iters.concatN1(
+			Iters.iterate(
 				IOInstance.Def.class,
 				Objects::nonNull,
-				cl -> Stream.of(cl.getInterfaces())
-				            .findAny()
-				            .orElse(null)),
-			Stream.of(Object.class)
-		).toList();
+				cl -> Iters.from(cl.getInterfaces())
+				           .findFirst()
+				           .orElse(null)),
+			Object.class
+		).collectToFinalList();
 	
 	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE = new ConcurrentHashMap<>();
@@ -445,10 +441,9 @@ public final class DefInstanceCompiler{
 		includeNames.ifPresent(strings -> checkIncludeNames(fieldInfo, strings));
 		
 		var orderedFields = getOrder(completeInter, fieldInfo)
-			                    .map(names -> names.stream()
-			                                       .map(name -> fieldInfo.stream().filter(f -> f.name.equals(name)).findAny())
-			                                       .map(Optional::orElseThrow)
-			                                       .toList())
+			                    .map(names -> Iters.from(names)
+			                                       .map(name -> Iters.from(fieldInfo).firstMatching(f -> f.name.equals(name)))
+			                                       .collectToFinalList(Optional::orElseThrow))
 			                    .or(() -> fieldInfo.size()>1? Optional.empty() : Optional.of(fieldInfo));
 		
 		checkClass(completeInter, specials, orderedFields);
@@ -479,9 +474,10 @@ public final class DefInstanceCompiler{
 	
 	private static void checkIncludeNames(List<FieldInfo> fieldInfo, Set<String> includeNames){
 		for(String includeName : includeNames){
-			if(fieldInfo.stream().map(FieldInfo::name).noneMatch(includeName::equals)){
+			var infoNames = Iters.from(fieldInfo).map(FieldInfo::name);
+			if(infoNames.noneMatch(includeName::equals)){
 				throw new IllegalArgumentException(includeName + " is not a valid field name. \n" +
-				                                   "Field names: " + fieldInfo.stream().map(FieldInfo::name).collect(Collectors.joining(", ")));
+				                                   "Field names: " + infoNames.joinAsStr(", "));
 			}
 		}
 	}
@@ -523,7 +519,7 @@ public final class DefInstanceCompiler{
 		
 		var implName = interf.getName() +
 		               IOInstance.Def.IMPL_NAME_POSTFIX + (numAddon != 0? "~" + numAddon : "") +
-		               includeNames.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
+		               includeNames.map(n -> Iters.from(n).joinAsStr("_", "€€fields~", "")).orElse("");
 		
 		var log = JorthLogger.make();
 		try{
@@ -542,8 +538,7 @@ public final class DefInstanceCompiler{
 				
 				var parms    = interf.getTypeParameters();
 				var parmsStr = "";
-				if(parms.length>0) parmsStr = Arrays.stream(parms).map(TypeVariable::getName)
-				                                    .collect(Collectors.joining(" ", "<", ">"));
+				if(parms.length>0) parmsStr = Iters.from(parms).joinAsStr(" ", "<", ">", TypeVariable::getName);
 				
 				for(var parm : parms){
 					var bounds = parm.getBounds();
@@ -572,8 +567,9 @@ public final class DefInstanceCompiler{
 				
 				defineStatics(writer);
 				
-				var includedFields  = includeNames.map(include -> fieldInfo.stream().filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
-				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> o.stream().filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
+				
+				var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filtered(f -> include.contains(f.name)).collectToFinalList()).orElse(fieldInfo);
+				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filtered(f -> include.contains(f.name)).collectToFinalList())).orElse(orderedFields);
 				
 				generateDefaultConstructor(writer, includedFields);
 				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
@@ -585,11 +581,11 @@ public final class DefInstanceCompiler{
 				if(specials.set.isEmpty() && completion.completed != completion.base){
 					var setters = new ArrayList<FieldStub>();
 					collectMethods(completion.base, new ArrayList<>(), setters);
-					var setterNames = setters.stream().map(FieldStub::varName).collect(Collectors.toSet());
+					var setterNames = Iters.from(setters).collectToSet(FieldStub::varName);
 					
-					var dataFields = includedFields.stream().filter(
+					var dataFields = Iters.from(includedFields).filtered(
 						f -> !setterNames.contains(f.name) && (includeNames.isEmpty() || includeNames.get().contains(f.name))
-					).toList();
+					).collectToFinalList();
 					if(dataFields.isEmpty()) break readOnlyConstructor;
 					if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
 					
@@ -697,7 +693,7 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
-		var fragment = ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
+		var fragment = ToStringFormat.parse(format.value(), Iters.from(fieldInfo).collectToList(FieldInfo::name));
 		
 		if(specials.toStr.isEmpty()){
 			generateFormatToString(includeNames, fieldInfo, "toString", true, fragment, writer, humanName);
@@ -814,7 +810,7 @@ public final class DefInstanceCompiler{
 				}
 			}
 			case FieldValue frag -> {
-				var field = fieldInfo.stream().filter(n -> n.name.equals(frag.name())).findFirst().orElseThrow();
+				var field = Iters.from(fieldInfo).firstMatching(n -> n.name.equals(frag.name())).orElseThrow();
 				append(writer, w -> w.write(
 					"""
 						static call #String valueOf start
@@ -939,7 +935,7 @@ public final class DefInstanceCompiler{
 						get #typ.impl $STRUCT
 					end
 				""",
-			IntStream.range(0, orderedFields.size()).mapToObj(i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
+			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type)).asCollection()
 		);
 		
 		for(int i = 0; i<orderedFields.size(); i++){
@@ -949,11 +945,10 @@ public final class DefInstanceCompiler{
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
 			else nullCheck = info.type == ChunkPointer.class || info.type == Optional.class ||
-			                 info.annotations.stream()
-			                                 .filter(a -> a instanceof IONullability)
-			                                 .findAny()
-			                                 .map(a -> ((IONullability)a).value())
-			                                 .orElse(NOT_NULL) == NOT_NULL;
+			                 Iters.from(info.annotations)
+			                      .firstMatching(a -> a instanceof IONullability)
+			                      .map(a -> ((IONullability)a).value())
+			                      .orElse(NOT_NULL) == NOT_NULL;
 			
 			if(!included){
 				if(nullCheck){
@@ -976,11 +971,11 @@ public final class DefInstanceCompiler{
 		var setters = new ArrayList<FieldStub>();
 		//noinspection unchecked,rawtypes
 		collectMethods((Class<IOInstance>)its, getters, setters);
-		return Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).collect(Collectors.toSet());
+		return Iters.concat(getters, setters).collectToSet(FieldStub::varName);
 	}
 	
 	private static Optional<Class<?>> upperSame(Class<?> interf){
-		var its = Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
+		var its = Iters.from(interf.getInterfaces()).filtered(IOInstance.Def::isDefinition).collectToList();
 		if(its.size() != 1) return Optional.empty();
 		
 		Set<String> parentNames = collectNames(its.getFirst());
@@ -993,21 +988,21 @@ public final class DefInstanceCompiler{
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order = interf.getAnnotation(IOInstance.Def.Order.class);
 		if(order == null){
-			var its = Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
+			var its = Iters.from(interf.getInterfaces()).filtered(IOInstance.Def::isDefinition).collectToList();
 			if(its.size() != 1) return Optional.empty();
 			
 			var upper = upperSame(interf);
 			return upper.flatMap(u -> getOrder(u, fieldInfo));
 		}
 		
-		var check   = fieldInfo.stream().map(FieldInfo::name).collect(Collectors.toSet());
+		var check   = Iters.from(fieldInfo).collectToSet(FieldInfo::name);
 		var ordered = List.of(order.value());
 		
 		for(String name : ordered){
 			if(check.remove(name)) continue;
 			throw new MalformedTemplateStruct(
 				name + " does not exist in " + interf.getName() + ".\n" +
-				"Existing field names: " + fieldInfo.stream().map(FieldInfo::name).toList()
+				"Existing field names: " + Iters.from(fieldInfo).map(FieldInfo::name).collectToList()
 			);
 		}
 		
@@ -1022,7 +1017,7 @@ public final class DefInstanceCompiler{
 		writer.write(
 			"""
 				private static final field $STRUCT #Struct
-				
+								
 				function <clinit> start
 					static call #Struct of start
 						class #typ.impl
@@ -1101,9 +1096,9 @@ public final class DefInstanceCompiler{
 		var anns = new ArrayList<>(info.annotations);
 		anns.removeIf(a -> (a instanceof IOValue v && v.name().isEmpty()) || a instanceof Override);
 		
-		var valAnn = anns.stream().filter(a -> a instanceof IOValue).findAny().orElseGet(() -> Annotations.make(IOValue.class, Map.of("name", info.name)));
+		var valAnn = Iters.from(anns).firstMatching(a -> a instanceof IOValue).orElseGet(() -> Annotations.make(IOValue.class, Map.of("name", info.name)));
 		
-		if(anns.stream().noneMatch(a -> a instanceof IOValue)) anns.add(valAnn);
+		if(Iters.from(anns).noneMatch(a -> a instanceof IOValue)) anns.add(valAnn);
 		
 		writeAnnotations(writer, anns);
 		writer.write(
@@ -1164,14 +1159,14 @@ public final class DefInstanceCompiler{
 				}
 				return Optional.empty();
 			});
-			toShortStr = toShortStr.or(() -> Arrays.stream(clazz.getMethods()).filter(m -> isToString(clazz, m, "toShortString")).findAny());
+			toShortStr = toShortStr.or(() -> Iters.from(clazz.getMethods()).firstMatching(m -> isToString(clazz, m, "toShortString")));
 			if(toStr.isPresent() && toShortStr.isPresent()) break;
 			
 			if(q.isEmpty()){
-				last.stream()
-				    .flatMap(t -> Arrays.stream(t.getInterfaces()))
-				    .filter(i -> i != IOInstance.Def.class && UtilL.instanceOf(interf, IOInstance.Def.class))
-				    .forEach(q::addLast);
+				Iters.from(last)
+				     .flatMapArray(Class::getInterfaces)
+				     .filtered(i -> i != IOInstance.Def.class && UtilL.instanceOf(interf, IOInstance.Def.class))
+				     .forEach(q::addLast);
 				last.clear();
 			}
 		}
@@ -1210,63 +1205,59 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static List<FieldInfo> mergeStubs(List<FieldStub> getters, List<FieldStub> setters){
-		return Stream.concat(getters.stream(), setters.stream())
-		             .map(FieldStub::varName)
-		             .distinct()
-		             .map(name -> {
-			             var getter = getters.stream().filter(s -> s.varName().equals(name)).findAny();
-			             var setter = setters.stream().filter(s -> s.varName().equals(name)).findAny();
-			             
-			             var gors = getter.or(() -> setter).orElseThrow();
-			             
-			             var type = gors.type();
-			             
-			             var anns = Stream.concat(getter.stream(), setter.stream())
-			                              .map(f -> f.method().getAnnotations())
-			                              .flatMap(Arrays::stream)
-			                              .filter(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
-			                              .collect(Collectors.toList());
-			             
-			             IOValue valBack = null;
-			             var     iter    = anns.iterator();
-			             while(iter.hasNext()){
-				             var ann = iter.next();
-				             if(ann instanceof IOValue val){
-					             if(val.name().isEmpty()){
-						             valBack = val;
-						             iter.remove();
-						             continue;
-					             }
-					             throw new MalformedTemplateStruct(gors.varName() + ": @IOValue can not contain a name");
-				             }
-			             }
-			             if(valBack == null) valBack = Annotations.make(IOValue.class);
-			             anns.add(valBack);
-			             
-			             return new FieldInfo(name, type, anns, getter, setter);
-		             })
-		             .toList();
+		return Iters.concat(getters, setters)
+		            .map(FieldStub::varName)
+		            .distinct()
+		            .map(name -> {
+			            var getter = Iters.from(getters).firstMatching(s -> s.varName().equals(name));
+			            var setter = Iters.from(setters).firstMatching(s -> s.varName().equals(name));
+			            
+			            var gors = getter.or(() -> setter).orElseThrow();
+			            
+			            var type = gors.type();
+			            
+			            var anns = Iters.ofPresent(getter, setter)
+			                            .flatMapArray(f -> f.method().getAnnotations())
+			                            .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+			                            .collectToList();
+			            
+			            IOValue valBack = null;
+			            var     iter    = anns.iterator();
+			            while(iter.hasNext()){
+				            var ann = iter.next();
+				            if(ann instanceof IOValue val){
+					            if(val.name().isEmpty()){
+						            valBack = val;
+						            iter.remove();
+						            continue;
+					            }
+					            throw new MalformedTemplateStruct(gors.varName() + ": @IOValue can not contain a name");
+				            }
+			            }
+			            if(valBack == null) valBack = Annotations.make(IOValue.class);
+			            anns.add(valBack);
+			            
+			            return new FieldInfo(name, type, anns, getter, setter);
+		            })
+		            .collectToList();
 	}
 	
 	private static Style checkStyles(List<FieldStub> getters, List<FieldStub> setters){
-		Map<Style, List<FieldStub>> styles = Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::style));
+		Map<Style, List<FieldStub>> styles = Iters.concat(getters, setters).collectToGrouping(FieldStub::style);
 		if(styles.isEmpty()){
 			return Style.NAMED;
 		}
 		if(styles.size()>1){
-			var style = styles.entrySet().stream().reduce((a, b) -> a.getValue().size()>b.getValue().size()? a : b).map(Map.Entry::getKey).orElseThrow();
+			var style = Iters.entries(styles).reduce((a, b) -> a.getValue().size()>b.getValue().size()? a : b).map(Map.Entry::getKey).orElseThrow();
 			throw new MalformedTemplateStruct(
 				"Inconsistent getter/setter styles!\n" +
-				"Style patterns:\n" + styles.keySet().stream().map(s -> "\t" + s + ":\t" + s.humanPattern).collect(Collectors.joining("\n")) + "\n" +
+				"Style patterns:\n" + Iters.keys(styles).joinAsStr("\n", s -> "\t" + s + ":\t" + s.humanPattern) + "\n" +
 				"Most common style is:\n" + style + "\n" +
 				"Bad styles:\n" +
-				styles.entrySet()
-				      .stream()
-				      .filter(e -> e.getKey() != style)
-				      .map(Map.Entry::getValue)
-				      .flatMap(Collection::stream)
-				      .map(s -> "\t" + s.method().getName() + ":\t" + s.style())
-				      .collect(Collectors.joining("\n"))
+				Iters.entries(styles)
+				     .filtered(e -> e.getKey() != style)
+				     .flatMap(Map.Entry::getValue)
+				     .joinAsStr("\n", s -> "\t" + s.method().getName() + ":\t" + s.style())
 			);
 		}
 		return styles.keySet().iterator().next();

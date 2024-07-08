@@ -231,10 +231,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		@Override
 		public void accept(IOField<T, ?> e){
 			Objects.requireNonNull(e);
-			var data = safeData;
-			var lPos = pos;
+			var data  = safeData;
+			var lPos  = pos;
+			var fName = e.getName();
 			for(int i = 0; i<lPos; i++){
-				if(data[i].getName().equals(e.getName())){
+				if(data[i].getName().equals(fName)){
 					return;
 				}
 			}
@@ -253,14 +254,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
-		var s = stream.spliterator();
-		var b = new SetBuilder<T>((int)s.getExactSizeIfKnown());
-		s.forEachRemaining(b);
-		return b.make();
-	}
 	public static <T extends IOInstance<T>> FieldSet<T> of(Iterable<IOField<T, ?>> iterable){
-		var b = new SetBuilder<T>(-1);
+		var b = new SetBuilder<T>(IterablePP.SizedPP.tryGetUnknown(iterable).orElse(-1));
 		iterable.forEach(b);
 		return b.make();
 	}
@@ -509,10 +504,6 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return filtered(f -> UtilL.instanceOf(f.getType(), type)).map(f -> (IOField<T, E>)f);
 	}
 	
-	public <E extends IOField<T, ?>> IterablePP<? extends E> byFieldType(Class<E> type){
-		return filtered(type::isInstance).map(type::cast);
-	}
-	
 	@SuppressWarnings("unchecked")
 	public IterablePP<RefField<T, ?>> onlyRefs(){
 		return (IterablePP<RefField<T, ?>>)(Object)filtered(e -> e instanceof RefField);
@@ -549,15 +540,15 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return requireExactFieldType(IOFieldPrimitive.FBoolean.class, name);
 	}
 	
-	public Stream<IOField<T, ?>> unpackedStream(){
-		return stream().flatMap(IOField::streamUnpackedFields);
+	public IterablePP<IOField<T, ?>> unpackedStream(){
+		return flatMap(IOField::iterUnpackedFields);
 	}
 	public FieldSet<T> unpacked(){
 		return FieldSet.of(unpackedStream());
 	}
 	
-	public Stream<IOField<T, ?>> streamDependentOn(IOField<T, ?> field){
-		return stream().filter(f -> f.isDependency(field));
+	public IterablePP<IOField<T, ?>> iterDependentOn(IOField<T, ?> field){
+		return filtered(f -> f.isDependency(field));
 	}
 	
 	@Override

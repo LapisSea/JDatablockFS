@@ -74,7 +74,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
 				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
-				pipe.sizesStr = Iters.from(buff).joinAsStr(s -> s.shortName + "");
+				pipe.sizesStr = Iters.from(buff).map(NumberSize::shortName).joinAsStr();
 				cache.put(buff, pipe);
 				
 				return pipe;

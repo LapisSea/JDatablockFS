@@ -275,13 +275,13 @@ public class DefragmentManager{
 		while(true){
 			Chunk fragmentedChunk;
 			{
-				var fragmentedChunkOpt = cluster.getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).findFirst();
+				var fragmentedChunkOpt = cluster.getFirstChunk().chunksAhead().skip(1).firstMatching(Chunk::hasNextPtr);
 				if(fragmentedChunkOpt.isEmpty()) break;
 				fragmentedChunk = fragmentedChunkOpt.get();
 				
 				while(true){
 					var fptr  = fragmentedChunk.getPtr();
-					var chRef = cluster.getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).filter(c -> c.getNextPtr().equals(fptr)).findAny();
+					var chRef = cluster.getFirstChunk().chunksAhead().skip(1).firstMatching(c -> c.getNextPtr().equals(fptr));
 					if(chRef.isEmpty()) break;
 					fragmentedChunk = chRef.get();
 				}

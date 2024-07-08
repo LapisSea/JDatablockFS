@@ -45,7 +45,6 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.config.GlobalConfig.TYPE_VALIDATION;
@@ -305,7 +304,7 @@ public sealed interface IOTypeDB{
 			
 			private Fixed(Map<String, TypeDef> defs, Map<Integer, IOType> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
-				var maxID = Iters.keys(idToTyp).mapToInt(i -> i).max().orElse(0);
+				var maxID = Iters.keys(idToTyp).mapToInt().max().orElse(0);
 				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
 				typToID = Iters.entries(idToTyp).collectToFinalMap(Map.Entry::getValue, Map.Entry::getKey);
@@ -635,7 +634,7 @@ public sealed interface IOTypeDB{
 					     }
 					     return Map.entry(e.getKey(), typ);
 				     })
-				     .filtered(Objects::nonNull)
+				     .nonNulls()
 				     .collectToMap(e -> e.getKey().typeName, e -> {
 					     var typ  = e.getValue();
 					     var pipe = StandardStructPipe.of(typ);
@@ -647,7 +646,7 @@ public sealed interface IOTypeDB{
 			
 			Set<String> containedKeys;
 			try(var ignore = defsLock.read()){
-				containedKeys = defs.stream().map(IOMap.IOEntry::getKey).map(t -> t.typeName).collect(Collectors.toUnmodifiableSet());
+				containedKeys = Iters.from(defs).map(ent -> ent.getKey().typeName).collectToSet();
 			}catch(Throwable e1){
 				throw new IOException("Failed to read def keys", e1);
 			}
@@ -747,9 +746,9 @@ public sealed interface IOTypeDB{
 			if(parent != null){
 				recordType(builtIn, IOType.of(switch(parent.type()){
 					case EXTEND -> typ.getSuperclass();
-					case JUST_INTERFACE -> Arrays.stream(typ.getInterfaces())
-					                             .filter(i -> i.getName().equals(parent.name()))
-					                             .findAny().orElseThrow();
+					case JUST_INTERFACE -> Iters.from(typ.getInterfaces())
+					                            .firstMatching(i -> i.getName().equals(parent.name()))
+					                            .orElseThrow();
 				}), newDefs);
 			}
 			
@@ -877,7 +876,7 @@ public sealed interface IOTypeDB{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				recordType(universe.id2cl.values().stream().map(IOType::of).toList());
+				recordType(Iters.values(universe.id2cl).map(IOType::of).collectToList());
 				
 				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				for(var e : universe.id2cl.entrySet()){

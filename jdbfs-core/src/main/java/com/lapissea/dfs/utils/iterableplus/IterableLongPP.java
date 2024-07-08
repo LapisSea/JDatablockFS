@@ -9,20 +9,37 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
+import java.util.function.LongUnaryOperator;
 
 public interface IterableLongPP{
 	
-	final class ArrayIterL implements LongIterator{
+	final class ArrayIter implements LongIterator{
 		private final long[] data;
 		private       int    i;
-		public ArrayIterL(long[] data){ this.data = data; }
+		public ArrayIter(long[] data){ this.data = data; }
 		@Override
 		public boolean hasNext(){ return i<data.length; }
 		@Override
 		public long nextLong(){ return data[i++]; }
 	}
+	
+	final class SingleIter implements LongIterator{
+		private final long    value;
+		private       boolean done;
+		public SingleIter(long value){ this.value = value; }
+		@Override
+		public boolean hasNext(){ return !done; }
+		@Override
+		public long nextLong(){
+			if(done) throw new NoSuchElementException();
+			done = true;
+			return value;
+		}
+	}
+	
 	static IterableLongPP empty(){
 		return () -> new LongIterator(){
 			@Override
@@ -126,6 +143,22 @@ public interface IterableLongPP{
 	
 	LongIterator iterator();
 	
+	default IterableLongPP map(LongUnaryOperator map){
+		return () -> {
+			var src = IterableLongPP.this.iterator();
+			return new LongIterator(){
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public long nextLong(){
+					return map.applyAsLong(src.nextLong());
+				}
+			};
+		};
+	}
+	
 	default <T> IterablePP<T> mapToObj(LongFunction<T> function){
 		return () -> {
 			var src = IterableLongPP.this.iterator();
@@ -137,6 +170,22 @@ public interface IterableLongPP{
 				@Override
 				public T next(){
 					return function.apply(src.nextLong());
+				}
+			};
+		};
+	}
+	
+	default IterablePP<Long> box(){
+		return () -> {
+			var src = IterableLongPP.this.iterator();
+			return new Iterator<>(){
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public Long next(){
+					return src.nextLong();
 				}
 			};
 		};
@@ -211,4 +260,49 @@ public interface IterableLongPP{
 		if(count == 0) return OptionalDouble.empty();
 		return OptionalDouble.of((double)sum/count);
 	}
+	
+	default void forEach(LongConsumer consumer){
+		var iter = iterator();
+		while(iter.hasNext()){
+			var element = iter.nextLong();
+			consumer.accept(element);
+		}
+	}
+	default void forEach(LongPredicate predicate){
+		var iter = iterator();
+		while(iter.hasNext()){
+			var element = iter.nextLong();
+			if(!predicate.test(element)){
+				break;
+			}
+		}
+	}
+	
+	default IterableLongPP distinct(){
+		return () -> {
+			return new LongIterator(){
+				private long[] sorted;
+				private int    i;
+				
+				private long[] sort(){
+					return sorted = IterableLongPP.this.box().sorted().mapToLong().collectToArray();
+				}
+				
+				@Override
+				public boolean hasNext(){
+					var s = sorted;
+					if(s == null) s = sort();
+					return i<s.length;
+				}
+				@Override
+				public long nextLong(){
+					var s = sorted;
+					if(s == null) s = sort();
+					if(i>=s.length) throw new NoSuchElementException();
+					return s[i++];
+				}
+			};
+		};
+	}
+	
 }

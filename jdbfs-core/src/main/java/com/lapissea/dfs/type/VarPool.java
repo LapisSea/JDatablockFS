@@ -5,11 +5,10 @@ import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.access.VirtualAccessor;
 import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 
-import java.util.Arrays;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -45,8 +44,8 @@ public interface VarPool<T extends IOInstance<T>>{
 		private void protectAccessor(VirtualAccessor<T> accessor, Class<?>... types){
 			protectAccessor(accessor);
 			
-			if(Arrays.stream(types).noneMatch(type -> accessor.getType() == type)){
-				throw new IllegalArgumentException(accessor.getType() + " != " + Arrays.stream(types).map(Class::getName).collect(Collectors.joining(" || ", "(", ")")));
+			if(Iters.from(types).noneIs(accessor.getType())){
+				throw new IllegalArgumentException(accessor.getType() + " != " + Iters.from(types).joinAsStr(" || ", "(", ")", Class::getName));
 			}
 		}
 		private void protectAccessor(VirtualAccessor<T> accessor, Class<?> type){

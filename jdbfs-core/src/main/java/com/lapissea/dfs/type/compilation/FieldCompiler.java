@@ -98,7 +98,7 @@ public final class FieldCompiler{
 			}
 		}
 		
-		return FieldSet.of(valueDefs.stream().flatMap(valueDef -> {
+		return FieldSet.of(Iters.from(valueDefs).flatMap(valueDef -> {
 			valueDef.setAccessible(true);
 			
 			try{
@@ -378,14 +378,12 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
-		var errors = Iters.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null)).asCollection();
-		if(errors.isEmpty()) return;
-		
-		throw new IllegalField(
-			"Invalid transient (getter+setter, no field) " + TextUtil.plural("IOField", errors.size()) +
-			" for " + cl.getName() + ":\n" +
-			errors.joinAsStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
-		);
+		Iters.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null))
+		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
+		     .ifPresent(invalidFields -> {
+			     throw new IllegalField("Invalid transient (getter+setter, no field) IOField(s) for " + cl.getName() + ":\n" +
+			                            invalidFields);
+		     });
 	}
 	
 	private static IterablePP<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }

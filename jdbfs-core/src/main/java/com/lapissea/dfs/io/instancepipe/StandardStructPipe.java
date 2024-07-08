@@ -167,8 +167,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		for(IOField<T, ?> field : fields){
 			
 			//If any other field depends on this field, then it has to be read
-			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
-				var needsInstance = !field.streamUnpackedFields().allMatch(f -> f.isVirtual(IO));
+			if(field.iterUnpackedFields().flatMap(fields::iterDependentOn).hasAny()){
+				var needsInstance = !field.iterUnpackedFields().allMatch(f -> f.isVirtual(IO));
 				cmds.add(new CmdBuild.Read(needsInstance, field.needsIOPool()));
 				continue;
 			}

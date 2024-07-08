@@ -53,7 +53,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.Utils.getCallee;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -659,12 +658,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		);
 	}
 	
-	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t -> t.getVirtual(null)).flatMap(Optional::stream);
+	private IterablePP<VirtualAccessor<T>> virtualAccessorStream(){
+		return getFields().flatOptionals(t -> t.getVirtual(null));
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Ptr)
+		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Ptr)
 		                                    .mapToInt(a -> a.getStoragePool().ordinal()).toArray();
 		if(vPools.length == 0) return null;
 		var poolPointerSizes = new short[StoragePool.values().length];
@@ -677,15 +676,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Primitive)
+		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Primitive)
 		                                    .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes = new short[StoragePool.values().length];
-		for(var e : vPools.entrySet()){
-			var siz = e.getValue()
-			           .stream()
-			           .mapToInt(a -> ((Primitive)a.typeOff).size)
-			           .sum();
+		for(Map.Entry<StoragePool, List<VirtualAccessor<T>>> e : vPools.entrySet()){
+			var siz = Iters.from(e.getValue())
+			               .mapToInt(a -> ((Primitive)a.typeOff).size)
+			               .sum();
 			if(siz>Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolSizes[e.getKey().ordinal()] = (short)siz;
 		}
@@ -953,7 +951,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				var obj  = make();
 				var pool = allocVirtualVarPool(IO);
 				inv = fields.unpackedStream()
-				            .filter(f -> f.getNullability() == NOT_NULL)
+				            .filtered(f -> f.getNullability() == NOT_NULL)
 				            .anyMatch(f -> f.isNull(pool, obj));
 			}
 			invalidInitialNulls = (byte)(inv? 1 : 0);

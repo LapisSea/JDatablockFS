@@ -994,7 +994,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
-		}).filtered(Objects::nonNull));
+		}).nonNulls());
 		
 		ctx.renderer.setColor(bitColor);
 		try(var ignored = ctx.renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
@@ -1422,7 +1422,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ioPool = instance.getThisStruct().allocVirtualVarPool(IO);
 			if(ioPool != null){
 				try(var io = reference.io(ctx.provider)){
-					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.streamUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
+					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.iterUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
 					var dep      = pipe.getFieldDependency();
 					var deps     = dep.getDeps(virtuals);
 					pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));

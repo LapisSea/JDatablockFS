@@ -29,14 +29,11 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			private       int          size;
 			@Override
 			public Iterable<Ldx<T>> entrySet(){
-				return Iters.from(cache)
-				            .enumerateL()
-				            .filtered(e -> e.getValue() != null);
+				return Iters.from(cache).enumerateL().nonNullProps(Ldx::val);
 			}
 			@Override
 			public Iterable<T> values(){
-				return Iters.from(cache)
-				            .filtered(Objects::nonNull);
+				return Iters.from(cache).nonNulls();
 			}
 			@Override
 			public int size(){ return size; }

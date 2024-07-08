@@ -6,11 +6,13 @@ import com.lapissea.util.TextUtil;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -239,14 +241,59 @@ public final class Iters{
 		};
 	}
 	
+	public static IterableLongPP ofLongs(long element){
+		return () -> new IterableLongPP.SingleIter(element);
+	}
 	public static IterableLongPP ofLongs(long... data){
-		if(data.length == 0) return IterableLongPP.empty();
-		return () -> new IterableLongPP.ArrayIterL(data);
+		return switch(data.length){
+			case 0 -> IterableLongPP.empty();
+			case 1 -> ofLongs(data[0]);
+			default -> () -> new IterableLongPP.ArrayIter(data);
+		};
+	}
+	public static IterableIntPP ofInts(int element){
+		return () -> new IterableIntPP.SingleIter(element);
 	}
 	public static IterableIntPP ofInts(int... data){
-		if(data.length == 0) return IterableIntPP.empty();
-		return () -> new IterableIntPP.ArrayIterI(data);
+		return switch(data.length){
+			case 0 -> IterableIntPP.empty();
+			case 1 -> ofInts(data[0]);
+			default -> () -> new IterableIntPP.ArrayIter(data);
+		};
 	}
+	public static IterableLongPP range(long start, long endExclusive){
+		if(start == endExclusive) return IterableLongPP.empty();
+		if(endExclusive<start) throw new IllegalArgumentException("endExclusive<start");
+		return () -> new LongIterator(){
+			private long i = start;
+			@Override
+			public boolean hasNext(){
+				return i<endExclusive;
+			}
+			@Override
+			public long nextLong(){
+				if(!hasNext()) throw new NoSuchElementException();
+				return i++;
+			}
+		};
+	}
+	public static IterableIntPP range(int start, int endExclusive){
+		if(start == endExclusive) return IterableIntPP.empty();
+		if(endExclusive<start) throw new IllegalArgumentException("endExclusive<start");
+		return () -> new IntIterator(){
+			private int i = start;
+			@Override
+			public boolean hasNext(){
+				return i<endExclusive;
+			}
+			@Override
+			public int nextInt(){
+				if(!hasNext()) throw new NoSuchElementException();
+				return i++;
+			}
+		};
+	}
+	
 	
 	@SuppressWarnings("unchecked")
 	public static <T> IterablePP<T> of(){ return (IterablePP<T>)EMPTY; }
@@ -254,6 +301,13 @@ public final class Iters{
 	@SafeVarargs
 	public static <T> IterablePP<T> of(T... data){ return from(data); }
 	
+	public static IterableLongPP ofPresent(OptionalLong element)    { return element.isEmpty()? IterableLongPP.empty() : ofLongs(element.getAsLong()); }
+	public static IterableLongPP ofPresent(OptionalLong... elements){ return from(elements).filtered(OptionalLong::isPresent).mapToLong(OptionalLong::getAsLong); }
+	
+	public static IterableIntPP ofPresent(OptionalInt... elements)  { return from(elements).filtered(OptionalInt::isPresent).mapToInt(OptionalInt::getAsInt); }
+	public static IterableIntPP ofPresent(OptionalInt element)      { return element.isEmpty()? IterableIntPP.empty() : ofInts(element.getAsInt()); }
+	
+	public static <T> IterablePP<T> ofPresent(Optional<T> element)  { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
 	@SafeVarargs
 	public static <T> IterablePP<T> ofPresent(Optional<T>... data){ return data.length == 0? of() : new ArrayIterable<>(data).flatOptionals(Function.identity()); }
 	
@@ -368,8 +422,10 @@ public final class Iters{
 		};
 	}
 	
-	public static <T> IterablePP<T> concat1N(T first, Iterable<T> extra){ return concat(Iters.of(first), extra); }
-	public static <T> IterablePP<T> concatN1(Iterable<T> start, T last) { return concat(start, Iters.of(last)); }
+	public static <T> IterablePP<T> concat1N(T first, Collection<T> extra){ return concat(List.of(first), extra); }
+	public static <T> IterablePP<T> concat1N(T first, Iterable<T> extra)  { return concat(Iters.of(first), extra); }
+	public static <T> IterablePP<T> concatN1(Collection<T> start, T last) { return concat(start, List.of(last)); }
+	public static <T> IterablePP<T> concatN1(Iterable<T> start, T last)   { return concat(start, Iters.of(last)); }
 	
 	public static <A, B> IterablePP<Map.Entry<A, B>> zip(Collection<A> a, Collection<B> b){
 		return zip(a, b, AbstractMap.SimpleEntry::new);
@@ -389,6 +445,10 @@ public final class Iters{
 					}
 					@Override
 					public Zip next(){
+						boolean hna = ai.hasNext(), hnb = bi.hasNext();
+						if(hna != hnb) throw new IllegalStateException("Zipped collections changed size!");
+						if(!hna) throw new NoSuchElementException();
+						
 						return zipper.apply(ai.next(), bi.next());
 					}
 				};

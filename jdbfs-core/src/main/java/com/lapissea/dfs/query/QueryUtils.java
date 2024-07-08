@@ -3,12 +3,10 @@ package com.lapissea.dfs.query;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 public enum QueryUtils{
@@ -38,7 +36,7 @@ public enum QueryUtils{
 	private static void deepPromotion(SupportedPrimitive l, Set<SupportedPrimitive> result){
 		result.add(l);
 		while(true){
-			var wave = Iters.from(result).map(PROMOTION_MAP::get).filtered(Objects::nonNull).flatMap(e -> e).collectToList();
+			var wave = Iters.from(result).map(PROMOTION_MAP::get).nonNulls().flatMap(e -> e).collectToList();
 			if(!result.addAll(wave)){
 				break;
 			}
@@ -51,7 +49,6 @@ public enum QueryUtils{
 		deepPromotion(l, deepL);
 		deepPromotion(r, deepR);
 		
-		var result = deepL.stream().filter(deepR::contains).min(Comparator.comparingLong(c -> c.maxSize.get()));
-		return result.orElse(null);
+		return Iters.from(deepL).filtered(deepR::contains).minBy(c -> c.maxSize.get()).orElse(null);
 	}
 }

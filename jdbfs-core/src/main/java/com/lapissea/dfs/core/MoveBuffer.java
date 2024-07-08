@@ -2,11 +2,10 @@ package com.lapissea.dfs.core;
 
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public final class MoveBuffer{
 	
@@ -73,7 +72,7 @@ public final class MoveBuffer{
 	
 	@Override
 	public String toString(){
-		return IntStream.range(0, size).map(i -> i*2).mapToObj(p -> buff[p] + "->" + buff[p + 1])
-		                .collect(Collectors.joining(", ", "[", "]"));
+		return Iters.rangeMap(0, size, i -> i*2).map(p -> buff[p] + "->" + buff[p + 1])
+		            .joinAsStr(", ", "[", "]");
 	}
 }

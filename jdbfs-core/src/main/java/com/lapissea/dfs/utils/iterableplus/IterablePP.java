@@ -56,6 +56,15 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 			return OptionalInt.empty();
 		}
+		static OptionalInt tryGetUnknown(Iterable<?> iter){
+			if(iter instanceof SizedPP<?> s){
+				return s.calculateSize();
+			}
+			if(iter instanceof Collection<?> s){
+				return OptionalInt.of(s.size());
+			}
+			return OptionalInt.empty();
+		}
 		
 		abstract class Default<T> extends Iters.DefaultIterable<T> implements SizedPP<T>{ }
 		
@@ -66,6 +75,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		return StreamSupport.stream(spliterator(), false);
 	}
 	
+	default boolean hasAny(){
+		return !isEmpty();
+	}
 	default boolean isEmpty(){
 		return !iterator().hasNext();
 	}
@@ -75,16 +87,31 @@ public interface IterablePP<T> extends Iterable<T>{
 		if(iter.hasNext()) return iter.next();
 		throw new NoSuchElementException();
 	}
+	
 	default Optional<T> findFirst(){
-		var iter = iterator();
-		if(iter.hasNext()) return Optional.of(iter.next());
+		for(T element : this){
+			if(element == null) continue;
+			return Optional.of(element);
+		}
 		return Optional.empty();
 	}
 	
+	default Optional<T> findLast(){
+		Iterator<T> iterator = this.iterator();
+		if(!iterator.hasNext()) return Optional.empty();
+		T last = null;
+		do{
+			var result = iterator.next();
+			if(result != null) last = result;
+		}while(iterator.hasNext());
+		return Optional.ofNullable(last);
+	}
+	
 	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
-		for(T t : this){
-			if(t != null && predicate.test(t)){
-				return Optional.of(t);
+		for(var element : this){
+			if(element == null) continue;
+			if(predicate.test(element)){
+				return Optional.of(element);
 			}
 		}
 		return Optional.empty();
@@ -93,6 +120,7 @@ public interface IterablePP<T> extends Iterable<T>{
 	default int count(){
 		var s = tryGetSize();
 		if(s.isPresent()) return s.getAsInt();
+		
 		int num = 0;
 		for(var ignore : this){
 			preIncrementInt(num);
@@ -104,6 +132,7 @@ public interface IterablePP<T> extends Iterable<T>{
 	default long countL(){
 		var s = tryGetSize();
 		if(s.isPresent()) return s.getAsInt();
+		
 		long num = 0;
 		for(var ignore : this){
 			preIncrementLong(num);
@@ -113,8 +142,9 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
-		final Iterator<T> src = IterablePP.this.iterator();
+		var src = iterator();
 		if(!src.hasNext()) return OptionalPP.empty();
+		
 		var result = src.next();
 		while(src.hasNext()){
 			var next = src.next();
@@ -123,9 +153,20 @@ public interface IterablePP<T> extends Iterable<T>{
 		return OptionalPP.of(result);
 	}
 	
+	default T reduce(T initial, BinaryOperator<T> reducer){
+		var result = initial;
+		for(T next : this){
+			result = reducer.apply(result, next);
+		}
+		return result;
+	}
+	
 	default OptionalPP<T> min(){
 		//noinspection unchecked
 		return min((a, b) -> ((Comparable<T>)a).compareTo(b));
+	}
+	default <U extends Comparable<? super U>> OptionalPP<T> minBy(Function<T, U> sortProperty){
+		return min(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> min(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.minBy(comparator));
@@ -163,9 +204,18 @@ public interface IterablePP<T> extends Iterable<T>{
 		assert size.isEmpty() || size.getAsInt() == res.size() : size.getAsInt() + "!=" + res.size();
 		return res;
 	}
+	
+	default <E> List<E> collectToList(Function<T, E> map){
+		return map(map).toArrayList();
+	}
 	default List<T> collectToList(){
 		return toArrayList();
 	}
+	
+	default <E> List<E> collectToFinalList(Function<T, E> map){
+		return map(map).collectToFinalList();
+	}
+	
 	default List<T> collectToFinalList(){
 		OptionalInt  size = tryGetSize();
 		ArrayList<T> res;
@@ -206,6 +256,9 @@ public interface IterablePP<T> extends Iterable<T>{
 	default Set<T> collectToFinalSet(){
 		return Set.copyOf(collectToList());
 	}
+	default <E> Set<E> collectToSet(Function<T, E> map){
+		return map(map).collectToSet();
+	}
 	default Set<T> collectToSet(){
 		OptionalInt size = tryGetSize();
 		HashSet<T>  res;
@@ -216,6 +269,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		}else res = new HashSet<>();
 		for(T t : this){
 			res.add(t);
+		}
+		if(size.isPresent() && size.getAsInt()>0 && size.getAsInt()>=res.size()*2){
+			res = new HashSet<>(res);
 		}
 		return res;
 	}
@@ -304,6 +360,28 @@ public interface IterablePP<T> extends Iterable<T>{
 	default String joinAsStr(String delimiter, String prefix, String suffix, Function<T, String> toString){
 		var iter = iterator();
 		if(!iter.hasNext()) return prefix.isEmpty() && suffix.isEmpty()? "" : prefix + suffix;
+		return strLoop(delimiter, prefix, suffix, toString, iter);
+	}
+	
+	default Optional<String> joinAsOptionalStr()                                              { return joinAsOptionalStr("", "", "", null); }
+	default Optional<String> joinAsOptionalStr(String delimiter)                              { return joinAsOptionalStr(delimiter, "", "", null); }
+	default Optional<String> joinAsOptionalStr(Function<T, String> toString)                  { return joinAsOptionalStr("", "", "", toString); }
+	default Optional<String> joinAsOptionalStr(String delimiter, Function<T, String> toString){ return joinAsOptionalStr(delimiter, "", "", toString); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Optional<String> joinAsOptionalStr(String delimiter, String prefix, String suffix){ return joinAsOptionalStr(delimiter, prefix, suffix, null); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Optional<String> joinAsOptionalStr(String delimiter, String prefix, String suffix, Function<T, String> toString){
+		var iter = iterator();
+		if(!iter.hasNext()) return Optional.empty();
+		var res = strLoop(delimiter, prefix, suffix, toString, iter);
+		return Optional.of(res);
+	}
+	
+	private static <T> String strLoop(String delimiter, String prefix, String suffix, Function<T, String> toString, Iterator<T> iter){
 		var res = new StringJoiner(delimiter, prefix, suffix);
 		do{
 			var    t = iter.next();
@@ -313,23 +391,6 @@ public interface IterablePP<T> extends Iterable<T>{
 			res.add(str);
 		}while(iter.hasNext());
 		return res.toString();
-	}
-	
-	default Optional<String> joinAsOptionalStr()                            { return joinAsOptionalStr("", null); }
-	default Optional<String> joinAsOptionalStr(String delimiter)            { return joinAsOptionalStr(delimiter, null); }
-	default Optional<String> joinAsOptionalStr(Function<T, String> toString){ return joinAsOptionalStr("", toString); }
-	default Optional<String> joinAsOptionalStr(String delimiter, Function<T, String> toString){
-		var iter = iterator();
-		if(!iter.hasNext()) return Optional.empty();
-		var res = new StringJoiner(delimiter);
-		do{
-			var    t = iter.next();
-			String str;
-			if(toString == null) str = Objects.toString(t);
-			else str = toString.apply(t);
-			res.add(str);
-		}while(iter.hasNext());
-		return Optional.of(res.toString());
 	}
 	
 	default <E extends Throwable> boolean noneMatch(UnsafePredicate<T, E> predicate) throws E{
@@ -371,6 +432,46 @@ public interface IterablePP<T> extends Iterable<T>{
 		return false;
 	}
 	
+	default IterablePP<T> nonNullProps(Function<T, ?> property){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingNonNullIterator<>(){
+					@Override
+					protected T doNext(){
+						while(true){
+							if(!src.hasNext()) return null;
+							var element = src.next();
+							if(element == null) continue;
+							if(property.apply(element) == null) continue;
+							return element;
+						}
+					}
+				};
+			}
+		};
+	}
+	default IterablePP<T> nonNulls(){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingNonNullIterator<>(){
+					@Override
+					protected T doNext(){
+						while(true){
+							if(!src.hasNext()) return null;
+							var element = src.next();
+							if(element == null) continue;
+							return element;
+						}
+					}
+				};
+			}
+		};
+	}
+	
 	default IterablePP<T> filtered(Predicate<T> filter){
 		return new Iters.DefaultIterable<>(){
 			@Override
@@ -397,6 +498,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	default IterablePP<T> sortedByI(ToIntFunction<T> comparator)                               { return sorted(Comparator.comparingInt(comparator)); }
 	default IterablePP<T> sortedByL(ToLongFunction<T> comparator)                              { return sorted(Comparator.comparingLong(comparator)); }
 	default <U extends Comparable<? super U>> IterablePP<T> sortedBy(Function<T, U> comparator){ return sorted(Comparator.comparing(comparator)); }
+	default IterablePP<T> sorted(){
+		//noinspection unchecked
+		return sorted((Comparator<T>)Comparator.naturalOrder());
+	}
 	default IterablePP<T> sorted(Comparator<T> comparator){
 		return new SizedPP.Default<>(){
 			@Override
@@ -566,9 +671,12 @@ public interface IterablePP<T> extends Iterable<T>{
 				}
 			};
 		};
-//		return filtered(instance::isInstance).map(instance::cast);
 	}
-	default <L> SizedPP<L> map(Function<T, L> mapper){
+	default IterablePP<T> instancesOf(Class<?> instance, Function<T, ?> element){
+		return filtered(e -> instance.isInstance(element.apply(e)));
+	}
+	
+	default <L> IterablePP<L> map(Function<T, L> mapper){
 		return new SizedPP.Default<>(){
 			@Override
 			public OptionalInt calculateSize(){ return SizedPP.tryGet(IterablePP.this); }
@@ -589,6 +697,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default IterableLongPP mapToLong(){ return mapToLong(e -> (long)e); }
 	default IterableLongPP mapToLong(FunctionOL<T> mapper){
 		return () -> {
 			var iter = IterablePP.this.iterator();
@@ -604,6 +713,7 @@ public interface IterablePP<T> extends Iterable<T>{
 			};
 		};
 	}
+	default IterableIntPP mapToInt(){ return mapToInt(e -> (int)e); }
 	default IterableIntPP mapToInt(FunctionOI<T> mapper){
 		return () -> {
 			var iter = IterablePP.this.iterator();
@@ -620,19 +730,19 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
-	default IterablePP<T> skip(int count){
+	default IterablePP<T> skip(long count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
 		return new SizedPP.Default<>(){
 			@Override
 			public OptionalInt calculateSize(){
 				var s = SizedPP.tryGet(IterablePP.this);
 				if(s.isEmpty()) return OptionalInt.empty();
-				return OptionalInt.of(Math.max(0, s.getAsInt() - count));
+				return OptionalInt.of((int)Math.max(0, s.getAsInt() - count));
 			}
 			@Override
 			public Iterator<T> iterator(){
 				var iter = IterablePP.this.iterator();
-				for(int i = 0; i<count; i++){
+				for(long i = 0; i<count; i++){
 					if(!iter.hasNext()) break;
 					iter.next();
 				}

@@ -32,6 +32,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -49,7 +50,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -208,8 +208,7 @@ public final class Cluster implements DataProvider{
 			if(db == null) return "<uninitialized>";
 			return "{db: " + db.toShortString() + ", " +
 			       freeChunks.size() + " freeChunks, " +
-			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
-			                                    .collect(Collectors.joining(", ", "[", "]"))
+			       "rootObjects: " + Iters.from(rootObjects).joinAsStr(", ", "[", "]", e -> e.getKey().toString())
 			       + "}";
 		}
 	}
@@ -376,7 +375,7 @@ public final class Cluster implements DataProvider{
 		throw new MalformedStruct(
 			"Failed to load type of " + name + "\n" +
 			"Stored names:\n" +
-			names.stream().map(s -> "\t" + s).collect(Collectors.joining("\n")),
+			Iters.from(names).joinAsStr("\n", s -> "\t" + s),
 			e
 		);
 	}

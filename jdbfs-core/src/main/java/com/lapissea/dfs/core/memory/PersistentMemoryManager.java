@@ -12,6 +12,7 @@ import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -301,9 +302,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 									cleanupStacks();
 									var anyActive =
 										allStacks.size()>1 &&
-										allStacks.entrySet().stream()
-										         .filter(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
-										         .anyMatch(l -> l != stack && !l.isEmpty());
+										Iters.entries(allStacks)
+										     .filtered(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
+										     .anyMatch(l -> l != stack && !l.isEmpty());
 									if(!anyActive) break;
 								}
 								UtilL.sleep(0.1F);

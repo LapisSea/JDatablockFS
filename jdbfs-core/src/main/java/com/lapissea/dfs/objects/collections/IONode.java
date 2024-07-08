@@ -36,6 +36,7 @@ import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -46,7 +47,6 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -199,7 +199,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			next.initLateData(FieldSet.of(List.of(getNextSizeField())));
 			
 			
-			return Stream.of(
+			return Iters.of(
 				next,
 				new NoIOField<>(valueAccessor, valDesc)
 			);

@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -242,8 +243,8 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			cached.makeOlder();
 			return cached.node.clone();
 		}
-		nodeCache.entrySet().stream().skip((nodeIdx + nodeCache.size())%Math.max(1, nodeCache.size())).findAny()
-		         .filter(e -> (e.getValue().age -= 2)<=0).map(Map.Entry::getKey).ifPresent(nodeCache::remove);
+		Iters.entries(nodeCache).skip((nodeIdx + nodeCache.size())%Math.max(1, nodeCache.size())).findFirst()
+		     .filter(e -> (e.getValue().age -= 2)<=0).map(Map.Entry::getKey).ifPresent(nodeCache::remove);
 		
 		var val = nodes.get(nodeIdx);
 		nodeCache.put(nodeIdx, new NodeCache(val));

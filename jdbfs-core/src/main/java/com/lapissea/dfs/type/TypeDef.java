@@ -8,6 +8,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotImplementedException;
@@ -16,12 +17,9 @@ import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -61,7 +59,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			nullability = IOFieldTools.getNullability(field);
 			isDynamic = IOFieldTools.isGeneric(field);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
-			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
+			var deps = field.getDependencies().collectToSet(IOField::getName);
 			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
 			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
 			dependencies = deps.toArray(String[]::new);
@@ -143,7 +141,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
 				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
 				fields = structFields.map(FieldDef::new).toArray(FieldDef[]::new);
-				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
+				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).iterIds().toArray();
 			}
 		}
 		if(type.isEnum()){
@@ -202,8 +200,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public boolean isSealed()       { return permits != null; }
 	public boolean isJustInterface(){ return justInterface; }
 	
-	public IntStream getFieldOrder(){
-		return Arrays.stream(fieldOrder);
+	public IterableIntPP getFieldOrder(){
+		return Iters.ofInts(fieldOrder);
 	}
 	public List<String> getPermittedSubclasses(){
 		if(permits == null) return List.of();

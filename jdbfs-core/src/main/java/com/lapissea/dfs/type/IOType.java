@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
@@ -415,7 +414,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			@Override
 			public String toString(){
-				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t)).collect(Collectors.joining(" & "));
+				return name + ": " + Iters.from(bounds).joinAsStr(" & ", Utils::typeToHuman);
 			}
 		}
 		

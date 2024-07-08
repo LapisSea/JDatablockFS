@@ -20,15 +20,14 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -118,7 +117,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 		@Override
 		public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
-			return new GeneralMerger<>(Iters.from(group).<BitField<T, ?>>map(f -> f.maxAsFixedSize(varProvider)).collectToFinalList());
+			return new GeneralMerger<>(Iters.from(group).collectToFinalList(f -> f.maxAsFixedSize(varProvider)));
 		}
 		
 	}
@@ -197,7 +196,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	public static <T extends IOInstance<T>> BitFieldMerger<T> of(List<BitField<T, ?>> group){
 		if(group.isEmpty()) throw new IllegalArgumentException("group is empty");
 		
-		if(group.stream().anyMatch(g -> g.getSizeDescriptor().getWordSpace() != WordSpace.BIT)){
+		if(Iters.from(group).anyMatch(g -> g.getSizeDescriptor().getWordSpace() != WordSpace.BIT)){
 			throw new IllegalArgumentException(group + "");
 		}
 		group = List.copyOf(group);
@@ -241,7 +240,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		var fixedSize = BitUtils.bitsToBytes(bits);
 		if(fixedSize.isPresent()){
 			initSizeDescriptor(SizeDescriptor.Fixed.of(fixedSize.getAsLong()));
-			safetyBits = bits.stream().mapToObj(BitLayout::new).findAny();
+			safetyBits = Iters.ofPresent(bits).mapToObj(BitLayout::new).findFirst();
 		}else{
 			safetyBits = Optional.empty();
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
@@ -250,13 +249,13 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				(ioPool, prov, inst) -> BitUtils.bitsToBytes(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			));
 		}
-		initLateData(FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
+		initLateData(FieldSet.of(Iters.from(group).flatMap(IOField::getDependencies)));
 		generators = IOFieldTools.fieldsToGenerators(group);
 	}
 	
 	@Override
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		var res = group.stream().map(field -> {
+		return Iters.from(group).flatOptionals(field -> {
 			Optional<String> str;
 			try{
 				str = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
@@ -264,16 +263,11 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				str = Optional.of("<UNINITIALIZED>");
 			}
 			return str.map(s -> field.getName() + "=" + s);
-		}).flatMap(Optional::stream).collect(Collectors.joining(" + ", "{", "}"));
-		
-		if(res.length() == 2) return Optional.empty();
-		return Optional.of(res);
+		}).joinAsOptionalStr(" + ", "{", "}");
 	}
 	
 	@Override
-	public String toString(){
-		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));
-	}
+	public String toString(){ return getName(); }
 	@Override
 	public Object get(VarPool<T> ioPool, T instance){
 		throw new UnsupportedOperationException();
@@ -285,12 +279,12 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public String getName(){
-		return group.stream().map(IOField::getName).collect(Collectors.joining(" + "));
+		return Iters.from(group).joinAsStr(" + ", IOField::getName);
 	}
 	
 	@Override
-	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
-		return Stream.concat(Stream.of(this), group.stream());
+	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
+		return Iters.concat1N(this, (List<IOField<T, ?>>)(Object)group);
 	}
 	
 	public List<BitField<T, ?>> fieldGroup(){

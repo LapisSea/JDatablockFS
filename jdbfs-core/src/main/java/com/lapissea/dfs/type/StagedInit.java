@@ -20,8 +20,6 @@ import java.io.ObjectOutputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
@@ -263,7 +260,7 @@ public abstract class StagedInit{
 			StringJoiner str = new StringJoiner("\n");
 			str.add("Issues with state IDs for " + this.getClass().getSimpleName() + ":");
 			problems.forEach(str::add);
-			str.add(TextUtil.toTable(states.stream().sorted(Comparator.comparingInt(StateInfo::id))));
+			str.add(TextUtil.toTable(Iters.from(states).sortedByI(StateInfo::id)));
 			throw new ShouldNeverHappenError(str.toString());
 		}
 		
@@ -303,7 +300,7 @@ public abstract class StagedInit{
 		if(Duration.between(start, Instant.now()).toMillis()<LONG_WAIT_THRESHOLD) return;
 		Log.warn(
 			"possible lock at {}#yellow on thread {}#yellow\n{}",
-			this, initThread.getName(), Arrays.stream(initThread.getStackTrace()).map(s -> "\t" + s).collect(Collectors.joining("\n"))
+			this, initThread.getName(), Iters.from(initThread.getStackTrace()).joinAsStr("\n", s -> "\t" + s)
 		);
 	}
 	

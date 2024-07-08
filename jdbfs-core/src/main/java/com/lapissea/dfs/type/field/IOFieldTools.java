@@ -117,7 +117,7 @@ public final class IOFieldTools{
 			if(dataOrderAnn != null) return predefinedOrder(fields, structType, dataOrderAnn);
 		}
 		try{
-			return new DepSort<>(fields, f -> f.dependencyStream()
+			return new DepSort<>(fields, f -> f.getDependencies()
 			                                   .mapToInt(o -> IntStream.range(0, fields.size())
 			                                                           .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
 			                                                           .findAny()
@@ -134,7 +134,7 @@ public final class IOFieldTools{
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f -> f.getType().isEnum() || SupportedPrimitive.isAny(f.getType())? 0 : 1)
 			                 //Encourage fields with similar dependencies to be next to each other
-			                 .thenComparing(f -> f.dependencyStream().map(IOField::getName).collect(Collectors.joining(" / ")))
+			                 .thenComparing(f -> f.getDependencies().joinAsStr(" / ", IOField::getName))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
 			                 .thenComparing(IOField::getName)
 			);

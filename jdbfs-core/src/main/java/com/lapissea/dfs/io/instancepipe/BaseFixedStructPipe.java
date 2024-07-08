@@ -56,7 +56,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 		return sizeFieldStream(structFields)
 			       .distinct()
 			       .collectToFinalMap(Function.identity(), sizingField -> {
-				       return getType().getFields().streamDependentOn(sizingField)
+				       return getType().getFields().iterDependentOn(sizingField)
 				                       .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
 				                       .distinct()
 				                       .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())

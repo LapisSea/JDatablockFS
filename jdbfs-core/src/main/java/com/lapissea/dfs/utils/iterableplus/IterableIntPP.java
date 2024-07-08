@@ -4,24 +4,41 @@ package com.lapissea.dfs.utils.iterableplus;
 import com.lapissea.dfs.Utils;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.StringJoiner;
+import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
+import java.util.function.IntUnaryOperator;
 
 public interface IterableIntPP{
 	
-	final class ArrayIterI implements IntIterator{
+	final class ArrayIter implements IntIterator{
 		private final int[] data;
 		private       int   i;
-		public ArrayIterI(int[] data){ this.data = data; }
+		public ArrayIter(int[] data){ this.data = data; }
 		@Override
 		public boolean hasNext(){ return i<data.length; }
 		@Override
 		public int nextInt(){ return data[i++]; }
+	}
+	
+	final class SingleIter implements IntIterator{
+		private final int     value;
+		private       boolean done;
+		public SingleIter(int value){ this.value = value; }
+		@Override
+		public boolean hasNext(){ return !done; }
+		@Override
+		public int nextInt(){
+			if(done) throw new NoSuchElementException();
+			done = true;
+			return value;
+		}
 	}
 	
 	static IterableIntPP empty(){
@@ -127,6 +144,39 @@ public interface IterableIntPP{
 	
 	IntIterator iterator();
 	
+	
+	default IterableIntPP map(IntUnaryOperator map){
+		return () -> {
+			var src = IterableIntPP.this.iterator();
+			return new IntIterator(){
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public int nextInt(){
+					return map.applyAsInt(src.nextInt());
+				}
+			};
+		};
+	}
+	
+	default IterablePP<Integer> box(){
+		return () -> {
+			var src = IterableIntPP.this.iterator();
+			return new Iterator<>(){
+				@Override
+				public boolean hasNext(){
+					return src.hasNext();
+				}
+				@Override
+				public Integer next(){
+					return src.nextInt();
+				}
+			};
+		};
+	}
+	
 	default <T> IterablePP<T> mapToObj(IntFunction<T> function){
 		return () -> {
 			var src = IterableIntPP.this.iterator();
@@ -209,4 +259,77 @@ public interface IterableIntPP{
 		}
 		return Arrays.copyOf(res, size);
 	}
+	
+	default void forEach(IntConsumer consumer){
+		var iter = iterator();
+		while(iter.hasNext()){
+			var element = iter.nextInt();
+			consumer.accept(element);
+		}
+	}
+	default void forEach(IntPredicate predicate){
+		var iter = iterator();
+		while(iter.hasNext()){
+			var element = iter.nextInt();
+			if(!predicate.test(element)){
+				break;
+			}
+		}
+	}
+	
+	default IterableIntPP sorted(){
+		return () -> {
+			var src = IterableIntPP.this;
+			return new IntIterator(){
+				private int[] sorted;
+				private int   i;
+				private int[] sort(){
+					var arr = src.toArray();
+					Arrays.sort(arr);
+					return sorted = arr;
+				}
+				@Override
+				public boolean hasNext(){
+					var s = sorted;
+					if(s == null) s = sort();
+					return i<s.length;
+				}
+				@Override
+				public int nextInt(){
+					var s = sorted;
+					if(s == null) s = sort();
+					if(i == s.length) throw new NoSuchElementException();
+					return s[i++];
+				}
+			};
+		};
+	}
+	
+	default <T> IterableIntPP sorted(IntFunction<T> map, Comparator<T> compare){
+		return () -> {
+			var src = IterableIntPP.this;
+			return new IntIterator(){
+				private int[] sorted;
+				private int   i;
+				private int[] sort(){
+					//TODO: implement int sort without boxing
+					return sorted = src.mapToObj(i1 -> i1).sorted((a, b) -> compare.compare(map.apply(a), map.apply(b))).mapToInt().toArray();
+				}
+				@Override
+				public boolean hasNext(){
+					var s = sorted;
+					if(s == null) s = sort();
+					return i<s.length;
+				}
+				@Override
+				public int nextInt(){
+					var s = sorted;
+					if(s == null) s = sort();
+					if(i == s.length) throw new NoSuchElementException();
+					return s[i++];
+				}
+			};
+		};
+	}
+	
 }
