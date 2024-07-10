@@ -12,7 +12,6 @@ import com.lapissea.util.TextUtil;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -231,14 +230,14 @@ public interface CodeStream extends AutoCloseable{
 					var idx = indexTok.requireAs(Token.NumToken.IntVal.class).value();
 					
 					var l = Objects.requireNonNull(objs[idx], "Arguments can not be null");
-					if(l instanceof Collection<?> col) vals.addAll(col);
+					if(l instanceof Iterable<?> col) col.forEach(vals::add);
 					else if(l instanceof Stream<?> s) s.forEach(vals::add);
 					else if(l.getClass().isArray()){
 						for(int i = 0, len = Array.getLength(l); i<len; i++){
 							vals.add(Array.get(l, i));
 						}
 					}else{
-						throw new IllegalArgumentException(l.getClass().getName() + " is not a list or array or stream");
+						throw new IllegalArgumentException(l.getClass().getName() + " is not an iterable or array or stream");
 					}
 				}
 				for(Object val : vals){
