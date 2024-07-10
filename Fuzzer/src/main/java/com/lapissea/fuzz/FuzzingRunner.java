@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Spliterator;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -34,6 +35,10 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	private record NOOP() implements Serializable{ }
+	
+	private static final class SequenceHolder{
+		private FuzzSequence sequence;
+	}
 	
 	public static final Object NOOP_ACTION = new NOOP();
 	public static Object noopAction(RandomGenerator r){ return NOOP_ACTION; }
@@ -312,76 +317,67 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					};
 				}
 				
+				Supplier<List<FuzzFail<State, Action>>> finalize = () -> {
+					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
+					Thread.startVirtualThread(System::gc);
+					return res;
+				};
+				
 				if(nThreads == 1){
+					assert data instanceof ManyData.Instant;
 					try{
 						source.all().sequential().filter(seq -> stateEnv.shouldRun(seq, mark)).forEach(sequence -> {
 							if(progress.hasErr()) throw new HasErr();
 							runSequence(mark, sequence, progress).ifPresent(reportFail);
 						});
 					}catch(HasErr ignore){ }
-					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
-					Thread.startVirtualThread(System::gc);
-					yield res;
+					yield finalize.get();
 				}
-				
-				try(var worker = new ThreadPoolExecutor(nThreads - 1, nThreads - 1, 500, MILLISECONDS,
-				                                        new LinkedBlockingQueue<>(), new RunnerFactory(nThreads - 1, name))){
+				var poolThreads = nThreads - 1;
+				try(var executor = new ThreadPoolExecutor(
+					poolThreads, poolThreads, 500, MILLISECONDS, new LinkedBlockingQueue<>(), new RunnerFactory(poolThreads, name))
+				){
 					
 					if(data instanceof ManyData.Async async) async.compute.accept(worker);
 					
 					var desiredBuffer = Math.max(nThreads*4, 8);
-					var splits        = new ArrayList<>(List.of(source.all().spliterator()));
-					while(splits.size()<desiredBuffer){
-						var res = splits.stream().map(Spliterator::trySplit).filter(Objects::nonNull).toList();
+					var jobSegments   = new ConcurrentLinkedDeque<>(List.of(source.all().spliterator()));
+					while(jobSegments.size()<desiredBuffer){
+						var res = jobSegments.stream().map(Spliterator::trySplit).filter(Objects::nonNull).toList();
 						if(res.isEmpty()) break;
-						splits.addAll(res);
+						jobSegments.addAll(res);
 					}
-					splits.trimToSize();
 					
 					while(data instanceof ManyData.Async async && !async.computeFlags.started){
 						try{ Thread.sleep(1); }catch(InterruptedException e){ throw new RuntimeException(e); }
 					}
 					
-					var work = new ArrayList<CompletableFuture<Spliterator<FuzzSequence>>>();
-					while(!progress.hasErr() && (!splits.isEmpty() || !work.isEmpty())){
-						var anyDone = work.removeIf(f -> {
-							if(f.isDone()){
-								var split = f.join();
-								if(split != null){
-									splits.add(split);
-								}
-								return true;
-							}
-							return false;
-						});
-						
-						splits.stream().map(split -> CompletableFuture.supplyAsync(new Supplier<Spliterator<FuzzSequence>>(){
-							private FuzzSequence sequence;
-							@Override
-							public Spliterator<FuzzSequence> get(){
-								while(!progress.hasErr() && sequence == null && split.tryAdvance(seq -> {
-									if(stateEnv.shouldRun(seq, mark)) sequence = seq;
-								})) ;
-								if(sequence == null) return null;
-								worker.execute(() -> runSequence(mark, sequence, progress).ifPresent(reportFail));
-								return split;
-							}
-						}, worker)).forEach(work::add);
-						splits.clear();
-						
-						if(anyDone){
-							continue;
+					Runnable fuzz = () -> {
+						while(true){
+							var split = jobSegments.poll();
+							if(split == null) return;
+							
+							var holder = new SequenceHolder();
+							while(!progress.hasErr() && holder.sequence == null && split.tryAdvance(seq -> {
+								if(stateEnv.shouldRun(seq, mark)) holder.sequence = seq;
+							})) ;
+							var sequence = holder.sequence;
+							if(sequence == null) return;
+							
+							jobSegments.add(split);
+							
+							runSequence(mark, sequence, progress).ifPresent(reportFail);
 						}
-						//Do useful work instead of busy waiting
-						Runnable task;
-						if((task = worker.getQueue().poll()) != null){
-							task.run();
-						}
-					}
+					};
 					
-					Runnable task;
-					while((task = worker.getQueue().poll()) != null){
-						task.run();
+					while(!progress.hasErr() && !jobSegments.isEmpty()){
+						var workerBatch = IntStream.range(0, jobSegments.size()).mapToObj(__ -> CompletableFuture.runAsync(fuzz, executor)).toList();
+						
+						fuzz.run();
+						
+						for(var worker : workerBatch){
+							worker.join();
+						}
 					}
 					
 					if(data instanceof ManyData.Async async){
@@ -398,9 +394,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					}
 				}
 				
-				var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
-				Thread.startVirtualThread(System::gc);
-				yield res;
+				yield finalize.get();
 			}
 		};
 	}
