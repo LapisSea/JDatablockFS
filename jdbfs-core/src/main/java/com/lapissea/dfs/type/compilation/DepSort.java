@@ -1,5 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ZeroArrays;
 
@@ -9,11 +11,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 
 public class DepSort<T>{
 	
-	public static class CycleException extends RuntimeException{
+	public static final class CycleException extends RuntimeException{
 		
 		public final Index cycle;
 		
@@ -74,7 +75,7 @@ public class DepSort<T>{
 			visited.clear();
 		}
 		
-		Index sort(IntStream roots){
+		Index sort(IterableIntPP roots){
 			if(data.isEmpty()) return new Index(ZeroArrays.ZERO_INT);
 			
 			roots.forEach(i -> {
@@ -96,7 +97,7 @@ public class DepSort<T>{
 			}
 			stack.add(i);
 			
-			getDependencies(i).forEach(index -> {
+			getDependencies.apply(data.get(i)).forEach(index -> {
 				Objects.checkIndex(index, data.size());
 				walkGraph(index);
 			});
@@ -107,31 +108,24 @@ public class DepSort<T>{
 		}
 	}
 	
-	private final List<T>                data;
-	private final Function<T, IntStream> getDependencies;
+	private final List<T>                    data;
+	private final Function<T, IterableIntPP> getDependencies;
 	
-	public DepSort(@NotNull List<T> data, @NotNull Function<T, IntStream> getDependencies){
+	public DepSort(@NotNull List<T> data, @NotNull Function<T, IterableIntPP> getDependencies){
 		this.getDependencies = Objects.requireNonNull(getDependencies);
 		this.data = Objects.requireNonNull(data);
 	}
 	
 	public Index sort(){
-		return sort(IntStream.range(0, data.size()));
+		return sort(Iters.range(0, data.size()));
 	}
 	
 	public final Index sort(Comparator<T> comparator){
-		return sort(IntStream.range(0, data.size())
-		                     .boxed()
-		                     .sorted((a, b) -> comparator.compare(data.get(a), data.get(b)))
-		                     .mapToInt(i -> i));
+		return sort(Iters.range(0, data.size()).sorted(data::get, comparator));
 	}
 	
-	public Index sort(IntStream orderSuggestion){
+	public Index sort(IterableIntPP orderSuggestion){
 		return new TSort().sort(orderSuggestion);
-	}
-	
-	private IntStream getDependencies(int i){
-		return getDependencies.apply(data.get(i));
 	}
 	
 }

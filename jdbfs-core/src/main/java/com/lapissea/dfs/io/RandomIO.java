@@ -508,6 +508,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		class LocalTransactionIO implements RandomIO{
 			private final IOTransactionBuffer transactionBuffer = new IOTransactionBuffer(false);
 			
+			private final IOTransactionBuffer.BaseAccess readAt = this::readAt;
+			
+			
 			private       long size     = RandomIO.this.getSize();
 			private final long capacity = RandomIO.this.getCapacity();
 			private       long pos      = RandomIO.this.getPos();
@@ -566,16 +569,16 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 				return b;
 			}
 			@Override
-			public void write(int b){
-				transactionBuffer.writeByte(pos, b);
+			public void write(int b) throws IOException{
+				transactionBuffer.writeByte(readAt, pos, b);
 				pos++;
 				if(size<=pos) size = pos + 1;
 			}
 			
 			@Override
-			public void writeAtOffsets(Collection<WriteChunk> data){
+			public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
 				for(var e : data){
-					transactionBuffer.write(e.ioOffset, e.data, e.dataOffset, e.dataLength);
+					transactionBuffer.write(readAt, e.ioOffset, e.data, e.dataOffset, e.dataLength);
 				}
 			}
 			@Override

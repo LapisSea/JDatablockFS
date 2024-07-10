@@ -8,8 +8,8 @@ import com.lapissea.dfs.objects.CollectionInfo.PrimitiveArrayInfo;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
@@ -62,12 +62,12 @@ public abstract class CollectionInfoAnalysis{
 		
 		var arr = (Object[])array;
 		
-		var result = analyseElements(IterablePPs.of(arr));
+		var result = analyseElements(Iters.of(arr));
 		return new ArrayInfo(arr.getClass(), arr.length, result.constType(), result.layout(), result.hasNulls());
 	}
 	
 	private static CollectionInfo analyzeList(List<?> list){
-		var result = analyseElements(IterablePPs.from(list));
+		var result = analyseElements(Iters.from(list));
 		var unMod  = UNMODIFIABLE_LISTS.contains(list.getClass());
 		return new ListInfo(list.size(), result.constType(), result.layout(), result.hasNulls(), unMod);
 	}

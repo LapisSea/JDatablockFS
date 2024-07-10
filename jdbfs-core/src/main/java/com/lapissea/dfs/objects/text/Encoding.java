@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.field.FieldNames;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.PairM;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -18,9 +19,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.io.bit.BitUtils.bitsToBytes;
@@ -130,8 +129,8 @@ class Encoding{
 			while(table.length>1<<bits) bits++;
 			assert table.length == (1<<bits);
 			
-			int offset = IntStream.range(0, table.length).map(i -> table[i]).min().orElseThrow();
-			int end    = IntStream.range(0, table.length).map(i -> table[i]).max().orElse(-2) + 1;
+			int offset = Iters.range(0, table.length).map(i -> table[i]).min().orElseThrow();
+			int end    = Iters.range(0, table.length).map(i -> table[i]).max().orElse(-2) + 1;
 			
 			var indexTable = new byte[end - offset];
 			Arrays.fill(indexTable, (byte)0xFF);
@@ -420,7 +419,7 @@ class Encoding{
 		public static final CharEncoding DEFAULT = LATIN1;
 		
 		private static final CharEncoding[] SORTED =
-			Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c -> c.format.sizeWeight())).toArray(CharEncoding[]::new);
+			Iters.from(CharEncoding.values()).sortedByD(c -> c.format.sizeWeight()).toArray(CharEncoding[]::new);
 		public static CharEncoding findBest(String data){
 			return switch(data.length()){
 				case 0 -> DEFAULT;

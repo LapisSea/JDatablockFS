@@ -56,7 +56,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					
 					var annotations = Stream.concat(
 						Stream.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
-						anns.stream().map(field::getAnnotation).filter(Optional::isPresent).map(Optional::get)
+						anns.stream().map(field::getAnnotation).flatMap(Optional::stream)
 					).toList();
 					
 					var genType = field.getGenericType(null);

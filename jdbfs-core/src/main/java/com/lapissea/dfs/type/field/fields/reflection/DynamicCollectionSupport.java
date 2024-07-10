@@ -26,7 +26,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -196,7 +196,7 @@ public abstract class DynamicCollectionSupport{
 		int actualElements;
 		if(!info.hasNulls()) actualElements = info.length();
 		else{
-			actualElements = info.iter(val).filtered(Objects::nonNull).count();
+			actualElements = info.iter(val).nonNulls().count();
 		}
 		
 		return calcNullBufferSize(info) + switch(pTyp){
@@ -209,7 +209,7 @@ public abstract class DynamicCollectionSupport{
 					for(var i : arr){
 						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
 					}
-				}else bytesPer = info.iter(val).filtered(Objects::nonNull).map(Long.class::cast)
+				}else bytesPer = info.iter(val).nonNulls().map(Long.class::cast)
 				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
 				yield 1 + bytesPer*(long)actualElements;
 			}
@@ -220,7 +220,7 @@ public abstract class DynamicCollectionSupport{
 					for(var i : arr){
 						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
 					}
-				}else bytesPer = info.iter(val).filtered(Objects::nonNull).map(Integer.class::cast)
+				}else bytesPer = info.iter(val).nonNulls().map(Integer.class::cast)
 				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
 				yield 1 + bytesPer*(long)actualElements;
 			}
@@ -282,7 +282,7 @@ public abstract class DynamicCollectionSupport{
 		}else{
 			if(info.hasNulls()){
 				writeNullBuffer(dest, val, info);
-				var iter = info.iter(val).filtered(Objects::nonNull);
+				var iter = info.iter(val).nonNulls();
 				writePrimitiveCollection(dest, iter, iter.count(), pTyp);
 			}else{
 				writePrimitiveCollection(dest, info.iter(val), info.length(), pTyp);
@@ -293,7 +293,7 @@ public abstract class DynamicCollectionSupport{
 	
 	private static long dynamicSiz(DataProvider prov, CollectionInfo info, Object val){
 		long sum = calcNullBufferSize(info);
-		for(var el : info.iter(val).filtered(Objects::nonNull)){
+		for(var el : info.iter(val).nonNulls()){
 			int id;
 			try{
 				id = prov.getTypeDb().objToID(el, false).val();
@@ -329,7 +329,7 @@ public abstract class DynamicCollectionSupport{
 		writeNullBuffer(dest, val, info);
 		
 		var db = provider.getTypeDb();
-		for(var el : info.iter(val).filtered(Objects::nonNull)){
+		for(var el : info.iter(val).nonNulls()){
 			var id = db.objToID(el);
 			dest.writeUnsignedInt4Dynamic(id);
 			DynamicSupport.writeValue(provider, dest, el);
@@ -446,7 +446,7 @@ public abstract class DynamicCollectionSupport{
 	private static void instanceWrite(DataProvider provider, ContentWriter dest, CollectionInfo res, Object val) throws IOException{
 		writeNullBuffer(dest, val, res);
 		
-		var iter   = res.iter(val).filtered(Objects::nonNull);
+		var iter   = res.iter(val).nonNulls();
 		var struct = Struct.ofUnknown(res.constantType());
 		if(struct instanceof Struct.Unmanaged){
 			for(var uInst : (Iterable<IOInstance.Unmanaged<?>>)iter){
@@ -492,7 +492,7 @@ public abstract class DynamicCollectionSupport{
 		writeNullBuffer(dest, val, info);
 		var pip  = StandardStructPipe.of(wrapperType.struct());
 		var ctor = wrapperType.constructor();
-		for(var inst : info.iter(val).filtered(Objects::nonNull)){
+		for(var inst : info.iter(val).nonNulls()){
 			pip.write(provider, dest, ctor.apply(inst));
 		}
 	}
@@ -500,7 +500,7 @@ public abstract class DynamicCollectionSupport{
 	
 	private static long collectionSiz(DataProvider provider, CollectionInfo info, Object val){
 		long sum = calcNullBufferSize(info);
-		for(var e : info.iter(val).filtered(Objects::nonNull)){
+		for(var e : info.iter(val).nonNulls()){
 			var eRes = CollectionInfoAnalysis.analyze(e);
 			if(eRes == null) throw new IllegalStateException(e + " not a collection");
 			sum += calcCollectionSize(provider, eRes, e);
@@ -527,7 +527,7 @@ public abstract class DynamicCollectionSupport{
 	}
 	private static void collectionWrite(DataProvider provider, ContentWriter dest, CollectionInfo info, Object val) throws IOException{
 		writeNullBuffer(dest, val, info);
-		for(var e : info.iter(val).filtered(Objects::nonNull)){
+		for(var e : info.iter(val).nonNulls()){
 			var eRes = CollectionInfoAnalysis.analyze(e);
 			Objects.requireNonNull(eRes, "Element could not be interpreted as a collection");
 			writeCollection(provider, dest, eRes, e);

@@ -20,14 +20,14 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -117,7 +117,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 		@Override
 		public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
-			return new GeneralMerger<>(group.stream().<BitField<T, ?>>map(f -> f.maxAsFixedSize(varProvider)).toList());
+			return new GeneralMerger<>(Iters.from(group).collectToFinalList(f -> f.maxAsFixedSize(varProvider)));
 		}
 		
 	}
@@ -127,7 +127,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		private final int        oneBits;
 		private final NumberSize numSize;
 		
-		private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
 		
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
@@ -143,9 +142,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				fi.writeBits(ioPool, writer, instance);
 			}
 			if(oneBits>1){
-				var integrityDiv = INTEGRITY_DIVS[oneBits];
-				var rem          = writer.getBuffer()%integrityDiv;
-				var remRaw       = integrityDiv - rem;
+				var remRaw = calcIntegrityBits(writer.getBuffer(), oneBits);
 				writer.writeBits(remRaw, oneBits);
 			}else{
 				writer.fillNOne(oneBits);
@@ -161,14 +158,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				fi.readBits(ioPool, reader, instance);
 			}
 			if(oneBits>1){
-				var integrityDiv = INTEGRITY_DIVS[oneBits];
-				var remRaw       = reader.readBits(oneBits);
-				var remStored    = integrityDiv - remRaw;
-				var payload      = raw&BitUtils.makeMask(numSize.bits() - oneBits);
-				var rem          = payload%integrityDiv;
-				if(rem != remStored){
-					throw new IOException("Bit integrity failed");
-				}
+				var remRaw = reader.readBits(oneBits);
+				readIntegrityBits(remRaw, raw, numSize.bits(), oneBits);
 			}else{
 				reader.checkNOneAndThrow(oneBits);
 			}
@@ -180,10 +171,32 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 	}
 	
+	private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
+	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
+		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
+	}
+	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
+		var integrityDiv = INTEGRITY_DIVS[oneBits];
+		var remStored    = integrityDiv - remainingBits;
+		var payload      = raw&BitUtils.makeMask(totalBits - oneBits);
+		var rem          = payload%integrityDiv;
+		if(rem != remStored){
+			throw new IOException("Bit integrity failed");
+		}
+	}
+	public static long calcIntegrityBits(long writtenData, int oneBits, int writtenDataBits){
+		return calcIntegrityBits(writtenData, oneBits)<<writtenDataBits;
+	}
+	public static long calcIntegrityBits(long writtenData, int oneBits){
+		var integrityDiv = INTEGRITY_DIVS[oneBits];
+		var rem          = writtenData%integrityDiv;
+		return integrityDiv - rem;
+	}
+	
 	public static <T extends IOInstance<T>> BitFieldMerger<T> of(List<BitField<T, ?>> group){
 		if(group.isEmpty()) throw new IllegalArgumentException("group is empty");
 		
-		if(group.stream().anyMatch(g -> g.getSizeDescriptor().getWordSpace() != WordSpace.BIT)){
+		if(Iters.from(group).anyMatch(g -> g.getSizeDescriptor().getWordSpace() != WordSpace.BIT)){
 			throw new IllegalArgumentException(group + "");
 		}
 		group = List.copyOf(group);
@@ -227,7 +240,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		var fixedSize = BitUtils.bitsToBytes(bits);
 		if(fixedSize.isPresent()){
 			initSizeDescriptor(SizeDescriptor.Fixed.of(fixedSize.getAsLong()));
-			safetyBits = bits.stream().mapToObj(BitLayout::new).findAny();
+			safetyBits = Iters.ofPresent(bits).mapToObj(BitLayout::new).findFirst();
 		}else{
 			safetyBits = Optional.empty();
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
@@ -236,13 +249,13 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				(ioPool, prov, inst) -> BitUtils.bitsToBytes(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			));
 		}
-		initLateData(FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
+		initLateData(FieldSet.of(Iters.from(group).flatMap(IOField::getDependencies)));
 		generators = IOFieldTools.fieldsToGenerators(group);
 	}
 	
 	@Override
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		var res = group.stream().map(field -> {
+		return Iters.from(group).flatOptionals(field -> {
 			Optional<String> str;
 			try{
 				str = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
@@ -250,16 +263,11 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				str = Optional.of("<UNINITIALIZED>");
 			}
 			return str.map(s -> field.getName() + "=" + s);
-		}).filter(Optional::isPresent).map(Optional::get).collect(Collectors.joining(" + ", "{", "}"));
-		
-		if(res.length() == 2) return Optional.empty();
-		return Optional.of(res);
+		}).joinAsOptionalStr(" + ", "{", "}");
 	}
 	
 	@Override
-	public String toString(){
-		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));
-	}
+	public String toString(){ return getName(); }
 	@Override
 	public Object get(VarPool<T> ioPool, T instance){
 		throw new UnsupportedOperationException();
@@ -271,12 +279,12 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public String getName(){
-		return group.stream().map(IOField::getName).collect(Collectors.joining(" + "));
+		return Iters.from(group).joinAsStr(" + ", IOField::getName);
 	}
 	
 	@Override
-	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
-		return Stream.concat(Stream.of(this), group.stream());
+	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
+		return Iters.concat1N(this, (List<IOField<T, ?>>)(Object)group);
 	}
 	
 	public List<BitField<T, ?>> fieldGroup(){

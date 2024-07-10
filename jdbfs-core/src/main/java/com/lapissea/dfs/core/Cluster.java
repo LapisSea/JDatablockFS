@@ -6,9 +6,12 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkCache;
+import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.core.memory.PersistentMemoryManager;
+import com.lapissea.dfs.exceptions.MalformedClusterData;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -25,9 +28,13 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -40,15 +47,58 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.dfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
 
 public final class Cluster implements DataProvider{
+	
+	public enum Version{
+		INDEV(0, 1), V1_0;
+		
+		public static final Version CURRENT = INDEV;
+		
+		public final short major, minor;
+		
+		Version(){
+			var parts = name().split("\\D+");
+			this.major = Short.parseShort(parts[1]);
+			this.minor = Short.parseShort(parts[2]);
+		}
+		Version(int major, int minor){
+			this.major = (short)major;
+			this.minor = (short)minor;
+		}
+	}
+	
+	@IOValue
+	private static class VersionTag extends IOInstance.Managed<VersionTag>{
+		
+		private short major, minor;
+		
+		public VersionTag(){ }
+		public VersionTag(Version version){
+			this.major = version.major;
+			this.minor = version.minor;
+		}
+		
+		Optional<Version> get(){
+			for(var v : Version.values()){
+				if(v.minor == minor && v.major == major){
+					return Optional.of(v);
+				}
+			}
+			return Optional.empty();
+		}
+		@Override
+		public String toString(){
+			return get().map(Enum::toString).orElse("<unknown>");
+		}
+	}
 	
 	private class Roots implements RootProvider{
 		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
@@ -121,10 +171,14 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
+	@IOValue
 	private static class RootRef extends IOInstance.Managed<RootRef>{
-		@IOValue
+		
+		private VersionTag version = new VersionTag(Version.CURRENT);
+		
 		@IOValue.Reference(dataPipeType = FLEXIBLE)
 		@IONullability(DEFAULT_IF_NULL)
+		@IODependency("version")
 		private Metadata metadata;
 	}
 	
@@ -154,20 +208,30 @@ public final class Cluster implements DataProvider{
 			if(db == null) return "<uninitialized>";
 			return "{db: " + db.toShortString() + ", " +
 			       freeChunks.size() + " freeChunks, " +
-			       "rootObjects: " + rootObjects.stream().map(e -> e.getKey().toString())
-			                                    .collect(Collectors.joining(", ", "[", "]"))
+			       "rootObjects: " + Iters.from(rootObjects).joinAsStr(", ", "[", "]", e -> e.getKey().toString())
 			       + "}";
 		}
 	}
 	
 	
 	static{
-		Thread.startVirtualThread(IOTypeDB.PersistentDB::new);
-		Thread.startVirtualThread(FieldCompiler::init);
+//		Preload.preloadPipe(IOTypeDB.PersistentDB.class, StandardStructPipe.class);
+		Preload.preload(IOTypeDB.PersistentDB.class);
+		Preload.preload(FieldCompiler.class);
+		Preload.preload(Reference.class);
 	}
 	
-	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
-	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	private static ChunkPointer             FIRST_CHUNK_PTR;
+	private static FixedStructPipe<RootRef> ROOT_PIPE;
+	
+	private static FixedStructPipe<RootRef> rootPipe(){
+		if(ROOT_PIPE == null) ROOT_PIPE = FixedStructPipe.of(RootRef.class);
+		return ROOT_PIPE;
+	}
+	private static ChunkPointer firstChunkPtr(){
+		if(FIRST_CHUNK_PTR == null) FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
+		return FIRST_CHUNK_PTR;
+	}
 	
 	private static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
 		var provider = DataProvider.newVerySimpleProvider(data);
@@ -177,16 +241,21 @@ public final class Cluster implements DataProvider{
 			MagicID.write(io);
 		}
 		
-		var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-		                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
-		                               .submit(provider);
+		var rrSiz = 16 + 4;
+		
+		var firstChunk = MemoryOperations.allocateAppendToFile(provider, AllocateTicket.bytes(rrSiz), false);
+		if(!firstChunk.getPtr().equals(firstChunkPtr())) throw new ShouldNeverHappenError();
 		
 		db.init(provider);
 		
-		ROOT_PIPE.modify(firstChunk, root -> {
-			root.metadata.db = db;
-			root.metadata.allocateNulls(provider, null);
-		}, null);
+		var ref = new RootRef();
+		ref.metadata = new Metadata();
+		ref.metadata.db = db;
+		ref.metadata.allocateNulls(provider, null);
+		
+		rootPipe().write(firstChunk, ref);
+		
+		assert firstChunk.chainSize() == rrSiz : firstChunk.chainSize() + " != " + rrSiz;
 	}
 	
 	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
@@ -232,13 +301,18 @@ public final class Cluster implements DataProvider{
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
+		var   rp = rootPipe();
 		
-		var s = ROOT_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		var version = ch.ioMap(io -> rp.readNewSelective(this, io, Set.of("version"), null).version);
+		handleVersion(version);
+		
+		
+		var s = rp.getFixedDescriptor().get(WordSpace.BYTE);
 		if(s>ch.getSize()){
 			throw new IOException("no valid cluster data " + s + " " + ch.getSize());
 		}
 		
-		root = ROOT_PIPE.readNew(this, ch, null);
+		root = rp.readNew(this, ch, null);
 		metadata = root.metadata;
 		
 		memoryManager = new PersistentMemoryManager(
@@ -250,6 +324,18 @@ public final class Cluster implements DataProvider{
 		
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
+		}
+	}
+	
+	private void handleVersion(VersionTag ver) throws MalformedClusterData{
+		var v = ver.get();
+		if(v.isEmpty()){
+			throw new MalformedClusterData("No known version found! Listed version number: " + ver.major + "." + ver.minor);
+		}
+		var version = v.get();
+		if(version != Version.CURRENT){
+			throw new NotImplementedException("Cluster version update not implemented yet! " +
+			                                  "Listed version is " + version + " but current is " + Version.CURRENT);
 		}
 	}
 	
@@ -289,7 +375,7 @@ public final class Cluster implements DataProvider{
 		throw new MalformedStruct(
 			"Failed to load type of " + name + "\n" +
 			"Stored names:\n" +
-			names.stream().map(s -> "\t" + s).collect(Collectors.joining("\n")),
+			Iters.from(names).joinAsStr("\n", s -> "\t" + s),
 			e
 		);
 	}
@@ -297,7 +383,7 @@ public final class Cluster implements DataProvider{
 	@Override
 	public Chunk getFirstChunk() throws IOException{
 		try{
-			return getChunk(FIRST_CHUNK_PTR);
+			return getChunk(firstChunkPtr());
 		}catch(MalformedPointer e){
 			throw new IOException("First chunk does not exist", e);
 		}
@@ -380,9 +466,9 @@ public final class Cluster implements DataProvider{
 	}
 	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot, boolean recordStats) throws IOException{
 		if(refRoot){
-			rec.log(new Reference(), null, null, FIRST_CHUNK_PTR.makeReference());
+			rec.log(new Reference(), null, null, firstChunkPtr().makeReference());
 		}
-		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), ROOT_PIPE, recordStats, rec);
+		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), rootPipe(), recordStats, rec);
 	}
 	
 	public void defragment() throws IOException{

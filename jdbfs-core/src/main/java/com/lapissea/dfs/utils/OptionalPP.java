@@ -7,6 +7,7 @@ import com.lapissea.util.function.UnsafePredicate;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.Serializable;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,6 +52,16 @@ public final class OptionalPP<T> implements Serializable{
 	public boolean isPresentAnd(Predicate<T> test){
 		return value != null && test.test(value);
 	}
+	public boolean isPresentAndNot(Predicate<T> test){
+		return value != null && test.test(value);
+	}
+	
+	public boolean isEmptyOr(Predicate<T> test){
+		return value == null || test.test(value);
+	}
+	public boolean isEmptyOrNot(Predicate<T> test){
+		return value == null || test.test(value);
+	}
 	
 	public boolean isEmpty(){
 		return value == null;
@@ -70,6 +81,22 @@ public final class OptionalPP<T> implements Serializable{
 		}
 	}
 	
+	public <K> OptionalPP<Map.Entry<K, T>> asValueWith(K key){
+		Objects.requireNonNull(key);
+		if(!isPresent()){
+			return empty();
+		}else{
+			return OptionalPP.of(Map.entry(key, this.value));
+		}
+	}
+	public <V> OptionalPP<Map.Entry<T, V>> asKeyWith(V value){
+		Objects.requireNonNull(value);
+		if(!isPresent()){
+			return empty();
+		}else{
+			return OptionalPP.of(Map.entry(this.value, value));
+		}
+	}
 	public <U, E extends Throwable> OptionalPP<U> map(UnsafeFunction<? super T, ? extends U, E> mapper) throws E{
 		Objects.requireNonNull(mapper);
 		if(!isPresent()){
@@ -180,7 +207,7 @@ public final class OptionalPP<T> implements Serializable{
 		       : "OptionalPP.empty";
 	}
 	
-	public Optional<T> toOptional(){
+	public Optional<T> opt(){
 		return Optional.ofNullable(value);
 	}
 }

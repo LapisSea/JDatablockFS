@@ -5,8 +5,8 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -28,15 +28,12 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			private final ArrayList<T> cache = new ArrayList<>();
 			private       int          size;
 			@Override
-			public Iterable<LdxValue<T>> entrySet(){
-				return IterablePPs.from(cache)
-				                  .enumerateL()
-				                  .filtered(e -> e.getValue() != null);
+			public Iterable<Ldx<T>> entrySet(){
+				return Iters.from(cache).enumerateL().nonNullProps(Ldx::val);
 			}
 			@Override
 			public Iterable<T> values(){
-				return IterablePPs.from(cache)
-				                  .filtered(Objects::nonNull);
+				return Iters.from(cache).nonNulls();
 			}
 			@Override
 			public int size(){ return size; }
@@ -213,8 +210,8 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			}
 			
 			private void checkAll(){
-				var a = IterablePPs.concat(ref.entrySet()).collectToMap(Map.Entry::getKey, Map.Entry::getValue);
-				var b = IterablePPs.concat(test.entrySet()).collectToMap(Map.Entry::getKey, Map.Entry::getValue);
+				var a = Iters.from(ref.entrySet()).collectToMap(e -> e);
+				var b = Iters.from(test.entrySet()).collectToMap(e -> e);
 				if(!a.equals(b)){
 					LogUtil.println(a + "\n" + b);
 					throw new IllegalStateException("\n" + a + "\n" + b);

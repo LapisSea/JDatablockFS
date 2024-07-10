@@ -22,7 +22,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.OptionalLong;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -74,26 +74,28 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 		
 		final class SealedTypeImpl<E extends IOInstance<E>> implements ElementIOImpl<E>{
 			
-			private SealedUtil.SealedInstanceUniverse<E> universe;
+			private final Class<E>                     root;
+			private final Map<Class<E>, StructPipe<E>> pipeMap;
 			
 			public SealedTypeImpl(SealedUtil.SealedInstanceUniverse<E> universe){
-				this.universe = Objects.requireNonNull(universe);
-				for(var componentType : universe.pipeMap().keySet()){
+				root = universe.root();
+				pipeMap = universe.pipeMap();
+				for(var componentType : pipeMap.keySet()){
 					if(!IOInstance.isInstance(componentType)) throw new MalformedStruct(componentType + " is not an IOInstance");
 					if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct(componentType + " is unmanaged");
 				}
 			}
 			
 			private StructPipe<E> getPipe(E element){
-				return universe.pipeMap().get(element.getClass());
+				return pipeMap.get(element.getClass());
 			}
 			private StructPipe<E> getPipe(Class<E> type){
-				return universe.pipeMap().get(type);
+				return pipeMap.get(type);
 			}
 			
 			@Override
 			public Class<E> componentType(){
-				return universe.root();
+				return root;
 				
 			}
 			@Override
@@ -102,7 +104,7 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 				var pip = getPipe(element);
 				int id;
 				try{
-					id = provider.getTypeDb().toID(universe.root(), (Class<E>)element.getClass(), false);
+					id = provider.getTypeDb().toID(root, (Class<E>)element.getClass(), false);
 				}catch(IOException e){
 					throw new RuntimeException("Failed to compute ID", e);
 				}
@@ -120,7 +122,7 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 				if(element != null){
 					//noinspection unchecked
 					var type = (Class<E>)element.getClass();
-					id = provider.getTypeDb().toID(universe.root(), type, true);
+					id = provider.getTypeDb().toID(root, type, true);
 				}
 				dest.writeInt4Dynamic(id);
 				if(id != 0){
@@ -132,14 +134,14 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 			public E read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 				var id = src.readInt4Dynamic();
 				if(id == 0) return null;
-				var type = provider.getTypeDb().fromID(universe.root(), id);
+				var type = provider.getTypeDb().fromID(root, id);
 				return getPipe(type).readNew(provider, src, genericContext);
 			}
 			@Override
 			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 				var id = src.readInt4Dynamic();
 				if(id == 0) return;
-				var type = provider.getTypeDb().fromID(universe.root(), id);
+				var type = provider.getTypeDb().fromID(root, id);
 				getPipe(type).skip(provider, src, genericContext);
 			}
 		}

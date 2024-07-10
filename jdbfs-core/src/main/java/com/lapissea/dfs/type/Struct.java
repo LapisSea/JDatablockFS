@@ -9,6 +9,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -24,9 +25,9 @@ import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
@@ -34,8 +35,6 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -53,9 +52,7 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.Utils.getCallee;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -77,8 +74,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	static{
 		//Preload for faster first start
-		Thread.startVirtualThread(DefInstanceCompiler::init);
-		Thread.startVirtualThread(FieldCompiler::init);
+		Preload.preload(DefInstanceCompiler.class);
+		Preload.preload(FieldCompiler.class);
 	}
 	
 	
@@ -185,7 +182,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				IterablePPs.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				Iters.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -408,6 +405,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 		}
 		
+		var wh = needsImpl? new WaitHolder() : null;
+		
 		S struct;
 		
 		try(var lock = STRUCT_CACHE_LOCK.write()){
@@ -417,15 +416,20 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var existing = getCachedUnsafe(instanceClass, lock.getLock());
 			if(existing != null) return (S)existing;
 			
-			Log.trace("Requested struct: {}#green{}#greenBright",
-			          () -> List.of(
-				          instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
-				          instanceClass.getSimpleName()
-			          ));
+			//The struct is being synchronously requested and the lock is released
+			if(STRUCT_THREAD_LOG.get(instanceClass) != null){
+				S cached = waitForDoneCompiling(instanceClass, lock);
+				if(cached != null) return cached;
+			}
+			
+			
+			if(Log.TRACE) Log.trace("Requested struct: {}#green{}#greenBright",
+			                        instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
+			                        instanceClass.getSimpleName());
 			
 			try{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
-				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
+				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, wh);
 				
 				if(runNow) lock.getLock().unlock();
 				try{
@@ -448,12 +452,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		if(needsImpl) struct.runOnState(STATE_CONCRETE_TYPE, () -> {
 			try{
-				var impl = struct.getConcreteType();
+				var     impl = struct.getConcreteType();
+				boolean hadOld;
 				try(var ignored = STRUCT_CACHE_LOCK.write()){
-					var hadOld = STRUCT_CACHE.put(impl, struct) != null;
+					hadOld = STRUCT_CACHE.put(impl, struct) != null;
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
-					if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 				}
+				if(hadOld) Log.trace("Replaced existing struct {}#yellow in cache", impl);
 			}catch(Throwable ignored){ }
 		}, null);
 		
@@ -462,25 +467,33 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(!ConfigDefs.PRINT_COMPILATION.resolveVal()){
 				struct.runOnStateDone(
 					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), (Supplier<String>)() -> {
-						var sw = new StringWriter();
-						e.printStackTrace(new PrintWriter(sw));
-						return sw.toString();
-					})
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 				);
 			}else{
 				struct.runOnStateDone(
 					() -> Log.log(GREEN_BRIGHT + TextUtil.toTable(struct.cleanFullName(), struct.getFields()) + RESET),
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), (Supplier<String>)() -> {
-						var sw = new StringWriter();
-						e.printStackTrace(new PrintWriter(sw));
-						return sw.toString();
-					})
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 				);
 			}
 		}
 		
 		return struct;
+	}
+	
+	private static <T extends IOInstance<T>, S extends Struct<T>> S waitForDoneCompiling(Class<T> instanceClass, ReadWriteClosableLock.LockSession writeLock){
+		var wl = writeLock.getLock();
+		wl.unlock();
+		while(true){
+			UtilL.sleep(1);
+			try(var ignore = STRUCT_CACHE_LOCK.read()){
+				if(STRUCT_THREAD_LOG.get(instanceClass) == null){
+					break;
+				}
+			}
+		}
+		wl.lock();
+		//noinspection unchecked
+		return (S)getCachedUnsafe(instanceClass, wl);
 	}
 	
 	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE     = Map.of();
@@ -496,13 +509,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				}
 			}
 		}
-		
+		boolean   noNeedForNonConcrete = noNeedForNonConcrete(instanceClass);
 		Struct<T> cached;
 		try(var lock = STRUCT_CACHE_LOCK.read()){
-			cached = getCachedUnsafe(instanceClass, lock.getLock());
+			if(noNeedForNonConcrete){
+				cached = (Struct<T>)STRUCT_CACHE.get(instanceClass);
+			}else{
+				cached = getCachedUnsafe(instanceClass, lock.getLock());
+			}
 			if(cached == null) return null;
 			
-			if((stableCacheCount++>=200)){
+			if((stableCacheCount++>=200) || STABLE_CACHE.isEmpty()){
 				stableCacheCount = 0;
 				STABLE_CACHE =
 					STRUCT_CACHE.entrySet().stream().collect(Collectors.groupingBy(e -> e.getKey().hashCode()))
@@ -523,10 +540,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> void waitNonConcrete(Class<T> instanceClass, Lock lock){
-		if(instanceClass.isInterface() || !UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
-			return;
-		}
-		
+		if(noNeedForNonConcrete(instanceClass)) return;
+		actuallyWaitNonConcrete(instanceClass, lock);
+	}
+	private static <T extends IOInstance<T>> void actuallyWaitNonConcrete(Class<T> instanceClass, Lock lock){
 		var queue = new ArrayDeque<Class<?>>();
 		queue.push(instanceClass);
 		while(!queue.isEmpty()){
@@ -550,11 +567,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(sup != null && UtilL.instanceOf(sup, IOInstance.Def.class)) queue.push(sup);
 		}
 	}
+	private static <T extends IOInstance<T>> boolean noNeedForNonConcrete(Class<T> instanceClass){
+		return instanceClass.isInterface() || !UtilL.instanceOf(instanceClass, IOInstance.Def.class);
+	}
 	
 	private static void recursiveCompileCheck(Class<?> interf){
 		Thread thread = STRUCT_THREAD_LOG.get(interf);
 		if(thread != null && thread == Thread.currentThread()){
-			throw new RecursiveSelfCompilation("Recursive struct compilation");
+			throw new RecursiveSelfCompilation("Recursive struct compilation of: " + interf.getTypeName());
 		}
 	}
 	
@@ -623,19 +643,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
-			Thread.startVirtualThread(() -> {
-				for(IOField<T, ?> field : fields){
-					field.typeFlags();
-				}
-			});
 		});
 	}
 	
 	@Override
-	protected Stream<StateInfo> listStates(){
-		return Stream.concat(
+	protected IterablePP<StateInfo> listStates(){
+		return Iters.concat(
 			super.listStates(),
-			Stream.of(
+			Iters.of(
 				new StateInfo(STATE_CONCRETE_TYPE, "CONCRETE_TYPE"),
 				new StateInfo(STATE_FIELD_MAKE, "FIELD_MAKE"),
 				new StateInfo(STATE_INIT_FIELDS, "INIT_FIELDS")
@@ -643,12 +658,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		);
 	}
 	
-	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t -> t.getVirtual(null)).flatMap(Optional::stream);
+	private IterablePP<VirtualAccessor<T>> virtualAccessorStream(){
+		return getFields().flatOptionals(t -> t.getVirtual(null));
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Ptr)
+		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Ptr)
 		                                    .mapToInt(a -> a.getStoragePool().ordinal()).toArray();
 		if(vPools.length == 0) return null;
 		var poolPointerSizes = new short[StoragePool.values().length];
@@ -661,15 +676,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Primitive)
+		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Primitive)
 		                                    .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes = new short[StoragePool.values().length];
-		for(var e : vPools.entrySet()){
-			var siz = e.getValue()
-			           .stream()
-			           .mapToInt(a -> ((Primitive)a.typeOff).size)
-			           .sum();
+		for(Map.Entry<StoragePool, List<VirtualAccessor<T>>> e : vPools.entrySet()){
+			var siz = Iters.from(e.getValue())
+			               .mapToInt(a -> ((Primitive)a.typeOff).size)
+			               .sum();
 			if(siz>Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolSizes[e.getKey().ordinal()] = (short)siz;
 		}
@@ -817,12 +831,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private List<FieldStruct<T>> calcNullContainInstances(){
 		return getRealFields()
-			       .map(f -> Struct.tryOf(f.getType())
-			                       .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
-			                       .map(s -> new FieldStruct<>(f, s)))
-			       .filtered(Optional::isPresent)
-			       .map(Optional::get)
-			       .collectToList();
+			       .flatOptionals(f -> Struct.tryOf(f.getType())
+			                                 .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
+			                                 .map(s -> new FieldStruct<>(f, s)))
+			       .collectToFinalList();
 	}
 	
 	public FieldSet<T> getFields(){
@@ -897,8 +909,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str = fields.stream().map(fieldMapper).flatMap(Optional::stream)
-		                .collect(Collectors.joining(fieldSeparator, prefix, end));
+		var str = fields.flatOptionals(fieldMapper).joinAsStr(fieldSeparator, prefix, end);
 		
 		if(!doShort){
 			if(str.equals(prefix + end)) return name;
@@ -940,7 +951,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				var obj  = make();
 				var pool = allocVirtualVarPool(IO);
 				inv = fields.unpackedStream()
-				            .filter(f -> f.getNullability() == NOT_NULL)
+				            .filtered(f -> f.getNullability() == NOT_NULL)
 				            .anyMatch(f -> f.isNull(pool, obj));
 			}
 			invalidInitialNulls = (byte)(inv? 1 : 0);

@@ -43,9 +43,9 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.NotImplementedException;
@@ -987,14 +987,14 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		drawIndex.accept(IterablePPs.from(clampedOverflow));
+		drawIndex.accept(Iters.from(clampedOverflow));
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
-		drawIndex.accept(IterablePPs.from(ranges).map(r -> {
+		drawIndex.accept(Iters.from(ranges).map(r -> {
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
-		}).filtered(Objects::nonNull));
+		}).nonNulls());
 		
 		ctx.renderer.setColor(bitColor);
 		try(var ignored = ctx.renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
@@ -1422,7 +1422,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ioPool = instance.getThisStruct().allocVirtualVarPool(IO);
 			if(ioPool != null){
 				try(var io = reference.io(ctx.provider)){
-					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.streamUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
+					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.iterUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
 					var dep      = pipe.getFieldDependency();
 					var deps     = dep.getDeps(virtuals);
 					pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));

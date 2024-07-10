@@ -11,8 +11,8 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -38,9 +38,11 @@ public sealed interface CollectionInfo{
 		StructPipe<Store> PIPE = StandardStructPipe.of(Store.class);
 		static Store of(CollectionInfo val){
 			class Cache{
-				private static final Function<CollectionInfo, Store> make = Def.constrRef(Store.class, CollectionInfo.class);
+				private static Function<CollectionInfo, Store> make;
 			}
-			return Cache.make.apply(val);
+			var c = Cache.make;
+			if(c == null) c = Cache.make = Def.constrRef(Store.class, CollectionInfo.class);
+			return c.apply(val);
 		}
 	}
 	
@@ -58,7 +60,7 @@ public sealed interface CollectionInfo{
 		@Override
 		public boolean hasNulls(){ return false; }
 		@Override
-		public IterablePP<?> iter(Object collection){ return IterablePPs.of(); }
+		public IterablePP<?> iter(Object collection){ return Iters.of(); }
 	}
 	
 	@IOValue
@@ -87,7 +89,7 @@ public sealed interface CollectionInfo{
 		public boolean hasNulls(){ return false; }
 		@Override
 		public IterablePP<?> iter(Object collection){
-			return IterablePPs.rangeMap(0, Array.getLength(collection), i -> Array.get(collection, i));
+			return Iters.rangeMap(0, Array.getLength(collection), i -> Array.get(collection, i));
 		}
 	}
 	
@@ -125,8 +127,7 @@ public sealed interface CollectionInfo{
 		public boolean hasNulls(){ return hasNulls; }
 		@Override
 		public IterablePP<?> iter(Object collection){
-			var arr = (Object[])collection;
-			return IterablePPs.rangeMap(0, arr.length, i -> arr[i]);
+			return Iters.from((Object[])collection);
 		}
 		
 		public Class<?> getArrayType(){ return arrayType; }
@@ -171,7 +172,7 @@ public sealed interface CollectionInfo{
 		public IterablePP<?> iter(Object collection){
 			//noinspection unchecked
 			var list = (List<Object>)collection;
-			return list::iterator;
+			return Iters.from(list);
 		}
 	}
 	

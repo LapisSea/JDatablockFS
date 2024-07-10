@@ -2,10 +2,10 @@ package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.IterableLongPP;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
-import com.lapissea.dfs.utils.LongIterator;
+import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.LongIterator;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -198,9 +197,6 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	public ChunkSet(){
 	}
 	
-	public ChunkSet(Stream<ChunkPointer> data){
-		data.forEach(this::add);
-	}
 	public ChunkSet(Collection<ChunkPointer> data){
 		addAll(data);
 	}
@@ -217,10 +213,10 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		this(Arrays.asList(data));
 	}
 	public ChunkSet(long... data){
-		this(Arrays.stream(data).mapToObj(ChunkPointer::of));
+		this(Iters.ofLongs(data).mapToObj(ChunkPointer::of));
 	}
 	public ChunkSet(int... data){
-		this(Arrays.stream(data).mapToObj(ChunkPointer::of));
+		this(Iters.ofInts(data).mapToObj(ChunkPointer::of));
 	}
 	
 	
@@ -264,11 +260,11 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		return ptrs(c).allMatch(this::contains);
 	}
 	private IterablePP<ChunkPointer> ptrs(Collection<?> c){
-		return IterablePPs.from(c).map(o -> switch(o){
+		return Iters.from(c).map(o -> switch(o){
 			case ChunkPointer p -> p;
 			case Chunk ch -> ch.getPtr();
 			default -> null;
-		}).filtered(Objects::nonNull);
+		}).nonNulls();
 	}
 	@Override
 	public boolean addAll(Collection<? extends ChunkPointer> c){

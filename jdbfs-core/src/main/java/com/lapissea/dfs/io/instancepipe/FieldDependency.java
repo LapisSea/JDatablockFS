@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,7 +36,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
-		return getDeps(FieldSet.of(names.stream().map(allFields::requireByName)));
+		return getDeps(FieldSet.of(Iters.from(names).map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()) return emptyTicket();
@@ -81,8 +82,8 @@ public class FieldDependency<T extends IOInstance<T>>{
 		var readFields  = new ArrayList<IOField<T, ?>>();
 		for(IOField<T, ?> selectedField : selectedFields){
 			var part = getDeps(selectedField);
-			part.writeFields.stream().filter(f -> writeFields.stream().flatMap(IOField::streamUnpackedFields).noneMatch(ef -> ef == f)).forEach(writeFields::add);
-			part.readFields.stream().filter(f -> readFields.stream().flatMap(IOField::streamUnpackedFields).noneMatch(ef -> ef == f)).forEach(readFields::add);
+			part.writeFields.filtered(f -> Iters.from(writeFields).flatMap(IOField::iterUnpackedFields).noneIs(f)).forEach(writeFields::add);
+			part.readFields.filtered(f -> Iters.from(readFields).flatMap(IOField::iterUnpackedFields).noneIs(f)).forEach(readFields::add);
 		}
 		return makeTicket(new HashSet<>(writeFields), new HashSet<>(readFields));
 	}
@@ -101,7 +102,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 			
 			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(allFields.filtered(f -> f.streamUnpackedFields().anyMatch(field::isDependency)).asCollection())){
+					if(selectedWriteFieldsSet.addAll(allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).asCollection())){
 						shouldRun = true;
 					}
 				}
@@ -113,7 +114,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 			}
 			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(allFields.filtered(f -> f.streamUnpackedFields().anyMatch(field::isDependency)).asCollection())){
+					if(selectedReadFieldsSet.addAll(allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).asCollection())){
 						shouldRun = true;
 					}
 				}
@@ -131,9 +132,9 @@ public class FieldDependency<T extends IOInstance<T>>{
 				
 				for(IOField<T, ?> skipped : before){
 					//is skipped field dependency of another skipped field who's size may depend on it.
-					if(before.stream().filter(e -> !e.getSizeDescriptor().hasFixed())
-					         .flatMap(IOField::dependencyStream)
-					         .anyMatch(e -> skipped.streamUnpackedFields().anyMatch(s -> s == e))){
+					if(Iters.from(before).filtered(e -> !e.getSizeDescriptor().hasFixed())
+					        .flatMap(IOField::getDependencies)
+					        .anyMatch(e -> skipped.iterUnpackedFields().anyIs(e))){
 						selectedReadFieldsSet.add(skipped);
 						shouldRun = true;
 					}
@@ -166,10 +167,8 @@ public class FieldDependency<T extends IOInstance<T>>{
 	private FieldSet<T> fieldSetToOrderedList(FieldSet<T> source, Set<IOField<T, ?>> fieldsSet){
 		List<IOField<T, ?>> result = new ArrayList<>(fieldsSet.size());
 		for(IOField<T, ?> f : source){
-			var iter       = f.streamUnpackedFields().iterator();
 			var anyRemoved = false;
-			while(iter.hasNext()){
-				var fi = iter.next();
+			for(IOField<T, ?> fi : f.iterUnpackedFields()){
 				if(fieldsSet.remove(fi)) anyRemoved = true;
 			}
 			

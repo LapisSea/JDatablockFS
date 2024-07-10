@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
@@ -8,11 +9,9 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static java.lang.reflect.Modifier.isStatic;
 
@@ -68,7 +67,7 @@ public class JorthUtils{
 						if(SupportedPrimitive.isAny(n.getClass())) yield n + "";
 						throw new UnsupportedOperationException();
 					}
-					case String[] strs -> Arrays.stream(strs).map(s -> "'" + s.replace("'", "\\'") + "'").collect(Collectors.joining(" ", "[", "]"));
+					case String[] strs -> Iters.from(strs).joinAsStr(" ", "[", "]", s -> "'" + s.replace("'", "\\'") + "'");
 					default -> throw new NotImplementedException(value.getClass() + "");
 				});
 			});

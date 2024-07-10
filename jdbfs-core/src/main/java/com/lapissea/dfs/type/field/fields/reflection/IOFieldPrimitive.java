@@ -23,17 +23,16 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.objects.NumberSize.*;
 import static com.lapissea.dfs.type.WordSpace.BIT;
@@ -54,8 +53,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			var res = new ArrayList<Behaviour<?, T>>(3);
 			
-			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)) res.add(Behaviour.noop(IOValue.Unsigned.class));
-			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)) res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
+			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)){
+				res.add(Behaviour.noop(IOValue.Unsigned.class));
+			}
+			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)){
+				res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
+			}
 			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
 				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
 					throw new MalformedStruct(VirtualNumSize.class.getName() + " is not allowed on " + fieldType.getName());
@@ -633,22 +636,22 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
-		var fieldOpt = forceFixed? Optional.<IOField<T, NumberSize>>empty() : IOFieldTools.getDynamicSize(getAccessor());
-		if(fieldOpt.isPresent()){
-			var allowed = EnumSet.copyOf(allowedSizes().stream().filter(s -> s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));
-			var field   = fieldOpt.get();
+		var dynamicSizeO = forceFixed? Optional.<IOField<T, NumberSize>>empty() : IOFieldTools.getDynamicSize(getAccessor());
+		dynamicSizeO.ifPresentOrElse(field -> {
+			var allowed = EnumSet.copyOf(Iters.from(allowedSizes()).filtered(s -> s.lesserThanOrEqual(maxSize.size)).collectToSet());
 			dynamicSize = (ioPool, instance) -> {
 				var val = field.get(ioPool, instance);
-				if(!allowed.contains(val)) throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
+				if(!allowed.contains(val))
+					throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
 				return val;
 			};
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
-				allowed.stream().min(Comparator.naturalOrder()).orElse(VOID),
-				allowed.stream().max(Comparator.naturalOrder()),
+				Iters.from(allowed).min().orElse(VOID),
+				Iters.from(allowed).max().opt(),
 				field.getAccessor()));
-		}else{
+		}, () -> {
 			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
-		}
+		});
 	}
 	
 	@Override
@@ -660,7 +663,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected abstract EnumSet<NumberSize> allowedSizes();
 	
 	private NumberSize maxAllowed(){
-		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
+		return Iters.from(allowedSizes()).reduce(NumberSize::max).orElseThrow();
 	}
 	
 	protected final NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){

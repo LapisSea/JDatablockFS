@@ -8,7 +8,6 @@ import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
-import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
@@ -26,7 +25,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -40,7 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -130,7 +128,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 		
 		public OptimizedChunkPipe(){
-			super(STRUCT, (type, f) -> List.of(
+			super(STRUCT, (type, f, testRun) -> List.of(
 				BitFieldMerger.of(List.of(
 					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
 					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
@@ -148,12 +146,11 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		@Override
 		protected Chunk doRead(VarPool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
-			NumberSize bns;
-			NumberSize nns;
-			try(var f = FlagReader.read(src, NumberSize.BYTE)){
-				bns = NumberSize.FLAG_INFO.get((int)f.readBits(3));
-				nns = NumberSize.FLAG_INFO.get((int)f.readBits(3));
-			}
+			var raw = src.readUnsignedInt1();
+			var bns = NumberSize.FLAG_INFO.get(raw&0b111);
+			var nns = NumberSize.FLAG_INFO.get((raw >>> 3)&0b111);
+			BitFieldMerger.readIntegrityBits(raw, 8, 6);
+			
 			instance.bodyNumSize = bns;
 			instance.nextSize = nns;
 			try{
@@ -191,18 +188,26 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	public static final byte FLAGS_SIZE = 1;
 	
-	private static final int  CHECK_BYTE_OFF;
-	private static final byte CHECK_BIT_MASK;
+	private static final int CHECK_BYTE_OFF = 0;
+	private static final int CHECK_BIT_MASK = 0b11000000;
 	
 	static{
+		if(DEBUG_VALIDATION) validateHeaderBitVals();
+	}
+	
+	private static void validateHeaderBitVals(){
 		if(PIPE.getSpecificFields().getFirst() instanceof BitFieldMerger<?> bf){
 			if(bf.getSizeDescriptor().requireFixed(WordSpace.BYTE) != FLAGS_SIZE) throw new AssertionError("flag size not " + FLAGS_SIZE);
 			var layout = bf.getSafetyBits().orElseThrow();
 			
-			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);
+			if(CHECK_BYTE_OFF != (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1)){
+				throw new ShouldNeverHappenError(CHECK_BYTE_OFF + " " + layout);
+			}
 			
 			int offset = (int)(layout.usedBits() - CHECK_BYTE_OFF*Byte.SIZE);
-			CHECK_BIT_MASK = (byte)(BitUtils.makeMask(layout.safetyBits())<<offset);
+			if(CHECK_BIT_MASK != (int)(BitUtils.makeMask(layout.safetyBits())<<offset)){
+				throw new ShouldNeverHappenError(CHECK_BIT_MASK + " " + layout);
+			}
 			
 			if(offset + layout.safetyBits() != 8) throw new AssertionError("not 1 byte");
 		}else{
@@ -246,9 +251,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 	}
 	public static boolean earlyCheckChunkAt(ContentReader reader) throws IOException{
-		var flags  = reader.readInt1();
-		int masked = flags&CHECK_BIT_MASK;
-		return masked == CHECK_BIT_MASK;
+		var flags        = reader.readUnsignedInt1();
+		var requiredBits = BitFieldMerger.calcIntegrityBits(flags&0b111_111, 2, 6);
+		return requiredBits == (flags&CHECK_BIT_MASK);
 	}
 	
 	@IOValue
@@ -356,7 +361,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 //			.writeBits(nns.ordinal(), 3)
 //			.fillRestAllOne()
 //			.export(destBuff, 0);
-		destBuff[0] = (byte)(bns.ordinal()|(nns.ordinal()<<3)|(0b11<<6));
+		var header = bns.ordinal()|(nns.ordinal()<<3);
+		destBuff[0] = (byte)(header|BitFieldMerger.calcIntegrityBits(header, 2, 6));
 		
 		bns.write(destBuff, 1, getCapacity());
 		bns.write(destBuff, 1 + bns.bytes, getSize());
@@ -664,9 +670,6 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}while(ch != null);
 		
 		return data;
-	}
-	public Stream<Chunk> streamNext(){
-		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
 	public ChainWalker walkNext(){
 		return new ChainWalker(this);

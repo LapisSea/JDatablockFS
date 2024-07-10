@@ -24,6 +24,8 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -45,8 +47,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
@@ -138,7 +138,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						return dependencyNames.get().apply(accessor, ann);
 					}
 					var fields = generateFields.apply(accessor, ann).fields;
-					return fields.stream().map(VirtualFieldDefinition::name).collect(Collectors.toSet());
+					return Iters.from(fields).map(VirtualFieldDefinition::name).collectToSet();
 				});
 			}
 		}
@@ -397,15 +397,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 	}
 	
-	@Nullable
+	@NotNull
 	public final FieldSet<T> getDependencies(){
 		requireLateData();
-		return dependencies;
-	}
-	
-	public final Stream<IOField<T, ?>> dependencyStream(){
-		var d = getDependencies();
-		return d != null? d.stream() : Stream.of();
+		var d = dependencies;
+		return d == null? FieldSet.of() : dependencies;
 	}
 	
 	public final boolean isDependency(IOField<T, ?> depField){
@@ -433,8 +429,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	/**
 	 * @return a stream of fields that are directly referenced by the struct. (field that represents a group of fields should return the containing fields)
 	 */
-	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
-		return Stream.of(this);
+	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
+		return Iters.of(this);
 	}
 	
 	protected void throwInformativeFixedSizeError(){ }

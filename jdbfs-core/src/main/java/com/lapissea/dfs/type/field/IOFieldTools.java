@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -113,41 +114,10 @@ public final class IOFieldTools{
 			var struct       = fields.stream().map(IOField::getAccessor).filter(Objects::nonNull).findAny().orElseThrow().getDeclaringStruct();
 			var structType   = struct.getType();
 			var dataOrderAnn = structType.getAnnotation(InternalDataOrder.class);
-			if(dataOrderAnn != null){
-				if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
-					throw new MalformedStruct(InternalDataOrder.class.getName() + " is for internal use only. " +
-					                          "To be used only by " + TemplateClassLoader.class.getName());
-				}
-				var dataOrder    = dataOrderAnn.value();
-				var actualNames  = fields.stream().map(IOField::getName).collect(Collectors.toSet());
-				var dataOrderSet = Set.of(dataOrder);
-				if(!dataOrderSet.equals(actualNames)){
-					throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);
-				}
-				
-				var index = new int[dataOrder.length];
-				
-				for(int i = 0; i<dataOrder.length; i++){
-					var name = dataOrder[i];
-					index[i] = IntStream.range(0, fields.size())
-					                    .filter(idx -> fields.get(idx).getName().equals(name))
-					                    .findFirst().orElseThrow();
-				}
-				
-				var res = new Index(index);
-				if(GlobalConfig.DEBUG_VALIDATION){
-					var testNames = res.mapData(fields).stream().map(IOField::getName).toArray(String[]::new);
-					if(!Arrays.equals(testNames, dataOrder)){
-						throw new AssertionError("\n" +
-						                         Arrays.toString(testNames) + "\n" +
-						                         Arrays.toString(dataOrder));
-					}
-				}
-				return res;
-			}
+			if(dataOrderAnn != null) return predefinedOrder(fields, structType, dataOrderAnn);
 		}
 		try{
-			return new DepSort<>(fields, f -> f.dependencyStream()
+			return new DepSort<>(fields, f -> f.getDependencies()
 			                                   .mapToInt(o -> IntStream.range(0, fields.size())
 			                                                           .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
 			                                                           .findAny()
@@ -164,7 +134,7 @@ public final class IOFieldTools{
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f -> f.getType().isEnum() || SupportedPrimitive.isAny(f.getType())? 0 : 1)
 			                 //Encourage fields with similar dependencies to be next to each other
-			                 .thenComparing(f -> f.dependencyStream().map(IOField::getName).collect(Collectors.joining(" / ")))
+			                 .thenComparing(f -> f.getDependencies().joinAsStr(" / ", IOField::getName))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
 			                 .thenComparing(IOField::getName)
 			);
@@ -172,19 +142,52 @@ public final class IOFieldTools{
 			throw new MalformedStruct("Field dependency cycle detected:\n" + TextUtil.toTable(e.cycle.mapData(fields)), e);
 		}
 	}
+	@SuppressWarnings("deprecation")
+	private static <T extends IOInstance<T>> Index predefinedOrder(List<IOField<T, ?>> fields, Class<T> structType, InternalDataOrder dataOrderAnn){
+		if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
+			throw new MalformedStruct(InternalDataOrder.class.getName() + " is for internal use only. " +
+			                          "To be used only by " + TemplateClassLoader.class.getName());
+		}
+		var dataOrder    = dataOrderAnn.value();
+		var actualNames  = Iters.from(fields).map(IOField::getName).collectToSet();
+		var dataOrderSet = Set.of(dataOrder);
+		if(!dataOrderSet.equals(actualNames)){
+			throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);
+		}
+		
+		var index = new int[dataOrder.length];
+		
+		for(int i = 0; i<dataOrder.length; i++){
+			var name = dataOrder[i];
+			index[i] = IntStream.range(0, fields.size())
+			                    .filter(idx -> fields.get(idx).getName().equals(name))
+			                    .findFirst().orElseThrow();
+		}
+		
+		var res = new Index(index);
+		if(GlobalConfig.DEBUG_VALIDATION){
+			var testNames = res.mapData(fields).stream().map(IOField::getName).toArray(String[]::new);
+			if(!Arrays.equals(testNames, dataOrder)){
+				throw new AssertionError("\n" +
+				                         Arrays.toString(testNames) + "\n" +
+				                         Arrays.toString(dataOrder));
+			}
+		}
+		return res;
+	}
 	
 	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
-		Optional<String> dynSiz = Stream.of(
+		Optional<String> dynSiz = Iters.ofPresent(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(FieldNames.numberSize(field))).findAny()
-		).filter(Optional::isPresent).map(Optional::get).findAny();
+			Iters.from(field.getAnnotation(IODependency.class)).flatMapArray(IODependency::value).firstMatching(name -> name.equals(FieldNames.numberSize(field)))
+		).findFirst();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
 		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("Missing or invalid field should have been checked in annotation logic");
-		return opt.toOptional();
+		return opt;
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){

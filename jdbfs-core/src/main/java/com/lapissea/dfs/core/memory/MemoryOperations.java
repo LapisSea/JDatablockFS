@@ -21,7 +21,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
@@ -69,7 +69,7 @@ public final class MemoryOperations{
 			
 			
 			//test unknowns
-			var iter = (noTrim? IterablePPs.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
+			var iter = (noTrim? Iters.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
 			while(iter.hasNext()){
 				var headIndex = iter.nextLong();
 				
@@ -325,7 +325,7 @@ public final class MemoryOperations{
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    destroyChunks = toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList();
+			var    destroyChunks = Iters.from(toDestroy).map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).collectToList();
 			
 			if(purgeTransaction != null){
 				try(var io = provider.getSource().io()){
@@ -340,7 +340,7 @@ public final class MemoryOperations{
 				}
 			}
 			
-			for(Chunk chunk : toDestroy){ provider.getChunkCache().notifyDestroyed(chunk); }
+			provider.getChunkCache().notifyDestroyed(toDestroy);
 		}else{
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(writeChunks);
@@ -757,7 +757,7 @@ public final class MemoryOperations{
 		
 		if(dryRun) return chunk;
 		
-		try(var io = src.ioAt(chunk.getPtr().getValue())){
+		try(var ignore = src.openIOTransaction(); var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
 			IOUtils.zeroFill(io, chunk.getCapacity());
 		}
@@ -781,7 +781,7 @@ public final class MemoryOperations{
 			throw new IllegalArgumentException(firstChunk + " is not the first chunk! " + ch + " declares it as next.");
 		}
 		
-		if(firstChunk.walkNext().noneMatch(c -> c == target)){
+		if(firstChunk.walkNext().noneIs(target)){
 			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}

@@ -7,20 +7,20 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiFunction;
-
-import static java.util.stream.Collectors.toUnmodifiableMap;
+import java.util.function.Function;
 
 public final class SealedUtil{
 	
@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, data.universe.stream().collect(toUnmodifiableMap(t -> t, StandardStructPipe::of)));
+			this(data.root, Iters.from(data.universe).collectToFinalMap(Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(
@@ -52,10 +52,10 @@ public final class SealedUtil{
 			WordSpace    wordSpace;
 			
 			if(computeSize){
-				var sizes = pipeMap.values().stream().map(StructPipe::getSizeDescriptor).toList();
+				var sizes = Iters.values(pipeMap).map(StructPipe::getSizeDescriptor);
 				
-				wordSpace = sizes.stream().map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
-				var fixed = sizes.stream().map(s -> s.getFixed(wordSpace))
+				wordSpace = sizes.map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElseThrow();
+				var fixed = sizes.map(s -> s.getFixed(wordSpace))
 				                 .reduce((a, b) -> a.isPresent() && b.isPresent() && a.getAsLong() == b.getAsLong()?
 				                                   a : OptionalLong.empty())
 				                 .orElseThrow();
@@ -63,8 +63,8 @@ public final class SealedUtil{
 					return SizeDescriptor.Fixed.of(wordSpace, fixed.getAsLong());
 				}
 				
-				minSize = nullable? 0 : sizes.stream().mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
-				maxSize = sizes.stream().map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
+				minSize = nullable? 0 : sizes.mapToLong(s -> s.getMin(wordSpace)).min().orElseThrow();
+				maxSize = sizes.map(s -> s.getMax(wordSpace)).reduce((a, b) -> Utils.combineIfBoth(a, b, Math::max)).orElseThrow();
 			}else{
 				wordSpace = WordSpace.BYTE;
 				minSize = 0;
@@ -87,17 +87,16 @@ public final class SealedUtil{
 		}
 		
 		public boolean calcCanHavePointers(){
-			return pipeMap.values().stream()
-			              .map(StructPipe::getType)
-			              .anyMatch(Struct::getCanHavePointers);
+			return Iters.values(pipeMap).map(StructPipe::getType).anyMatch(Struct::getCanHavePointers);
 		}
 	}
 	
-	public record SealedUniverse<T>(Class<T> root, Set<Class<T>> universe){
+	public record SealedUniverse<T>(Class<T> root, Collection<Class<T>> universe){
+		
 		public SealedUniverse{
 			Objects.requireNonNull(root);
 			assert isSealedCached(root);
-			universe = Set.copyOf(universe);
+			universe = Iters.from(universe).distinct().sortedBy(Class::getName).collectToFinalList();
 		}
 	}
 	
@@ -134,16 +133,9 @@ public final class SealedUtil{
 	
 	private static final class SNode{
 		
-		private static final class Val<T>{
+		private record Val<T>(boolean sealed, WeakReference<List<Class<T>>> permittedSubclasses){
 			private static final Val<?> NON = new Val<>(false, new WeakReference<>(null));
 			
-			private final boolean                       sealed;
-			private final WeakReference<List<Class<T>>> permittedSubclasses;
-			
-			private Val(boolean sealed, WeakReference<List<Class<T>>> permittedSubclasses){
-				this.sealed = sealed;
-				this.permittedSubclasses = permittedSubclasses;
-			}
 			private static <T> Val<T> of(Class<T> clazz){
 				var permittedSubclasses = fetchSubclasses(clazz);
 				if(permittedSubclasses == null){
@@ -185,7 +177,7 @@ public final class SealedUtil{
 		private static <T> List<Class<T>> fetchSubclasses(Class<T> clazz){
 			//noinspection unchecked
 			var sbc = (Class<T>[])clazz.getPermittedSubclasses();
-			return sbc == null? null : List.of(sbc);
+			return sbc == null? null : Iters.of(sbc).sortedBy(Class::getName).collectToFinalList();
 		}
 	}
 	

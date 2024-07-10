@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
@@ -142,9 +142,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		});
 		
-		var sup = super.getGenerators();
-		if(sup == null) return List.of(gen);
-		return Stream.concat(sup.stream(), Stream.of(gen)).toList();
+		return Iters.concatN1(super.getGenerators(), gen).collectToList();
 	}
 	
 	@Override

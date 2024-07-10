@@ -1,8 +1,9 @@
 package com.lapissea.dfs.io.bit;
 
+import com.lapissea.dfs.utils.iterableplus.Iters;
+
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public final class BitUtils{
 	
@@ -55,10 +56,10 @@ public final class BitUtils{
 	public static String byteArrayToBitString(byte[] data)            { return byteArrayToBitString(data, 0, data.length); }
 	public static String byteArrayToBitString(byte[] data, int length){ return byteArrayToBitString(data, 0, length); }
 	public static String byteArrayToBitString(byte[] data, int offset, int length){
-		return IntStream.range(offset, offset + length)
-		                .map(i -> data[i]&0xFF)
-		                .mapToObj(b -> String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
-		                .map(s -> new StringBuilder(s).reverse())
-		                .collect(Collectors.joining());
+		return Iters.range(offset, offset + length)
+		            .map(i -> data[i]&0xFF)
+		            .mapToObj(b -> String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
+		            .map(s -> new StringBuilder(s).reverse())
+		            .collect(Collectors.joining());
 	}
 }

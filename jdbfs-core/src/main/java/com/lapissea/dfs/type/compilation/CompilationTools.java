@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.Method;
@@ -83,10 +84,14 @@ public final class CompilationTools{
 		}
 	);
 	
+	static Optional<FieldStub> asStub(Method method){
+		return Iters.concat(GETTER_PATTERNS, SETTER_PATTERNS).flatOptionals(f -> f.apply(method)).findFirst();
+	}
+	
 	static Optional<FieldStub> asGetterStub(Method method){
-		return GETTER_PATTERNS.stream().map(f -> f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
+		return Iters.from(GETTER_PATTERNS).flatOptionals(f -> f.apply(method)).findFirst();
 	}
 	static Optional<FieldStub> asSetterStub(Method method){
-		return SETTER_PATTERNS.stream().map(f -> f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
+		return Iters.from(SETTER_PATTERNS).flatOptionals(f -> f.apply(method)).findFirst();
 	}
 }

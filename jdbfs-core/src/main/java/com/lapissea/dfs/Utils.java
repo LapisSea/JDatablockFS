@@ -4,12 +4,15 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
@@ -31,7 +34,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.LongBinaryOperator;
-import java.util.stream.Collectors;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
@@ -41,7 +44,7 @@ public final class Utils{
 	
 	public static void fairDistribute(long[] values, long toDistribute){
 		
-		long totalUsage = Arrays.stream(values).sum();
+		long totalUsage = Iters.ofLongs(values).sum();
 		
 		var free = toDistribute - totalUsage;
 		
@@ -198,10 +201,9 @@ public final class Utils{
 		
 		var parts = TextUtil.splitByChar(name, '.');
 		if(parts.length == 1) name = name + ("[]".repeat(arrayLevels));
-		else name = Arrays.stream(parts)
-		                  .limit(parts.length - 1)
-		                  .map(c -> c.charAt(0) + "")
-		                  .collect(Collectors.joining(".")) +
+		else name = Iters.from(parts)
+		                 .limit(parts.length - 1)
+		                 .joinAsStr(".", c -> c.charAt(0) + "") +
 		            "." + parts[parts.length - 1] +
 		            ("[]".repeat(arrayLevels));
 		return name;
@@ -210,8 +212,7 @@ public final class Utils{
 		return switch(type){
 			case Class<?> c -> classNameToHuman(c.getName());
 			case ParameterizedType p -> typeToHuman(p.getRawType()) +
-			                            Arrays.stream(p.getActualTypeArguments()).map(Utils::typeToHuman)
-			                                  .collect(Collectors.joining(", ", "<", ">"));
+			                            Iters.from(p.getActualTypeArguments()).joinAsStr(", ", "<", ">", Utils::typeToHuman);
 			case WildcardType w -> {
 				var    lowerBounds = w.getLowerBounds();
 				var    bounds      = lowerBounds;
@@ -223,11 +224,11 @@ public final class Utils{
 						ext = "extends";
 					}else yield "?";
 				}
-				yield "? " + ext + " " + Arrays.stream(bounds).map(Utils::typeToHuman).collect(Collectors.joining(" & "));
+				yield "? " + ext + " " + Iters.from(bounds).joinAsStr(" & ", Utils::typeToHuman);
 			}
 			case GenericArrayType a -> typeToHuman(a.getGenericComponentType()) + "[]";
 			case TypeVariable<?> t -> {
-				yield t.getName() + ":" + Arrays.stream(t.getBounds()).map(Utils::typeToHuman).collect(Collectors.joining("&"));
+				yield t.getName() + ":" + Iters.from(t.getBounds()).joinAsStr("&", Utils::typeToHuman);
 			}
 			default -> type.getTypeName();
 		};
@@ -328,4 +329,34 @@ public final class Utils{
 	public static <T> Optional<T> None(){
 		return Optional.empty();
 	}
+	
+	public static Supplier<String> errToStackTraceOnDemand(Throwable e){
+		return () -> errToStackTrace(e);
+	}
+	public static String errToStackTrace(Throwable e){
+		var sw = new StringWriter();
+		e.printStackTrace(new PrintWriter(sw));
+		return sw.toString();
+	}
+	
+	public static int[] growArr(int[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	public static long[] growArr(long[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	public static <T> T[] growArr(T[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
+	private static int calcNextSize(int length){
+		long nextSizeL = length*2L;
+		if(nextSizeL != (int)nextSizeL){
+			if(length == Integer.MAX_VALUE){
+				throw new OutOfMemoryError();
+			}
+			nextSizeL = Integer.MAX_VALUE;
+		}
+		return (int)nextSizeL;
+	}
+	
 }

@@ -77,10 +77,8 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 			}
 			dependencies = getDeclaringStruct()
 				               .getFields()
-				               .stream()
-				               .filter(f -> f.isDependency(field))
-				               .map(IOField::getAccessor)
-				               .toList();
+				               .filtered(f -> f.isDependency(field))
+				               .collectToFinalList(IOField::getAccessor);
 		}
 	}
 	

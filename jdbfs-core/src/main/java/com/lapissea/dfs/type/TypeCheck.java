@@ -2,6 +2,7 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.lang.reflect.Modifier;
 import java.util.LinkedList;
@@ -9,7 +10,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 public class TypeCheck{
 	public interface ArgCheck{
@@ -92,7 +92,7 @@ public class TypeCheck{
 						return;
 					}
 				}
-				throw new IllegalStateException("No matching type requirement:\n\t" + args.stream().map(c -> c.errMsg(resolved)).collect(Collectors.joining("\n\t")));
+				throw new IllegalStateException("No matching type requirement:\n\t" + Iters.from(args).joinAsStr("\n\t", c -> c.errMsg(resolved)));
 			};
 		}
 		

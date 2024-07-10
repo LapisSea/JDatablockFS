@@ -359,7 +359,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 				long cursor;
 				
 				IOIterator.Iter<IONode<T>> iter;
-				long iterCursor;
+				long                       iterCursor;
 				
 				@SuppressWarnings("rawtypes")
 				@Override

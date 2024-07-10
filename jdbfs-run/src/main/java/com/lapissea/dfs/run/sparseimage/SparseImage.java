@@ -15,7 +15,7 @@ import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
 
-public class SparseImage{
+public final class SparseImage{
 	
 	public static void main(String[] args) throws Exception{
 		

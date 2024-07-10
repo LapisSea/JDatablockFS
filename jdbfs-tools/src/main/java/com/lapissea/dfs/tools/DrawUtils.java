@@ -4,8 +4,8 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.render.RenderBackend;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.awt.Color;
@@ -345,7 +345,7 @@ class DrawUtils{
 		renderer.drawLine(xFrom*scale, yFrom*scale, xTo*scale, yTo*scale);
 	}
 	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
-		return IterablePPs.nullTerminated(() -> new Supplier<>(){
+		return Iters.nullTerminated(() -> new Supplier<>(){
 			long remaining = size;
 			final ChunkChainIO io;
 			

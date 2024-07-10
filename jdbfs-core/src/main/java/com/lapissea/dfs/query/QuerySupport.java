@@ -76,7 +76,7 @@ public enum QuerySupport{
 			var elements = data.elements(Set.of());
 			return new IOIterator<>(){
 				private Accessor<T> acc;
-				private boolean run = true;
+				private boolean     run = true;
 				
 				private void run() throws IOException{
 					if(run){

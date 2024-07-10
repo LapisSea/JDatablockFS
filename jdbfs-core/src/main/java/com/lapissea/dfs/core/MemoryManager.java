@@ -7,6 +7,7 @@ import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -217,7 +218,7 @@ public interface MemoryManager extends DataProvider.Holder{
 		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){
-				if(chunks.stream().anyMatch(c -> c.getPtr().equals(ptr))){
+				if(Iters.from(chunks).anyMatch(c -> c.getPtr().equals(ptr))){
 					throw new RuntimeException("Duplicate pointer passed " + ptr);
 				}
 			}
