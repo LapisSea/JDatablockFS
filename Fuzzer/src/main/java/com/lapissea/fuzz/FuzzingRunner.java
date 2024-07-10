@@ -226,6 +226,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, Instant.now())));
 		}
 		
+		var record = progress != null && progress.config.shouldLog()? new ProgressRecord(progress, sequence.iterations()) : null;
+		
 		for(var actionIndex = 0; actionIndex<sequence.iterations(); actionIndex++){
 			if(progress != null && progress.hasErr()) return none();
 			
@@ -237,19 +239,70 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				));
 			}
 			
+			var incOff = record == null? 0 : actionIndex - record.lastInc;
+			
 			var idx = sequence.startIndex() + actionIndex;
 			try{
 				stateEnv.applyAction(state, idx, action, mark);
 			}catch(Throwable e){
+				if(record != null) record.reportFinal(false);
 				var duration = Duration.between(start, Instant.now());
 				FuzzFail.trimErr(e);
 				return Optional.of(new FuzzFail.Action<>(e, sequence, action, idx, duration, state));
 			}
 			
-			if(progress != null) progress.inc();
+			if(record != null && incOff>=record.incPeriod) record.report(incOff, actionIndex);
 		}
 		
+		if(record != null) record.reportFinal(true);
+		
 		return none();
+	}
+	
+	private static final class ProgressRecord{
+		private final FuzzProgress progress;
+		private final int          iterations;
+		
+		private int  lastInc     = 0;
+		private long lastIncTime = System.nanoTime();
+		
+		private       int  incPeriod;
+		private final long desiredMsReportPeriod;
+		
+		private ProgressRecord(FuzzProgress progress, int iterations){
+			this.progress = progress;
+			this.iterations = iterations;
+			incPeriod = progress.estimatedIncrementPeriod();
+			desiredMsReportPeriod = Math.max(10, progress.config.logTimeout().toMillis()/5);
+		}
+		
+		private void report(int incOff, int actionIndex){
+			lastInc = actionIndex;
+			long t     = System.nanoTime();
+			var  durNs = t - lastIncTime;
+			lastIncTime = t;
+			
+			progress.reportSteps(incOff, durNs);
+			incPeriod = adjustIncrementPeriod(durNs);
+		}
+		
+		private void reportFinal(boolean adjust){
+			var durNs = System.nanoTime() - lastIncTime;
+			if(adjust) incPeriod = Math.max(adjustIncrementPeriod(durNs), 2);
+			progress.reportStepsAndPeriod(iterations - lastInc, durNs, incPeriod);
+		}
+		
+		private int adjustIncrementPeriod(long durationNs){
+			var duration = durationNs/1000_000;
+			if(duration<desiredMsReportPeriod){
+				if(duration<desiredMsReportPeriod/3) return incPeriod*2;
+				else return incPeriod + 1;
+			}else if(incPeriod>2){
+				if(duration>desiredMsReportPeriod*3) return Math.max(2, incPeriod/2);
+				else return incPeriod - 1;
+			}
+			return incPeriod;
+		}
 	}
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
@@ -269,12 +322,15 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return run(config, mark, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
 	public List<FuzzFail<State, Action>> run(FuzzConfig config, RunMark mark, FuzzSequenceSource source){
-		final var conf = config == null? new FuzzConfig() : config;
+		final var conf = config == null? new FuzzConfig().withName(getTaskName()) : config;
 		
 		return switch(RunType.of(source, stateEnv, mark, conf.maxWorkers()<=1)){
 			case RunType.Noop ignored -> List.of();
 			case RunType.Single(var sequence) -> {
-				var fail = runSequence(mark, sequence, new FuzzProgress(conf, sequence.iterations()));
+				var progress = new FuzzProgress(conf, CompletableFuture.completedFuture((long)sequence.iterations()));
+				progress.reportStart();
+				var fail = runSequence(mark, sequence, progress);
+				progress.reportDone();
 				yield fail.stream().toList();
 			}
 			case RunType.Many(var data) -> {
@@ -285,7 +341,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				});
 				var progress = switch(data){
 					case ManyData.Async d -> new FuzzProgress(conf, d.totalIterations);
-					case ManyData.Instant d -> new FuzzProgress(conf, d.totalIterations);
+					case ManyData.Instant d -> new FuzzProgress(conf, CompletableFuture.completedFuture(d.totalIterations));
 				};
 				
 				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>(){
@@ -318,10 +374,13 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				}
 				
 				Supplier<List<FuzzFail<State, Action>>> finalize = () -> {
+					progress.reportDone();
 					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
 					Thread.startVirtualThread(System::gc);
 					return res;
 				};
+				
+				progress.reportStart();
 				
 				if(nThreads == 1){
 					assert data instanceof ManyData.Instant;
@@ -338,7 +397,13 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					poolThreads, poolThreads, 500, MILLISECONDS, new LinkedBlockingQueue<>(), new RunnerFactory(poolThreads, name))
 				){
 					
-					if(data instanceof ManyData.Async async) async.compute.accept(worker);
+					if(data instanceof ManyData.Async async){
+						async.compute.accept(task -> executor.execute(() -> {
+							progress.reportCusomMsg("Computing stats...");
+							task.run();
+							progress.reportCusomMsg("Stats computed!");
+						}));
+					}
 					
 					var desiredBuffer = Math.max(nThreads*4, 8);
 					var jobSegments   = new ConcurrentLinkedDeque<>(List.of(source.all().spliterator()));
