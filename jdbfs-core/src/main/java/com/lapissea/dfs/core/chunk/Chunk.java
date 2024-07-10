@@ -3,6 +3,7 @@ package com.lapissea.dfs.core.chunk;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
+import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.IOInterface;
@@ -146,19 +147,29 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		@Override
 		protected Chunk doRead(VarPool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
+			instance.forbidReadOnly();
+			
 			var raw = src.readUnsignedInt1();
-			var bns = NumberSize.FLAG_INFO.get(raw&0b111);
-			var nns = NumberSize.FLAG_INFO.get((raw >>> 3)&0b111);
+			var bns = NumberSize.ordinal(raw&0b111);
+			var nns = NumberSize.ordinal((raw >>> 3)&0b111);
 			BitFieldMerger.readIntegrityBits(raw, 8, 6);
 			
 			instance.bodyNumSize = bns;
 			instance.nextSize = nns;
+			
+			var cap = bns.read(src);
+			var siz = bns.read(src);
+			if(siz>cap){
+				throw new MalformedObject("Size bigger than capacity");
+			}
+			var nextPtr = ChunkPointer.read(nns, src);
+			
 			try{
-				instance.setCapacity(bns.read(src));
-				instance.setSize(bns.read(src));
-				instance.setNextPtr(ChunkPointer.read(nns, src));
+				instance.capacity = cap;
+				instance.size = siz;
+				instance.setNextPtr(nextPtr);
 			}catch(OutOfBitDepth e){
-				throw new IOException(e);
+				throw new MalformedObject(e);
 			}
 			return instance;
 		}
@@ -228,16 +239,18 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * referenced outside a controlled context, then it should be reported to the chunk cache as it is not a "real" chunk until that happens.
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(!earlyCheckChunkAt(provider, pointer)) throw new MalformedPointer("Invalid chunk at " + pointer);
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE)))
-			throw new MalformedPointer(pointer + " points outside of available data");
+		if(!earlyCheckChunkAt(provider, pointer)) throw failChunk(pointer, null);
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
 		}catch(Exception e){
-			throw new MalformedPointer("No valid chunk at " + pointer, e);
+			throw failChunk(pointer, e);
 		}
 		return chunk;
+	}
+	
+	private static MalformedPointer failChunk(ChunkPointer pointer, Exception e){
+		return new MalformedPointer("No valid chunk at ", pointer, e);
 	}
 	
 	/**
@@ -274,7 +287,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@IOValue
 	@IODependency.NumSize("nextSize")
-	private ChunkPointer nextPtr = ChunkPointer.NULL;
+	private ChunkPointer nextPtr;
 	
 	
 	@NotNull
@@ -290,33 +303,40 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	private Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr){
 		super(STRUCT);
 		this.provider = provider;
-		this.ptr = ptr;
+		this.ptr = Objects.requireNonNull(ptr);
+		nextPtr = ChunkPointer.NULL;
 	}
 	
 	public Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr, @NotNull NumberSize bodyNumSize, long capacity, long size, NumberSize nextSize, ChunkPointer nextPtr){
 		this.provider = Objects.requireNonNull(provider);
 		this.ptr = Objects.requireNonNull(ptr);
-		this.bodyNumSize = Objects.requireNonNull(bodyNumSize);
+		this.bodyNumSize = bodyNumSize;
 		this.capacity = requireCapacityPositive(capacity);
 		this.size = size;
-		this.nextSize = Objects.requireNonNull(nextSize);
-		try{
-			setNextPtr(nextPtr);
-		}catch(OutOfBitDepth e){
-			throw new RuntimeException(e);
-		}
+		this.nextSize = nextSize;
+		this.nextPtr = nextPtr;
 		
 		if(size>capacity){
-			throw new IllegalArgumentException(size + " > " + capacity);
+			badSize(capacity, size);
 		}
 		
+		if(nextPtr.equals(ptr)) throw new IllegalArgumentException();
 		try{
+			nextSize.ensureCanFit(nextPtr);
 			bodyNumSize.ensureCanFit(capacity);
 		}catch(OutOfBitDepth e){
-			throw new IllegalArgumentException("capacity(" + capacity + ") can not fit in to " + bodyNumSize, e);
+			badBodyNumSize(e);
 		}
 		
 		refreshHeaderSize();
+		dirty = true;
+	}
+	
+	private static void badBodyNumSize(OutOfBitDepth e){
+		throw new IllegalArgumentException("Number size can not fit value", e);
+	}
+	private static void badSize(long capacity, long size){
+		throw new IllegalArgumentException(size + " > " + capacity);
 	}
 	
 	private void refreshHeaderSize(){
@@ -423,18 +443,20 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return ptr;
 	}
 	
-	public void pushSize(long newSize){
+	public void pushSize(long newSize) throws MalformedObject{
 		if(newSize>getSize()) setSize(newSize);
 	}
 	public void clampSize(long newSize){
+		forbidReadOnly();
 		if(newSize<getSize()){
-			setSize(newSize);
+			setSizeUnsafe(newSize);
 		}
 	}
 	public void growSizeAndZeroOut(long newSize) throws IOException{
 		if(newSize>getCapacity()){
 			throw new IllegalArgumentException("newSize(" + newSize + ") is bigger than capacity(" + getCapacity() + ") on " + this);
 		}
+		forbidReadOnly();
 		
 		var oldSize = getSize();
 		zeroOutFromTo(oldSize, newSize);
@@ -447,14 +469,16 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return size;
 	}
 	@IOValue
-	public void setSize(long newSize){
+	public void setSize(long newSize) throws MalformedObject{
 		forbidReadOnly();
 		if(this.size == newSize) return;
-		if(newSize>capacity){
-			throw new IllegalArgumentException("New size " + newSize + " is bigger than capacity " + capacity);
-		}
+		if(newSize>capacity) throw badSize(newSize);
 		
 		setSizeUnsafe(newSize);
+	}
+	
+	private MalformedObject badSize(long newSize){
+		return new MalformedObject("New size " + newSize + " is bigger than capacity " + capacity);
 	}
 	
 	private void setSizeUnsafe(long newSize){
@@ -630,7 +654,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			var oldSiz = getHeaderSize();
 			setNextSize(NumberSize.VOID);
 			var newSiz = getHeaderSize();
-			setSize(0);
+			setSizeUnsafe(0);
 			try{
 				setCapacity(getCapacity() + oldSiz - newSiz);
 			}catch(OutOfBitDepth e){
@@ -801,7 +825,6 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	private void markDirty(){
-		forbidReadOnly();
 		if(reading) return;
 		dirty = true;
 	}

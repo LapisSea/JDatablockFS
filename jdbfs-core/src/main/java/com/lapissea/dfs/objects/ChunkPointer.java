@@ -172,9 +172,11 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 	
 	@Override
 	public boolean equals(Object o){
-		return o == this ||
-		       o instanceof ChunkPointer num &&
+		return o instanceof ChunkPointer num &&
 		       equals(num.getValue());
+	}
+	public boolean equals(ChunkPointer o){
+		return equals(o.getValue());
 	}
 	
 	@Override
@@ -203,10 +205,6 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 	
 	public long getValue(){
 		return value;
-	}
-	
-	public int getValueInt(){
-		return Math.toIntExact(getValue());
 	}
 	
 	public boolean equals(long value){

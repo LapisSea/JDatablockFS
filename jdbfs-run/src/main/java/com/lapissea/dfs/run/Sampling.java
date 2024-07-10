@@ -64,7 +64,7 @@ public class Sampling{
 			if(true){
 				var avg = (long)count.values().stream().mapToLong(i -> i).average().orElse(0);
 				LogUtil.Init.detach();
-				LogUtil.println(count.entrySet().stream().filter(e -> e.getValue()>avg).sorted(Comparator.comparing(e -> -e.getValue())).limit(5).map(e -> e.getValue() + "\n" + e.getKey()).collect(Collectors.joining("\n\n")));
+				LogUtil.println(count.entrySet().stream().filter(e -> e.getValue()>avg).sorted(Comparator.comparing(e -> -e.getValue())).limit(10).map(e -> e.getValue() + "\n" + e.getKey()).collect(Collectors.joining("\n\n")));
 				LogUtil.println(avg);
 			}
 			

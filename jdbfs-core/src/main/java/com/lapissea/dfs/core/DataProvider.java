@@ -111,7 +111,7 @@ public interface DataProvider{
 	private void ensureChunkValid(ChunkPointer ptr) throws IOException{
 		var siz = getSource().getIOSize();
 		if(ptr.getValue()>=siz){
-			throw new PointerOutsideFile(ptr.getValue() + " outside " + siz + " file");
+			throw new PointerOutsideFile("Pointer outside " + siz + " file: ", ptr);
 		}
 		
 		var cached = getChunkCache().get(ptr);

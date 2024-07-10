@@ -46,19 +46,20 @@ public enum NumberSize{
 		BYTE_MAP = res;
 	}
 	
-	public static final EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
+	public static final  EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
+	private static final NumberSize[]             VALUES    = values();
 	
 	public static final NumberSize LARGEST = LONG;
 	
 	static{
-		for(NumberSize ns : values()){
+		for(NumberSize ns : VALUES){
 			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes));
 			ns.next = FLAG_INFO.filtered(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
 		}
 	}
 	
 	public static NumberSize ordinal(int index){
-		return FLAG_INFO.get(index);
+		return VALUES[index];
 	}
 	
 	public static NumberSize bySize(ChunkPointer size){
