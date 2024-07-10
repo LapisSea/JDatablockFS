@@ -9,7 +9,7 @@ import com.lapissea.dfs.utils.iterableplus.LongIterator;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.longlong.Roaring64NavigableMap;
+import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -101,7 +101,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		}
 		
 		final class Bitmap64 implements Index{
-			private final Roaring64NavigableMap data = new Roaring64NavigableMap();
+			private final Roaring64Bitmap data = new Roaring64Bitmap();
 			
 			@Override
 			public boolean isEmpty(){
@@ -140,7 +140,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 				data.andNot(d);
 			}
 			
-			private static IterableLongPP iter(Roaring64NavigableMap data){
+			private static IterableLongPP iter(Roaring64Bitmap data){
 				return () -> {
 					var iter = data.getLongIterator();
 					return new LongIterator(){
