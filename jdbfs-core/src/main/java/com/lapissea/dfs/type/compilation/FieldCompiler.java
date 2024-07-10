@@ -34,13 +34,13 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -85,16 +85,18 @@ public final class FieldCompiler{
 				throw new IllegalField(valueMethod + " is not static!");
 			}
 			
-			var context = GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
-			
-			if(!UtilL.instanceOf(context.resolveReturnClass(), IOUnmanagedValueInfo.Data.class)){
-				throw new IllegalField(valueMethod + " does not return " + IOField.class.getName());
+			if(!UtilL.instanceOf(valueMethod.getReturnType(), IOUnmanagedValueInfo.Data.class)){
+				throw new IllegalField(valueMethod + "\n\tdoes not return " + IOUnmanagedValueInfo.Data.class.getName());
 			}
+			var returnTypeArg = switch(valueMethod.getGenericReturnType()){
+				case ParameterizedType parm -> parm.getActualTypeArguments()[0];
+				default -> throw new IllegalField(valueMethod + "\t\t must be a " + IOUnmanagedValueInfo.Data.class.getName() + "<This class>");
+			};
+			var rawReturnType = Utils.typeToRaw(returnTypeArg);
 			
-			Class<?> ioFieldOwner = context.returnType().type(IOUnmanagedValueInfo.Data.class).generic("T");
-			
-			if(ioFieldOwner != valueMethod.getDeclaringClass()){
-				throw new IllegalField(valueMethod + " does not return IOField of same owner type!\n" + ioFieldOwner.getName() + "\n" + valueMethod.getDeclaringClass().getName());
+			if(rawReturnType != valueMethod.getDeclaringClass()){
+				throw new IllegalField(valueMethod + " does not return type of same owner type!\n\t" + rawReturnType.getName() +
+				                       "\n\t" + valueMethod.getDeclaringClass().getName());
 			}
 		}
 		
