@@ -115,11 +115,10 @@ public sealed interface FuzzFail<State, Act>{
 		public String trace(){
 			StringWriter sw = new StringWriter();
 			sw.append("Failed to apply action on sequence: ")
-			  .append(String.valueOf(sequence.index())).append(", actionIndex: (")
+			  .append(String.valueOf(sequence.index())).append("->").append(sequence.makeDataStick()).append(", actionIndex: (")
 			  .append(String.valueOf(actionIndex - sequence.startIndex())).append(")\t").append(String.valueOf(actionIndex))
 			  .append(" Action: ").append(String.valueOf(action)).append("\n");
-			PrintWriter pw = new PrintWriter(sw);
-			e.printStackTrace(pw);
+			e.printStackTrace(new PrintWriter(sw));
 			return sw.toString();
 		}
 		@Override
@@ -161,7 +160,8 @@ public sealed interface FuzzFail<State, Act>{
 			}
 		}
 		
-		try{
+		//TODO figure why last frame matches the "in fuzzing code" in very rare case
+		if(end>0) try{
 			var el  = stack[end - 1];
 			var typ = Class.forName(el.getClassName());
 			if(Arrays.stream(typ.getDeclaredMethods()).filter(Method::isSynthetic)

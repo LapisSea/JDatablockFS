@@ -6,11 +6,11 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -20,12 +20,11 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.lang.Float.parseFloat;
 import static java.lang.Long.parseLong;
 
-public class QueryExpressionParser{
+public final class QueryExpressionParser{
 	
 	private interface Matched{
 		List<String> matches();
@@ -138,7 +137,7 @@ public class QueryExpressionParser{
 		return Optional.ofNullable(arg.type());
 	}
 	
-	private static class Tokenizer{
+	private static final class Tokenizer{
 		private       int    pos;
 		private final String str;
 		private Tokenizer(String str){
@@ -263,13 +262,13 @@ public class QueryExpressionParser{
 		}
 		private <T extends Enum<T> & Matched> T match(Class<T> toCheck, boolean require){
 			var universe = EnumUniverse.of(toCheck);
-			var result = universe.stream().flatMap(c -> c.matches().stream().map(m -> Map.entry(c, m)))
+			var result = universe.flatMap(c -> Iters.from(c.matches()).map(m -> Map.entry(c, m)))
 			                     .sorted(Comparator.comparingInt(e -> -e.getValue().length()))
-			                     .filter(e -> match(e.getValue())).findFirst().map(Map.Entry::getKey);
+			                     .firstMatching(e -> match(e.getValue())).map(Map.Entry::getKey);
 			if(require && result.isEmpty()){
 				throw new InvalidQueryString(
 					"Expected any " + toCheck.getSimpleName() +
-					" (" + universe.stream().flatMap(c -> c.matches().stream()).collect(Collectors.joining(", ")) + ")" +
+					" (" + universe.flatMap(Matched::matches).joinAsStr(", ") + ")" +
 					atTemplate(pos));
 			}
 			return result.orElse(null);
@@ -403,7 +402,7 @@ public class QueryExpressionParser{
 			
 			var str = tokenizer.string();
 			if(str != null){
-				if(Comparison.IN.matches().stream().noneMatch(tokenizer::match)){
+				if(Iters.from(Comparison.IN.matches()).noneMatch(tokenizer::match)){
 					throw tokenizer.nextWordBad(
 						"Expected " + String.join(" or ", Comparison.IN.matches()) +
 						" after left hand string literal"
@@ -456,7 +455,7 @@ public class QueryExpressionParser{
 				}
 			}catch(NoSuchMethodException ignored){ }
 			
-			var fieldO = Arrays.stream(type.getFields()).filter(f -> f.getName().equals(fieldName)).findAny();
+			var fieldO = Iters.from(type.getFields()).firstMatching(f -> f.getName().equals(fieldName));
 			if(fieldO.isPresent()){
 				return new QueryValueSource.Field.Raw(fieldO.get());
 			}

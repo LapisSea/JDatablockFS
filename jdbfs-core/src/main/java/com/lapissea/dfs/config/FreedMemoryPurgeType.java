@@ -1,7 +1,8 @@
 package com.lapissea.dfs.config;
 
+import com.lapissea.dfs.utils.iterableplus.Iters;
+
 import java.util.List;
-import java.util.stream.Stream;
 
 public enum FreedMemoryPurgeType implements NamedEnum{
 	/**
@@ -28,9 +29,7 @@ public enum FreedMemoryPurgeType implements NamedEnum{
 	private final List<String> names;
 	
 	FreedMemoryPurgeType(String... names){
-		this.names = Stream.concat(Stream.of(name()), Stream.of(names).sorted())
-		                   .map(String::toUpperCase)
-		                   .toList();
+		this.names = Iters.concat1N(name(), Iters.from(names).sorted()).collectToFinalList(String::toUpperCase);
 	}
 	
 	@Override

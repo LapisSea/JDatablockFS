@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.collections.listtools;
 
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -23,13 +24,13 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 		
 		Class<?> c;
 		if(typeConstructor != null) c = typeConstructor.get().getClass();
-		else c = data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElse(null);
+		else c = Iters.from(data).firstMatching(Objects::nonNull).map(Object::getClass).orElse(null);
 		elementType = (Class<T>)c;
 	}
 	
 	@Override
 	public Class<T> elementType(){
-		if(elementType == null) elementType = (Class<T>)data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElseThrow();
+		if(elementType == null) elementType = (Class<T>)Iters.from(data).nonNulls().getFirst().getClass();
 		return elementType;
 	}
 	

@@ -16,6 +16,7 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Objects;
@@ -399,8 +400,13 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	default ContentOutputStream outStream(){ return outStream(true); }
 	default ContentOutputStream outStream(boolean trimOnClose){ return new RandomOutputStream(this, trimOnClose); }
 	
-	default ChunkPointer posAsPtr() throws IOException{
-		return ChunkPointer.of(getPos());
+	@Override
+	default byte[] readRemaining() throws IOException{
+		var rem = remaining();
+		if(rem>Integer.MAX_VALUE) throw new OutOfMemoryError();
+		var res = readInts1((int)rem);
+		assert remaining() == 0;
+		return res;
 	}
 	
 	@Override
@@ -408,11 +414,19 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		int buffSize = BATCH_BYTES;
 		
 		var remaining = remaining();
-		if(remaining<buffSize){
-			buffSize = Math.max((int)remaining, 8);
-		}
+		if(remaining == 0) return 0;
+		buffSize = (int)Math.min(buffSize, remaining);
 		
-		return transferTo(out, buffSize);
+		long transferred = 0;
+		
+		byte[] buffer = new byte[buffSize];
+		int    read;
+		while(transferred<remaining && (read = this.read(buffer))>=0){
+			out.write(buffer, 0, read);
+			transferred += read;
+		}
+		assert remaining() == 0;
+		return transferred;
 	}
 	@Override
 	default long transferTo(OutputStream out) throws IOException{
@@ -426,7 +440,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		return transferTo(out, buffSize);
 	}
 	
-	record WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) implements Comparable<WriteChunk>{
+	record WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) implements Comparable<WriteChunk>, Serializable{
 		public WriteChunk(long ioOffset, byte[] data){
 			this(ioOffset, 0, data.length, data);
 		}
@@ -494,6 +508,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		class LocalTransactionIO implements RandomIO{
 			private final IOTransactionBuffer transactionBuffer = new IOTransactionBuffer(false);
 			
+			private final IOTransactionBuffer.BaseAccess readAt = this::readAt;
+			
+			
 			private       long size     = RandomIO.this.getSize();
 			private final long capacity = RandomIO.this.getCapacity();
 			private       long pos      = RandomIO.this.getPos();
@@ -552,16 +569,16 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 				return b;
 			}
 			@Override
-			public void write(int b){
-				transactionBuffer.writeByte(pos, b);
+			public void write(int b) throws IOException{
+				transactionBuffer.writeByte(readAt, pos, b);
 				pos++;
 				if(size<=pos) size = pos + 1;
 			}
 			
 			@Override
-			public void writeAtOffsets(Collection<WriteChunk> data){
+			public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
 				for(var e : data){
-					transactionBuffer.write(e.ioOffset, e.data, e.dataOffset, e.dataLength);
+					transactionBuffer.write(readAt, e.ioOffset, e.data, e.dataOffset, e.dataLength);
 				}
 			}
 			@Override

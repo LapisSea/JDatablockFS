@@ -8,6 +8,8 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -15,12 +17,9 @@ import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -34,7 +33,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String name();
 		IOType bound();
 		
-		public static ClassArgDef of(String name, IOType bound){
+		static ClassArgDef of(String name, IOType bound){
 			return Def.of(ClassArgDef.class, name, bound);
 		}
 	}
@@ -60,7 +59,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			nullability = IOFieldTools.getNullability(field);
 			isDynamic = IOFieldTools.isGeneric(field);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
-			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
+			var deps = field.getDependencies().collectToSet(IOField::getName);
 			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
 			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
 			dependencies = deps.toArray(String[]::new);
@@ -141,8 +140,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
 				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
-				fields = structFields.stream().map(FieldDef::new).toArray(FieldDef[]::new);
-				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).stream().toArray();
+				fields = structFields.map(FieldDef::new).toArray(FieldDef[]::new);
+				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).iterIds().toArray();
 			}
 		}
 		if(type.isEnum()){
@@ -201,8 +200,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public boolean isSealed()       { return permits != null; }
 	public boolean isJustInterface(){ return justInterface; }
 	
-	public IntStream getFieldOrder(){
-		return Arrays.stream(fieldOrder);
+	public IterableIntPP getFieldOrder(){
+		return Iters.ofInts(fieldOrder);
 	}
 	public List<String> getPermittedSubclasses(){
 		if(permits == null) return List.of();
@@ -240,7 +239,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(isSealed()){
 			var permits = this.permits.clone();
 			if(permits.length>0){
-				int startsPos = Arrays.stream(permits).mapToInt(String::length).min().orElse(0) - 1;
+				int startsPos = Iters.of(permits).mapToInt(String::length).min().orElse(0) - 1;
 				while(startsPos>0){
 					var start = permits[0].substring(0, startsPos);
 					var c     = start.charAt(start.length() - 1);
@@ -248,7 +247,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 						startsPos = 0;
 						break;
 					}
-					if(c == '$' && Arrays.stream(permits).allMatch(s -> s.startsWith(start))){
+					if(c == '$' && Iters.of(permits).allMatch(s -> s.startsWith(start))){
 						break;
 					}
 					startsPos--;
@@ -257,13 +256,13 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i]);
 				}
 			}
-			sb.append(Arrays.stream(permits).collect(Collectors.joining(", ", "->[", "]")));
+			sb.append(Iters.of(permits).joinAsStr(", ", "->[", "]"));
 		}
 		sb.append('{');
 		if(!getEnumConstants().isEmpty()){
-			sb.append(getEnumConstants().stream().map(Objects::toString).collect(Collectors.joining(", ")));
+			sb.append(Iters.from(getEnumConstants()).joinAsStr(", "));
 		}
-		sb.append(Arrays.stream(fields).map(FieldDef::toShortString).collect(Collectors.joining(", ")));
+		sb.append(Iters.of(fields).joinAsStr(", ", FieldDef::toShortString));
 		sb.append('}');
 		
 		return sb.toString();

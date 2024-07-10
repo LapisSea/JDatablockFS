@@ -2,16 +2,21 @@ package com.lapissea.dfs.utils;
 
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeFunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.Serializable;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-public final class OptionalPP<T>{
+public final class OptionalPP<T> implements Serializable{
 	private static final OptionalPP<?> EMPTY = new OptionalPP<>(null);
 	
 	private final T value;
@@ -44,6 +49,19 @@ public final class OptionalPP<T>{
 	public boolean isPresent(){
 		return value != null;
 	}
+	public boolean isPresentAnd(Predicate<T> test){
+		return value != null && test.test(value);
+	}
+	public boolean isPresentAndNot(Predicate<T> test){
+		return value != null && test.test(value);
+	}
+	
+	public boolean isEmptyOr(Predicate<T> test){
+		return value == null || test.test(value);
+	}
+	public boolean isEmptyOrNot(Predicate<T> test){
+		return value == null || test.test(value);
+	}
 	
 	public boolean isEmpty(){
 		return value == null;
@@ -63,12 +81,37 @@ public final class OptionalPP<T>{
 		}
 	}
 	
+	public <K> OptionalPP<Map.Entry<K, T>> asValueWith(K key){
+		Objects.requireNonNull(key);
+		if(!isPresent()){
+			return empty();
+		}else{
+			return OptionalPP.of(Map.entry(key, this.value));
+		}
+	}
+	public <V> OptionalPP<Map.Entry<T, V>> asKeyWith(V value){
+		Objects.requireNonNull(value);
+		if(!isPresent()){
+			return empty();
+		}else{
+			return OptionalPP.of(Map.entry(this.value, value));
+		}
+	}
 	public <U, E extends Throwable> OptionalPP<U> map(UnsafeFunction<? super T, ? extends U, E> mapper) throws E{
 		Objects.requireNonNull(mapper);
 		if(!isPresent()){
 			return empty();
 		}else{
 			return OptionalPP.ofNullable(mapper.apply(value));
+		}
+	}
+	
+	public <E extends Throwable> OptionalLong mapToLong(UnsafeFunctionOL<? super T, E> mapper) throws E{
+		Objects.requireNonNull(mapper);
+		if(!isPresent()){
+			return OptionalLong.empty();
+		}else{
+			return OptionalLong.of(mapper.apply(value));
 		}
 	}
 	
@@ -164,7 +207,7 @@ public final class OptionalPP<T>{
 		       : "OptionalPP.empty";
 	}
 	
-	public Optional<T> toOptional(){
+	public Optional<T> opt(){
 		return Optional.ofNullable(value);
 	}
 }

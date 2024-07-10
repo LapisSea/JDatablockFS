@@ -7,6 +7,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
@@ -68,14 +68,12 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			PRIMITIVE_MARKER + "V", void.class
 		);
 		
-		private static final int PRIMITIVE_NAMES_MAX_LEN = PRIMITIVE_NAMES.values().stream()
-		                                                                  .map(Class::getName).mapToInt(String::length)
-		                                                                  .max().orElseThrow();
+		private static final int PRIMITIVE_NAMES_MAX_LEN = Iters.values(PRIMITIVE_NAMES)
+		                                                        .map(Class::getName).mapToInt(String::length)
+		                                                        .max().orElseThrow();
 		
 		private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
-			PRIMITIVE_NAMES.entrySet()
-			               .stream()
-			               .collect(Collectors.toUnmodifiableMap(e -> e.getValue().getName(), Map.Entry::getKey));
+			Iters.entries(PRIMITIVE_NAMES).collectToFinalMap(e -> e.getValue().getName(), Map.Entry::getKey);
 		
 		@IOValue
 		private String name;
@@ -105,6 +103,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public Class<?> generic(IOTypeDB db){
 			return (Class<?>)super.generic(db);
+		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
 		}
 		@Override
 		protected Class<?> makeGeneric(IOTypeDB db){ return getTypeClass(db); }
@@ -241,6 +243,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			return SyntheticParameterizedType.of(raw.getTypeClass(db), args);
 		}
 		@Override
+		public IOType asArrayType(IOTypeDB db){
+			return withRaw(getTypeClass(db).arrayType());
+		}
+		@Override
 		public int hashCode(){
 			int result = getTypeName().hashCode();
 			result = 31*result + args.hashCode();
@@ -259,11 +265,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		@Override
 		public String toString(){
 			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
-			return raw + args.stream().map(IOType::toString).collect(Collectors.joining(", ", "<", ">"));
+			return raw + Iters.from(args).joinAsStr(", ", "<", ">");
 		}
 		@Override
 		public String toShortString(){
-			return raw.toShortString() + args.stream().map(IOType::toShortString).collect(Collectors.joining(", ", "<", ">"));
+			return raw.toShortString() + Iters.from(args).joinAsStr(", ", "<", ">", IOType::toShortString);
 		}
 		@Override
 		public IOType withArgs(IOType... args){
@@ -308,6 +314,11 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			Type bound = this.bound == null? Object.class : this.bound.generic(db);
 			return new SyntheticWildcardType(List.of(bound), isLower);
 		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
+		}
+		
 		@Override
 		public int hashCode(){
 			int result = Objects.hashCode(bound);
@@ -403,7 +414,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			}
 			@Override
 			public String toString(){
-				return name + ": " + Arrays.stream(bounds).map(t -> Utils.typeToHuman(t)).collect(Collectors.joining(" & "));
+				return name + ": " + Iters.from(bounds).joinAsStr(" & ", Utils::typeToHuman);
 			}
 		}
 		
@@ -414,6 +425,10 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			var    declaration = parent.getTypeClass(db);
 			Type[] bounds      = findBounds(declaration, name);
 			return new GenTypeVariable(name, bounds, declaration);
+		}
+		@Override
+		public IOType asArrayType(IOTypeDB db){
+			throw new NotImplementedException("can not wrap " + this + " in array");
 		}
 		
 		public Type[] findBounds(IOTypeDB db){
@@ -498,7 +513,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 			case WildcardType wild -> of(wild);
 			case GenericArrayType a -> {
 				var comp = of(a.getGenericComponentType());
-				yield ((RawAndArg)comp).withRaw(comp.getRaw().typeClassCache.arrayType());
+				yield comp.asArrayType(null);
 			}
 			default -> throw new NotImplementedException(genericType.getClass().getName());
 		};
@@ -607,6 +622,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		};
 	}
 	
+	public abstract IOType asArrayType(IOTypeDB db);
 	
 	private static boolean argsEqual(List<IOType> a, List<IOType> b){
 		if(a.size() != b.size()){

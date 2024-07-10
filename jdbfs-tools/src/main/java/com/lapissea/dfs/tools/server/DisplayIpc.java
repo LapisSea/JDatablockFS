@@ -122,10 +122,10 @@ public class DisplayIpc implements DataLogger{
 				
 				var asyncWriter = new Object(){
 					
-					private boolean running = true;
-					private final List<Event> queue = new LinkedList<>();
-					private final Thread t;
-					private boolean fullFlag;
+					private       boolean     running = true;
+					private final List<Event> queue   = new LinkedList<>();
+					private final Thread      t;
+					private       boolean     fullFlag;
 					
 					{
 						t = Thread.ofVirtual().name("socket writer").start(() -> {

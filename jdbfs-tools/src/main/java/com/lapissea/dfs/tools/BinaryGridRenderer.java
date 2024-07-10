@@ -18,6 +18,7 @@ import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.CollectionInfo;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.text.AutoText;
@@ -34,7 +35,6 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.fields.BitField;
@@ -43,9 +43,9 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.IterablePP;
-import com.lapissea.dfs.utils.IterablePPs;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.NotImplementedException;
@@ -987,14 +987,14 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		drawIndex.accept(IterablePPs.from(clampedOverflow));
+		drawIndex.accept(Iters.from(clampedOverflow));
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
-		drawIndex.accept(IterablePPs.from(ranges).map(r -> {
+		drawIndex.accept(Iters.from(ranges).map(r -> {
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
 			return r;
-		}).filtered(Objects::nonNull));
+		}).nonNulls());
 		
 		ctx.renderer.setColor(bitColor);
 		try(var ignored = ctx.renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
@@ -1422,8 +1422,10 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ioPool = instance.getThisStruct().allocVirtualVarPool(IO);
 			if(ioPool != null){
 				try(var io = reference.io(ctx.provider)){
-					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.isVirtual(IO)));
-					pipe.readDeps(ioPool, ctx.provider, io, pipe.getFieldDependency().getDeps(virtuals), instance, generics(instance, parentGenerics));
+					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.iterUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
+					var dep      = pipe.getFieldDependency();
+					var deps     = dep.getDeps(virtuals);
+					pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));
 				}catch(Throwable e){
 					var size = 1L;
 					try{
@@ -1483,9 +1485,9 @@ public class BinaryGridRenderer implements DataRenderer{
 								continue;
 							}
 							if(inst instanceof IOInstance<?>[] arr){
-								annotateDynamicArrayValueLength(ctx, instance, reference, fieldOffset, ioPool, field, col, arr);
+								var len = annotateDynamicArrayValueHead(ctx, instance, reference, fieldOffset, ioPool, field, col, arr);
 								if(arr.length>0){
-									var        arrayOffset = fieldOffset + 1 + NumberSize.bySize(arr.length).bytes;
+									var        arrayOffset = fieldOffset + len + NumberSize.bySize(arr.length).bytes;
 									StructPipe pip         = getStructPipe(instance, pipe, unmanagedStage, field, arr[0]);
 									var        gens        = generics(instance, parentGenerics);
 									for(var val : arr){
@@ -1495,10 +1497,8 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 								continue;
 							}
-							if(inst.getClass().isArray()){
-								var arr = (Object[])inst;
-								annotateDynamicArrayValueLength(ctx, instance, reference, fieldOffset, ioPool, field, col, arr);
-								var ahead       = 1 + NumberSize.bySize(arr.length).bytes;
+							if(inst.getClass().isArray() || UtilL.instanceOf(inst.getClass(), List.class)){
+								var ahead       = annotateDynamicArrayValueHead(ctx, instance, reference, fieldOffset, ioPool, field, col, inst);
 								var arrayOffset = fieldOffset + ahead;
 								if(annotate)
 									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(arrayOffset, size - ahead));
@@ -1873,7 +1873,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				}catch(Throwable e){
 					String instStr = instanceErrStr(instance);
 					var    err     = new RuntimeException("failed to annotate " + field + " at " + reference.addOffset(fieldOffset) + " in " + instStr + " at " + reference, e);
-					
+					e.printStackTrace();
 					if(fieldErr == null){
 						fieldErr = err;
 					}else{
@@ -1916,54 +1916,18 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
-		var arrayLenSiz = NumberSize.bySize(arr.length);
-		
-		var arrayLenName     = FieldNames.collectionLen(field.getAccessor());
-		var arrayLenSizeName = FieldNames.numberSize(FieldNames.name(arrayLenName));
-		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new BasicFieldAccessor<T>(null, arrayLenSizeName, List.of()){
-			@Override
-			public Type getGenericType(GenericContext genericContext){
-				return NumberSize.class;
-			}
-			@Override
-			public int getTypeID(){
-				return TypeFlag.ID_OBJECT;
-			}
-			@Override
-			public boolean genericTypeHasArgs(){ return false; }
-			@Override
-			public Object get(VarPool<T> ioPool, T instance){
-				return arrayLenSiz;
-			}
-			@Override
-			public void set(VarPool<T> ioPool, T instance, Object value){
-				throw new UnsupportedOperationException();
-			}
-		}, SizeDescriptor.Fixed.of(1)), col, reference, DrawUtils.Range.fromSize(fieldOffset, 1));
-		
-		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new BasicFieldAccessor<T>(null, arrayLenName, List.of()){
-			@Override
-			public Type getGenericType(GenericContext genericContext){
-				return int.class;
-			}
-			@Override
-			public int getTypeID(){
-				return TypeFlag.ID_OBJECT;
-			}
-			@Override
-			public boolean genericTypeHasArgs(){ return false; }
-			@Override
-			public Object get(VarPool<T> ioPool, T instance){
-				return arr.length;
-			}
-			@Override
-			public void set(VarPool<T> ioPool, T instance, Object value){
-				throw new UnsupportedOperationException();
-			}
-		}, SizeDescriptor.Fixed.of(arrayLenSiz.bytes)), col, reference, DrawUtils.Range.fromSize(fieldOffset + 1, arrayLenSiz.bytes));
+	private <T extends IOInstance<T>> int annotateDynamicArrayValueHead(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object arr) throws IOException{
+		CollectionInfo.Store info;
+		var                  ref = reference.addOffset(fieldOffset);
+		try{
+			info = ref.ioMap(ctx.provider, io -> CollectionInfo.Store.PIPE.readNew(ctx.provider, io, null));
+		}catch(Throwable e){
+			throw new IOException("Failed to read " + CollectionInfo.class.getSimpleName() + " on " + ref, e);
+		}
+		annotateStruct(ctx, info, ref, CollectionInfo.Store.PIPE, null, true, false);
+		return (int)info.val().calcIOBytes(ctx.provider);
 	}
+	
 	private <T extends IOInstance<T>> GenericContext generics(T instance, GenericContext parentGenerics){
 		return instance instanceof IOInstance.Unmanaged<?> u? u.getGenerics() : null;
 	}

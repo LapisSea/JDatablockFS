@@ -10,69 +10,72 @@ import java.util.Set;
 
 public class CheckSet<T> implements IOSet<T>{
 	
-	private final IOSet<T> data;
-	private final Set<T>   base = new HashSet<>();
+	private final IOSet<T> testData;
+	private final Set<T>   reference = new HashSet<>();
 	
-	public CheckSet(IOSet<T> data) throws IOException{
-		this.data = data;
-		copyData(base);
+	public CheckSet(IOSet<T> testData) throws IOException{
+		this.testData = testData;
+		copyData(reference);
 		dataEquality();
 	}
 	
 	private void dataEquality() throws IOException{
-		Assert.assertEquals(data.size(), base.size(), "Sizes do not match");
-		var copy = HashSet.<T>newHashSet(Math.toIntExact(data.size()));
+		Assert.assertEquals(testData.size(), reference.size(), "Sizes do not match");
+		var copy = HashSet.<T>newHashSet(Math.toIntExact(testData.size()));
 		copyData(copy);
-		Assert.assertEquals(copy, base);
+		Assert.assertEquals(copy.size(), testData.size(), "Number of elements does not match the reported size");
+		Assert.assertEquals(copy, reference);
 	}
 	
 	private void copyData(Set<T> copy) throws IOException{
-		var iter = data.iterator();
+		var iter = testData.iterator();
 		while(iter.hasNext()){
-			copy.add(iter.ioNext());
+			if(!copy.add(iter.ioNext())){
+				throw new AssertionError("Duplicate element in test data");
+			}
 		}
 	}
 	
 	@Override
 	public boolean add(T value) throws IOException{
-		var a = data.add(value);
-		var b = base.add(value);
-		Assert.assertEquals(a, b);
+		var a = testData.add(value);
+		var b = reference.add(value);
+		Assert.assertEquals(a, b, "add() failed: previous values are not equal");
 		dataEquality();
 		return a;
 	}
 	@Override
 	public boolean remove(T value) throws IOException{
-		var a = data.remove(value);
-		var b = base.remove(value);
+		var a = testData.remove(value);
+		var b = reference.remove(value);
 		Assert.assertEquals(a, b);
 		dataEquality();
 		return a;
 	}
 	@Override
 	public void clear() throws IOException{
-		data.clear();
-		base.clear();
+		testData.clear();
+		reference.clear();
 		dataEquality();
 	}
 	@Override
 	public boolean contains(T value) throws IOException{
-		var a = data.contains(value);
-		var b = base.contains(value);
-		Assert.assertEquals(a, b);
+		var a = testData.contains(value);
+		var b = reference.contains(value);
+		Assert.assertEquals(a, b, "contains failed: result differs from reference");
 		return a;
 	}
 	@Override
 	public long size(){
-		var a = data.size();
-		var b = base.size();
+		var a = testData.size();
+		var b = reference.size();
 		Assert.assertEquals(a, b);
 		return a;
 	}
 	@Override
 	public IOIterator<T> iterator(){
-		var copy = new HashSet<>(base);
-		var iter = data.iterator();
+		var copy = new HashSet<>(reference);
+		var iter = testData.iterator();
 		return new IOIterator<>(){
 			
 			@Override
@@ -93,7 +96,7 @@ public class CheckSet<T> implements IOSet<T>{
 	
 	@Override
 	public void requestCapacity(long capacity) throws IOException{
-		data.requestCapacity(capacity);
+		testData.requestCapacity(capacity);
 		dataEquality();
 	}
 	
@@ -101,11 +104,11 @@ public class CheckSet<T> implements IOSet<T>{
 	public boolean equals(Object obj){
 		return obj == this ||
 		       obj instanceof IOSet<?> set &&
-		       set.equals(data);
+		       set.equals(testData);
 	}
 	
 	@Override
 	public String toString(){
-		return data.toString();
+		return testData.toString();
 	}
 }

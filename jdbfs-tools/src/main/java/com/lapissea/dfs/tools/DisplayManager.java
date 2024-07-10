@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
@@ -363,7 +364,7 @@ public class DisplayManager implements DataLogger{
 			ImGui.newLine();
 			ImGui.text("Full stack trace:");
 			ImGui.separator();
-			showTrace(MemFrame.errorToStr(err), cfWrap, skipImpl);
+			showTrace(Utils.errToStackTrace(err), cfWrap, skipImpl);
 			
 			ImGui.end();
 		});
@@ -389,7 +390,12 @@ public class DisplayManager implements DataLogger{
 								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
 							case DataRenderer.FieldVal<?> inst -> {
-								String str = inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
+								String str;
+								try{
+									str = inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
+								}catch(Throwable e){
+									str = "<CORRUPT :" + e + ">";
+								}
 								
 								var col = msg.color();
 								if(col == null) col = new Color(100, 255, 100);

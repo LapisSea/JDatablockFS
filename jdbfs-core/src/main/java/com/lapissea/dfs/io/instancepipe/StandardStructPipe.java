@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,7 +25,7 @@ import static com.lapissea.dfs.type.field.StoragePool.IO;
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields) -> IOFieldTools.stepFinal(structFields, List.of(
+		return (t, structFields, testRun) -> IOFieldTools.stepFinal(structFields, List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
 		));
@@ -166,8 +167,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		for(IOField<T, ?> field : fields){
 			
 			//If any other field depends on this field, then it has to be read
-			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
-				var needsInstance = !field.streamUnpackedFields().allMatch(f -> f.isVirtual(IO));
+			if(field.iterUnpackedFields().flatMap(fields::iterDependentOn).hasAny()){
+				var needsInstance = !field.iterUnpackedFields().allMatch(f -> f.isVirtual(IO));
 				cmds.add(new CmdBuild.Read(needsInstance, field.needsIOPool()));
 				continue;
 			}
@@ -186,7 +187,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			cmds.add(new CmdBuild.Skip(field.needsIOPool()));
 		}
 		
-		var buff = new byte[cmds.stream().mapToInt(CmdBuild::siz).sum()];
+		var buff = new byte[Iters.from(cmds).mapToInt(CmdBuild::siz).sum()];
 		var pos  = 0;
 		for(var c : cmds){
 			c.write(pos, buff);
@@ -195,12 +196,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		assert pos == buff.length;
 		
-		boolean needsInstance = cmds.stream().anyMatch(c -> switch(c){
+		boolean needsInstance = Iters.from(cmds).anyMatch(c -> switch(c){
 			case CmdBuild.Skip ignored -> false;
 			case CmdBuild.SkipFixed ignored -> false;
 			case CmdBuild.Read read -> read.needsInstance;
 		});
-		boolean needsIOPool = cmds.stream().anyMatch(c -> switch(c){
+		boolean needsIOPool = Iters.from(cmds).anyMatch(c -> switch(c){
 			case CmdBuild.Skip skip -> skip.needsIOPool;
 			case CmdBuild.SkipFixed ignored -> false;
 			case CmdBuild.Read read -> read.needsIOPool;

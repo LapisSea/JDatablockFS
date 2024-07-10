@@ -14,7 +14,9 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.utils.IterablePPs;
+import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -276,9 +278,13 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@SuppressWarnings("unchecked")
+		private Struct<SELF> fetchStruct(){
+			return Struct.of((Class<SELF>)getClass());
+		}
+		
 		private void init(){
-			thisStruct = Struct.of((Class<SELF>)getClass());
-			virtualFields = getThisStruct().allocVirtualVarPool(INSTANCE);
+			thisStruct = fetchStruct();
+			virtualFields = thisStruct.allocVirtualVarPool(INSTANCE);
 		}
 		
 		@Override
@@ -335,11 +341,25 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException{
 			var ctx = genericContext;
 			if(ctx == null && this instanceof IOInstance.Unmanaged<?> u) ctx = u.getGenerics();
-			var s = getThisStruct();
-			for(var ref : s.getRealFields().onlyRefs()){
-				if(!ref.isNull(null, self()))
+			
+			var s = thisStruct;
+			if(s == null){
+				s = fetchStruct();
+				if(s.getEstimatedState() == StagedInit.STATE_DONE){
+					s = getThisStruct();
+				}
+			}
+			
+			for(var field : s.getRealFields()){
+				if(!field.isNull(null, self())){
+					if(field.getNullability() == IONullability.Mode.DEFAULT_IF_NULL){
+						field.get(null, self());
+					}
 					continue;
-				ref.allocate(self(), provider, genericContext);
+				}
+				if(field instanceof RefField<SELF, ?> ref){
+					ref.allocate(self(), provider, ctx);
+				}
 			}
 			
 			for(var pair : s.getNullContainInstances()){
@@ -349,7 +369,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				}
 				var struct = pair.struct();
 				var val    = struct.make();
-				val.allocateNulls(provider, field.makeContext(genericContext));
+				val.allocateNulls(provider, field.makeContext(ctx));
 				//noinspection rawtypes,unchecked
 				((IOField)field).set(null, self(), val);
 			}
@@ -484,7 +504,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var dynamic = ((DynamicFields<SELF>)this).listDynamicUnmanagedFields();
 			if(fs.isEmpty()) return dynamic;
 			
-			return IterablePPs.concat(fs, dynamic);
+			return Iters.concat(fs, dynamic);
 		}
 		
 		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
@@ -694,7 +714,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	
 	static boolean isInstance(SealedUtil.SealedUniverse<?> universe){
-		return universe.universe().stream().allMatch(IOInstance::isInstance);
+		return Iters.from(universe.universe()).allMatch(IOInstance::isInstance);
 	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);

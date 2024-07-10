@@ -2,8 +2,8 @@ package com.lapissea.dfs.config;
 
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,19 +78,18 @@ public final class ConfigUtils{
 	public static <T extends Enum<T>> FuzzyResult<T> configEnum(Optional<String> value, T defaultValue){
 		Objects.requireNonNull(defaultValue);
 		return value.map(
-			s -> Arrays.stream(defaultValue.getClass().getEnumConstants())
-			           .filter(e -> {
-				           if(e instanceof NamedEnum ne){
-					           for(var name : ne.names()){
-						           if(name.equalsIgnoreCase(s)) return true;
-					           }
-					           return false;
-				           }
-				           return e.name().equalsIgnoreCase(s);
-			           })
-			           .findAny()
-			           .map(e -> new FuzzyResult<>((T)e))
-			           .orElse(new FuzzyResult<>(defaultValue, s))
+			s -> Iters.from(defaultValue.getClass().getEnumConstants())
+			          .firstMatching(e -> {
+				          if(e instanceof NamedEnum ne){
+					          for(var name : ne.names()){
+						          if(name.equalsIgnoreCase(s)) return true;
+					          }
+					          return false;
+				          }
+				          return e.name().equalsIgnoreCase(s);
+			          })
+			          .map(e -> new FuzzyResult<>((T)e))
+			          .orElse(new FuzzyResult<>(defaultValue, s))
 		).orElse(new FuzzyResult<>(defaultValue));
 	}
 	

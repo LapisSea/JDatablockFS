@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
@@ -59,7 +60,7 @@ public final class TestUtils{
 		}catch(Throwable ignored){ }
 		
 		
-		String sessionName = getSessionName(info);
+		String sessionName = info.getName();
 		
 		IOInterface mem      = LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
 		boolean     deleting = false;
@@ -88,6 +89,9 @@ public final class TestUtils{
 		});
 	}
 	
+	static void testCluster(UnsafeConsumer<Cluster, IOException> session) throws IOException{
+		testCluster(TestInfo.ofDepth(2), session);
+	}
 	static void testCluster(TestInfo info, UnsafeConsumer<Cluster, IOException> session) throws IOException{
 		testRawMem(info, mem -> {
 			var c = Cluster.init(mem);
@@ -98,10 +102,6 @@ public final class TestUtils{
 			}
 			c.rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 		});
-	}
-	
-	private static String getSessionName(TestInfo info){
-		return info.getName();
 	}
 	
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
@@ -320,5 +320,20 @@ public final class TestUtils{
 		}
 		
 		return new ShadowClassLoader();
+	}
+	
+	public static Cluster optionallyLogged(boolean logged, String name) throws IOException{
+		return Cluster.init(optionallyLoggedMemory(logged, name));
+	}
+	public static IOInterface optionallyLoggedMemory(boolean logged, String name) throws IOException{
+		if(!logged) return MemoryData.builder().withRaw(new byte[MagicID.size()]).build();
+		class Lazy{
+			private static final LateInit.Safe<DataLogger> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
+			
+			static{ LogUtil.println("DataLogger made"); }
+		}
+		var mem = LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
+		mem.write(true, new byte[MagicID.size()]);
+		return mem;
 	}
 }

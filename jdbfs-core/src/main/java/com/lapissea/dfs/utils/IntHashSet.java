@@ -495,10 +495,6 @@ public final class IntHashSet implements Cloneable, Iterable<IntHashSet.Cursor>{
 		return Math.min(arraySize - 1, (int)Math.ceil(arraySize*loadFactor));
 	}
 	
-	public int removeAll(final int key){
-		return remove(key)? 1 : 0;
-	}
-	
 	public boolean remove(final int key){
 		if(key == 0){
 			if(this.allocatedDefaultKey){
@@ -595,7 +591,9 @@ public final class IntHashSet implements Cloneable, Iterable<IntHashSet.Cursor>{
 	public void clear(){
 		this.assigned = 0;
 		this.allocatedDefaultKey = false;
-		Arrays.fill(keys, 0);
+		var b = minBufferSize(8, loadFactor);
+		if(keys.length != b) allocateBuffers(b);
+		else Arrays.fill(keys, 0);
 	}
 	
 	public int size(){

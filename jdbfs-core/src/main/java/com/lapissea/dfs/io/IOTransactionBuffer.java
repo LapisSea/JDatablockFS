@@ -1,17 +1,22 @@
 package com.lapissea.dfs.io;
 
-import com.lapissea.dfs.internal.WordIO;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.dfs.utils.IntHashSet;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
-import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -146,7 +151,6 @@ public final class IOTransactionBuffer{
 	}
 	
 	public int read(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
-		doMerge(base, offset + len);
 		if(len == 0) return 0;
 		try(var ignored = lock.read()){
 			if(len == 1){
@@ -161,7 +165,6 @@ public final class IOTransactionBuffer{
 	}
 	
 	public long readWord(BaseAccess base, long offset, int len) throws IOException{
-		doMerge(base, offset + len);
 		if(len == 0) return 0;
 		try(var ignored = lock.read()){
 			if(writeEvents.isEmpty()){
@@ -188,8 +191,11 @@ public final class IOTransactionBuffer{
 				break;
 			}
 			
-			byte[] buf = new byte[len];
-			read0(base, offset, buf, 0, len);
+			byte[] buf  = new byte[len];
+			var    read = read0(base, offset, buf, 0, len);
+			if(read == -1){
+				throw new EOFException();
+			}
 			return WordIO.getWord(buf, 0, len);
 		}
 	}
@@ -322,36 +328,36 @@ public final class IOTransactionBuffer{
 		return new WriteEvent(offset, arr);
 	}
 	
-	public void writeByte(long offset, int b){
-		write(offset, new byte[]{(byte)b}, 0, 1);
+	public void writeByte(BaseAccess base, long offset, int b) throws IOException{
+		write(base, offset, new byte[]{(byte)b}, 0, 1);
 	}
 	
-	public void writeChunks(Collection<RandomIO.WriteChunk> writeData){
+	public void writeChunks(BaseAccess base, Collection<RandomIO.WriteChunk> writeData) throws IOException{
 		try(var ignored = lock.write()){
 			for(var e : writeData){
-				write0(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				write0(base, e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 			}
 		}
 	}
 	
-	public void write(long offset, byte[] b, int off, int len){
+	public void write(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		try(var ignored = lock.write()){
-			write0(offset, b, off, len);
+			write0(base, offset, b, off, len);
 		}
 	}
 	
-	public void writeWord(long offset, long v, int len){
+	public void writeWord(BaseAccess base, long offset, long v, int len) throws IOException{
 		try(var ignored = lock.write()){
 			var newEnd = offset + len;
 			if(!writeEvents.isEmpty()){
 				if(writeEvents.getFirst().start()>newEnd){
 					writeEvents.addFirst(makeWordEvent(offset, v, len));
-					markIndexDirty(0);
+					markIndexDirty(base, 0, offset);
 					return;
 				}
 				if(writeEvents.getLast().end()<offset){
 					writeEvents.add(makeWordEvent(offset, v, len));
-					markIndexDirty(writeEvents.size() - 1);
+					markIndexDirty(base, writeEvents.size() - 1, offset);
 					return;
 				}
 			}else{
@@ -377,11 +383,11 @@ public final class IOTransactionBuffer{
 			
 			byte[] arr = new byte[len];
 			WordIO.setWord(v, arr, 0, len);
-			write0(offset, arr, 0, len);
+			write0(base, offset, arr, 0, len);
 		}
 	}
 	
-	private void write0(long offset, byte[] b, int off, int len){
+	private void write0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		if(len == 0) return;
 		var newStart = offset;
 		var newEnd   = offset + len;
@@ -389,12 +395,12 @@ public final class IOTransactionBuffer{
 			if(!writeEvents.isEmpty()){
 				if(writeEvents.getFirst().start()>newEnd){
 					writeEvents.addFirst(makeEvent(offset, b, off, len));
-					markIndexDirty(0);
+					markIndexDirty(base, 0, offset);
 					return;
 				}
 				if(writeEvents.getLast().end()<newStart){
 					writeEvents.add(makeEvent(offset, b, off, len));
-					markIndexDirty(writeEvents.size() - 1);
+					markIndexDirty(base, writeEvents.size() - 1, offset);
 					return;
 				}
 			}else{
@@ -411,12 +417,12 @@ public final class IOTransactionBuffer{
 				var eEnd   = event.end();
 				
 				if(eEnd == newStart){
-					if(checkNext(offset, b, off, len, i, event.end() + len)) return;
+					if(checkNext(base, offset, b, off, len, i, event.end() + len)) return;
 					
 					byte[] data = Arrays.copyOf(event.data, event.data.length + len);
 					System.arraycopy(b, off, data, event.data.length, len);
 					writeEvents.set(i, new WriteEvent(event.offset, data));
-					markIndexDirty(i);
+					markIndexDirty(base, i, offset);
 					return;
 				}
 				if(newEnd == eStart){
@@ -424,7 +430,7 @@ public final class IOTransactionBuffer{
 					byte[] data = new byte[event.data.length + len];
 					System.arraycopy(b, off, data, 0, len);
 					System.arraycopy(event.data, 0, data, len, event.data.length);
-					setEventSorted(i, new WriteEvent(offset, data));
+					setEventSorted(base, i, new WriteEvent(offset, data), offset);
 					return;
 				}
 				if(rangeOverlaps(newStart, newEnd, eStart, eEnd)){
@@ -432,13 +438,13 @@ public final class IOTransactionBuffer{
 					var start = Math.min(newStart, eStart);
 					var end   = Math.max(newEnd, eEnd);
 					
-					if(checkNext(offset, b, off, len, i, end)) return;
+					if(checkNext(base, offset, b, off, len, i, end)) return;
 					
 					//new event completely contains existing event, existing event can be replaced wi
 					if(newStart<eStart && newEnd>eEnd){
 						byte[] data = new byte[len];
 						System.arraycopy(b, off, data, 0, len);
-						setEventSorted(i, new WriteEvent(offset, data));
+						setEventSorted(base, i, new WriteEvent(offset, data), offset);
 						return;
 					}
 					
@@ -456,12 +462,12 @@ public final class IOTransactionBuffer{
 					byte[] data = new byte[size];
 					System.arraycopy(event.data, 0, data, eOff, event.data.length);
 					System.arraycopy(b, off, data, newOff, len);
-					setEventSorted(i, new WriteEvent(start, data));
+					setEventSorted(base, i, new WriteEvent(start, data), offset);
 					return;
 				}
 			}
 			UtilL.addRemainSorted(writeEvents, makeEvent(offset, b, off, len));
-			askOptimize();
+			markIndexDirty(base, (int)(offset%writeEvents.size()), offset);
 		}finally{
 			if(modifiedCapacity != -1){
 				var last = writeEvents.getLast();
@@ -469,77 +475,82 @@ public final class IOTransactionBuffer{
 					modifiedCapacity = last.end();
 				}
 			}
-			if(DEBUG_VALIDATION){
-				var copy = new ArrayList<>(writeEvents);
-				copy.sort(WriteEvent::compareTo);
-				if(!copy.equals(writeEvents)) throw new AssertionError("\n" + copy + "\n" + writeEvents);
-				
-				for(var event1 : writeEvents){
-					for(var event2 : writeEvents){
-						if(event1 == event2) continue;
-						if(event1.end() == event2.start() ||
-						   event2.end() == event1.start() ||
-						   rangeOverlaps(event1.start(), event1.end(), event2.start(), event2.end())){
-							throw new RuntimeException(event1 + " " + event2 + " " + writeEvents);
-						}
-					}
+
+//			if(DEBUG_VALIDATION) validate();
+		}
+	}
+	
+	private void validate(){
+		var copy = new ArrayList<>(writeEvents);
+		copy.sort(WriteEvent::compareTo);
+		if(!copy.equals(writeEvents)) throw new AssertionError("\n" + copy + "\n" + writeEvents);
+		
+		for(var event1 : writeEvents){
+			for(var event2 : writeEvents){
+				if(event1 == event2) continue;
+				if(event1.end() == event2.start() ||
+				   event2.end() == event1.start() ||
+				   rangeOverlaps(event1.start(), event1.end(), event2.start(), event2.end())){
+					throw new RuntimeException(event1 + " " + event2 + " " + writeEvents);
 				}
 			}
 		}
 	}
 	
-	private       boolean    optimize;
 	private final IntHashSet dirty = new IntHashSet();
+	private       boolean    merging;
 	
-	private void markIndexDirty(int i){
+	private void markIndexDirty(BaseAccess base, int i, long jitter) throws IOException{
+		if(writeEvents.size()<64 || merging) return;
 		if(i>0) dirty.add(i - 1);
 		dirty.add(i);
-//		if(i+2<writeEvents.size()) dirty.add(i+1);
-		askOptimize();
-	}
-	
-	private void askOptimize(){
-		if(writeEvents.size()<64) return;
-		optimize = true;
+		merging = true;
+		doMerge(base, jitter);
+		merging = false;
 	}
 	
 	private void doMerge(BaseAccess base, long jitter) throws IOException{
-		if(!optimize) return;
-		optimize = false;
+		var bufs = new ArrayList<WriteEvent>(dirty.size());
 		
-		try(var ignored = lock.write()){
-			for(int i = 0; i<writeEvents.size() - 1; i += 40){
-				dirty.add((int)((jitter + i)%(writeEvents.size() - 1)));
-			}
-			
-			var jumpSize = writeEvents.size()/4;
-			for(var ic : dirty){
-				var i = ic.value;
-				
-				if(i + 1>=writeEvents.size()) continue;
-				var e1End   = writeEvents.get(i).end();
-				var e2Start = writeEvents.get(i + 1).start();
-				var dist    = (int)(e2Start - e1End);
-				if(dist<=jumpSize){
-					var bb   = new byte[dist];
-					var read = read0(base, e1End, bb, 0, bb.length);
-					write(e1End, bb, 0, read);
-					break;
-				}
-			}
-			dirty.clear();
+		var addFac = 40;
+		int count  = writeEvents.size()/addFac;
+		for(int i = 0; i<count; i++){
+			var id = (int)(Math.abs(jitter + i*addFac)%(writeEvents.size() - 1));
+			dirty.remove(id);
+			acumMergeBuf(base, id, bufs);
+		}
+		for(var ic : dirty){
+			var i = ic.value;
+			acumMergeBuf(base, i, bufs);
+		}
+		dirty.clear();
+		
+		for(var buf : bufs){
+			write0(base, buf.offset, buf.data, 0, buf.data.length);
+		}
+	}
+	private void acumMergeBuf(BaseAccess base, int i, ArrayList<WriteEvent> bufs) throws IOException{
+		if(i + 1>=writeEvents.size()) return;
+		var e1End    = writeEvents.get(i).end();
+		var e2Start  = writeEvents.get(i + 1).start();
+		var dist     = (int)(e2Start - e1End);
+		var jumpSize = writeEvents.size()/4;
+		if(dist<=jumpSize){
+			var bb   = new byte[dist];
+			var read = read0(base, e1End, bb, 0, bb.length);
+			bufs.add(new WriteEvent(e1End, bb.length != read? Arrays.copyOf(bb, read) : bb));
 		}
 	}
 	
-	private void setEventSorted(int i, WriteEvent m){
+	private void setEventSorted(BaseAccess base, int i, WriteEvent m, long jitter) throws IOException{
 		var old = writeEvents.set(i, m);
-		markIndexDirty(i);
+		markIndexDirty(base, i, jitter);
 		if(old.offset == m.offset) return;
 		if(i>0){
 			var prev = writeEvents.get(i - 1);
 			if(prev.compareTo(m)>0){
 				writeEvents.sort(WriteEvent::compareTo);
-				markIndexDirty(i - 1);
+				markIndexDirty(base, i - 1, jitter);
 				return;
 			}
 		}
@@ -547,12 +558,12 @@ public final class IOTransactionBuffer{
 			var next = writeEvents.get(i + 1);
 			if(m.compareTo(next)>0){
 				writeEvents.sort(WriteEvent::compareTo);
-				markIndexDirty(i + 1);
+				markIndexDirty(base, i + 1, jitter);
 				return;
 			}
 		}
 	}
-	private boolean checkNext(long offset, byte[] b, int off, int len, int i, long end){
+	private boolean checkNext(BaseAccess base, long offset, byte[] b, int off, int len, int i, long end) throws IOException{
 		while(i<writeEvents.size() - 1){
 			var next = writeEvents.get(i + 1);
 			//multi merge
@@ -562,16 +573,16 @@ public final class IOTransactionBuffer{
 				if(nextOverwrite>=next.data.length){
 					continue;
 				}
-				write(offset, b, off, len);
+				write0(base, offset, b, off, len);
 				
 				if(nextOverwrite == 0){
-					write(next.offset, next.data, 0, next.data.length);
+					write0(base, next.offset, next.data, 0, next.data.length);
 					return true;
 				}
 				
 				byte[] trimmed = new byte[next.data.length - nextOverwrite];
 				System.arraycopy(next.data, nextOverwrite, trimmed, 0, trimmed.length);
-				write(next.offset + nextOverwrite, trimmed, 0, trimmed.length);
+				write0(base, next.offset + nextOverwrite, trimmed, 0, trimmed.length);
 				return true;
 			}
 			break;
@@ -579,7 +590,7 @@ public final class IOTransactionBuffer{
 		return false;
 	}
 	
-	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){
+	public record TransactionExport(OptionalPP<Long> setCapacity, List<RandomIO.WriteChunk> writes) implements Serializable{
 		
 		public void apply(RandomIO io) throws IOException{
 			switch(writes.size()){
@@ -591,7 +602,7 @@ public final class IOTransactionBuffer{
 				default -> io.writeAtOffsets(writes);
 			}
 			if(setCapacity.isPresent()){
-				io.setCapacity(setCapacity.getAsLong());
+				io.setCapacity(setCapacity.get());
 			}
 		}
 		
@@ -608,9 +619,9 @@ public final class IOTransactionBuffer{
 			writes.add(new RandomIO.WriteChunk(e.offset, e.data));
 		}
 		
-		var setCapacity = OptionalLong.empty();
+		var setCapacity = OptionalPP.<Long>empty();
 		if(modifiedCapacity != -1){
-			setCapacity = OptionalLong.of(modifiedCapacity);
+			setCapacity = OptionalPP.of(modifiedCapacity);
 		}
 		reset();
 		
@@ -650,7 +661,7 @@ public final class IOTransactionBuffer{
 		transactionOpenVar.set(target, true);
 		
 		return new IOTransaction(){
-			private final int startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
+			private final int  startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
 			private final long startingTotalBytes = DEBUG_VALIDATION && oldTransactionOpen? getTotalBytes() : 0;
 			
 			@Override
@@ -662,12 +673,39 @@ public final class IOTransactionBuffer{
 				return IOTransactionBuffer.this.getTotalBytes();
 			}
 			
-			@Override
-			public void close() throws IOException{
+			private void exportData() throws IOException{
 				transactionOpenVar.set(target, oldTransactionOpen);
 				if(!oldTransactionOpen){
 					var data = export();
 					target.io(data::apply);
+				}
+			}
+			
+			private void exportDataDeb() throws IOException{
+				if(oldTransactionOpen){
+					transactionOpenVar.set(target, true);
+					return;
+				}
+				var expected = target.readAll();
+				var data     = export();
+				transactionOpenVar.set(target, false);
+				target.io(data::apply);
+				var actual = target.readAll();
+				if(!Arrays.equals(expected, actual)){
+					var baos = new ByteArrayOutputStream();
+					try(var oos = new ObjectOutputStream(baos)){ oos.writeObject(data); }
+					throw new AssertionError("Transaction before and after apply differs!\n" +
+					                         "Expected: " + Arrays.toString(expected) + "\n" +
+					                         "Actual:   " + Arrays.toString(actual) + "\n" +
+					                         "Transaction:\n" + Base64.getEncoder().encodeToString(baos.toByteArray()));
+				}
+			}
+			
+			@Override
+			public void close() throws IOException{
+				try(var ignore = lock.write()){
+					if(DEBUG_VALIDATION) exportDataDeb();
+					else exportData();
 				}
 			}
 			

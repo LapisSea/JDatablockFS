@@ -89,7 +89,12 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 	
 	@Override
 	public boolean equals(Object o){
-		if(o == this) return true;
+		if(o.getClass() == this.getClass()){
+			//noinspection unchecked
+			var that = (UnmanagedIOSet<T>)o;
+			return this.getPointer().equals(that.getPointer());
+		}
+		
 		if(!(o instanceof IOSet<?> that)) return false;
 		
 		if(that.size() != this.size()){

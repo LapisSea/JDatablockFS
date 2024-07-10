@@ -32,11 +32,9 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool               PRINT_FLAGS       = flagB("log.printFlags", () -> deb() && LOG_LEVEL.resolve().isWithin(INFO));
 	Flag.FBool               PRINT_COMPILATION = flagB("log.printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
-	Flag.FBool             LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
-	Flag.FInt              LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
-	Flag.FBool             TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
-	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE         = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
-	Flag.FBool             COSTLY_STACK_TRACE        = flagB("tweaks.costlyStackTrace", deb());
+	Flag.FInt              LONG_WAIT_THRESHOLD = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
+	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE   = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
+	Flag.FBool             COSTLY_STACK_TRACE  = flagB("tweaks.costlyStackTrace", deb());
 	
 	Flag.FBool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
 	Flag.FBool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);

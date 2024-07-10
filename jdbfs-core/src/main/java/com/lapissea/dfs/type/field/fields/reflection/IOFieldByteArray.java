@@ -72,6 +72,12 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		}
 	}
 	
+	private static final byte[] DEFAULT_VAL = new byte[0];
+	@Override
+	public byte[] get(VarPool<T> ioPool, T instance){
+		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+	}
+	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		if(compression == null){

@@ -18,6 +18,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -31,7 +32,6 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,7 +43,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.SealedUtil.getPermittedSubclasses;
 import static com.lapissea.dfs.SealedUtil.getSealedUniverse;
@@ -80,8 +79,10 @@ final class FieldRegistry{
 				}
 				if(!any) UtilL.sleep(0.1);
 			}
-			var usages = scanned.entrySet().stream().sorted(Comparator.comparing(e -> e.getKey().getName()))
-			                    .map(Map.Entry::getValue).flatMap(Collection::stream).toList();
+			
+			var usages = Iters.entries(scanned).sortedBy(e -> e.getKey().getName())
+			                  .flatMap(Map.Entry::getValue).collectToFinalList();
+			
 			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
 		}
@@ -144,19 +145,19 @@ final class FieldRegistry{
 			var usageClasses =
 				Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
 				        .map(IOField.FieldUsageRef::value).filter(a -> a.length>0).map(List::of)
-				        .orElseGet(() -> Arrays.stream(type.getDeclaredClasses())
-				                               .filter(c -> UtilL.instanceOf(c, FieldUsage.class))
-				                               .map(c -> {
-					                               //noinspection unchecked
-					                               return (Class<FieldUsage>)c;
-				                               })
-				                               .toList());
+				        .orElseGet(() -> Iters.from(type.getDeclaredClasses())
+				                              .filtered(c -> UtilL.instanceOf(c, FieldUsage.class))
+				                              .map(c -> {
+					                              //noinspection unchecked
+					                              return (Class<FieldUsage>)c;
+				                              })
+				                              .collectToFinalList());
 			
 			if(usageClasses.isEmpty()){
 				return Optional.empty();
 			}
 			
-			return Optional.of(Map.entry(type, usageClasses.stream().map(u -> make(u)).toList()));
+			return Optional.of(Map.entry(type, Iters.from(usageClasses).map(u -> make(u)).collectToFinalList()));
 		}
 		
 		private static FieldUsage make(Class<FieldUsage> usageClass){
@@ -200,27 +201,26 @@ final class FieldRegistry{
 			private static final Collection<Class<?>> VAL;
 			
 			static{
+				var uni = getSealedUniverse(NullFlagCompanyField.class, true).orElseThrow();
 				VAL = Collections.unmodifiableSet(new LinkedHashSet<>(
-					getSealedUniverse(NullFlagCompanyField.class, true)
-						.orElseThrow()
-						.universe().stream()
-						.<Optional<Class<?>>>map((Class<NullFlagCompanyField> fieldType) -> {
-							if(fieldType.isAnnotationPresent(IOUnsafeValue.Mark.class)){
-								return Optional.empty();
-							}
-							var superC = (ParameterizedType)fieldType.getGenericSuperclass();
-							if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
-								return Optional.empty();
-							}
-							var args = superC.getActualTypeArguments();
-							if(!(args[1] instanceof Class<?> valueType)){
-								return Optional.empty();
-							}
-							return Optional.of(valueType);
-						})
-						.filter(Optional::isPresent).<Class<?>>map(Optional::get)
-						.distinct()
-						.sorted(Comparator.comparing(Class::getName)).toList()
+					Iters.from(uni.universe())
+					     .flatOptionals((Class<NullFlagCompanyField> fieldType) -> {
+						     if(fieldType.isAnnotationPresent(IOUnsafeValue.Mark.class)){
+							     return Optional.empty();
+						     }
+						     var superC = (ParameterizedType)fieldType.getGenericSuperclass();
+						     if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+							     return Optional.empty();
+						     }
+						     var args = superC.getActualTypeArguments();
+						     if(!(args[1] instanceof Class<?> valueType)){
+							     return Optional.empty();
+						     }
+						     return Optional.of(valueType);
+					     })
+					     .distinct()
+					     .sortedBy(Class::getName)
+					     .collectToList()
 				));
 			}
 		}
@@ -236,9 +236,7 @@ final class FieldRegistry{
 		return data;
 	}
 	
-	public static void init(){ }
-	
-	private FieldRegistry()  { }
+	private FieldRegistry(){ }
 	
 	static boolean canCreate(Type type, GetAnnotation annotations){
 		for(var usage : getData()){
@@ -288,17 +286,15 @@ final class FieldRegistry{
 			if(!typs.contains(res.getClass())){
 				throw new RuntimeException(
 					"Type " + res.getClass().getName() + "\nAllowed:\n" +
-					typs.stream().map(Class::getName).collect(Collectors.joining("\n"))
+					Iters.from(typs).joinAsStr("\n", Class::getName)
 				);
 			}
 			
-			var allCompatible = getData().stream().filter(u -> u.isCompatible(type, ann)).toList();
+			var allCompatible = Iters.from(getData()).filtered(usage -> usage.isCompatible(type, ann)).asCollection();
 			if(allCompatible.size()>1){
 				throw new RuntimeException(
 					"Ambiguous usage picking\n" +
-					allCompatible.stream()
-					             .map(u -> "\t" + u.getClass().getName())
-					             .collect(Collectors.joining("\n"))
+					allCompatible.joinAsStr("\n", u -> "\t" + u.getClass().getName())
 				);
 			}
 		}
@@ -306,15 +302,16 @@ final class FieldRegistry{
 	}
 	
 	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS
-		= FieldCompiler.ANNOTATION_TYPES.stream().filter(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
-		                                .collect(Collectors.toUnmodifiableSet());
+		= Iters.from(FieldCompiler.ANNOTATION_TYPES)
+		       .filtered(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
+		       .collectToFinalSet();
 	
 	private static <T extends IOInstance<T>> Set<FieldUsage> findUsages(IOField<T, ?> field){
 		var             producers = getProducers();
 		Set<FieldUsage> usages    = producers.get(field.getClass());
-		if(usages == null) usages = producers.entrySet().stream()
-		                                     .filter(e -> UtilL.instanceOf(field.getClass(), e.getKey()))
-		                                     .findFirst().map(Map.Entry::getValue).orElse(null);
+		if(usages == null) usages = Iters.entries(producers)
+		                                 .firstMatching(e -> UtilL.instanceOf(field.getClass(), e.getKey()))
+		                                 .map(Map.Entry::getValue).orElse(null);
 		return usages;
 	}
 	
@@ -326,7 +323,7 @@ final class FieldRegistry{
 		var acc  = field.getAccessor();
 		
 		Set<VirtualFieldDefinition<T, ?>> result     = new HashSet<>();
-		Set<Class<? extends Annotation>>  activeAnns = CONSUMABLE_ANNOTATIONS.stream().filter(acc::hasAnnotation).collect(Collectors.toSet());
+		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filtered(acc::hasAnnotation).collectToSet();
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
 				behaviour.generateFields(acc).ifPresent(res -> {
@@ -340,15 +337,14 @@ final class FieldRegistry{
 		if(!activeAnns.isEmpty()){
 			throw new IllegalAnnotation(
 				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
-				activeAnns.stream().map(t -> {
-					          return "\t" + t.getName() +
-					                 Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
-				          })
-				          .collect(Collectors.joining("\n"))
+				Iters.from(activeAnns)
+				     .joinAsStr("\n", t -> {
+					     return "\t" + t.getName() + Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
+				     })
 			);
 		}
 		
-		return result.stream().sorted(Comparator.comparing(VirtualFieldDefinition::name)).toList();
+		return Iters.from(result).sortedBy(VirtualFieldDefinition::name).collectToList();
 	}
 	
 	static <T extends IOInstance<T>> Set<String> getDependencyValueNames(IOField<T, ?> field){

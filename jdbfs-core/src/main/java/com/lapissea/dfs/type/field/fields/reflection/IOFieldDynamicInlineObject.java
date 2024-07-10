@@ -25,6 +25,7 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
@@ -129,9 +129,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			}
 		});
 		
-		var gens = super.getGenerators();
-		if(gens == null) return List.of(idGenerator);
-		return Stream.concat(gens.stream(), Stream.of(idGenerator)).toList();
+		return Iters.concatN1(super.getGenerators(), idGenerator).collectToList();
 	}
 	
 	@Override

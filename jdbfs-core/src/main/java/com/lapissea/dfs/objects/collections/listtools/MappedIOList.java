@@ -3,7 +3,6 @@ package com.lapissea.dfs.objects.collections.listtools;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -85,33 +84,18 @@ public abstract class MappedIOList<From, To> implements IOList<To>, Wrapper<IOLi
 	}
 	
 	@Override
-	public OptionalPP<To> first(){
-		return data.first().map(this::map);
+	public To getFirst(){
+		return map(data.getFirst());
 	}
 	
 	@Override
-	public OptionalPP<To> peekFirst() throws IOException{
-		return data.peekFirst().map(this::map);
+	public To getLast() throws IOException{
+		return map(data.getLast());
 	}
 	
 	@Override
-	public OptionalPP<To> popFirst() throws IOException{
-		return data.popFirst().map(this::map);
-	}
-	
-	@Override
-	public OptionalPP<To> peekLast() throws IOException{
-		return data.peekLast().map(this::map);
-	}
-	
-	@Override
-	public OptionalPP<To> popLast() throws IOException{
-		return data.popLast().map(this::map);
-	}
-	
-	@Override
-	public void pushFirst(To newFirst) throws IOException{
-		data.pushFirst(unmap(newFirst));
+	public boolean removeLast() throws IOException{
+		return data.removeLast();
 	}
 	
 	@Override

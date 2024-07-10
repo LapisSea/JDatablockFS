@@ -1,11 +1,12 @@
 package com.lapissea.dfs.config;
 
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -14,8 +15,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.util.ConsoleColors.*;
 
@@ -251,12 +250,12 @@ public final class ConfigTools{
 	public static String configFlagsToTable(List<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
-		var nameLen = values.stream().map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
+		var nameLen = Iters.from(values).map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
 		
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
 		if(grouping){
-			var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
+			var groups = Iters.from(values).collectToGrouping(e -> e.name.split("\\.")[1]);
 			for(var e : groups.entrySet()){
 				if(e.getValue().size() == 1){
 					singles.add(e.getValue().getFirst());
@@ -294,7 +293,7 @@ public final class ConfigTools{
 			  .append(gName.length()>2? TextUtil.firstToUpperCase(gName) : gName).append(' ')
 			  .append("-".repeat(after)).append('\n');
 			
-			var len = Arrays.stream(elements.getFirst().name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
+			var len = Iters.from(elements.getFirst().name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
 			for(var e : elements){
 				var name     = e.name;
 				var val      = e.val;
@@ -314,17 +313,17 @@ public final class ConfigTools{
 	}
 	
 	public static List<ConfEntry> collectConfigFlags(){
-		return configFlagFields().map(val -> {
+		return configFlagFields().collectToFinalList(val -> {
 			var name = val.name();
 			return ConfEntry.checked(name, switch(val){
 				case Flag.FEnum<?> enumFlag -> {
 					var enums = enumFlag.defaultValue().value().getClass().getEnumConstants();
-					var enumStr = Arrays.stream(enums).map(e -> {
+					var enumStr = Iters.from(enums).joinAsStr(", ", "[", "]", e -> {
 						if(e instanceof NamedEnum ne){
 							return String.join(" / ", ne.names());
 						}
 						return e.toString();
-					}).collect(Collectors.joining(", ", "[", "]"));
+					});
 					yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
 				}
 				case Flag.FBool bool -> BLUE + bool.resolve() + RESET;
@@ -332,10 +331,10 @@ public final class ConfigTools{
 				case Flag.FStr str -> PURPLE_BRIGHT + str.resolve() + RESET;
 				case Flag.FStrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
 			});
-		}).toList();
+		});
 	}
-	public static Stream<Flag<?>> configFlagFields(){
-		return Arrays.stream(ConfigDefs.class.getDeclaredFields()).filter(field -> UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)).map(field -> {
+	public static IterablePP<Flag<?>> configFlagFields(){
+		return Iters.from(ConfigDefs.class.getDeclaredFields()).filtered(field -> UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)).map(field -> {
 			try{
 				var obj = (Flag<?>)field.get(null);
 				if(obj == null){

@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
@@ -37,7 +38,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -69,7 +69,7 @@ public final class MemoryOperations{
 			
 			
 			//test unknowns
-			var iter = (noTrim? LongStream.of(possibleHeaders.last().getValue()) : possibleHeaders.longStream()).iterator();
+			var iter = (noTrim? Iters.ofLongs(possibleHeaders.last().getValue()) : possibleHeaders.longIter()).iterator();
 			while(iter.hasNext()){
 				var headIndex = iter.nextLong();
 				
@@ -105,7 +105,7 @@ public final class MemoryOperations{
 			
 			noTrim = true;
 			//pop alone headers, no change will make them valid
-			iter = possibleHeaders.longStream().iterator();
+			iter = possibleHeaders.longIter().iterator();
 			long lastIndex = -maxHeaderSize*2L;
 			var  index     = iter.nextLong();
 			while(iter.hasNext()){
@@ -175,15 +175,16 @@ public final class MemoryOperations{
 					existing = tmp;
 				}
 				if(next.isNextPhysical(existing)){
-					freeListReplace(data, 0, newCh);
-					mergeFreeChunks(next, existing);
-					//check if the next element in free list is now next physical and merge+remove from the list
-					if(data.size()>1){
-						var ptr = data.get(1);
-						if(existing.isNextPhysical(ptr)){
-							var ch = ptr.dereference(provider);
-							data.remove(1);
-							mergeFreeChunks(existing, ch);
+					if(freeListReplace(provider, data, 0, newCh)){
+						mergeFreeChunks(next, existing);
+						//check if the next element in free list is now next physical and merge+remove from the list
+						if(data.size()>1){
+							var ptr = data.get(1);
+							if(existing.isNextPhysical(ptr)){
+								var ch = ptr.dereference(provider);
+								data.remove(1);
+								mergeFreeChunks(existing, ch);
+							}
 						}
 					}
 					continue;
@@ -209,8 +210,9 @@ public final class MemoryOperations{
 					var next = data.get(insertIndex).dereference(provider);
 					
 					if(newCh.isNextPhysical(next)){
-						freeListReplace(data, insertIndex, newCh);
-						mergeFreeChunks(newCh, next);
+						if(freeListReplace(provider, data, insertIndex, newCh)){
+							mergeFreeChunks(newCh, next);
+						}
 						continue;
 					}
 				}
@@ -220,9 +222,19 @@ public final class MemoryOperations{
 		if(DEBUG_VALIDATION) checkOptimal(provider, data);
 	}
 	
-	private static void freeListReplace(IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
+	private static boolean freeListReplace(DataProvider provider, IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
 		clearFree(newCh);
+		
+		var old = data.get(replaceIndex);
+		if(NumberSize.bySize(newCh.getPtr()).greaterThan(NumberSize.bySize(old))){
+			data.remove(replaceIndex);
+			data.add(replaceIndex, newCh.getPtr());
+			provider.getMemoryManager().free(old.dereference(provider));
+			return false;
+		}
+		
 		data.set(replaceIndex, newCh.getPtr());
+		return true;
 	}
 	private static void freeListAdd(IOList<ChunkPointer> data, long insertIndex, Chunk newCh) throws IOException{
 		clearFree(newCh);
@@ -253,13 +265,22 @@ public final class MemoryOperations{
 	
 	private static void mergeFreeChunks(Chunk prev, Chunk next) throws IOException{
 		prepareFreeChunkMerge(prev, next);
-		prev.syncStruct();
-		next.destroy(true);
+		if(prev.dataStart()>next.getPtr().getValue()){
+			try(var ignore = next.getDataProvider().getSource().openIOTransaction()){
+				next.destroy(true);
+				prev.syncStruct();
+			}
+		}else{
+			prev.syncStruct();
+			next.destroy(true);
+		}
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
 		var wholeSize = next.getHeaderSize() + next.getCapacity();
-		prev.setCapacityAndModifyNumSize(prev.getCapacity() + wholeSize);
+		if(!prev.setCapacityAndModifyNumSize(prev.getCapacity() + wholeSize)){
+			throw new ShouldNeverHappenError("The chunk should have enough space. This is a bug");
+		}
 		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
@@ -304,7 +325,7 @@ public final class MemoryOperations{
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    destroyChunks = toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList();
+			var    destroyChunks = Iters.from(toDestroy).map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).collectToList();
 			
 			if(purgeTransaction != null){
 				try(var io = provider.getSource().io()){
@@ -319,7 +340,7 @@ public final class MemoryOperations{
 				}
 			}
 			
-			for(Chunk chunk : toDestroy){ provider.getChunkCache().notifyDestroyed(chunk); }
+			provider.getChunkCache().notifyDestroyed(toDestroy);
 		}else{
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(writeChunks);
@@ -459,7 +480,7 @@ public final class MemoryOperations{
 			var stranglers = strangler.collectNext();
 			var toMove     = 0;
 			for(var c : stranglers){
-				toMove += c.getCapacity();
+				toMove = Math.addExact(toMove, Math.toIntExact(c.getCapacity()));
 			}
 			if(toMove>0){
 				try(var src = strangler.io();
@@ -511,7 +532,9 @@ public final class MemoryOperations{
 				
 				overflow:
 				if(target.getCapacity()<growth){
-					var prevBodyNum = bodyNum.prev();
+					var prevBodyNumO = bodyNum.prev();
+					if(prevBodyNumO.isEmpty()) break;
+					var prevBodyNum = prevBodyNumO.get();
 					bodyShrink = (bodyNum.bytes - prevBodyNum.bytes)*2;
 					growth = (nextSiz.bytes - target.getNextSize().bytes) - bodyShrink;
 					while(true){
@@ -547,19 +570,15 @@ public final class MemoryOperations{
 		
 		IOInterface source = target.getDataProvider().getSource();
 		
-		int shiftSize = Math.toIntExact(Math.min(target.getCapacity() - growth, target.getSize()));
-		if(shiftSize<0){
-			shiftSize = 0;
-		}
+		int shiftSize = Math.max(Math.toIntExact(Math.min(target.getCapacity() - growth, target.getSize())), 0);
+		
 		byte[] toShift;
-		if(shiftSize>0){
-			try(var io = target.io()){
-				toShift = io.readInts1(shiftSize);
-				try(var pio = toPin.io()){
-					io.transferTo(pio);
-				}
+		try(var io = target.io()){
+			toShift = shiftSize>0? io.readInts1(shiftSize) : ZeroArrays.ZERO_BYTE;
+			try(var pio = toPin.io()){
+				io.transferTo(pio);
 			}
-		}else toShift = ZeroArrays.ZERO_BYTE;
+		}
 		
 		var oldCapacity = target.getCapacity();
 		var dataEnd     = target.dataEnd();
@@ -571,7 +590,7 @@ public final class MemoryOperations{
 		if(oldCapacity == growth){
 			var numSizShrink     = bodyNum.bytes*2;
 			var ptrSizeCandidate = nextSiz.bytes + numSizShrink;
-			var newPtrSizeO      = NumberSize.FLAG_INFO.stream().filter(n -> n.bytes == ptrSizeCandidate).findAny();
+			var newPtrSizeO      = NumberSize.FLAG_INFO.firstMatching(n -> n.bytes == ptrSizeCandidate);
 			if(newPtrSizeO.isPresent()){
 				nextSiz = newPtrSizeO.get();
 				bodyNum = NumberSize.VOID;
@@ -619,7 +638,7 @@ public final class MemoryOperations{
 		var before = freeChunks.listIterator(index);
 		
 		return new IOIterator<>(){
-			private boolean toggle;
+			private boolean                             toggle;
 			private IOList.IOListIterator<ChunkPointer> lastRet;
 			@Override
 			public boolean hasNext(){
@@ -662,9 +681,9 @@ public final class MemoryOperations{
 			
 			var freeSpace = effectiveCapacity - ticket.bytes();
 			
-			var potentialChunk = chBuilderFromTicket(context, c.getPtr(), ticket).create();
+			var potentialChunk = chBuilderFromTicketSafeSize(context, c.getPtr(), ticket).create();
 			if(freeSpace>c.getHeaderSize() + potentialChunk.getHeaderSize()){
-				Chunk reallocate = chipEndProbe(context, ticket, c, dryRun);
+				Chunk reallocate = tryChipEnd(context, ticket, c, dryRun);
 				if(reallocate != null) return reallocate;
 			}
 			
@@ -689,36 +708,43 @@ public final class MemoryOperations{
 		return null;
 	}
 	
-	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch, boolean dryRun) throws IOException{
+	private static Chunk tryChipEnd(DataProvider context, AllocateTicket ticket, Chunk ch, boolean dryRun) throws IOException{
 		var ptr     = ch.getPtr();
-		var builder = chBuilderFromTicket(context, ptr, ticket);
+		var builder = chBuilderFromTicketSafeSize(context, ptr, ticket);
 		
-		var reallocate = builder.create();
+		var siz   = builder.create().totalSize();
+		var end   = ch.dataEnd();
+		var chunk = builder.move(ChunkPointer.of(end - siz)).create();
 		
-		var siz = reallocate.totalSize();
-		var end = ch.dataEnd();
-		builder.withPtr(ChunkPointer.of(end - siz));
-		reallocate = builder.create();
+		if(chunk.dataEnd() != ch.dataEnd()){
+			throw new IllegalStateException();
+		}
 		
-		if(reallocate.dataEnd() != ch.dataEnd()) throw new IllegalStateException();
-		
-		if(!ticket.approve(reallocate)){
+		var newCap = ch.getCapacity() - chunk.totalSize();
+		if(newCap<0){
 			return null;
 		}
-		if(dryRun) return reallocate;
 		
-		reallocate.writeHeader();
+		var chc = ch.clone();
+		if(!chc.setCapacityAndModifyNumSizeInPlace(newCap) || chc.totalSize()<Chunk.minSafeSize()){
+			return null;
+		}
 		
-		ch.setCapacityAndModifyNumSize(ch.getCapacity() - reallocate.totalSize());
+		if(!ticket.approve(chunk)){
+			return null;
+		}
+		if(dryRun) return chunk;
+		
+		ch.setCapacityAndModifyNumSizeInPlace(newCap);
+		
+		chunk.writeHeader();
 		ch.writeHeader();
-		context.getChunkCache().add(reallocate);
-		return reallocate;
+		
+		context.getChunkCache().add(chunk);
+		return chunk;
 	}
-	private static ChunkBuilder chBuilderFromTicket(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
-		return new ChunkBuilder(context, ptr)
-			       .withCapacity(ticket.bytes())
-			       .withExplicitNextSize(ticket.calcNextSize())
-			       .withNext(ticket.next());
+	private static ChunkBuilder chBuilderFromTicketSafeSize(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
+		return new ChunkBuilder(context, ptr, ticket).ensureMinSize();
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException{
@@ -726,14 +752,12 @@ public final class MemoryOperations{
 		var src   = context.getSource();
 		var ioSiz = src.getIOSize();
 		
-		ChunkBuilder builder = chBuilderFromTicket(context, ChunkPointer.of(ioSiz), ticket);
-		
-		var chunk = builder.create();
+		var chunk = chBuilderFromTicketSafeSize(context, ChunkPointer.of(ioSiz), ticket).create();
 		if(!ticket.approve(chunk)) return null;
 		
 		if(dryRun) return chunk;
 		
-		try(var io = src.ioAt(chunk.getPtr().getValue())){
+		try(var ignore = src.openIOTransaction(); var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
 			IOUtils.zeroFill(io, chunk.getCapacity());
 		}
@@ -749,24 +773,22 @@ public final class MemoryOperations{
 		var ptr = firstChunk.getPtr();
 		
 		var prev = new PhysicalChunkWalker(context.getFirstChunk())
-			           .stream()
-			           .filter(Chunk::hasNextPtr)
 			           .map(Chunk::getNextPtr)
-			           .filter(p -> p.equals(ptr))
-			           .findAny();
+			           .firstMatching(ptr::equals);
 		
 		if(prev.isPresent()){
 			var ch = context.getChunk(prev.get());
 			throw new IllegalArgumentException(firstChunk + " is not the first chunk! " + ch + " declares it as next.");
 		}
 		
-		if(firstChunk.walkNext().noneMatch(c -> c == target)){
+		if(firstChunk.walkNext().noneIs(target)){
 			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}
 	
 	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate, boolean allowRemove) throws IOException{
 		var end = target.dataEnd();
+		freeIter:
 		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
 			ChunkPointer freePtr = iter.ioNext();
 			if(!freePtr.equals(end)){
@@ -804,7 +826,27 @@ public final class MemoryOperations{
 			long  newCapacity;
 			while(true){
 				ch = new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
-				ch.setCapacityAndModifyNumSize(size - ch.getHeaderSize() - safeToAllocate);
+				var chCap = size - ch.getHeaderSize() - safeToAllocate;
+				
+				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap) || ch.totalSize()<Chunk.minSafeSize()){
+					newCapacity = target.getCapacity() + size;
+					if(!target.getBodyNumSize().canFit(newCapacity)){
+						continue freeIter;
+					}
+					try(var ignored = provider.getSource().openIOTransaction()){
+						iter.ioRemove();
+						
+						try{
+							target.setCapacity(newCapacity);
+						}catch(OutOfBitDepth e){
+							throw new ShouldNeverHappenError(e);
+						}
+						target.syncStruct();
+						
+						freeChunk.destroy(false);
+					}
+					return size;
+				}
 				
 				newCapacity = target.getCapacity() + safeToAllocate;
 				if(!target.getBodyNumSize().canFit(newCapacity)){
@@ -813,14 +855,20 @@ public final class MemoryOperations{
 				}
 				break;
 			}
-			if(safeToAllocate == 0) continue;
+			if(safeToAllocate<=0) continue;
+			
+			// Edge-case: List wants to grow the data size and may consume the currently to be freed chunk.
+			// We solve this by first removing the chunk, so the freeing mechanism is not aware of it.
+			// We can then finally add the chunk back by using the free mechanism
+			var growEdgecase = NumberSize.bySize(ch.getPtr()).greaterThan(NumberSize.bySize(freePtr));
 			
 			try(var ignored = provider.getSource().openIOTransaction()){
+				if(growEdgecase){
+					iter.ioRemove();
+				}
+				
 				ch.writeHeader();
-				ch = ch.getPtr().dereference(provider);
-				
-				iter.ioSet(ch.getPtr());
-				
+				provider.getChunkCache().add(ch);
 				
 				try{
 					target.setCapacity(newCapacity);
@@ -828,7 +876,16 @@ public final class MemoryOperations{
 					throw new ShouldNeverHappenError(e);
 				}
 				target.syncStruct();
+				
+				if(growEdgecase){
+					manager.free(ch);
+				}else{
+					iter.ioSet(ch.getPtr());
+				}
+				
 			}
+			
+			
 			if(safeToAllocate<freeChunk.getHeaderSize()){
 				try(var io = provider.getSource().ioAt(freeChunk.getPtr().getValue())){
 					IOUtils.zeroFill(io, safeToAllocate);

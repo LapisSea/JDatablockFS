@@ -1,12 +1,12 @@
 package com.lapissea.dfs.io.content;
 
-import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.util.NotNull;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public abstract class ContentInputStream extends InputStream implements ContentReader{
 	
@@ -66,8 +66,8 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		private final byte[] ba;
 		private       int    pos;
 		
-		public BA(byte[] ba){
-			this.ba = ba;
+		public BA(@NotNull byte[] ba){
+			this.ba = Objects.requireNonNull(ba);
 		}
 		
 		

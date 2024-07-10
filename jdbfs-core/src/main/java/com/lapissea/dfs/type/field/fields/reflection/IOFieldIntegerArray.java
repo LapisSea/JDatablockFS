@@ -168,6 +168,11 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 	}
 	
 	@Override
+	public CollectionType get(VarPool<T> ioPool, T instance){
+		return getNullable(ioPool, instance, () -> addapters.get(NumberSize.BYTE).makeNew(0));
+	}
+	
+	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(numSize, new ValueGenerator<>(){
 			@Override

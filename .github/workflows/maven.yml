@@ -29,7 +29,7 @@ jobs:
         cache: maven
     
     - name: Build with Maven
-      run: mvn -Ddfs.log.level=TRACE clean test --batch-mode
+      run: mvn -Ddfs.log.level=TRACE -Dfuzz.seedMod=ALWAYS -Dfuzz.iterationMultiplier=2 clean test --batch-mode
     
     - name: Surefire Report
       if: success() || failure()

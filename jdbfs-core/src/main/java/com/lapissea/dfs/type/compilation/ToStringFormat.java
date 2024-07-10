@@ -1,11 +1,11 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.exceptions.MalformedToStringFormat;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 public class ToStringFormat{
 	
@@ -20,7 +20,7 @@ public class ToStringFormat{
 		
 		record SpecialValue(Value value) implements ToStringFragment{
 			SpecialValue(String name){
-				this(Arrays.stream(Value.values()).filter(v -> v.name.equalsIgnoreCase(name)).findAny().orElseThrow());
+				this(Iters.from(Value.values()).firstMatching(v -> v.name.equalsIgnoreCase(name)).orElseThrow());
 			}
 			
 			public enum Value{
@@ -36,11 +36,11 @@ public class ToStringFormat{
 		
 		record OptionalBlock(ToStringFragment content) implements ToStringFragment{ }
 		
-		default Stream<ToStringFragment> deep(){
+		default IterablePP<ToStringFragment> deep(){
 			return switch(this){
-				case Concat c -> c.fragments.stream().flatMap(ToStringFragment::deep);
+				case Concat c -> Iters.from(c.fragments).flatMap(ToStringFragment::deep);
 				case OptionalBlock o -> o.content.deep();
-				default -> Stream.of(this);
+				default -> Iters.of(this);
 			};
 		}
 	}
@@ -100,7 +100,9 @@ public class ToStringFormat{
 				
 				ToStringFragment val;
 				while(true){
-					if(range.from == range.to) throw new MalformedToStringFormat("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					if(range.from == range.to){
+						throw new MalformedToStringFormat("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					}
 					var name = format.substring(range.from, range.to);
 					if(names.contains(name)){
 						val = new ToStringFragment.FieldValue(name);

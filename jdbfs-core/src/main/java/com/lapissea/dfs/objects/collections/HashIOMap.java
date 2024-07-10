@@ -4,6 +4,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.internal.HashCommons;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
@@ -20,7 +21,8 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -45,6 +47,8 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
+	static{ Preload.preloadFn(BucketEntry.class, "of", null, null); }
+	
 	@SuppressWarnings({"unchecked"})
 	@Def.ToString.Format("[!!className]{@key: @value}")
 	@Def.Order({"key", "value"})
@@ -59,11 +63,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		static <K, V> BucketEntry<K, V> of(K key, V value){
 			//noinspection rawtypes
-			class Val{
-				private static final BiFunction<Object, Object, BucketEntry> NEW =
-					IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
+			class Cache{
+				private static BiFunction<Object, Object, BucketEntry> make;
 			}
-			return Val.NEW.apply(key, value);
+			var c = Cache.make;
+			if(c == null) c = Cache.make = IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
+			return c.apply(key, value);
 		}
 		
 		@IONullability(NULLABLE)
@@ -112,9 +117,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			throw new RuntimeException("bucket entry not found");
 		}
 		
-		private Stream<IONode<BucketEntry<K, V>>> nodeStream(){
-			if(node == null) return Stream.of();
-			return node.stream();
+		private IterablePP<IONode<BucketEntry<K, V>>> nodeStream(){
+			if(node == null) return Iters.of();
+			return node;
 		}
 		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
 			if(node == null) return null;
@@ -313,7 +318,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			int smallHash = e.getKey();
 			
 			Bucket<K, V>              bucket      = newBuckets.get(smallHash);
-			IONode<BucketEntry<K, V>> last        = bucket.nodeStream().reduce((a, b) -> b).orElse(null);
+			IONode<BucketEntry<K, V>> last        = bucket.nodeStream().findLast().orElse(null);
 			IOTransaction             transaction = null;
 			
 			if(last != null || noods.size()>1){
@@ -355,7 +360,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
 		for(Bucket<K, V> oldBucket : oldBuckets){
-			var oldNodes = oldBucket.nodeStream().toList();
+			var oldNodes = oldBucket.nodeStream().collectToList();
 			for(var node : oldNodes){
 				if(node.hasNext()) node.setNext(null);
 				
@@ -450,8 +455,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@Override
 	public Iterator<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
-			private IOIterator<IONode<BucketEntry<K, V>>> bucket;
-			private final IOIterator<Bucket<K, V>> iter = buckets.iterator();
+			private       IOIterator<IONode<BucketEntry<K, V>>> bucket;
+			private final IOIterator<Bucket<K, V>>              iter = buckets.iterator();
 			
 			private boolean has() throws IOException{
 				return bucket != null && bucket.hasNext();
@@ -490,12 +495,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	@Override
 	public Stream<IOEntry<K, V>> stream(){
-		return rawEntryStream(buckets).map(BucketEntry::unmodifiable);
+		return rawEntryStream(buckets).map(BucketEntry::unmodifiable).stream();
 	}
 	private IterablePP<BucketEntry<K, V>> rawEntries(IOList<Bucket<K, V>> buckets){
 		return () -> rawEntryStream(buckets).iterator();
 	}
-	private Stream<BucketEntry<K, V>> rawEntryStream(IOList<Bucket<K, V>> buckets){
+	private IterablePP<BucketEntry<K, V>> rawEntryStream(IOList<Bucket<K, V>> buckets){
 		return rawNodeStreamWithValues(buckets).map(e -> {
 			try{
 				return e.getValue();
@@ -505,7 +510,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		});
 	}
 	
-	private Stream<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
+	private IterablePP<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
 		return rawNodeStream(buckets)
 			       .map(e -> {
 				       try{
@@ -514,16 +519,16 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					       throw UtilL.uncheckedThrow(ex);
 				       }
 			       })
-			       .filter(KeyResult::hasValue)
+			       .filtered(KeyResult::hasValue)
 			       .map(KeyResult::key);
 	}
 	
-	private Stream<IONode<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
-		return buckets.stream().flatMap(Bucket::nodeStream);
+	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
+		return buckets.flatMap(Bucket::nodeStream);
 	}
 	
-	private Stream<IONode<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
-		return rawNodeStream(buckets).filter(e -> {
+	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
+		return rawNodeStream(buckets).filtered(e -> {
 			try{
 				return e.hasValue();
 			}catch(IOException ex){

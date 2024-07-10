@@ -24,6 +24,8 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -45,8 +47,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
@@ -138,7 +138,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						return dependencyNames.get().apply(accessor, ann);
 					}
 					var fields = generateFields.apply(accessor, ann).fields;
-					return fields.stream().map(VirtualFieldDefinition::name).collect(Collectors.toSet());
+					return Iters.from(fields).map(VirtualFieldDefinition::name).collectToSet();
 				});
 			}
 		}
@@ -167,24 +167,31 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int     typeFlags   = -1;
-	private int     inStructUID = -1;
+	private int     typeFlags = -1;
 	private Boolean needsIOPool;
+	
+	private final int hashCode;
 	
 	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
 		this.accessor = accessor;
+		hashCode = calcHashCode(accessor);
 		initSizeDescriptor(descriptor);
 	}
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor = accessor;
+		hashCode = calcHashCode(accessor);
 	}
 	
-	public final void initLateData(int inStructUID, FieldSet<T> dependencies){
+	private int calcHashCode(FieldAccessor<T> accessor){
+		if(accessor == null) return System.identityHashCode(this);
+		return accessor.getName().hashCode();
+	}
+	
+	public final void initLateData(FieldSet<T> dependencies){
 		if(lateDataInitialized) throw new IllegalStateException("already initialized");
 		
 		this.dependencies = dependencies == null? null : Utils.nullIfEmpty(dependencies);
 		lateDataInitialized = true;
-		this.inStructUID = inStructUID;
 	}
 	
 	public final boolean typeFlag(int flag){
@@ -195,10 +202,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		var f = typeFlags;
 		if(f == -1) f = typeFlags = FieldSupport.typeFlags(this);
 		return f;
-	}
-	
-	public final int getInStructUID(){
-		return inStructUID;
 	}
 	
 	public boolean isNull(VarPool<T> ioPool, T instance){
@@ -317,11 +320,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return List.of();
 	}
 	
-	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		return getGenerators().stream();
-	}
-	
-	
 	public final void writeReported(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			write(ioPool, provider, dest, instance);
@@ -399,15 +397,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 	}
 	
-	@Nullable
+	@NotNull
 	public final FieldSet<T> getDependencies(){
 		requireLateData();
-		return dependencies;
-	}
-	
-	public final Stream<IOField<T, ?>> dependencyStream(){
-		var d = getDependencies();
-		return d != null? d.stream() : Stream.of();
+		var d = dependencies;
+		return d == null? FieldSet.of() : dependencies;
 	}
 	
 	public final boolean isDependency(IOField<T, ?> depField){
@@ -435,8 +429,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	/**
 	 * @return a stream of fields that are directly referenced by the struct. (field that represents a group of fields should return the containing fields)
 	 */
-	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
-		return Stream.of(this);
+	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
+		return Iters.of(this);
 	}
 	
 	protected void throwInformativeFixedSizeError(){ }
@@ -459,7 +453,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 		var f = maxAsFixedSize(provider == null? VaryingSize.Provider.ALL_MAX : provider);
 		if(f != this){
-			f.initLateData(getInStructUID(), getDependencies());
+			f.initLateData(getDependencies());
 			var struct = declaringStruct();
 			f.init(struct == null? null : struct.getFields());
 			Objects.requireNonNull(f.getSizeDescriptor(), "Descriptor was not inited");
@@ -517,9 +511,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return acc.equals(ioField.getAccessor());
 	}
 	@Override
-	public final int hashCode(){
-		return getName().hashCode();
-	}
+	public final int hashCode(){ return hashCode; }
 	
 	public boolean needsIOPool(){
 		if(needsIOPool == null) needsIOPool = calcNeedsIOPool();

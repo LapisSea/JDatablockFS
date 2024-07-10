@@ -3,6 +3,7 @@ package com.lapissea.dfs.objects;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -19,6 +20,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -35,10 +37,10 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	
 	static{
 		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolveVal()){
-			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields) -> {
+			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
-					f.get(0) instanceof BitFieldMerger<?> m && m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize")) &&
+					f.get(0) instanceof BitFieldMerger<?> m && Iters.from(m.fieldGroup()).map(IOField::getName).collectToList().equals(List.of("offsetSize", "ptrSize")) &&
 					f.get(1).getName().equals("offset") &&
 					f.get(2).getName().equals("ptr")
 				){
@@ -56,20 +58,18 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					var offsetSize = NumberSize.bySize(off);
 					var ptrSize    = NumberSize.bySize(ptr);
 					
-					var flags = offsetSize.ordinal()|(ptrSize.ordinal()<<3)|(0b11<<6);
+					var header = offsetSize.ordinal()|(ptrSize.ordinal()<<3);
 					
-					dest.writeInt1(flags);
+					dest.writeInt1(header|(int)BitFieldMerger.calcIntegrityBits(header, 2, 6));
 					offsetSize.write(dest, off);
 					ptrSize.write(dest, ptr);
 				}
 				@Override
 				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
-					int flags      = src.readInt1()&0xFF;
+					int flags      = src.readUnsignedInt1();
 					var offsetSize = NumberSize.ordinal(flags&0b111);
 					var ptrSize    = NumberSize.ordinal((flags >>> 3)&0b111);
-					if((flags&(0b11<<6)) != (0b11<<6)){
-						throw new IOException("Illegal reference bits");
-					}
+					BitFieldMerger.readIntegrityBits(flags, 8, 6);
 					
 					var off = offsetSize.read(src);
 					var ptr = ChunkPointer.of(ptrSize.read(src));
@@ -79,7 +79,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					return instance;
 				}
 			});
-			FixedStructPipe.registerSpecialImpl(STRUCT, () -> new FixedStructPipe<>(STRUCT, (t, structFields) -> {
+			FixedStructPipe.registerSpecialImpl(STRUCT, () -> new FixedStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = FixedStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
 					f.get(0).getName().equals("offset") &&
@@ -117,8 +117,8 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	private static StructPipe<Reference>      STANDARD_PIPE;
 	
 	static{
-		Thread.startVirtualThread(Reference::ensureFixed);
-		Thread.startVirtualThread(Reference::ensureStandard);
+		Preload.preloadFn(Reference.class, "ensureFixed");
+		Preload.preloadFn(Reference.class, "ensureStandard");
 	}
 	
 	public static FixedStructPipe<Reference> fixedPipe(){

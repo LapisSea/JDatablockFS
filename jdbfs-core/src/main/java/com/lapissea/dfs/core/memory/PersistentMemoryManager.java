@@ -11,6 +11,8 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -20,8 +22,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -205,7 +209,6 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
-			tryPopFree();
 			return;
 		}
 		
@@ -218,6 +221,8 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		freeChunksLock.lock();
 		adding = true;
+		var oldAllowFreeRemove = allowFreeRemove;
+		allowFreeRemove = false;
 		try{
 			addQueue(toAdd);
 			do{
@@ -236,6 +241,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		}finally{
 			adding = false;
 			freeChunksLock.unlock();
+			allowFreeRemove = oldAllowFreeRemove;
 		}
 		
 		tryPopFree();
@@ -246,17 +252,17 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private boolean   popping;
 	private MoveState badMoveState;
 	private void tryPopFree() throws IOException{
-		if(adding || popping) return;
+		if(!allowFreeRemove || popping) return;
 		popping = true;
 		try{
 			boolean anyPopped;
 			do{
 				anyPopped = false;
-				var lastFreeO = freeChunks.peekLast().map(p -> p.dereference(context));
+				var lastFreeO = freeChunks.isEmpty()? OptionalPP.<Chunk>empty() : OptionalPP.of(freeChunks.getLast().dereference(context));
 				if(lastFreeO.filter(Chunk::checkLastPhysical).isPresent()){
 					var lastCh = lastFreeO.get();
 					
-					freeChunks.popLast();
+					freeChunks.removeLast();
 					if(lastCh.checkLastPhysical()){
 						try(var io = context.getSource().io()){
 							io.setCapacity(lastCh.getPtr().getValue());
@@ -287,7 +293,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								return;
 							}
 						}
-						
+						var oldAllowFreeRemove = allowFreeRemove;
 						try{
 							drainThread = Thread.currentThread();
 							drainIO = true;
@@ -296,9 +302,9 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 									cleanupStacks();
 									var anyActive =
 										allStacks.size()>1 &&
-										allStacks.entrySet().stream()
-										         .filter(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
-										         .anyMatch(l -> l != stack && !l.isEmpty());
+										Iters.entries(allStacks)
+										     .filtered(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
+										     .anyMatch(l -> l != stack && !l.isEmpty());
 									if(!anyActive) break;
 								}
 								UtilL.sleep(0.1F);
@@ -307,7 +313,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 							{//Disable modification of the list while it is being moved
 								var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 								var freeRef = fch.getPointer();
-								if(freeRef.dereference(context).walkNext().anyMatch(c -> c == toMove)){
+								if(freeRef.dereference(context).walkNext().anyIs(toMove)){
 									allowFreeRemove = false;
 								}
 							}
@@ -325,7 +331,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 								}
 							}else badMoveState = new MoveState(lastFree.clone(), toMove.clone());
 						}finally{
-							allowFreeRemove = true;
+							allowFreeRemove = oldAllowFreeRemove;
 							drainIO = false;
 						}
 					}
@@ -341,9 +347,13 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		boolean           dirty  = true;
 		
 		if(toFree.isEmpty()) return toFree;
-		var end = toFree.iterator().next().getDataProvider().getSource().getIOSize();
+		var end = context.getSource().getIOSize();
 		
 		List<Chunk> toNotify = new ArrayList<>();
+		boolean     any      = false;
+		
+		Map<ChunkPointer, Chunk> nextMap = null;
+		Set<Chunk>               toClear = null;
 		
 		wh:
 		while(true){
@@ -356,28 +366,58 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 					result = new ArrayList<>(result);
 					continue wh;
 				}
+				any = true;
 				end = chunk.getPtr().getValue();
 				var ptr = chunk.getPtr();
 				
 				i.remove();
+				if(toClear != null) toClear.remove(chunk);
 				toNotify.add(chunk);
 				
-				for(Chunk c : result){
-					if(c.getNextPtr().equals(ptr)){
-						c.modifyAndSave(Chunk::clearNextPtr);
+				if(nextMap == null){
+					nextMap = new HashMap<>();
+					for(var c : result){
+						var next = c.getNextPtr();
+						if(!next.isNull()) nextMap.put(next, c);
 					}
+				}
+				
+				var prev = nextMap.get(ptr);
+				if(prev != null){
+					if(toClear == null) toClear = new HashSet<>();
+					toClear.add(prev);
 				}
 				continue wh;
 			}
-			if(!dirty){
-				try(var io = context.getSource().io()){
-					io.setCapacity(end);
-				}
-				for(Chunk chunk : toNotify){
-					context.getChunkCache().notifyDestroyed(chunk);
-				}
+			
+			if(!any){
+				return result;
 			}
-			return result;
+			any = false;
+			
+			try(var io = context.getSource().io()){
+				if(toClear != null) for(var c : toClear){
+					if(c.getPtr().compareTo(end)>=0) continue;
+					c.setSize(0);
+					c.clearAndCompressHeader();
+					if(!c.dirty()) continue;
+					var b = c.writeHeaderToBuf();
+					io.setPos(b.ioOffset()).write(b.data(), b.dataOffset(), b.dataLength());
+				}
+				io.setCapacity(end);
+			}
+			
+			context.getChunkCache().notifyDestroyed(toNotify);
+			toNotify.clear();
+			
+			var before = context.getSource().getIOSize();
+			tryPopFree();
+			var after = context.getSource().getIOSize();
+			if(after>=before){
+				return result;
+			}
+			end = after;
+			if(toClear != null) toClear.clear();
 		}
 	}
 }

@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -63,7 +64,7 @@ public final class BehaviourSupport{
 		if(IOInstance.isInstance(typ)){
 			return IOInstance.isManaged(typ);
 		}
-		return IOFieldTools.isGeneric(field) || FieldCompiler.getWrapperTypes().stream().anyMatch(c -> UtilL.instanceOf(typ, c));
+		return IOFieldTools.isGeneric(field) || Iters.from(FieldCompiler.getWrapperTypes()).anyMatch(c -> UtilL.instanceOf(typ, c));
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){

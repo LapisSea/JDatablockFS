@@ -1,10 +1,10 @@
 package com.lapissea.dfs.io.impl;
 
-import com.lapissea.dfs.internal.WordIO;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeSupplier;

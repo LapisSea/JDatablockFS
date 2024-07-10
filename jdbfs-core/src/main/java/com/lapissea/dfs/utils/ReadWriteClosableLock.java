@@ -1,5 +1,6 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.util.function.UnsafeRunnable;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.concurrent.TimeUnit;
@@ -95,6 +96,17 @@ public interface ReadWriteClosableLock{
 	default <T, E extends Throwable> T write(UnsafeSupplier<T, E> fun) throws E{
 		try(var ignore = write()){
 			return fun.get();
+		}
+	}
+	
+	default <T, E extends Throwable> void read(UnsafeRunnable<E> fun) throws E{
+		try(var ignore = read()){
+			fun.run();
+		}
+	}
+	default <T, E extends Throwable> void write(UnsafeRunnable<E> fun) throws E{
+		try(var ignore = write()){
+			fun.run();
 		}
 	}
 	

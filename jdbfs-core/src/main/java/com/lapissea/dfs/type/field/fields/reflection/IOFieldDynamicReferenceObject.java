@@ -27,6 +27,7 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -35,7 +36,6 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 
 public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
 	
@@ -127,9 +127,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			}
 		});
 		
-		var gens = super.getGenerators();
-		if(gens == null) return List.of(idGenerator);
-		return Stream.concat(gens.stream(), Stream.of(idGenerator)).toList();
+		return Iters.concatN1(super.getGenerators(), idGenerator).collectToFinalList();
 	}
 	
 	@Override
