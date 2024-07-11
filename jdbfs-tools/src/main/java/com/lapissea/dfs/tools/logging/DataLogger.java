@@ -10,7 +10,7 @@ public interface DataLogger{
 	}
 	
 	interface Session{
-		class Blank implements Session{
+		final class Blank implements Session{
 			public static final Session INSTANCE = new Blank();
 			private Blank(){ }
 			
@@ -41,7 +41,7 @@ public interface DataLogger{
 		String getName();
 	}
 	
-	class Blank implements DataLogger{
+	final class Blank implements DataLogger{
 		public static final DataLogger INSTANCE = new Blank();
 		private Blank(){ }
 		

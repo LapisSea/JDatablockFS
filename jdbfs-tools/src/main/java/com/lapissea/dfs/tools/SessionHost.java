@@ -36,7 +36,7 @@ public class SessionHost implements DataLogger{
 	
 	public record CachedFrame(MemFrame memData, ParsedFrame parsed){ }
 	
-	public class HostedSession implements Session{
+	public final class HostedSession implements Session{
 		public final List<CachedFrame> frames   = new ArrayList<>();
 		public final ChangeRegistryInt framePos = new ChangeRegistryInt(-1);
 		
