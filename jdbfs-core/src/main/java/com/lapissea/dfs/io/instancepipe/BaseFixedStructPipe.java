@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import static java.util.function.Predicate.not;
 
@@ -32,15 +33,15 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	
-	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFields(Struct<T> type, FieldSet<T> structFields, Predicate<IOField<T, ?>> checkFixed, Function<IOField<T, ?>, IOField<T, ?>> makeFixed){
+	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFields(Struct<T> type, FieldSet<T> structFields, Predicate<IOField<T, ?>> checkFixed, UnaryOperator<IOField<T, ?>> makeFixed){
 		type.waitForState(Struct.STATE_INIT_FIELDS);
 		try{
 			return IOFieldTools.stepFinal(
 				structFields,
 				List.of(
-					IOFieldTools.streamStep(s -> s.map(f -> checkFixed.test(f)? f : makeFixed.apply(f))),
+					IOFieldTools.streamStep(s -> s.mapIfNot(checkFixed, makeFixed)),
 					IOFieldTools::dependencyReorder,
-					IOFieldTools.streamStep(s -> s.filter(not(checkFixed))),
+					IOFieldTools.streamStep(s -> s.filtered(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupported e){

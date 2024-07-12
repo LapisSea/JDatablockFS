@@ -676,6 +676,32 @@ public interface IterablePP<T> extends Iterable<T>{
 		return filtered(e -> instance.isInstance(element.apply(e)));
 	}
 	
+	default IterablePP<T> mapIfNot(Predicate<T> selector, Function<T, T> mapper){ return mapIf(Predicate.not(selector), mapper); }
+	default IterablePP<T> mapIf(Predicate<T> selector, Function<T, T> mapper){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt calculateSize(){ return SizedPP.tryGet(IterablePP.this); }
+			@Override
+			public Iterator<T> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iterator<>(){
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public T next(){
+						T unmapped = src.next();
+						if(selector.test(unmapped)){
+							return mapper.apply(unmapped);
+						}
+						return unmapped;
+					}
+				};
+			}
+		};
+	}
+	
 	default <L> IterablePP<L> map(Function<T, L> mapper){
 		return new SizedPP.Default<>(){
 			@Override

@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -34,11 +35,11 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,8 +63,8 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public final class IOFieldTools{
 	
-	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
-		return list -> map.apply(list.stream()).toList();
+	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<IterablePP<IOField<T, ?>>, IterablePP<IOField<T, ?>>> map){
+		return list -> map.apply(Iters.from(list)).collectToFinalList();
 	}
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> stepFinal(List<IOField<T, ?>> data, Iterable<Function<List<IOField<T, ?>>, List<IOField<T, ?>>>> steps){
@@ -75,15 +76,15 @@ public final class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> mergeBitSpace(List<IOField<T, ?>> mapData){
-		var result     = new LinkedList<IOField<T, ?>>();
-		var bitBuilder = new LinkedList<BitField<T, ?>>();
+		var result     = new ArrayList<IOField<T, ?>>(mapData.size());
+		var bitBuilder = new ArrayDeque<BitField<T, ?>>();
 		
 		Runnable pushBuilt = () -> {
 			switch(bitBuilder.size()){
 				case 0 -> { }
 				case 1 -> result.add(bitBuilder.removeFirst());
 				default -> {
-					result.add(BitFieldMerger.of(bitBuilder));
+					result.add(BitFieldMerger.of(List.copyOf(bitBuilder)));
 					bitBuilder.clear();
 				}
 			}
