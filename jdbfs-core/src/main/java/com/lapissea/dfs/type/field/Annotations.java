@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -11,13 +12,9 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-
-import static java.util.function.Predicate.not;
 
 public abstract class Annotations{
 	
@@ -34,7 +31,7 @@ public abstract class Annotations{
 			throw new IllegalArgumentException(annotationType.getName() + " not an annotation");
 		}
 		
-		var safeValues = Arrays.stream(annotationType.getDeclaredMethods()).map(element -> {
+		var safeValues = Iters.from(annotationType.getDeclaredMethods()).map(element -> {
 			String elementName = element.getName();
 			if(values.containsKey(elementName)){
 				var returnType = getReturnType(element);
@@ -51,13 +48,13 @@ public abstract class Annotations{
 					throw new IllegalArgumentException("Missing value " + elementName);
 				}
 			}
-		}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+		}).collectToFinalMap(Map.Entry::getKey, Map.Entry::getValue);
 		
-		values.keySet().stream().filter(not(safeValues::containsKey)).findAny().ifPresent(v -> {
+		Iters.keys(values).firstNotMatching(safeValues::containsKey).ifPresent(v -> {
 			throw new IllegalArgumentException(annotationType.getTypeName() + " does not have value: \"" + v + '"');
 		});
 		
-		int hash = values.entrySet().stream().mapToInt(element -> {
+		int hash = Iters.entries(values).mapToInt(element -> {
 			int    res;
 			Object val = element.getValue();
 			if(val.getClass().isArray()){
@@ -95,7 +92,7 @@ public abstract class Annotations{
 				var that    = annotationType.cast(other);
 				var thatAnn = that.annotationType();
 				
-				return safeValues.entrySet().stream().allMatch(element -> {
+				return Iters.entries(safeValues).allMatch(element -> {
 					try{
 						var thatVal = thatAnn.getMethod(element.getKey()).invoke(that);
 						return Objects.deepEquals(element.getValue(), thatVal);

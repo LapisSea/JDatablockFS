@@ -21,6 +21,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+@SuppressWarnings("unused")
 public final class Iters{
 	
 	public abstract static class DefaultIterable<T> implements IterablePP<T>{
@@ -206,38 +207,63 @@ public final class Iters{
 	public static <T> IterablePP<T> iterate(T seed, Predicate<? super T> hasNext, UnaryOperator<T> next){
 		Objects.requireNonNull(next);
 		Objects.requireNonNull(hasNext);
-		return () -> new Iterator<>(){
-			private T       val = seed;
-			private boolean advance;
-			
-			private void advance(){
-				val = next.apply(val);
-				advance = false;
-			}
+		return new Iters.DefaultIterable<>(){
 			@Override
-			public boolean hasNext(){
-				if(advance) advance();
-				return hasNext.test(val);
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private T       val = seed;
+					private boolean advance;
+					
+					private void advance(){
+						val = next.apply(val);
+						advance = false;
+					}
+					@Override
+					public boolean hasNext(){
+						if(advance) advance();
+						return hasNext.test(val);
+					}
+					@Override
+					public T next(){
+						var v = val;
+						if(advance) advance();
+						advance = true;
+						return v;
+					}
+				};
 			}
+		};
+	}
+	
+	public static <T> IterablePP<T> generate(Supplier<Supplier<T>> generatorSup){
+		return new Iters.DefaultIterable<>(){
 			@Override
-			public T next(){
-				var v = val;
-				if(advance) advance();
-				advance = true;
-				return v;
+			public Iterator<T> iterator(){
+				var generator = generatorSup.get();
+				return new Iterator<>(){
+					@Override
+					public boolean hasNext(){ return true; }
+					@Override
+					public T next(){
+						return generator.get();
+					}
+				};
 			}
 		};
 	}
 	
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
-		return () -> {
-			var src = supplier.get();
-			return new FindingNonNullIterator<>(){
-				@Override
-				protected T doNext(){
-					return src.get();
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = supplier.get();
+				return new FindingNonNullIterator<>(){
+					@Override
+					protected T doNext(){
+						return src.get();
+					}
+				};
+			}
 		};
 	}
 	
@@ -323,7 +349,7 @@ public final class Iters{
 	
 	public static <T> IterablePP<T> rangeMap(int fromInclusive, int toExclusive, IntFunction<T> mapping){
 		if(fromInclusive>toExclusive) throw new IllegalArgumentException(fromInclusive + " > " + toExclusive);
-		return new IterablePP.SizedPP.Default<T>(){
+		return new IterablePP.SizedPP.Default<>(){
 			@Override
 			public OptionalInt calculateSize(){
 				return OptionalInt.of(toExclusive - fromInclusive);

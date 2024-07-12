@@ -1,6 +1,7 @@
 package com.lapissea.dfs.run;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.File;
 import java.io.FileReader;
@@ -8,14 +9,12 @@ import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 public class Configuration{
 	
 	public interface Loader{
-		Stream<Map.Entry<String, Object>> load();
+		Iterable<Map.Entry<String, Object>> load();
 		
 		class DashedNameValueArgs implements Loader{
 			
@@ -25,8 +24,8 @@ public class Configuration{
 			}
 			
 			@Override
-			public Stream<Map.Entry<String, Object>> load(){
-				return Stream.generate(new Supplier<Map.Entry<String, Object>>(){
+			public Iterable<Map.Entry<String, Object>> load(){
+				return Iters.nullTerminated(() -> new Supplier<>(){
 					int index;
 					@Override
 					public Map.Entry<String, Object> get(){
@@ -49,7 +48,7 @@ public class Configuration{
 						}catch(NumberFormatException ignored){ }
 						return new AbstractMap.SimpleImmutableEntry<>(name, str);
 					}
-				}).takeWhile(Objects::nonNull);
+				});
 			}
 			
 		}
@@ -64,7 +63,7 @@ public class Configuration{
 			}
 			
 			@Override
-			public Stream<Map.Entry<String, Object>> load(){
+			public Iterable<Map.Entry<String, Object>> load(){
 				Map<Object, Object> m;
 				try(var reader = new FileReader(source)){
 					m = new GsonBuilder().create().<HashMap<Object, Object>>fromJson(reader, HashMap.class);
@@ -73,9 +72,8 @@ public class Configuration{
 					else throw new RuntimeException(e);
 				}
 				
-				return m.entrySet()
-				        .stream()
-				        .map(e -> new AbstractMap.SimpleImmutableEntry<>((String)e.getKey(), e.getValue()));
+				return Iters.entries(m)
+				            .map(e -> new AbstractMap.SimpleImmutableEntry<>((String)e.getKey(), e.getValue()));
 			}
 		}
 		

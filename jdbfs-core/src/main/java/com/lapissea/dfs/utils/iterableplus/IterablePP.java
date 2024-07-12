@@ -107,6 +107,15 @@ public interface IterablePP<T> extends Iterable<T>{
 		return Optional.ofNullable(last);
 	}
 	
+	default <E extends Throwable> Optional<T> firstNotMatching(UnsafePredicate<T, E> predicate) throws E{
+		for(var element : this){
+			if(element == null) continue;
+			if(!predicate.test(element)){
+				return Optional.of(element);
+			}
+		}
+		return Optional.empty();
+	}
 	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
 			if(element == null) continue;
@@ -161,17 +170,26 @@ public interface IterablePP<T> extends Iterable<T>{
 		return result;
 	}
 	
+	default OptionalPP<T> minByI(ToIntFunction<T> sortProperty)   { return min(Comparator.comparingInt(sortProperty)); }
+	default OptionalPP<T> minByL(ToLongFunction<T> sortProperty)  { return min(Comparator.comparingLong(sortProperty)); }
+	default OptionalPP<T> minByD(ToDoubleFunction<T> sortProperty){ return min(Comparator.comparingDouble(sortProperty)); }
+	default <U extends Comparable<? super U>> OptionalPP<T> minBy(Function<T, U> sortProperty){
+		return min(Comparator.comparing(sortProperty));
+	}
 	default OptionalPP<T> min(){
 		//noinspection unchecked
 		return min((a, b) -> ((Comparable<T>)a).compareTo(b));
-	}
-	default <U extends Comparable<? super U>> OptionalPP<T> minBy(Function<T, U> sortProperty){
-		return min(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> min(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.minBy(comparator));
 	}
 	
+	default OptionalPP<T> maxByI(ToIntFunction<T> sortProperty)   { return max(Comparator.comparingInt(sortProperty)); }
+	default OptionalPP<T> maxByL(ToLongFunction<T> sortProperty)  { return max(Comparator.comparingLong(sortProperty)); }
+	default OptionalPP<T> maxByD(ToDoubleFunction<T> sortProperty){ return max(Comparator.comparingDouble(sortProperty)); }
+	default <U extends Comparable<? super U>> OptionalPP<T> maxBy(Function<T, U> sortProperty){
+		return max(Comparator.comparing(sortProperty));
+	}
 	default OptionalPP<T> max(){
 		//noinspection unchecked
 		return max((a, b) -> ((Comparable<T>)a).compareTo(b));
@@ -521,22 +539,25 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterablePP<T> distinct(){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iters.FindingIterator<>(){
-				private final Set<T> seen = new HashSet<>();
-				@Override
-				protected boolean doNext(){
-					while(true){
-						if(!src.hasNext()) return false;
-						T t = src.next();
-						if(seen.add(t)){
-							reportFound(t);
-							return true;
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingIterator<>(){
+					private final Set<T> seen = new HashSet<>();
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(!src.hasNext()) return false;
+							T t = src.next();
+							if(seen.add(t)){
+								reportFound(t);
+								return true;
+							}
 						}
 					}
-				}
-			};
+				};
+			}
 		};
 	}
 	
@@ -617,39 +638,45 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default <L> IterablePP<L> flatIterators(Function<T, Iterator<L>> flatten){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iters.FindingIterator<>(){
-				private Iterator<L> flat;
-				@Override
-				protected boolean doNext(){
-					while(true){
-						if(flat == null || !flat.hasNext()){
-							if(!src.hasNext()) return false;
-							flat = flatten.apply(src.next());
-							continue;
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<L> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingIterator<>(){
+					private Iterator<L> flat;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(flat == null || !flat.hasNext()){
+								if(!src.hasNext()) return false;
+								flat = flatten.apply(src.next());
+								continue;
+							}
+							reportFound(flat.next());
+							return true;
 						}
-						reportFound(flat.next());
-						return true;
 					}
-				}
-			};
+				};
+			}
 		};
 	}
 	default <L> IterablePP<L> flatOptionals(Function<T, Optional<L>> map){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iters.FindingNonNullIterator<>(){
-				@Override
-				protected L doNext(){
-					while(true){
-						if(!src.hasNext()) return null;
-						var o = map.apply(src.next());
-						if(o.isEmpty()) continue;
-						return o.get();
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<L> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingNonNullIterator<>(){
+					@Override
+					protected L doNext(){
+						while(true){
+							if(!src.hasNext()) return null;
+							var o = map.apply(src.next());
+							if(o.isEmpty()) continue;
+							return o.get();
+						}
 					}
-				}
-			};
+				};
+			}
 		};
 	}
 	default <L> IterablePP<L> flatOptionalsPP(Function<T, OptionalPP<L>> map){
@@ -657,19 +684,22 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default <L> IterablePP<L> instancesOf(Class<L> instance){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iters.FindingNonNullIterator<>(){
-				@Override
-				protected L doNext(){
-					while(true){
-						if(!src.hasNext()) return null;
-						var o = src.next();
-						if(!instance.isInstance(o)) continue;
-						return instance.cast(o);
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<L> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingNonNullIterator<>(){
+					@Override
+					protected L doNext(){
+						while(true){
+							if(!src.hasNext()) return null;
+							var o = src.next();
+							if(!instance.isInstance(o)) continue;
+							return instance.cast(o);
+						}
 					}
-				}
-			};
+				};
+			}
 		};
 	}
 	default IterablePP<T> instancesOf(Class<?> instance, Function<T, ?> element){
@@ -799,9 +829,88 @@ public interface IterablePP<T> extends Iterable<T>{
 					}
 					@Override
 					public T next(){
-						if(maxLen<=count) throw new NoSuchElementException();
-						count++;
+						if(maxLen<++count) throw new NoSuchElementException();
 						return src.next();
+					}
+				};
+			}
+		};
+	}
+	
+	default IterablePP<T> takeWhile(Predicate<T> condition){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var iter = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private T       val;
+					private boolean hasVal, triggered;
+					
+					private boolean calcNext(){
+						if(triggered || !iter.hasNext()) return false;
+						var v = iter.next();
+						if(!condition.test(v)){
+							triggered = true;
+							return false;
+						}
+						val = v;
+						return true;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						return hasVal || (hasVal = calcNext());
+					}
+					@Override
+					public T next(){
+						if(!hasVal && !calcNext()) throw new NoSuchElementException();
+						hasVal = false;
+						return val;
+					}
+				};
+			}
+		};
+	}
+	default IterablePP<T> dropWhile(Predicate<T> condition){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var iter = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private T       val;
+					private boolean hasVal, dropped;
+					
+					private void drop(){
+						dropped = true;
+						while(iter.hasNext()){
+							var next = iter.next();
+							if(condition.test(next)){
+								continue;
+							}
+							val = next;
+							hasVal = true;
+							break;
+						}
+					}
+					
+					@Override
+					public boolean hasNext(){
+						if(dropped){
+							return hasVal || iter.hasNext();
+						}
+						drop();
+						return hasVal;
+					}
+					@Override
+					public T next(){
+						if(!dropped) drop();
+						if(hasVal){
+							hasVal = false;
+							var v = val;
+							val = null;
+							return v;
+						}
+						return iter.next();
 					}
 				};
 			}
@@ -835,73 +944,85 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterablePP<Idx<T>> enumerate(){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iterator<>(){
-				private int index;
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public Idx<T> next(){
-					preIncrementInt(index);
-					return new Idx<>(index++, src.next());
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<Idx<T>> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private int index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public Idx<T> next(){
+						preIncrementInt(index);
+						return new Idx<>(index++, src.next());
+					}
+				};
+			}
 		};
 	}
 	
 	default IterablePP<Ldx<T>> enumerateL(){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iterator<>(){
-				private long index;
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public Ldx<T> next(){
-					preIncrementLong(index);
-					return new Ldx<>(index++, src.next());
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<Ldx<T>> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private long index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public Ldx<T> next(){
+						preIncrementLong(index);
+						return new Ldx<>(index++, src.next());
+					}
+				};
+			}
 		};
 	}
 	
 	default <R> IterablePP<R> enumerate(Enumerator<T, R> enumerator){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iterator<>(){
-				private int index;
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public R next(){
-					preIncrementInt(index);
-					return enumerator.enumerate(index++, src.next());
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<R> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private int index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public R next(){
+						preIncrementInt(index);
+						return enumerator.enumerate(index++, src.next());
+					}
+				};
+			}
 		};
 	}
 	default <R> IterablePP<R> enumerateL(EnumeratorL<T, R> enumerator){
-		return () -> {
-			var src = IterablePP.this.iterator();
-			return new Iterator<>(){
-				private long index;
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public R next(){
-					preIncrementLong(index);
-					return enumerator.enumerate(index++, src.next());
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<R> iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iterator<>(){
+					private long index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public R next(){
+						preIncrementLong(index);
+						return enumerator.enumerate(index++, src.next());
+					}
+				};
+			}
 		};
 	}
 	

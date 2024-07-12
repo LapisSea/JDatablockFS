@@ -5,6 +5,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.config.ConfigTools;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
@@ -15,7 +16,6 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -355,23 +355,21 @@ public class Log{
 		);
 	}
 	
-	private static Optional<Tag> findColor(CharSequence formatted, int hStart){
+	private static OptionalPP<Tag> findColor(CharSequence formatted, int hStart){
 		int len = formatted.length() - hStart;
-		return COLORS.stream()
-		             .filter(e -> e.name.length()<=len)
-		             .filter(e -> {
-			             var s = e.name;
-			             for(int j = 0; j<s.length(); j++){
-				             var z1 = s.charAt(j);
-				             var z2 = Character.toUpperCase(formatted.charAt(hStart + j));
-				             if(z1 != z2) return false;
-			             }
-			             return true;
-		             })
-		             .limit(2)
-		             .reduce((r, l) -> r.name.length()>
-		                               l.name.length()?
-		                               r : l);
+		return Iters.from(COLORS)
+		            .filtered(e -> {
+			            if(e.name.length()>len) return false;
+			            var s = e.name;
+			            for(int j = 0; j<s.length(); j++){
+				            var z1 = s.charAt(j);
+				            var z2 = Character.toUpperCase(formatted.charAt(hStart + j));
+				            if(z1 != z2) return false;
+			            }
+			            return true;
+		            })
+		            .limit(2)
+		            .maxByI(c -> c.name.length());
 	}
 	
 	public static void nonFatal0(Throwable error, CharSequence message){
