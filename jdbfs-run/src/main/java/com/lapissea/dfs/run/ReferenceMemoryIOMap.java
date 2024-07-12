@@ -3,8 +3,8 @@ package com.lapissea.dfs.run;
 import com.lapissea.dfs.objects.collections.IOMap;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	
@@ -37,8 +37,18 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
-	public Stream<IOEntry<K, V>> stream(){
-		return data.entrySet().stream().map(IOEntry::viewOf);
+	public Iterator<IOEntry<K, V>> iterator(){
+		var src = data.entrySet().iterator();
+		return new Iterator<>(){
+			@Override
+			public boolean hasNext(){
+				return src.hasNext();
+			}
+			@Override
+			public IOEntry<K, V> next(){
+				return IOEntry.viewOf(src.next());
+			}
+		};
 	}
 	
 	@Override

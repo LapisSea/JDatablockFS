@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class CheckMap<K, V> implements IOMap<K, V>{
 	
@@ -125,10 +124,6 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 	@Override
 	public IOEntry.Modifiable<K, V> getEntry(K key){
 		throw NotImplementedException.infer();//TODO: implement CheckMap.getEntry()
-	}
-	@Override
-	public Stream<IOEntry<K, V>> stream(){
-		throw NotImplementedException.infer();//TODO: implement CheckMap.stream()
 	}
 	@Override
 	public void put(K key, V value) throws IOException{

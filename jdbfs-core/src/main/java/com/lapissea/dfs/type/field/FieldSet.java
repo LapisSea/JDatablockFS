@@ -7,6 +7,8 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -30,7 +32,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePP.SizedPP<IOField<T, ?>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePPSource<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
 		
@@ -541,10 +543,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public IterablePP<IOField<T, ?>> unpackedStream(){
-		return flatMap(IOField::iterUnpackedFields);
-	}
-	public FieldSet<T> unpacked(){
-		return FieldSet.of(unpackedStream());
+		return flatMapped(IOField::iterUnpackedFields);
 	}
 	
 	public IterablePP<IOField<T, ?>> iterDependentOn(IOField<T, ?> field){
@@ -562,8 +561,14 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public Stream<IOField<T, ?>> parallelStream(){
 		return stream().parallel();
 	}
+	
 	@Override
-	public OptionalInt calculateSize(){
+	public OptionalInt tryGetSize(){
 		return OptionalInt.of(size());
+	}
+	
+	@Override
+	public IterablePP.SizedPP<IOField<T, ?>> iter(){
+		return Iters.from(data);
 	}
 }

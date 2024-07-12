@@ -180,8 +180,8 @@ public final class DefInstanceCompiler{
 				              missingSetters.isEmpty()? "" : "missing setters: " + missingSetters
 				));
 			
-			var getterMap = Iters.from(getters).collectToMap(FieldStub::varName, Function.identity());
-			var setterMap = Iters.from(setters).collectToMap(FieldStub::varName, Function.identity());
+			var getterMap = Iters.from(getters).toModMap(FieldStub::varName, Function.identity());
+			var setterMap = Iters.from(setters).toModMap(FieldStub::varName, Function.identity());
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
@@ -332,7 +332,7 @@ public final class DefInstanceCompiler{
 				           .findFirst()
 				           .orElse(null)),
 			Object.class
-		).collectToFinalList();
+		).toList();
 	
 	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE = new ConcurrentHashMap<>();
@@ -443,7 +443,7 @@ public final class DefInstanceCompiler{
 		var orderedFields = getOrder(completeInter, fieldInfo)
 			                    .map(names -> Iters.from(names)
 			                                       .map(name -> Iters.from(fieldInfo).firstMatching(f -> f.name.equals(name)))
-			                                       .collectToFinalList(Optional::orElseThrow))
+			                                       .toList(Optional::orElseThrow))
 			                    .or(() -> fieldInfo.size()>1? Optional.empty() : Optional.of(fieldInfo));
 		
 		checkClass(completeInter, specials, orderedFields);
@@ -568,8 +568,8 @@ public final class DefInstanceCompiler{
 				defineStatics(writer);
 				
 				
-				var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filtered(f -> include.contains(f.name)).collectToFinalList()).orElse(fieldInfo);
-				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filtered(f -> include.contains(f.name)).collectToFinalList())).orElse(orderedFields);
+				var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
+				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
 				
 				generateDefaultConstructor(writer, includedFields);
 				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
@@ -581,11 +581,11 @@ public final class DefInstanceCompiler{
 				if(specials.set.isEmpty() && completion.completed != completion.base){
 					var setters = new ArrayList<FieldStub>();
 					collectMethods(completion.base, new ArrayList<>(), setters);
-					var setterNames = Iters.from(setters).collectToSet(FieldStub::varName);
+					var setterNames = Iters.from(setters).toModSet(FieldStub::varName);
 					
-					var dataFields = Iters.from(includedFields).filtered(
+					var dataFields = Iters.from(includedFields).filter(
 						f -> !setterNames.contains(f.name) && (includeNames.isEmpty() || includeNames.get().contains(f.name))
-					).collectToFinalList();
+					).toList();
 					if(dataFields.isEmpty()) break readOnlyConstructor;
 					if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
 					
@@ -693,7 +693,7 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
-		var fragment = ToStringFormat.parse(format.value(), Iters.from(fieldInfo).collectToList(FieldInfo::name));
+		var fragment = ToStringFormat.parse(format.value(), Iters.from(fieldInfo).toModList(FieldInfo::name));
 		
 		if(specials.toStr.isEmpty()){
 			generateFormatToString(includeNames, fieldInfo, "toString", true, fragment, writer, humanName);
@@ -971,11 +971,11 @@ public final class DefInstanceCompiler{
 		var setters = new ArrayList<FieldStub>();
 		//noinspection unchecked,rawtypes
 		collectMethods((Class<IOInstance>)its, getters, setters);
-		return Iters.concat(getters, setters).collectToSet(FieldStub::varName);
+		return Iters.concat(getters, setters).toModSet(FieldStub::varName);
 	}
 	
 	private static Optional<Class<?>> upperSame(Class<?> interf){
-		var its = Iters.from(interf.getInterfaces()).filtered(IOInstance.Def::isDefinition).collectToList();
+		var its = Iters.from(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toModList();
 		if(its.size() != 1) return Optional.empty();
 		
 		Set<String> parentNames = collectNames(its.getFirst());
@@ -988,21 +988,21 @@ public final class DefInstanceCompiler{
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order = interf.getAnnotation(IOInstance.Def.Order.class);
 		if(order == null){
-			var its = Iters.from(interf.getInterfaces()).filtered(IOInstance.Def::isDefinition).collectToList();
+			var its = Iters.from(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toModList();
 			if(its.size() != 1) return Optional.empty();
 			
 			var upper = upperSame(interf);
 			return upper.flatMap(u -> getOrder(u, fieldInfo));
 		}
 		
-		var check   = Iters.from(fieldInfo).collectToSet(FieldInfo::name);
+		var check   = Iters.from(fieldInfo).toModSet(FieldInfo::name);
 		var ordered = List.of(order.value());
 		
 		for(String name : ordered){
 			if(check.remove(name)) continue;
 			throw new MalformedTemplateStruct(
 				name + " does not exist in " + interf.getName() + ".\n" +
-				"Existing field names: " + Iters.from(fieldInfo).map(FieldInfo::name).collectToList()
+				"Existing field names: " + Iters.from(fieldInfo).toModList(FieldInfo::name)
 			);
 		}
 		
@@ -1165,7 +1165,7 @@ public final class DefInstanceCompiler{
 			if(q.isEmpty()){
 				Iters.from(last)
 				     .flatMapArray(Class::getInterfaces)
-				     .filtered(i -> i != IOInstance.Def.class && UtilL.instanceOf(interf, IOInstance.Def.class))
+				     .filter(i -> i != IOInstance.Def.class && UtilL.instanceOf(interf, IOInstance.Def.class))
 				     .forEach(q::addLast);
 				last.clear();
 			}
@@ -1218,8 +1218,8 @@ public final class DefInstanceCompiler{
 			            
 			            var anns = Iters.ofPresent(getter, setter)
 			                            .flatMapArray(f -> f.method().getAnnotations())
-			                            .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
-			                            .collectToList();
+			                            .filter(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+			                            .toModList();
 			            
 			            IOValue valBack = null;
 			            var     iter    = anns.iterator();
@@ -1239,11 +1239,11 @@ public final class DefInstanceCompiler{
 			            
 			            return new FieldInfo(name, type, anns, getter, setter);
 		            })
-		            .collectToList();
+		            .toModList();
 	}
 	
 	private static Style checkStyles(List<FieldStub> getters, List<FieldStub> setters){
-		Map<Style, List<FieldStub>> styles = Iters.concat(getters, setters).collectToGrouping(FieldStub::style);
+		Map<Style, List<FieldStub>> styles = Iters.concat(getters, setters).toGrouping(FieldStub::style);
 		if(styles.isEmpty()){
 			return Style.NAMED;
 		}
@@ -1255,7 +1255,7 @@ public final class DefInstanceCompiler{
 				"Most common style is:\n" + style + "\n" +
 				"Bad styles:\n" +
 				Iters.entries(styles)
-				     .filtered(e -> e.getKey() != style)
+				     .filter(e -> e.getKey() != style)
 				     .flatMap(Map.Entry::getValue)
 				     .joinAsStr("\n", s -> "\t" + s.method().getName() + ":\t" + s.style())
 			);
@@ -1268,10 +1268,10 @@ public final class DefInstanceCompiler{
 			gs -> {
 				var typeGroups = gs.stubs()
 				                   .flatMapArray(g -> g.method().getAnnotations())
-				                   .filtered(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
-				                   .collectToGrouping(Annotation::annotationType);
+				                   .filter(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+				                   .toGrouping(Annotation::annotationType);
 				return Iters.values(typeGroups)
-				            .filtered(l -> l.size()>1)
+				            .filter(l -> l.size()>1)
 				            .joinAsOptionalStr("\n", l -> "\t\t" + l.getFirst().annotationType().getName())
 				            .map(names -> "\t" + gs.name + ":\n" + names);
 			}

@@ -40,7 +40,7 @@ public final class SealedUtil{
 		}
 		
 		public SealedInstanceUniverse(SealedUniverse<T> data){
-			this(data.root, Iters.from(data.universe).collectToFinalMap(Function.identity(), StandardStructPipe::of));
+			this(data.root, Iters.from(data.universe).toMap(Function.identity(), StandardStructPipe::of));
 		}
 		
 		public <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> makeSizeDescriptor(
@@ -96,7 +96,7 @@ public final class SealedUtil{
 		public SealedUniverse{
 			Objects.requireNonNull(root);
 			assert isSealedCached(root);
-			universe = Iters.from(universe).distinct().sortedBy(Class::getName).collectToFinalList();
+			universe = Iters.from(universe).distinct().sortedBy(Class::getName).toList();
 		}
 	}
 	
@@ -177,7 +177,7 @@ public final class SealedUtil{
 		private static <T> List<Class<T>> fetchSubclasses(Class<T> clazz){
 			//noinspection unchecked
 			var sbc = (Class<T>[])clazz.getPermittedSubclasses();
-			return sbc == null? null : Iters.of(sbc).sortedBy(Class::getName).collectToFinalList();
+			return sbc == null? null : Iters.of(sbc).sortedBy(Class::getName).toList();
 		}
 	}
 	

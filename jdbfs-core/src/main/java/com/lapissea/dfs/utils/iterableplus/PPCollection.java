@@ -11,30 +11,42 @@ import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
-public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
+public final class PPCollection<T> implements IterablePP.SizedPP<T>, Collection<T>{
 	private final IterablePP<T> source;
 	private       List<T>       computed;
 	private       Set<T>        computedSet;
 	private       byte          empty = UNKNOWN;
 	private       int           size  = -1;
 	
+	private Iterator<T> madeIter;
+	
 	private static final byte TRUE = 1, FALSE = 0, UNKNOWN = 2;
 	
-	public PPCollection(IterablePP<T> source, OptionalInt estimatedSize){
+	public PPCollection(IterablePP<T> source, OptionalInt size){
 		this(source);
-		if(estimatedSize.isPresent()){
-			size = estimatedSize.getAsInt();
-			empty = size == 0? TRUE : FALSE;
+		if(size.isPresent()){
+			this.size = size.getAsInt();
+			empty = this.size == 0? TRUE : FALSE;
 		}
 	}
 	public PPCollection(IterablePP<T> source){ this.source = source; }
+	
+	private Iterator<T> sourceIter(){
+		var mi = madeIter;
+		if(mi != null){
+			madeIter = null;
+			return mi;
+		}
+		
+		return source.iterator();
+	}
 	
 	private List<T> compute(){
 		var c = computed;
 		if(c != null) return c;
 		if(empty == TRUE) return computed = List.of();
-		c = collectToList();
-		if(emp(c.isEmpty())){
+		c = toModList();
+		if(recordEmpty(c.isEmpty())){
 			c = List.of();
 		}
 		return computed = c;
@@ -45,7 +57,7 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 		if(c != null) return c;
 		if(empty == TRUE) return computedSet = Set.of();
 		if(computed != null) return computedSet = new HashSet<>(computed);
-		return computedSet = collectToSet();
+		return computedSet = toModSet();
 	}
 	
 	@Override
@@ -53,8 +65,8 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 		var c = computed;
 		if(c != null) return c.iterator();
 		if(empty == TRUE) return (Iterator<T>)Iters.EMPTY_ITER;
-		var iter = source.iterator();
-		if(empty == UNKNOWN) emp(!iter.hasNext());
+		var iter = sourceIter();
+		if(empty == UNKNOWN) recordEmpty(!iter.hasNext());
 		return iter;
 	}
 	@Override
@@ -91,11 +103,33 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 	@Override
 	public boolean isEmpty(){
 		if(empty != UNKNOWN) return empty == TRUE;
-		if(computed != null) return emp(computed.isEmpty());
-		if(computedSet != null) return emp(computedSet.isEmpty());
-		return emp(!source.iterator().hasNext());
+		if(computed != null) return recordEmpty(computed.isEmpty());
+		if(computedSet != null) return recordEmpty(computedSet.isEmpty());
+		var iter    = sourceIter();
+		var isEmpty = recordEmpty(!iter.hasNext());
+		if(!isEmpty) conserveIter(iter);
+		return isEmpty;
 	}
-	private boolean emp(boolean empty){
+	
+	private void conserveIter(Iterator<T> iter){
+		var first = iter.next();
+		madeIter = new Iterator<>(){
+			private boolean didFirst;
+			@Override
+			public boolean hasNext(){
+				return !didFirst || iter.hasNext();
+			}
+			@Override
+			public T next(){
+				if(!didFirst){
+					didFirst = true;
+					return first;
+				}
+				return iter.next();
+			}
+		};
+	}
+	private boolean recordEmpty(boolean empty){
 		this.empty = empty? TRUE : FALSE;
 		return empty;
 	}
@@ -116,5 +150,12 @@ public final class PPCollection<T> implements IterablePP<T>, Collection<T>{
 		if(empty == TRUE) return "[]";
 		if(computed != null) return TextUtil.toString(computed);
 		return "[<?>]";
+	}
+	@Override
+	public OptionalInt getSize(){
+		if(empty == TRUE) return OptionalInt.of(0);
+		if(size != -1) return OptionalInt.of(size);
+		if(computed != null) return OptionalInt.of(computed.size());
+		return OptionalInt.empty();
 	}
 }

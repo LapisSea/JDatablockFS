@@ -48,9 +48,9 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.getFilter = getFilter;
 		
 		if(Iters.from(annotations).noneMatch(an -> an instanceof IOValue)){
-			annotations = Iters.concatN1(annotations, Annotations.make(IOValue.class)).collectToFinalList();
+			annotations = Iters.concatN1(annotations, Annotations.make(IOValue.class)).toList();
 		}
-		this.annotations = Iters.from(annotations).collectToFinalMap(Annotation::annotationType, a -> a);
+		this.annotations = Iters.from(annotations).toMap(Annotation::annotationType, a -> a);
 	}
 	
 	@Override

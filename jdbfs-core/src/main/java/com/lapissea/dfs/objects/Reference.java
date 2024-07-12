@@ -40,7 +40,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields, testRun) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(
-					f.get(0) instanceof BitFieldMerger<?> m && Iters.from(m.fieldGroup()).map(IOField::getName).collectToList().equals(List.of("offsetSize", "ptrSize")) &&
+					f.get(0) instanceof BitFieldMerger<?> m && Iters.from(m.fieldGroup()).toModList(IOField::getName).equals(List.of("offsetSize", "ptrSize")) &&
 					f.get(1).getName().equals("offset") &&
 					f.get(2).getName().equals("ptr")
 				){

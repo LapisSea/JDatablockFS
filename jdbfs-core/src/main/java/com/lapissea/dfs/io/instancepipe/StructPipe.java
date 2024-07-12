@@ -274,8 +274,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
-				getNonNulls().filtered(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
-				             .collectToFinalList()
+				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
+				             .toList()
 			);
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
@@ -341,7 +341,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var refs = fields.instancesOf(RefField.class)
 		                 .flatOptionalsPP(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).asKeyWith(ref))
-		                 .collectToMap(Function.identity());
+		                 .toModMap(Function.identity());
 		
 		for(var field : fields){
 			var refVal = refs.get(field);
@@ -457,7 +457,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private IterablePP<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filtered(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
+		return ioFields.unpackedStream().filter(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
 	}
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
@@ -544,19 +544,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var max = hasDynamicFields? OptionalLong.empty() : IOFieldTools.sumVarsIfAll(fields, siz -> siz.getMax(wordSpace));
 		
 		var rawGroups = fields.instancesOf(SizeDescriptor.UnknownNum.class, IOField::getSizeDescriptor)
-		                      .collectToGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor());
+		                      .toGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor());
 		var groups = Iters.entries(rawGroups)
-		                  .filtered(e -> e.getValue().size()>=minGroup)
-		                  .collectToFinalList(SizeGroup::new);
+		                  .filter(e -> e.getValue().size()>=minGroup)
+		                  .toList(SizeGroup::new);
 		
-		var groupNumberSet = Iters.from(groups).map(e -> e.num).collectToSet();
+		var groupNumberSet = Iters.from(groups).map(e -> e.num).toModSet();
 		
 		return new SizeRelationReport<>(
 			fields, wordSpace, knownFixed, min, max, hasDynamicFields,
 			groups,
 			fields.filtered(f -> !f.getSizeDescriptor().hasFixed())
-			      .filtered(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
-			      .collectToFinalList()
+			      .filter(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
+			      .toList()
 		);
 	}
 	

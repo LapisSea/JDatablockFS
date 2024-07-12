@@ -64,7 +64,7 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 public final class IOFieldTools{
 	
 	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<IterablePP<IOField<T, ?>>, IterablePP<IOField<T, ?>>> map){
-		return list -> map.apply(Iters.from(list)).collectToFinalList();
+		return list -> map.apply(Iters.from(list)).toList();
 	}
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> stepFinal(List<IOField<T, ?>> data, Iterable<Function<List<IOField<T, ?>>, List<IOField<T, ?>>>> steps){
@@ -119,10 +119,10 @@ public final class IOFieldTools{
 		}
 		try{
 			return new DepSort<>(fields, f -> f.getDependencies()
-			                                   .mapToInt(o -> IntStream.range(0, fields.size())
-			                                                           .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
-			                                                           .findAny()
-			                                                           .orElseThrow())
+			                                   .mappedToInt(o -> IntStream.range(0, fields.size())
+			                                                              .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
+			                                                              .findAny()
+			                                                              .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f) -> {//Pull fixed fields back and enforce word space sort order
 				                 var order = f.sizeDescriptorSafe().getWordSpace().sortOrder;
 				                 if(!f.getSizeDescriptor().hasFixed()){
@@ -135,7 +135,7 @@ public final class IOFieldTools{
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f -> f.getType().isEnum() || SupportedPrimitive.isAny(f.getType())? 0 : 1)
 			                 //Encourage fields with similar dependencies to be next to each other
-			                 .thenComparing(f -> f.getDependencies().joinAsStr(" / ", IOField::getName))
+			                 .thenComparing(f -> f.getDependencies().iter().joinAsStr(" / ", IOField::getName))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
 			                 .thenComparing(IOField::getName)
 			);
@@ -150,7 +150,7 @@ public final class IOFieldTools{
 			                          "To be used only by " + TemplateClassLoader.class.getName());
 		}
 		var dataOrder    = dataOrderAnn.value();
-		var actualNames  = Iters.from(fields).map(IOField::getName).collectToSet();
+		var actualNames  = Iters.from(fields).map(IOField::getName).toModSet();
 		var dataOrderSet = Set.of(dataOrder);
 		if(!dataOrderSet.equals(actualNames)){
 			throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);

@@ -117,7 +117,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 		@Override
 		public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
-			return new GeneralMerger<>(Iters.from(group).collectToFinalList(f -> f.maxAsFixedSize(varProvider)));
+			return new GeneralMerger<>(Iters.from(group).toList(f -> f.maxAsFixedSize(varProvider)));
 		}
 		
 	}

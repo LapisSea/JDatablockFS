@@ -41,7 +41,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 				List.of(
 					IOFieldTools.streamStep(s -> s.mapIfNot(checkFixed, makeFixed)),
 					IOFieldTools::dependencyReorder,
-					IOFieldTools.streamStep(s -> s.filtered(not(checkFixed))),
+					IOFieldTools.streamStep(s -> s.filter(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupported e){
@@ -50,13 +50,13 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		sizeFieldStream(structFields).filtered(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
+		sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
 			throw new IllegalField(badFields + " should not have dependencies");
 		});
 		
 		return sizeFieldStream(structFields)
 			       .distinct()
-			       .collectToFinalMap(Function.identity(), sizingField -> {
+			       .toMap(Function.identity(), sizingField -> {
 				       return getType().getFields().iterDependentOn(sizingField)
 				                       .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
 				                       .distinct()

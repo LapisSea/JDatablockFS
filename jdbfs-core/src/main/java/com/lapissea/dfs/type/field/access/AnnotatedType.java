@@ -21,7 +21,7 @@ public interface AnnotatedType{
 		private final Class<?>                            type;
 		
 		public Simple(Collection<? extends Annotation> annotations, Class<?> type){
-			this.annotations = Iters.from(annotations).collectToFinalMap(Annotation::annotationType, identity());
+			this.annotations = Iters.from(annotations).toMap(Annotation::annotationType, identity());
 			this.type = type;
 		}
 		

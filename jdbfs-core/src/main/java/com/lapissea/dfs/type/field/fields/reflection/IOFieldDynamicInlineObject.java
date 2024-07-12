@@ -129,7 +129,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			}
 		});
 		
-		return Iters.concatN1(super.getGenerators(), idGenerator).collectToList();
+		return Iters.concatN1(super.getGenerators(), idGenerator).toModList();
 	}
 	
 	@Override

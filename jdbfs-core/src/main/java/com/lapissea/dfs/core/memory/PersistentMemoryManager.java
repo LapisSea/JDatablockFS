@@ -303,7 +303,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 									var anyActive =
 										allStacks.size()>1 &&
 										Iters.entries(allStacks)
-										     .filtered(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
+										     .filter(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
 										     .anyMatch(l -> l != stack && !l.isEmpty());
 									if(!anyActive) break;
 								}

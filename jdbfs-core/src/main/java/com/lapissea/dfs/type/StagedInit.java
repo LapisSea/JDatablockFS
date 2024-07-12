@@ -229,7 +229,7 @@ public abstract class StagedInit{
 	}
 	
 	protected Optional<StateInfo> getStateInfo(int stateId){
-		return listStates().filtered(i -> i.id == stateId).findFirst();
+		return listStates().filter(i -> i.id == stateId).findFirst();
 	}
 	/***
 	 * This method lists information about all states that this object can be in. This method is only
@@ -245,7 +245,7 @@ public abstract class StagedInit{
 		List<String>   problems = new ArrayList<>();
 		Set<StateInfo> base     = new HashSet<>(StateInfo.BASE_STATES);
 		
-		var states = listStates().collectToList();
+		var states = listStates().toModList();
 		states.forEach(state -> {
 			if(state.id<StateInfo.MIN_ID) problems.add("\t" + state + ": id is too small!");
 			if(!ids.add(state.id)) problems.add("\t" + state + ": has a duplicate id");

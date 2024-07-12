@@ -21,7 +21,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
 		return (t, structFields, testRun) -> {
-			var sizeFields = sizeFieldStream(structFields).collectToSet();
+			var sizeFields = sizeFieldStream(structFields).toModSet();
 			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
 	}

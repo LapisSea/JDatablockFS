@@ -81,7 +81,7 @@ final class FieldRegistry{
 			}
 			
 			var usages = Iters.entries(scanned).sortedBy(e -> e.getKey().getName())
-			                  .flatMap(Map.Entry::getValue).collectToFinalList();
+			                  .flatMap(Map.Entry::getValue).toList();
 			
 			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
@@ -146,18 +146,17 @@ final class FieldRegistry{
 				Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
 				        .map(IOField.FieldUsageRef::value).filter(a -> a.length>0).map(List::of)
 				        .orElseGet(() -> Iters.from(type.getDeclaredClasses())
-				                              .filtered(c -> UtilL.instanceOf(c, FieldUsage.class))
-				                              .map(c -> {
+				                              .filter(c -> UtilL.instanceOf(c, FieldUsage.class))
+				                              .toList(c -> {
 					                              //noinspection unchecked
 					                              return (Class<FieldUsage>)c;
-				                              })
-				                              .collectToFinalList());
+				                              }));
 			
 			if(usageClasses.isEmpty()){
 				return Optional.empty();
 			}
 			
-			return Optional.of(Map.entry(type, Iters.from(usageClasses).map(u -> make(u)).collectToFinalList()));
+			return Optional.of(Map.entry(type, Iters.from(usageClasses).toList(u -> make(u))));
 		}
 		
 		private static FieldUsage make(Class<FieldUsage> usageClass){
@@ -220,7 +219,7 @@ final class FieldRegistry{
 					     })
 					     .distinct()
 					     .sortedBy(Class::getName)
-					     .collectToList()
+					     .toModList()
 				));
 			}
 		}
@@ -290,7 +289,7 @@ final class FieldRegistry{
 				);
 			}
 			
-			var allCompatible = Iters.from(getData()).filtered(usage -> usage.isCompatible(type, ann)).asCollection();
+			var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
 			if(allCompatible.size()>1){
 				throw new RuntimeException(
 					"Ambiguous usage picking\n" +
@@ -303,8 +302,8 @@ final class FieldRegistry{
 	
 	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS
 		= Iters.from(FieldCompiler.ANNOTATION_TYPES)
-		       .filtered(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
-		       .collectToFinalSet();
+		       .filter(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
+		       .toSet();
 	
 	private static <T extends IOInstance<T>> Set<FieldUsage> findUsages(IOField<T, ?> field){
 		var             producers = getProducers();
@@ -323,7 +322,7 @@ final class FieldRegistry{
 		var acc  = field.getAccessor();
 		
 		Set<VirtualFieldDefinition<T, ?>> result     = new HashSet<>();
-		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filtered(acc::hasAnnotation).collectToSet();
+		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filter(acc::hasAnnotation).toModSet();
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
 				behaviour.generateFields(acc).ifPresent(res -> {
@@ -344,7 +343,7 @@ final class FieldRegistry{
 			);
 		}
 		
-		return Iters.from(result).sortedBy(VirtualFieldDefinition::name).collectToList();
+		return Iters.from(result).sortedBy(VirtualFieldDefinition::name).toModList();
 	}
 	
 	static <T extends IOInstance<T>> Set<String> getDependencyValueNames(IOField<T, ?> field){

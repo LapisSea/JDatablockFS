@@ -36,7 +36,7 @@ public enum QueryUtils{
 	private static void deepPromotion(SupportedPrimitive l, Set<SupportedPrimitive> result){
 		result.add(l);
 		while(true){
-			var wave = Iters.from(result).map(PROMOTION_MAP::get).nonNulls().flatMap(e -> e).collectToList();
+			var wave = Iters.from(result).map(PROMOTION_MAP::get).nonNulls().flatMap(e -> e).toModList();
 			if(!result.addAll(wave)){
 				break;
 			}
@@ -49,6 +49,6 @@ public enum QueryUtils{
 		deepPromotion(l, deepL);
 		deepPromotion(r, deepR);
 		
-		return Iters.from(deepL).filtered(deepR::contains).minBy(c -> c.maxSize.get()).orElse(null);
+		return Iters.from(deepL).filter(deepR::contains).minBy(c -> c.maxSize.get()).orElse(null);
 	}
 }

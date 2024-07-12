@@ -138,7 +138,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						return dependencyNames.get().apply(accessor, ann);
 					}
 					var fields = generateFields.apply(accessor, ann).fields;
-					return Iters.from(fields).map(VirtualFieldDefinition::name).collectToSet();
+					return Iters.from(fields).map(VirtualFieldDefinition::name).toModSet();
 				});
 			}
 		}

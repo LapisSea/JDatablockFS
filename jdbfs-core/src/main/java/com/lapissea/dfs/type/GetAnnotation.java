@@ -23,7 +23,7 @@ public interface GetAnnotation{
 	}
 	
 	static GetAnnotation from(Collection<? extends Annotation> data){
-		return from(Iters.from(data).collectToFinalMap(Annotation::annotationType, an -> an));
+		return from(Iters.from(data).toMap(Annotation::annotationType, an -> an));
 	}
 	static GetAnnotation from(Map<Class<? extends Annotation>, ? extends Annotation> data){
 		if(data.isEmpty()) return new GetAnnotation(){

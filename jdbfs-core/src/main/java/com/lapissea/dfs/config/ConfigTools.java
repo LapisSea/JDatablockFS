@@ -7,6 +7,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -247,7 +248,7 @@ public final class ConfigTools{
 		}
 	}
 	
-	public static String configFlagsToTable(List<ConfEntry> values, int padding, boolean grouping){
+	public static String configFlagsToTable(Collection<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
 		var nameLen = Iters.from(values).map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
@@ -255,7 +256,7 @@ public final class ConfigTools{
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
 		if(grouping){
-			var groups = Iters.from(values).collectToGrouping(e -> e.name.split("\\.")[1]);
+			var groups = Iters.from(values).toGrouping(e -> e.name.split("\\.")[1]);
 			for(var e : groups.entrySet()){
 				if(e.getValue().size() == 1){
 					singles.add(e.getValue().getFirst());
@@ -313,7 +314,7 @@ public final class ConfigTools{
 	}
 	
 	public static List<ConfEntry> collectConfigFlags(){
-		return configFlagFields().collectToFinalList(val -> {
+		return configFlagFields().toList(val -> {
 			var name = val.name();
 			return ConfEntry.checked(name, switch(val){
 				case Flag.FEnum<?> enumFlag -> {
@@ -334,7 +335,7 @@ public final class ConfigTools{
 		});
 	}
 	public static IterablePP<Flag<?>> configFlagFields(){
-		return Iters.from(ConfigDefs.class.getDeclaredFields()).filtered(field -> UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)).map(field -> {
+		return Iters.from(ConfigDefs.class.getDeclaredFields()).filter(field -> UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)).map(field -> {
 			try{
 				var obj = (Flag<?>)field.get(null);
 				if(obj == null){

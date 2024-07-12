@@ -81,7 +81,7 @@ public class Log{
 				ConfigTools.configFlagsToTable(values, 4, true)
 			);
 			
-			var existingNames = Iters.from(values).map(ConfigTools.ConfEntry::name).collectToSet();
+			var existingNames = Iters.from(values).map(ConfigTools.ConfEntry::name).toModSet();
 			if(scanBadFlags(existingNames)){
 				Thread.startVirtualThread(() -> {
 					UtilL.sleep(1000);
@@ -95,10 +95,10 @@ public class Log{
 	
 	private static boolean scanBadFlags(Set<String> existingNames){
 		var badValues = Iters.keys(System.getProperties()).instancesOf(String.class)
-		                     .filtered(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
-		                     .filtered(key -> !existingNames.contains(key))
+		                     .filter(key -> key.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX))
+		                     .filter(key -> !existingNames.contains(key))
 		                     .map(key -> new ConfigTools.ConfEntry(key, Objects.toString(System.getProperty(key))))
-		                     .collectToList();
+		                     .asCollection();
 		
 		if(!badValues.isEmpty()){
 			var msg = resolveArgs(
@@ -358,7 +358,7 @@ public class Log{
 	private static OptionalPP<Tag> findColor(CharSequence formatted, int hStart){
 		int len = formatted.length() - hStart;
 		return Iters.from(COLORS)
-		            .filtered(e -> {
+		            .filter(e -> {
 			            if(e.name.length()>len) return false;
 			            var s = e.name;
 			            for(int j = 0; j<s.length(); j++){

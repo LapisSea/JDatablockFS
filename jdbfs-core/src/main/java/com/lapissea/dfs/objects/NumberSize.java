@@ -53,8 +53,8 @@ public enum NumberSize{
 	
 	static{
 		for(NumberSize ns : VALUES){
-			ns.prev = FLAG_INFO.filtered(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes));
-			ns.next = FLAG_INFO.filtered(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.prev = FLAG_INFO.filter(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes));
+			ns.next = FLAG_INFO.filter(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
 		}
 	}
 	

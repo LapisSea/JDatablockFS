@@ -207,7 +207,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		var fields = classType.def.getFields();
 		
 		if(!fields.isEmpty()){
-			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).collectToFinalList();
+			var order = classType.def.getFieldOrder().mapToObj(fields::get).toList(TypeDef.FieldDef::getName);
 			//noinspection deprecation
 			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}

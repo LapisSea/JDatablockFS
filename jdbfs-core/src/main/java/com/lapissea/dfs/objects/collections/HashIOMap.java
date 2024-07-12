@@ -34,13 +34,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -117,9 +117,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			throw new RuntimeException("bucket entry not found");
 		}
 		
-		private IterablePP<IONode<BucketEntry<K, V>>> nodeStream(){
+		private IterablePP<IONode<BucketEntry<K, V>>> nodeIter(){
 			if(node == null) return Iters.of();
-			return node;
+			return node.iter();
 		}
 		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
 			if(node == null) return null;
@@ -318,7 +318,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			int smallHash = e.getKey();
 			
 			Bucket<K, V>              bucket      = newBuckets.get(smallHash);
-			IONode<BucketEntry<K, V>> last        = bucket.nodeStream().findLast().orElse(null);
+			IONode<BucketEntry<K, V>> last        = bucket.nodeIter().findLast().orElse(null);
 			IOTransaction             transaction = null;
 			
 			if(last != null || noods.size()>1){
@@ -360,7 +360,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
 		for(Bucket<K, V> oldBucket : oldBuckets){
-			var oldNodes = oldBucket.nodeStream().collectToList();
+			var oldNodes = oldBucket.nodeIter().toModList();
 			for(var node : oldNodes){
 				if(node.hasNext()) node.setNext(null);
 				
@@ -455,29 +455,27 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@Override
 	public Iterator<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
-			private       IOIterator<IONode<BucketEntry<K, V>>> bucket;
-			private final IOIterator<Bucket<K, V>>              iter = buckets.iterator();
+			private       IOIterator<IONode<BucketEntry<K, V>>> nodeIter;
+			private final IOIterator<Bucket<K, V>>              bucketsIter = buckets.iterator();
 			
-			private boolean has() throws IOException{
-				return bucket != null && bucket.hasNext();
-			}
-			
-			private void ensure() throws IOException{
-				if(has()) return;
-				while(iter.hasNext()){
-					var next = iter.ioNext();
-					if(next.node != null){
-						bucket = next.node.iterator();
-						return;
-					}
+			private IOIterator<IONode<BucketEntry<K, V>>> tryFindNext() throws IOException{
+				while(bucketsIter.hasNext()){
+					var next = bucketsIter.ioNext();
+					if(next.node == null) continue;
+					
+					var iter = next.node.iterator();
+					if(!iter.hasNext()) continue;
+					return nodeIter = iter;
 				}
+				return null;
 			}
 			
 			@Override
 			public boolean hasNext(){
 				try{
-					ensure();
-					return has();
+					var ni = nodeIter;
+					if(ni != null && ni.hasNext()) return true;
+					return tryFindNext() != null;
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
@@ -485,29 +483,15 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			
 			@Override
 			public IOEntry<K, V> ioNext() throws IOException{
-				ensure();
-				var node  = bucket.ioNext();
+				var ni = nodeIter;
+				if(ni == null || !ni.hasNext()){
+					if((ni = tryFindNext()) == null) throw new NoSuchElementException();
+				}
+				var node  = ni.ioNext();
 				var value = node.getValue();
 				return value.unmodifiable();
 			}
 		};
-	}
-	
-	@Override
-	public Stream<IOEntry<K, V>> stream(){
-		return rawEntryStream(buckets).map(BucketEntry::unmodifiable).stream();
-	}
-	private IterablePP<BucketEntry<K, V>> rawEntries(IOList<Bucket<K, V>> buckets){
-		return () -> rawEntryStream(buckets).iterator();
-	}
-	private IterablePP<BucketEntry<K, V>> rawEntryStream(IOList<Bucket<K, V>> buckets){
-		return rawNodeStreamWithValues(buckets).map(e -> {
-			try{
-				return e.getValue();
-			}catch(IOException ex){
-				throw UtilL.uncheckedThrow(ex);
-			}
-		});
 	}
 	
 	private IterablePP<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
@@ -519,16 +503,16 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					       throw UtilL.uncheckedThrow(ex);
 				       }
 			       })
-			       .filtered(KeyResult::hasValue)
+			       .filter(KeyResult::hasValue)
 			       .map(KeyResult::key);
 	}
 	
 	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
-		return buckets.flatMap(Bucket::nodeStream);
+		return buckets.flatMapped(Bucket::nodeIter);
 	}
 	
 	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
-		return rawNodeStream(buckets).filtered(e -> {
+		return rawNodeStream(buckets).filter(e -> {
 			try{
 				return e.hasValue();
 			}catch(IOException ex){

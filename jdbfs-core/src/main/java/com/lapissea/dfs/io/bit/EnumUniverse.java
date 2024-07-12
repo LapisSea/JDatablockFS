@@ -262,7 +262,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	}
 	
 	@Override
-	public OptionalInt calculateSize(){
+	public OptionalInt getSize(){
 		return OptionalInt.of(size());
 	}
 }

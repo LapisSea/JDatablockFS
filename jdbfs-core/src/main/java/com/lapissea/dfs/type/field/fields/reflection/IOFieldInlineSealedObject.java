@@ -142,7 +142,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		});
 		
-		return Iters.concatN1(super.getGenerators(), gen).collectToList();
+		return Iters.concatN1(super.getGenerators(), gen).toModList();
 	}
 	
 	@Override

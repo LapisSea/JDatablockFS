@@ -76,8 +76,8 @@ public final class FieldCompiler{
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var valueDefs = deepClasses(struct.getConcreteType())
 			                .flatMapArray(Class::getDeclaredMethods)
-			                .filtered(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
-			                .collectToList();
+			                .filter(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
+			                .toModList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
 		for(Method valueMethod : valueDefs){
@@ -139,7 +139,7 @@ public final class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void checkIOFieldValidity(List<FieldAccessor<T>> fields){
 		var fails = Iters.from(fields)
-		                 .filtered(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
+		                 .filter(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
 		                 .asCollection();
 		if(fails.isEmpty()) return;
 		throw new IllegalField(
@@ -164,7 +164,7 @@ public final class FieldCompiler{
 			if(dep == null){
 				throw new IllegalField("Could not find dependencies " +
 				                       Iters.from(depNames)
-				                            .filtered(name -> !fields.containsKey(name))
+				                            .filter(name -> !fields.containsKey(name))
 				                            .joinAsStr(", ") +
 				                       " on field " + field.getAccessor());
 			}
@@ -174,7 +174,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
-		var mapFields = Iters.from(fields).collectToMap(IOField::getName, identity());
+		var mapFields = Iters.from(fields).toModMap(IOField::getName, identity());
 		for(var field : fields){
 			field.initLateData(generateDependencies(mapFields, field));
 		}
@@ -269,10 +269,10 @@ public final class FieldCompiler{
 		
 		var usedFields = new HashSet<Method>();
 		
-		var ioMethods = allMethods(cl).filtered(IOFieldTools::isIOField).asCollection();
+		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).asCollection();
 		var fields    = collectAccessors(struct, ioMethods, usedFields::add);
 		
-		var hangingMethods = ioMethods.filtered(method -> !usedFields.contains(method)).collectToList();
+		var hangingMethods = ioMethods.filter(method -> !usedFields.contains(method)).toModList();
 		
 		var functionFields = new HashMap<String, GetSet>();
 		
@@ -307,7 +307,7 @@ public final class FieldCompiler{
 			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
 				Iters.of(p.getter, p.setter).flatMapArray(Method::getAnnotations).distinct()
-				     .collectToFinalMap(Annotation::annotationType, identity());
+				     .toMap(Annotation::annotationType, identity());
 			
 			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
 			
@@ -326,13 +326,13 @@ public final class FieldCompiler{
 	){
 		var gettersSetters = Iters.values(functionFields).flatMap(GetSet::iter);
 		
-		var unusedErr = Iters.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
+		var unusedErr = Iters.from(hangingMethods).filter(gettersSetters::noneIs).map(method -> {
 			String helpStr = "";
 			if(Iters.from(fields).map(FieldAccessor::getName).anyEquals(method.getName())){
 				helpStr = calcGetPrefixes(method).joinAsStr(" or ", " did you mean ", "?", p -> p + TextUtil.firstToUpperCase(method.getName()));
 			}
 			return method + helpStr;
-		}).collectToList();
+		}).toModList();
 		
 		if(!unusedErr.isEmpty()){
 			throw new MalformedStruct(
@@ -348,7 +348,7 @@ public final class FieldCompiler{
 		var cl     = struct.getConcreteType();
 		var fields = new ArrayList<FieldAccessor<T>>();
 		
-		for(Field field : deepClasses(cl).flatMapArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
+		for(Field field : deepClasses(cl).flatMapArray(Class::getDeclaredFields).filter(IOFieldTools::isIOField)){
 			try{
 				var getter = pickGSMethod(ioMethods, field, true);
 				var setter = pickGSMethod(ioMethods, field, false);
@@ -380,7 +380,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
-		Iters.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null))
+		Iters.entries(functionFields).filter(e -> e.getValue().iter().anyIs(null))
 		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
 		     .ifPresent(invalidFields -> {
 			     throw new IllegalField("Invalid transient (getter+setter, no field) IOField(s) for " + cl.getName() + ":\n" +
@@ -443,10 +443,10 @@ public final class FieldCompiler{
 		Iters.from(activeAnnotations())
 		     .flatMap(ann -> Iters.concat1N(
 			     ann, Iters.of(ann.getClasses())
-			               .filtered(Class::isAnnotation)
+			               .filter(Class::isAnnotation)
 			               .map(c -> (Class<? extends Annotation>)c)
 		     ))
-		     .collectToFinalList();
+		     .toList();
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

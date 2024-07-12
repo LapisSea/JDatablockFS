@@ -127,7 +127,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			}
 		});
 		
-		return Iters.concatN1(super.getGenerators(), idGenerator).collectToFinalList();
+		return Iters.concatN1(super.getGenerators(), idGenerator).toModList();
 	}
 	
 	@Override

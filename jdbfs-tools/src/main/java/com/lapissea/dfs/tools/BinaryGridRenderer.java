@@ -1128,7 +1128,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			int pSiz = ptr.size();
 			
 			Color col;
-			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
+			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
 				col = ColorUtils.mix(CHUNK_BASE_COLOR, ptr.color(), 0.5F);
 				drawMsg = true;
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);

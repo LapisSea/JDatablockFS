@@ -48,7 +48,7 @@ public abstract class Annotations{
 					throw new IllegalArgumentException("Missing value " + elementName);
 				}
 			}
-		}).collectToFinalMap(Map.Entry::getKey, Map.Entry::getValue);
+		}).toMap(Map.Entry::getKey, Map.Entry::getValue);
 		
 		Iters.keys(values).firstNotMatching(safeValues::containsKey).ifPresent(v -> {
 			throw new IllegalArgumentException(annotationType.getTypeName() + " does not have value: \"" + v + '"');

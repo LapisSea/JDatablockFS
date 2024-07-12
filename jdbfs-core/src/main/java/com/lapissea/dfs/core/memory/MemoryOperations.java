@@ -325,7 +325,7 @@ public final class MemoryOperations{
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    destroyChunks = Iters.from(toDestroy).map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).collectToList();
+			var    destroyChunks = Iters.from(toDestroy).toModList(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize()));
 			
 			if(purgeTransaction != null){
 				try(var io = provider.getSource().io()){

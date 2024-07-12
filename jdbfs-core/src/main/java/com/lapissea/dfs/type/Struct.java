@@ -663,7 +663,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Ptr)
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Ptr)
 		                                    .mapToInt(a -> a.getStoragePool().ordinal()).toArray();
 		if(vPools.length == 0) return null;
 		var poolPointerSizes = new short[StoragePool.values().length];
@@ -676,7 +676,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools = virtualAccessorStream().filtered(a -> a.typeOff instanceof Primitive)
+		var vPools = virtualAccessorStream().filter(a -> a.typeOff instanceof Primitive)
 		                                    .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes = new short[StoragePool.values().length];
@@ -834,7 +834,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			       .flatOptionals(f -> Struct.tryOf(f.getType())
 			                                 .filter(struct -> !struct.getRealFields().onlyRefs().isEmpty())
 			                                 .map(s -> new FieldStruct<>(f, s)))
-			       .collectToFinalList();
+			       .toList();
 	}
 	
 	public FieldSet<T> getFields(){
@@ -951,7 +951,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				var obj  = make();
 				var pool = allocVirtualVarPool(IO);
 				inv = fields.unpackedStream()
-				            .filtered(f -> f.getNullability() == NOT_NULL)
+				            .filter(f -> f.getNullability() == NOT_NULL)
 				            .anyMatch(f -> f.isNull(pool, obj));
 			}
 			invalidInitialNulls = (byte)(inv? 1 : 0);

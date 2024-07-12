@@ -65,9 +65,9 @@ public final class Access{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
-		var match = Iters.from(type.getMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
+		var match = Iters.from(type.getMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
 		if(match.isEmpty()){
-			match = Iters.from(type.getDeclaredMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
+			match = Iters.from(type.getDeclaredMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
 		}
 		if(match.size()>1) throw new IllegalArgumentException("Ambiguous method name");
 		return makeLambda(match.getFirst(), functionalInterface);
@@ -124,8 +124,8 @@ public final class Access{
 	
 	public static <FInter> Method getFunctionalMethod(Class<FInter> functionalInterface){
 		var methods = Iters.from(functionalInterface.getMethods())
-		                   .filtered(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers()))
-		                   .collectToList();
+		                   .filter(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers()))
+		                   .toModList();
 		if(methods.size() != 1){
 			throw new IllegalArgumentException(functionalInterface + " is not a functional interface!");
 		}

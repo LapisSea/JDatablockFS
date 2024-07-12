@@ -570,7 +570,7 @@ public class GeneralTypeHandlingTests{
 		var strings = data.strings().list();
 		strings.add("foo");
 		strings.add("bar");
-		assertEquals(List.of("foo", "bar"), strings.collectToList());
+		assertEquals(List.of("foo", "bar"), strings.iter().toModList());
 		assertEquals(IOType.of(ContiguousIOList.class, String.class), strings.getTypeDef());
 	}
 	

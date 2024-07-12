@@ -3,7 +3,7 @@ package com.lapissea.dfs.objects.collections;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -13,10 +13,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
-import java.util.stream.Stream;
 
 @IOValue.OverrideType.DefaultImpl(HashIOMap.class)
-public interface IOMap<K, V> extends IterablePP.SizedPP<IOMap.IOEntry<K, V>>{
+public interface IOMap<K, V> extends IterablePPSource<IOMap.IOEntry<K, V>>{
 	
 	interface IOEntry<K, V>{
 		
@@ -127,7 +126,6 @@ public interface IOMap<K, V> extends IterablePP.SizedPP<IOMap.IOEntry<K, V>>{
 	
 	long size();
 	
-	@Override
 	default boolean isEmpty(){
 		return size() == 0;
 	}
@@ -150,18 +148,10 @@ public interface IOMap<K, V> extends IterablePP.SizedPP<IOMap.IOEntry<K, V>>{
 	}
 	
 	/**
-	 * Provides a stream of read only entries
-	 */
-	@Override
-	Stream<IOEntry<K, V>> stream();
-	
-	/**
 	 * Provides an iterator of read only entries
 	 */
 	@Override
-	default Iterator<IOEntry<K, V>> iterator(){
-		return stream().iterator();
-	}
+	Iterator<IOEntry<K, V>> iterator();
 	
 	default V computeIfAbsent(K key, UnsafeSupplier<V, IOException> compute) throws IOException{
 		var e = getEntry(key);
@@ -239,7 +229,7 @@ public interface IOMap<K, V> extends IterablePP.SizedPP<IOMap.IOEntry<K, V>>{
 		}
 	}
 	@Override
-	default OptionalInt calculateSize(){
+	default OptionalInt tryGetSize(){
 		var size = size();
 		return size>Integer.MAX_VALUE? OptionalInt.empty() : OptionalInt.of((int)size);
 	}

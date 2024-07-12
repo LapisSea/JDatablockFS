@@ -881,7 +881,7 @@ public class SlowTests{
 						first = null;
 					}
 					if(first != null){
-						var set = new PhysicalChunkWalker(first).collectToSet();
+						var set = new PhysicalChunkWalker(first).toModSet();
 						for(var ch : set){
 							if(!ch.hasNextPtr()) continue;
 							var next = ch.requireNext();
