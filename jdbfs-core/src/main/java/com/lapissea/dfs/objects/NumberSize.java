@@ -8,6 +8,8 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -74,6 +76,16 @@ public enum NumberSize{
 		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
 	}
 	
+	public static NumberSize bySizeSigned(IterableIntPP.Bounds size){
+		var sizeA = bySizeSigned(size.min());
+		var sizeB = bySizeSigned(size.max());
+		return sizeA.max(sizeB);
+	}
+	public static NumberSize bySizeSigned(IterableLongPP.Bounds size){
+		var sizeA = bySizeSigned(size.min());
+		var sizeB = bySizeSigned(size.max());
+		return sizeA.max(sizeB);
+	}
 	public static NumberSize bySizeSigned(long size){
 		if(size == 0) return VOID;
 		var off = size<0? -(size + 1) : size;

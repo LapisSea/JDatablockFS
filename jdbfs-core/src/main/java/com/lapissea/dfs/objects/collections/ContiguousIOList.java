@@ -259,14 +259,14 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		//TODO: index and object reusing hackery may cause problems? Investigate when appropriate
 		//if(unmanaged != null){
-		//	return LongStream.range(0, size()).mapToObj(
+		//	return Iters.range(0, size()).mapToObj(
 		//		index -> {
 		//			var f = new UnmanagedField<>(new IndexAccessor<>(genericType, index, true), index, unmanaged);
 		//			return (IOField<ContiguousIOList<T>, ?>)(Object)f;
 		//		}
 		//	);
 		//}
-		//return LongStream.range(0, size()).mapToObj(
+		//return Iters.range(0, size()).mapToObj(
 		//	index -> storage.field(new IndexAccessor<>(genericType, index, false), () -> ioAtElement(index))
 		//);
 		

@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
@@ -38,7 +39,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -387,11 +387,9 @@ public class GeneralTests{
 	@Test
 	void bySizeSignedInt(){
 		NumberSize.FLAG_INFO
-			.stream().flatMapToLong(
-			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
-			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
-			.filter(l -> Integer.MAX_VALUE>=l && l>=Integer.MIN_VALUE)
-			.mapToInt(Math::toIntExact)
+			.flatMapToLong(v -> Iters.ofLongs(v.signedMinValue, v.signedMaxValue, v.maxSize))
+			.flatMap(Iters.range(-5, 5)::addOverflowFiltered)
+			.mapToIntOverflowFiltered()
 			.forEach(e -> {
 				var v = NumberSize.bySizeSigned(e);
 				
@@ -407,9 +405,8 @@ public class GeneralTests{
 	@Test
 	void bySizeSignedLong(){
 		NumberSize.FLAG_INFO
-			.stream().flatMapToLong(
-			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
-			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.flatMapToLong(v -> Iters.ofLongs(v.signedMinValue, v.signedMaxValue, v.maxSize))
+			.flatMap(Iters.range(-5, 5)::addOverflowFiltered)
 			.forEach(e -> {
 				var v = NumberSize.bySizeSigned(e);
 				

@@ -42,7 +42,7 @@ import java.util.stream.StreamSupport;
  *   </li>
  *   <li>
  *       It has very low overhead. While it does create lambda objects, they are very
- *       simple and most of the time will get inlined by the JIT.
+ *       simple and are more likely to be inlined by the JIT.
  *   </li>
  * </ul>
  */
@@ -709,6 +709,53 @@ public interface IterablePP<T> extends Iterable<T>{
 		return flatOptionals(v -> map.apply(v).opt());
 	}
 	
+	default IterableLongPP flatMapToLong(Function<T, IterableLongPP> flatten){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingLongIterator(){
+					private LongIterator flat;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(flat == null || !flat.hasNext()){
+								if(!src.hasNext()) return false;
+								flat = flatten.apply(src.next()).iterator();
+								continue;
+							}
+							reportFound(flat.nextLong());
+							return true;
+						}
+					}
+				};
+			}
+		};
+	}
+	default IterableIntPP flatMapToInt(Function<T, IterableIntPP> flatten){
+		return new Iters.DefaultIntIterable(){
+			@Override
+			public IntIterator iterator(){
+				var src = IterablePP.this.iterator();
+				return new Iters.FindingIntIterator(){
+					private IntIterator flat;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(flat == null || !flat.hasNext()){
+								if(!src.hasNext()) return false;
+								flat = flatten.apply(src.next()).iterator();
+								continue;
+							}
+							reportFound(flat.nextInt());
+							return true;
+						}
+					}
+				};
+			}
+		};
+	}
+	
 	default <L> IterablePP<L> instancesOf(Class<L> type){
 		return new Iters.DefaultIterable<>(){
 			@Override
@@ -779,36 +826,68 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
-	default IterableLongPP mapToLong(){ return mapToLong(e -> (long)e); }
-	default IterableLongPP mapToLong(FunctionOL<T> mapper){
-		return () -> {
-			var iter = IterablePP.this.iterator();
-			return new LongIterator(){
-				@Override
-				public boolean hasNext(){
-					return iter.hasNext();
-				}
-				@Override
-				public long nextLong(){
-					return mapper.apply(iter.next());
-				}
-			};
+	default IterableLongPP mapToLong(){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var iter = IterablePP.this.iterator();
+				return new LongIterator(){
+					@Override
+					public boolean hasNext(){ return iter.hasNext(); }
+					@Override
+					public long nextLong(){
+						return (long)iter.next();
+					}
+				};
+			}
 		};
 	}
-	default IterableIntPP mapToInt(){ return mapToInt(e -> (int)e); }
+	default IterableLongPP mapToLong(FunctionOL<T> mapper){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var iter = IterablePP.this.iterator();
+				return new LongIterator(){
+					@Override
+					public boolean hasNext(){ return iter.hasNext(); }
+					@Override
+					public long nextLong(){
+						return mapper.apply(iter.next());
+					}
+				};
+			}
+		};
+	}
+	default IterableIntPP mapToInt(){
+		return new Iters.DefaultIntIterable(){
+			@Override
+			public IntIterator iterator(){
+				var iter = IterablePP.this.iterator();
+				return new IntIterator(){
+					@Override
+					public boolean hasNext(){ return iter.hasNext(); }
+					@Override
+					public int nextInt(){
+						return (int)iter.next();
+					}
+				};
+			}
+		};
+	}
 	default IterableIntPP mapToInt(FunctionOI<T> mapper){
-		return () -> {
-			var iter = IterablePP.this.iterator();
-			return new IntIterator(){
-				@Override
-				public boolean hasNext(){
-					return iter.hasNext();
-				}
-				@Override
-				public int nextInt(){
-					return mapper.apply(iter.next());
-				}
-			};
+		return new Iters.DefaultIntIterable(){
+			@Override
+			public IntIterator iterator(){
+				var iter = IterablePP.this.iterator();
+				return new IntIterator(){
+					@Override
+					public boolean hasNext(){ return iter.hasNext(); }
+					@Override
+					public int nextInt(){
+						return mapper.apply(iter.next());
+					}
+				};
+			}
 		};
 	}
 	

@@ -27,6 +27,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -37,8 +38,6 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 
 
 /**
@@ -209,8 +208,8 @@ public abstract class DynamicCollectionSupport{
 					for(var i : arr){
 						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
 					}
-				}else bytesPer = info.iter(val).nonNulls().map(Long.class::cast)
-				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+				}else bytesPer = info.iter(val).nonNulls().mapToLong().bounds()
+				                     .map(NumberSize::bySizeSigned).orElse(NumberSize.VOID).bytes;
 				yield 1 + bytesPer*(long)actualElements;
 			}
 			case INT -> {
@@ -220,8 +219,8 @@ public abstract class DynamicCollectionSupport{
 					for(var i : arr){
 						bytesPer = Math.max(bytesPer, NumberSize.bySizeSigned(i).bytes);
 					}
-				}else bytesPer = info.iter(val).nonNulls().map(Integer.class::cast)
-				                     .map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID).bytes;
+				}else bytesPer = info.iter(val).nonNulls().mapToInt().bounds()
+				                     .map(NumberSize::bySizeSigned).orElse(NumberSize.VOID).bytes;
 				yield 1 + bytesPer*(long)actualElements;
 			}
 			case SHORT, CHAR -> 2L*actualElements;
@@ -620,7 +619,7 @@ public abstract class DynamicCollectionSupport{
 				}
 			}
 			case LONG -> {
-				var siz = NumberSize.bySizeSigned(LongStream.of((long[])array).max().orElse(0));
+				var siz = Iters.ofLongs((long[])array).bounds().map(NumberSize::bySizeSigned).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
@@ -632,7 +631,7 @@ public abstract class DynamicCollectionSupport{
 				dest.write(bb);
 			}
 			case INT -> {
-				var siz = NumberSize.bySizeSigned(IntStream.of((int[])array).max().orElse(0));
+				var siz = Iters.ofInts((int[])array).bounds().map(NumberSize::bySizeSigned).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
@@ -699,26 +698,28 @@ public abstract class DynamicCollectionSupport{
 				}
 			}
 			case LONG -> {
-				var nums = array.map(Long.class::cast);
-				var siz  = nums.map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID);
+				var nums = array.mapToLong();
+				var siz  = nums.bounds().map(NumberSize::bySizeSigned).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
-					for(long l : nums){
+					for(var iterator = nums.iterator(); iterator.hasNext(); ){
+						long l = iterator.nextLong();
 						siz.writeSigned(io, l);
 					}
 				}
 				dest.write(bb);
 			}
 			case INT -> {
-				var nums = array.map(Integer.class::cast);
-				var siz  = nums.map(NumberSize::bySizeSigned).reduce(NumberSize::max).orElse(NumberSize.VOID);
+				var nums = array.mapToInt();
+				var siz  = nums.bounds().map(NumberSize::bySizeSigned).orElse(NumberSize.VOID);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb = new byte[siz.bytes*len];
 				try(var io = new ContentOutputStream.BA(bb)){
-					for(var l : nums){
+					for(var iterator = nums.iterator(); iterator.hasNext(); ){
+						int l = iterator.nextInt();
 						siz.writeIntSigned(io, l);
 					}
 				}

@@ -2,11 +2,11 @@ package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.type.WordSpace.BIT;
 import static com.lapissea.dfs.type.WordSpace.BYTE;
@@ -46,8 +46,8 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		@SuppressWarnings("unchecked")
 		final class Basic<T, PoolType> implements IFixed<T, PoolType>{
 			
-			private static final Basic<?, ?>[] BIT_CACHE  = LongStream.range(0, 9).mapToObj(i -> new Basic<>(BIT, i)).toArray(Basic<?, ?>[]::new);
-			private static final Basic<?, ?>[] BYTE_CACHE = LongStream.range(0, 17).mapToObj(i -> new Basic<>(BYTE, i)).toArray(Basic<?, ?>[]::new);
+			private static final Basic<?, ?>[] BIT_CACHE  = Iters.range(0, 9).mapToObj(i -> new Basic<>(BIT, i)).toArray(Basic<?, ?>[]::new);
+			private static final Basic<?, ?>[] BYTE_CACHE = Iters.range(0, 17).mapToObj(i -> new Basic<>(BYTE, i)).toArray(Basic<?, ?>[]::new);
 			
 			private static <T, PoolType> Basic<T, PoolType> ofByte(long bytes){
 				return bytes>=BYTE_CACHE.length? new Basic<>(BYTE, bytes) : (Basic<T, PoolType>)BYTE_CACHE[(int)bytes];

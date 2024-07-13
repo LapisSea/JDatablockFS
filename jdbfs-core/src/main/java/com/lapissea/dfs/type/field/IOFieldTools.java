@@ -52,7 +52,6 @@ import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.Utils.None;
 import static com.lapissea.dfs.Utils.Some;
@@ -117,10 +116,9 @@ public final class IOFieldTools{
 		}
 		try{
 			return new DepSort<>(fields, f -> f.getDependencies()
-			                                   .mappedToInt(o -> IntStream.range(0, fields.size())
-			                                                              .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
-			                                                              .findAny()
-			                                                              .orElseThrow())
+			                                   .mappedToInt(o -> Iters.range(0, fields.size())
+			                                                          .firstMatching(i -> fields.get(i).getAccessor() == o.getAccessor())
+			                                                          .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f) -> {//Pull fixed fields back and enforce word space sort order
 				                 var order = f.sizeDescriptorSafe().getWordSpace().sortOrder;
 				                 if(!f.getSizeDescriptor().hasFixed()){
@@ -158,9 +156,9 @@ public final class IOFieldTools{
 		
 		for(int i = 0; i<dataOrder.length; i++){
 			var name = dataOrder[i];
-			index[i] = IntStream.range(0, fields.size())
-			                    .filter(idx -> fields.get(idx).getName().equals(name))
-			                    .findFirst().orElseThrow();
+			index[i] = Iters.range(0, fields.size())
+			                .firstMatching(idx -> fields.get(idx).getName().equals(name))
+			                .orElseThrow();
 		}
 		
 		var res = new Index(index);

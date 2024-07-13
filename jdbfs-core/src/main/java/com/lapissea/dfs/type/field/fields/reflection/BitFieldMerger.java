@@ -27,7 +27,6 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -171,7 +170,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 	}
 	
-	private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
+	private static final int[] INTEGRITY_DIVS = Iters.range(0, 16).mapExact(BitUtils::makeMask).toArray();
+	
 	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
 		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
 	}

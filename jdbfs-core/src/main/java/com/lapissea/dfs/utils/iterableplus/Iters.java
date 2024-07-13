@@ -32,6 +32,20 @@ public final class Iters{
 		}
 	}
 	
+	public abstract static class DefaultLongIterable implements IterableLongPP{
+		@Override
+		public String toString(){
+			return Iters.toString(box());
+		}
+	}
+	
+	public abstract static class DefaultIntIterable implements IterableIntPP{
+		@Override
+		public String toString(){
+			return Iters.toString(box());
+		}
+	}
+	
 	abstract static class FindingIterator<T> implements Iterator<T>{
 		
 		private T       next;
@@ -80,6 +94,54 @@ public final class Iters{
 			n = doNext();
 			if(n == null) throw new NoSuchElementException();
 			return n;
+		}
+	}
+	
+	abstract static class FindingLongIterator implements LongIterator{
+		
+		private long    next;
+		private boolean hasData;
+		
+		protected void reportFound(long val){
+			hasData = true;
+			next = val;
+		}
+		
+		protected abstract boolean doNext();
+		
+		@Override
+		public boolean hasNext(){
+			return hasData || doNext();
+		}
+		@Override
+		public long nextLong(){
+			if(!hasData && !doNext()) throw new NoSuchElementException();
+			hasData = false;
+			return next;
+		}
+	}
+	
+	abstract static class FindingIntIterator implements IntIterator{
+		
+		private int     next;
+		private boolean hasData;
+		
+		protected void reportFound(int val){
+			hasData = true;
+			next = val;
+		}
+		
+		protected abstract boolean doNext();
+		
+		@Override
+		public boolean hasNext(){
+			return hasData || doNext();
+		}
+		@Override
+		public int nextInt(){
+			if(!hasData && !doNext()) throw new NoSuchElementException();
+			hasData = false;
+			return next;
 		}
 	}
 	
