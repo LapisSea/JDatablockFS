@@ -31,6 +31,7 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import org.testng.ITestResult;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -51,57 +52,66 @@ public final class TestUtils{
 	
 	private static final LateInit<DataLogger, RuntimeException> LOGGER = LoggedMemoryUtils.createLoggerFromConfig();
 	
+	private static MemoryData makeRawMem(TestInfo info){
+		return LoggedMemoryUtils.newLoggedMemory(info.name(), LOGGER);
+	}
 	
-	static void testRawMem(TestInfo info, UnsafeConsumer<IOInterface, IOException> session) throws IOException{
-		
+	private static void closeSession(String name, boolean deleting){
+		var ses = LOGGER.get().getSession(name);
+		if(deleting){
+			if(ses != DataLogger.Session.Blank.INSTANCE){
+				trace("deleting ok session {}", name);
+			}
+			ses.delete();
+		}else{
+			ses.finish();
+		}
+	}
+	
+	private static boolean shouldDeleteOk(){
 		boolean shouldDeleteOk = false;
 		try{
 			shouldDeleteOk = Boolean.parseBoolean(System.getProperty("deleteOk"));
 		}catch(Throwable ignored){ }
-		
-		
-		String sessionName = info.getName();
-		
-		IOInterface mem      = LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
-		boolean     deleting = false;
-		try{
-			session.accept(mem);
-			if(shouldDeleteOk){
-				deleting = true;
-			}
-		}finally{
-			var ses = LOGGER.get().getSession(sessionName);
-			if(deleting){
-				if(ses != DataLogger.Session.Blank.INSTANCE){
-					trace("deleting ok session {}", sessionName);
-				}
-				ses.delete();
-			}else{
-				ses.finish();
-			}
+		return shouldDeleteOk;
+	}
+	
+	private static Cluster      cluster;
+	private static DataProvider provider;
+	private static TestInfo     testInfo;
+	
+	public static Cluster testCluster() throws IOException              { return testCluster(TestInfo.ofDepth(2)); }
+	public static Cluster testCluster(Object... args) throws IOException{ return testCluster(TestInfo.ofDepth(2, args)); }
+	public static Cluster testCluster(TestInfo info) throws IOException{
+		if(cluster != null) return checkBadData(info, cluster);
+		testInfo = info;
+		var mem = makeRawMem(info);
+		return cluster = Cluster.init(mem);
+	}
+	private static <T> T checkBadData(TestInfo info, T obj){
+		if(!info.methodName().equals(testInfo.methodName())){
+			throw new IllegalStateException("Data not cleaned up");
 		}
+		return obj;
 	}
 	
-	static void testChunkProvider(TestInfo info, UnsafeConsumer<DataProvider, IOException> session) throws IOException{
-		testRawMem(info, mem -> {
-			mem.write(true, MagicID.get());
-			session.accept(DataProvider.newVerySimpleProvider(mem));
-		});
+	public static DataProvider testChunkProvider() throws IOException              { return testChunkProvider(TestInfo.ofDepth(2)); }
+	public static DataProvider testChunkProvider(Object... args) throws IOException{ return testChunkProvider(TestInfo.ofDepth(2, args)); }
+	public static DataProvider testChunkProvider(TestInfo info) throws IOException{
+		if(provider != null) return checkBadData(info, provider);
+		testInfo = info;
+		var mem = makeRawMem(info);
+		mem.write(true, MagicID.get());
+		return provider = DataProvider.newVerySimpleProvider(mem);
 	}
 	
-	static void testCluster(UnsafeConsumer<Cluster, IOException> session) throws IOException{
-		testCluster(TestInfo.ofDepth(2), session);
-	}
-	static void testCluster(TestInfo info, UnsafeConsumer<Cluster, IOException> session) throws IOException{
-		testRawMem(info, mem -> {
-			var c = Cluster.init(mem);
-			try{
-				session.accept(c);
-			}catch(Throwable e){
-				throw new RuntimeException("Failed cluster session", e);
-			}
-			c.rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
-		});
+	public static void cleanup(ITestResult ctx){
+		if(testInfo == null || !ctx.getName().equals(testInfo.methodName())) return;
+		closeSession(testInfo.name(), ctx.isSuccess() && shouldDeleteOk());
+		LogUtil.println("Cleaned up session " + testInfo.name());
+		provider = null;
+		cluster = null;
+		testInfo = null;
 	}
 	
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
@@ -138,10 +148,25 @@ public final class TestUtils{
 			assertEquals(read, obj);
 		};
 		
-		if(useCluster){
-			testCluster(info, ses::accept);
-		}else{
-			testChunkProvider(info, ses);
+		var mem = makeRawMem(info);
+		mem.write(true, MagicID.get());
+		boolean deleting = false;
+		try{
+			if(useCluster){
+				var c = Cluster.init(mem);
+				try{
+					((UnsafeConsumer<Cluster, IOException>)ses::accept).accept(c);
+				}catch(Throwable e){
+					throw new RuntimeException("Failed cluster session", e);
+				}
+				c.rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
+			}else{
+				mem.write(true, MagicID.get());
+				ses.accept(DataProvider.newVerySimpleProvider(mem));
+			}
+			if(shouldDeleteOk()) deleting = true;
+		}finally{
+			closeSession(info.name(), deleting);
 		}
 	}
 	
