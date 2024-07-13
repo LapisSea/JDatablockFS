@@ -44,7 +44,7 @@ public abstract class CursorIOData implements IOInterface{
 		
 		@Override
 		public long getSize(){
-			return CursorIOData.this.used;
+			return getCapacity();
 		}
 		
 		@Override
