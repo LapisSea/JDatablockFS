@@ -135,17 +135,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		private final NewUnmanaged<T> unmanagedConstructor;
-		private final boolean         overridingDynamicUnmanaged;
+		private final boolean         hasDynamicFields;
 		private       FieldSet<T>     unmanagedStaticFields;
 		
 		private Unmanaged(Class<T> type, boolean runNow){
 			super(type, runNow);
-			overridingDynamicUnmanaged = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
+			hasDynamicFields = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
 			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class);
 		}
 		
-		public boolean isOverridingDynamicUnmanaged(){
-			return overridingDynamicUnmanaged;
+		public boolean hasDynamicFields(){
+			return hasDynamicFields;
 		}
 		
 		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
@@ -439,8 +439,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private boolean calcCanHavePointers(){
-		if(this instanceof Struct.Unmanaged) return true;
-		return getFields().stream().anyMatch(f -> {
+		IterablePP<IOField<T, ?>> fields;
+		if(this instanceof Struct.Unmanaged<?> u){
+			if(u.hasDynamicFields()) return true;
+			//noinspection unchecked
+			fields = Iters.concat(getFields(), (FieldSet<T>)u.getUnmanagedStaticFields());
+		}else{
+			fields = getFields().iter();
+		}
+		return fields.anyMatch(f -> {
 			var acc = f.getAccessor();
 			if(acc == null) return true;
 			
@@ -502,7 +509,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		if(state>=STATE_FIELD_MAKE){
 			var fields  = getFields();
-			var dynamic = this instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
+			var dynamic = this instanceof Struct.Unmanaged<?> u && u.hasDynamicFields();
 			sj.add((dynamic? "+" : "") + fields.size() + " " + TextUtil.plural("field", fields.size() + (dynamic? 10 : 0)));
 		}
 		
@@ -768,7 +775,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(!typ.isInterface()){
 			typ = (Class<E>)IOInstance.Def.unmap((Class<E>)type).orElseThrow();
 		}
-		var names = f.stream().map(IOField::getName).collect(Collectors.toUnmodifiableSet());
+		var names = Iters.from(f).toSet(IOField::getName);
 		var impl  = IOInstance.Def.partialImplementation(typ, names);
 		return Struct.of(impl);
 	}

@@ -126,6 +126,13 @@ public interface IterablePP<T> extends Iterable<T>{
 		return Optional.ofNullable(last);
 	}
 	
+	default Optional<T> firstNonNull(){
+		for(var element : this){
+			if(element == null) continue;
+			return Optional.of(element);
+		}
+		return Optional.empty();
+	}
 	default <E extends Throwable> Optional<T> firstNotMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
 			if(element == null) continue;
@@ -287,6 +294,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		return Arrays.copyOf(res, siz);
 	}
 	
+	default <E> Set<E> toSet(Function<T, E> map){
+		return map(map).toSet();
+	}
 	default Set<T> toSet(){
 		return Set.copyOf(toModList());
 	}

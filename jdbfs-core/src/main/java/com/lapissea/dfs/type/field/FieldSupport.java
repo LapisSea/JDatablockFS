@@ -8,6 +8,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -226,10 +227,7 @@ final class FieldSupport{
 						case Set<?> ignored -> "Set";
 						default -> data.getClass().getSimpleName();
 					};
-					var type = UtilL.findClosestCommonSuper(
-						data.stream()
-						    .filter(Objects::nonNull)
-						    .map(Object::getClass));
+					var type = Utils.findClosestCommonSuper(Iters.from(data).nonNulls().map(Object::getClass));
 					if(type == Object.class) return Optional.of(dataName + "<?>[" + data.size() + "]");
 					return Optional.of(dataName + "<" + type.getSimpleName() + ">[" + data.size() + "]");
 				}

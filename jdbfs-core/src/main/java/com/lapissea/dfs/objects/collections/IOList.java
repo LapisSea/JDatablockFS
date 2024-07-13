@@ -701,8 +701,5 @@ public interface IOList<T> extends IterablePPSource<T>{
 	}
 	
 	@Override
-	default OptionalInt tryGetSize(){
-		var size = size();
-		return size>Integer.MAX_VALUE? OptionalInt.empty() : OptionalInt.of((int)size);
-	}
+	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 }

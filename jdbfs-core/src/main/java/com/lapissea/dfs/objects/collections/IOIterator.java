@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.collections;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -34,7 +35,7 @@ public interface IOIterator<T>{
 			try{
 				return ioNext();
 			}catch(IOException e){
-				throw new RuntimeException(e);
+				throw new UncheckedIOException(e);
 			}
 		}
 		@Override
@@ -43,7 +44,7 @@ public interface IOIterator<T>{
 			try{
 				ioRemove();
 			}catch(IOException e){
-				throw new RuntimeException(e);
+				throw new UncheckedIOException(e);
 			}
 		}
 	}

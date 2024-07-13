@@ -1,5 +1,6 @@
 package com.lapissea.dfs.utils.iterableplus;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.TextUtil;
 
@@ -155,17 +156,17 @@ public final class Iters{
 	}
 	
 	private static final class FlatArrIterator<T> implements Iterator<T>{
-		private final Iterable<T>[] iterables;
+		private final Iterable<? extends T>[] iterables;
 		
-		private Iterator<T> iter;
-		private int         pos;
-		public FlatArrIterator(Iterable<T>[] iterables){ this.iterables = Objects.requireNonNull(iterables); }
+		private Iterator<? extends T> iter;
+		private int                   pos;
+		public FlatArrIterator(Iterable<? extends T>[] iterables){ this.iterables = Objects.requireNonNull(iterables); }
 		
 		@Override
 		public boolean hasNext(){
 			return iter != null && iter.hasNext() || findNext() != null;
 		}
-		private Iterator<T> findNext(){
+		private Iterator<? extends T> findNext(){
 			while(pos<iterables.length){
 				var i = iter = iterables[pos++].iterator();
 				if(i.hasNext()) return i;
@@ -174,7 +175,7 @@ public final class Iters{
 		}
 		@Override
 		public T next(){
-			Iterator<T> i = iter;
+			var i = iter;
 			if((i == null || !i.hasNext()) &&
 			   (i = findNext()) == null){
 				throw new NoSuchElementException();
@@ -377,8 +378,7 @@ public final class Iters{
 			@Override
 			public OptionalInt getSize(){
 				var size = toExclusive - fromInclusive;
-				if(size>Integer.MAX_VALUE) return OptionalInt.empty();
-				return OptionalInt.of((int)size);
+				return Utils.longToOptInt(size);
 			}
 			@Override
 			public Iterator<T> iterator(){
@@ -397,9 +397,50 @@ public final class Iters{
 		};
 	}
 	
+	public static <T> IterablePP.SizedPP<T> concat(Collection<T> a, Collection<T> b){
+		var aEmpty = a.isEmpty();
+		if(aEmpty || b.isEmpty()){
+			var col = aEmpty? b : a;
+			//noinspection unchecked
+			return col instanceof IterablePP.SizedPP<?> i? (IterablePP.SizedPP<T>)i : from(col);
+		}
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				var lSize = a.size() + (long)b.size();
+				return Utils.longToOptInt(lSize);
+			}
+			@Override
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private Iterator<T> iter = a.iterator();
+					private boolean     aDone;
+					
+					private Iterator<T> nextIter(){
+						if(aDone) return null;
+						aDone = true;
+						var it = iter = b.iterator();
+						return it.hasNext()? it : null;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						return iter.hasNext() || nextIter() != null;
+					}
+					@Override
+					public T next(){
+						var it = iter;
+						if(!it.hasNext() && (it = nextIter()) == null) throw new NoSuchElementException();
+						return it.next();
+					}
+				};
+			}
+		};
+	}
+	
 	@SafeVarargs
 	@SuppressWarnings("varargs")
-	public static <T> IterablePP.SizedPP<T> concat(Collection<T>... iterables){
+	public static <T> IterablePP.SizedPP<T> concat(Collection<? extends T>... iterables){
 		if(iterables.length == 0) return of();
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
@@ -419,7 +460,7 @@ public final class Iters{
 	
 	@SafeVarargs
 	@SuppressWarnings("varargs")
-	public static <T> IterablePP.SizedPP<T> concat(Iterable<T>... iterables){
+	public static <T> IterablePP.SizedPP<T> concat(Iterable<? extends T>... iterables){
 		if(iterables.length == 0) return of();
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
@@ -448,10 +489,10 @@ public final class Iters{
 		};
 	}
 	
-	public static <T> IterablePP.SizedPP<T> concat1N(T first, Collection<T> extra){ return concat(List.of(first), extra); }
-	public static <T> IterablePP.SizedPP<T> concat1N(T first, Iterable<T> extra)  { return concat(Iters.of(first), extra); }
-	public static <T> IterablePP.SizedPP<T> concatN1(Collection<T> start, T last) { return concat(start, List.of(last)); }
-	public static <T> IterablePP.SizedPP<T> concatN1(Iterable<T> start, T last)   { return concat(start, Iters.of(last)); }
+	public static <T> IterablePP.SizedPP<T> concat1N(T first, Collection<? extends T> extra){ return concat(List.of(first), extra); }
+	public static <T> IterablePP.SizedPP<T> concat1N(T first, Iterable<? extends T> extra)  { return concat(Iters.of(first), extra); }
+	public static <T> IterablePP.SizedPP<T> concatN1(Collection<? extends T> start, T last) { return concat(start, List.of(last)); }
+	public static <T> IterablePP.SizedPP<T> concatN1(Iterable<? extends T> start, T last)   { return concat(start, Iters.of(last)); }
 	
 	public static <A, B> IterablePP.SizedPP<Map.Entry<A, B>> zip(Collection<A> a, Collection<B> b){
 		return zip(a, b, AbstractMap.SimpleEntry::new);
@@ -485,4 +526,5 @@ public final class Iters{
 			}
 		};
 	}
+	
 }

@@ -678,6 +678,15 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	@Override
 	public OptionalInt tryGetSize(){
-		return OptionalInt.empty();
+		boolean next;
+		try{
+			next = hasNext();
+		}catch(IOException e){
+			next = true;
+		}
+		if(next){
+			return OptionalInt.empty();
+		}
+		return OptionalInt.of(1);
 	}
 }

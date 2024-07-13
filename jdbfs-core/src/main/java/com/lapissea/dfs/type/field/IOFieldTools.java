@@ -42,7 +42,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -54,7 +53,6 @@ import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.Utils.None;
 import static com.lapissea.dfs.Utils.Some;
@@ -112,7 +110,7 @@ public final class IOFieldTools{
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		if(fields.isEmpty()) return new Index(new int[0]);
 		{
-			var struct       = fields.stream().map(IOField::getAccessor).filter(Objects::nonNull).findAny().orElseThrow().getDeclaringStruct();
+			var struct       = Iters.from(fields).map(IOField::getAccessor).firstNonNull().orElseThrow().getDeclaringStruct();
 			var structType   = struct.getType();
 			var dataOrderAnn = structType.getAnnotation(InternalDataOrder.class);
 			if(dataOrderAnn != null) return predefinedOrder(fields, structType, dataOrderAnn);
@@ -167,7 +165,7 @@ public final class IOFieldTools{
 		
 		var res = new Index(index);
 		if(GlobalConfig.DEBUG_VALIDATION){
-			var testNames = res.mapData(fields).stream().map(IOField::getName).toArray(String[]::new);
+			var testNames = Iters.from(res.mapData(fields)).map(IOField::getName).toArray(String[]::new);
 			if(!Arrays.equals(testNames, dataOrder)){
 				throw new AssertionError("\n" +
 				                         Arrays.toString(testNames) + "\n" +
@@ -269,7 +267,7 @@ public final class IOFieldTools{
 						data.add(new String[]{"No reason??"});
 					}
 					
-					int[] lengths = new int[data.stream().mapToInt(s -> s.length).max().orElse(0)];
+					int[] lengths = new int[Iters.from(data).mapToInt(s -> s.length).max().orElse(0)];
 					for(var line : data){
 						for(int i = 0; i<line.length; i++){
 							lengths[i] = Math.max(lengths[i], line[i].length() + 1);
@@ -338,12 +336,13 @@ public final class IOFieldTools{
 	public static Map<Class<? extends Annotation>, Annotation> computeAnnotations(Field field){
 		var ann   = field.getAnnotations();
 		var types = Arrays.stream(ann).map(Annotation::annotationType).collect(Collectors.toSet());
-		return Stream.concat(
-			Arrays.stream(ann),
-			FieldCompiler.ANNOTATION_TYPES.stream()
-			                              .filter(typ -> !types.contains(typ))
-			                              .map(at -> field.getDeclaringClass().getAnnotation(at)).filter(Objects::nonNull)
-		).collect(Collectors.toMap(Annotation::annotationType, a -> a));
+		return Iters.concat(
+			Iters.from(ann),
+			Iters.from(FieldCompiler.ANNOTATION_TYPES)
+			     .filter(typ -> !types.contains(typ))
+			     .<Annotation>map(at -> field.getDeclaringClass().getAnnotation(at))
+			     .nonNulls()
+		).toMap(Annotation::annotationType, Function.identity());
 	}
 	
 	public static boolean isIOField(Method m){
@@ -367,11 +366,11 @@ public final class IOFieldTools{
 		var typ = field.getType();
 		if(typ.isPrimitive()) return false;
 		return isGeneric(field) || typ.isArray() ||
-		       Stream.of(
-			       Stream.of(IOInstance.class, Enum.class, Type.class),
-			       FieldCompiler.getWrapperTypes().stream(),
-			       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
-		       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));
+		       Iters.concat(
+			       Iters.of(IOInstance.class, Enum.class, Type.class),
+			       FieldCompiler.getWrapperTypes(),
+			       Iters.from(SupportedPrimitive.values()).map(p -> p.wrapper)
+		       ).anyMatch(c -> UtilL.instanceOf(typ, c));
 	}
 	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
 		var nam = size.name();

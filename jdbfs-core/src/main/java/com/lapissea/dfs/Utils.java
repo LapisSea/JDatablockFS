@@ -4,6 +4,7 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -30,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
@@ -359,4 +361,12 @@ public final class Utils{
 		return (int)nextSizeL;
 	}
 	
+	public static OptionalInt longToOptInt(long lSize){
+		if(lSize>Integer.MAX_VALUE) return OptionalInt.empty();
+		return OptionalInt.of((int)lSize);
+	}
+	public static Class<?> findClosestCommonSuper(IterablePP<Class<?>> classes){
+		return classes.reduce(UtilL::findClosestCommonSuper)
+		              .orElse(Object.class);
+	}
 }

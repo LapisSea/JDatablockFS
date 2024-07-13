@@ -431,7 +431,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw new NotImplementedException(field + " (" + type.getName() + ") not handled");
 		}
 		
-		if(getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged()){
+		if(getType() instanceof Struct.Unmanaged<?> u && u.hasDynamicFields()){
 			builder.unmanagedRest();
 		}else{
 			builder.endFlow();
@@ -517,7 +517,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		type.waitForState(Struct.STATE_INIT_FIELDS);
 		var wordSpace = IOFieldTools.minWordSpace(fields);
 		
-		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
+		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.hasDynamicFields();
 		
 		type.waitForStateDone();
 		

@@ -284,7 +284,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
-		return Iters.concat1N(this, (List<IOField<T, ?>>)(Object)group);
+		return Iters.concat1N(this, group);
 	}
 	
 	public List<BitField<T, ?>> fieldGroup(){

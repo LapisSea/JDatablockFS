@@ -325,7 +325,7 @@ public final class DefInstanceCompiler{
 	
 	private static final List<Class<?>> IGNORE_TYPES =
 		Iters.concatN1(
-			Iters.iterate(
+			Iters.<Class<?>>iterate(
 				IOInstance.Def.class,
 				Objects::nonNull,
 				cl -> Iters.from(cl.getInterfaces())
