@@ -294,20 +294,18 @@ public class Log{
 			var c1 = formatted.charAt(i);
 			var c2 = formatted.charAt(i + 1);
 			if(c1 == '{' && c2 == '}'){
-				if(formatted.length()>i + 2){
-					var c3 = formatted.charAt(i + 2);
-					if(c3 == '~'){
-						var replace = arg instanceof Type typ? Utils.typeToHuman(typ) : Utils.toShortString(arg);
-						formatted.replace(i, i + 3, replace);
+				var c3 = formatted.length()>i + 2? formatted.charAt(i + 2) : 0;
+				if(c3 == '~'){
+					var replace = arg instanceof Type typ? Utils.typeToHuman(typ) : Utils.toShortString(arg);
+					formatted.replace(i, i + 3, replace);
+					return i + replace.length();
+				}else if(c3 == '#'){
+					int hStart = i + 3;
+					var any    = findColor(formatted, hStart);
+					if(any.isPresent()){
+						var replace = any.get().cmd + TextUtil.toString(arg) + ConsoleColors.RESET;
+						formatted.replace(i, hStart + any.get().name.length(), replace);
 						return i + replace.length();
-					}else if(c3 == '#'){
-						int hStart = i + 3;
-						var any    = findColor(formatted, hStart);
-						if(any.isPresent()){
-							var replace = any.get().cmd + TextUtil.toString(arg) + ConsoleColors.RESET;
-							formatted.replace(i, hStart + any.get().name.length(), replace);
-							return i + replace.length();
-						}
 					}
 				}
 				

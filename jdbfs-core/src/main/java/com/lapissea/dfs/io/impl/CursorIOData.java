@@ -268,7 +268,7 @@ public abstract class CursorIOData implements IOInterface{
 			String transactionStr = transactionOpen? ", transaction: {" + transactionBuff.infoString() + "}" : "";
 			
 			String name = getClass().getSimpleName();
-			String pre  = "{pos=" + getPos() + transactionStr;
+			String pre  = "{pos=" + getPos() + " / " + getSize() + transactionStr;
 			if(start != 0 || start != end){
 				pre += ", data=";
 			}

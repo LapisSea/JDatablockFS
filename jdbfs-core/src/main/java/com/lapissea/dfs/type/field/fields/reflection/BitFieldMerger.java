@@ -176,13 +176,19 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
 	}
 	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
+		if(!areIntegrityBitsValid(remainingBits, raw, totalBits, oneBits)){
+			throw new IOException("Bit integrity failed");
+		}
+	}
+	public static boolean areIntegrityBitsValid(long raw, int totalBits, int readBits){
+		return areIntegrityBitsValid(raw >>> readBits, raw, totalBits, totalBits - readBits);
+	}
+	public static boolean areIntegrityBitsValid(long remainingBits, long raw, int totalBits, int oneBits){
 		var integrityDiv = INTEGRITY_DIVS[oneBits];
 		var remStored    = integrityDiv - remainingBits;
 		var payload      = raw&BitUtils.makeMask(totalBits - oneBits);
 		var rem          = payload%integrityDiv;
-		if(rem != remStored){
-			throw new IOException("Bit integrity failed");
-		}
+		return rem == remStored;
 	}
 	public static long calcIntegrityBits(long writtenData, int oneBits, int writtenDataBits){
 		return calcIntegrityBits(writtenData, oneBits)<<writtenDataBits;

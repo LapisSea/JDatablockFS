@@ -243,13 +243,13 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
-		}catch(Exception e){
+		}catch(Throwable e){
 			throw failChunk(pointer, e);
 		}
 		return chunk;
 	}
 	
-	private static MalformedPointer failChunk(ChunkPointer pointer, Exception e){
+	private static MalformedPointer failChunk(ChunkPointer pointer, Throwable e){
 		return new MalformedPointer("No valid chunk at ", pointer, e);
 	}
 	
