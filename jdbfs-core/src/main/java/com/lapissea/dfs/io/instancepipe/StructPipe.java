@@ -306,7 +306,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected void postValidate(){
 		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
 			var type = getType();
-			T   inst;
+			if(!type.canHaveDefaultConstructor()) return;
+			T inst;
 			try{
 				inst = type.make();
 			}catch(Throwable e){
