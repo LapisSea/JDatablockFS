@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -189,7 +190,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	private final long     fieldOffset;
 	
 	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, name, genericType, IOFieldTools.computeAnnotations(field));
+		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		declaringClass = field.getDeclaringClass();
 		fieldOffset = MyUnsafe.objectFieldOffset(field);
 	}
@@ -202,25 +203,27 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	}
 	
 	@Override
-	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-		checkInstance(instance);
-		UNSAFE.putShort(instance, fieldOffset, value);
-	}
-	@Override
 	protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
 		checkInstance(instance);
 		return UNSAFE.getShort(instance, fieldOffset);
 	}
-	
 	@Override
-	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
+	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		checkInstance(instance);
-		UNSAFE.putChar(instance, fieldOffset, value);
+		checkReadOnlyField();
+		UNSAFE.putShort(instance, fieldOffset, value);
 	}
+	
 	@Override
 	protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
 		checkInstance(instance);
 		return UNSAFE.getChar(instance, fieldOffset);
+	}
+	@Override
+	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
+		checkInstance(instance);
+		checkReadOnlyField();
+		UNSAFE.putChar(instance, fieldOffset, value);
 	}
 	
 	@Override
@@ -231,6 +234,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	@Override
 	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		checkInstance(instance);
+		checkReadOnlyField();
 		UNSAFE.putLong(instance, fieldOffset, value);
 	}
 	
@@ -242,6 +246,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	@Override
 	protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		checkInstance(instance);
+		checkReadOnlyField();
 		UNSAFE.putByte(instance, fieldOffset, value);
 	}
 	
@@ -253,6 +258,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	@Override
 	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		checkInstance(instance);
+		checkReadOnlyField();
 		UNSAFE.putInt(instance, fieldOffset, value);
 	}
 	
@@ -264,29 +270,32 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	@Override
 	protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		checkInstance(instance);
+		checkReadOnlyField();
 		UNSAFE.putDouble(instance, fieldOffset, value);
 	}
 	
-	@Override
-	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-		checkInstance(instance);
-		UNSAFE.putFloat(instance, fieldOffset, value);
-	}
 	@Override
 	protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
 		checkInstance(instance);
 		return UNSAFE.getFloat(instance, fieldOffset);
 	}
-	
 	@Override
-	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		checkInstance(instance);
-		UNSAFE.putBoolean(instance, fieldOffset, value);
+		checkReadOnlyField();
+		UNSAFE.putFloat(instance, fieldOffset, value);
 	}
+	
 	@Override
 	protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		checkInstance(instance);
 		return UNSAFE.getBoolean(instance, fieldOffset);
+	}
+	@Override
+	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+		checkInstance(instance);
+		checkReadOnlyField();
+		UNSAFE.putBoolean(instance, fieldOffset, value);
 	}
 	
 	@Override
@@ -297,6 +306,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	@Override
 	protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		checkInstance(instance);
+		checkReadOnlyField();
 		UNSAFE.putObject(instance, fieldOffset, getType().cast(value));
 	}
 }

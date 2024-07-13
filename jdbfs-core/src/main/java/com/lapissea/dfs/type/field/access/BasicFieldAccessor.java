@@ -6,6 +6,7 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
@@ -16,11 +17,33 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
 
 public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
+	
+	public abstract static class ReadOnly<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+		
+		private final boolean readOnlyField;
+		
+		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations, boolean readOnlyField){
+			super(declaringStruct, name, annotations);
+			this.readOnlyField = readOnlyField;
+		}
+		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
+			super(declaringStruct, name, annotations);
+			this.readOnlyField = readOnlyField;
+		}
+		
+		protected void checkReadOnlyField(){
+			if(readOnlyField){
+				failReadOnly();
+			}
+		}
+		private void failReadOnly(){
+			throw new IllegalArgumentException("Field for " + getName() + " is final, can not set it!");
+		}
+	}
 	
 	protected static void validateSetter(Type fieldType, Method func){
 		if(!Utils.genericInstanceOf(func.getReturnType(), Void.TYPE)){
@@ -57,7 +80,7 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
-		this(declaringStruct, name, annotations.isEmpty()? Map.of() : annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity())));
+		this(declaringStruct, name, Iters.from(annotations).toMap(Annotation::annotationType, identity()));
 	}
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name,
 	                             Map<Class<? extends Annotation>, ? extends Annotation> annotations){

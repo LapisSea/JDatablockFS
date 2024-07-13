@@ -41,7 +41,7 @@ import static com.lapissea.dfs.type.field.access.TypeFlag.*;
  * types. For example, if an {@link Integer} type is passed to the {@link FieldAccessor#set} function of a {@code long} accessor, then this class will unbox the
  * {@link Integer} in to an int and widen it to a long. This value will then be passed on to the {@link ExactFieldAccessor#setExactLong} function
  */
-public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor.ReadOnly<CTyp>{
 	
 	protected static Method findParent(Method method){
 		var cl = method.getDeclaringClass();
@@ -66,8 +66,8 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	private final int      typeID;
 	private final boolean  genericTypeHasArgs;
 	
-	public ExactFieldAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations){
-		super(struct, name, annotations);
+	public ExactFieldAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
+		super(struct, name, annotations, readOnlyField);
 		
 		Class<?> type = Utils.typeToRaw(genericType);
 		
