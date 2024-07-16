@@ -91,7 +91,7 @@ public final class FuzzProgress{
 		if(!config.shouldLog()) return;
 		
 		var dur = elapsedSumAcum.addAndGet(nsDuration);
-		if(dur>Integer.MAX_VALUE){
+		if(dur>Long.MAX_VALUE/2){
 			synchronized(this){
 				elapsedSumAcum.getAndAdd(-dur);
 				elapsedSum = elapsedSum.add(BigInteger.valueOf(dur));
