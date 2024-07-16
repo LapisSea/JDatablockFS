@@ -555,7 +555,6 @@ public final class IOTransactionBuffer{
 	
 	private void setEventSorted(BaseAccess base, int i, WriteEvent m, long jitter) throws IOException{
 		var old = writeEvents.set(i, m);
-		markIndexDirty(base, i, jitter);
 		if(old.offset == m.offset) return;
 		if(i>0){
 			var prev = writeEvents.get(i - 1);
