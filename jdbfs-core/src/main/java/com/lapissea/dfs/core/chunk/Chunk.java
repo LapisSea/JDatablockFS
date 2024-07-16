@@ -13,6 +13,7 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
@@ -239,7 +240,6 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * referenced outside a controlled context, then it should be reported to the chunk cache as it is not a "real" chunk until that happens.
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(!earlyCheckChunkAt(provider, pointer)) throw failChunk(pointer, null);
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
@@ -253,16 +253,46 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return new MalformedPointer("No valid chunk at ", pointer, e);
 	}
 	
-	/**
-	 * Quickly checks if a chunk start is possible at all at a certain pointer.
-	 */
-	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
-		var src = provider.getSource();
-		if(src.getIOSize()<=pointer.getValue()) return false;
-		try(var io = src.ioAt(pointer.add(CHECK_BYTE_OFF))){
-			return earlyCheckChunkAt(io);
+	public static boolean isChunkValidAt(DataProvider provider, ChunkPointer pointer){
+		try(var src = provider.getSource().io()){
+			
+			if(src.remaining()<=pointer.getValue()) return false;//unexpected EOF
+			src.skipExact(pointer.getValue());
+			
+			if(src.remaining()<1) return false;// unexpected EOF
+			var raw = src.readUnsignedInt1();
+			var bns = NumberSize.ordinal(raw&0b111);
+			var nns = NumberSize.ordinal((raw >>> 3)&0b111);
+			if(!BitFieldMerger.areIntegrityBitsValid(raw, 8, 6)){
+				return false;//Bit integrity failed
+			}
+			
+			if(src.remaining()<bns.bytes) return false;// unexpected EOF
+			var cap = bns.read(src);
+			if(src.remaining()<bns.bytes) return false;// unexpected EOF
+			var siz = bns.read(src);
+			
+			if(siz>cap){
+				return false;//Size bigger than capacity
+			}
+			
+			if(src.remaining()<nns.bytes) return false;// unexpected EOF
+			var nextPtrL = nns.read(src);
+			if(nextPtrL<0){
+				return false;//Long overflow. Illegal
+			}
+			var nextPtr = ChunkPointer.of(nextPtrL);
+			
+			if(nextPtr.equals(pointer)){
+				return false;// can't point to self
+			}
+		}catch(Throwable e){
+			Log.trace("Unexpected error reading chunk! {}#red", e);
+			return false;//unexpected error
 		}
+		return true;
 	}
+	
 	public static boolean earlyCheckChunkAt(ContentReader reader) throws IOException{
 		var flags        = reader.readUnsignedInt1();
 		var requiredBits = BitFieldMerger.calcIntegrityBits(flags&0b111_111, 2, 6);

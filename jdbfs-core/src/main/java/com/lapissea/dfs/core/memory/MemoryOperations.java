@@ -75,9 +75,7 @@ public final class MemoryOperations{
 				
 				var pos = headIndex + from;
 				
-				try{
-					Chunk.readChunk(provider, ChunkPointer.of(pos));
-				}catch(Throwable e){
+				if(!Chunk.isChunkValidAt(provider, ChunkPointer.of(pos))){
 					//invalid only if last
 					lastUnknown = Math.max(lastUnknown, headIndex);
 					continue;

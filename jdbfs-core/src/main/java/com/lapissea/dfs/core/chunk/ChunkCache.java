@@ -75,13 +75,7 @@ public final class ChunkCache{
 	}
 	
 	private void validateDestroyed(Chunk chunk){
-		var fail = false;
-		try{
-			Chunk.readChunk(chunk.getDataProvider(), chunk.getPtr());
-		}catch(Throwable e){
-			fail = true;
-		}
-		if(!fail){
+		if(Chunk.isChunkValidAt(chunk.getDataProvider(), chunk.getPtr())){
 			throw new IllegalStateException("Chunk at " + chunk.getPtr() + " is still valid!");
 		}
 		
