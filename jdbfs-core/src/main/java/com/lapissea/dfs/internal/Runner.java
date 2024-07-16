@@ -50,8 +50,8 @@ public final class Runner{
 	
 	private static final List<Task> TASKS = new ArrayList<>();
 	
-	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolve();
-	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveVal();
+	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolveLocking();
+	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveValLocking();
 	
 	private static int             virtualChoke = 0;
 	private static boolean         cherry       = true;

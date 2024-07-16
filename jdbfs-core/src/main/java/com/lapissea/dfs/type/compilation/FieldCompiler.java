@@ -68,7 +68,7 @@ public final class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
+	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
 	
 	/**
 	 * Scans an unmanaged struct for

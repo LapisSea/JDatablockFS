@@ -64,7 +64,7 @@ public class Log{
 	public static final boolean MIN, WARN, INFO, DEBUG, TRACE, SMALL_TRACE;
 	
 	static{
-		var level = ConfigDefs.LOG_LEVEL.resolve();
+		var level = ConfigDefs.LOG_LEVEL.resolveLocking();
 		MIN = level.isWithin(LogLevel.MIN);
 		WARN = level.isWithin(LogLevel.WARN);
 		INFO = level.isWithin(LogLevel.INFO);

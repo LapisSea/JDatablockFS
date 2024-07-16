@@ -101,7 +101,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	private class Roots implements RootProvider{
-		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
+		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveValLocking();
 		
 		private static class Node{
 			WeakReference<Object> val;

@@ -36,7 +36,7 @@ import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
 public abstract class StagedInit{
 	
-	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
+	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveValLocking();
 	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
 	
 	private static class InitInfo{

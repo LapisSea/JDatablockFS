@@ -6,12 +6,14 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.IllegalField;
+import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -26,6 +28,8 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -47,6 +51,7 @@ import static org.testng.Assert.assertTrue;
 
 public class GeneralTests{
 	
+	private static final Logger log = LoggerFactory.getLogger(GeneralTests.class);
 	@AfterMethod
 	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
 	
@@ -427,6 +432,8 @@ public class GeneralTests{
 		}
 		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
 			Foo.of(Optional.empty());
+		}catch(LockedFlagSet e){
+			Log.warn("{}", e);
 		}
 		
 		var c   = TestUtils.testCluster();

@@ -37,7 +37,7 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public final class Access{
 	
-	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveVal();
+	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveValLocking();
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")
