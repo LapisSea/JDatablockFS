@@ -365,14 +365,17 @@ public interface IterablePP<T> extends Iterable<T>{
 			if(siz == 0) return new HashMap<>();
 			res = HashMap.newHashMap(siz);
 		}else res = new HashMap<>();
-		
+		return toModMap(res, key, value);
+	}
+	
+	default <K, V, M extends Map<K, V>> M toModMap(M dest, Function<T, K> key, Function<T, V> value){
 		for(T t : this){
 			K k;
-			if(res.put((k = key.apply(t)), value.apply(t)) != null){
+			if(dest.put((k = key.apply(t)), value.apply(t)) != null){
 				throw new IllegalStateException("Duplicate key of: " + k);
 			}
 		}
-		return res;
+		return dest;
 	}
 	
 	default <K> Map<K, Integer> toGroupingSizes(Function<T, K> key){

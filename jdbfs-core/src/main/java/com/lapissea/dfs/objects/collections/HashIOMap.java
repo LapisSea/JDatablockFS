@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
@@ -37,7 +38,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -754,7 +754,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private static <K, V> void yeet(Map<Integer, BucketContainer<K, V>> hotBuckets){
 		var chance = 1F/256;
-		var random = new Random();
+		var random = new RawRandom();
 		hotBuckets.entrySet().removeIf(e -> random.nextFloat()<=chance && (e.getValue().age--)<=0);
 	}
 	

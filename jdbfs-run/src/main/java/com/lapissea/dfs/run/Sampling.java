@@ -1,19 +1,22 @@
 package com.lapissea.dfs.run;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-public class Sampling{
+/**
+ * Mostly just used for JMH single shot run profiling.
+ */
+public final class Sampling{
 	
 	public static final class Exec{
 		private boolean end, started, ended;
@@ -27,44 +30,49 @@ public class Sampling{
 			UtilL.sleepUntil(() -> ended);
 		}
 	}
-	public static Exec sampleThread(String logName, boolean all, String interest){
+	
+	public static Exec sampleThread(String logName, boolean all, String interest, boolean print){
 		var exec = new Exec();
 		var t    = Thread.currentThread();
 		Thread.ofPlatform().start(() -> {
-			Map<String, Long> count = new HashMap<>();
+			Map<List<String>, Long> count = new HashMap<>();
 			if(logName != null) readLog(logName, count);
 			
-			var sb = new StringBuilder();
+			var lines = new ArrayList<String>(32);
 			LogUtil.println("started");
 			exec.started = true;
 			while(!exec.end){
 				for(var tt : all? Thread.getAllStackTraces().entrySet() : List.of(Map.entry(t, t.getStackTrace()))){
 					if(tt.getKey() == Thread.currentThread()) continue;
 					var trace = tt.getValue();
-					sb.setLength(0);
+					if(trace.length == 0 || List.of("wait0", "park").contains(trace[0].getMethodName())){
+						continue;
+					}
+					lines.clear();
 					var noInterest = interest != null;
 					for(var e : trace){
-						var s = e.toString();
+						var s = e.toString().replaceFirst("Lambda/0x[0-9A-Fa-f]+", "Lambda_NUM");
 						if(noInterest && s.contains(interest)){
 							noInterest = false;
 						}
-						sb.append('\t').append(s).append('\n');
+						lines.add(s);
 					}
 					if(noInterest) continue;
-					if(sb.length()>0 && sb.charAt(sb.length() - 1) == '\n'){
-						sb.setLength(sb.length() - 1);
-					}
-					count.compute(sb.toString(), (k, v) -> {
+					count.compute(List.copyOf(lines), (k, v) -> {
 						return v == null? 1 : v + 1;
 					});
 				}
 				UtilL.sleep(1);
 			}
 			
-			if(true){
-				var avg = (long)count.values().stream().mapToLong(i -> i).average().orElse(0);
+			if(print){
+				var avg = (long)Iters.values(count).mapToLong(i -> i).average().orElse(0);
 				LogUtil.Init.detach();
-				LogUtil.println(count.entrySet().stream().filter(e -> e.getValue()>avg).sorted(Comparator.comparing(e -> -e.getValue())).limit(10).map(e -> e.getValue() + "\n" + e.getKey()).collect(Collectors.joining("\n\n")));
+				LogUtil.println(
+					Iters.entries(count).filter(e -> e.getValue()>avg).sortedByL(e -> -e.getValue()).limit(10)
+					     .map(e -> e.getValue() + "\n" + Iters.from(e.getKey()).joinAsStr("\n", l -> "\t" + l))
+					     .joinAsStr("\n\n")
+				);
 				LogUtil.println(avg);
 			}
 			
@@ -75,19 +83,22 @@ public class Sampling{
 		return exec;
 	}
 	
-	private static void writeLog(String logName, Map<String, Long> count){
+	private static void writeLog(String logName, Map<List<String>, Long> count){
 		try(var f = new FileWriter(logName)){
-			var m = new LinkedHashMap<>();
-			count.entrySet().stream().sorted(Comparator.comparingLong(e -> -e.getValue())).forEach(e -> m.put(e.getKey(), e.getValue()));
-			f.write(new GsonBuilder().create().toJson(m));
+			var m = Iters.entries(count).sorted(Comparator.<Map.Entry<List<String>, Long>>comparingLong(
+				e -> -e.getValue()).thenComparing(e -> e.getKey().size())
+			).toModList(e -> {
+				return Map.of("trace", e.getKey(), "samples", e.getValue());
+			});
+			f.write(new GsonBuilder().setPrettyPrinting().create().toJson(m));
 		}catch(Throwable e){
 			LogUtil.println(e);
 		}
 	}
-	private static void readLog(String logName, Map<String, Long> count){
+	private static void readLog(String logName, Map<List<String>, Long> count){
 		try(var f = new FileReader(logName)){
-			new GsonBuilder().create().<HashMap<?, ?>>fromJson(f, HashMap.class).forEach((k, v) -> {
-				count.put((String)k, ((Number)v).longValue());
+			new GsonBuilder().create().<ArrayList<Map<?, ?>>>fromJson(f, ArrayList.class).forEach(m -> {
+				count.put(List.copyOf((List<String>)m.get("trace")), ((Number)m.get("samples")).longValue());
 			});
 		}catch(Throwable e){
 			LogUtil.println(e);
