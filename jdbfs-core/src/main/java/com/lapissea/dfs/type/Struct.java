@@ -348,8 +348,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		init(runNow, () -> {
 			calcHash();
 			
-			isDefinition = UtilL.instanceOf(type, IOInstance.Def.class);
-			if(IOInstance.Def.isDefinition(type)){
+			var idef = isDefinition = IOInstance.Def.isDefinition(type);
+			if(idef){
 				concreteType = DefInstanceCompiler.getImpl(type);
 			}else concreteType = type;
 			
@@ -531,8 +531,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private void resolveConcrete(){
-		isDefinition = UtilL.instanceOf(type, IOInstance.Def.class);
-		if(IOInstance.Def.isDefinition(type)){
+		var idef = isDefinition = IOInstance.Def.isDefinition(type);
+		if(idef){
 			waitForState(STATE_CONCRETE_TYPE);
 		}else{
 			concreteType = type;
@@ -776,10 +776,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(!isDefinition()){
 			throw new UnsupportedOperationException();
 		}
-		var typ = (Class<E>)getType();
-		if(!typ.isInterface()){
-			typ = (Class<E>)IOInstance.Def.unmap((Class<E>)type).orElseThrow();
-		}
+		var typ   = (Class<E>)this.getType();
 		var names = Iters.from(f).toSet(IOField::getName);
 		var impl  = IOInstance.Def.partialImplementation(typ, names);
 		return Struct.of(impl);

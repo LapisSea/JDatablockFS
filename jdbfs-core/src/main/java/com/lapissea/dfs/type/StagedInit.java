@@ -62,6 +62,8 @@ public abstract class StagedInit implements Stringify{
 	private int      state    = STATE_NOT_STARTED;
 	private InitInfo initInfo = new InitInfo();
 	
+	private Map<Integer, String> statesCache;
+	
 	protected void init(boolean runNow, Runnable init){
 		init(runNow, init, null);
 	}
@@ -124,11 +126,12 @@ public abstract class StagedInit implements Stringify{
 	}
 	
 	private void validateNewState(int state){
-		if(getStateInfo(state).isEmpty()){
+		if(getStateName(state).isEmpty()){
 			throw new IllegalArgumentException("Unknown state: " + state);
 		}
-		if(state<=this.state){
-			throw new IllegalArgumentException("State must advance! Current state: " + stateToString(this.state) + ", Requested state: " + stateToString(state));
+		var ts = this.state;
+		if(state<=ts){
+			throw new IllegalArgumentException("State must advance! Current state: " + stateToString(ts) + ", Requested state: " + stateToString(state));
 		}
 	}
 	
@@ -226,12 +229,19 @@ public abstract class StagedInit implements Stringify{
 	}
 	
 	protected String stateToString(int state){
-		return getStateInfo(state).map(StateInfo::name).orElseGet(() -> "UNKNOWN_STATE_" + state);
+		return getStateName(state).orElseGet(() -> "UNKNOWN_STATE_" + state);
 	}
 	
-	protected Optional<StateInfo> getStateInfo(int stateId){
-		return listStates().filter(i -> i.id == stateId).findFirst();
+	protected Optional<String> getStateName(int stateId){
+		return Optional.ofNullable(getStates().get(stateId));
 	}
+	
+	private Map<Integer, String> getStates(){
+		var s = statesCache;
+		if(s == null) s = statesCache = listStates().toMap(StateInfo::id, StateInfo::name);
+		return s;
+	}
+	
 	/***
 	 * This method lists information about all states that this object can be in. This method is only
 	 * called when debugging or calling toString so performance is not of great concern.
