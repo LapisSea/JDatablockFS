@@ -461,11 +461,15 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default boolean noneIs(T value){ return !anyIs(value); }
+	default boolean anyIsNot(T value){
+		for(T t : this){
+			if(t != value) return true;
+		}
+		return false;
+	}
 	default boolean anyIs(T value){
 		for(T t : this){
-			if(t == value){
-				return true;
-			}
+			if(t == value) return true;
 		}
 		return false;
 	}

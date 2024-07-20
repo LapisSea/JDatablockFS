@@ -158,6 +158,10 @@ public final class Iters{
 		public String toString(){
 			return data.toString();
 		}
+		@Override
+		public List<T> toList(){
+			return List.copyOf(data);
+		}
 	}
 	
 	private record ArrayIterable<T>(T[] data) implements IterablePP.SizedPP<T>{
@@ -185,6 +189,10 @@ public final class Iters{
 		@Override
 		public String toString(){
 			return TextUtil.unknownArrayToString(data);
+		}
+		@Override
+		public List<T> toList(){
+			return List.of(data);
 		}
 	}
 	
@@ -214,6 +222,10 @@ public final class Iters{
 		@Override
 		public String toString(){
 			return "[" + element + "]";
+		}
+		@Override
+		public List<T> toList(){
+			return List.of(element);
 		}
 	}
 	

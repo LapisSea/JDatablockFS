@@ -11,6 +11,7 @@ import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+@SuppressWarnings("unused")
 public interface IterablePPSource<T> extends Iterable<T>{
 	
 	OptionalInt tryGetSize();
@@ -57,13 +58,13 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default IterableIntPP mappedToInt()                      { return iter().mapToInt(); }
 	default IterableIntPP mappedToInt(FunctionOI<T> mapper)  { return iter().mapToInt(mapper); }
 	
-	default <E extends Throwable> boolean noneMatch(UnsafePredicate<T, E> predicate) throws E{
+	default <E extends Throwable> boolean noneMatches(UnsafePredicate<T, E> predicate) throws E{
 		return iter().noneMatch(predicate);
 	}
-	default <E extends Throwable> boolean anyMatch(UnsafePredicate<T, E> predicate) throws E{
+	default <E extends Throwable> boolean anyMatches(UnsafePredicate<T, E> predicate) throws E{
 		return iter().anyMatch(predicate);
 	}
-	default <E extends Throwable> boolean allMatch(UnsafePredicate<T, E> predicate) throws E{
+	default <E extends Throwable> boolean allMatches(UnsafePredicate<T, E> predicate) throws E{
 		return iter().allMatch(predicate);
 	}
 	
