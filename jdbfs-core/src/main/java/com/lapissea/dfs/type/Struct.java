@@ -492,6 +492,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Override
+	public String toShortString(){
+		return cleanName();
+	}
+	
+	@Override
 	public String toString(){
 		var name = cleanName();
 		var sj   = new StringJoiner(", ", name + "{", "}");

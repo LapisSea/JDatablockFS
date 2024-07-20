@@ -4,6 +4,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -34,7 +35,7 @@ import java.util.function.Consumer;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
-public abstract class StagedInit{
+public abstract class StagedInit implements Stringify{
 	
 	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveValLocking();
 	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
@@ -107,7 +108,7 @@ public abstract class StagedInit{
 					initInfo.conditionChange.signalAll();
 				}
 			}
-		});
+		}, "Init->" + this.toShortString());
 	}
 	
 	protected final void setInitState(int state){
@@ -174,7 +175,7 @@ public abstract class StagedInit{
 					return;
 				}
 				onEvent.run();
-			});
+			}, this.toShortString() + "->" + stateToString(state));
 		}
 	}
 	
