@@ -37,8 +37,8 @@ import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
 public abstract class StagedInit implements Stringify{
 	
-	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveValLocking();
-	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
+	private static final Duration LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveLocking();
+	private static final boolean  DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD != null && Log.DEBUG;
 	
 	private static class InitInfo{
 		private Throwable error;
@@ -298,7 +298,7 @@ public abstract class StagedInit implements Stringify{
 	
 	private void reportPossibleLock(Instant start, Thread initThread){
 		if(initThread == null || !Log.WARN) return;
-		if(Duration.between(start, Instant.now()).toMillis()<LONG_WAIT_THRESHOLD) return;
+		if(Duration.between(start, Instant.now()).compareTo(LONG_WAIT_THRESHOLD)<0) return;
 		Log.warn(
 			"possible lock at {}#yellow on thread {}#yellow\n{}",
 			this, initThread.getName(), Iters.from(initThread.getStackTrace()).joinAsStr("\n", s -> "\t" + s)
@@ -314,7 +314,7 @@ public abstract class StagedInit implements Stringify{
 			}
 		}
 		var waitTime = Duration.between(start, end);
-		if(waitTime.toMillis()>LONG_WAIT_THRESHOLD){
+		if(waitTime.compareTo(LONG_WAIT_THRESHOLD)>0){
 			Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", stateToString(state), this, waitTime.toMillis());
 		}
 	}

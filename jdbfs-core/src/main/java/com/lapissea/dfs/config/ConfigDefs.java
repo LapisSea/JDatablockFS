@@ -6,6 +6,7 @@ import com.lapissea.dfs.type.compilation.JorthLogger.CodeLog;
 import com.lapissea.util.LogUtil;
 
 import java.net.URL;
+import java.time.Duration;
 import java.util.Objects;
 
 import static com.lapissea.dfs.config.ConfigTools.*;
@@ -32,7 +33,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool               PRINT_FLAGS       = flagB("log.printFlags", () -> deb() && LOG_LEVEL.resolve().isWithin(INFO));
 	Flag.FBool               PRINT_COMPILATION = flagB("log.printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
-	Flag.FInt              LONG_WAIT_THRESHOLD = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
+	Flag.FDur              LONG_WAIT_THRESHOLD = flagDur("loading.longWaitThreshold", RELEASE_MODE.boolMap(null, Duration.ofMillis(10000/cores()))).positive();
 	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE   = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
 	Flag.FBool             COSTLY_STACK_TRACE  = flagB("tweaks.costlyStackTrace", deb());
 	
@@ -50,8 +51,8 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FStr  RUNNER_BASE_TASK_NAME       = flagS("runner.baseTaskName", "Task");
 	Flag.FBool RUNNER_ONLY_VIRTUAL_WORKERS = flagB("runner.onlyVirtual", false);
 	Flag.FBool RUNNER_MUTE_CHOKE_WARNING   = flagB("runner.muteWarning", false);
-	Flag.FInt  RUNNER_TASK_CHOKE_TIME_MS   = flagI("runner.taskChokeTime", () -> 2000/cores()).natural();
-	Flag.FInt  RUNNER_WATCHER_TIMEOUT_MS   = flagI("runner.watcherTimeout", 1000).natural();
+	Flag.FDur  RUNNER_TASK_CHOKE_TIME      = flagDur("runner.taskChokeTime", () -> Duration.ofMillis(2000/cores())).positive().limitMaxNs(Long.MAX_VALUE);
+	Flag.FDur  RUNNER_WATCHER_TIMEOUT      = flagDur("runner.watcherTimeout", Duration.ofMillis(1000)).positive().limitMaxMs(Integer.MAX_VALUE);
 	
 	Flag.FBool          CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
 	Flag.FBool          CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);

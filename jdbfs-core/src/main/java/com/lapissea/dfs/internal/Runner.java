@@ -88,9 +88,9 @@ public final class Runner{
 		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
 			
-			int timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.resolveVal();
-			int watcherTimeout = ConfigDefs.RUNNER_WATCHER_TIMEOUT_MS.resolveVal();
-			var toRestart      = new ArrayList<Task>();
+			long timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME.resolve().toNanos();
+			int  watcherTimeout = (int)ConfigDefs.RUNNER_WATCHER_TIMEOUT.resolve().toMillis();
+			var  toRestart      = new ArrayList<Task>();
 			
 			// debug wait prevents debugging sessions from often restarting the watcher by
 			// repeatedly sleeping for a short time and checking if it should still exit.
