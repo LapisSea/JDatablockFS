@@ -20,9 +20,17 @@ public sealed interface LogMessage{
 		}
 	}
 	
-	record Start(Optional<String> fuzzName) implements LogMessage{ }
+	record Start(Optional<String> fuzzName) implements LogMessage{
+		public Start{
+			Objects.requireNonNull(fuzzName);
+		}
+	}
 	
 	record End() implements LogMessage{ }
 	
-	record CustomMessage(String message) implements LogMessage{ }
+	record CustomMessage(String message) implements LogMessage{
+		public CustomMessage{
+			Objects.requireNonNull(message);
+		}
+	}
 }
