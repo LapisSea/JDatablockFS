@@ -333,6 +333,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private boolean[] hasPools;
 	
 	private boolean canHavePointers;
+	private boolean needsBuilderObj;
 	private byte    invalidInitialNulls = -1;
 	
 	private NewObj.Instance<T> emptyConstructor;
@@ -356,7 +357,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			setInitState(STATE_CONCRETE_TYPE);
 			
 			fields = FieldCompiler.compile(this);
+			needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
+			
 			setInitState(STATE_FIELD_MAKE);
+			
 			for(var field : fields){
 				try{
 					field.init(fields);
@@ -365,7 +369,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					throw new RuntimeException("Failed to init " + field, e);
 				}
 			}
+			
 			setInitState(STATE_INIT_FIELDS);
+			
 			poolObjectsSize = calcPoolObjectsSize();
 			poolPrimitivesSize = calcPoolPrimitivesSize();
 			hasPools = calcHasPools();
@@ -595,7 +601,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			          .orElse(true);
 		}
 		var s = ofUnknown(instanceClass, STATE_DONE);
-		return s.canHavePointers;
+		return s.getCanHavePointers();
 	}
 	
 	@Override
@@ -753,6 +759,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public boolean isDefinition(){
 		waitForState(STATE_CONCRETE_TYPE);
 		return isDefinition;
+	}
+	
+	public boolean needsBuilderObj(){
+		waitForState(STATE_FIELD_MAKE);
+		return needsBuilderObj;
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

@@ -14,6 +14,7 @@ import java.io.IOException;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class ReadOnlyTests{
 	
@@ -35,6 +36,7 @@ public class ReadOnlyTests{
 	@Test
 	public void simpleInstanceStruct(){
 		var struct = Struct.of(Simple.class, STATE_DONE);
+		assertTrue(struct.needsBuilderObj(), "Struct needs builder obj");
 		Log.info("Ok: {}#green", struct);
 	}
 	
