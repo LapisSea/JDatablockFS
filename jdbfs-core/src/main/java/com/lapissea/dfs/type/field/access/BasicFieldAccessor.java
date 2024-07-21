@@ -43,6 +43,9 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 		private void failReadOnly(){
 			throw new UnsupportedOperationException("Field for " + getName() + " is final, can not set it!");
 		}
+		
+		@Override
+		public boolean isReadOnly(){ return readOnlyField; }
 	}
 	
 	protected static void validateSetter(Type fieldType, Method func){

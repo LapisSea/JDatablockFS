@@ -119,6 +119,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 						throw new RuntimeException(e);
 					}
 				}
+				@Override
+				public boolean isReadOnly(){ return false; }
 			};
 			
 			SizeDescriptor<IONode<T>> valDesc = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
@@ -170,6 +172,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 						throw new RuntimeException(e);
 					}
 				}
+				@Override
+				public boolean isReadOnly(){ return false; }
 			};
 			
 			var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){

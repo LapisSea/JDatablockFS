@@ -1724,6 +1724,8 @@ public class BinaryGridRenderer implements DataRenderer{
 											public void set(VarPool<T> ioPool, T instance, Object value){
 												throw new UnsupportedOperationException();
 											}
+											@Override
+											public boolean isReadOnly(){ return false; }
 										});
 										for(int i = 0; i<arrSiz; i++){
 											index[0] = i;
@@ -1777,6 +1779,8 @@ public class BinaryGridRenderer implements DataRenderer{
 										public void set(VarPool<T> ioPool, T instance, Object value){
 											throw new UnsupportedOperationException();
 										}
+										@Override
+										public boolean isReadOnly(){ return false; }
 									}, SizeDescriptor.Unknown.of((ioPool1, prov, value) -> {
 										throw new ShouldNeverHappenError();
 									}));
@@ -1840,6 +1844,8 @@ public class BinaryGridRenderer implements DataRenderer{
 											public Type getGenericType(GenericContext genericContext){
 												return comp;
 											}
+											@Override
+											public boolean isReadOnly(){ return false; }
 										}, SizeDescriptor.Fixed.of(WordSpace.BIT, siz));
 										
 										if(annotate)

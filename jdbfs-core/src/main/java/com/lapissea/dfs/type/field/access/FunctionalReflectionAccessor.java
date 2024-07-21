@@ -16,19 +16,22 @@ import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Map;
+import java.util.Optional;
 
 public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	public static class Ptr<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
 		
-		public Ptr(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Method getter, Method setter, String name){
+		public Ptr(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
+		           Method getter, Optional<Method> setter, String name){
 			super(struct, annotations, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
 			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() +
+				                               " is null but ChunkPointer is a non nullable type");
 			}
 			return num.getValue();
 		}
@@ -38,7 +41,10 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Type type){
+	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(
+		Struct<T> struct, String name, Method getter, Optional<Method> setter,
+		Map<Class<? extends Annotation>, ? extends Annotation> annotations, Type type
+	){
 		if(type == ChunkPointer.class){
 			return new Ptr<>(struct, annotations, getter, setter, name);
 		}else{
@@ -54,7 +60,8 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	private final MethodHandle getter;
 	private final MethodHandle setter;
 	
-	public FunctionalReflectionAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations, Method getter, Method setter, String name, Type genericType){
+	public FunctionalReflectionAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
+	                                    Method getter, Optional<Method> setter, String name, Type genericType){
 		super(struct, name, annotations);
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(genericType);
@@ -67,19 +74,20 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		if(getter.getParameterCount() != 0){
 			throw new MalformedStruct("getter must not have arguments\n" + getter);
 		}
-		
-		if(!Utils.genericInstanceOf(setter.getReturnType(), Void.TYPE)){
-			throw new MalformedStruct("setter returns " + setter.getReturnType() + " but " + genericType + " is required\n" + setter);
-		}
-		if(setter.getParameterCount() != 1){
-			throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + setter);
-		}
-		if(!Utils.genericInstanceOf(setter.getGenericParameterTypes()[0], genericType)){
-			throw new MalformedStruct("setter argument is " + setter.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + setter);
-		}
-		
 		this.getter = Access.makeMethodHandle(getter);
-		this.setter = Access.makeMethodHandle(setter);
+		
+		this.setter = setter.map(fn -> {
+			if(!Utils.genericInstanceOf(fn.getReturnType(), Void.TYPE)){
+				throw new MalformedStruct("setter returns " + fn.getReturnType() + " but " + genericType + " is required\n" + fn);
+			}
+			if(fn.getParameterCount() != 1){
+				throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + fn);
+			}
+			if(!Utils.genericInstanceOf(fn.getGenericParameterTypes()[0], genericType)){
+				throw new MalformedStruct("setter argument is " + fn.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + fn);
+			}
+			return Access.makeMethodHandle(fn);
+		}).orElse(null);
 	}
 	
 	@Override
@@ -236,4 +244,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	protected String strName(){
 		return getName() + "(F)";
 	}
+	
+	@Override
+	public boolean isReadOnly(){ return setter == null; }
 }
