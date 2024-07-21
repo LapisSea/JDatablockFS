@@ -182,6 +182,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created.postValidate();
 				}catch(Throwable e){
 					remove(struct);
+					errors.put(struct, e);
+					throw e;
 				}
 			}
 			
