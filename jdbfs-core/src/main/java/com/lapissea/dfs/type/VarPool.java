@@ -66,24 +66,7 @@ public interface VarPool<T extends IOInstance<T>>{
 				}
 				pool[off.index] = value;
 			}else{
-				Objects.requireNonNull(value);
-				var typ = accessor.getType();
-				if(typ == long.class) setLong(accessor, switch(value){
-					case Long n -> n;
-					case Integer n -> n;
-					case Short n -> n;
-					case Byte n -> n;
-					default -> throw new ClassCastException(value.getClass().getName() + " can not be converted to long");
-				});
-				else if(typ == int.class) setInt(accessor, switch(value){
-					case Integer n -> n;
-					case Short n -> n;
-					case Byte n -> n;
-					default -> throw new ClassCastException(value.getClass().getName() + " can not be converted to int");
-				});
-				else if(typ == byte.class) setByte(accessor, (Byte)value);
-				else if(typ == boolean.class) setBoolean(accessor, (Boolean)value);
-				else throw new NotImplementedException(typ.getName());
+				setPrimitive(accessor, value);
 			}
 		}
 		@Override
@@ -93,13 +76,37 @@ public interface VarPool<T extends IOInstance<T>>{
 				if(pool == null) return null;
 				return pool[ptr.index];
 			}else{
-				var typ = accessor.getType();
-				if(typ == long.class) return getLong(accessor);
-				if(typ == int.class) return getInt(accessor);
-				if(typ == boolean.class) return getBoolean(accessor);
-				if(typ == byte.class) return getByte(accessor);
-				throw new NotImplementedException(typ.getName());
+				return getBoxed(accessor);
 			}
+		}
+		
+		private void setPrimitive(VirtualAccessor<T> accessor, Object value){
+			Objects.requireNonNull(value);
+			var typ = accessor.getType();
+			if(typ == long.class) setLong(accessor, switch(value){
+				case Long n -> n;
+				case Integer n -> n;
+				case Short n -> n;
+				case Byte n -> n;
+				default -> throw new ClassCastException(value.getClass().getName() + " can not be converted to long");
+			});
+			else if(typ == int.class) setInt(accessor, switch(value){
+				case Integer n -> n;
+				case Short n -> n;
+				case Byte n -> n;
+				default -> throw new ClassCastException(value.getClass().getName() + " can not be converted to int");
+			});
+			else if(typ == byte.class) setByte(accessor, (Byte)value);
+			else if(typ == boolean.class) setBoolean(accessor, (Boolean)value);
+			else throw new NotImplementedException(typ.getName());
+		}
+		private Object getBoxed(VirtualAccessor<T> accessor){
+			var typ = accessor.getType();
+			if(typ == long.class) return getLong(accessor);
+			if(typ == int.class) return getInt(accessor);
+			if(typ == boolean.class) return getBoolean(accessor);
+			if(typ == byte.class) return getByte(accessor);
+			throw new NotImplementedException(typ.getName());
 		}
 		
 		@Override

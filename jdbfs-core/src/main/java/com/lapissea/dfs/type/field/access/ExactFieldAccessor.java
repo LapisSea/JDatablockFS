@@ -232,11 +232,14 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return switch(typeID){
 			case ID_DOUBLE -> getExactDouble(ioPool, instance);
 			case ID_FLOAT -> getExactFloat(ioPool, instance);
-			case ID_OBJECT -> switch(getExactObject(ioPool, instance)){
-				case Double n -> n;
-				case Float n -> n;
-				default -> throw classCastThrow();
-			};
+			case ID_OBJECT -> getObjAsDouble(ioPool, instance);
+			default -> throw classCastThrow();
+		};
+	}
+	private double getObjAsDouble(VarPool<CTyp> ioPool, CTyp instance){
+		return switch(getExactObject(ioPool, instance)){
+			case Double n -> n;
+			case Float n -> n;
 			default -> throw classCastThrow();
 		};
 	}
@@ -253,9 +256,12 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_FLOAT -> getExactFloat(ioPool, instance);
-			case ID_OBJECT -> (Float)getExactObject(ioPool, instance);
+			case ID_OBJECT -> getObjAsFloat(ioPool, instance);
 			default -> throw classCastThrow();
 		};
+	}
+	private float getObjAsFloat(VarPool<CTyp> ioPool, CTyp instance){
+		return (Float)getExactObject(ioPool, instance);
 	}
 	@Override
 	public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
@@ -271,9 +277,12 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_BYTE -> getExactByte(ioPool, instance);
-			case ID_OBJECT -> (Byte)getExactObject(ioPool, instance);
+			case ID_OBJECT -> getObjAsByte(ioPool, instance);
 			default -> throw classCastThrow();
 		};
+	}
+	private byte getObjAsByte(VarPool<CTyp> ioPool, CTyp instance){
+		return (Byte)getExactObject(ioPool, instance);
 	}
 	@Override
 	public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
@@ -291,9 +300,12 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_BOOLEAN -> getExactBoolean(ioPool, instance);
-			case ID_OBJECT -> (Boolean)getExactObject(ioPool, instance);
+			case ID_OBJECT -> getObjAsBoolean(ioPool, instance);
 			default -> throw classCastThrow();
 		};
+	}
+	private boolean getObjAsBoolean(VarPool<CTyp> ioPool, CTyp instance){
+		return (Boolean)getExactObject(ioPool, instance);
 	}
 	@Override
 	public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
@@ -311,13 +323,16 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 			case ID_INT -> getExactInt(ioPool, instance);
 			case ID_SHORT -> getExactShort(ioPool, instance);
 			case ID_BYTE -> getExactByte(ioPool, instance);
-			case ID_OBJECT -> switch(getExactObject(ioPool, instance)){
-				case Long n -> n;
-				case Integer n -> n;
-				case Short n -> n;
-				case Byte n -> n;
-				default -> throw classCastThrow();
-			};
+			case ID_OBJECT -> getObjAsLong(ioPool, instance);
+			default -> throw classCastThrow();
+		};
+	}
+	private long getObjAsLong(VarPool<CTyp> ioPool, CTyp instance){
+		return switch(getExactObject(ioPool, instance)){
+			case Long n -> n;
+			case Integer n -> n;
+			case Short n -> n;
+			case Byte n -> n;
 			default -> throw classCastThrow();
 		};
 	}
@@ -336,12 +351,15 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 			case ID_INT -> getExactInt(ioPool, instance);
 			case ID_SHORT -> getExactShort(ioPool, instance);
 			case ID_BYTE -> getExactByte(ioPool, instance);
-			case ID_OBJECT -> switch(getExactObject(ioPool, instance)){
-				case Integer n -> n;
-				case Short n -> n;
-				case Byte n -> n;
-				default -> throw classCastThrow();
-			};
+			case ID_OBJECT -> getObjAsInt(ioPool, instance);
+			default -> throw classCastThrow();
+		};
+	}
+	private int getObjAsInt(VarPool<CTyp> ioPool, CTyp instance){
+		return switch(getExactObject(ioPool, instance)){
+			case Integer n -> n;
+			case Short n -> n;
+			case Byte n -> n;
 			default -> throw classCastThrow();
 		};
 	}
@@ -360,11 +378,14 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return switch(typeID){
 			case ID_SHORT -> getExactShort(ioPool, instance);
 			case ID_BYTE -> getExactByte(ioPool, instance);
-			case ID_OBJECT -> switch(getExactObject(ioPool, instance)){
-				case Short n -> n;
-				case Byte n -> n;
-				default -> throw classCastThrow();
-			};
+			case ID_OBJECT -> getObjAsShort(ioPool, instance);
+			default -> throw classCastThrow();
+		};
+	}
+	private short getObjAsShort(VarPool<CTyp> ioPool, CTyp instance){
+		return switch(getExactObject(ioPool, instance)){
+			case Short n -> n;
+			case Byte n -> n;
 			default -> throw classCastThrow();
 		};
 	}
@@ -382,10 +403,13 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	public char getChar(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_CHAR -> getExactChar(ioPool, instance);
-			case ID_OBJECT -> switch(getExactObject(ioPool, instance)){
-				case Character n -> n;
-				default -> throw classCastThrow();
-			};
+			case ID_OBJECT -> getObjAsChar(ioPool, instance);
+			default -> throw classCastThrow();
+		};
+	}
+	private char getObjAsChar(VarPool<CTyp> ioPool, CTyp instance){
+		return switch(getExactObject(ioPool, instance)){
+			case Character n -> n;
 			default -> throw classCastThrow();
 		};
 	}
