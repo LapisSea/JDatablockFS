@@ -26,13 +26,13 @@ public final class ConfigUtils{
 		
 		private void logBad(String nameOfBadEnum){
 			
-			logBadValue(Log.resolveArgs(
+			logBadValue(Log.fmt(
 				"{} can only be one of {} but is actually \"{}\". Defaulting to {}",
 				nameOfBadEnum,
 				value.getClass().getEnumConstants(),
 				incorrect,
 				value
-			).toString());
+			));
 		}
 	}
 	
@@ -55,9 +55,9 @@ public final class ConfigUtils{
 	}
 	
 	private static void logBadInt(String name, String s){
-		logBadValue(Log.resolveArgs(
+		logBadValue(Log.fmt(
 			"{} can only be an integer but is \"{}\"", name, s
-		).toString());
+		));
 	}
 	
 	public static Duration configDuration(String name, Map<String, ?> map, Duration defaultValue){
@@ -113,9 +113,9 @@ public final class ConfigUtils{
 	}
 	
 	private static void logBadDuration(String name, String s, String extra){
-		logBadValue(Log.resolveArgs(
+		logBadValue(Log.fmt(
 			"{} can only be a duration. A duration is made of number + a unit of time like: h/hour, m/min... but is \"{}\"{}", name, s, extra
-		).toString());
+		));
 	}
 	
 	public static <T extends Enum<T>> T configEnum(String name, Map<String, ?> map, T defaultValue){
@@ -167,9 +167,9 @@ public final class ConfigUtils{
 	}
 	
 	private static void logBadBool(String name, String val){
-		logBadValue(Log.resolveArgs(
+		logBadValue(Log.fmt(
 			"{} can only be one of [true, false, yes, no] but is \"{}\"", name, val
-		).toString());
+		));
 	}
 	
 	

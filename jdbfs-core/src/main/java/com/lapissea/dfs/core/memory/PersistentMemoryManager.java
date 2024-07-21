@@ -196,11 +196,11 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			for(var c : stack){
 				for(Chunk lockedCH : c.head.walkNext()){
 					if(chToFree == lockedCH){
-						var err = Log.resolveArgs(
+						var err = Log.fmt(
 							"{}#red was called to be freed but it is currently locked{}!",
 							chToFree,
-							lockedCH == c.head? "" : Log.resolveArgs(" by {}#yellow", lockedCH)
-						).toString();
+							lockedCH == c.head? "" : Log.fmt(" by {}#yellow", lockedCH)
+						);
 						throw new FreeWhileUsed(err);
 					}
 				}

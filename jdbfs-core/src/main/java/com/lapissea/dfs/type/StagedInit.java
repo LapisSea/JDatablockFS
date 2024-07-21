@@ -159,6 +159,8 @@ public abstract class StagedInit implements Stringify{
 	
 	public final void waitForState(int state){
 		if(this.state>=state) return;
+		// This is a separate method as it is called rarely and often does not need to be inlined or even compiled.
+		// Rare path as function a day keeps the "Inlined: No, Too big" away
 		actuallyWaitForState(state);
 	}
 	
@@ -280,7 +282,7 @@ public abstract class StagedInit implements Stringify{
 	
 	private void actuallyWaitForState(int state){
 		var info = initInfo;
-		if(info == null) return;//If no info, then the object is inited
+		if(info == null) return;//If no info, then the object is initialized
 		
 		threadCheck(info.ctxThread);
 		var start = DO_TIMESTAMPS? Instant.now() : Instant.EPOCH;

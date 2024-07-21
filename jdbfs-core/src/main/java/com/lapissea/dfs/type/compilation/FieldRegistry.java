@@ -60,7 +60,7 @@ final class FieldRegistry{
 			if(log) System.setProperty(FieldRegistry.class.getName() + "#printed", "true");
 			
 			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
-			var lines = log? new ConcurrentLinkedDeque<CharSequence>() : null;
+			var lines = log? new ConcurrentLinkedDeque<String>() : null;
 			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
@@ -87,11 +87,11 @@ final class FieldRegistry{
 			return usages;
 		}
 		
-		private static void log(String str, Class<?> typ, Deque<CharSequence> lines){
-			if(lines != null) lines.add(Log.resolveArgs(str, typ));
+		private static void log(String str, Class<?> typ, Deque<String> lines){
+			if(lines != null) lines.add(Log.fmt(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<CharSequence> lines){
+		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
 			if(type.getSimpleName().contains("NoIO")){
 				log("Ignoring \"NoIO\" {#blackBright{}~#}", type, lines);
 				return;

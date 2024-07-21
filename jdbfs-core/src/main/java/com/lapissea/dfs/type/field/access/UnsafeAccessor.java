@@ -134,7 +134,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		}
 	}
 	
-	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor.Funct<CTyp>{
+	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends Funct<CTyp>{
 		
 		public PtrFunc(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
 			super(struct, field, getter, setter, name, ChunkPointer.class);

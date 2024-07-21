@@ -101,7 +101,7 @@ public class Log{
 		                     .asCollection();
 		
 		if(!badValues.isEmpty()){
-			var msg = resolveArgs(
+			var msg = fmt(
 				"{#redBrightUnrecognised flags:#}\n{}",
 				ConfigTools.configFlagsToTable(badValues, 4, false)
 			).toString();
@@ -113,156 +113,158 @@ public class Log{
 		return badValues.isEmpty();
 	}
 	
-	public static void log(String message){
-		if(MIN) LogUtil.println(message);
+	public static void log(String msg){
+		if(MIN) LogUtil.println(msg);
 	}
 	
-	public static void warn(String message)                                                    { if(WARN) warn0(resolveArgs(message)); }
-	public static void warn(String message, Object arg1)                                       { if(WARN) warn0(resolveArgs(message, arg1)); }
-	public static void warn(String message, Object arg1, Object arg2)                          { if(WARN) warn0(resolveArgs(message, arg1, arg2)); }
-	public static void warn(String message, Object arg1, Object arg2, Object arg3)             { if(WARN) warn0(resolveArgs(message, arg1, arg2, arg3)); }
-	public static void warn(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(WARN) warn0(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-	public static void warn(String message, Supplier<List<?>> lazyArgs)                        { if(WARN) warn0(resolveArgs(message, lazyArgs)); }
-	public static void warn(String message, Object... args)                                    { if(WARN) warn0(resolveArgs(message, args)); }
-	private static void warn0(CharSequence message){
-		LogUtil.printlnEr(message);
+	public static void warn(String msg)                                                    { if(WARN) w(fmt(msg)); }
+	public static void warn(String msg, Object arg1)                                       { if(WARN) w(fmt(msg, arg1)); }
+	public static void warn(String msg, Object arg1, Object arg2)                          { if(WARN) w(fmt(msg, arg1, arg2)); }
+	public static void warn(String msg, Object arg1, Object arg2, Object arg3)             { if(WARN) w(fmt(msg, arg1, arg2, arg3)); }
+	public static void warn(String msg, Object arg1, Object arg2, Object arg3, Object arg4){ if(WARN) w(fmt(msg, arg1, arg2, arg3, arg4)); }
+	public static void warn(String msg, Supplier<List<?>> lazyArgs)                        { if(WARN) w(fmt(msg, lazyArgs)); }
+	public static void warn(String msg, Object... args)                                    { if(WARN) w(fmt(msg, args)); }
+	private static void w(String msg){
+		LogUtil.printlnEr(msg);
 	}
 	
-	public static void info(String message)                                                    { if(INFO) info0(resolveArgs(message)); }
-	public static void info(String message, Object arg1)                                       { if(INFO) info0(resolveArgs(message, arg1)); }
-	public static void info(String message, Object arg1, Object arg2)                          { if(INFO) info0(resolveArgs(message, arg1, arg2)); }
-	public static void info(String message, Object arg1, Object arg2, Object arg3)             { if(INFO) info0(resolveArgs(message, arg1, arg2, arg3)); }
-	public static void info(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(INFO) info0(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-	public static void info(String message, Supplier<List<?>> lazyArgs)                        { if(INFO) info0(resolveArgs(message, lazyArgs)); }
-	public static void info(String message, Object... args)                                    { if(INFO) info0(resolveArgs(message, args)); }
-	private static void info0(CharSequence message){
-		LogUtil.println(message);
+	public static void info(String msg)                                                    { if(INFO) i(fmt(msg)); }
+	public static void info(String msg, Object arg1)                                       { if(INFO) i(fmt(msg, arg1)); }
+	public static void info(String msg, Object arg1, Object arg2)                          { if(INFO) i(fmt(msg, arg1, arg2)); }
+	public static void info(String msg, Object arg1, Object arg2, Object arg3)             { if(INFO) i(fmt(msg, arg1, arg2, arg3)); }
+	public static void info(String msg, Object arg1, Object arg2, Object arg3, Object arg4){ if(INFO) i(fmt(msg, arg1, arg2, arg3, arg4)); }
+	public static void info(String msg, Supplier<List<?>> lazyArgs)                        { if(INFO) i(fmt(msg, lazyArgs)); }
+	public static void info(String msg, Object... args)                                    { if(INFO) i(fmt(msg, args)); }
+	private static void i(String msg){
+		LogUtil.println(msg);
 	}
 	
-	public static void debug(String message)                                                    { if(DEBUG) debug0(resolveArgs(message)); }
-	public static void debug(String message, Object arg1)                                       { if(DEBUG) debug0(resolveArgs(message, arg1)); }
-	public static void debug(String message, Object arg1, Object arg2)                          { if(DEBUG) debug0(resolveArgs(message, arg1, arg2)); }
-	public static void debug(String message, Object arg1, Object arg2, Object arg3)             { if(DEBUG) debug0(resolveArgs(message, arg1, arg2, arg3)); }
-	public static void debug(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(DEBUG) debug0(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-	public static void debug(String message, Supplier<List<?>> lazyArgs)                        { if(DEBUG) debug0(resolveArgs(message, lazyArgs)); }
-	public static void debug(String message, Object... args)                                    { if(DEBUG) debug0(resolveArgs(message, args)); }
-	private static void debug0(CharSequence message){
-		LogUtil.println(message);
+	public static void debug(String msg)                                                    { if(DEBUG) d(fmt(msg)); }
+	public static void debug(String msg, Object arg1)                                       { if(DEBUG) d(fmt(msg, arg1)); }
+	public static void debug(String msg, Object arg1, Object arg2)                          { if(DEBUG) d(fmt(msg, arg1, arg2)); }
+	public static void debug(String msg, Object arg1, Object arg2, Object arg3)             { if(DEBUG) d(fmt(msg, arg1, arg2, arg3)); }
+	public static void debug(String msg, Object arg1, Object arg2, Object arg3, Object arg4){ if(DEBUG) d(fmt(msg, arg1, arg2, arg3, arg4)); }
+	public static void debug(String msg, Supplier<List<?>> lazyArgs)                        { if(DEBUG) d(fmt(msg, lazyArgs)); }
+	public static void debug(String msg, Object... args)                                    { if(DEBUG) d(fmt(msg, args)); }
+	private static void d(String msg){
+		LogUtil.println(msg);
 	}
 	
-	public static void traceCall()                                                                  { if(TRACE) traceCall0("", getFrame(1)); }
-	public static void traceCall(String message)                                                    { if(TRACE) traceCall0(message, getFrame(1)); }
-	public static void traceCall(String message, Object arg1)                                       { if(TRACE) traceCall0(resolveArgs(message, arg1), getFrame(1)); }
-	public static void traceCall(String message, Object arg1, Object arg2)                          { if(TRACE) traceCall0(resolveArgs(message, arg1, arg2), getFrame(1)); }
-	public static void traceCall(String message, Object arg1, Object arg2, Object arg3)             { if(TRACE) traceCall0(resolveArgs(message, arg1, arg2, arg3), getFrame(1)); }
-	public static void traceCall(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(TRACE) traceCall0(resolveArgs(message, arg1, arg2, arg3, arg4), getFrame(1)); }
-	public static void traceCall(String message, Supplier<List<?>> lazyArgs)                        { if(TRACE) traceCall0(resolveArgs(message, lazyArgs), getFrame(1)); }
-	public static void traceCall(String message, Object... args)                                    { if(TRACE) traceCall0(resolveArgs(message, args), getFrame(1)); }
-	private static void traceCall0(CharSequence message, StackWalker.StackFrame frame){
-		var sb = new StringBuilder();
-		if(!message.isEmpty()) sb.append(ConsoleColors.BLACK_BRIGHT);
+	public static void traceCall()                                                              { if(TRACE) tc(""); }
+	public static void traceCall(String msg)                                                    { if(TRACE) tc(msg); }
+	public static void traceCall(String msg, Object arg1)                                       { if(TRACE) tc(fmt(msg, arg1)); }
+	public static void traceCall(String msg, Object arg1, Object arg2)                          { if(TRACE) tc(fmt(msg, arg1, arg2)); }
+	public static void traceCall(String msg, Object arg1, Object arg2, Object arg3)             { if(TRACE) tc(fmt(msg, arg1, arg2, arg3)); }
+	public static void traceCall(String msg, Object arg1, Object arg2, Object arg3, Object arg4){ if(TRACE) tc(fmt(msg, arg1, arg2, arg3, arg4)); }
+	public static void traceCall(String msg, Supplier<List<?>> lazyArgs)                        { if(TRACE) tc(fmt(msg, lazyArgs)); }
+	public static void traceCall(String msg, Object... args)                                    { if(TRACE) tc(fmt(msg, args)); }
+	private static void tc(String msg){
+		var frame = getFrame(2);
+		var sb    = new StringBuilder();
+		if(!msg.isEmpty()) sb.append(ConsoleColors.BLACK_BRIGHT);
 		Utils.frameToStr(sb, frame);
-		if(!message.isEmpty()) sb.append(" ->\t").append(ConsoleColors.RESET).append(message);
+		if(!msg.isEmpty()) sb.append(" ->\t").append(ConsoleColors.RESET).append(msg);
 		trace(sb.toString());
 	}
 	
-	public static void trace(String message, Object arg1)                                       { if(TRACE) trace0(resolveArgs(message, arg1)); }
-	public static void trace(String message, Object arg1, Object arg2)                          { if(TRACE) trace0(resolveArgs(message, arg1, arg2)); }
-	public static void trace(String message, Object arg1, Object arg2, Object arg3)             { if(TRACE) trace0(resolveArgs(message, arg1, arg2, arg3)); }
-	public static void trace(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(TRACE) trace0(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-	public static void trace(String message, Supplier<List<?>> lazyArgs)                        { if(TRACE) trace0(resolveArgs(message, lazyArgs)); }
-	public static void trace(String message, Object... args)                                    { if(TRACE) trace0(resolveArgs(message, args)); }
-	public static void trace(String message)                                                    { if(TRACE) trace0(resolveArgs(message)); }
-	private static void trace0(CharSequence message){
-		if(TRACE) LogUtil.println(message);
+	public static void trace(String msg, Object arg1)                                       { if(TRACE) t(fmt(msg, arg1)); }
+	public static void trace(String msg, Object arg1, Object arg2)                          { if(TRACE) t(fmt(msg, arg1, arg2)); }
+	public static void trace(String msg, Object arg1, Object arg2, Object arg3)             { if(TRACE) t(fmt(msg, arg1, arg2, arg3)); }
+	public static void trace(String msg, Object arg1, Object arg2, Object arg3, Object arg4){ if(TRACE) t(fmt(msg, arg1, arg2, arg3, arg4)); }
+	public static void trace(String msg, Supplier<List<?>> lazyArgs)                        { if(TRACE) t(fmt(msg, lazyArgs)); }
+	public static void trace(String msg, Object... args)                                    { if(TRACE) t(fmt(msg, args)); }
+	public static void trace(String msg)                                                    { if(TRACE) t(fmt(msg)); }
+	private static void t(String msg){
+		if(TRACE) LogUtil.println(msg);
 	}
 	
-	public static void smallTrace(String message, Object arg1)                                       { if(SMALL_TRACE) smallTrace0(resolveArgs(message, arg1)); }
-	public static void smallTrace(String message, Object arg1, Object arg2)                          { if(SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2)); }
-	public static void smallTrace(String message, Object arg1, Object arg2, Object arg3)             { if(SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2, arg3)); }
-	public static void smallTrace(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-	public static void smallTrace(String message, Supplier<List<?>> lazyArgs)                        { if(SMALL_TRACE) smallTrace0(resolveArgs(message, lazyArgs)); }
-	public static void smallTrace(String message, Object... args)                                    { if(SMALL_TRACE) smallTrace0(resolveArgs(message, args)); }
-	public static void smallTrace(String message)                                                    { if(SMALL_TRACE) smallTrace0(resolveArgs(message)); }
-	private static void smallTrace0(CharSequence message){
-		if(SMALL_TRACE) LogUtil.println(message);
+	public static void smallTrace(String msg, Object arg1)                                     { if(SMALL_TRACE) st(fmt(msg, arg1)); }
+	public static void smallTrace(String msg, Object arg1, Object arg2)                        { if(SMALL_TRACE) st(fmt(msg, arg1, arg2)); }
+	public static void smallTrace(String msg, Object arg1, Object arg2, Object arg3)           { if(SMALL_TRACE) st(fmt(msg, arg1, arg2, arg3)); }
+	public static void smallTrace(String msg, Object arg1, Object arg2, Object arg3, Object o4){ if(SMALL_TRACE) st(fmt(msg, arg1, arg2, arg3, o4)); }
+	public static void smallTrace(String msg, Supplier<List<?>> lazyArgs)                      { if(SMALL_TRACE) st(fmt(msg, lazyArgs)); }
+	public static void smallTrace(String msg, Object... args)                                  { if(SMALL_TRACE) st(fmt(msg, args)); }
+	public static void smallTrace(String msg)                                                  { if(SMALL_TRACE) st(fmt(msg)); }
+	private static void st(String msg){
+		if(SMALL_TRACE) LogUtil.println(msg);
 	}
 	
-	public static void nonFatal(Throwable error, String message){
-		if(WARN) nonFatal0(error, message);
+	public static void nonFatal(Throwable error, String msg){
+		if(WARN) nonFatal0(error, msg);
 	}
-	public static void nonFatal(Throwable error, String message, Object... args){
-		if(WARN) nonFatal0(error, resolveArgs(Objects.requireNonNull(message), args));
+	public static void nonFatal(Throwable error, String msg, Object... args){
+		if(WARN) nonFatal0(error, fmt(Objects.requireNonNull(msg), args));
 	}
 	
-	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2, Object arg3){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
-		int start = 0;
-		start = resolveArg(formatted, arg1, start);
-		start = resolveArg(formatted, arg2, start);
-		start = resolveArg(formatted, arg3, start);
-		return formatted;
-	}
-	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2, Object arg3, Object arg4){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
+	public static String fmt(String msg, Object arg1, Object arg2, Object arg3, Object arg4){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
 		int start = 0;
 		start = resolveArg(formatted, arg1, start);
 		start = resolveArg(formatted, arg2, start);
 		start = resolveArg(formatted, arg3, start);
 		start = resolveArg(formatted, arg4, start);
-		return formatted;
+		return formatted.toString();
 	}
-	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
+	public static String fmt(String msg, Object arg1, Object arg2, Object arg3){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
 		int start = 0;
 		start = resolveArg(formatted, arg1, start);
 		start = resolveArg(formatted, arg2, start);
-		return formatted;
+		start = resolveArg(formatted, arg3, start);
+		return formatted.toString();
 	}
-	private static StringBuilder resolveArgs(String message, Object arg1){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
+	public static String fmt(String msg, Object arg1, Object arg2){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
+		int start = 0;
+		start = resolveArg(formatted, arg1, start);
+		start = resolveArg(formatted, arg2, start);
+		return formatted.toString();
+	}
+	public static String fmt(String msg, Object arg1){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
 		resolveArg(formatted, arg1, 0);
-		return formatted;
+		return formatted.toString();
 	}
-	private static StringBuilder resolveArgs(String message){
-		var formatted = new StringBuilder(message.length());
-		rawToMsg(message, formatted);
-		return formatted;
+	public static String fmt(String msg){
+		var formatted = new StringBuilder(msg.length());
+		rawToMsg(msg, formatted);
+		return formatted.toString();
 	}
 	
-	public static StringBuilder resolveArgs(String message, Object... args){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
+	public static String fmt(String msg, Object... args){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
 		int start = 0;
 		for(Object arg : args){
 			start = resolveArg(formatted, arg, start);
 		}
-		return formatted;
+		return formatted.toString();
 	}
-	private static StringBuilder resolveArgs(String message, Supplier<List<?>> args){
-		var formatted = new StringBuilder(message.length() + 32);
-		rawToMsg(message, formatted);
+	
+	private static String fmt(String msg, Supplier<List<?>> args){
+		var formatted = new StringBuilder(msg.length() + 32);
+		rawToMsg(msg, formatted);
 		int start = 0;
 		for(Object arg : args.get()){
 			start = resolveArg(formatted, arg, start);
 		}
-		return formatted;
+		return formatted.toString();
 	}
 	
-	private static void rawToMsg(String message, StringBuilder formatted){
+	private static void rawToMsg(String msg, StringBuilder formatted){
 		String       last       = ConsoleColors.RESET;
 		List<String> colorStack = new ArrayList<>();
 		
-		for(int i = 0; i<message.length(); i++){
-			var c = message.charAt(i);
+		for(int i = 0; i<msg.length(); i++){
+			var c = msg.charAt(i);
 			
-			if(i<message.length() - 1){
-				if(c == '{' && message.charAt(i + 1) == '#'){
-					var col = findColor(message, i + 2).orElseThrow(
+			if(i<msg.length() - 1){
+				if(c == '{' && msg.charAt(i + 1) == '#'){
+					var col = findColor(msg, i + 2).orElseThrow(
 						() -> new IllegalArgumentException("Illegal log format, opened format block with {#... could not find a valid color. Valid colors: " +
 						                                   Iters.from(COLORS).joinAsStr(", ", "[", "]", Tag::name)));
 					var cmd = col.cmd;
@@ -271,7 +273,7 @@ public class Log{
 					last = cmd;
 					i += 1 + col.name.length();
 					continue;
-				}else if(c == '#' && message.charAt(i + 1) == '}'){
+				}else if(c == '#' && msg.charAt(i + 1) == '}'){
 					var col = colorStack.removeLast();
 					formatted.append(col);
 					last = col;
@@ -370,19 +372,19 @@ public class Log{
 		            .maxByI(c -> c.name.length());
 	}
 	
-	public static void nonFatal0(Throwable error, CharSequence message){
+	private static void nonFatal0(Throwable error, CharSequence msg){
 		var sb = new StringBuilder();
 		
 		Utils.frameToStr(sb, getFrame(1));
-		if(message != null) sb.append('\n').append("\nMessage: ").append(message);
+		if(msg != null) sb.append('\n').append("\nMessage: ").append(msg);
 		
 		Throwable e = error;
 		while(e != null){
 			
 			sb.append('\n');
 			Utils.classToStr(sb, e.getClass());
-			var msg = e.getLocalizedMessage();
-			if(msg != null) sb.append(": ").append(msg);
+			var lmsg = e.getLocalizedMessage();
+			if(lmsg != null) sb.append(": ").append(lmsg);
 			
 			e = e.getCause();
 		}

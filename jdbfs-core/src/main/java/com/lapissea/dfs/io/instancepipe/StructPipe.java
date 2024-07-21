@@ -318,8 +318,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					checkTypeIntegrity(inst, true);
 				}catch(FieldIsNull|InvalidGenericArgument ignored){
 				}catch(IOException e){
-					e.printStackTrace();
-					throw new RuntimeException(e);
+					throw new RuntimeException(Log.fmt("Failed to check integrity of: {}#red", type.cleanFullName()), e);
 				}
 			}
 		}
