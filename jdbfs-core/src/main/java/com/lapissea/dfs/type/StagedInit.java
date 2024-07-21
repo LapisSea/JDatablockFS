@@ -309,7 +309,7 @@ public abstract class StagedInit implements Stringify{
 	}
 	
 	private void reportPossibleLock(Instant start, Thread initThread){
-		if(initThread == null || !Log.WARN) return;
+		if(initThread == null || !DO_TIMESTAMPS) return;
 		if(Duration.between(start, Instant.now()).compareTo(LONG_WAIT_THRESHOLD)<0) return;
 		Log.warn(
 			"possible lock at {}#yellow on thread {}#yellow\n{}",

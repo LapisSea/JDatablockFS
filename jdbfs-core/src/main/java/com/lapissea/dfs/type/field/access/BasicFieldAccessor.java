@@ -41,7 +41,7 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 			}
 		}
 		private void failReadOnly(){
-			throw new IllegalArgumentException("Field for " + getName() + " is final, can not set it!");
+			throw new UnsupportedOperationException("Field for " + getName() + " is final, can not set it!");
 		}
 	}
 	
