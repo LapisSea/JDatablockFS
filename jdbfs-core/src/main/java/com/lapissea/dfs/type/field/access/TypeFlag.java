@@ -2,16 +2,17 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.util.ShouldNeverHappenError;
 
-public class TypeFlag{
+public final class TypeFlag{
+	
 	public static final int ID_OBJECT  = 0;
-	public static final int ID_DOUBLE  = 1;
-	public static final int ID_FLOAT   = 2;
-	public static final int ID_BYTE    = 3;
-	public static final int ID_BOOLEAN = 4;
-	public static final int ID_LONG    = 5;
-	public static final int ID_INT     = 6;
-	public static final int ID_SHORT   = 7;
-	public static final int ID_CHAR    = 8;
+	public static final int ID_LONG    = 1;
+	public static final int ID_INT     = 2;
+	public static final int ID_BOOLEAN = 3;
+	public static final int ID_FLOAT   = 4;
+	public static final int ID_DOUBLE  = 5;
+	public static final int ID_SHORT   = 6;
+	public static final int ID_CHAR    = 7;
+	public static final int ID_BYTE    = 8;
 	
 	public static int getId(Class<?> clazz){
 		if(clazz.isPrimitive()){
