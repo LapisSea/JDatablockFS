@@ -236,6 +236,7 @@ public final class DefInstanceCompiler{
 				
 				var file = jorth.getClassFile(completionName);
 				
+				ClassGenerationCommons.dumpClassName(completionName, file);
 				if(log != null){
 					Log.log("Generated jorth:\n" + log.output());
 					BytecodeUtils.printClass(file);

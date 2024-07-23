@@ -3,8 +3,9 @@ package com.lapissea.dfs.type.compilation;
 import com.lapissea.dfs.config.ConfigDefs;
 
 import java.util.StringJoiner;
+import java.util.function.Consumer;
 
-public interface JorthLogger{
+public interface JorthLogger extends Consumer<CharSequence>{
 	
 	enum CodeLog{
 		FALSE,
@@ -43,6 +44,10 @@ public interface JorthLogger{
 		};
 	}
 	
+	@Override
+	default void accept(CharSequence charSequence){
+		log(charSequence);
+	}
 	
 	void log(CharSequence fragment);
 	

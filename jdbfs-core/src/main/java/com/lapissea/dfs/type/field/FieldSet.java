@@ -529,15 +529,15 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 		return res.get();
 	}
-	public <E extends IOInstance<E>> IOFieldPrimitive.FLong<E> requireExactLong(String name){
+	public IOFieldPrimitive.FLong<T> requireExactLong(String name){
 		//noinspection unchecked
 		return requireExactFieldType(IOFieldPrimitive.FLong.class, name);
 	}
-	public <E extends IOInstance<E>> IOFieldPrimitive.FInt<E> requireExactInt(String name){
+	public IOFieldPrimitive.FInt<T> requireExactInt(String name){
 		//noinspection unchecked
 		return requireExactFieldType(IOFieldPrimitive.FInt.class, name);
 	}
-	public <E extends IOInstance<E>> IOFieldPrimitive.FBoolean<E> requireExactBoolean(String name){
+	public IOFieldPrimitive.FBoolean<T> requireExactBoolean(String name){
 		//noinspection unchecked
 		return requireExactFieldType(IOFieldPrimitive.FBoolean.class, name);
 	}

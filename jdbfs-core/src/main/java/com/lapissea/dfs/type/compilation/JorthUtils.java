@@ -10,7 +10,6 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import static java.lang.reflect.Modifier.isStatic;
@@ -42,7 +41,7 @@ public class JorthUtils{
 		}
 	}
 	
-	static void writeAnnotations(CodeStream writer, List<Annotation> annotations) throws MalformedJorth{
+	static void writeAnnotations(CodeStream writer, Iterable<? extends Annotation> annotations) throws MalformedJorth{
 		Set<Class<?>> annTypes = new HashSet<>();
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
