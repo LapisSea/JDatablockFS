@@ -17,19 +17,17 @@ public interface AnnotatedType{
 	
 	class Simple implements AnnotatedType{
 		
-		private final Map<Class<?>, ? extends Annotation> annotations;
-		private final Class<?>                            type;
+		private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
+		private final Class<?>                                               type;
 		
 		public Simple(Collection<? extends Annotation> annotations, Class<?> type){
 			this.annotations = Iters.from(annotations).toMap(Annotation::annotationType, identity());
 			this.type = type;
 		}
 		
-		@SuppressWarnings("unchecked")
-		@NotNull
 		@Override
-		public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-			return Optional.ofNullable((T)annotations.get(annotationClass));
+		public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+			return annotations;
 		}
 		
 		@Override
@@ -43,10 +41,15 @@ public interface AnnotatedType{
 	}
 	
 	@NotNull
-	<T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass);
-	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return getAnnotation(annotationClass).isPresent();
+	default <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+		//noinspection unchecked
+		return Optional.ofNullable((T)getAnnotations().get(annotationClass));
 	}
+	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+		return getAnnotations().containsKey(annotationClass);
+	}
+	
+	Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations();
 	
 	
 	Type getGenericType(GenericContext genericContext);

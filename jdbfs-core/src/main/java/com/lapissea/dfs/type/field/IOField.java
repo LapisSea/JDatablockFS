@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -479,18 +480,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return getNullability() == IONullability.Mode.NULLABLE;
 	}
 	
-	@NotNull
 	@Override
-	public final <Ty extends Annotation> Optional<Ty> getAnnotation(Class<Ty> annotationClass){
+	public final Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
 		var acc = getAccessor();
-		if(acc == null) return Optional.empty();
-		return acc.getAnnotation(annotationClass);
-	}
-	@Override
-	public final boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		var acc = getAccessor();
-		if(acc == null) return false;
-		return acc.hasAnnotation(annotationClass);
+		if(acc == null) return Map.of();
+		return acc.getAnnotations();
 	}
 	
 	@Override

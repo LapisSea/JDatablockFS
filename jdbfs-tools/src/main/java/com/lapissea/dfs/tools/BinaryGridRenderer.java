@@ -1692,10 +1692,9 @@ public class BinaryGridRenderer implements DataRenderer{
 										long  arrOffset = 0;
 										int[] index     = {0};
 										var f = IOFieldPrimitive.make(new FieldAccessor<T>(){
-											@NotNull
 											@Override
-											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-												return Optional.empty();
+											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+												return Map.of();
 											}
 											@Override
 											public int getTypeID(){
@@ -1745,10 +1744,9 @@ public class BinaryGridRenderer implements DataRenderer{
 									long  arrOffset = 0;
 									int[] index     = {0};
 									var f = new NoIOField<T, String>(new FieldAccessor<>(){
-										@NotNull
 										@Override
-										public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-											return Optional.empty();
+										public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+											return Map.of();
 										}
 										@Override
 										public Struct<T> getDeclaringStruct(){
@@ -1831,10 +1829,9 @@ public class BinaryGridRenderer implements DataRenderer{
 											public void set(VarPool<T> ioPool, T instance, Object value){
 												throw new UnsupportedOperationException();
 											}
-											@NotNull
 											@Override
-											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-												return Optional.empty();
+											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+												return Map.of();
 											}
 											@Override
 											public Type getGenericType(GenericContext genericContext){
