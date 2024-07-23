@@ -11,6 +11,7 @@ import com.lapissea.dfs.exceptions.MalformedPipe;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
@@ -28,6 +29,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.compilation.BuilderProxyCompiler;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
@@ -67,6 +69,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -253,11 +256,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private FieldDependency<T> fieldDependency;
 	
-	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2;
+	private StructPipe<BuilderProxyCompiler.Builder<T>> builderPipe;
+	private boolean                                     needsBuilderObj;
+	
+	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2, LOCAL_DATA = 3;
 	
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
 		this.type = type;
 		init(initNow, () -> {
+			needsBuilderObj = type.needsBuilderObj();
+			var bt = needsBuilderObj? builderObjectTask() : null;
+			
 			try{
 				this.ioFields = FieldSet.of(compiler.compile(getType(), getType().getFields()));
 			}catch(Exception e){
@@ -279,8 +288,23 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
+			setInitState(LOCAL_DATA);
+			if(bt != null){
+				builderPipe = bt.join();
+			}
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
+	}
+	
+	private CompletableFuture<StructPipe<BuilderProxyCompiler.Builder<T>>> builderObjectTask(){
+		return CompletableFuture.supplyAsync(() -> {
+			var type   = BuilderProxyCompiler.getProxy(getType());
+			var struct = Struct.of(type);
+			var st     = (Class<StructPipe<BuilderProxyCompiler.Builder<T>>>)getClass();
+			var pipe   = StructPipe.of(st, struct, STATE_DONE);
+			Log.trace("Acquired builder pipe for {}#green", this);
+			return pipe;
+		}, t -> Runner.run(t, "BP-" + this.toShortString()));
 	}
 	
 	protected static class DoNotTest extends RuntimeException{ }
@@ -443,7 +467,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	
 	public CommandSet getReferenceWalkCommands(){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		return referenceWalkCommands;
 	}
 	
@@ -453,7 +477,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			super.listStates(),
 			Iters.of(
 				new StateInfo(STATE_IO_FIELD, "IO_FIELD"),
-				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC")
+				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC"),
+				new StateInfo(LOCAL_DATA, "LOCAL_DATA")
 			)
 		);
 	}
@@ -654,12 +679,27 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		if(needsBuilderObj){
+			return readNewByBuilder(provider, src, genericContext);
+		}
 		T instance = type.make();
 		try{
 			return doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
 			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
+	}
+	private T readNewByBuilder(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var pipe     = getBuilderPipe();
+		var builtObj = pipe.readNew(provider, src, genericContext);
+		return builtObj.build();
+	}
+	
+	private StructPipe<BuilderProxyCompiler.Builder<T>> getBuilderPipe(){
+		var pipe = builderPipe;
+		if(pipe != null) return pipe;
+		waitForStateDone();
+		return Objects.requireNonNull(builderPipe);
 	}
 	
 	public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -693,7 +733,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public final void earlyCheckNulls(VarPool<T> ioPool, T instance){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		if(earlyNullChecks == null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
@@ -776,7 +816,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private boolean hasGenerators(){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		return generators != null;
 	}
 	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
