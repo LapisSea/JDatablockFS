@@ -340,7 +340,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{
 		var fun = functions.get(signature);
 		if(fun != null) return fun;
-		throw new MalformedJorth("Function of " + signature + " does not exist");
+		throw new MalformedJorth("Function of " + signature + " does not exist in " + name.dotted());
 	}
 	@Override
 	public Stream<? extends FunctionInfo> getFunctionsByName(String name){

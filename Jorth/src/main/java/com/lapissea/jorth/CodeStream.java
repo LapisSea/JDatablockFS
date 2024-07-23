@@ -2,6 +2,7 @@ package com.lapissea.jorth;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.CodeDestination;
+import com.lapissea.jorth.lang.Keyword;
 import com.lapissea.jorth.lang.Token;
 import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.Tokenizer;
@@ -146,11 +147,11 @@ public interface CodeStream extends AutoCloseable{
 				
 				loop:
 				while(true){
-					if(source.line() != line){
-						line = source.line();
+					var tok = source.readToken();
+					if(tok.line() != line && tok instanceof Token.KWord k && k.keyword() != Keyword.END){
+						line = tok.line();
 						part.append('\n');
 					}
-					var tok = source.readToken();
 					switch(tok){
 						case Token.KWord w -> {
 							switch(w.keyword()){

@@ -16,19 +16,28 @@ public class TypeIOFail extends IOException{
 		       msg.lines().map(s -> "\t" + s).collect(Collectors.joining("\n"));
 	}
 	
-	public final Class<?> type;
+	private record Msg(String note, Class<?> type, Throwable cause){ }
 	
-	public TypeIOFail(String note, Class<?> type){
-		super(makeMsg(note, type, null));
-		this.type = type;
-	}
+	public final Class<?> type;
+	private      String   msgCache;
+	private      Msg      msg;
 	
 	public TypeIOFail(String note, Class<?> type, Throwable cause){
-		super(makeMsg(note, type, cause), getCause(cause));
+		super(getCause(cause));
 		this.type = type;
+		msg = new Msg(note, type, cause);
 	}
+	
 	private static Throwable getCause(Throwable cause){
 		while(cause instanceof TypeIOFail f && f.getCause() != null) cause = f.getCause();
 		return cause;
+	}
+	
+	@Override
+	public String getMessage(){
+		if(msgCache != null) return msgCache;
+		msgCache = makeMsg(msg.note, msg.type, msg.cause);
+		msg = null;
+		return msgCache;
 	}
 }
