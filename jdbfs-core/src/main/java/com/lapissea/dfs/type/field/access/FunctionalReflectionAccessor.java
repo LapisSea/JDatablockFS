@@ -62,20 +62,20 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
-			throw new MalformedStruct("getter returns " + getter.getReturnType() + " but " + genericType + " is required\n" + getter);
+			throw new MalformedStruct("fmt", "Getter returns {}#red but {}#yellow is required\nGetter: {}#red", getter.getReturnType(), genericType, getter);
 		}
 		if(getter.getParameterCount() != 0){
-			throw new MalformedStruct("getter must not have arguments\n" + getter);
+			throw new MalformedStruct("fmt", "Getter must not have arguments: {}#red", getter);
 		}
 		
 		if(!Utils.genericInstanceOf(setter.getReturnType(), Void.TYPE)){
-			throw new MalformedStruct("setter returns " + setter.getReturnType() + " but " + genericType + " is required\n" + setter);
+			throw new MalformedStruct("fmt", "Setter returns {}#red but {}#yellow is required\nSetter: {}#red", setter.getReturnType(), genericType, setter);
 		}
 		if(setter.getParameterCount() != 1){
-			throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + setter);
+			throw new MalformedStruct("fmt", "Setter must have 1 argument of {}#yellow\nSetter: {}#red", genericType, setter);
 		}
 		if(!Utils.genericInstanceOf(setter.getGenericParameterTypes()[0], genericType)){
-			throw new MalformedStruct("setter argument is " + setter.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + setter);
+			throw new MalformedStruct("fmt", "Setter argument is {}#red but {}#yellow is required\nSetter: {}#red", setter.getGenericParameterTypes()[0], genericType, setter);
 		}
 		
 		this.getter = Access.makeMethodHandle(getter);

@@ -69,10 +69,10 @@ public final class BehaviourSupport{
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){
 		if(!IOFieldTools.canHaveNullAnnotation(field)){
-			throw new MalformedStruct(field + " is not a supported field");
+			throw new MalformedStruct("fmt", "{}#red is not a supported field", field);
 		}
 		if(SupportedPrimitive.get(field.getType()).isPresent() && ann.value() == DEFAULT_IF_NULL){
-			throw new MalformedStruct("Wrapper type on " + field + " does not support " + DEFAULT_IF_NULL + " mode");
+			throw new MalformedStruct("fmt", "Wrapper type on {}#yellow does not support {}#red mode", field, DEFAULT_IF_NULL);
 		}
 		
 		if(!IOFieldTools.isNullable(field) || !canHaveNullabilityField(field)) return BehaviourRes.non();
