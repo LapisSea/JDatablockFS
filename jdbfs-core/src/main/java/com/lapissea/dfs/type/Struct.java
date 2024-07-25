@@ -4,9 +4,11 @@ import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
@@ -377,10 +379,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			hasPools = calcHasPools();
 			canHavePointers = calcCanHavePointers();
 			
-			Thread.startVirtualThread(() -> {
-				if(emptyConstructor != null || !canHaveDefaultConstructor()) return;
+			if(canHaveDefaultConstructor()){
 				findEmptyConstructor();
-			});
+			}
 		});
 	}
 	
@@ -709,9 +710,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(fields.unpackedStream().anyMatch(f -> f.getNullability() == NOT_NULL)){
 			var obj  = make();
 			var pool = allocVirtualVarPool(IO);
-			inv = fields.unpackedStream()
-			            .filter(f -> f.getNullability() == NOT_NULL)
-			            .anyMatch(f -> f.isNull(pool, obj));
+			var invalidNullFields = fields.unpackedStream()
+			                              .filter(f -> f.isNonNullable() && f.isNull(pool, obj));
+			inv = invalidNullFields.isEmpty();
+			invalidNullFields.filter(IOField::isReadOnly).joinAsOptionalStr(", ").ifPresent(errFields -> {
+				throw new MalformedStruct(Log.fmt("The following fields from {}#red are not allowed to be null: {}#red", this, errFields));
+			});
 		}
 		return invalidInitialNulls = (byte)(inv? 1 : 0);
 	}

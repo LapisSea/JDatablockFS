@@ -299,7 +299,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private CompletableFuture<StructPipe<BuilderProxyCompiler.Builder<T>>> builderObjectTask(){
 		return CompletableFuture.supplyAsync(() -> {
 			var type   = BuilderProxyCompiler.getProxy(getType());
-			var struct = Struct.of(type);
+			var struct = Struct.of(type, STATE_DONE);
 			var st     = (Class<StructPipe<BuilderProxyCompiler.Builder<T>>>)getClass();
 			var pipe   = StructPipe.of(st, struct, STATE_DONE);
 			Log.trace("Acquired builder pipe for {}#green", this);
@@ -1054,7 +1054,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					     .map(fields::requireByName)
 					     .firstMatching(n -> n.getType() == NumberSize.class)//dependency that is a numsize
 					     .filter(f -> {
-						     if(f.isVirtual() || f.nullable()) return false;
+						     if(f.isVirtual() || f.nullable() || f.isReadOnly()) return false;
 						     return f.getAccessor().get(null, inst) == null;
 					     })
 					     .ifPresent(f -> {
@@ -1064,7 +1064,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					     });
 				}
 				
-				if(field.getType() == String.class){
+				if(field.getType() == String.class && !field.isReadOnly()){
 					field.getAccessor().set(null, inst, field + " : this is a test");
 				}
 			}
