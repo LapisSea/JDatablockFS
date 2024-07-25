@@ -6,7 +6,6 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
@@ -161,7 +160,7 @@ final class FieldSupport{
 			return Optional.of("CORRUPTED: " + e);
 		}
 		if(val == null){
-			if(field.getNullability() == IONullability.Mode.NOT_NULL){
+			if(field.isNonNullable()){
 				throw new FieldIsNull(field);
 			}
 			return Optional.empty();

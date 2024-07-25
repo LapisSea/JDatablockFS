@@ -329,7 +329,7 @@ public class InstanceCollection{
 		public void setReference(T instance, Reference newRef){
 			Objects.requireNonNull(newRef);
 			if(newRef.isNull()){
-				if(getNullability() == IONullability.Mode.NOT_NULL){
+				if(isNonNullable()){
 					throw new NullPointerException();
 				}
 			}

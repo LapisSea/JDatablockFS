@@ -38,7 +38,6 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
-import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
@@ -459,7 +458,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private IterablePP<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
+		return ioFields.unpackedStream().filter(f -> f.isNonNullable() && f.getAccessor().canBeNull());
 	}
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
