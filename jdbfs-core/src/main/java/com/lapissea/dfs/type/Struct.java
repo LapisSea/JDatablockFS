@@ -8,7 +8,6 @@ import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
@@ -704,20 +703,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return invalidInitialNulls = 0;
 		}
 		
-		waitForStateDone();
+		waitForState(STATE_INIT_FIELDS);
 		
-		boolean inv = false;
-		if(fields.unpackedStream().anyMatch(f -> f.getNullability() == NOT_NULL)){
-			var obj  = make();
-			var pool = allocVirtualVarPool(IO);
-			var invalidNullFields = fields.unpackedStream()
-			                              .filter(f -> f.isNonNullable() && f.isNull(pool, obj));
-			inv = invalidNullFields.isEmpty();
-			invalidNullFields.filter(IOField::isReadOnly).joinAsOptionalStr(", ").ifPresent(errFields -> {
-				throw new MalformedStruct(Log.fmt("The following fields from {}#red are not allowed to be null: {}#red", this, errFields));
-			});
-		}
-		return invalidInitialNulls = (byte)(inv? 1 : 0);
+		var nonNullables = fields.unpackedStream().filter(IOField::isNonNullable);
+		if(nonNullables.isEmpty()) return invalidInitialNulls = 0;
+		var obj          = make();
+		var pool         = allocVirtualVarPool(IO);
+		var invalidNulls = nonNullables.filter(f -> f.isNull(pool, obj));
+		invalidNulls.filter(IOField::isReadOnly).joinAsOptionalStr(", ").ifPresent(errFields -> {
+			throw new MalformedStruct("fmt", "The following fields from {}#red are not allowed to be null: {}#red", this, errFields);
+		});
+		return invalidInitialNulls = (byte)(invalidNulls.hasAny()? 1 : 0);
 	}
 	
 	@Nullable
