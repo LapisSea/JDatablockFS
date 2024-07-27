@@ -181,10 +181,10 @@ final class CompileStructTools{
 				var old = STRUCT_CACHE.put(instanceClass, struct);
 				assert old == null;
 			}catch(MalformedStruct e){
-				e.addSuppressed(new MalformedStruct("Failed to compile " + instanceClass.getName()));
+				e.addSuppressed(new MalformedStruct("fmt", "Failed to compile {}#red", instanceClass.getName()));
 				throw e;
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to compile " + instanceClass.getName(), e);
+				throw new MalformedStruct("fmt", e, "Failed to compile {}#red", instanceClass.getName());
 			}finally{
 				STRUCT_THREAD_LOG.remove(instanceClass);
 			}

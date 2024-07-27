@@ -142,14 +142,14 @@ public final class IOFieldTools{
 	@SuppressWarnings("deprecation")
 	private static <T extends IOInstance<T>> Index predefinedOrder(List<IOField<T, ?>> fields, Class<T> structType, InternalDataOrder dataOrderAnn){
 		if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
-			throw new MalformedStruct(InternalDataOrder.class.getName() + " is for internal use only. " +
-			                          "To be used only by " + TemplateClassLoader.class.getName());
+			throw new MalformedStruct(
+				"fmt", "{}#red is for internal use only. To be used only by {}#yellow", InternalDataOrder.class.getName(), TemplateClassLoader.class.getName());
 		}
 		var dataOrder    = dataOrderAnn.value();
 		var actualNames  = Iters.from(fields).map(IOField::getName).toModSet();
 		var dataOrderSet = Set.of(dataOrder);
 		if(!dataOrderSet.equals(actualNames)){
-			throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);
+			throw new MalformedStruct("fmt", "Data order and fields are not matching.\n{}#yellow,\n{}#red", actualNames, dataOrderSet);
 		}
 		
 		var index = new int[dataOrder.length];

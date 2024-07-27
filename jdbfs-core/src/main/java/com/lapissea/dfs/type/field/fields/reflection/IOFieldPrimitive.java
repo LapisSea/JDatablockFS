@@ -61,7 +61,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			}
 			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
 				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
-					throw new MalformedStruct(VirtualNumSize.class.getName() + " is not allowed on " + fieldType.getName());
+					throw new MalformedStruct("fmt", "{}#yellow is not allowed on {}#red", VirtualNumSize.class.getName(), fieldType.getName());
 				}
 				return BehaviourSupport.virtualNumSize(field, ann);
 			}));

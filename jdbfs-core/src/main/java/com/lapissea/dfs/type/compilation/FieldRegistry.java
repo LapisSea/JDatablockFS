@@ -21,7 +21,6 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -251,8 +250,8 @@ final class FieldRegistry{
 		}
 		if(UtilL.instanceOf(Utils.typeToRaw(type), Type.class)){
 			throw new IllegalField(
-				"Directly storing types should not be done as values will fail to load if a class is not present. " +
-				"Please use " + IOType.class.getTypeName() + " instead."
+				"fmt", "Directly storing types should not be done as values will fail to load if a class is not present. " +
+				       "Please use {}#green instead.", IOType.class.getTypeName()
 			);
 		}
 		throw fail(type.getTypeName());
@@ -335,11 +334,12 @@ final class FieldRegistry{
 		
 		if(!activeAnns.isEmpty()){
 			throw new IllegalAnnotation(
-				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
-				Iters.from(activeAnns)
-				     .joinAsStr("\n", t -> {
-					     return "\t" + t.getName() + Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
-				     })
+				"fmt", "Field {}#yellow has incompatible annotation(s):\n{}", field,
+				Iters.from(activeAnns).joinAsStr("\n", annType -> {
+					var usageAnn = annType.getAnnotation(AnnotationUsage.class);
+					if(usageAnn == null) return Log.fmt("\t{}#red", annType.getSimpleName());
+					return Log.fmt("\t{}#red:\t{}#yellow", annType.getSimpleName(), usageAnn.value());
+				})
 			);
 		}
 		
@@ -366,6 +366,6 @@ final class FieldRegistry{
 	}
 	
 	private static IllegalField fail(String typeName){
-		throw new IllegalField("Unable to find implementation of " + IOField.class.getSimpleName() + " from " + typeName);
+		throw new IllegalField("fmt", "Unable to find implementation of {}#yellow from {}#red", IOField.class.getSimpleName(), typeName);
 	}
 }

@@ -479,6 +479,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public final boolean nullable(){
 		return getNullability() == IONullability.Mode.NULLABLE;
 	}
+	public final boolean isNonNullable(){
+		return getNullability() == IONullability.Mode.NOT_NULL;
+	}
 	
 	@Override
 	public final Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){

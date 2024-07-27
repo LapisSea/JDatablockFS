@@ -51,7 +51,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
 		sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
-			throw new IllegalField(badFields + " should not have dependencies");
+			throw new IllegalField("fmt", "{}#red should not have dependencies", badFields);
 		});
 		
 		return sizeFieldStream(structFields)
@@ -63,7 +63,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 				                       .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
 				                       .reduce((a, b) -> {
 					                       if(a != b){
-						                       throw new MalformedStruct("inconsistent dependency sizes" + sizingField);
+						                       throw new MalformedStruct("fmt", "inconsistent dependency sizes for {}#red", sizingField);
 					                       }
 					                       return a;
 				                       })

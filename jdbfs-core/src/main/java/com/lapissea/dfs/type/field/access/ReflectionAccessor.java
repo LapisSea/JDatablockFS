@@ -27,10 +27,11 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-			}
+			if(num == null) fail();
 			return num.getValue();
+		}
+		private void fail(){
+			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){

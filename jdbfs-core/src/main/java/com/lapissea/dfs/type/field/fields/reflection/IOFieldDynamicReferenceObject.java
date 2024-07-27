@@ -148,7 +148,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 	public void setReference(CTyp instance, Reference newRef){
 		Objects.requireNonNull(newRef);
 		if(newRef.isNull()){
-			if(getNullability() == IONullability.Mode.NOT_NULL){
+			if(isNonNullable()){
 				throw new NullPointerException();
 			}
 		}

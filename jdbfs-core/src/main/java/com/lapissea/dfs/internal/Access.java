@@ -278,7 +278,7 @@ public final class Access{
 					case 1 -> "argument of " + parameterTypes[0];
 					default -> "arguments of " + Arrays.toString(parameterTypes);
 				};
-				var e = new MissingConstruct(clazz.getName() + " does not have a valid constructor or \"of\" static method with " + argStr);
+				var e = new MissingConstruct("fmt", "{}#red does not have a valid constructor or \"of\" static method with {}#yellow", clazz.getName(), argStr);
 				e.addSuppressed(ce);
 				e.addSuppressed(ofe);
 				throw e;

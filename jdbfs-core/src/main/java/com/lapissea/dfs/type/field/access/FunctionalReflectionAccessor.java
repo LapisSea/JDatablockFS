@@ -29,11 +29,11 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() +
-				                               " is null but ChunkPointer is a non nullable type");
-			}
+			if(num == null) fail();
 			return num.getValue();
+		}
+		private void fail(){
+			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
@@ -69,22 +69,22 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
-			throw new MalformedStruct("getter returns " + getter.getReturnType() + " but " + genericType + " is required\n" + getter);
+			throw new MalformedStruct("fmt", "Getter returns {}#red but {}#yellow is required\nGetter: {}#red", getter.getReturnType(), genericType, getter);
 		}
 		if(getter.getParameterCount() != 0){
-			throw new MalformedStruct("getter must not have arguments\n" + getter);
+			throw new MalformedStruct("fmt", "Getter must not have arguments: {}#red", getter);
 		}
 		this.getter = Access.makeMethodHandle(getter);
 		
 		this.setter = setter.map(fn -> {
 			if(!Utils.genericInstanceOf(fn.getReturnType(), Void.TYPE)){
-				throw new MalformedStruct("setter returns " + fn.getReturnType() + " but " + genericType + " is required\n" + fn);
+				throw new MalformedStruct("fmt", "Setter returns {}#red but {}#yellow is required\nSetter: {}#red", fn.getReturnType(), genericType, fn);
 			}
 			if(fn.getParameterCount() != 1){
-				throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + fn);
+				throw new MalformedStruct("fmt", "Setter must have 1 argument of {}#yellow\nSetter: {}#red", genericType, setter);
 			}
 			if(!Utils.genericInstanceOf(fn.getGenericParameterTypes()[0], genericType)){
-				throw new MalformedStruct("setter argument is " + fn.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + fn);
+				throw new MalformedStruct("fmt", "Setter argument is {}#red but {}#yellow is required\nSetter: {}#red", fn.getGenericParameterTypes()[0], genericType, fn);
 			}
 			return Access.makeMethodHandle(fn);
 		}).orElse(null);

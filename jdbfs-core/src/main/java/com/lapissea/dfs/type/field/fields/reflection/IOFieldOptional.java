@@ -61,7 +61,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					var genType = field.getGenericType(null);
 					
 					var type = IOFieldTools.unwrapOptionalType(genType).orElseThrow(() -> {
-						return new MalformedStruct("Illegal type of: " + field.getGenericType(null).getTypeName());
+						return new MalformedStruct("fmt", "Illegal type of: {}#red for optional field", field.getGenericType(null).getTypeName());
 					});
 					
 					return new BehaviourRes<>(List.of(new VirtualFieldDefinition<T, Integer>(

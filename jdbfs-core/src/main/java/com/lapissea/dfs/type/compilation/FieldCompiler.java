@@ -7,6 +7,7 @@ import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Preload;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -82,21 +83,28 @@ public final class FieldCompiler{
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
-				throw new IllegalField(valueMethod + " is not static!");
+				throw new IllegalField("fmt", "{}#red is not static!", valueMethod);
 			}
 			
 			if(!UtilL.instanceOf(valueMethod.getReturnType(), IOUnmanagedValueInfo.Data.class)){
-				throw new IllegalField(valueMethod + "\n\tdoes not return " + IOUnmanagedValueInfo.Data.class.getName());
+				throw new IllegalField("fmt", "{}#red does not return {}#yellow", valueMethod, IOUnmanagedValueInfo.Data.class.getName());
 			}
 			var returnTypeArg = switch(valueMethod.getGenericReturnType()){
 				case ParameterizedType parm -> parm.getActualTypeArguments()[0];
-				default -> throw new IllegalField(valueMethod + "\t\t must be a " + IOUnmanagedValueInfo.Data.class.getName() + "<This class>");
+				default -> throw new IllegalField(
+					"fmt", "{}#red must be a {}#yellow", valueMethod, IOUnmanagedValueInfo.Data.class.getName() + "<This class>"
+				);
 			};
 			var rawReturnType = Utils.typeToRaw(returnTypeArg);
 			
 			if(rawReturnType != valueMethod.getDeclaringClass()){
-				throw new IllegalField(valueMethod + " does not return type of same owner type!\n\t" + rawReturnType.getName() +
-				                       "\n\t" + valueMethod.getDeclaringClass().getName());
+				throw new IllegalField(
+					"fmt", """
+					{}#red does not return type of same owner type!
+					\tRaw return type: {}#red
+					\tOwner type: {}#yellow""",
+					valueMethod, rawReturnType.getName(), valueMethod.getDeclaringClass().getName()
+				);
 			}
 		}
 		
@@ -141,16 +149,16 @@ public final class FieldCompiler{
 		var fails = Iters.from(fields)
 		                 .filter(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
 		                 .asCollection();
-		if(fails.isEmpty()) return;
-		throw new IllegalField(
-			"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " + (fails.size()>1? "\n" : "") +
-			fails.joinAsStr("\n", e -> "\t" + e)
-		);
+		switch(fails.size()){
+			case 0 -> { }
+			case 1 -> throw new IllegalField("fmt", "Could not find implementation for: {}#red", fails.getFirst());
+			default -> throw new IllegalField("fmt", "Could not find implementations for: \n{}#red", fails.joinAsStr("\n", e -> "\t" + e));
+		}
 	}
 	
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
 		if(valName(type.getAnnotation(IOValue.class)).isPresent()){
-			throw new IllegalAnnotation(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
+			throw new IllegalAnnotation("fmt", "{}#red is not allowed to have a name when on a class", IOValue.class.getSimpleName());
 		}
 	}
 	
@@ -162,11 +170,11 @@ public final class FieldCompiler{
 		for(String nam : depNames){
 			var dep = fields.get(nam);
 			if(dep == null){
-				throw new IllegalField("Could not find dependencies " +
+				throw new IllegalField("fmt", "Could not find dependencies {} on field {}#yellow",
 				                       Iters.from(depNames)
 				                            .filter(name -> !fields.containsKey(name))
-				                            .joinAsStr(", ") +
-				                       " on field " + field.getAccessor());
+				                            .joinAsStr(", ", f -> Log.fmt("{}#red", f)),
+				                       field.getAccessor());
 			}
 			dependencies.add(dep);
 		}
@@ -202,7 +210,10 @@ public final class FieldCompiler{
 					if(existing != null){
 						var gTyp = existing.getGenericType(null);
 						if(!gTyp.equals(s.type)){
-							throw new IllegalField("Virtual field " + existing.getName() + " already defined but has a type conflict of " + gTyp + " and " + s.type);
+							throw new IllegalField(
+								"fmt", "Virtual field {}#yellow already defined but has a type conflict of {}#red and {}#red",
+								existing.getName(), gTyp, s.type
+							);
 						}
 						continue;
 					}
@@ -339,7 +350,8 @@ public final class FieldCompiler{
 		
 		if(!unusedErr.isEmpty()){
 			throw new MalformedStruct(
-				"There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" +
+				"fmt", "There are unused or invalid methods marked with {}#yellow\n{}#red",
+				IOValue.class.getSimpleName(),
 				String.join("\n", unusedErr)
 			);
 		}
@@ -369,7 +381,7 @@ public final class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to scan field #" + field.getName() + " on " + struct.cleanName(), e);
+				throw new MalformedStruct("fmt", e, "Failed to scan field {#red #{}} on {}#yellow", field.getName(), struct.cleanName());
 			}
 		}
 		return fields;
@@ -386,8 +398,8 @@ public final class FieldCompiler{
 		Iters.entries(functionFields).filter(e -> e.getValue().getter == null)
 		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": getter is missing!")
 		     .ifPresent(invalidFields -> {
-			     throw new IllegalField("Invalid transient (getter+setter, no field) IOField(s) for " + cl.getName() + ":\n" +
-			                            invalidFields);
+			     throw new IllegalField("fmt", "Invalid transient (getter+setter, no field) IOField(s) for {}#yellow:\n{}#red",
+			                            cl.getName(), invalidFields);
 		     });
 	}
 	
