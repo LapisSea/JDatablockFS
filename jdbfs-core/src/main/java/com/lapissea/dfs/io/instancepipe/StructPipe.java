@@ -31,6 +31,7 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.BuilderProxyCompiler;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
@@ -255,8 +256,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private FieldDependency<T> fieldDependency;
 	
-	private StructPipe<BuilderProxyCompiler.Builder<T>> builderPipe;
-	private boolean                                     needsBuilderObj;
+	private StructPipe<ProxyBuilder<T>> builderPipe;
+	private boolean                     needsBuilderObj;
 	
 	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2, LOCAL_DATA = 3;
 	
@@ -264,7 +265,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		this.type = type;
 		init(initNow, () -> {
 			needsBuilderObj = type.needsBuilderObj();
-			var bt = needsBuilderObj? builderObjectTask() : null;
+			var bt = needsBuilderObj? builderObjectTask(initNow) : null;
 			
 			try{
 				this.ioFields = FieldSet.of(compiler.compile(getType(), getType().getFields()));
@@ -295,15 +296,26 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}, initNow? null : this::postValidate);
 	}
 	
-	private CompletableFuture<StructPipe<BuilderProxyCompiler.Builder<T>>> builderObjectTask(){
-		return CompletableFuture.supplyAsync(() -> {
-			var type   = BuilderProxyCompiler.getProxy(getType());
-			var struct = Struct.of(type, STATE_DONE);
-			var st     = (Class<StructPipe<BuilderProxyCompiler.Builder<T>>>)getClass();
-			var pipe   = StructPipe.of(st, struct, STATE_DONE);
-			Log.trace("Acquired builder pipe for {}#green", this);
-			return pipe;
-		}, t -> Runner.run(t, "BP-" + this.toShortString()));
+	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow){
+		if(initNow){
+			var res = createBuilderPipe();
+			return CompletableFuture.completedFuture(res);
+		}
+		return CompletableFuture.supplyAsync(this::createBuilderPipe, t -> Runner.run(t, "BP-" + this.toShortString()));
+	}
+	private StructPipe<ProxyBuilder<T>> createBuilderPipe(){
+		var type   = BuilderProxyCompiler.getProxy(getType());
+		var struct = Struct.of(type, STATE_DONE);
+		//noinspection unchecked
+		var pipe = StructPipe.of((Class<StructPipe<ProxyBuilder<T>>>)getClass(), struct, STATE_DONE);
+		Log.trace("Acquired builder pipe for {}#green", this);
+		
+		if(DEBUG_VALIDATION){
+			var inst = struct.make();
+			inst.build();
+		}
+		
+		return pipe;
 	}
 	
 	protected static class DoNotTest extends RuntimeException{ }
@@ -694,7 +706,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return builtObj.build();
 	}
 	
-	private StructPipe<BuilderProxyCompiler.Builder<T>> getBuilderPipe(){
+	private StructPipe<ProxyBuilder<T>> getBuilderPipe(){
 		var pipe = builderPipe;
 		if(pipe != null) return pipe;
 		waitForStateDone();

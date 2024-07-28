@@ -4,6 +4,7 @@ import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.jorth.BytecodeUtils;
@@ -15,21 +16,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class BuilderProxyCompiler{
 	
-	public abstract static class Builder<Actual extends IOInstance<Actual>> extends IOInstance.Managed<Builder<Actual>>{
-		public abstract Actual build();
-	}
-	
 	public static final String BUILDER_PROXY_POSTFIX = "€Builder";
 	
-	private static final ConcurrentHashMap<Struct<?>, Class<Builder<?>>> CACHE = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<Struct<?>, Class<ProxyBuilder<?>>> CACHE = new ConcurrentHashMap<>();
 	
-	public static <T extends IOInstance<T>> Class<Builder<T>> getProxy(Class<T> type){ return getProxy(Struct.of(type)); }
-	public static <T extends IOInstance<T>> Class<Builder<T>> getProxy(Struct<T> type){
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Class<T> type){ return getProxy(Struct.of(type)); }
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Struct<T> type){
 		//noinspection unchecked,rawtypes
 		return (Class)CACHE.computeIfAbsent(type, s -> (Class)compileProxy(type));
 	}
 	
-	private static <T extends IOInstance<T>> Class<Builder<T>> compileProxy(Struct<T> type){
+	private static <T extends IOInstance<T>> Class<ProxyBuilder<T>> compileProxy(Struct<T> type){
 		if(!type.needsBuilderObj()){
 			throw new IllegalArgumentException();
 		}
@@ -44,7 +41,7 @@ public final class BuilderProxyCompiler{
 						extends {0} <{1}>
 						public class {!1} start
 						""",
-					Builder.class, proxyName);
+					ProxyBuilder.class, proxyName);
 				
 				for(IOField<T, ?> field : type.getFields()){
 					writeField(writer, field.getAccessor());
@@ -74,8 +71,8 @@ public final class BuilderProxyCompiler{
 			}
 			
 			//noinspection unchecked
-			var completed = (Class<Builder<T>>)Access.privateLookupIn(baseClass)
-			                                         .defineClass(clazzBytes);
+			var completed = (Class<ProxyBuilder<T>>)Access.privateLookupIn(baseClass)
+			                                              .defineClass(clazzBytes);
 			Log.trace("Generated builder: {}#yellow", proxyName);
 			return completed;
 		}catch(MalformedJorth e){
