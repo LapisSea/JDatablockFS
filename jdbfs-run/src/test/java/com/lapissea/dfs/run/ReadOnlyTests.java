@@ -23,7 +23,6 @@ public class ReadOnlyTests{
 		@IOValue
 		public final int val;
 		
-		public Simple(){ val = 0; }
 		public Simple(int val){
 			this.val = val;
 		}

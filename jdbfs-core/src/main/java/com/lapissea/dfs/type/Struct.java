@@ -689,7 +689,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return emptyConstructor = ctor;
 	}
 	public boolean canHaveDefaultConstructor(){
-		return !(this instanceof Struct.Unmanaged) &&
+		return !needsBuilderObj() &&
+		       !(this instanceof Struct.Unmanaged) &&
 		       !getType().isAnnotationPresent(NoDefaultConstructor.class);
 	}
 	
