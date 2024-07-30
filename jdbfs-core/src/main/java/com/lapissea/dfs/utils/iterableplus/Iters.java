@@ -21,6 +21,7 @@ import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.random.RandomGenerator;
 
 @SuppressWarnings("unused")
 public final class Iters{
@@ -601,4 +602,8 @@ public final class Iters{
 		};
 	}
 	
+	public static IterableIntPP rand(RandomGenerator rand, int streamSize, int origin, int bound){
+		if(streamSize<0) throw new IllegalArgumentException("Size must be positive!");
+		return range(0, streamSize).map(i -> rand.nextInt(origin, bound));
+	}
 }
