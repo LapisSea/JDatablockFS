@@ -277,7 +277,7 @@ final class FieldRegistry{
 			var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
 			var makedUnsafe = res.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
 			if(usesUnsafe != makedUnsafe){
-				throw new ShouldNeverHappenError(res.getClass() + " has IOUnsafeValue but is not marked as such");
+				throw new ShouldNeverHappenError(res.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
 			}
 			
 			var typs = compatible.listFieldTypes();

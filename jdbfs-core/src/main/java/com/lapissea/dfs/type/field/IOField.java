@@ -469,11 +469,12 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public final IONullability.Mode getNullability(){
-		if(nullability == null) calcNullability();
-		return nullability;
+		var n = nullability;
+		if(n != null) return n;
+		return calcNullability();
 	}
-	private void calcNullability(){
-		nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
+	private IONullability.Mode calcNullability(){
+		return nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
 	}
 	
 	public final boolean nullable(){

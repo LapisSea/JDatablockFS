@@ -7,10 +7,10 @@ import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
@@ -39,8 +39,6 @@ final class CompileStructTools{
 	private static final Map<Class<?>, Thread>                STRUCT_THREAD_LOG = new HashMap<>();
 	
 	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE = Map.of();
-	private static int                                          stableCacheCount;
-	
 	
 	@SuppressWarnings("unchecked")
 	static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
@@ -59,7 +57,10 @@ final class CompileStructTools{
 			}
 			if(cached == null) return null;
 			
-			if((++stableCacheCount>=200) || STABLE_CACHE.isEmpty()) rebuildStableCache();
+			if(++cached.unstableAccess>200 || STABLE_CACHE.isEmpty()){
+				cached.unstableAccess = 0;
+				rebuildStableCache();
+			}
 		}
 		return cached;
 	}

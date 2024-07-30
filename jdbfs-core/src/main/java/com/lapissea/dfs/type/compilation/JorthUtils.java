@@ -14,7 +14,7 @@ import java.util.Set;
 
 import static java.lang.reflect.Modifier.isStatic;
 
-public class JorthUtils{
+public final class JorthUtils{
 	
 	
 	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry) throws MalformedJorth{
@@ -41,7 +41,7 @@ public class JorthUtils{
 		}
 	}
 	
-	static void writeAnnotations(CodeStream writer, Iterable<? extends Annotation> annotations) throws MalformedJorth{
+	public static void writeAnnotations(CodeStream writer, Iterable<? extends Annotation> annotations) throws MalformedJorth{
 		Set<Class<?>> annTypes = new HashSet<>();
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
