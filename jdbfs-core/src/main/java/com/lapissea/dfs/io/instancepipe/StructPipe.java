@@ -43,6 +43,7 @@ import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
@@ -82,7 +83,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Target({ElementType.TYPE})
 	public @interface Special{ }
 	
-	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
+	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
 		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
 			P make(Struct<T> type, boolean runNow);
@@ -107,6 +108,23 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
 			this.type = type;
+		}
+		
+		private final WeakKeyValueMap<Struct<T>, P> pipes = new WeakKeyValueMap<>();
+		private P get(Struct<T> type){
+			synchronized(pipes){
+				return pipes.get(type);
+			}
+		}
+		private void put(Struct<T> type, P pipe){
+			synchronized(pipes){
+				pipes.put(type, pipe);
+			}
+		}
+		private void remove(Struct<T> type){
+			synchronized(pipes){
+				pipes.remove(type);
+			}
 		}
 		
 		P make(Struct<T> struct, boolean runNow){
