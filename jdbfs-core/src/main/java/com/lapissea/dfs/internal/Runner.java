@@ -99,7 +99,6 @@ public final class Runner{
 			var debugCounter = 0;
 			
 			while(true){
-				boolean[] counted = {false};
 				synchronized(TASKS){
 					if(TASKS.isEmpty()){
 						var d = Duration.between(lastTask, Instant.now());
@@ -124,24 +123,27 @@ public final class Runner{
 					lastTask = Instant.now();
 					debugCounter = 0;
 					
-					var now = System.nanoTime();
+					var now     = System.nanoTime();
+					var oldSize = TASKS.size();
 					TASKS.removeIf(t -> {
 						if(now - t.start<=timeThreshold) return false;
-						boolean started;
-						synchronized(t){ started = t.started; }
-						if(started) return true;
-						
+						if(t.started) return true;
 						if(t.counter<20){
 							t.counter++;
-							counted[0] = true;
 							return false;
 						}
 						toRestart.add(t);
 						return true;
 					});
+					if(oldSize>16){
+						var newSize = TASKS.size();
+						if(oldSize/2>newSize){
+							TASKS.trimToSize();
+						}
+					}
 				}
 				if(toRestart.isEmpty()){
-					if(counted[0]) UtilL.sleep(1);
+					UtilL.sleep(1);
 					continue;
 				}
 				
@@ -198,8 +200,12 @@ public final class Runner{
 		}else{
 			synchronized(TASKS){
 				pingWatcher();
-				TASKS.add(t);
-				TASKS.notifyAll();
+				if(!TASKS.isEmpty() && TASKS.getFirst().started){
+					TASKS.set(0, t);
+				}else{
+					TASKS.add(t);
+					TASKS.notifyAll();
+				}
 			}
 		}
 	}

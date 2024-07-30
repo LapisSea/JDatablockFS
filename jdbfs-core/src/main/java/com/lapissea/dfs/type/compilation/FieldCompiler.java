@@ -280,7 +280,7 @@ public final class FieldCompiler{
 		
 		var usedFields = new HashSet<Method>();
 		
-		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).asCollection();
+		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).bake();
 		var fields    = collectAccessors(struct, ioMethods, usedFields::add);
 		
 		var hangingMethods = ioMethods.filter(method -> !usedFields.contains(method)).toModList();

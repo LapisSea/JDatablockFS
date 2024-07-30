@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.BytecodeUtils;
@@ -51,7 +52,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -126,8 +126,8 @@ public final class DefInstanceCompiler{
 	
 	record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){
 		
-		private static final Map<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new HashMap<>();
-		private static final ReadWriteClosableLock            COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
+		private static final WeakKeyValueMap<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new WeakKeyValueMap<>();
+		private static final ReadWriteClosableLock                        COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
@@ -258,7 +258,7 @@ public final class DefInstanceCompiler{
 					if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
 						try(var ignored = COMPLETION_LOCK.read()){
 							var i      = interf;
-							var unfull = Iters.entries(COMPLETION_CACHE).firstMatching(e -> e.getValue().completed == i).map(Map.Entry::getKey);
+							var unfull = COMPLETION_CACHE.iter().firstMatching(e -> e.getValue().completed == i).map(Map.Entry::getKey);
 							if(unfull.isPresent()){
 								interf = unfull.get();
 							}

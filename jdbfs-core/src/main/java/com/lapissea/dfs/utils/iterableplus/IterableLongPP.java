@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -437,4 +438,68 @@ public interface IterableLongPP{
 		};
 	}
 	
+	record Idx(int index, long val) implements Map.Entry<Integer, Long>{
+		@Override
+		public Integer getKey(){ return index; }
+		@Override
+		public Long getValue(){ return val; }
+		@Override
+		public Long setValue(Long value){ throw new UnsupportedOperationException(); }
+	}
+	
+	record Ldx(long index, long val) implements Map.Entry<Long, Long>{
+		@Override
+		public Long getKey(){ return index; }
+		@Override
+		public Long getValue(){ return val; }
+		@Override
+		public Long setValue(Long value){ throw new UnsupportedOperationException(); }
+	}
+	
+	default IterablePP<Idx> enumerate(){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<IterableLongPP.Idx> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					private int index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public IterableLongPP.Idx next(){
+						preIncrementInt(index);
+						return new IterableLongPP.Idx(index++, src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	default IterablePP<Ldx> enumerateL(){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<IterableLongPP.Ldx> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					private long index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public IterableLongPP.Ldx next(){
+						preIncrementLong(index);
+						return new IterableLongPP.Ldx(index++, src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	private static void preIncrementLong(long index){
+		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	private static void preIncrementInt(int num){
+		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
 }

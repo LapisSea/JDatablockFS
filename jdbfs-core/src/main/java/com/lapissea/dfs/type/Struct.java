@@ -343,6 +343,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private int hash = -1;
 	
+	short unstableAccess;
+	
 	public static final int STATE_CONCRETE_TYPE = 1, STATE_FIELD_MAKE = 2, STATE_INIT_FIELDS = 3;
 	
 	private Struct(Class<T> type, boolean runNow){
