@@ -397,6 +397,10 @@ public interface IterablePP<T> extends Iterable<T>{
 	default PPCollection<T> asCollection(){
 		return new PPCollection<>(this, tryGetSize());
 	}
+	default PPBakedSequence<T> bake(){
+		//noinspection unchecked
+		return new PPBakedSequence<>((T[])toArray(Object[]::new));
+	}
 	
 	default String joinAsStr()                                              { return joinAsStr("", "", "", null); }
 	default String joinAsStr(String delimiter)                              { return joinAsStr(delimiter, "", "", null); }
