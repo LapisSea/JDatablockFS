@@ -163,6 +163,8 @@ public final class Iters{
 		public List<T> toList(){
 			return List.copyOf(data);
 		}
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){ return data.toArray(ctor); }
 	}
 	
 	private record ArrayIterable<T>(T[] data) implements IterablePP.SizedPP<T>{
@@ -194,6 +196,13 @@ public final class Iters{
 		@Override
 		public List<T> toList(){
 			return List.of(data);
+		}
+		@SuppressWarnings("SuspiciousSystemArraycopy")
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){
+			var res = ctor.apply(data.length);
+			System.arraycopy(data, 0, res, 0, data.length);
+			return res;
 		}
 	}
 	
@@ -227,6 +236,13 @@ public final class Iters{
 		@Override
 		public List<T> toList(){
 			return List.of(element);
+		}
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){
+			var res = ctor.apply(1);
+			res[0] = (T1)element;
+			return res;
 		}
 	}
 	

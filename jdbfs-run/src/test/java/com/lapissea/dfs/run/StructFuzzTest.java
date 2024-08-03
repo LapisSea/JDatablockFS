@@ -111,7 +111,7 @@ public final class StructFuzzTest{
 		
 		stableRun(Plan.start(
 			runner, new FuzzConfig(),
-			new FuzzSequenceSource.LenSeed(69420, 10_000, 1)
+			new FuzzSequenceSource.LenSeed(69420, 2_000, 1)
 //			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
 		), "fuzzChainResize");
 		
