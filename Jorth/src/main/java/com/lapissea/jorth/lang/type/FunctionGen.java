@@ -212,7 +212,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			counter += info.slots;
 		}
 		
-		if(owner.type == ClassType.INTERFACE){
+		if(owner.type == ClassType.INTERFACE && !access.contains(Access.STATIC)){
 			this.access.add(Access.ABSTRACT);
 		}
 		if(name.equals("<clinit>")){
