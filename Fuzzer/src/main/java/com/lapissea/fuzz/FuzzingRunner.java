@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,7 +17,6 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Spliterator;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.fuzz.FuzzConfig.none;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -405,38 +406,69 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 						}));
 					}
 					
-					var desiredBuffer = Math.max(nThreads*4, 8);
-					var jobSegments   = new ConcurrentLinkedDeque<>(List.of(source.all().spliterator()));
-					while(jobSegments.size()<desiredBuffer){
-						var res = jobSegments.stream().map(Spliterator::trySplit).filter(Objects::nonNull).toList();
-						if(res.isEmpty()) break;
-						jobSegments.addAll(res);
+					var jobsBuild = List.of(source.all().spliterator());
+					while(jobsBuild.size()<nThreads){
+						var res = jobsBuild.stream().flatMap(s -> Stream.of(s.trySplit(), s)).filter(Objects::nonNull).toList();
+						if(jobsBuild.size() == res.size()) break;
+						jobsBuild = res;
 					}
 					
-					while(data instanceof ManyData.Async async && !async.computeFlags.started){
-						try{ Thread.sleep(1); }catch(InterruptedException e){ throw new RuntimeException(e); }
-					}
+					while(data instanceof ManyData.Async async && !async.computeFlags.started) sleep1();
+					
+					var heldSegmentCount = new int[]{0};
+					var jobSegments      = new ArrayDeque<>(jobsBuild);
 					
 					Runnable fuzz = () -> {
+						var holder = new SequenceHolder();
 						while(true){
-							var split = jobSegments.poll();
-							if(split == null) return;
+							Spliterator<FuzzSequence> split;
+							findSplit:
+							synchronized(jobSegments){
+								split = jobSegments.poll();
+								if(split != null){
+									heldSegmentCount[0]++;
+									break findSplit;
+								}
+								if(heldSegmentCount[0] == 0){//No more segments! Job done.
+									return;
+								}
+								// There is a split that may potentially have more sequences to process.
+								// Wait for it to prevent CPU under-utilization
+								try{
+									jobSegments.wait(100);
+								}catch(InterruptedException e){ throw new RuntimeException(e); }
+								continue;
+							}
+							boolean count = true;
+							try{
+								holder.sequence = null;
+								while(!progress.hasErr() && holder.sequence == null && split.tryAdvance(seq -> {
+									if(stateEnv.shouldRun(seq, mark)) holder.sequence = seq;
+								})) ;
+								if(holder.sequence == null) continue;
+								
+								count = false;
+								synchronized(jobSegments){
+									jobSegments.addFirst(split);
+									heldSegmentCount[0]--;
+									jobSegments.notify();
+								}
+							}finally{
+								if(count) synchronized(jobSegments){
+									heldSegmentCount[0]--;
+									jobSegments.notify();
+								}
+							}
 							
-							var holder = new SequenceHolder();
-							while(!progress.hasErr() && holder.sequence == null && split.tryAdvance(seq -> {
-								if(stateEnv.shouldRun(seq, mark)) holder.sequence = seq;
-							})) ;
-							var sequence = holder.sequence;
-							if(sequence == null) return;
-							
-							jobSegments.add(split);
-							
-							runSequence(mark, sequence, progress).ifPresent(reportFail);
+							runSequence(mark, holder.sequence, progress).ifPresent(reportFail);
 						}
 					};
 					
 					while(!progress.hasErr() && !jobSegments.isEmpty()){
-						var workerBatch = IntStream.range(0, jobSegments.size()).mapToObj(__ -> CompletableFuture.runAsync(fuzz, executor)).toList();
+						var workerBatch = IntStream.range(0, Math.max(jobSegments.size(), poolThreads)).mapToObj(__ -> {
+							sleep1();
+							return CompletableFuture.runAsync(fuzz, executor);
+						}).toList();
 						
 						fuzz.run();
 						
@@ -462,6 +494,10 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				yield finalize.get();
 			}
 		};
+	}
+	
+	private static void sleep1(){
+		try{ Thread.sleep(1); }catch(InterruptedException e){ throw new RuntimeException(e); }
 	}
 	
 	private sealed interface RunType{
