@@ -232,22 +232,20 @@ public final class Access{
 		}
 	}
 	
-	private static final WeakKeyValueMap<Class<?>, Class<?>[]> ARG_CACHE = new WeakKeyValueMap<>();
 	
 	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface){
-		Class<?>[] args;
-		typ:
-		synchronized(ARG_CACHE){
-			var ref = ARG_CACHE.get(functionalInterface);
-			if(ref != null){
-				args = ref;
-				break typ;
-			}
-			args = Access.getFunctionalMethod(functionalInterface).getParameterTypes();
-			ARG_CACHE.put(functionalInterface, args);
-		}
-		
+		Class<?>[] args = getArgs(functionalInterface);
 		return findConstructorArgs(clazz, functionalInterface, args);
+	}
+	
+	private static final WeakKeyValueMap<Class<?>, Class<?>[]> ARG_CACHE = new WeakKeyValueMap.Sync<>();
+	private static <FInter> Class<?>[] getArgs(Class<FInter> functionalInterface){
+		var ref = ARG_CACHE.get(functionalInterface);
+		if(ref != null) return ref;
+		
+		var args = getFunctionalMethod(functionalInterface).getParameterTypes();
+		ARG_CACHE.put(functionalInterface, args);
+		return args;
 	}
 	
 	@NotNull

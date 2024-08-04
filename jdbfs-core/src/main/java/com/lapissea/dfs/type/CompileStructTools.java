@@ -6,6 +6,8 @@ import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.GcDelayer;
+import com.lapissea.dfs.utils.KeyCounter;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -14,9 +16,9 @@ import com.lapissea.util.UtilL;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
@@ -38,7 +40,11 @@ final class CompileStructTools{
 	private static final Map<Class<?>, WaitHolder>            NON_CONCRETE_WAIT = new HashMap<>();
 	private static final Map<Class<?>, Thread>                STRUCT_THREAD_LOG = new HashMap<>();
 	
-	private static Map<Integer, List<WeakReference<Struct<?>>>> STABLE_CACHE = Map.of();
+	private static Map<Integer, WeakReference<Struct<?>>[]> STABLE_CACHE = Map.of();
+	
+	private static final KeyCounter<String> COMPILATION_COUNT = new KeyCounter<>();
+	private static final Duration           GC_DELAY          = ConfigDefs.DELAY_COMP_OBJ_GC.resolveLocking();
+	private static final GcDelayer          GC_DELAYER        = GC_DELAY.isZero()? null : new GcDelayer();
 	
 	@SuppressWarnings("unchecked")
 	static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
@@ -65,7 +71,7 @@ final class CompileStructTools{
 		return cached;
 	}
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct<T> getStable(Class<T> instanceClass, List<WeakReference<Struct<?>>> stableRefs){
+	private static <T extends IOInstance<T>> Struct<T> getStable(Class<T> instanceClass, WeakReference<Struct<?>>[] stableRefs){
 		for(var ref : stableRefs){
 			Struct<?> val = ref.get();
 			if(val == null) continue;
@@ -80,7 +86,11 @@ final class CompileStructTools{
 		var groups = STRUCT_CACHE.iter().toGrouping(e -> e.getKey().hashCode());
 		STABLE_CACHE = Iters.entries(groups).toMap(
 			Map.Entry::getKey,
-			group -> Iters.from(group.getValue()).<WeakReference<Struct<?>>>map(e -> new WeakReference<>(e.getValue())).toList()
+			group -> Iters.from(group.getValue()).map(e -> new WeakReference<>(e.getValue()))
+			              .toArray(s -> {
+				              //noinspection unchecked
+				              return (WeakReference<Struct<?>>[])new WeakReference[s];
+			              })
 		);
 	}
 	
@@ -145,6 +155,9 @@ final class CompileStructTools{
 			}
 		}
 		
+		var encounterKey   = instanceClass.getClassLoader().hashCode() + "/" + instanceClass.getName();
+		var encounterCount = COMPILATION_COUNT.getCount(encounterKey);
+		
 		var wh = needsImpl? new WaitHolder() : null;
 		
 		S struct;
@@ -163,9 +176,9 @@ final class CompileStructTools{
 			}
 			
 			
-			if(Log.TRACE) Log.trace("Requested struct: {}#green{}#greenBright",
+			if(Log.TRACE) Log.trace("Requested struct: {}#green{}#greenBright{}",
 			                        instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
-			                        instanceClass.getSimpleName());
+			                        instanceClass.getSimpleName(), (encounterCount>0? " (again #" + encounterCount + ")" : ""));
 			
 			try{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
@@ -190,6 +203,11 @@ final class CompileStructTools{
 			}
 		}
 		
+		var count = COMPILATION_COUNT.inc(encounterKey);
+		if(count>1 && GC_DELAYER != null){
+			GC_DELAYER.delay(struct, GC_DELAY.multipliedBy(count - 1));
+		}
+		
 		if(needsImpl) struct.runOnState(Struct.STATE_CONCRETE_TYPE, () -> {
 			try{
 				var     impl = struct.getConcreteType();
@@ -206,7 +224,12 @@ final class CompileStructTools{
 		if(!GlobalConfig.RELEASE_MODE && Log.WARN){
 			if(!ConfigDefs.PRINT_COMPILATION.resolveVal()){
 				struct.runOnStateDone(
-					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
+					() -> {
+						var fullName  = struct.getFullName();
+						var cleanName = struct.cleanName();
+						var path      = fullName.substring(0, fullName.length() - cleanName.length());
+						Log.trace("Struct compiled: {}#cyan{}#cyanBright{}", path, struct, (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+					},
 					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 				);
 			}else{

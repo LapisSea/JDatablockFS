@@ -24,7 +24,6 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
-import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.BytecodeUtils;
@@ -39,8 +38,10 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -59,6 +60,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -124,10 +126,34 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){
+	record CompletionInfo<T extends IOInstance<T>>(
+		Class<T> base, Class<T> completed,
+		Set<String> completedGetters, Set<String> completedSetters
+	){
+		record Weak<T extends IOInstance<T>>(
+			WeakReference<Class<T>> base, WeakReference<Class<T>> completed,
+			Set<String> completedGetters, Set<String> completedSetters
+		){
+			CompletionInfo<T> deref(){
+				var base      = this.base.get();
+				var completed = this.completed.get();
+				if(base == null || completed == null) return null;
+				return new CompletionInfo<>(base, completed, completedGetters, completedSetters);
+			}
+		}
+		Weak<T> weakRef(){
+			return new Weak<>(new WeakReference<>(base), new WeakReference<>(completed), completedGetters, completedSetters);
+		}
 		
-		private static final WeakKeyValueMap<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new WeakKeyValueMap<>();
-		private static final ReadWriteClosableLock                        COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
+		CompletionInfo{
+			Objects.requireNonNull(base);
+			Objects.requireNonNull(completed);
+			Objects.requireNonNull(completedGetters);
+			Objects.requireNonNull(completedSetters);
+		}
+		
+		private static final WeakHashMap<Class<?>, CompletionInfo.Weak<?>> COMPLETION_CACHE = new WeakHashMap<>();
+		private static final ReadWriteClosableLock                         COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
@@ -135,20 +161,23 @@ public final class DefInstanceCompiler{
 			if(c != null) return c;
 			
 			try(var ignored = COMPLETION_LOCK.write()){
-				var cached = COMPLETION_CACHE.get(interf);
-				if(cached != null) return (CompletionInfo<T>)cached;
+				var cachedWeak = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
+				if(cachedWeak != null){
+					var cached = cachedWeak.deref();
+					if(cached != null) return cached;
+				}
 				
-				CompletionInfo<?> complete = complete(interf);
-				COMPLETION_CACHE.put(interf, complete);
-				return (CompletionInfo<T>)complete;
+				var complete = (CompletionInfo<T>)complete(interf);
+				COMPLETION_CACHE.put(interf, complete.weakRef());
+				return complete;
 			}
 		}
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> getCached(Class<T> interf){
 			try(var ignored = COMPLETION_LOCK.read()){
-				var cached = COMPLETION_CACHE.get(interf);
-				if(cached != null) return (CompletionInfo<T>)cached;
+				var cached = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
+				if(cached != null) return cached.deref();
 			}
 			return null;
 		}
@@ -209,6 +238,8 @@ public final class DefInstanceCompiler{
 					writer.write("implements {!}{}", interf.getName(), parmsStr);
 					writer.write("interface #typ.impl start");
 					
+					unmappedClassFn(writer, interf);
+					
 					for(String name : missingSetters){
 						writer.write(
 							"""
@@ -252,27 +283,15 @@ public final class DefInstanceCompiler{
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance.Def<T>> Optional<Class<T>> findSourceInterface(Class<?> impl){
-			var clazz = impl;
-			do{
-				for(Class<?> interf : clazz.getInterfaces()){
-					if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
-						try(var ignored = COMPLETION_LOCK.read()){
-							var i      = interf;
-							var unfull = COMPLETION_CACHE.iter().firstMatching(e -> e.getValue().completed == i).map(Map.Entry::getKey);
-							if(unfull.isPresent()){
-								interf = unfull.get();
-							}
-						}
-					}
-					//noinspection rawtypes
-					var node = CACHE.get(new Key(interf));
-					if(node != null && node.impl == impl){
-						return Optional.of((Class<T>)node.key.clazz);
-					}
-				}
-				clazz = clazz.getSuperclass();
-			}while(clazz != null);
-			return Optional.empty();
+			try{
+				var getCls = impl.getDeclaredMethod(GET_UNMAPPED_CLASS_FN);
+				var cls    = (Class<T>)getCls.invoke(null);
+				return Optional.of(cls);
+			}catch(NoSuchMethodException e){
+				throw new ShouldNeverHappenError("No " + GET_UNMAPPED_CLASS_FN + " on class " + impl.getTypeName());
+			}catch(InvocationTargetException|IllegalAccessException e){
+				throw new ShouldNeverHappenError(e);
+			}
 		}
 	}
 	
@@ -338,6 +357,7 @@ public final class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE = new ConcurrentHashMap<>();
 	
+	private static final String GET_UNMAPPED_CLASS_FN = "$$fetchUnmappedClass";
 	
 	//////////////////////////////// API /////////////////////////////////
 	
@@ -557,6 +577,8 @@ public final class DefInstanceCompiler{
 						public class #typ.impl start
 						""", parmsStr);
 				
+				unmappedClassFn(writer, completion.base);
+				
 				for(var info : fieldInfo){
 					if(isFieldIncluded(includeNames, info.name)){
 						defineField(writer, info);
@@ -665,7 +687,20 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Boolean isFieldIncluded(Optional<Set<String>> includeNames, String name){
+	private static <T extends IOInstance<T>> void unmappedClassFn(CodeStream writer, Class<T> baseClazz) throws MalformedJorth{
+		writer.write(
+			"""
+				public static function {}
+					returns {}
+				start
+					class {}
+				end
+				""",
+			GET_UNMAPPED_CLASS_FN, Class.class, baseClazz
+		);
+	}
+	
+	private static Boolean isFieldIncluded(Optional<Set<String>> includeNames, String name){
 		return includeNames.map(ns -> ns.contains(name)).orElse(true);
 	}
 	
@@ -693,7 +728,7 @@ public final class DefInstanceCompiler{
 			interf.getName());
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
+	private static void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
 		var fragment = ToStringFormat.parse(format.value(), Iters.from(fieldInfo).toModList(FieldInfo::name));
 		
 		if(specials.toStr.isEmpty()){
@@ -704,7 +739,7 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
+	private static void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
 		
 		if(specials.toStr.isEmpty()){
 			generateStandardToString(classHumanName, includeNames, toStrAnn, "toString", fieldInfo, writer);
@@ -1018,7 +1053,7 @@ public final class DefInstanceCompiler{
 		writer.write(
 			"""
 				private static final field $STRUCT #Struct
-								
+				
 				function <clinit> start
 					static call #Struct of start
 						class #typ.impl

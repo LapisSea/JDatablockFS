@@ -23,12 +23,15 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
@@ -36,6 +39,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.ref.Cleaner;
 import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
@@ -647,6 +651,36 @@ public class GeneralTypeHandlingTests{
 		var read = pipe.readNew(chunk, null);
 		
 		Assert.assertEquals(read, instance);
+	}
+	
+	@Test
+	void classUnload(){
+		var unloadedStatus = loadTestClass();
+		for(int i = 0; i<20; i++){
+			System.gc();
+			if(unloadedStatus[0]){
+				return;
+			}
+			UtilL.sleep(10);
+			LogUtil.println("retrying...", i);
+		}
+		Assert.fail("Class not unloaded!");
+	}
+	<T extends IOInstance<T>> boolean[] loadTestClass(){
+		var def = new TempClassGen.ClassGen(
+			"testunload",
+			List.of(new TempClassGen.FieldGen("hi", int.class, List.of(Annotations.make(IOValue.class)), false, null)),
+			Set.of(new TempClassGen.CtorType.Empty()),
+			IOInstance.Managed.class
+		);
+		var unloadedStatus = new boolean[]{false};
+		Cleaner.create().register(def, () -> unloadedStatus[0] = true);
+		
+		//noinspection unchecked
+		var typ    = (Class<T>)TempClassGen.gen(def);
+		var struct = Struct.of(typ, STATE_DONE);
+		StandardStructPipe.of(struct, STATE_DONE);
+		return unloadedStatus;
 	}
 	
 }
