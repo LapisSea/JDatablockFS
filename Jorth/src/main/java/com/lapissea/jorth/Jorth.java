@@ -319,7 +319,7 @@ public final class Jorth extends CodeDestination{
 				boolean interf = currentClass.type == ClassType.INTERFACE;
 				if(interf && vis != Visibility.PUBLIC) throw new MalformedJorth("Interface members must be public");
 				
-				boolean noBody = interf;
+				boolean noBody = interf && !acc.contains(Access.STATIC);
 				
 				propCollect:
 				while(true){
