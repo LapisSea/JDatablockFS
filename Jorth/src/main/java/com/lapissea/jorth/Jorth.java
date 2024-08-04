@@ -332,7 +332,9 @@ public final class Jorth extends CodeDestination{
 					}
 					switch(k){
 						case START -> {
-							if(noBody) throw new MalformedJorth("Can not start body of the function. Please use end instead of start");
+							if(noBody){
+								throw new MalformedJorth("Can not start body of the function. Please use end instead of start");
+							}
 							tab++;
 							break propCollect;
 						}
@@ -574,7 +576,9 @@ public final class Jorth extends CodeDestination{
 				var clazz = source.readClassName(importsFun);
 				currentFunction.loadClassTypeOp(clazz);
 			}
-			case WHAT_THE_STACK -> throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
+			case WHAT_THE_STACK -> {
+				throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
+			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in function " + currentFunction);
 		}
 	}
