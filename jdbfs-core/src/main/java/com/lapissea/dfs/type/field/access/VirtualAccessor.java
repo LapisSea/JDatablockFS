@@ -59,7 +59,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	public final TypeOff typeOff;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, TypeOff typeOff){
-		super(struct, type.name, type.type, type.annotations);
+		super(struct, type.name, type.type, type.annotations, false);
 		this.type = type;
 		this.typeOff = Objects.requireNonNull(typeOff);
 		
@@ -78,7 +78,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 			dependencies = getDeclaringStruct()
 				               .getFields()
 				               .filtered(f -> f.isDependency(field))
-				               .collectToFinalList(IOField::getAccessor);
+				               .toList(IOField::getAccessor);
 		}
 	}
 	

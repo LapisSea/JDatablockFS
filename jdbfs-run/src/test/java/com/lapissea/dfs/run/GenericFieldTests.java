@@ -15,6 +15,8 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiFunction;
 import org.testng.Assert;
+import org.testng.ITestResult;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -43,31 +45,33 @@ import static org.testng.AssertJUnit.assertEquals;
 
 public class GenericFieldTests{
 	
+	@AfterMethod
+	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
+	
 	@Test
 	void simpleGenericTest() throws IOException{
 		//noinspection unchecked
 		var pipe = StandardStructPipe.of(GenericContainer.class, STATE_DONE);
 		
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			
-			var container = new GenericContainer<>();
-			
-			container.value = new Dummy(123);
-			
-			pipe.write(chunk, container);
-			var read = pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-			
-			
-			container.value = "This is a test.";
-			
-			pipe.write(chunk, container);
-			read = pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-		});
+		var provider = TestUtils.testChunkProvider();
+		var chunk    = AllocateTicket.bytes(64).submit(provider);
+		
+		var container = new GenericContainer<>();
+		
+		container.value = new Dummy(123);
+		
+		pipe.write(chunk, container);
+		var read = pipe.readNew(chunk, null);
+		
+		assertEquals(container, read);
+		
+		
+		container.value = "This is a test.";
+		
+		pipe.write(chunk, container);
+		read = pipe.readNew(chunk, null);
+		
+		assertEquals(container, read);
 	}
 	
 	record Gen<T>(UnsafeBiFunction<RandomGenerator, DataProvider, T, IOException> gen, Class<T> type, String name){

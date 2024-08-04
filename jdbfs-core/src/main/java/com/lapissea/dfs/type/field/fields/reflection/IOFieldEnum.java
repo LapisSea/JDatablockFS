@@ -49,7 +49,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
-		createDefaultIfNull = () -> enumUniverse.getFirst();
+		createDefaultIfNull = enumUniverse::getFirst;
 	}
 	
 	@Override

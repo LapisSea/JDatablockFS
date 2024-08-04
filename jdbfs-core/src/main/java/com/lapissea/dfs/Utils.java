@@ -4,6 +4,7 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -30,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
@@ -359,4 +361,82 @@ public final class Utils{
 		return (int)nextSizeL;
 	}
 	
+	public static OptionalInt longToOptInt(long lSize){
+		if(lSize>Integer.MAX_VALUE) return OptionalInt.empty();
+		return OptionalInt.of((int)lSize);
+	}
+	public static Class<?> findClosestCommonSuper(IterablePP<Class<?>> classes){
+		return classes.reduce(UtilL::findClosestCommonSuper)
+		              .orElse(Object.class);
+	}
+	
+	public static String camelCaseToSnakeCase(String s){
+		var words = new ArrayList<String>();
+		{
+			var word = new StringBuilder();
+			for(int i = 0; i<s.length(); i++){
+				var c = s.charAt(i);
+				if(c == '_'){
+					if(word.length()>0){
+						words.add(word.toString());
+						word.setLength(0);
+					}
+					String prev;
+					if(!words.isEmpty() && (prev = words.getLast()).charAt(prev.length() - 1) == '_'){
+						prev += '_';
+						words.set(words.size() - 1, prev);
+					}else words.add("_");
+					continue;
+				}
+				if(Character.isUpperCase(c) && word.length()>0){
+					words.add(word.toString());
+					word.setLength(0);
+				}
+				word.append(c);
+			}
+			if(word.length()>0){
+				words.add(word.toString());
+			}
+		}
+		
+		//Merge abbreviations. eg: enableHTTPS will result in [enable, HTTPS]
+		if(words.size()>1){
+			for(int i = 0; i<words.size() - 1; i++){
+				var current = words.get(i);
+				if(current.length() == 1 && Character.isUpperCase(current.charAt(0))){
+					var currentMerge = new StringBuilder(current);
+					
+					var i1 = i + 1;
+					while(words.size()>i1){
+						var  other = words.get(i1);
+						char c;
+						if(other.length() == 1 && Character.isUpperCase(c = other.charAt(0))){
+							currentMerge.append(c);
+							words.remove(i1);
+						}else break;
+					}
+					
+					words.set(i, currentMerge.toString());
+				}
+			}
+		}
+		
+		for(int i = 0; i<words.size() - 1; i++){
+			var word = words.get(i);
+			if(!word.isEmpty() && word.charAt(0) == '_'){
+				if(word.length() == 1){
+					words.remove(i);
+					i--;
+					continue;
+				}else{
+					words.set(i, word = word.substring(1));
+				}
+			}
+			if(!word.isEmpty() && word.charAt(word.length() - 1) == '_'){
+				words.set(i, word.substring(0, word.length() - 1));
+			}
+		}
+		
+		return String.join("_", words);
+	}
 }

@@ -283,7 +283,7 @@ public class CheckIOList<T> implements IOList<T>{
 		return a;
 	}
 	@Override
-	public T getFirst(){
+	public T getFirst() throws IOException{
 		var a = data.getFirst();
 		var b = base.getFirst();
 		assertEquals(a, b);

@@ -25,7 +25,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
 	
 	private static void ensureEnum(Class<?> type){
-		if(!type.isEnum()) throw new IllegalArgumentException(type.getName() + " not an Enum");
+		if(!type.isEnum()) throw new IllegalArgumentException(type.getTypeName() + " not an Enum");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -262,7 +262,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	}
 	
 	@Override
-	public OptionalInt calculateSize(){
+	public OptionalInt getSize(){
 		return OptionalInt.of(size());
 	}
 }

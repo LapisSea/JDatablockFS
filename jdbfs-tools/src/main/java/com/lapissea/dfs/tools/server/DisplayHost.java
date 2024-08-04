@@ -52,7 +52,7 @@ public class DisplayHost{
 		new DisplayHost().start(Arrays.asList(args).contains("lazy"));
 	}
 	
-	private class Sess{
+	private final class Sess{
 		
 		private final String name;
 		private final Socket client;

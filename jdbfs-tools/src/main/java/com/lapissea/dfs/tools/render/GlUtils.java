@@ -9,7 +9,7 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL32.GL_GEOMETRY_SHADER;
 
 public class GlUtils{
-	public static class Texture{
+	public static final class Texture{
 		private int id;
 		private Texture(int id){
 			this.id = id;

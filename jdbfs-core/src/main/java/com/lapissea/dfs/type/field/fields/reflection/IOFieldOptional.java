@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -26,8 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
@@ -54,15 +53,15 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					anns.remove(IOValue.class);
 					anns.remove(IONullability.class);
 					
-					var annotations = Stream.concat(
-						Stream.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
-						anns.stream().map(field::getAnnotation).flatMap(Optional::stream)
+					var annotations = Iters.concat(
+						Iters.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
+						Iters.from(anns).flatOptionals(field::getAnnotation)
 					).toList();
 					
 					var genType = field.getGenericType(null);
 					
 					var type = IOFieldTools.unwrapOptionalType(genType).orElseThrow(() -> {
-						return new MalformedStruct("Illegal type of: " + field.getGenericType(null).getTypeName());
+						return new MalformedStruct("fmt", "Illegal type of: {}#red for optional field", field.getGenericType(null).getTypeName());
 					});
 					
 					return new BehaviourRes<>(List.of(new VirtualFieldDefinition<T, Integer>(
@@ -70,7 +69,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 						FieldNames.companionValueFlag(field),
 						type,
 						annotations
-					)), annotations.stream().map(Annotation::annotationType).collect(Collectors.toUnmodifiableSet()));
+					)), Iters.from(annotations).toSet(Annotation::annotationType));
 				})
 			);
 		}

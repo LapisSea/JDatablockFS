@@ -38,12 +38,12 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
-import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
@@ -83,7 +83,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Target({ElementType.TYPE})
 	public @interface Special{ }
 	
-	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
+	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
 		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
 			P make(Struct<T> type, boolean runNow);
@@ -108,6 +108,23 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
 			this.type = type;
+		}
+		
+		private final WeakKeyValueMap<Struct<T>, P> pipes = new WeakKeyValueMap<>();
+		private P get(Struct<T> type){
+			synchronized(pipes){
+				return pipes.get(type);
+			}
+		}
+		private void put(Struct<T> type, P pipe){
+			synchronized(pipes){
+				pipes.put(type, pipe);
+			}
+		}
+		private void remove(Struct<T> type){
+			synchronized(pipes){
+				pipes.remove(type);
+			}
 		}
 		
 		P make(Struct<T> struct, boolean runNow){
@@ -182,6 +199,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created.postValidate();
 				}catch(Throwable e){
 					remove(struct);
+					errors.put(struct, e);
+					throw e;
 				}
 			}
 			
@@ -274,8 +293,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			referenceWalkCommands = generateReferenceWalkCommands();
 			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
-				getNonNulls().filtered(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
-				             .collectToFinalList()
+				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
+				             .toList()
 			);
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
@@ -306,7 +325,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected void postValidate(){
 		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
 			var type = getType();
-			T   inst;
+			if(!type.canHaveDefaultConstructor()) return;
+			T inst;
 			try{
 				inst = type.make();
 			}catch(Throwable e){
@@ -317,8 +337,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					checkTypeIntegrity(inst, true);
 				}catch(FieldIsNull|InvalidGenericArgument ignored){
 				}catch(IOException e){
-					e.printStackTrace();
-					throw new RuntimeException(e);
+					throw new RuntimeException(Log.fmt("Failed to check integrity of: {}#red", type.cleanFullName()), e);
 				}
 			}
 		}
@@ -341,7 +360,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var refs = fields.instancesOf(RefField.class)
 		                 .flatOptionalsPP(ref -> fields.byName(FieldNames.ref(ref.getAccessor())).asKeyWith(ref))
-		                 .collectToMap(Function.identity());
+		                 .toModMap(Function.identity());
 		
 		for(var field : fields){
 			var refVal = refs.get(field);
@@ -430,7 +449,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw new NotImplementedException(field + " (" + type.getName() + ") not handled");
 		}
 		
-		if(getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged()){
+		if(getType() instanceof Struct.Unmanaged<?> u && u.hasDynamicFields()){
 			builder.unmanagedRest();
 		}else{
 			builder.endFlow();
@@ -457,7 +476,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private IterablePP<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filtered(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
+		return ioFields.unpackedStream().filter(f -> f.isNonNullable() && f.getAccessor().canBeNull());
 	}
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
@@ -516,7 +535,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		type.waitForState(Struct.STATE_INIT_FIELDS);
 		var wordSpace = IOFieldTools.minWordSpace(fields);
 		
-		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
+		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.hasDynamicFields();
 		
 		type.waitForStateDone();
 		
@@ -544,19 +563,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var max = hasDynamicFields? OptionalLong.empty() : IOFieldTools.sumVarsIfAll(fields, siz -> siz.getMax(wordSpace));
 		
 		var rawGroups = fields.instancesOf(SizeDescriptor.UnknownNum.class, IOField::getSizeDescriptor)
-		                      .collectToGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor());
+		                      .toGrouping(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor());
 		var groups = Iters.entries(rawGroups)
-		                  .filtered(e -> e.getValue().size()>=minGroup)
-		                  .collectToFinalList(SizeGroup::new);
+		                  .filter(e -> e.getValue().size()>=minGroup)
+		                  .toList(SizeGroup::new);
 		
-		var groupNumberSet = Iters.from(groups).map(e -> e.num).collectToSet();
+		var groupNumberSet = Iters.from(groups).map(e -> e.num).toModSet();
 		
 		return new SizeRelationReport<>(
 			fields, wordSpace, knownFixed, min, max, hasDynamicFields,
 			groups,
 			fields.filtered(f -> !f.getSizeDescriptor().hasFixed())
-			      .filtered(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
-			      .collectToFinalList()
+			      .filter(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
+			      .toList()
 		);
 	}
 	

@@ -4,6 +4,7 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistry;
 import com.lapissea.util.event.change.ChangeRegistryInt;
@@ -15,7 +16,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import java.util.stream.IntStream;
 
 public class SessionHost implements DataLogger{
@@ -36,7 +36,7 @@ public class SessionHost implements DataLogger{
 	
 	public record CachedFrame(MemFrame memData, ParsedFrame parsed){ }
 	
-	public class HostedSession implements Session{
+	public final class HostedSession implements Session{
 		public final List<CachedFrame> frames   = new ArrayList<>();
 		public final ChangeRegistryInt framePos = new ChangeRegistryInt(-1);
 		
@@ -58,7 +58,7 @@ public class SessionHost implements DataLogger{
 		public void log(MemFrame frame){
 			if(frames.size()>10000){
 				synchronized(frames){
-					var               ints      = new Random().ints(0, frames.size()).distinct().limit(1000).toArray();
+					var               ints      = new RawRandom().ints(0, frames.size()).distinct().limit(1000).toArray();
 					List<CachedFrame> tmpFrames = new LinkedList<>();
 					IntStream.range(0, (int)(frames.size()*0.7)).filter(i -> !UtilL.contains(ints, i)).mapToObj(frames::get).forEach(tmpFrames::add);
 					frames.clear();

@@ -26,12 +26,7 @@
 		<dependency>
 			<groupId>org.roaringbitmap</groupId>
 			<artifactId>RoaringBitmap</artifactId>
-			<version>1.0.5</version>
-		</dependency>
-		<dependency>
-			<groupId>ru.vyarus</groupId>
-			<artifactId>generics-resolver</artifactId>
-			<version>3.0.3</version>
+			<version>1.2.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lz4</groupId>

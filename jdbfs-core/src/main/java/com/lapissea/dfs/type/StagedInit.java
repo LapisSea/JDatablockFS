@@ -4,6 +4,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -34,10 +35,10 @@ import java.util.function.Consumer;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.RELEASE_MODE;
 
-public abstract class StagedInit{
+public abstract class StagedInit implements Stringify{
 	
-	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveVal();
-	private static final boolean DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD>0 && Log.DEBUG;
+	private static final Duration LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolveLocking();
+	private static final boolean  DO_TIMESTAMPS       = LONG_WAIT_THRESHOLD != null && Log.DEBUG;
 	
 	private static class InitInfo{
 		private Throwable error;
@@ -60,6 +61,8 @@ public abstract class StagedInit{
 	
 	private int      state    = STATE_NOT_STARTED;
 	private InitInfo initInfo = new InitInfo();
+	
+	private Map<Integer, String> statesCache;
 	
 	protected void init(boolean runNow, Runnable init){
 		init(runNow, init, null);
@@ -107,7 +110,7 @@ public abstract class StagedInit{
 					initInfo.conditionChange.signalAll();
 				}
 			}
-		});
+		}, "Init->" + this.toShortString());
 	}
 	
 	protected final void setInitState(int state){
@@ -123,11 +126,12 @@ public abstract class StagedInit{
 	}
 	
 	private void validateNewState(int state){
-		if(getStateInfo(state).isEmpty()){
+		if(getStateName(state).isEmpty()){
 			throw new IllegalArgumentException("Unknown state: " + state);
 		}
-		if(state<=this.state){
-			throw new IllegalArgumentException("State must advance! Current state: " + stateToString(this.state) + ", Requested state: " + stateToString(state));
+		var ts = this.state;
+		if(state<=ts){
+			throw new IllegalArgumentException("State must advance! Current state: " + stateToString(ts) + ", Requested state: " + stateToString(state));
 		}
 	}
 	
@@ -155,6 +159,8 @@ public abstract class StagedInit{
 	
 	public final void waitForState(int state){
 		if(this.state>=state) return;
+		// This is a separate method as it is called rarely and often does not need to be inlined or even compiled.
+		// Rare path as function a day keeps the "Inlined: No, Too big" away
 		actuallyWaitForState(state);
 	}
 	
@@ -174,7 +180,7 @@ public abstract class StagedInit{
 					return;
 				}
 				onEvent.run();
-			});
+			}, this.toShortString() + "->" + stateToString(state));
 		}
 	}
 	
@@ -225,12 +231,19 @@ public abstract class StagedInit{
 	}
 	
 	protected String stateToString(int state){
-		return getStateInfo(state).map(StateInfo::name).orElseGet(() -> "UNKNOWN_STATE_" + state);
+		return getStateName(state).orElseGet(() -> "UNKNOWN_STATE_" + state);
 	}
 	
-	protected Optional<StateInfo> getStateInfo(int stateId){
-		return listStates().filtered(i -> i.id == stateId).findFirst();
+	protected Optional<String> getStateName(int stateId){
+		return Optional.ofNullable(getStates().get(stateId));
 	}
+	
+	private Map<Integer, String> getStates(){
+		var s = statesCache;
+		if(s == null) s = statesCache = listStates().toMap(StateInfo::id, StateInfo::name);
+		return s;
+	}
+	
 	/***
 	 * This method lists information about all states that this object can be in. This method is only
 	 * called when debugging or calling toString so performance is not of great concern.
@@ -245,7 +258,7 @@ public abstract class StagedInit{
 		List<String>   problems = new ArrayList<>();
 		Set<StateInfo> base     = new HashSet<>(StateInfo.BASE_STATES);
 		
-		var states = listStates().collectToList();
+		var states = listStates().toModList();
 		states.forEach(state -> {
 			if(state.id<StateInfo.MIN_ID) problems.add("\t" + state + ": id is too small!");
 			if(!ids.add(state.id)) problems.add("\t" + state + ": has a duplicate id");
@@ -269,7 +282,7 @@ public abstract class StagedInit{
 	
 	private void actuallyWaitForState(int state){
 		var info = initInfo;
-		if(info == null) return;//If no info, then the object is inited
+		if(info == null) return;//If no info, then the object is initialized
 		
 		threadCheck(info.ctxThread);
 		var start = DO_TIMESTAMPS? Instant.now() : Instant.EPOCH;
@@ -296,8 +309,8 @@ public abstract class StagedInit{
 	}
 	
 	private void reportPossibleLock(Instant start, Thread initThread){
-		if(initThread == null || !Log.WARN) return;
-		if(Duration.between(start, Instant.now()).toMillis()<LONG_WAIT_THRESHOLD) return;
+		if(initThread == null || !DO_TIMESTAMPS) return;
+		if(Duration.between(start, Instant.now()).compareTo(LONG_WAIT_THRESHOLD)<0) return;
 		Log.warn(
 			"possible lock at {}#yellow on thread {}#yellow\n{}",
 			this, initThread.getName(), Iters.from(initThread.getStackTrace()).joinAsStr("\n", s -> "\t" + s)
@@ -313,7 +326,7 @@ public abstract class StagedInit{
 			}
 		}
 		var waitTime = Duration.between(start, end);
-		if(waitTime.toMillis()>LONG_WAIT_THRESHOLD){
+		if(waitTime.compareTo(LONG_WAIT_THRESHOLD)>0){
 			Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", stateToString(state), this, waitTime.toMillis());
 		}
 	}

@@ -28,6 +28,7 @@ public final class SparseImage{
 		long tim = System.currentTimeMillis();
 		main(config.getView());
 		LogUtil.println(System.currentTimeMillis() - tim);
+		LogUtil.Init.detach();
 	}
 	
 	public static void main(Configuration.View args) throws IOException{

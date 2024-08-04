@@ -27,7 +27,6 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -117,7 +116,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 		@Override
 		public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
-			return new GeneralMerger<>(Iters.from(group).collectToFinalList(f -> f.maxAsFixedSize(varProvider)));
+			return new GeneralMerger<>(Iters.from(group).toList(f -> f.maxAsFixedSize(varProvider)));
 		}
 		
 	}
@@ -171,18 +170,25 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 	}
 	
-	private static final int[] INTEGRITY_DIVS = IntStream.range(0, 16).map(i -> Math.toIntExact(BitUtils.makeMask(i))).toArray();
+	private static final int[] INTEGRITY_DIVS = Iters.range(0, 16).mapExact(BitUtils::makeMask).toArray();
+	
 	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
 		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
 	}
 	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
+		if(!areIntegrityBitsValid(remainingBits, raw, totalBits, oneBits)){
+			throw new IOException("Bit integrity failed");
+		}
+	}
+	public static boolean areIntegrityBitsValid(long raw, int totalBits, int readBits){
+		return areIntegrityBitsValid(raw >>> readBits, raw, totalBits, totalBits - readBits);
+	}
+	public static boolean areIntegrityBitsValid(long remainingBits, long raw, int totalBits, int oneBits){
 		var integrityDiv = INTEGRITY_DIVS[oneBits];
 		var remStored    = integrityDiv - remainingBits;
 		var payload      = raw&BitUtils.makeMask(totalBits - oneBits);
 		var rem          = payload%integrityDiv;
-		if(rem != remStored){
-			throw new IOException("Bit integrity failed");
-		}
+		return rem == remStored;
 	}
 	public static long calcIntegrityBits(long writtenData, int oneBits, int writtenDataBits){
 		return calcIntegrityBits(writtenData, oneBits)<<writtenDataBits;
@@ -284,7 +290,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public IterablePP<IOField<T, ?>> iterUnpackedFields(){
-		return Iters.concat1N(this, (List<IOField<T, ?>>)(Object)group);
+		return Iters.concat1N(this, group);
 	}
 	
 	public List<BitField<T, ?>> fieldGroup(){

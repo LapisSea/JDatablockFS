@@ -75,9 +75,7 @@ public final class MemoryOperations{
 				
 				var pos = headIndex + from;
 				
-				try{
-					Chunk.readChunk(provider, ChunkPointer.of(pos));
-				}catch(Throwable e){
+				if(!Chunk.isChunkValidAt(provider, ChunkPointer.of(pos))){
 					//invalid only if last
 					lastUnknown = Math.max(lastUnknown, headIndex);
 					continue;
@@ -284,7 +282,7 @@ public final class MemoryOperations{
 		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
-	private static final FreedMemoryPurgeType PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
+	private static final FreedMemoryPurgeType PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolveLocking();
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();
@@ -325,7 +323,7 @@ public final class MemoryOperations{
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    destroyChunks = Iters.from(toDestroy).map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).collectToList();
+			var    destroyChunks = Iters.from(toDestroy).toModList(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize()));
 			
 			if(purgeTransaction != null){
 				try(var io = provider.getSource().io()){

@@ -59,7 +59,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			nullability = IOFieldTools.getNullability(field);
 			isDynamic = IOFieldTools.isGeneric(field);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
-			var deps = field.getDependencies().collectToSet(IOField::getName);
+			var deps = field.getDependencies().iter().toModSet(IOField::getName);
 			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
 			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
 			dependencies = deps.toArray(String[]::new);
@@ -140,7 +140,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
 				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
-				fields = structFields.map(FieldDef::new).toArray(FieldDef[]::new);
+				fields = structFields.mapped(FieldDef::new).toArray(FieldDef[]::new);
 				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).iterIds().toArray();
 			}
 		}

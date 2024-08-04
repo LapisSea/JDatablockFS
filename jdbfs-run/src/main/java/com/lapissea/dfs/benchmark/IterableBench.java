@@ -66,7 +66,7 @@ public class IterableBench{
 	@Benchmark
 	public void iterpp_findFirst(BenchmarkState state, Blackhole blackhole){
 		var   toFind = rand.nextInt(state.size);
-		Value result = Iters.from(state.values).filtered(v -> v.a == toFind).findFirst().orElse(null);
+		Value result = Iters.from(state.values).filter(v -> v.a == toFind).findFirst().orElse(null);
 		blackhole.consume(result);
 	}
 	@Benchmark

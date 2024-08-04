@@ -6,8 +6,8 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -15,26 +15,47 @@ import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
 
 public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
 	
+	public abstract static class ReadOnly<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+		
+		private final boolean readOnlyField;
+		
+		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations, boolean readOnlyField){
+			super(declaringStruct, name, annotations);
+			this.readOnlyField = readOnlyField;
+		}
+		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
+			super(declaringStruct, name, annotations);
+			this.readOnlyField = readOnlyField;
+		}
+		
+		protected void checkReadOnlyField(){
+			if(readOnlyField){
+				failReadOnly();
+			}
+		}
+		private void failReadOnly(){
+			throw new UnsupportedOperationException("Field for " + getName() + " is final, can not set it!");
+		}
+	}
+	
 	protected static void validateSetter(Type fieldType, Method func){
 		if(!Utils.genericInstanceOf(func.getReturnType(), Void.TYPE)){
-			throw new MalformedStruct("setter returns\n" + func.getReturnType() + " but\n" + fieldType + " is required\nSetter: " + func);
+			throw new MalformedStruct("fmt", "Setter returns\n{}#red but\n{}#yellow is required\nSetter: {}#red", func.getReturnType(), fieldType, func);
 		}
 		if(func.getParameterCount() != 1){
-			throw new MalformedStruct("setter must have 1 argument of " + fieldType + "\n" + func);
+			throw new MalformedStruct("fmt", "Setter must have 1 argument of {}#yellow\nSetter: {}#red", fieldType, func);
 		}
 		var funType = func.getGenericParameterTypes()[0];
 		if(
 			!Utils.genericInstanceOf(funType, fieldType) &&
 			!Utils.genericInstanceOf(FieldCompiler.getType(funType, func::getAnnotation), fieldType)
 		){
-			throw new MalformedStruct("setter argument is " + func.getGenericParameterTypes()[0] + " but " + fieldType + " is required\n" + func);
+			throw new MalformedStruct("fmt", "Setter argument is {}#red but {}#yellow is required\n{}#red", func.getGenericParameterTypes()[0], fieldType, func);
 		}
 	}
 	
@@ -44,10 +65,10 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 			!Utils.genericInstanceOf(funType, fieldType) &&
 			!Utils.genericInstanceOf(FieldCompiler.getType(funType, func::getAnnotation), fieldType)
 		){
-			throw new MalformedStruct("getter returns\n" + func.getGenericReturnType() + " but\n" + fieldType + " is required\nGetter: " + func);
+			throw new MalformedStruct("fmt", "Getter returns {}#red but {}#yellow is required\nGetter:{}#red", func.getGenericReturnType(), fieldType, func);
 		}
 		if(func.getParameterCount() != 0){
-			throw new MalformedStruct("getter must not have arguments\n" + func);
+			throw new MalformedStruct("fmt", "Getter must not have arguments: {}#red", func);
 		}
 	}
 	
@@ -57,7 +78,7 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations){
-		this(declaringStruct, name, annotations.isEmpty()? Map.of() : annotations.stream().collect(Collectors.toMap(Annotation::annotationType, identity())));
+		this(declaringStruct, name, Iters.from(annotations).toMap(Annotation::annotationType, identity()));
 	}
 	protected BasicFieldAccessor(Struct<CTyp> declaringStruct, String name,
 	                             Map<Class<? extends Annotation>, ? extends Annotation> annotations){
@@ -66,16 +87,9 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 		this.annotations = Map.copyOf(annotations);
 	}
 	
-	@NotNull
-	@Nullable
 	@Override
-	@SuppressWarnings("unchecked")
-	public final <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return (Optional<T>)Optional.ofNullable(annotations.get(annotationClass));
-	}
-	@Override
-	public final boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return annotations.containsKey(annotationClass);
+	public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+		return annotations;
 	}
 	
 	@Override

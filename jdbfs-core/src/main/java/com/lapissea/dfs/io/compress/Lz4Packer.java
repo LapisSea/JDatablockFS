@@ -14,7 +14,7 @@ import static com.lapissea.dfs.io.compress.Packer.writeSiz;
 public abstract sealed class Lz4Packer implements Packer{
 	
 	private static LZ4Factory getFactory(){
-		return switch(ConfigDefs.LZ4_COMPATIBILITY.resolve()){
+		return switch(ConfigDefs.LZ4_COMPATIBILITY.resolveLocking()){
 			case ANY -> LZ4Factory.fastestInstance();
 			case JAVA_ONLY -> LZ4Factory.fastestJavaInstance();
 			case SAFE_ONLY -> LZ4Factory.safeInstance();

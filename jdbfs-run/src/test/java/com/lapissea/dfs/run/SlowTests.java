@@ -40,6 +40,8 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
+import org.testng.ITestResult;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -74,6 +76,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 public class SlowTests{
+	
+	@AfterMethod
+	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
 	
 	@Test
 	void ioMultiWrite() throws IOException{
@@ -244,120 +249,118 @@ public class SlowTests{
 	
 	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void bigMapCompliant() throws IOException{
-		bigMapRun(true);
+		bigMapRun(TestInfo.of("compliant"), true);
 	}
 	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void bigMap() throws IOException{
-		bigMapRun(false);
+		bigMapRun(TestInfo.of("fast"), false);
 	}
 	
-	void bigMapRun(boolean compliantCheck) throws IOException{
-		TestUtils.testCluster(TestInfo.of(compliantCheck), provider -> {
-			enum Mode{
-				DEFAULT, CHECKPOINT, MAKE_CHECKPOINT
+	void bigMapRun(TestInfo info, boolean compliantCheck) throws IOException{
+		var provider = TestUtils.testCluster(info);
+		enum Mode{
+			DEFAULT, CHECKPOINT, MAKE_CHECKPOINT
+		}
+		
+		Mode mode;
+		{
+			var prop = System.getProperty("chmode");
+			if(prop != null) mode = Mode.valueOf(prop);
+			else mode = Mode.DEFAULT;
+		}
+		
+		var checkpointFile = new File("bigmap.bin");
+		
+		long checkpointStep;
+		{
+			var prop = System.getProperty("checkpointStep");
+			if(prop != null){
+				checkpointStep = Integer.parseInt(prop);
+				if(checkpointStep<0) throw new IllegalArgumentException();
+			}else checkpointStep = -1;
+		}
+		
+		read:
+		if(mode == Mode.CHECKPOINT){
+			info("loading checkpoint from:", checkpointFile.getAbsoluteFile());
+			if(!checkpointFile.exists()){
+				if(checkpointStep == -1) throw new IllegalStateException("No checkpointStep defined");
+				info("No checkpoint, making checkpoint...");
+				mode = Mode.MAKE_CHECKPOINT;
+				break read;
 			}
-			
-			Mode mode;
-			{
-				var prop = System.getProperty("chmode");
-				if(prop != null) mode = Mode.valueOf(prop);
-				else mode = Mode.DEFAULT;
-			}
-			
-			var checkpointFile = new File("bigmap.bin");
-			
-			long checkpointStep;
-			{
-				var prop = System.getProperty("checkpointStep");
-				if(prop != null){
-					checkpointStep = Integer.parseInt(prop);
-					if(checkpointStep<0) throw new IllegalArgumentException();
-				}else checkpointStep = -1;
-			}
-			
-			read:
-			if(mode == Mode.CHECKPOINT){
-				info("loading checkpoint from:", checkpointFile.getAbsoluteFile());
-				if(!checkpointFile.exists()){
-					if(checkpointStep == -1) throw new IllegalStateException("No checkpointStep defined");
-					info("No checkpoint, making checkpoint...");
+			try(var f = new DataInputStream(new FileInputStream(checkpointFile))){
+				var step = f.readLong();
+				if(checkpointStep != -1 && step != checkpointStep){
+					info("Outdated checkpoint, making checkpoint...");
 					mode = Mode.MAKE_CHECKPOINT;
 					break read;
 				}
-				try(var f = new DataInputStream(new FileInputStream(checkpointFile))){
-					var step = f.readLong();
-					if(checkpointStep != -1 && step != checkpointStep){
-						info("Outdated checkpoint, making checkpoint...");
-						mode = Mode.MAKE_CHECKPOINT;
-						break read;
+				
+				provider.getSource().write(true, f.readAllBytes());
+			}
+			
+			provider.getSource().write(false, provider.getSource().read(0, 1));
+			provider = new Cluster(provider.getSource());
+		}
+		
+		var map = provider.roots().<IOMap<Object, Object>>builder("map").withType(IOType.of(HashIOMap.class, Object.class, Object.class)).request();
+		if(mode == Mode.CHECKPOINT){
+			info("Starting on step", map.size());
+		}
+		
+		IOMap<Object, Object> mapC;
+		if(compliantCheck){
+			var ref = new ReferenceMemoryIOMap<>();
+			for(var entry : map){
+				ref.put(entry.getKey(), entry.getValue());
+			}
+			mapC = new CheckMap<>(map);
+		}else{
+			mapC = map;
+		}
+		
+		var size = (compliantCheck? NumberSize.SHORT.maxSize : NumberSize.SMALL_INT.maxSize/2);
+		
+		var  inst = Instant.now();
+		long i    = mapC.size();
+		while(provider.getSource().getIOSize()<size){
+			IOException e1 = null;
+			
+			if(i == checkpointStep){
+				if(mode == Mode.MAKE_CHECKPOINT){
+					try(var f = new DataOutputStream(new FileOutputStream(checkpointFile))){
+						f.writeLong(checkpointStep);
+						provider.getSource().transferTo(f);
 					}
-					
-					provider.getSource().write(true, f.readAllBytes());
-				}
-				
-				provider.getSource().write(false, provider.getSource().read(0, 1));
-				provider = new Cluster(provider.getSource());
-			}
-			
-			var map = provider.roots().<IOMap<Object, Object>>builder("map").withType(IOType.of(HashIOMap.class, Object.class, Object.class)).request();
-			if(mode == Mode.CHECKPOINT){
-				info("Starting on step", map.size());
-			}
-			
-			IOMap<Object, Object> mapC;
-			if(compliantCheck){
-				var ref = new ReferenceMemoryIOMap<>();
-				for(var entry : map){
-					ref.put(entry.getKey(), entry.getValue());
-				}
-				mapC = new CheckMap<>(map);
-			}else{
-				mapC = map;
-			}
-			
-			var size = (compliantCheck? NumberSize.SHORT.maxSize : NumberSize.SMALL_INT.maxSize/2);
-			
-			var  inst = Instant.now();
-			long i    = mapC.size();
-			while(provider.getSource().getIOSize()<size){
-				IOException e1 = null;
-				
-				if(i == checkpointStep){
-					if(mode == Mode.MAKE_CHECKPOINT){
-						try(var f = new DataOutputStream(new FileOutputStream(checkpointFile))){
-							f.writeLong(checkpointStep);
-							provider.getSource().transferTo(f);
-						}
-						info("Saved checkpoint to", checkpointFile.getAbsoluteFile());
-						System.exit(0);
-					}
-				}
-				try{
-					if(mapC.size()>=1023*2) return;
-					mapC.put(i, ("int(" + i + ")").repeat(new Random(provider.getSource().getIOSize() + i).nextInt(20)));
-					i++;
-				}catch(Throwable e){
-					e1 = new IOException("failed to put element: " + i, e);
-				}
-				
-				if(Duration.between(inst, Instant.now()).toMillis()>1000 || e1 != null){
-					inst = Instant.now();
-					info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
-				}
-				if(e1 != null){
-					throw e1;
+					info("Saved checkpoint to", checkpointFile.getAbsoluteFile());
+					System.exit(0);
 				}
 			}
-			info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
-		});
+			try{
+				if(mapC.size()>=1023*2) return;
+				mapC.put(i, ("int(" + i + ")").repeat(new Random(provider.getSource().getIOSize() + i).nextInt(20)));
+				i++;
+			}catch(Throwable e){
+				e1 = new IOException("failed to put element: " + i, e);
+			}
+			
+			if(Duration.between(inst, Instant.now()).toMillis()>1000 || e1 != null){
+				inst = Instant.now();
+				info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
+			}
+			if(e1 != null){
+				throw e1;
+			}
+		}
+		info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
 	}
 	
 	void checkSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, boolean log) throws IOException{
-		if(log){
-			TestUtils.testCluster(TestInfo.of(), provider -> doCheckSet(type, session, provider));
-		}else{
-			doCheckSet(type, session, Cluster.emptyMem());
-		}
+		Cluster provider;
+		if(log) provider = TestUtils.testCluster();
+		else provider = Cluster.emptyMem();
+		doCheckSet(type, session, provider);
 	}
 	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
 		var set = provider.roots().<IOSet<Integer>>request(1, type, Integer.class);
@@ -881,7 +884,7 @@ public class SlowTests{
 						first = null;
 					}
 					if(first != null){
-						var set = new PhysicalChunkWalker(first).collectToSet();
+						var set = new PhysicalChunkWalker(first).toModSet();
 						for(var ch : set){
 							if(!ch.hasNextPtr()) continue;
 							var next = ch.requireNext();

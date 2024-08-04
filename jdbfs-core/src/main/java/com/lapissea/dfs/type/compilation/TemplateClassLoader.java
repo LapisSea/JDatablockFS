@@ -45,7 +45,7 @@ public final class TemplateClassLoader extends ClassLoader{
 	
 	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
-	private static final boolean PRINT_GENERATING_INFO = ConfigDefs.CLASSGEN_PRINT_GENERATING_INFO.resolveVal();
+	private static final boolean PRINT_GENERATING_INFO = ConfigDefs.CLASSGEN_PRINT_GENERATING_INFO.resolveValLocking();
 	
 	private final IOTypeDB db;
 	
@@ -207,7 +207,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		var fields = classType.def.getFields();
 		
 		if(!fields.isEmpty()){
-			var order = classType.def.getFieldOrder().mapToObj(fields::get).map(TypeDef.FieldDef::getName).collectToFinalList();
+			var order = classType.def.getFieldOrder().mapToObj(fields::get).toList(TypeDef.FieldDef::getName);
 			//noinspection deprecation
 			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}

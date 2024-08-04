@@ -8,12 +8,12 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.type.WordSpace.BIT;
 import static com.lapissea.dfs.type.WordSpace.BYTE;
@@ -27,8 +27,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 	@SuppressWarnings("unchecked")
 	final class Fixed<T extends IOInstance<T>> implements IFixed<T, VarPool<T>>, SizeDescriptor<T>{
 		
-		private static final Fixed<?>[] BIT_CACHE  = LongStream.range(0, 9).mapToObj(i -> new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
-		private static final Fixed<?>[] BYTE_CACHE = LongStream.range(0, 17).mapToObj(i -> new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
+		private static final Fixed<?>[] BIT_CACHE  = Iters.range(0, 9).mapToObj(i -> new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
+		private static final Fixed<?>[] BYTE_CACHE = Iters.range(0, 17).mapToObj(i -> new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
 		
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(BasicSizeDescriptor<?, ?> size){
 			if(!size.hasFixed()) throw new IllegalArgumentException("Can not create fixed size from a non fixed descriptor " + size);

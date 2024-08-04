@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
 
@@ -24,7 +23,7 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 		
 		Class<?> c;
 		if(typeConstructor != null) c = typeConstructor.get().getClass();
-		else c = Iters.from(data).firstMatching(Objects::nonNull).map(Object::getClass).orElse(null);
+		else c = Iters.from(data).firstNonNull().map(Object::getClass).orElse(null);
 		elementType = (Class<T>)c;
 	}
 	

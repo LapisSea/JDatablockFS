@@ -131,7 +131,7 @@ public final class BBView{
 		}
 	}
 	
-	private static final boolean UNS = ConfigDefs.FIELD_ACCESS_TYPE.resolve() == FieldCompiler.AccessType.UNSAFE;
+	private static final boolean UNS = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking() == FieldCompiler.AccessType.UNSAFE;
 	
 	private static final VarHandle SHORT_VIEW  = var(short.class);
 	private static final VarHandle CHAR_VIEW   = var(char.class);

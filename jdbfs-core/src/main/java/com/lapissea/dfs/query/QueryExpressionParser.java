@@ -339,7 +339,7 @@ public final class QueryExpressionParser{
 		}
 	}
 	
-	private static class Parser{
+	private static final class Parser{
 		
 		private final Class<?>  type;
 		private final Tokenizer tokenizer;

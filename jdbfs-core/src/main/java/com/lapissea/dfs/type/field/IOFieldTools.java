@@ -19,6 +19,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -34,14 +35,13 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -52,8 +52,6 @@ import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.dfs.Utils.None;
 import static com.lapissea.dfs.Utils.Some;
@@ -62,8 +60,8 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 
 public final class IOFieldTools{
 	
-	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
-		return list -> map.apply(list.stream()).toList();
+	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<IterablePP<IOField<T, ?>>, IterablePP<IOField<T, ?>>> map){
+		return list -> map.apply(Iters.from(list)).toList();
 	}
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> stepFinal(List<IOField<T, ?>> data, Iterable<Function<List<IOField<T, ?>>, List<IOField<T, ?>>>> steps){
@@ -75,15 +73,15 @@ public final class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> mergeBitSpace(List<IOField<T, ?>> mapData){
-		var result     = new LinkedList<IOField<T, ?>>();
-		var bitBuilder = new LinkedList<BitField<T, ?>>();
+		var result     = new ArrayList<IOField<T, ?>>(mapData.size());
+		var bitBuilder = new ArrayDeque<BitField<T, ?>>();
 		
 		Runnable pushBuilt = () -> {
 			switch(bitBuilder.size()){
 				case 0 -> { }
 				case 1 -> result.add(bitBuilder.removeFirst());
 				default -> {
-					result.add(BitFieldMerger.of(bitBuilder));
+					result.add(BitFieldMerger.of(List.copyOf(bitBuilder)));
 					bitBuilder.clear();
 				}
 			}
@@ -111,17 +109,16 @@ public final class IOFieldTools{
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		if(fields.isEmpty()) return new Index(new int[0]);
 		{
-			var struct       = fields.stream().map(IOField::getAccessor).filter(Objects::nonNull).findAny().orElseThrow().getDeclaringStruct();
+			var struct       = Iters.from(fields).map(IOField::getAccessor).firstNonNull().orElseThrow().getDeclaringStruct();
 			var structType   = struct.getType();
 			var dataOrderAnn = structType.getAnnotation(InternalDataOrder.class);
 			if(dataOrderAnn != null) return predefinedOrder(fields, structType, dataOrderAnn);
 		}
 		try{
 			return new DepSort<>(fields, f -> f.getDependencies()
-			                                   .mapToInt(o -> IntStream.range(0, fields.size())
-			                                                           .filter(i -> fields.get(i).getAccessor() == o.getAccessor())
-			                                                           .findAny()
-			                                                           .orElseThrow())
+			                                   .mappedToInt(o -> Iters.range(0, fields.size())
+			                                                          .firstMatching(i -> fields.get(i).getAccessor() == o.getAccessor())
+			                                                          .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f) -> {//Pull fixed fields back and enforce word space sort order
 				                 var order = f.sizeDescriptorSafe().getWordSpace().sortOrder;
 				                 if(!f.getSizeDescriptor().hasFixed()){
@@ -134,7 +131,7 @@ public final class IOFieldTools{
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f -> f.getType().isEnum() || SupportedPrimitive.isAny(f.getType())? 0 : 1)
 			                 //Encourage fields with similar dependencies to be next to each other
-			                 .thenComparing(f -> f.getDependencies().joinAsStr(" / ", IOField::getName))
+			                 .thenComparing(f -> f.getDependencies().iter().joinAsStr(" / ", IOField::getName))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
 			                 .thenComparing(IOField::getName)
 			);
@@ -145,28 +142,28 @@ public final class IOFieldTools{
 	@SuppressWarnings("deprecation")
 	private static <T extends IOInstance<T>> Index predefinedOrder(List<IOField<T, ?>> fields, Class<T> structType, InternalDataOrder dataOrderAnn){
 		if((!(structType.getClassLoader() instanceof TemplateClassLoader))){
-			throw new MalformedStruct(InternalDataOrder.class.getName() + " is for internal use only. " +
-			                          "To be used only by " + TemplateClassLoader.class.getName());
+			throw new MalformedStruct(
+				"fmt", "{}#red is for internal use only. To be used only by {}#yellow", InternalDataOrder.class.getName(), TemplateClassLoader.class.getName());
 		}
 		var dataOrder    = dataOrderAnn.value();
-		var actualNames  = Iters.from(fields).map(IOField::getName).collectToSet();
+		var actualNames  = Iters.from(fields).map(IOField::getName).toModSet();
 		var dataOrderSet = Set.of(dataOrder);
 		if(!dataOrderSet.equals(actualNames)){
-			throw new MalformedStruct("Data order and fields are not matching.\n" + actualNames + "\n" + dataOrderSet);
+			throw new MalformedStruct("fmt", "Data order and fields are not matching.\n{}#yellow,\n{}#red", actualNames, dataOrderSet);
 		}
 		
 		var index = new int[dataOrder.length];
 		
 		for(int i = 0; i<dataOrder.length; i++){
 			var name = dataOrder[i];
-			index[i] = IntStream.range(0, fields.size())
-			                    .filter(idx -> fields.get(idx).getName().equals(name))
-			                    .findFirst().orElseThrow();
+			index[i] = Iters.range(0, fields.size())
+			                .firstMatching(idx -> fields.get(idx).getName().equals(name))
+			                .orElseThrow();
 		}
 		
 		var res = new Index(index);
 		if(GlobalConfig.DEBUG_VALIDATION){
-			var testNames = res.mapData(fields).stream().map(IOField::getName).toArray(String[]::new);
+			var testNames = Iters.from(res.mapData(fields)).map(IOField::getName).toArray(String[]::new);
 			if(!Arrays.equals(testNames, dataOrder)){
 				throw new AssertionError("\n" +
 				                         Arrays.toString(testNames) + "\n" +
@@ -268,7 +265,7 @@ public final class IOFieldTools{
 						data.add(new String[]{"No reason??"});
 					}
 					
-					int[] lengths = new int[data.stream().mapToInt(s -> s.length).max().orElse(0)];
+					int[] lengths = new int[Iters.from(data).mapToInt(s -> s.length).max().orElse(0)];
 					for(var line : data){
 						for(int i = 0; i<line.length; i++){
 							lengths[i] = Math.max(lengths[i], line[i].length() + 1);
@@ -337,12 +334,13 @@ public final class IOFieldTools{
 	public static Map<Class<? extends Annotation>, Annotation> computeAnnotations(Field field){
 		var ann   = field.getAnnotations();
 		var types = Arrays.stream(ann).map(Annotation::annotationType).collect(Collectors.toSet());
-		return Stream.concat(
-			Arrays.stream(ann),
-			FieldCompiler.ANNOTATION_TYPES.stream()
-			                              .filter(typ -> !types.contains(typ))
-			                              .map(at -> field.getDeclaringClass().getAnnotation(at)).filter(Objects::nonNull)
-		).collect(Collectors.toMap(Annotation::annotationType, a -> a));
+		return Iters.concat(
+			Iters.from(ann),
+			Iters.from(FieldCompiler.ANNOTATION_TYPES)
+			     .filter(typ -> !types.contains(typ))
+			     .<Annotation>map(at -> field.getDeclaringClass().getAnnotation(at))
+			     .nonNulls()
+		).toMap(Annotation::annotationType, Function.identity());
 	}
 	
 	public static boolean isIOField(Method m){
@@ -366,11 +364,11 @@ public final class IOFieldTools{
 		var typ = field.getType();
 		if(typ.isPrimitive()) return false;
 		return isGeneric(field) || typ.isArray() ||
-		       Stream.of(
-			       Stream.of(IOInstance.class, Enum.class, Type.class),
-			       FieldCompiler.getWrapperTypes().stream(),
-			       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
-		       ).<Class<?>>flatMap(Function.identity()).anyMatch(c -> UtilL.instanceOf(typ, c));
+		       Iters.concat(
+			       Iters.of(IOInstance.class, Enum.class, Type.class),
+			       FieldCompiler.getWrapperTypes(),
+			       Iters.from(SupportedPrimitive.values()).map(p -> p.wrapper)
+		       ).anyMatch(c -> UtilL.instanceOf(typ, c));
 	}
 	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
 		var nam = size.name();

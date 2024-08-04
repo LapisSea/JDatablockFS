@@ -10,6 +10,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -140,10 +141,11 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-			}
+			if(num == null) fail();
 			return num.getValue();
+		}
+		private void fail(){
+			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
@@ -159,10 +161,11 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-			}
+			if(num == null) fail();
 			return num.getValue();
+		}
+		private void fail(){
+			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
@@ -187,17 +190,17 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	private final VarHandle handle;
 	
 	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, name, genericType, IOFieldTools.computeAnnotations(field));
+		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		handle = Access.makeVarHandle(field);
 	}
 	
 	@Override
-	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-		handle.set(instance, value);
-	}
-	@Override
 	protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
 		return (short)handle.get(instance);
+	}
+	@Override
+	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
+		handle.set(instance, value);
 	}
 	
 	@Override
@@ -246,21 +249,21 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	}
 	
 	@Override
-	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-		handle.set(instance, value);
-	}
-	@Override
 	protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
 		return (float)handle.get(instance);
 	}
-	
 	@Override
-	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		handle.set(instance, value);
 	}
+	
 	@Override
 	protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		return (boolean)handle.get(instance);
+	}
+	@Override
+	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+		handle.set(instance, value);
 	}
 	
 	@Override

@@ -30,6 +30,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import org.testng.Assert;
+import org.testng.ITestResult;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -57,7 +59,9 @@ import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class GeneralTypeHandlingTests{
-	static{ Thread.startVirtualThread(Cluster::emptyMem); }
+	
+	@AfterMethod
+	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
 	
 	@Test(dataProvider = "types")
 	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
@@ -145,20 +149,19 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void compressByteArray() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), provider -> {
-			var blob = IOInstance.Def.of(
-				NamedBlob.class, "Hello world",
-				"""
-					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
-					""".getBytes(UTF_8)
-			);
-			provider.roots().provide(1, blob);
-			var read = provider.roots().request(1, NamedBlob.class);
+		var provider = TestUtils.testCluster();
+		var blob = IOInstance.Def.of(
+			NamedBlob.class, "Hello world",
+			"""
+				aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
+				""".getBytes(UTF_8)
+		);
+		provider.roots().provide(1, blob);
+		var read = provider.roots().request(1, NamedBlob.class);
 
-//			assertTrue("Compression not working", chunk.chainSize()<64);
-			
-			assertEquals(blob, read);
-		});
+//		assertTrue("Compression not working", chunk.chainSize()<64);
+		
+		assertEquals(blob, read);
 	}
 	
 	@DataProvider(name = "templateTypes")
@@ -304,17 +307,16 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dataProvider = "longTypes")
 	<T extends IOInstance.Def<T>> void testLongClass(LongTyp<T> typ) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			var hold  = StandardStructPipe.of(typ.typ);
-			var chunk = AllocateTicket.bytes(64).submit(provider);
+		var provider = TestUtils.testChunkProvider(typ);
+		var hold     = StandardStructPipe.of(typ.typ);
+		var chunk    = AllocateTicket.bytes(64).submit(provider);
+		
+		for(var val : (IterablePP<T>)() -> new Random(42069).longs(10000).mapToObj(typ.func).iterator()){
+			hold.write(chunk, val);
+			var read = hold.readNew(chunk, null);
 			
-			for(var val : (IterablePP<T>)() -> new Random(42069).longs(10000).mapToObj(typ.func).iterator()){
-				hold.write(chunk, val);
-				var read = hold.readNew(chunk, null);
-				
-				assertEquals(read, val);
-			}
-		});
+			assertEquals(read, val);
+		}
 	}
 	
 	@Test
@@ -322,24 +324,23 @@ public class GeneralTypeHandlingTests{
 		interface LocDateTime extends IOInstance.Def<LocDateTime>{
 			LocalDateTime val();
 		}
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			var hold  = StandardStructPipe.of(LocDateTime.class);
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			var rand  = new Random(42096);
+		var provider = TestUtils.testChunkProvider();
+		var hold     = StandardStructPipe.of(LocDateTime.class);
+		var chunk    = AllocateTicket.bytes(64).submit(provider);
+		var rand     = new Random(42096);
+		
+		for(int i = 0; i<10000; i++){
+			var tim = LocalDateTime.of(
+				LocalDate.ofEpochDay(rand.nextLong()%365243219162L),
+				LocalTime.ofNanoOfDay(Math.abs(rand.nextLong())%86399999999999L)
+			);
+			var val = IOInstance.Def.of(LocDateTime.class, tim);
 			
-			for(int i = 0; i<10000; i++){
-				var tim = LocalDateTime.of(
-					LocalDate.ofEpochDay(rand.nextLong()%365243219162L),
-					LocalTime.ofNanoOfDay(Math.abs(rand.nextLong())%86399999999999L)
-				);
-				var val = IOInstance.Def.of(LocDateTime.class, tim);
-				
-				hold.write(chunk, val);
-				var read = hold.readNew(chunk, null);
-				
-				assertEquals(read, val);
-			}
-		});
+			hold.write(chunk, val);
+			var read = hold.readNew(chunk, null);
+			
+			assertEquals(read, val);
+		}
 	}
 	
 	sealed interface Seal{
@@ -403,38 +404,37 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void testSealedType() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), provider -> {
-			@IOInstance.Def.Order({"seal1", "seal2"})
-			interface Container extends IOInstance.Def<Container>{
-				Seal seal1();
-				Seal seal2();
-			}
+		@IOInstance.Def.Order({"seal1", "seal2"})
+		interface Container extends IOInstance.Def<Container>{
+			Seal seal1();
+			Seal seal2();
+		}
+		
+		var provider = TestUtils.testCluster();
+		var hold     = StandardStructPipe.of(Container.class);
+		var chunk    = AllocateTicket.bytes(64).submit(provider);
+		{
+			var val = IOInstance.Def.of(Container.class, new Seal.A(69), new Seal.C(1, 2, 3));
 			
-			var hold  = StandardStructPipe.of(Container.class);
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			{
-				var val = IOInstance.Def.of(Container.class, new Seal.A(69), new Seal.C(1, 2, 3));
-				
-				hold.write(chunk, val);
-				var read = hold.readNew(chunk, null);
-				
-				assertEquals(read, val);
-			}
-			{
-				var val = IOInstance.Def.of(Container.class, new Seal.C(4, 5, -6), new Seal.D(420.69F));
-				
-				hold.write(chunk, val);
-				var read = hold.readNew(chunk, null);
-				
-				assertEquals(read, val);
-			}
-			chunk.freeChaining();
+			hold.write(chunk, val);
+			var read = hold.readNew(chunk, null);
 			
-			IOList<Seal> list = provider.roots().request("list", IOList.class, Seal.class);
-			list.add(new Seal.A(69));
-			list.add(new Seal.B(Instant.now()));
-			list.add(new Seal.C(4, 2, 0));
-		});
+			assertEquals(read, val);
+		}
+		{
+			var val = IOInstance.Def.of(Container.class, new Seal.C(4, 5, -6), new Seal.D(420.69F));
+			
+			hold.write(chunk, val);
+			var read = hold.readNew(chunk, null);
+			
+			assertEquals(read, val);
+		}
+		chunk.freeChaining();
+		
+		IOList<Seal> list = provider.roots().request("list", IOList.class, Seal.class);
+		list.add(new Seal.A(69));
+		list.add(new Seal.B(Instant.now()));
+		list.add(new Seal.C(4, 2, 0));
 	}
 	
 	private static class OrderTestType extends IOInstance.Managed<OrderTestType>{
@@ -570,7 +570,7 @@ public class GeneralTypeHandlingTests{
 		var strings = data.strings().list();
 		strings.add("foo");
 		strings.add("bar");
-		assertEquals(List.of("foo", "bar"), strings.collectToList());
+		assertEquals(List.of("foo", "bar"), strings.iter().toModList());
 		assertEquals(IOType.of(ContiguousIOList.class, String.class), strings.getTypeDef());
 	}
 	

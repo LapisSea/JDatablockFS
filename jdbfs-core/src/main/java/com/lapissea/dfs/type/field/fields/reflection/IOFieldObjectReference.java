@@ -54,7 +54,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 	public void setReference(T instance, Reference newRef){
 		Objects.requireNonNull(newRef);
 		if(newRef.isNull()){
-			if(getNullability() == IONullability.Mode.NOT_NULL){
+			if(isNonNullable()){
 				throw new NullPointerException();
 			}
 		}

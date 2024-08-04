@@ -455,7 +455,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	
 	private void validate() throws IOException{
 		if(isEmpty()) return;
-		var nodes = this.nodes.stream().toList();
+		var nodes = this.nodes.iter().toModList();
 		
 		for(var e : nodeCache.entrySet()){
 			var cached = e.getValue().node;

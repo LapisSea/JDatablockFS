@@ -7,6 +7,7 @@ import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Preload;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -34,13 +35,13 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,7 +69,7 @@ public final class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
+	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
 	
 	/**
 	 * Scans an unmanaged struct for
@@ -76,25 +77,34 @@ public final class FieldCompiler{
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var valueDefs = deepClasses(struct.getConcreteType())
 			                .flatMapArray(Class::getDeclaredMethods)
-			                .filtered(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
-			                .collectToList();
+			                .filter(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
+			                .toModList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
-				throw new IllegalField(valueMethod + " is not static!");
+				throw new IllegalField("fmt", "{}#red is not static!", valueMethod);
 			}
 			
-			var context = GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
-			
-			if(!UtilL.instanceOf(context.resolveReturnClass(), IOUnmanagedValueInfo.Data.class)){
-				throw new IllegalField(valueMethod + " does not return " + IOField.class.getName());
+			if(!UtilL.instanceOf(valueMethod.getReturnType(), IOUnmanagedValueInfo.Data.class)){
+				throw new IllegalField("fmt", "{}#red does not return {}#yellow", valueMethod, IOUnmanagedValueInfo.Data.class.getName());
 			}
+			var returnTypeArg = switch(valueMethod.getGenericReturnType()){
+				case ParameterizedType parm -> parm.getActualTypeArguments()[0];
+				default -> throw new IllegalField(
+					"fmt", "{}#red must be a {}#yellow", valueMethod, IOUnmanagedValueInfo.Data.class.getName() + "<This class>"
+				);
+			};
+			var rawReturnType = Utils.typeToRaw(returnTypeArg);
 			
-			Class<?> ioFieldOwner = context.returnType().type(IOUnmanagedValueInfo.Data.class).generic("T");
-			
-			if(ioFieldOwner != valueMethod.getDeclaringClass()){
-				throw new IllegalField(valueMethod + " does not return IOField of same owner type!\n" + ioFieldOwner.getName() + "\n" + valueMethod.getDeclaringClass().getName());
+			if(rawReturnType != valueMethod.getDeclaringClass()){
+				throw new IllegalField(
+					"fmt", """
+					{}#red does not return type of same owner type!
+					\tRaw return type: {}#red
+					\tOwner type: {}#yellow""",
+					valueMethod, rawReturnType.getName(), valueMethod.getDeclaringClass().getName()
+				);
 			}
 		}
 		
@@ -137,18 +147,18 @@ public final class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void checkIOFieldValidity(List<FieldAccessor<T>> fields){
 		var fails = Iters.from(fields)
-		                 .filtered(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
+		                 .filter(field -> !FieldRegistry.canCreate(field.getGenericType(null), GetAnnotation.from(field)))
 		                 .asCollection();
-		if(fails.isEmpty()) return;
-		throw new IllegalField(
-			"Could not find " + TextUtil.plural("implementation", fails.size()) + " for: " + (fails.size()>1? "\n" : "") +
-			fails.joinAsStr("\n", e -> "\t" + e)
-		);
+		switch(fails.size()){
+			case 0 -> { }
+			case 1 -> throw new IllegalField("fmt", "Could not find implementation for: {}#red", fails.getFirst());
+			default -> throw new IllegalField("fmt", "Could not find implementations for: \n{}#red", fails.joinAsStr("\n", e -> "\t" + e));
+		}
 	}
 	
 	private static <T extends IOInstance<T>> void validateClassAnnotations(Class<T> type){
 		if(valName(type.getAnnotation(IOValue.class)).isPresent()){
-			throw new IllegalAnnotation(IOValue.class.getSimpleName() + " is not allowed to have a name when on a class");
+			throw new IllegalAnnotation("fmt", "{}#red is not allowed to have a name when on a class", IOValue.class.getSimpleName());
 		}
 	}
 	
@@ -160,11 +170,11 @@ public final class FieldCompiler{
 		for(String nam : depNames){
 			var dep = fields.get(nam);
 			if(dep == null){
-				throw new IllegalField("Could not find dependencies " +
+				throw new IllegalField("fmt", "Could not find dependencies {} on field {}#yellow",
 				                       Iters.from(depNames)
-				                            .filtered(name -> !fields.containsKey(name))
-				                            .joinAsStr(", ") +
-				                       " on field " + field.getAccessor());
+				                            .filter(name -> !fields.containsKey(name))
+				                            .joinAsStr(", ", f -> Log.fmt("{}#red", f)),
+				                       field.getAccessor());
 			}
 			dependencies.add(dep);
 		}
@@ -172,7 +182,7 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void initLateData(List<IOField<T, ?>> fields){
-		var mapFields = Iters.from(fields).collectToMap(IOField::getName, identity());
+		var mapFields = Iters.from(fields).toModMap(IOField::getName, identity());
 		for(var field : fields){
 			field.initLateData(generateDependencies(mapFields, field));
 		}
@@ -200,7 +210,10 @@ public final class FieldCompiler{
 					if(existing != null){
 						var gTyp = existing.getGenericType(null);
 						if(!gTyp.equals(s.type)){
-							throw new IllegalField("Virtual field " + existing.getName() + " already defined but has a type conflict of " + gTyp + " and " + s.type);
+							throw new IllegalField(
+								"fmt", "Virtual field {}#yellow already defined but has a type conflict of {}#red and {}#red",
+								existing.getName(), gTyp, s.type
+							);
 						}
 						continue;
 					}
@@ -267,10 +280,10 @@ public final class FieldCompiler{
 		
 		var usedFields = new HashSet<Method>();
 		
-		var ioMethods = allMethods(cl).filtered(IOFieldTools::isIOField).asCollection();
+		var ioMethods = allMethods(cl).filter(IOFieldTools::isIOField).bake();
 		var fields    = collectAccessors(struct, ioMethods, usedFields::add);
 		
-		var hangingMethods = ioMethods.filtered(method -> !usedFields.contains(method)).collectToList();
+		var hangingMethods = ioMethods.filter(method -> !usedFields.contains(method)).toModList();
 		
 		var functionFields = new HashMap<String, GetSet>();
 		
@@ -305,13 +318,13 @@ public final class FieldCompiler{
 			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
 				Iters.of(p.getter, p.setter).flatMapArray(Method::getAnnotations).distinct()
-				     .collectToFinalMap(Annotation::annotationType, identity());
+				     .toMap(Annotation::annotationType, identity());
 			
 			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
 			
 			Type setType = p.setter.getGenericParameterTypes()[0];
 			if(!Utils.genericInstanceOf(type, setType)){
-				throw new IllegalField(setType + " is not a valid argument in\n" + p.setter);
+				throw new IllegalField("fmt", "{}#red is not a valid argument in\n{}#yellow", setType, p.setter);
 			}
 			
 			fields.add(FunctionalReflectionAccessor.make(struct, name, p.getter, p.setter, annotations, type));
@@ -324,17 +337,18 @@ public final class FieldCompiler{
 	){
 		var gettersSetters = Iters.values(functionFields).flatMap(GetSet::iter);
 		
-		var unusedErr = Iters.from(hangingMethods).filtered(gettersSetters::noneIs).map(method -> {
+		var unusedErr = Iters.from(hangingMethods).filter(gettersSetters::noneIs).map(method -> {
 			String helpStr = "";
 			if(Iters.from(fields).map(FieldAccessor::getName).anyEquals(method.getName())){
 				helpStr = calcGetPrefixes(method).joinAsStr(" or ", " did you mean ", "?", p -> p + TextUtil.firstToUpperCase(method.getName()));
 			}
 			return method + helpStr;
-		}).collectToList();
+		}).toModList();
 		
 		if(!unusedErr.isEmpty()){
 			throw new MalformedStruct(
-				"There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" +
+				"fmt", "There are unused or invalid methods marked with {}#yellow\n{}#red",
+				IOValue.class.getSimpleName(),
 				String.join("\n", unusedErr)
 			);
 		}
@@ -346,7 +360,7 @@ public final class FieldCompiler{
 		var cl     = struct.getConcreteType();
 		var fields = new ArrayList<FieldAccessor<T>>();
 		
-		for(Field field : deepClasses(cl).flatMapArray(Class::getDeclaredFields).filtered(IOFieldTools::isIOField)){
+		for(Field field : deepClasses(cl).flatMapArray(Class::getDeclaredFields).filter(IOFieldTools::isIOField)){
 			try{
 				var getter = pickGSMethod(ioMethods, field, true);
 				var setter = pickGSMethod(ioMethods, field, false);
@@ -364,7 +378,7 @@ public final class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to scan field #" + field.getName() + " on " + struct.cleanName(), e);
+				throw new MalformedStruct("fmt", e, "Failed to scan field {#red #{}} on {}#yellow", field.getName(), struct.cleanName());
 			}
 		}
 		return fields;
@@ -378,11 +392,11 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
-		Iters.entries(functionFields).filtered(e -> e.getValue().iter().anyIs(null))
+		Iters.entries(functionFields).filter(e -> e.getValue().iter().anyIs(null))
 		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
 		     .ifPresent(invalidFields -> {
-			     throw new IllegalField("Invalid transient (getter+setter, no field) IOField(s) for " + cl.getName() + ":\n" +
-			                            invalidFields);
+			     throw new IllegalField("fmt", "Invalid transient (getter+setter, no field) IOField(s) for {}#yellow:\n{}#red",
+			                            cl.getName(), invalidFields);
 		     });
 	}
 	
@@ -441,10 +455,10 @@ public final class FieldCompiler{
 		Iters.from(activeAnnotations())
 		     .flatMap(ann -> Iters.concat1N(
 			     ann, Iters.of(ann.getClasses())
-			               .filtered(Class::isAnnotation)
+			               .filter(Class::isAnnotation)
 			               .map(c -> (Class<? extends Annotation>)c)
 		     ))
-		     .collectToFinalList();
+		     .toList();
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

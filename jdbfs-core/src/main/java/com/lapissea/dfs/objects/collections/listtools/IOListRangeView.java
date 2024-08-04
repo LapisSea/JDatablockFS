@@ -12,7 +12,6 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
 import java.util.StringJoiner;
-import java.util.stream.Stream;
 
 public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	
@@ -40,11 +39,6 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	}
 	private long toLocalIndex(long index){
 		return index - from;
-	}
-	
-	@Override
-	public Stream<T> stream(){
-		return data.stream().skip(from).limit(subSize);
 	}
 	
 	@Override

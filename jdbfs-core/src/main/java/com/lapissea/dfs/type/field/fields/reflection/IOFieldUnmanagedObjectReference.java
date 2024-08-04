@@ -44,7 +44,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
 		if(getNullability() == DEFAULT_IF_NULL){
-			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for unmanaged objects");
+			throw new MalformedStruct("fmt", "{}#red is not supported for unmanaged objects", DEFAULT_IF_NULL);
 		}
 		
 		if(varProvider != null){

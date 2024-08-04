@@ -6,7 +6,7 @@ import java.io.Closeable;
 
 public interface IOTransaction extends Closeable{
 	
-	boolean DISABLE_TRANSACTIONS = ConfigDefs.DISABLE_TRANSACTIONS.resolveVal();
+	boolean DISABLE_TRANSACTIONS = ConfigDefs.DISABLE_TRANSACTIONS.resolveValLocking();
 	
 	IOTransaction NOOP = new IOTransaction(){
 		@Override

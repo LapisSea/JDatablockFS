@@ -1,6 +1,7 @@
 package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.type.field.annotations.IOCompression;
+import com.lapissea.dfs.utils.RawRandom;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -16,7 +17,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
@@ -33,8 +33,8 @@ public class CompressionBench{
 	
 	@Setup(Level.Invocation)
 	public void initData(){
-		Random r = new Random();
-		raw = new byte[r.nextInt(1000)];
+		var r = new RawRandom();
+		raw = new byte[r.nextInt(1000) + 500];
 		for(int i = 0; i<raw.length; ){
 			if(r.nextFloat()<0.2){
 				for(int to = Math.min(i + r.nextInt(300) + 1, raw.length); i<to; i++){

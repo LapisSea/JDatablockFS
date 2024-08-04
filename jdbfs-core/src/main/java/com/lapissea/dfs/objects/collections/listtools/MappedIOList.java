@@ -7,11 +7,11 @@ import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.stream.Stream;
 
 public abstract class MappedIOList<From, To> implements IOList<To>, Wrapper<IOList<From>>{
 	private final IOList<From> data;
@@ -79,13 +79,12 @@ public abstract class MappedIOList<From, To> implements IOList<To>, Wrapper<IOLi
 	}
 	
 	@Override
-	public Stream<To> stream(){
-		return data.stream().map(this::map);
-	}
-	
-	@Override
 	public To getFirst(){
-		return map(data.getFirst());
+		try{
+			return map(data.getFirst());
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
 	}
 	
 	@Override

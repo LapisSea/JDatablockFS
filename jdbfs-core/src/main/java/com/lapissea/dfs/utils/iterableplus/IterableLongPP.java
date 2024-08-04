@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -12,8 +13,10 @@ import java.util.StringJoiner;
 import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
+import java.util.function.LongToIntFunction;
 import java.util.function.LongUnaryOperator;
 
+@SuppressWarnings("unused")
 public interface IterableLongPP{
 	
 	final class ArrayIter implements LongIterator{
@@ -41,16 +44,43 @@ public interface IterableLongPP{
 	}
 	
 	static IterableLongPP empty(){
-		return () -> new LongIterator(){
+		return new Iters.DefaultLongIterable(){
 			@Override
-			public boolean hasNext(){
-				return false;
-			}
-			@Override
-			public long nextLong(){
-				throw new NoSuchElementException();
+			public LongIterator iterator(){
+				return new LongIterator(){
+					@Override
+					public boolean hasNext(){
+						return false;
+					}
+					@Override
+					public long nextLong(){
+						throw new NoSuchElementException();
+					}
+				};
 			}
 		};
+	}
+	
+	default long getFirst(){
+		var iter = iterator();
+		if(iter.hasNext()) return iter.nextLong();
+		throw new NoSuchElementException();
+	}
+	
+	default OptionalLong findFirst(){
+		var iter = iterator();
+		if(!iter.hasNext()) return OptionalLong.empty();
+		return OptionalLong.of(iter.nextLong());
+	}
+	default OptionalLong firstMatching(LongPredicate predicate){
+		var iter = iterator();
+		while(iter.hasNext()){
+			var element = iter.nextLong();
+			if(predicate.test(element)){
+				return OptionalLong.of(element);
+			}
+		}
+		return OptionalLong.empty();
 	}
 	
 	default long sum(){
@@ -97,7 +127,7 @@ public interface IterableLongPP{
 	/**
 	 * Use when the count is O(1) or known to be cheap
 	 */
-	default long[] collectToArrayCounting(){
+	default long[] toArrayCounting(){
 		var res  = new long[count()];
 		var iter = iterator();
 		for(int i = 0; i<res.length; i++){
@@ -105,10 +135,10 @@ public interface IterableLongPP{
 		}
 		return res;
 	}
-	default long[] collectToArray(){
-		return collectToArray(8);
+	default long[] toArray(){
+		return toArray(8);
 	}
-	default long[] collectToArray(int initialSize){
+	default long[] toArray(int initialSize){
 		var iter = iterator();
 		var res  = new long[initialSize];
 		int i    = 0;
@@ -143,84 +173,184 @@ public interface IterableLongPP{
 	
 	LongIterator iterator();
 	
+	
+	default IterableLongPP flatMap(LongFunction<IterableLongPP> flatten){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iters.FindingLongIterator(){
+					private LongIterator flat;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(flat == null || !flat.hasNext()){
+								if(!src.hasNext()) return false;
+								flat = flatten.apply(src.nextLong()).iterator();
+								continue;
+							}
+							reportFound(flat.nextLong());
+							return true;
+						}
+					}
+				};
+			}
+		};
+	}
+	
+	default IterableLongPP addOverflowFiltered(long val){
+		return filter(other -> {
+			long r = other + val;
+			return ((other^r)&(val^r))>=0;
+		}).map(other -> other + val);
+	}
+	default IterableLongPP addExact(long val){
+		return map(other -> Math.addExact(other, val));
+	}
+	default IterableLongPP add(long val){
+		return map(other -> other + val);
+	}
+	
 	default IterableLongPP map(LongUnaryOperator map){
-		return () -> {
-			var src = IterableLongPP.this.iterator();
-			return new LongIterator(){
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public long nextLong(){
-					return map.applyAsLong(src.nextLong());
-				}
-			};
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new LongIterator(){
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public long nextLong(){
+						return map.applyAsLong(src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	
+	default IterableIntPP mapToIntOverflowFiltered(){ return filterIntRange().mapToInt(); }
+	default IterableIntPP mapToIntExact()           { return mapToInt(Math::toIntExact); }
+	default IterableIntPP mapToInt()                { return mapToInt(e -> (int)e); }
+	default IterableIntPP mapToInt(LongToIntFunction mapper){
+		return new Iters.DefaultIntIterable(){
+			@Override
+			public IntIterator iterator(){
+				var iter = IterableLongPP.this.iterator();
+				return new IntIterator(){
+					@Override
+					public boolean hasNext(){
+						return iter.hasNext();
+					}
+					@Override
+					public int nextInt(){
+						return mapper.applyAsInt(iter.nextLong());
+					}
+				};
+			}
 		};
 	}
 	
 	default <T> IterablePP<T> mapToObj(LongFunction<T> function){
-		return () -> {
-			var src = IterableLongPP.this.iterator();
-			return new Iterator<>(){
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public T next(){
-					return function.apply(src.nextLong());
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public T next(){
+						return function.apply(src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	
+	default IterableLongPP filterIntRange(){
+		return filter(v -> v>=Integer.MIN_VALUE && v<=Integer.MAX_VALUE);
+	}
+	default IterableLongPP filter(LongPredicate filter){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iters.FindingLongIterator(){
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(!src.hasNext()) return false;
+							var t = src.nextLong();
+							if(filter.test(t)){
+								reportFound(t);
+								return true;
+							}
+						}
+					}
+				};
+			}
 		};
 	}
 	
 	default IterablePP<Long> box(){
-		return () -> {
-			var src = IterableLongPP.this.iterator();
-			return new Iterator<>(){
-				@Override
-				public boolean hasNext(){
-					return src.hasNext();
-				}
-				@Override
-				public Long next(){
-					return src.nextLong();
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<Long> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public Long next(){
+						return src.nextLong();
+					}
+				};
+			}
 		};
 	}
 	
 	
 	default IterableLongPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
-		return () -> {
-			var iter = IterableLongPP.this.iterator();
-			for(int i = 0; i<count; i++){
-				if(!iter.hasNext()) break;
-				iter.nextLong();
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var iter = IterableLongPP.this.iterator();
+				for(int i = 0; i<count; i++){
+					if(!iter.hasNext()) break;
+					iter.nextLong();
+				}
+				return iter;
 			}
-			return iter;
 		};
 	}
 	
 	default IterableLongPP limit(int maxLen){
 		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
-		return () -> {
-			var src = IterableLongPP.this.iterator();
-			return new LongIterator(){
-				private int count;
-				
-				@Override
-				public boolean hasNext(){
-					return maxLen>count && src.hasNext();
-				}
-				@Override
-				public long nextLong(){
-					count++;
-					return src.nextLong();
-				}
-			};
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new LongIterator(){
+					private int count;
+					
+					@Override
+					public boolean hasNext(){
+						return maxLen>count && src.hasNext();
+					}
+					@Override
+					public long nextLong(){
+						count++;
+						return src.nextLong();
+					}
+				};
+			}
 		};
 	}
 	
@@ -279,30 +409,97 @@ public interface IterableLongPP{
 	}
 	
 	default IterableLongPP distinct(){
-		return () -> {
-			return new LongIterator(){
-				private long[] sorted;
-				private int    i;
-				
-				private long[] sort(){
-					return sorted = IterableLongPP.this.box().sorted().mapToLong().collectToArray();
-				}
-				
-				@Override
-				public boolean hasNext(){
-					var s = sorted;
-					if(s == null) s = sort();
-					return i<s.length;
-				}
-				@Override
-				public long nextLong(){
-					var s = sorted;
-					if(s == null) s = sort();
-					if(i>=s.length) throw new NoSuchElementException();
-					return s[i++];
-				}
-			};
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				return new LongIterator(){
+					private long[] sorted;
+					private int    i;
+					
+					private long[] sort(){
+						return sorted = IterableLongPP.this.box().sorted().mapToLong().toArray();
+					}
+					
+					@Override
+					public boolean hasNext(){
+						var s = sorted;
+						if(s == null) s = sort();
+						return i<s.length;
+					}
+					@Override
+					public long nextLong(){
+						var s = sorted;
+						if(s == null) s = sort();
+						if(i>=s.length) throw new NoSuchElementException();
+						return s[i++];
+					}
+				};
+			}
 		};
 	}
 	
+	record Idx(int index, long val) implements Map.Entry<Integer, Long>{
+		@Override
+		public Integer getKey(){ return index; }
+		@Override
+		public Long getValue(){ return val; }
+		@Override
+		public Long setValue(Long value){ throw new UnsupportedOperationException(); }
+	}
+	
+	record Ldx(long index, long val) implements Map.Entry<Long, Long>{
+		@Override
+		public Long getKey(){ return index; }
+		@Override
+		public Long getValue(){ return val; }
+		@Override
+		public Long setValue(Long value){ throw new UnsupportedOperationException(); }
+	}
+	
+	default IterablePP<Idx> enumerate(){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<IterableLongPP.Idx> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					private int index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public IterableLongPP.Idx next(){
+						preIncrementInt(index);
+						return new IterableLongPP.Idx(index++, src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	default IterablePP<Ldx> enumerateL(){
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<IterableLongPP.Ldx> iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iterator<>(){
+					private long index;
+					@Override
+					public boolean hasNext(){
+						return src.hasNext();
+					}
+					@Override
+					public IterableLongPP.Ldx next(){
+						preIncrementLong(index);
+						return new IterableLongPP.Ldx(index++, src.nextLong());
+					}
+				};
+			}
+		};
+	}
+	private static void preIncrementLong(long index){
+		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	private static void preIncrementInt(int num){
+		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
 }

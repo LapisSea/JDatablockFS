@@ -6,12 +6,14 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.IllegalField;
+import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -24,7 +26,12 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.ITestResult;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -36,7 +43,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -44,6 +50,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 public class GeneralTests{
+	
+	private static final Logger log = LoggerFactory.getLogger(GeneralTests.class);
+	@AfterMethod
+	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
 	
 	@Test
 	void signedIO() throws IOException{
@@ -75,58 +85,53 @@ public class GeneralTests{
 	
 	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkHeadIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
-			var chunk = AllocateTicket.bytes(capacity).submit(provider);
-			
-			var providerRead = DataProvider.newVerySimpleProvider(provider.getSource());
-			var readChunk    = providerRead.getChunk(chunk.getPtr());
-			
-			assertEquals(readChunk, chunk);
-		});
+		var provider     = TestUtils.testChunkProvider(capacity);
+		var chunk        = AllocateTicket.bytes(capacity).submit(provider);
+		var providerRead = DataProvider.newVerySimpleProvider(provider.getSource());
+		var readChunk    = providerRead.getChunk(chunk.getPtr());
+		
+		assertEquals(readChunk, chunk);
 	}
 	
 	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkBodyIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
-			var chunkSecond = AllocateTicket.bytes(1).submit(provider);
-			var chunk       = AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
-//			var chunk      =AllocateTicket.bytes(capacity).submit(provider);
-			
-			byte[] bodyData = new byte[(int)capacity];
-			for(int i = 0; i<bodyData.length; i++){
-				bodyData[i] = (byte)i;
-			}
-			
-			chunk.write(true, bodyData);
-			
-			var readBody = chunk.readAll();
-			assertEquals(readBody, bodyData);
-		});
+		var provider    = TestUtils.testChunkProvider(capacity);
+		var chunkSecond = AllocateTicket.bytes(1).submit(provider);
+		var chunk       = AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
+		//var chunk =AllocateTicket.bytes(capacity).submit(provider);
+		
+		byte[] bodyData = new byte[(int)capacity];
+		for(int i = 0; i<bodyData.length; i++){
+			bodyData[i] = (byte)i;
+		}
+		
+		chunk.write(true, bodyData);
+		
+		var readBody = chunk.readAll();
+		assertEquals(readBody, bodyData);
 	}
 	
 	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkBodyChainedIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
-			
-			var ticket      = AllocateTicket.bytes(capacity/2);
-			var chunkSecond = ticket.submit(provider);
-			var chunk       = ticket.withNext(chunkSecond).submit(provider);
-			
-			byte[] bodyData = new byte[(int)capacity];
-			for(int i = 0; i<bodyData.length; i++){
-				bodyData[i] = (byte)i;
-			}
-			
-			chunk.write(true, bodyData);
-			
-			var readBody = chunk.readAll();
-			assertEquals(readBody, bodyData);
-		});
+		var provider    = TestUtils.testChunkProvider(capacity);
+		var ticket      = AllocateTicket.bytes(capacity/2);
+		var chunkSecond = ticket.submit(provider);
+		var chunk       = ticket.withNext(chunkSecond).submit(provider);
+		
+		byte[] bodyData = new byte[(int)capacity];
+		for(int i = 0; i<bodyData.length; i++){
+			bodyData[i] = (byte)i;
+		}
+		
+		chunk.write(true, bodyData);
+		
+		var readBody = chunk.readAll();
+		assertEquals(readBody, bodyData);
 	}
 	
 	@Test
 	void blankCluster() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), ses -> { });
+		TestUtils.testCluster();
 	}
 	
 	@org.testng.annotations.DataProvider(name = "lists")
@@ -254,20 +259,19 @@ public class GeneralTests{
 	
 	@Test
 	void stringTest() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
-			String data = "this is a test!";
-			
-			StructPipe<StringContainer> pipe = StandardStructPipe.of(StringContainer.class);
-			
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			
-			var text = new StringContainer(data);
-			
-			pipe.write(provider, chunk, text);
-			var read = pipe.readNew(chunk, null);
-			
-			assertEquals(text, read);
-		});
+		var    provider = TestUtils.testChunkProvider();
+		String data     = "this is a test!";
+		
+		StructPipe<StringContainer> pipe = StandardStructPipe.of(StringContainer.class);
+		
+		var chunk = AllocateTicket.bytes(64).submit(provider);
+		
+		var text = new StringContainer(data);
+		
+		pipe.write(provider, chunk, text);
+		var read = pipe.readNew(chunk, null);
+		
+		assertEquals(text, read);
 	}
 	
 	
@@ -295,19 +299,17 @@ public class GeneralTests{
 	
 	@Test(dataProvider = "strings")
 	void autoTextTest(String data) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(data), provider -> {
-			
-			var chunk = AllocateTicket.bytes(64).submit(provider);
-			
-			var text = new AutoText(data);
-			
-			AutoText.PIPE.write(chunk, text);
-			var read = AutoText.PIPE.readNew(chunk, null);
-			
-			if(Objects.equals(text, read)) return;
-			assertEquals(text, read, "Text bytes: " + data.chars().mapToObj(Integer::toString)
-			                                              .collect(Collectors.joining(", ", "[", "]")));
-		});
+		var provider = TestUtils.testChunkProvider(data);
+		var chunk    = AllocateTicket.bytes(64).submit(provider);
+		
+		var text = new AutoText(data);
+		
+		AutoText.PIPE.write(chunk, text);
+		var read = AutoText.PIPE.readNew(chunk, null);
+		
+		if(Objects.equals(text, read)) return;
+		assertEquals(text, read, "Text bytes: " + data.chars().mapToObj(Integer::toString)
+		                                              .collect(Collectors.joining(", ", "[", "]")));
 	}
 	
 	@Test(dataProvider = "strings")
@@ -341,62 +343,58 @@ public class GeneralTests{
 	
 	@Test
 	void lastChunkMoveOnFree() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), cluster -> {
-			
-			var frees = List.of(AllocateTicket.bytes(1).submit(cluster),
-			                    AllocateTicket.bytes(1).submit(cluster),
-			                    AllocateTicket.bytes(1).submit(cluster),
-			                    AllocateTicket.bytes(1).submit(cluster),
-			                    AllocateTicket.bytes(1).submit(cluster));
-			AllocateTicket.bytes(1).submit(cluster);
-			var c1 = AllocateTicket.bytes(40).submit(cluster);
-			var mm = cluster.getMemoryManager();
-			assertEquals(mm.getFreeChunks().size(), 0);
-			mm.free(List.of(frees.get(0), frees.get(2), frees.get(4)));
-			assertEquals(mm.getFreeChunks().size(), 3);
-			mm.free(List.of(frees.get(1), frees.get(3)));
-			assertEquals(mm.getFreeChunks().size(), 1);
-			assertTrue(cluster.getSource().getIOSize()>c1.getPtr().getValue());
-			c1.freeChaining();
-			assertEquals(mm.getFreeChunks().size(), 1);
-			assertEquals(cluster.getSource().getIOSize(), c1.getPtr().getValue());
-		});
+		var cluster = TestUtils.testCluster();
+		
+		var frees = List.of(AllocateTicket.bytes(1).submit(cluster),
+		                    AllocateTicket.bytes(1).submit(cluster),
+		                    AllocateTicket.bytes(1).submit(cluster),
+		                    AllocateTicket.bytes(1).submit(cluster),
+		                    AllocateTicket.bytes(1).submit(cluster));
+		AllocateTicket.bytes(1).submit(cluster);
+		var c1 = AllocateTicket.bytes(40).submit(cluster);
+		var mm = cluster.getMemoryManager();
+		assertEquals(mm.getFreeChunks().size(), 0);
+		mm.free(List.of(frees.get(0), frees.get(2), frees.get(4)));
+		assertEquals(mm.getFreeChunks().size(), 3);
+		mm.free(List.of(frees.get(1), frees.get(3)));
+		assertEquals(mm.getFreeChunks().size(), 1);
+		assertTrue(cluster.getSource().getIOSize()>c1.getPtr().getValue());
+		c1.freeChaining();
+		assertEquals(mm.getFreeChunks().size(), 1);
+		assertEquals(cluster.getSource().getIOSize(), c1.getPtr().getValue());
 	}
 	
 	@Test
 	void allocateByChainWalkUpDefragment() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), data -> {
-			var first = AllocateTicket.bytes(16).withExplicitNextSize(Optional.of(NumberSize.SHORT)).submit(data);
-			AllocateTicket.bytes(0).submit(data);
-			first.modifyAndSave(c -> {
-				try{
-					c.setNextPtr(AllocateTicket.bytes(0).submit(data).getPtr());
-				}catch(OutOfBitDepth e){
-					throw new RuntimeException(e);
-				}
-			});
-			AllocateTicket.bytes(220).submit(data);
-			
-			byte[] bb = new byte[18];
-			for(int i = 0; i<bb.length; i++) bb[i] = (byte)i;
-			
-			try(var io = first.io()){
-				io.write(bb);
+		var data  = TestUtils.testChunkProvider();
+		var first = AllocateTicket.bytes(16).withExplicitNextSize(Optional.of(NumberSize.SHORT)).submit(data);
+		AllocateTicket.bytes(0).submit(data);
+		first.modifyAndSave(c -> {
+			try{
+				c.setNextPtr(AllocateTicket.bytes(0).submit(data).getPtr());
+			}catch(OutOfBitDepth e){
+				throw new RuntimeException(e);
 			}
-			
-			assertEquals(first.chainLength(), 2);
-			assertEquals(first.readAll(), bb);
 		});
+		AllocateTicket.bytes(220).submit(data);
+		
+		byte[] bb = new byte[18];
+		for(int i = 0; i<bb.length; i++) bb[i] = (byte)i;
+		
+		try(var io = first.io()){
+			io.write(bb);
+		}
+		
+		assertEquals(first.chainLength(), 2);
+		assertEquals(first.readAll(), bb);
 	}
 	
 	@Test
 	void bySizeSignedInt(){
 		NumberSize.FLAG_INFO
-			.stream().flatMapToLong(
-			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
-			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
-			.filter(l -> Integer.MAX_VALUE>=l && l>=Integer.MIN_VALUE)
-			.mapToInt(Math::toIntExact)
+			.flatMapToLong(v -> Iters.ofLongs(v.signedMinValue, v.signedMaxValue, v.maxSize))
+			.flatMap(Iters.range(-5, 5)::addOverflowFiltered)
+			.mapToIntOverflowFiltered()
 			.forEach(e -> {
 				var v = NumberSize.bySizeSigned(e);
 				
@@ -412,9 +410,8 @@ public class GeneralTests{
 	@Test
 	void bySizeSignedLong(){
 		NumberSize.FLAG_INFO
-			.stream().flatMapToLong(
-			          v -> LongStream.of(v.signedMinValue, v.signedMaxValue, v.maxSize)
-			                         .flatMap(off -> LongStream.range(-5, 5).map(l -> l + off)))
+			.flatMapToLong(v -> Iters.ofLongs(v.signedMinValue, v.signedMaxValue, v.maxSize))
+			.flatMap(Iters.range(-5, 5)::addOverflowFiltered)
 			.forEach(e -> {
 				var v = NumberSize.bySizeSigned(e);
 				
@@ -435,21 +432,22 @@ public class GeneralTests{
 		}
 		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
 			Foo.of(Optional.empty());
+		}catch(LockedFlagSet e){
+			Log.warn("{}", e);
 		}
 		
-		TestUtils.testCluster(TestInfo.of(), c -> {
-			Foo def = c.roots().request("default", Foo.class);
-			assertEquals(def, Foo.of(Optional.empty()));
-			
-			var helloWorld = Optional.of("Hello world! :)");
-			c.roots().provide("some", Foo.of(helloWorld));
-			var read = c.roots().request("some", Foo.class);
-			assertEquals(read, Foo.of(helloWorld));
-			
-			c.roots().provide("none", Foo.of(Optional.empty()));
-			Foo none = c.roots().request("none", Foo.class);
-			assertEquals(none, Foo.of(Optional.empty()));
-		});
+		var c   = TestUtils.testCluster();
+		Foo def = c.roots().request("default", Foo.class);
+		assertEquals(def, Foo.of(Optional.empty()));
+		
+		var helloWorld = Optional.of("Hello world! :)");
+		c.roots().provide("some", Foo.of(helloWorld));
+		var read = c.roots().request("some", Foo.class);
+		assertEquals(read, Foo.of(helloWorld));
+		
+		c.roots().provide("none", Foo.of(Optional.empty()));
+		Foo none = c.roots().request("none", Foo.class);
+		assertEquals(none, Foo.of(Optional.empty()));
 	}
 	
 	@Test(expectedExceptions = IllegalField.class)
@@ -473,19 +471,18 @@ public class GeneralTests{
 		Struct.of(Foo.class, Struct.STATE_DONE);
 		
 		
-		TestUtils.testCluster(TestInfo.of(), c -> {
-			Foo def = c.roots().request("default", Foo.class);
-			assertEquals(def, Foo.of(null));
-			
-			var helloWorld = String.class;
-			c.roots().provide("some", Foo.of(helloWorld));
-			var read = c.roots().request("some", Foo.class);
-			assertEquals(read, Foo.of(helloWorld));
-			
-			c.roots().provide("none", Foo.of(null));
-			Foo none = c.roots().request("none", Foo.class);
-			assertEquals(none, Foo.of(null));
-		});
+		var c   = TestUtils.testCluster();
+		Foo def = c.roots().request("default", Foo.class);
+		assertEquals(def, Foo.of(null));
+		
+		var helloWorld = String.class;
+		c.roots().provide("some", Foo.of(helloWorld));
+		var read = c.roots().request("some", Foo.class);
+		assertEquals(read, Foo.of(helloWorld));
+		
+		c.roots().provide("none", Foo.of(null));
+		Foo none = c.roots().request("none", Foo.class);
+		assertEquals(none, Foo.of(null));
 	}
 	
 	@Test()
@@ -499,18 +496,17 @@ public class GeneralTests{
 		
 		Struct.of(Foo.class, Struct.STATE_DONE);
 		
-		TestUtils.testCluster(TestInfo.of(), c -> {
-			Foo def = c.roots().request("default", Foo.class);
-			assertEquals(def, Foo.of(null));
-			
-			var helloWorld = SyntheticParameterizedType.of(List.class, List.of(Integer.class));
-			c.roots().provide("some", Foo.of(helloWorld));
-			var read = c.roots().request("some", Foo.class);
-			assertEquals(read, Foo.of(helloWorld));
-			
-			c.roots().provide("none", Foo.of(null));
-			Foo none = c.roots().request("none", Foo.class);
-			assertEquals(none, Foo.of(null));
-		});
+		var c   = TestUtils.testCluster();
+		Foo def = c.roots().request("default", Foo.class);
+		assertEquals(def, Foo.of(null));
+		
+		var helloWorld = SyntheticParameterizedType.of(List.class, List.of(Integer.class));
+		c.roots().provide("some", Foo.of(helloWorld));
+		var read = c.roots().request("some", Foo.class);
+		assertEquals(read, Foo.of(helloWorld));
+		
+		c.roots().provide("none", Foo.of(null));
+		Foo none = c.roots().request("none", Foo.class);
+		assertEquals(none, Foo.of(null));
 	}
 }

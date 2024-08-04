@@ -44,6 +44,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
@@ -1128,7 +1129,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			int pSiz = ptr.size();
 			
 			Color col;
-			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
+			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
 				col = ColorUtils.mix(CHUNK_BASE_COLOR, ptr.color(), 0.5F);
 				drawMsg = true;
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
@@ -1403,7 +1404,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var rctx = ctx.renderCtx;
 			
 			RuntimeException fieldErr = null;
-			Random           rand     = new Random();
+			var              rand     = new RawRandom();
 			renderer.setLineWidth(4);
 			
 			Iterator<IOField<T, ?>> iterator = pipe.getSpecificFields().iterator();
@@ -1449,7 +1450,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				
 				var field = (IOField<T, Object>)iterator.next();
 				try{
-					var col = ColorUtils.makeCol(rand, typeHash, field);
+					var col = ColorUtils.makeCol(typeHash, field);
 					
 					final long size;
 					
@@ -1582,7 +1583,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(rctx.pixelsPerByte>8){
 								for(BitField<T, ?> bit : merger.fieldGroup()){
 									
-									var bCol = ColorUtils.makeCol(rand, typeHash, bit);
+									var bCol = ColorUtils.makeCol(typeHash, bit);
 									var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 									
 									if(annotate)
@@ -1691,10 +1692,9 @@ public class BinaryGridRenderer implements DataRenderer{
 										long  arrOffset = 0;
 										int[] index     = {0};
 										var f = IOFieldPrimitive.make(new FieldAccessor<T>(){
-											@NotNull
 											@Override
-											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-												return Optional.empty();
+											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+												return Map.of();
 											}
 											@Override
 											public int getTypeID(){
@@ -1744,10 +1744,9 @@ public class BinaryGridRenderer implements DataRenderer{
 									long  arrOffset = 0;
 									int[] index     = {0};
 									var f = new NoIOField<T, String>(new FieldAccessor<>(){
-										@NotNull
 										@Override
-										public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-											return Optional.empty();
+										public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+											return Map.of();
 										}
 										@Override
 										public Struct<T> getDeclaringStruct(){
@@ -1802,7 +1801,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									var universe  = EnumUniverse.ofUnknown(comp);
 									var arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
-										var bCol = ColorUtils.makeCol(rand, typeHash, field);
+										var bCol = ColorUtils.makeCol(typeHash, field);
 										var siz  = universe.bitSize;
 										
 										var ii = i;
@@ -1830,10 +1829,9 @@ public class BinaryGridRenderer implements DataRenderer{
 											public void set(VarPool<T> ioPool, T instance, Object value){
 												throw new UnsupportedOperationException();
 											}
-											@NotNull
 											@Override
-											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-												return Optional.empty();
+											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+												return Map.of();
 											}
 											@Override
 											public Type getGenericType(GenericContext genericContext){
@@ -1891,7 +1889,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ranges = instance instanceof Chunk? List.of(DrawUtils.Range.fromSize(offsetStart, fieldOffset)) : DrawUtils.chainRangeResolve(ctx.provider, reference, 0, fieldOffset);
 			for(DrawUtils.Range range : ranges){
 				if(rctx.isRangeHovered(range)){
-					rctx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), ColorUtils.makeCol(rand, typeHash, offsetStart + ""), new Object[]{"Inst: ", instance}));
+					rctx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), ColorUtils.makeCol(typeHash, offsetStart + ""), new Object[]{"Inst: ", instance}));
 					break;
 				}
 			}

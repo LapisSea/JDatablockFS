@@ -1,5 +1,6 @@
 package com.lapissea.dfs.utils.iterableplus;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.TextUtil;
 
@@ -20,13 +21,29 @@ import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.random.RandomGenerator;
 
+@SuppressWarnings("unused")
 public final class Iters{
 	
 	public abstract static class DefaultIterable<T> implements IterablePP<T>{
 		@Override
 		public String toString(){
 			return Iters.toString(this);
+		}
+	}
+	
+	public abstract static class DefaultLongIterable implements IterableLongPP{
+		@Override
+		public String toString(){
+			return Iters.toString(box());
+		}
+	}
+	
+	public abstract static class DefaultIntIterable implements IterableIntPP{
+		@Override
+		public String toString(){
+			return Iters.toString(box());
 		}
 	}
 	
@@ -81,19 +98,73 @@ public final class Iters{
 		}
 	}
 	
+	abstract static class FindingLongIterator implements LongIterator{
+		
+		private long    next;
+		private boolean hasData;
+		
+		protected void reportFound(long val){
+			hasData = true;
+			next = val;
+		}
+		
+		protected abstract boolean doNext();
+		
+		@Override
+		public boolean hasNext(){
+			return hasData || doNext();
+		}
+		@Override
+		public long nextLong(){
+			if(!hasData && !doNext()) throw new NoSuchElementException();
+			hasData = false;
+			return next;
+		}
+	}
+	
+	abstract static class FindingIntIterator implements IntIterator{
+		
+		private int     next;
+		private boolean hasData;
+		
+		protected void reportFound(int val){
+			hasData = true;
+			next = val;
+		}
+		
+		protected abstract boolean doNext();
+		
+		@Override
+		public boolean hasNext(){
+			return hasData || doNext();
+		}
+		@Override
+		public int nextInt(){
+			if(!hasData && !doNext()) throw new NoSuchElementException();
+			hasData = false;
+			return next;
+		}
+	}
+	
 	private record CollectionIterable<T>(Collection<T> data) implements IterablePP.SizedPP<T>{
 		@Override
 		public Iterator<T> iterator(){
 			return data.iterator();
 		}
 		@Override
-		public OptionalInt calculateSize(){
+		public OptionalInt getSize(){
 			return OptionalInt.of(data.size());
 		}
 		@Override
 		public String toString(){
 			return data.toString();
 		}
+		@Override
+		public List<T> toList(){
+			return List.copyOf(data);
+		}
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){ return data.toArray(ctor); }
 	}
 	
 	private record ArrayIterable<T>(T[] data) implements IterablePP.SizedPP<T>{
@@ -115,12 +186,23 @@ public final class Iters{
 			return new Iter<>(data);
 		}
 		@Override
-		public OptionalInt calculateSize(){
+		public OptionalInt getSize(){
 			return OptionalInt.of(data.length);
 		}
 		@Override
 		public String toString(){
 			return TextUtil.unknownArrayToString(data);
+		}
+		@Override
+		public List<T> toList(){
+			return List.of(data);
+		}
+		@SuppressWarnings("SuspiciousSystemArraycopy")
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){
+			var res = ctor.apply(data.length);
+			System.arraycopy(data, 0, res, 0, data.length);
+			return res;
 		}
 	}
 	
@@ -144,27 +226,38 @@ public final class Iters{
 			return new Iter<>(element);
 		}
 		@Override
-		public OptionalInt calculateSize(){
+		public OptionalInt getSize(){
 			return OptionalInt.of(1);
 		}
 		@Override
 		public String toString(){
 			return "[" + element + "]";
 		}
+		@Override
+		public List<T> toList(){
+			return List.of(element);
+		}
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T1> T1[] toArray(IntFunction<T1[]> ctor){
+			var res = ctor.apply(1);
+			res[0] = (T1)element;
+			return res;
+		}
 	}
 	
 	private static final class FlatArrIterator<T> implements Iterator<T>{
-		private final Iterable<T>[] iterables;
+		private final Iterable<? extends T>[] iterables;
 		
-		private Iterator<T> iter;
-		private int         pos;
-		public FlatArrIterator(Iterable<T>[] iterables){ this.iterables = Objects.requireNonNull(iterables); }
+		private Iterator<? extends T> iter;
+		private int                   pos;
+		public FlatArrIterator(Iterable<? extends T>[] iterables){ this.iterables = Objects.requireNonNull(iterables); }
 		
 		@Override
 		public boolean hasNext(){
 			return iter != null && iter.hasNext() || findNext() != null;
 		}
-		private Iterator<T> findNext(){
+		private Iterator<? extends T> findNext(){
 			while(pos<iterables.length){
 				var i = iter = iterables[pos++].iterator();
 				if(i.hasNext()) return i;
@@ -173,7 +266,7 @@ public final class Iters{
 		}
 		@Override
 		public T next(){
-			Iterator<T> i = iter;
+			var i = iter;
 			if((i == null || !i.hasNext()) &&
 			   (i = findNext()) == null){
 				throw new NoSuchElementException();
@@ -182,15 +275,15 @@ public final class Iters{
 		}
 	}
 	
-	static final Iterator<Object>   EMPTY_ITER = new Iterator<>(){
+	static final Iterator<Object>           EMPTY_ITER = new Iterator<>(){
 		@Override
 		public boolean hasNext(){ return false; }
 		@Override
 		public Object next(){ return null; }
 	};
-	static final IterablePP<Object> EMPTY      = new IterablePP.SizedPP<>(){
+	static final IterablePP.SizedPP<Object> EMPTY      = new IterablePP.SizedPP<>(){
 		@Override
-		public OptionalInt calculateSize(){
+		public OptionalInt getSize(){
 			return OptionalInt.of(0);
 		}
 		@Override
@@ -206,38 +299,63 @@ public final class Iters{
 	public static <T> IterablePP<T> iterate(T seed, Predicate<? super T> hasNext, UnaryOperator<T> next){
 		Objects.requireNonNull(next);
 		Objects.requireNonNull(hasNext);
-		return () -> new Iterator<>(){
-			private T       val = seed;
-			private boolean advance;
-			
-			private void advance(){
-				val = next.apply(val);
-				advance = false;
-			}
+		return new Iters.DefaultIterable<>(){
 			@Override
-			public boolean hasNext(){
-				if(advance) advance();
-				return hasNext.test(val);
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private T       val = seed;
+					private boolean advance;
+					
+					private void advance(){
+						val = next.apply(val);
+						advance = false;
+					}
+					@Override
+					public boolean hasNext(){
+						if(advance) advance();
+						return hasNext.test(val);
+					}
+					@Override
+					public T next(){
+						var v = val;
+						if(advance) advance();
+						advance = true;
+						return v;
+					}
+				};
 			}
+		};
+	}
+	
+	public static <T> IterablePP<T> generate(Supplier<Supplier<T>> generatorSup){
+		return new Iters.DefaultIterable<>(){
 			@Override
-			public T next(){
-				var v = val;
-				if(advance) advance();
-				advance = true;
-				return v;
+			public Iterator<T> iterator(){
+				var generator = generatorSup.get();
+				return new Iterator<>(){
+					@Override
+					public boolean hasNext(){ return true; }
+					@Override
+					public T next(){
+						return generator.get();
+					}
+				};
 			}
 		};
 	}
 	
 	public static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
-		return () -> {
-			var src = supplier.get();
-			return new FindingNonNullIterator<>(){
-				@Override
-				protected T doNext(){
-					return src.get();
-				}
-			};
+		return new Iters.DefaultIterable<>(){
+			@Override
+			public Iterator<T> iterator(){
+				var src = supplier.get();
+				return new FindingNonNullIterator<>(){
+					@Override
+					protected T doNext(){
+						return src.get();
+					}
+				};
+			}
 		};
 	}
 	
@@ -296,36 +414,36 @@ public final class Iters{
 	
 	
 	@SuppressWarnings("unchecked")
-	public static <T> IterablePP<T> of(){ return (IterablePP<T>)EMPTY; }
-	public static <T> IterablePP<T> of(T element){ return new SingleIterable<>(element); }
+	public static <T> IterablePP.SizedPP<T> of(){ return (IterablePP.SizedPP<T>)EMPTY; }
+	public static <T> IterablePP.SizedPP<T> of(T element){ return new SingleIterable<>(element); }
 	@SafeVarargs
-	public static <T> IterablePP<T> of(T... data){ return from(data); }
+	public static <T> IterablePP.SizedPP<T> of(T... data){ return from(data); }
 	
-	public static IterableLongPP ofPresent(OptionalLong element)    { return element.isEmpty()? IterableLongPP.empty() : ofLongs(element.getAsLong()); }
-	public static IterableLongPP ofPresent(OptionalLong... elements){ return from(elements).filtered(OptionalLong::isPresent).mapToLong(OptionalLong::getAsLong); }
+	public static IterableLongPP ofPresent(OptionalLong element)          { return element.isEmpty()? IterableLongPP.empty() : ofLongs(element.getAsLong()); }
+	public static IterableLongPP ofPresent(OptionalLong... elements)      { return from(elements).filter(OptionalLong::isPresent).mapToLong(OptionalLong::getAsLong); }
 	
-	public static IterableIntPP ofPresent(OptionalInt... elements)  { return from(elements).filtered(OptionalInt::isPresent).mapToInt(OptionalInt::getAsInt); }
-	public static IterableIntPP ofPresent(OptionalInt element)      { return element.isEmpty()? IterableIntPP.empty() : ofInts(element.getAsInt()); }
+	public static IterableIntPP ofPresent(OptionalInt... elements)        { return from(elements).filter(OptionalInt::isPresent).mapToInt(OptionalInt::getAsInt); }
+	public static IterableIntPP ofPresent(OptionalInt element)            { return element.isEmpty()? IterableIntPP.empty() : ofInts(element.getAsInt()); }
 	
-	public static <T> IterablePP<T> ofPresent(Optional<T> element)  { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
+	public static <T> IterablePP.SizedPP<T> ofPresent(Optional<T> element){ return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
 	@SafeVarargs
 	public static <T> IterablePP<T> ofPresent(Optional<T>... data){ return data.length == 0? of() : new ArrayIterable<>(data).flatOptionals(Function.identity()); }
 	
-	public static <T> IterablePP<T> from(OptionalPP<T> element)             { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
-	public static <T> IterablePP<T> from(Optional<T> element)               { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
-	public static <T> IterablePP<T> from(Collection<T> data)                { return new CollectionIterable<>(data); }
-	public static <T> IterablePP<T> from(Iterable<T> data)                  { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
-	public static <T> IterablePP<T> from(T[] data)                          { return data.length == 0? of() : new ArrayIterable<>(data); }
+	public static <T> IterablePP.SizedPP<T> from(OptionalPP<T> element)             { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
+	public static <T> IterablePP.SizedPP<T> from(Optional<T> element)               { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
+	public static <T> IterablePP.SizedPP<T> from(Collection<T> data)                { return new CollectionIterable<>(data); }
+	public static <T> IterablePP.SizedPP<T> from(T[] data)                          { return data.length == 0? of() : new ArrayIterable<>(data); }
+	public static <T> IterablePP<T> from(Iterable<T> data)                          { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
 	
-	public static <V> IterablePP<V> values(Map<?, V> data)                  { return new CollectionIterable<>(data.values()); }
-	public static <K> IterablePP<K> keys(Map<K, ?> data)                    { return new CollectionIterable<>(data.keySet()); }
-	public static <K, V> IterablePP<Map.Entry<K, V>> entries(Map<K, V> data){ return new CollectionIterable<>(data.entrySet()); }
+	public static <V> IterablePP.SizedPP<V> values(Map<?, V> data)                  { return new CollectionIterable<>(data.values()); }
+	public static <K> IterablePP.SizedPP<K> keys(Map<K, ?> data)                    { return new CollectionIterable<>(data.keySet()); }
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(Map<K, V> data){ return new CollectionIterable<>(data.entrySet()); }
 	
-	public static <T> IterablePP<T> rangeMap(int fromInclusive, int toExclusive, IntFunction<T> mapping){
+	public static <T> IterablePP.SizedPP<T> rangeMap(int fromInclusive, int toExclusive, IntFunction<T> mapping){
 		if(fromInclusive>toExclusive) throw new IllegalArgumentException(fromInclusive + " > " + toExclusive);
-		return new IterablePP.SizedPP.Default<T>(){
+		return new IterablePP.SizedPP.Default<>(){
 			@Override
-			public OptionalInt calculateSize(){
+			public OptionalInt getSize(){
 				return OptionalInt.of(toExclusive - fromInclusive);
 			}
 			@Override
@@ -345,14 +463,13 @@ public final class Iters{
 		};
 	}
 	
-	public static <T> IterablePP<T> rangeMapL(long fromInclusive, long toExclusive, LongFunction<T> mapping){
+	public static <T> IterablePP.SizedPP<T> rangeMapL(long fromInclusive, long toExclusive, LongFunction<T> mapping){
 		if(fromInclusive>toExclusive) throw new IllegalArgumentException(fromInclusive + " > " + toExclusive);
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
-			public OptionalInt calculateSize(){
+			public OptionalInt getSize(){
 				var size = toExclusive - fromInclusive;
-				if(size>Integer.MAX_VALUE) return OptionalInt.empty();
-				return OptionalInt.of((int)size);
+				return Utils.longToOptInt(size);
 			}
 			@Override
 			public Iterator<T> iterator(){
@@ -371,13 +488,54 @@ public final class Iters{
 		};
 	}
 	
+	public static <T> IterablePP.SizedPP<T> concat(Collection<T> a, Collection<T> b){
+		var aEmpty = a.isEmpty();
+		if(aEmpty || b.isEmpty()){
+			var col = aEmpty? b : a;
+			//noinspection unchecked
+			return col instanceof IterablePP.SizedPP<?> i? (IterablePP.SizedPP<T>)i : from(col);
+		}
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				var lSize = a.size() + (long)b.size();
+				return Utils.longToOptInt(lSize);
+			}
+			@Override
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private Iterator<T> iter = a.iterator();
+					private boolean     aDone;
+					
+					private Iterator<T> nextIter(){
+						if(aDone) return null;
+						aDone = true;
+						var it = iter = b.iterator();
+						return it.hasNext()? it : null;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						return iter.hasNext() || nextIter() != null;
+					}
+					@Override
+					public T next(){
+						var it = iter;
+						if(!it.hasNext() && (it = nextIter()) == null) throw new NoSuchElementException();
+						return it.next();
+					}
+				};
+			}
+		};
+	}
+	
 	@SafeVarargs
 	@SuppressWarnings("varargs")
-	public static <T> IterablePP<T> concat(Collection<T>... iterables){
+	public static <T> IterablePP.SizedPP<T> concat(Collection<? extends T>... iterables){
 		if(iterables.length == 0) return of();
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
-			public OptionalInt calculateSize(){
+			public OptionalInt getSize(){
 				int size = 0;
 				for(var col : iterables){
 					var lSize = size + (long)col.size();
@@ -393,18 +551,18 @@ public final class Iters{
 	
 	@SafeVarargs
 	@SuppressWarnings("varargs")
-	public static <T> IterablePP<T> concat(Iterable<T>... iterables){
+	public static <T> IterablePP.SizedPP<T> concat(Iterable<? extends T>... iterables){
 		if(iterables.length == 0) return of();
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
-			public OptionalInt calculateSize(){
+			public OptionalInt getSize(){
 				int size = 0;
 				for(var iter : iterables){
 					int siz;
 					switch(iter){
 						case Collection<?> c -> siz = c.size();
 						case SizedPP<?> s -> {
-							var o = s.calculateSize();
+							var o = s.getSize();
 							if(o.isPresent()) siz = o.getAsInt();
 							else return OptionalInt.empty();
 						}
@@ -422,15 +580,15 @@ public final class Iters{
 		};
 	}
 	
-	public static <T> IterablePP<T> concat1N(T first, Collection<T> extra){ return concat(List.of(first), extra); }
-	public static <T> IterablePP<T> concat1N(T first, Iterable<T> extra)  { return concat(Iters.of(first), extra); }
-	public static <T> IterablePP<T> concatN1(Collection<T> start, T last) { return concat(start, List.of(last)); }
-	public static <T> IterablePP<T> concatN1(Iterable<T> start, T last)   { return concat(start, Iters.of(last)); }
+	public static <T> IterablePP.SizedPP<T> concat1N(T first, Collection<? extends T> extra){ return concat(List.of(first), extra); }
+	public static <T> IterablePP.SizedPP<T> concat1N(T first, Iterable<? extends T> extra)  { return concat(Iters.of(first), extra); }
+	public static <T> IterablePP.SizedPP<T> concatN1(Collection<? extends T> start, T last) { return concat(start, List.of(last)); }
+	public static <T> IterablePP.SizedPP<T> concatN1(Iterable<? extends T> start, T last)   { return concat(start, Iters.of(last)); }
 	
-	public static <A, B> IterablePP<Map.Entry<A, B>> zip(Collection<A> a, Collection<B> b){
+	public static <A, B> IterablePP.SizedPP<Map.Entry<A, B>> zip(Collection<A> a, Collection<B> b){
 		return zip(a, b, AbstractMap.SimpleEntry::new);
 	}
-	public static <A, B, Zip> IterablePP<Zip> zip(Collection<A> a, Collection<B> b, BiFunction<A, B, Zip> zipper){
+	public static <A, B, Zip> IterablePP.SizedPP<Zip> zip(Collection<A> a, Collection<B> b, BiFunction<A, B, Zip> zipper){
 		int s;
 		if((s = a.size()) != b.size()) throw new IllegalArgumentException("Collection sizes are not the same!");
 		return new IterablePP.SizedPP.Default<>(){
@@ -454,9 +612,14 @@ public final class Iters{
 				};
 			}
 			@Override
-			public OptionalInt calculateSize(){
+			public OptionalInt getSize(){
 				return OptionalInt.of(s);
 			}
 		};
+	}
+	
+	public static IterableIntPP rand(RandomGenerator rand, int streamSize, int origin, int bound){
+		if(streamSize<0) throw new IllegalArgumentException("Size must be positive!");
+		return range(0, streamSize).map(i -> rand.nextInt(origin, bound));
 	}
 }

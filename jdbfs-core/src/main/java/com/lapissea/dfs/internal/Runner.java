@@ -10,7 +10,6 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -48,13 +47,13 @@ public final class Runner{
 		}
 	}
 	
-	private static final List<Task> TASKS = new ArrayList<>();
+	private static final ArrayList<Task> TASKS = new ArrayList<>();
 	
-	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolve();
-	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveVal();
+	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolveLocking();
+	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveValLocking();
 	
 	private static int             virtualChoke = 0;
-	private static boolean         cherry       = true;
+	private static boolean         chokeWarningEmited;
 	private static ExecutorService platformExecutor;
 	private static Instant         lastTask;
 	private static Thread          watcher;
@@ -89,9 +88,9 @@ public final class Runner{
 		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
 			
-			int timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.resolveVal();
-			int watcherTimeout = ConfigDefs.RUNNER_WATCHER_TIMEOUT_MS.resolveVal();
-			var toRestart      = new ArrayList<Task>();
+			long timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME.resolve().toNanos();
+			int  watcherTimeout = (int)ConfigDefs.RUNNER_WATCHER_TIMEOUT.resolve().toMillis();
+			var  toRestart      = new ArrayList<Task>();
 			
 			// debug wait prevents debugging sessions from often restarting the watcher by
 			// repeatedly sleeping for a short time and checking if it should still exit.
@@ -100,7 +99,6 @@ public final class Runner{
 			var debugCounter = 0;
 			
 			while(true){
-				boolean counted = false;
 				synchronized(TASKS){
 					if(TASKS.isEmpty()){
 						var d = Duration.between(lastTask, Instant.now());
@@ -116,7 +114,7 @@ public final class Runner{
 						}
 						debugCounter = 0;
 						try{
-							TASKS.wait(cherry? 200 : 20);
+							TASKS.wait(chokeWarningEmited? 20 : 200);
 						}catch(InterruptedException e){
 							throw new RuntimeException(e);
 						}
@@ -125,32 +123,31 @@ public final class Runner{
 					lastTask = Instant.now();
 					debugCounter = 0;
 					
-					for(int i = TASKS.size() - 1; i>=0; i--){
-						var t = TASKS.get(i);
-						
-						boolean started;
-						synchronized(t){ started = t.started; }
-						if(started){
-							TASKS.remove(i);
-							continue;
+					var now     = System.nanoTime();
+					var oldSize = TASKS.size();
+					TASKS.removeIf(t -> {
+						if(now - t.start<=timeThreshold) return false;
+						if(t.started) return true;
+						if(t.counter<20){
+							t.counter++;
+							return false;
 						}
-						if(System.nanoTime() - t.start>timeThreshold*1000_000L){
-							if(t.counter<20){
-								t.counter++;
-								counted = true;
-								continue;
-							}
-							TASKS.remove(i);
-							toRestart.add(t);
+						toRestart.add(t);
+						return true;
+					});
+					if(oldSize>16){
+						var newSize = TASKS.size();
+						if(oldSize/2>newSize){
+							TASKS.trimToSize();
 						}
 					}
 				}
 				if(toRestart.isEmpty()){
-					if(counted) UtilL.sleep(1);
+					UtilL.sleep(1);
 					continue;
 				}
 				
-				pop();
+				emitChokeWarning();
 				
 				for(Task task : toRestart){
 					Log.debug("{#redPerformance:#} Virtual threads choking, running task {}#green on platform", task.id);
@@ -167,31 +164,31 @@ public final class Runner{
 					});
 				}
 				
+				var cl = toRestart.size()>32;
 				toRestart.clear();
-				toRestart.trimToSize();
+				if(cl) toRestart.trimToSize();
 			}
 		});
 	}
 	
-	private static void pop(){
-		if(cherry){
-			cherry = false;
-			if(!ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.resolveVal()){
-				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
-				         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
-				         ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.name(), ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.name());
-			}
+	private static void emitChokeWarning(){
+		if(chokeWarningEmited) return;
+		chokeWarningEmited = true;
+		if(!ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.resolveVal()){
+			Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
+			         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
+			         ConfigDefs.RUNNER_TASK_CHOKE_TIME.name(), ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.name());
 		}
 	}
 	
-	private static void virtualRun(Runnable task){
-		CompletableFuture.runAsync(task, Thread.ofVirtual().name(BASE_NAME + Task.ID_COUNTER.incrementAndGet())::start);
+	private static void virtualRun(Runnable task, String name){
+		CompletableFuture.runAsync(task, Thread.ofVirtual().name(makeName(name, Task.ID_COUNTER.incrementAndGet()))::start);
 	}
 	
-	private static void robustRun(Runnable task){
+	private static void robustRun(Runnable task, String name){
 		var t = new Task(task);
 		
-		CompletableFuture.runAsync(t, Thread.ofVirtual().name(BASE_NAME + t.id)::start);
+		CompletableFuture.runAsync(t, Thread.ofVirtual().name(makeName(name, t.id))::start);
 		
 		// If tasks were choking recently, it is beneficial to
 		// immediately attempt to work on a platform thread
@@ -203,10 +200,18 @@ public final class Runner{
 		}else{
 			synchronized(TASKS){
 				pingWatcher();
-				TASKS.add(t);
-				TASKS.notifyAll();
+				if(!TASKS.isEmpty() && TASKS.getFirst().started){
+					TASKS.set(0, t);
+				}else{
+					TASKS.add(t);
+					TASKS.notifyAll();
+				}
 			}
 		}
+	}
+	private static String makeName(String name, long id){
+		if(name == null) return BASE_NAME + id;
+		return id + ":" + name;
 	}
 	
 	/**
@@ -216,22 +221,22 @@ public final class Runner{
 	 * worker pool.
 	 * </p>
 	 * <p>
-	 * If the thread has been waiting to start for more than {@link ConfigDefs#RUNNER_TASK_CHOKE_TIME_MS}, it may be executed on a
+	 * If the thread has been waiting to start for more than {@link ConfigDefs#RUNNER_TASK_CHOKE_TIME}, it may be executed on a
 	 * platform thread. <br>
 	 * A task might be ran on a platform thread right away if a task start has timed out recently.
 	 * </p>
 	 *
 	 * @param task A task to be executed
 	 */
-	public static void run(Runnable task){
+	public static void run(Runnable task, String taskName){
 		if(ONLY_VIRTUAL){
-			virtualRun(task);
+			virtualRun(task, taskName);
 		}else{
-			robustRun(task);
+			robustRun(task, taskName);
 		}
 	}
 	
-	private static final Executor run = Runner::run;
+	private static final Executor run = t -> Runner.run(t, null);
 	
 	/**
 	 * Creates a {@link LateInit} with no checked exception that is executed as a task. See {@link Runner#run)}<br>

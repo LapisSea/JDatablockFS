@@ -498,7 +498,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public final Iterable<IOField<SELF, ?>> listUnmanagedFields(){
 			var s  = getThisStruct();
 			var fs = s.getUnmanagedStaticFields();
-			if(!s.isOverridingDynamicUnmanaged()){
+			if(!s.hasDynamicFields()){
 				return fs;
 			}
 			var dynamic = ((DynamicFields<SELF>)this).listDynamicUnmanagedFields();
@@ -508,7 +508,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
-			if(getThisStruct().isOverridingDynamicUnmanaged()){
+			if(getThisStruct().hasDynamicFields()){
 				throw new NotImplementedException(getThisStruct() + " has dynamic fields! Please implement walk commands!");
 			}else{
 				throw new UnsupportedOperationException();
@@ -636,7 +636,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			try(var io = selfIO()){
 				getPipe().write(provider, io, self());
 				var struct = getThisStruct();
-				if(!struct.isOverridingDynamicUnmanaged() && struct.getUnmanagedStaticFields().isEmpty()){
+				if(!struct.hasDynamicFields() && struct.getUnmanagedStaticFields().isEmpty()){
 					io.trim();
 				}
 			}

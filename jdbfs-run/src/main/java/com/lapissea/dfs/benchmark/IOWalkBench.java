@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
@@ -55,7 +56,7 @@ public class IOWalkBench{
 				vals.put("radius", System.getProperty("radius"));
 			}
 			
-			conf.load(() -> vals.entrySet().stream());
+			conf.load(() -> Iters.entries(vals));
 			SparseImage.run(c, conf.getView());
 			
 			if("true".equals(System.getProperty("read_only_benchy"))){

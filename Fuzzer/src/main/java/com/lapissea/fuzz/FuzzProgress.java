@@ -5,46 +5,42 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.OptionalDouble;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
-import static com.lapissea.fuzz.FuzzConfig.LogState.stdTime;
+import static com.lapissea.fuzz.FuzzConfig.none;
+import static com.lapissea.fuzz.FuzzConfig.some;
+import static com.lapissea.fuzz.FuzzTime.bigToDuration;
+import static com.lapissea.fuzz.FuzzTime.durationToBigDecimal;
 
 public final class FuzzProgress{
 	
-	private final AtomicLong executedCount = new AtomicLong();
-	private       int        last          = -1;
-	private       Instant    lastLog       = Instant.now();
-	private final Instant    start         = Instant.now();
+	public final FuzzConfig config;
+	
+	private final AtomicLong executedCount  = new AtomicLong();
+	private final AtomicLong elapsedSumAcum = new AtomicLong();
+	private       BigInteger elapsedSum     = BigInteger.ZERO;
+	private       int        last           = -1;
+	private       Instant    lastLog        = Instant.now();
+	private       Instant    start          = Instant.now();
 	private       boolean    hasErr;
 	private       boolean    errMark;
 	
-	private final FuzzConfig              config;
+	private final int[] incPeriods   = new int[10];
+	private       int   incPeriodPos = -1;
+	
 	private final CompletableFuture<Long> totalIterations;
+	private       long                    totalIterationsDone = -1;
 	
-	private final Consumer<FuzzConfig.LogState> logger;
+	private final FuzzLogger logger;
 	
-	public FuzzProgress(FuzzConfig config, long totalIterations){
-		this(config, CompletableFuture.completedFuture(totalIterations));
-	}
 	public FuzzProgress(FuzzConfig config, CompletableFuture<Long> totalIterations){
 		this.config = config;
 		this.totalIterations = totalIterations;
-		logger = config.shouldLog()? config.logFunct().orElseGet(() -> new Consumer<>(){
-			private boolean first = true;
-			@Override
-			public void accept(FuzzConfig.LogState state){
-				if(first){
-					first = false;
-					config.name().ifPresent(name -> {
-						System.out.println("Fuzzing of \033[0;92m" + name + "\033[0m started");
-					});
-				}
-				TO_CONSOLE.accept(state);
-			}
-		}) : null;
+		logger = config.shouldLog()? config.logFunct().orElse(FuzzLogger.TO_CONSOLE) : null;
+		Arrays.fill(incPeriods, 2);
 	}
 	
 	synchronized void err(){
@@ -66,110 +62,141 @@ public final class FuzzProgress{
 		return hasErr;
 	}
 	
-	void inc(){
+	public void reportIncrementPeriod(int incPeriod){
+		synchronized(incPeriods){
+			if(incPeriodPos == -1){
+				Arrays.fill(incPeriods, incPeriod);
+				incPeriodPos = 0;
+				return;
+			}
+			incPeriods[incPeriodPos] = incPeriod;
+			incPeriodPos = (incPeriodPos + 1)%incPeriods.length;
+		}
+	}
+	public int estimatedIncrementPeriod(){
+		int sum = 0;
+		for(var p : incPeriods) sum += p;
+		return Math.max(sum/incPeriods.length, 2);
+	}
+	
+	void reportStepsAndPeriod(int num, long nsDuration, int incPeriod){
+		reportSteps(num, nsDuration);
+		reportIncrementPeriod(incPeriod);
+	}
+	
+	void reportSteps(int num, long nsDuration){
+		if(num == 0) return;
+		if(num<0) throw new IllegalArgumentException("Can not increment progress by negative value");
+		if(nsDuration<0) throw new IllegalArgumentException("Duration must be positive!");
 		if(!config.shouldLog()) return;
-		var count     = executedCount.incrementAndGet();
+		
+		var dur = elapsedSumAcum.addAndGet(nsDuration);
+		if(dur>Long.MAX_VALUE/2){
+			synchronized(this){
+				elapsedSumAcum.getAndAdd(-dur);
+				elapsedSum = elapsedSum.add(BigInteger.valueOf(dur));
+			}
+		}
+		
+		var count     = executedCount.addAndGet(num);
 		var progressI = calcProgressI(count);
 		
 		if(progressI == last) return;
 		
-		synchronized(this){
-			logInc(count, progressI);
-		}
+		logInc(count, progressI);
 	}
 	
+	synchronized void reportStart(){
+		if(logger == null) return;
+		start = Instant.now();
+		lastLog = start.plus(config.initialLogDelay()).minus(config.logTimeout());
+		logger.log(new LogMessage.Start(config.name()));
+	}
+	synchronized void reportDone(){
+		if(logger == null) return;
+		logger.log(makeLogState(Instant.now(), start, errMark, executedCount.get(), BigDecimal.ONE, calcElapsedWork()));
+		logger.log(new LogMessage.End());
+	}
+	synchronized void reportCusomMsg(String msg){
+		if(logger == null) return;
+		logger.log(new LogMessage.CustomMessage(msg));
+	}
+	
+	private static final int  PROGRESS_PRECISION = 1000;
+	private static final long MAX_FAST_COUNT     = (Long.MAX_VALUE/PROGRESS_PRECISION);
+	
 	private int calcProgressI(long count){
-		return (int)((count*1000)/totalIterations.getNow(Long.MAX_VALUE));
+		var ti = totalIterations();
+		if(count<MAX_FAST_COUNT){
+			return (int)((count*PROGRESS_PRECISION)/ti);
+		}
+		return BigInteger.valueOf(count).multiply(BigInteger.valueOf(PROGRESS_PRECISION))
+		                 .divide(BigInteger.valueOf(ti))
+		                 .intValueExact();
+	}
+	
+	
+	private boolean iterationsComputed(){
+		return totalIterationsDone != -1 || totalIterations.isDone();
+	}
+	private long totalIterations(){
+		long iters = totalIterationsDone;
+		if(iters != -1) return iters;
+		if(totalIterations.isDone()){
+			iters = totalIterations.join();
+			if(iters<0) throw new IllegalStateException("Total iterations can't be negative");
+			totalIterationsDone = iters;
+		}else{
+			iters = Long.MAX_VALUE;
+		}
+		return iters;
 	}
 	
 	private void logInc(long count, int progressI){
-		var now = Instant.now();
-		if(Duration.between(lastLog, now).compareTo(config.logTimeout())>0){
+		var now   = Instant.now();
+		var ltout = config.logTimeout();
+		if(Duration.between(lastLog, now).compareTo(ltout)<=0) return;
+		
+		synchronized(this){
+			if(Duration.between(lastLog, now).compareTo(ltout)<=0){
+				return;
+			}
+			
 			lastLog = now;
 			last = progressI;
 			
 			BigDecimal progress;
-			if(totalIterations.isDone()){
-				progress = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalIterations.join()), MathContext.DECIMAL128);
-			}else progress = BigDecimal.ZERO;
-			log(count, progress);
-		}
-	}
-	
-	private static final Consumer<FuzzConfig.LogState> TO_CONSOLE = state -> {
-		final String red   = "\033[0;91m";
-		final String green = "\033[0;92m";
-		
-		final String gray  = "\033[0;90m";
-		final String reset = "\033[0m";
-		
-		var f = String.format("%.1f", state.progress()*100);
-		if(f.equals("100.0")) f = "Done";
-		
-		var    perOpO = state.nanosecondsPerOp();
-		String unit;
-		String value;
-		if(perOpO.isEmpty()){
-			unit = "ms";
-			value = "--";
-		}else{
-			var perOp = perOpO.getAsDouble();
-			if(perOp>1000_000_000){
-				unit = " S";
-				value = String.format("~%.4f", perOp/1000_000_000D);
-			}else if(perOp>1000){
-				unit = "ms";
-				value = String.format("~%.4f", perOp/1_000_000D);
+			if(iterationsComputed()){
+				progress = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalIterations()), MathContext.DECIMAL128);
 			}else{
-				unit = "Ns";
-				value = String.format("~%.2f", perOp);
+				progress = BigDecimal.ZERO;
 			}
+			
+			var logState = makeLogState(now, start, errMark, count, progress, calcElapsedWork());
+			logger.log(logState);
 		}
-		
-		System.out.println(
-			(state.hasFail()? red + "FAIL " : green + "OK | ") +
-			gray + "Progress: " + reset + (f.length()<4? " " + f : f) + "%" +
-			gray + ", ET: " + reset + stdTime(state.estimatedTotalTime()) +
-			gray + ", ETR: " + reset + stdTime(state.estimatedTimeRemaining()) +
-			gray + ", elapsed: " + reset + stdTime(state.elapsed()) +
-			gray + ", " + unit + "/op: " + reset + value
-		);
-	};
-	
-	private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1000_000_000L);
-	private static BigInteger durationToBigDecimal(Duration duration){
-		var seconds = duration.getSeconds();
-		var nanos   = duration.getNano();
-		return BigInteger.valueOf(seconds).multiply(NANOS_PER_SECOND).add(BigInteger.valueOf(nanos));
 	}
-	private static Duration bigToDuration(BigDecimal val){
-		return val == null? null : bigToDuration(val.toBigInteger());
-	}
-	private static Duration bigToDuration(BigInteger val){
-		if(val == null) return null;
-		var seconds = val.divide(NANOS_PER_SECOND);
-		var nanos   = val.subtract(seconds.multiply(NANOS_PER_SECOND));
-		return Duration.ofSeconds(seconds.longValueExact(), nanos.longValueExact());
+	private BigInteger calcElapsedWork(){
+		return elapsedSum.add(BigInteger.valueOf(elapsedSumAcum.get()));
 	}
 	
-	private void log(long count, BigDecimal progress){
-		var now = Instant.now();
-		
+	private static LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress, BigInteger elapsedWork){
 		var elapsedTime = Duration.between(start, now);
 		
 		var progressZero = progress.equals(BigDecimal.ZERO);
 		
 		var elapsedTimeNs      = new BigDecimal(durationToBigDecimal(elapsedTime));
 		var totalTimeEstimated = progressZero? null : elapsedTimeNs.divide(progress, MathContext.DECIMAL32);
-		var timeRemaining      = progressZero? null : totalTimeEstimated.subtract(elapsedTimeNs);
+		var timeRemaining      = progressZero? null : totalTimeEstimated.subtract(elapsedTimeNs).max(BigDecimal.ZERO);
 		
-		logger.accept(new FuzzConfig.LogState(
+		boolean estimate = count>100 && !progressZero;
+		return new LogMessage.State(
 			progress.doubleValue(),
-			count<100? null : bigToDuration(totalTimeEstimated),
-			count<100? null : bigToDuration(timeRemaining),
+			!estimate? none() : some(bigToDuration(totalTimeEstimated)),
+			!estimate? none() : some(bigToDuration(timeRemaining)),
 			elapsedTime,
-			count<100? OptionalDouble.empty() : OptionalDouble.of(elapsedTimeNs.divide(BigDecimal.valueOf(count), MathContext.DECIMAL64).doubleValue()),
+			!estimate? OptionalDouble.empty() : OptionalDouble.of(new BigDecimal(elapsedWork).divide(BigDecimal.valueOf(count), MathContext.DECIMAL64).doubleValue()),
 			errMark
-		));
+		);
 	}
 }

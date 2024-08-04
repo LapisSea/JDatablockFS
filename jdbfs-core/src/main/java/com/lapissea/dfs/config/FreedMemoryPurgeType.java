@@ -29,7 +29,7 @@ public enum FreedMemoryPurgeType implements NamedEnum{
 	private final List<String> names;
 	
 	FreedMemoryPurgeType(String... names){
-		this.names = Iters.concat1N(name(), Iters.from(names).sorted()).collectToFinalList(String::toUpperCase);
+		this.names = Iters.concat1N(name(), Iters.from(names).sorted()).toList(String::toUpperCase);
 	}
 	
 	@Override

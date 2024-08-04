@@ -73,7 +73,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		                                                        .max().orElseThrow();
 		
 		private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
-			Iters.entries(PRIMITIVE_NAMES).collectToFinalMap(e -> e.getValue().getName(), Map.Entry::getKey);
+			Iters.entries(PRIMITIVE_NAMES).toMap(e -> e.getValue().getName(), Map.Entry::getKey);
 		
 		@IOValue
 		private String name;

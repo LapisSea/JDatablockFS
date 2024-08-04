@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import static java.util.function.Predicate.not;
 
@@ -32,13 +33,13 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	
-	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFields(Struct<T> type, FieldSet<T> structFields, Predicate<IOField<T, ?>> checkFixed, Function<IOField<T, ?>, IOField<T, ?>> makeFixed){
+	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFields(Struct<T> type, FieldSet<T> structFields, Predicate<IOField<T, ?>> checkFixed, UnaryOperator<IOField<T, ?>> makeFixed){
 		type.waitForState(Struct.STATE_INIT_FIELDS);
 		try{
 			return IOFieldTools.stepFinal(
 				structFields,
 				List.of(
-					IOFieldTools.streamStep(s -> s.map(f -> checkFixed.test(f)? f : makeFixed.apply(f))),
+					IOFieldTools.streamStep(s -> s.mapIfNot(checkFixed, makeFixed)),
 					IOFieldTools::dependencyReorder,
 					IOFieldTools.streamStep(s -> s.filter(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
@@ -49,20 +50,20 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		sizeFieldStream(structFields).filtered(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
-			throw new IllegalField(badFields + " should not have dependencies");
+		sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
+			throw new IllegalField("fmt", "{}#red should not have dependencies", badFields);
 		});
 		
 		return sizeFieldStream(structFields)
 			       .distinct()
-			       .collectToFinalMap(Function.identity(), sizingField -> {
+			       .toMap(Function.identity(), sizingField -> {
 				       return getType().getFields().iterDependentOn(sizingField)
 				                       .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
 				                       .distinct()
 				                       .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
 				                       .reduce((a, b) -> {
 					                       if(a != b){
-						                       throw new MalformedStruct("inconsistent dependency sizes" + sizingField);
+						                       throw new MalformedStruct("fmt", "inconsistent dependency sizes for {}#red", sizingField);
 					                       }
 					                       return a;
 				                       })

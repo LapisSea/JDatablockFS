@@ -39,8 +39,8 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 			
 			public PipeImpl(Class<E> componentType){
 				this.componentType = componentType;
-				if(!IOInstance.isInstance(componentType)) throw new MalformedStruct(componentType + " is not an IOInstance");
-				if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct(componentType + " is unmanaged");
+				if(!IOInstance.isInstance(componentType)) throw new MalformedStruct("fmt", "{}#red is not an IOInstance", componentType);
+				if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct("fmt", "{}#red is unmanaged", componentType);
 				
 				pipe = StandardStructPipe.of(componentType, STATE_DONE);
 			}
@@ -81,8 +81,8 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 				root = universe.root();
 				pipeMap = universe.pipeMap();
 				for(var componentType : pipeMap.keySet()){
-					if(!IOInstance.isInstance(componentType)) throw new MalformedStruct(componentType + " is not an IOInstance");
-					if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct(componentType + " is unmanaged");
+					if(!IOInstance.isInstance(componentType)) throw new MalformedStruct("fmt", "{}#red is not an IOInstance", componentType);
+					if(IOInstance.isUnmanaged(componentType)) throw new MalformedStruct("fmt", "{}#red is unmanaged", componentType);
 				}
 			}
 			
@@ -160,7 +160,7 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 			var raw  = Utils.typeToRaw(type);
 			var comp = raw.componentType();
 			if(comp == null) throw new ShouldNeverHappenError();
-			if(comp.isArray()) throw new MalformedStruct(type + " is multi dimensional array");
+			if(comp.isArray()) throw new MalformedStruct("fmt", "{}#red is multi dimensional array", type);
 			return comp;
 		}
 		

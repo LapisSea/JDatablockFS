@@ -1,8 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="TextBench.*" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.dfs.benchmark.TextBench.*" working-dir="C:\Programming\Java\JDatablockFS project\JDatablockFS\runDir\main" benchmark-type="CLASS" benchmark-class="com.lapissea.dfs.benchmark.TextBench" isAlternativeJrePathEnabled="false">
-    <module name="jdbfs-run" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
-</component>

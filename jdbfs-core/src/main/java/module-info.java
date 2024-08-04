@@ -4,7 +4,6 @@ module JDatablockFS.core {
 	requires jlapisutil;
 	requires roaringbitmap;
 	requires Jorth;
-	requires generics.resolver;
 	requires org.lz4.java;
 	
 	exports com.lapissea.dfs.type.field.annotations;

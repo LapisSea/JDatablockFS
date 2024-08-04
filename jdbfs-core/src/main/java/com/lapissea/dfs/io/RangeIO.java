@@ -124,7 +124,7 @@ public final class RangeIO implements RandomIO, Stringify{
 	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
 		var max = Iters.from(data).mapToLong(WriteChunk::ioEnd).max().orElse(-1);
 		if(maxLength<max) endFail();
-		parent.writeAtOffsets(Iters.from(data).map(d -> d.withOffset(d.ioOffset() + offset)).collectToList());
+		parent.writeAtOffsets(Iters.from(data).toModList(d -> d.withOffset(d.ioOffset() + offset)));
 	}
 	
 	@Override

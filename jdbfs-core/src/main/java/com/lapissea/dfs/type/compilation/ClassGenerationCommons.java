@@ -3,6 +3,7 @@ package com.lapissea.dfs.type.compilation;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.util.UtilL;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,7 +14,7 @@ import java.util.Optional;
 
 public final class ClassGenerationCommons{
 	
-	private static final Optional<File> DUMP_LOCATION = ConfigDefs.CLASSGEN_DUMP_LOCATION.resolve().map(File::new);
+	private static final Optional<File> DUMP_LOCATION = ConfigDefs.CLASSGEN_DUMP_LOCATION.resolveLocking().map(File::new);
 	private static final int            CHUNK_SIZE    = DUMP_LOCATION.map(File::toPath).flatMap(Utils::findPathBlockSize).orElse(1024);
 	
 	public static void dumpClassName(String className, byte[] data){
@@ -21,9 +22,15 @@ public final class ClassGenerationCommons{
 			var classPath = new File(location, className.replace('.', '/') + ".class");
 			
 			var classFolder = classPath.getParentFile();
-			if(!classFolder.exists() && classFolder.mkdirs()){
-				Log.warn("Failed to create folder(s) to {}", classFolder);
-				return;
+			for(int i = 0, attempts = 5; i<attempts; i++){
+				if(!classFolder.exists() && classFolder.mkdirs()){
+					if(i != attempts - 1){
+						UtilL.sleep(5);
+						continue;
+					}
+					Log.warn("Failed to create folder(s) to {}", classFolder);
+					return;
+				}
 			}
 			
 			if(classPath.exists() && classPath.length() == data.length){

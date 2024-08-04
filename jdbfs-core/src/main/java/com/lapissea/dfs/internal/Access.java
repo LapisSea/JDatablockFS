@@ -6,6 +6,7 @@ import com.lapissea.dfs.exceptions.MissingConstruct;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -19,7 +20,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -27,9 +27,7 @@ import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.WeakHashMap;
 
 import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
@@ -37,7 +35,7 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public final class Access{
 	
-	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveVal();
+	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveValLocking();
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")
@@ -65,9 +63,9 @@ public final class Access{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
-		var match = Iters.from(type.getMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
+		var match = Iters.from(type.getMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
 		if(match.isEmpty()){
-			match = Iters.from(type.getDeclaredMethods()).filtered(m -> m.getName().equals(name)).limit(2).collectToList();
+			match = Iters.from(type.getDeclaredMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
 		}
 		if(match.size()>1) throw new IllegalArgumentException("Ambiguous method name");
 		return makeLambda(match.getFirst(), functionalInterface);
@@ -124,8 +122,8 @@ public final class Access{
 	
 	public static <FInter> Method getFunctionalMethod(Class<FInter> functionalInterface){
 		var methods = Iters.from(functionalInterface.getMethods())
-		                   .filtered(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers()))
-		                   .collectToList();
+		                   .filter(m -> !Modifier.isStatic(m.getModifiers()) && Modifier.isAbstract(m.getModifiers()))
+		                   .toModList();
 		if(methods.size() != 1){
 			throw new IllegalArgumentException(functionalInterface + " is not a functional interface!");
 		}
@@ -234,7 +232,7 @@ public final class Access{
 		}
 	}
 	
-	private static final Map<Class<?>, WeakReference<Class<?>[]>> ARG_CACHE = new WeakHashMap<>();
+	private static final WeakKeyValueMap<Class<?>, Class<?>[]> ARG_CACHE = new WeakKeyValueMap<>();
 	
 	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface){
 		Class<?>[] args;
@@ -242,11 +240,11 @@ public final class Access{
 		synchronized(ARG_CACHE){
 			var ref = ARG_CACHE.get(functionalInterface);
 			if(ref != null){
-				args = ref.get();
-				if(args != null) break typ;
+				args = ref;
+				break typ;
 			}
 			args = Access.getFunctionalMethod(functionalInterface).getParameterTypes();
-			ARG_CACHE.put(functionalInterface, new WeakReference<>(args));
+			ARG_CACHE.put(functionalInterface, args);
 		}
 		
 		return findConstructorArgs(clazz, functionalInterface, args);
@@ -278,7 +276,7 @@ public final class Access{
 					case 1 -> "argument of " + parameterTypes[0];
 					default -> "arguments of " + Arrays.toString(parameterTypes);
 				};
-				var e = new MissingConstruct(clazz.getName() + " does not have a valid constructor or \"of\" static method with " + argStr);
+				var e = new MissingConstruct("fmt", "{}#red does not have a valid constructor or \"of\" static method with {}#yellow", clazz.getName(), argStr);
 				e.addSuppressed(ce);
 				e.addSuppressed(ofe);
 				throw e;

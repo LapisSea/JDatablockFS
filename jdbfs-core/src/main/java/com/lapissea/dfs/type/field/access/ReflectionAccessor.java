@@ -13,10 +13,11 @@ import com.lapissea.util.UtilL;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Optional;
 
-public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor.ReadOnly<CTyp>{
 	
 	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
@@ -26,10 +27,11 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-			}
+			if(num == null) fail();
 			return num.getValue();
+		}
+		private void fail(){
+			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
@@ -55,7 +57,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	private final MethodHandle setter;
 	
 	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		super(struct, name, IOFieldTools.computeAnnotations(field));
+		super(struct, name, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		this.field = field;
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(this.genericType);
@@ -109,6 +111,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.set(instance, value);
 			}
 		}catch(Throwable e){
@@ -135,6 +138,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setDouble(instance, value);
 			}
 		}catch(Throwable e){
@@ -161,6 +165,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setFloat(instance, value);
 			}
 		}catch(Throwable e){
@@ -187,6 +192,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setByte(instance, value);
 			}
 		}catch(Throwable e){
@@ -213,6 +219,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setBoolean(instance, value);
 			}
 		}catch(Throwable e){
@@ -240,6 +247,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setLong(instance, value);
 			}
 		}catch(Throwable e){
@@ -266,6 +274,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setInt(instance, value);
 			}
 		}catch(Throwable e){
@@ -292,6 +301,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
+				checkReadOnlyField();
 				field.setShort(instance, value);
 			}
 		}catch(Throwable e){

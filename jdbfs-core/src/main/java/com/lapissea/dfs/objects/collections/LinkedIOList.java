@@ -101,7 +101,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	);
 	
 	private static final LateInit.Safe<IOField<?, ?>> HEAD_FIELD = Runner.async(
-		() -> Struct.Unmanaged.thisClass().getFields().requireByName("head")
+		() -> Struct.Unmanaged.of(LinkedIOList.class).getFields().requireByName("head")
 	);
 	
 	@IOValue

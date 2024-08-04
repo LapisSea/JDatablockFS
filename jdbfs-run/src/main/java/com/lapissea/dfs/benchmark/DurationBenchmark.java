@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.utils.RawRandom;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
@@ -18,7 +19,6 @@ import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -51,7 +51,7 @@ public class DurationBenchmark{
 	
 	@Setup(Level.Invocation)
 	public void init() throws IOException{
-		val = MAKE.apply(Duration.ofMillis(new Random().nextLong()));
+		val = MAKE.apply(Duration.ofMillis(new RawRandom().nextLong()));
 		PIPE.write((DataProvider)null, new ContentOutputStream.BA(bb), val);
 	}
 	

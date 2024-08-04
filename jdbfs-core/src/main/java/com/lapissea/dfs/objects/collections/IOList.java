@@ -9,7 +9,7 @@ import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.query.QueryCheck;
 import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
@@ -36,7 +36,7 @@ import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
-public interface IOList<T> extends IterablePP.SizedPP<T>{
+public interface IOList<T> extends IterablePPSource<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -558,7 +558,6 @@ public interface IOList<T> extends IterablePP.SizedPP<T>{
 		}
 	}
 	
-	@Override
 	default boolean isEmpty(){
 		return size() == 0;
 	}
@@ -604,10 +603,9 @@ public interface IOList<T> extends IterablePP.SizedPP<T>{
 		return -1;
 	}
 	
-	@Override
-	default T getFirst(){
+	default T getFirst() throws IOException{
 		if(isEmpty()) throw new IndexOutOfBoundsException(0);
-		return getUnsafe(0);
+		return get(0);
 	}
 	
 	default T getLast() throws IOException{
@@ -703,8 +701,5 @@ public interface IOList<T> extends IterablePP.SizedPP<T>{
 	}
 	
 	@Override
-	default OptionalInt calculateSize(){
-		var size = size();
-		return size>Integer.MAX_VALUE? OptionalInt.empty() : OptionalInt.of((int)size);
-	}
+	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 }

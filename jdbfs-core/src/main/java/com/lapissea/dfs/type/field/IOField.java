@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -138,7 +139,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						return dependencyNames.get().apply(accessor, ann);
 					}
 					var fields = generateFields.apply(accessor, ann).fields;
-					return Iters.from(fields).map(VirtualFieldDefinition::name).collectToSet();
+					return Iters.from(fields).map(VirtualFieldDefinition::name).toModSet();
 				});
 			}
 		}
@@ -468,29 +469,26 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public final IONullability.Mode getNullability(){
-		if(nullability == null) calcNullability();
-		return nullability;
+		var n = nullability;
+		if(n != null) return n;
+		return calcNullability();
 	}
-	private void calcNullability(){
-		nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
+	private IONullability.Mode calcNullability(){
+		return nullability = getAccessor() == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(getAccessor());
 	}
 	
 	public final boolean nullable(){
 		return getNullability() == IONullability.Mode.NULLABLE;
 	}
-	
-	@NotNull
-	@Override
-	public final <Ty extends Annotation> Optional<Ty> getAnnotation(Class<Ty> annotationClass){
-		var acc = getAccessor();
-		if(acc == null) return Optional.empty();
-		return acc.getAnnotation(annotationClass);
+	public final boolean isNonNullable(){
+		return getNullability() == IONullability.Mode.NOT_NULL;
 	}
+	
 	@Override
-	public final boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+	public final Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
 		var acc = getAccessor();
-		if(acc == null) return false;
-		return acc.hasAnnotation(annotationClass);
+		if(acc == null) return Map.of();
+		return acc.getAnnotations();
 	}
 	
 	@Override

@@ -307,8 +307,8 @@ public sealed interface IOTypeDB{
 				var maxID = Iters.keys(idToTyp).mapToInt().max().orElse(0);
 				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
-				typToID = Iters.entries(idToTyp).collectToFinalMap(Map.Entry::getValue, Map.Entry::getKey);
-				this.sealedMultiverse = Iters.entries(sealedMultiverse).collectToFinalMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
+				typToID = Iters.entries(idToTyp).toMap(Map.Entry::getValue, Map.Entry::getKey);
+				this.sealedMultiverse = Iters.entries(sealedMultiverse).toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
 			}
 			
 			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
@@ -593,7 +593,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		public Set<String> listStoredTypeDefinitionNames(){
-			return defsLock.read(() -> defs.map(k -> k.getKey().typeName).collectToSet());
+			return defsLock.read(() -> defs.mapped(k -> k.getKey().typeName).toModSet());
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
@@ -610,18 +610,16 @@ public sealed interface IOTypeDB{
 			}
 			
 			var names = Iters.entries(newDefs)
-			                 .filtered(e -> !e.getValue().isUnmanaged())
+			                 .filter(e -> !e.getValue().isUnmanaged())
 			                 .map(e -> e.getKey().typeName)
-			                 .collectToSet();
+			                 .toModSet();
 			
 			Function<StructPipe<?>, List<String>> toNames =
-				pipe -> Iters.from(pipe.getSpecificFields())
-				             .map(IOField::getName)
-				             .collectToList();
+				pipe -> Iters.from(pipe.getSpecificFields()).toModList(IOField::getName);
 			
 			var fieldMap =
 				Iters.entries(newDefs)
-				     .filtered(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
+				     .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
 				     .map(e -> {
 					     Struct<?> typ;
 					     try{
@@ -635,7 +633,7 @@ public sealed interface IOTypeDB{
 					     return Map.entry(e.getKey(), typ);
 				     })
 				     .nonNulls()
-				     .collectToMap(e -> e.getKey().typeName, e -> {
+				     .toModMap(e -> e.getKey().typeName, e -> {
 					     var typ  = e.getValue();
 					     var pipe = StandardStructPipe.of(typ);
 					     return toNames.apply(pipe);
@@ -646,7 +644,7 @@ public sealed interface IOTypeDB{
 			
 			Set<String> containedKeys;
 			try(var ignore = defsLock.read()){
-				containedKeys = Iters.from(defs).map(ent -> ent.getKey().typeName).collectToSet();
+				containedKeys = Iters.from(defs).map(ent -> ent.getKey().typeName).toModSet();
 			}catch(Throwable e1){
 				throw new IOException("Failed to read def keys", e1);
 			}
@@ -876,7 +874,7 @@ public sealed interface IOTypeDB{
 			//noinspection unchecked
 			var universe = (MemoryOnlyDB.Basic.MemUniverse<T>)sealedMultiverseTouch.remove(rootType);
 			if(universe != null){
-				recordType(Iters.values(universe.id2cl).map(IOType::of).collectToList());
+				recordType(Iters.values(universe.id2cl).toModList(IOType::of));
 				
 				IOList<String> ioUniverse = requireIOUniverse(rootType.getName());
 				for(var e : universe.id2cl.entrySet()){

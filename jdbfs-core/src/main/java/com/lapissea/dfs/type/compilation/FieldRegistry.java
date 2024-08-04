@@ -21,7 +21,6 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -60,7 +59,7 @@ final class FieldRegistry{
 			if(log) System.setProperty(FieldRegistry.class.getName() + "#printed", "true");
 			
 			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
-			var lines = log? new ConcurrentLinkedDeque<CharSequence>() : null;
+			var lines = log? new ConcurrentLinkedDeque<String>() : null;
 			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
@@ -81,17 +80,17 @@ final class FieldRegistry{
 			}
 			
 			var usages = Iters.entries(scanned).sortedBy(e -> e.getKey().getName())
-			                  .flatMap(Map.Entry::getValue).collectToFinalList();
+			                  .flatMap(Map.Entry::getValue).toList();
 			
 			if(log) Log.trace("{#yellowBrightFound {} FieldUsage owners with {} usages#}", scanned.size(), usages.size());
 			return usages;
 		}
 		
-		private static void log(String str, Class<?> typ, Deque<CharSequence> lines){
-			if(lines != null) lines.add(Log.resolveArgs(str, typ));
+		private static void log(String str, Class<?> typ, Deque<String> lines){
+			if(lines != null) lines.add(Log.fmt(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<CharSequence> lines){
+		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
 			if(type.getSimpleName().contains("NoIO")){
 				log("Ignoring \"NoIO\" {#blackBright{}~#}", type, lines);
 				return;
@@ -146,18 +145,17 @@ final class FieldRegistry{
 				Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
 				        .map(IOField.FieldUsageRef::value).filter(a -> a.length>0).map(List::of)
 				        .orElseGet(() -> Iters.from(type.getDeclaredClasses())
-				                              .filtered(c -> UtilL.instanceOf(c, FieldUsage.class))
-				                              .map(c -> {
+				                              .filter(c -> UtilL.instanceOf(c, FieldUsage.class))
+				                              .toList(c -> {
 					                              //noinspection unchecked
 					                              return (Class<FieldUsage>)c;
-				                              })
-				                              .collectToFinalList());
+				                              }));
 			
 			if(usageClasses.isEmpty()){
 				return Optional.empty();
 			}
 			
-			return Optional.of(Map.entry(type, Iters.from(usageClasses).map(u -> make(u)).collectToFinalList()));
+			return Optional.of(Map.entry(type, Iters.from(usageClasses).toList(u -> make(u))));
 		}
 		
 		private static FieldUsage make(Class<FieldUsage> usageClass){
@@ -220,7 +218,7 @@ final class FieldRegistry{
 					     })
 					     .distinct()
 					     .sortedBy(Class::getName)
-					     .collectToList()
+					     .toModList()
 				));
 			}
 		}
@@ -252,8 +250,8 @@ final class FieldRegistry{
 		}
 		if(UtilL.instanceOf(Utils.typeToRaw(type), Type.class)){
 			throw new IllegalField(
-				"Directly storing types should not be done as values will fail to load if a class is not present. " +
-				"Please use " + IOType.class.getTypeName() + " instead."
+				"fmt", "Directly storing types should not be done as values will fail to load if a class is not present. " +
+				       "Please use {}#green instead.", IOType.class.getTypeName()
 			);
 		}
 		throw fail(type.getTypeName());
@@ -279,7 +277,7 @@ final class FieldRegistry{
 			var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
 			var makedUnsafe = res.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
 			if(usesUnsafe != makedUnsafe){
-				throw new ShouldNeverHappenError(res.getClass() + " has IOUnsafeValue but is not marked as such");
+				throw new ShouldNeverHappenError(res.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
 			}
 			
 			var typs = compatible.listFieldTypes();
@@ -290,7 +288,7 @@ final class FieldRegistry{
 				);
 			}
 			
-			var allCompatible = Iters.from(getData()).filtered(usage -> usage.isCompatible(type, ann)).asCollection();
+			var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
 			if(allCompatible.size()>1){
 				throw new RuntimeException(
 					"Ambiguous usage picking\n" +
@@ -303,8 +301,8 @@ final class FieldRegistry{
 	
 	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS
 		= Iters.from(FieldCompiler.ANNOTATION_TYPES)
-		       .filtered(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
-		       .collectToFinalSet();
+		       .filter(t -> !List.of(IOValue.class, IODependency.class, IOValue.OverrideType.class).contains(t))
+		       .toSet();
 	
 	private static <T extends IOInstance<T>> Set<FieldUsage> findUsages(IOField<T, ?> field){
 		var             producers = getProducers();
@@ -323,7 +321,7 @@ final class FieldRegistry{
 		var acc  = field.getAccessor();
 		
 		Set<VirtualFieldDefinition<T, ?>> result     = new HashSet<>();
-		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filtered(acc::hasAnnotation).collectToSet();
+		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filter(acc::hasAnnotation).toModSet();
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
 				behaviour.generateFields(acc).ifPresent(res -> {
@@ -336,15 +334,16 @@ final class FieldRegistry{
 		
 		if(!activeAnns.isEmpty()){
 			throw new IllegalAnnotation(
-				"Field " + field + " has incompatible " + TextUtil.plural("annotation", activeAnns.size()) + ":\n" +
-				Iters.from(activeAnns)
-				     .joinAsStr("\n", t -> {
-					     return "\t" + t.getName() + Utils.getAnnotation(t, AnnotationUsage.class).map(v -> ":\t" + v.value()).orElse("");
-				     })
+				"fmt", "Field {}#yellow has incompatible annotation(s):\n{}", field,
+				Iters.from(activeAnns).joinAsStr("\n", annType -> {
+					var usageAnn = annType.getAnnotation(AnnotationUsage.class);
+					if(usageAnn == null) return Log.fmt("\t{}#red", annType.getSimpleName());
+					return Log.fmt("\t{}#red:\t{}#yellow", annType.getSimpleName(), usageAnn.value());
+				})
 			);
 		}
 		
-		return Iters.from(result).sortedBy(VirtualFieldDefinition::name).collectToList();
+		return Iters.from(result).sortedBy(VirtualFieldDefinition::name).toModList();
 	}
 	
 	static <T extends IOInstance<T>> Set<String> getDependencyValueNames(IOField<T, ?> field){
@@ -367,6 +366,6 @@ final class FieldRegistry{
 	}
 	
 	private static IllegalField fail(String typeName){
-		throw new IllegalField("Unable to find implementation of " + IOField.class.getSimpleName() + " from " + typeName);
+		throw new IllegalField("fmt", "Unable to find implementation of {}#yellow from {}#red", IOField.class.getSimpleName(), typeName);
 	}
 }

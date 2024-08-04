@@ -5,6 +5,9 @@ public class MissingConstruct extends MalformedStruct{
 	public MissingConstruct(){
 	}
 	
+	public MissingConstruct(String fmt, String message, Object... args){
+		super(fmt, message, args);
+	}
 	public MissingConstruct(String message){
 		super(message);
 	}

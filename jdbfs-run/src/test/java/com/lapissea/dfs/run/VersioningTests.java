@@ -115,7 +115,7 @@ public class VersioningTests{
 		             .require(1, IOInstance.class);
 		
 		var type  = obj.getThisStruct();
-		var names = type.getFields().map(IOField::getName).collectToSet();
+		var names = type.getFields().mapped(IOField::getName).toModSet();
 		Assert.assertEquals(names, Set.of("a"));
 		var aField = type.getFields().requireExact(int.class, "a");
 		Assert.assertEquals(aField.get(null, obj), 1);

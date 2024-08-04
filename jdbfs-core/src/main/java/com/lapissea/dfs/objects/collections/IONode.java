@@ -35,7 +35,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.IOUtils;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -46,12 +46,13 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
+public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePPSource<IONode<T>>{
 	
 	private static final class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
@@ -674,5 +675,18 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(!(valueStorage instanceof ValueStorage.InstanceBased)){
 			throw new UnsupportedOperationException("Node with type of " + valueStorage.getType().getType() + " is not a valid instance");
 		}
+	}
+	@Override
+	public OptionalInt tryGetSize(){
+		boolean next;
+		try{
+			next = hasNext();
+		}catch(IOException e){
+			next = true;
+		}
+		if(next){
+			return OptionalInt.empty();
+		}
+		return OptionalInt.of(1);
 	}
 }

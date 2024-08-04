@@ -1,12 +1,13 @@
 package com.lapissea.dfs.tools;
 
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.MathUtil;
 
 import java.awt.Color;
-import java.util.Random;
+import java.util.random.RandomGenerator;
 
-public class ColorUtils{
+public final class ColorUtils{
 	
 	public static Color mul(Color color, float mul){
 		return new Color(Math.round(color.getRed()*mul), Math.round(color.getGreen()*mul), Math.round(color.getBlue()*mul), color.getAlpha());
@@ -34,37 +35,32 @@ public class ColorUtils{
 		return add(mul(color, 1 - mul), mul(other, mul));
 	}
 	
-	
-	public static Color makeCol(Random rand, int typeHash, IOField<?, ?> field){
-		return makeCol(rand, typeHash, field.getName());
+	public static Color makeCol(int typeHash, IOField<?, ?> field){
+		return makeCol(typeHash, field.getName());
 	}
-	
-	public static Color makeCol(Random rand, int typeHash, String fieldName){
-		
-		rand.setSeed(typeHash);
-		float typeHue = calcHue(rand);
-		
-		rand.setSeed(fieldName.hashCode());
-		float fieldHue = calcHue(rand);
+	public static Color makeCol(int typeHash, String fieldName){
+		float typeHue   = calcHue(new RawRandom(typeHash));
+		var   fieldRand = new RawRandom(fieldName.hashCode());
+		float fieldHue  = calcHue(fieldRand);
 		
 		float mix = 0.4F;
 //		var   hue=typeHue;
 		var hue = typeHue*mix + fieldHue*(1 - mix);
 		
 		float brightness = 1;
-		float saturation = calcSaturation(rand);
+		float saturation = calcSaturation(fieldRand);
 		
 		return new Color(Color.HSBtoRGB(hue, saturation, brightness));
 	}
 	
-	private static float calcSaturation(Random rand){
+	private static float calcSaturation(RandomGenerator rand){
 		float saturation;
 //		saturation=0.8F;
 		saturation = rand.nextFloat()*0.4F + 0.6F;
 		return saturation;
 	}
 	
-	private static float calcHue(Random rand){
+	private static float calcHue(RandomGenerator rand){
 		float[] hues = {
 			0.1F,
 			1,

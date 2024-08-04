@@ -1,9 +1,13 @@
 package com.lapissea.dfs.config;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,18 +25,14 @@ public final class ConfigUtils{
 		}
 		
 		private void logBad(String nameOfBadEnum){
-			var msg = Log.resolveArgs(
+			
+			logBadValue(Log.fmt(
 				"{} can only be one of {} but is actually \"{}\". Defaulting to {}",
 				nameOfBadEnum,
 				value.getClass().getEnumConstants(),
 				incorrect,
 				value
-			).toString();
-			
-			if(ConfigDefs.STRICT_FLAGS.resolveVal()){
-				throw new IllegalConfiguration("\n" + msg);
-			}
-			Log.log(msg);
+			));
 		}
 	}
 	
@@ -55,13 +55,67 @@ public final class ConfigUtils{
 	}
 	
 	private static void logBadInt(String name, String s){
-		var msg = Log.resolveArgs(
+		logBadValue(Log.fmt(
 			"{} can only be an integer but is \"{}\"", name, s
-		).toString();
-		if(ConfigDefs.STRICT_FLAGS.resolveVal()){
-			throw new IllegalConfiguration("\n" + msg);
-		}
-		Log.log(msg);
+		));
+	}
+	
+	public static Duration configDuration(String name, Map<String, ?> map, Duration defaultValue){
+		return configDuration(name, Optional.ofNullable(map.get(name)).map(Object::toString), defaultValue);
+	}
+	public static Duration configDuration(String name, Duration defaultValue){
+		return configDuration(name, optionalProperty(name), defaultValue);
+	}
+	public static Duration configDuration(String name, Optional<String> value, Duration defaultValue){
+		return value.map(s -> {
+			try{
+				var unitStart = 0;
+				while(unitStart<s.length()){
+					var c = s.charAt(unitStart);
+					if(Character.isDigit(c) || c == '.' || c == '_' || c == '-') unitStart++;
+					else break;
+				}
+				var numStr = s.substring(0, unitStart).replace("_", "");
+				var num    = new BigDecimal(numStr);
+				
+				var unit = s.substring(unitStart).toUpperCase().trim();
+				if(unit.isEmpty()) throw new RuntimeException("Unit of time must be present");
+				if(unit.length()>3 && unit.charAt(unit.length() - 1) == 'S') unit = unit.substring(0, unit.length() - 1);
+				//@formatter:off
+				long toNanosMultiplier = switch(unit){
+					case "H", "HOUR"          -> 60*60*1000*1000_000L;
+					case "M", "MIN", "MINUTE" ->    60*1000*1000_000L;
+					case "S", "SEC", "SECOND" ->       1000*1000_000L;
+					case "MS", "MILLISECOND"  ->            1000_000L;
+					case "NS", "NANOSECOND"   ->                   1L;
+					default -> throw new RuntimeException("Unexpected unit: \"" + unit + '"');
+				};
+				//@formatter:on
+				
+				var nanos = num.multiply(BigDecimal.valueOf(toNanosMultiplier));
+				
+				return bigToDuration(nanos);
+			}catch(Throwable e){
+				logBadDuration(name, s, "\n\t" + e.getMessage());
+				return null;
+			}
+		}).orElse(defaultValue);
+	}
+	
+	private static Duration bigToDuration(BigDecimal val){
+		var nanosPerSecond = BigInteger.valueOf(1000_000_000L);
+		
+		var integer = val.toBigInteger();
+		var seconds = integer.divide(nanosPerSecond);
+		var nanos   = integer.subtract(seconds.multiply(nanosPerSecond));
+		
+		return Duration.ofSeconds(seconds.longValueExact(), nanos.longValueExact());
+	}
+	
+	private static void logBadDuration(String name, String s, String extra){
+		logBadValue(Log.fmt(
+			"{} can only be a duration. A duration is made of number + a unit of time like: h/hour, m/min... but is \"{}\"{}", name, s, extra
+		));
 	}
 	
 	public static <T extends Enum<T>> T configEnum(String name, Map<String, ?> map, T defaultValue){
@@ -74,23 +128,25 @@ public final class ConfigUtils{
 		return configEnum(name, optionalProperty(name), defaultValue);
 	}
 	
-	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> FuzzyResult<T> configEnum(Optional<String> value, T defaultValue){
 		Objects.requireNonNull(defaultValue);
 		return value.map(
-			s -> Iters.from(defaultValue.getClass().getEnumConstants())
-			          .firstMatching(e -> {
-				          if(e instanceof NamedEnum ne){
-					          for(var name : ne.names()){
-						          if(name.equalsIgnoreCase(s)) return true;
-					          }
-					          return false;
-				          }
-				          return e.name().equalsIgnoreCase(s);
-			          })
-			          .map(e -> new FuzzyResult<>((T)e))
-			          .orElse(new FuzzyResult<>(defaultValue, s))
+			s -> matchEnum(defaultValue, s)
+				     .or(() -> matchEnum(defaultValue, Utils.camelCaseToSnakeCase(s)))
+				     .map(FuzzyResult::new)
+				     .orElse(new FuzzyResult<>(defaultValue, s))
 		).orElse(new FuzzyResult<>(defaultValue));
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends Enum<T>> Optional<T> matchEnum(T defaultValue, String s){
+		return Iters.from((T[])defaultValue.getClass().getEnumConstants())
+		            .firstMatching(e -> {
+			            if(e instanceof NamedEnum ne){
+				            return Iters.from(ne.names()).anyMatch(s::equalsIgnoreCase);
+			            }
+			            return e.name().equalsIgnoreCase(s);
+		            });
 	}
 	
 	public static boolean configBoolean(String name, Map<String, ?> map, boolean defaultValue){
@@ -111,14 +167,9 @@ public final class ConfigUtils{
 	}
 	
 	private static void logBadBool(String name, String val){
-		var msg = Log.resolveArgs(
+		logBadValue(Log.fmt(
 			"{} can only be one of [true, false, yes, no] but is \"{}\"", name, val
-		).toString();
-		
-		if(ConfigDefs.STRICT_FLAGS.resolveVal()){
-			throw new IllegalConfiguration("\n" + msg);
-		}
-		Log.log(msg);
+		));
 	}
 	
 	
@@ -126,5 +177,12 @@ public final class ConfigUtils{
 		return Optional.ofNullable(System.getProperty(name));
 	}
 	
+	
+	private static void logBadValue(String msg){
+		if(ConfigDefs.STRICT_FLAGS.resolveVal()){
+			throw new IllegalConfiguration("\n" + msg);
+		}
+		Log.log(msg);
+	}
 	
 }

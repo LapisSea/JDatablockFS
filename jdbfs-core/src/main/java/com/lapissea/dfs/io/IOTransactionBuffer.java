@@ -191,13 +191,24 @@ public final class IOTransactionBuffer{
 				break;
 			}
 			
-			byte[] buf  = new byte[len];
-			var    read = read0(base, offset, buf, 0, len);
-			if(read == -1){
-				throw new EOFException();
-			}
+			byte[] buf = readFully(base, offset, len);
 			return WordIO.getWord(buf, 0, len);
 		}
+	}
+	
+	private byte[] readFully(BaseAccess base, long offset, int len) throws IOException{
+		byte[] buf       = new byte[len];
+		var    rem       = len;
+		var    totalRead = 0;
+		while(rem>0){
+			var read = read0(base, offset + totalRead, buf, totalRead, len);
+			if(read<=-1){
+				throw new EOFException();
+			}
+			rem -= read;
+			totalRead += read;
+		}
+		return buf;
 	}
 	
 	private int read0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
@@ -544,7 +555,6 @@ public final class IOTransactionBuffer{
 	
 	private void setEventSorted(BaseAccess base, int i, WriteEvent m, long jitter) throws IOException{
 		var old = writeEvents.set(i, m);
-		markIndexDirty(base, i, jitter);
 		if(old.offset == m.offset) return;
 		if(i>0){
 			var prev = writeEvents.get(i - 1);
