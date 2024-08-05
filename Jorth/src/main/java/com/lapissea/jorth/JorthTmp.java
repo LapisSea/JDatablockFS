@@ -131,7 +131,7 @@ public class JorthTmp{
 					public class {!} start
 					""", name);
 			write.accept(writer);
-			writer.write("end");
+			writer.wEnd();
 		});
 		
 		var t2 = System.currentTimeMillis();

@@ -19,7 +19,7 @@ public class TestUtils{
 			);
 			
 			generator.accept(writer);
-			writer.write("end");
+			writer.wEnd();
 		});
 	}
 	
