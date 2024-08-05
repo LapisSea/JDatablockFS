@@ -308,10 +308,11 @@ public interface CodeStream extends AutoCloseable{
 		return Objects.toString(obj);
 	}
 	
-	CodeStream write(CharSequence code) throws MalformedJorth;
+	default void wEnd() throws MalformedJorth{ write("end"); }
+	void write(CharSequence code) throws MalformedJorth;
 	
-	default CodeStream write(String code, Object... objs) throws MalformedJorth{
-		return write(processFragment(code, objs));
+	default void write(String code, Object... objs) throws MalformedJorth{
+		write(processFragment(code, objs));
 	}
 	
 	default void addImports(Class<?>... classes){
