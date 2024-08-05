@@ -262,7 +262,7 @@ public final class DefInstanceCompiler{
 							setterMap.get(name).type()
 						);
 					}
-					writer.write("end");
+					writer.wEnd();
 				}
 				
 				var file = jorth.getClassFile(completionName);
@@ -648,7 +648,7 @@ public final class DefInstanceCompiler{
 						}
 						writer.write("set this {!}", info.name);
 					}
-					writer.write("end");
+					writer.wEnd();
 				}
 				
 				generateSpecialToString(interf, writer, specials);
@@ -670,7 +670,7 @@ public final class DefInstanceCompiler{
 						break stringSaga;
 					}
 				}
-				writer.write("end");
+				writer.wEnd();
 			}
 			
 			var file = jorth.getClassFile(implName);
@@ -929,7 +929,7 @@ public final class DefInstanceCompiler{
 				call append start
 				""");
 		val.accept(writer);
-		writer.write("end");
+		writer.wEnd();
 	}
 	
 	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
@@ -951,7 +951,7 @@ public final class DefInstanceCompiler{
 				writer.write("set this {!}", info.name);
 			}
 		}
-		writer.write("end");
+		writer.wEnd();
 	}
 	
 	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
@@ -999,7 +999,7 @@ public final class DefInstanceCompiler{
 			}
 			writer.write("set this {!}", info.name);
 		}
-		writer.write("end");
+		writer.wEnd();
 	}
 	
 	private static Set<String> collectNames(Class<?> its){

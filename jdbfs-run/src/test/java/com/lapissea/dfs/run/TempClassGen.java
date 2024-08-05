@@ -100,7 +100,7 @@ public final class TempClassGen{
 					}
 				}
 				
-				code.write("end");
+				code.wEnd();
 			});
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class", e);
