@@ -3,20 +3,30 @@ package com.lapissea.dfs.run;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.JorthUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
 
 public final class TempClassGen{
 	
+	public interface CodePart{
+		void write(CodeStream dest);
+	}
+	
 	public sealed interface CtorType{
-		record Empty() implements CtorType{ }
+		record Empty(Map<String, Object> values) implements CtorType{
+			public Empty(){
+				this(Map.of());
+			}
+		}
 		
 		record All() implements CtorType{ }
 	}
@@ -94,8 +104,21 @@ public final class TempClassGen{
 								"""
 									public function <init> start
 										super start end
-									end
 									""");
+							for(var e : empty.values.entrySet()){
+								var name = e.getKey();
+								if(Iters.from(classGen.fields).map(FieldGen::name).noneEquals(name)){
+									throw new IllegalArgumentException(name + " is not a field");
+								}
+								var val = e.getValue();
+								if(val instanceof CodePart block){
+									block.write(code);
+								}else{
+									code.write("{}", val);
+								}
+								code.write("set this {!}", name);
+							}
+							code.wEnd();
 						}
 					}
 				}
