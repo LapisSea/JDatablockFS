@@ -19,14 +19,12 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.NewUnmanaged;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.type.compilation.JorthLogger;
+import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -38,6 +36,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -218,60 +217,13 @@ public final class TestUtils{
 	public record Prop(String name, Type type, Object val){ }
 	
 	public static Class<?> generateIOManagedClass(String className, List<Prop> props){
-		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
-			@Override
-			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				if(!className.equals(name)) return super.findClass(name);
-				
-				var l = JorthLogger.make();
-				var j = new Jorth(this, l == null? null : l::log);
-				
-				try(var code = j.writer()){
-					writeIOManagedClass(code, name, props);
-				}catch(MalformedJorth e){
-					throw new RuntimeException("Failed to generate: " + name, e);
-				}finally{
-					if(l != null) LogUtil.println(l.output());
-				}
-				var bb = j.getClassFile(name);
-				return defineClass(name, bb, 0, bb.length);
-			}
-		};
-		try{
-			return loader.loadClass(className);
-		}catch(ClassNotFoundException e){
-			throw new RuntimeException("Failed to load: " + className, e);
-		}
-	}
-	
-	public static void writeIOManagedClass(CodeStream code, String className, List<Prop> props) throws MalformedJorth{
-		code.addImports(IOInstance.Managed.class, IOValue.class);
-		code.write(
-			"""
-				extends #IOInstance.Managed<{0}>
-				public class {0} start
-					
-					template-for #val in {1} start
-						@ #IOValue
-						public field #val.name #val.type
-					end
-					
-					public function <init> start
-						super start end
-				""",
-			className, props
-		);
-		for(Prop prop : props){
-			if(prop.val != null){
-				code.write("{} set this {!}", prop.val, prop.name);
-			}
-		}
-		code.write(
-			"""
-					end
-				end
-				"""
-		);
+		var ioVal = Annotations.make(IOValue.class);
+		return TempClassGen.gen(new TempClassGen.ClassGen(
+			className,
+			Iters.from(props).map(p -> new TempClassGen.FieldGen(p.name, p.type, List.of(ioVal), false, null)).toList(),
+			Set.of(new TempClassGen.CtorType.Empty(Iters.from(props).nonNullProps(Prop::val).toMap(Prop::name, Prop::val))),
+			IOInstance.Managed.class
+		));
 	}
 	
 	public static <T> T callWithClassLoader(ClassLoader classLoader, String sesName) throws ReflectiveOperationException{

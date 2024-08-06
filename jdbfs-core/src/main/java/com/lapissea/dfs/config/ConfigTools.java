@@ -193,7 +193,8 @@ public final class ConfigTools{
 						throw new IllegalArgumentException("Default value not valid: " + val + "\n\tReason: " + err);
 					}
 				}
-				super.set(val);
+				checkLocked();
+				System.setProperty(name(), durToStr(val));
 			}
 			
 			@Override
@@ -237,7 +238,10 @@ public final class ConfigTools{
 			}
 			@Override
 			public String resolveAsStr(){
-				var dur = resolve();
+				return durToStr(resolve());
+			}
+			private static String durToStr(Duration dur){
+				if(dur.isZero()) return "0 ms";
 				try{
 					long val;
 					if(dur.equals(Duration.ofHours(val = dur.toHours()))) return val + " hours";

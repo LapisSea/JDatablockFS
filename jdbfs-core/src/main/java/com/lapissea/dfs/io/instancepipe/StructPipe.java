@@ -45,6 +45,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.utils.ClosableLock;
+import com.lapissea.dfs.utils.GcDelayer;
+import com.lapissea.dfs.utils.KeyCounter;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -60,6 +62,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -114,25 +117,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			this.type = type;
 		}
 		
-		private final WeakKeyValueMap<Struct<T>, P> pipes = new WeakKeyValueMap<>();
-		private P get(Struct<T> type){
-			synchronized(pipes){
-				return pipes.get(type);
-			}
-		}
-		private void put(Struct<T> type, P pipe){
-			synchronized(pipes){
-				pipes.put(type, pipe);
-			}
-		}
-		private void remove(Struct<T> type){
-			synchronized(pipes){
-				pipes.remove(type);
-			}
-		}
+		private final WeakKeyValueMap<Struct<T>, P> pipes            = new WeakKeyValueMap.Sync<>();
+		private final KeyCounter<String>            compilationCount = new KeyCounter<>();
+		private final Duration                      gcDelay          = ConfigDefs.DELAY_COMP_OBJ_GC.resolveLocking();
+		private final GcDelayer                     gcDelayer        = gcDelay.isZero()? null : new GcDelayer();
 		
 		P make(Struct<T> struct, boolean runNow){
-			var cached = get(struct);
+			var cached = pipes.get(struct);
 			if(cached != null) return cached;
 			return lockingMake(struct, runNow);
 		}
@@ -140,7 +131,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private P lockingMake(Struct<T> struct, boolean runNow){
 			var info = locks.computeIfAbsent(struct, __ -> new CompileInfo());
 			try(var ignored = info.lock.open()){
-				var cached = get(struct);
+				var cached = pipes.get(struct);
 				if(cached != null) return cached;
 				
 				if(info.recursiveCompilingDepth>50){
@@ -159,11 +150,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			
+			String encounterKey   = struct.getType().getClassLoader().hashCode() + "/" + struct.getType().getName();
+			var    prevEncounters = compilationCount.getCount(encounterKey);
 			if(Log.TRACE){
 				var name     = struct.cleanFullName();
 				var smolName = struct.cleanName();
-				Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright",
-				          shortPipeName(type), name.substring(0, name.length() - smolName.length()), smolName);
+				var again    = prevEncounters>0? " (again #" + prevEncounters + ")" : "";
+				Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright{}",
+				          shortPipeName(type), name.substring(0, name.length() - smolName.length()), smolName, again);
 			}
 			
 			P created;
@@ -197,20 +191,26 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw e;
 			}
 			
-			put(struct, created);//TODO: replace put/remove with scoped value as temporary storage before putting. Avoid potentially invalid result
+			//TODO: replace put/remove with scoped value as temporary storage before putting. Avoid potentially invalid result
+			pipes.put(struct, created);
 			if(runNow){
 				try{
 					created.postValidate();
 				}catch(Throwable e){
-					remove(struct);
+					pipes.remove(struct);
 					errors.put(struct, e);
 					throw e;
 				}
 			}
 			
+			int count = compilationCount.inc(encounterKey);
+			if(count>1 && gcDelayer != null){
+				gcDelayer.delay(created, gcDelay.multipliedBy(count - 1));
+			}
+			
 			if(ConfigDefs.PRINT_COMPILATION.resolveVal()){
 				created.runOnStateDone(() -> {
-					String s = "Compiled: " + struct.getFullName() + "\n" +
+					String s = "Compiled: " + struct.getFullName() + (prevEncounters>0? " (again)" : "") + "\n" +
 					           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +
 					           "\tSize: " + BLUE_BRIGHT + created.getSizeDescriptor() + CYAN_BRIGHT + "\n" +
 					           "\tReference commands: " + created.getReferenceWalkCommands();

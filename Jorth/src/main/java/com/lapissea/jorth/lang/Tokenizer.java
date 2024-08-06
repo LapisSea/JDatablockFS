@@ -90,13 +90,12 @@ public class Tokenizer implements CodeStream, TokenSource{
 	private boolean buffering;
 	
 	@Override
-	public CodeStream write(CharSequence code) throws MalformedJorth{
+	public void write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
 		codeBuffer.addLast(code);
 		if(!buffering){
 			parseExisting();
 		}
-		return this;
 	}
 	
 	@Override

@@ -2,6 +2,7 @@ package com.lapissea.dfs.utils.iterableplus;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.function.IntFunction;
@@ -28,6 +29,11 @@ public final class PPBakedSequence<T> extends AbstractList<T> implements Iterabl
 	public Stream<T> stream(){
 		return Arrays.stream(data);
 	}
+	@Override
+	public List<T> toList(){
+		return List.of(data);
+	}
+	@SuppressWarnings("SuspiciousSystemArraycopy")
 	@Override
 	public <T1> T1[] toArray(IntFunction<T1[]> generator){
 		var arr = generator.apply(data.length);

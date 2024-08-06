@@ -171,7 +171,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		for(var constant : classType.def.getEnumConstants()){
 			writer.write("enum {!}", constant.getName());
 		}
-		writer.write("end");
+		writer.wEnd();
 	}
 	
 	private static void stringsAnnotation(CodeStream code, Class<? extends Annotation> type, Collection<String> values) throws MalformedJorth{
@@ -265,7 +265,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			
 			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));
 		}
-		writer.write("end");
+		writer.wEnd();
 	}
 	
 	private void generateJustAnInterface(TypeNamed classType, CodeStream writer) throws MalformedJorth{

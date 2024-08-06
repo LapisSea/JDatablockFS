@@ -70,7 +70,7 @@ public final class JorthUtils{
 					default -> throw new NotImplementedException(value.getClass() + "");
 				});
 			});
-			if(any[0]) writer.write("end");
+			if(any[0]) writer.wEnd();
 			else writer.write("@ {!}", ann.annotationType().getName());
 			part.close();
 		}
