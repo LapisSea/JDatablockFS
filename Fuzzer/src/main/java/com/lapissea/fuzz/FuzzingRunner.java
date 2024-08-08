@@ -234,8 +234,10 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			
 			var action = actionFactory.apply(rand);
 			if(action == null){
+				var e = new NullPointerException("Action can not be null");
+				FuzzFail.trimErr(e);
 				return Optional.of(new FuzzFail.Create<>(
-					new NullPointerException("Action can not be null"),
+					e,
 					sequence, Duration.between(start, Instant.now())
 				));
 			}
