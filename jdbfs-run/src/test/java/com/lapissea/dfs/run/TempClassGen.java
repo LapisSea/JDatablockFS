@@ -34,17 +34,23 @@ public final class TempClassGen{
 	public record FieldGen(String name, Type type, Iterable<Annotation> annotations, boolean isFinal, Function<RandomGenerator, Object> generator){
 		@Override
 		public String toString(){
-			return Iters.from(annotations).joinAsOptionalStr("\n", "", "\n", a -> "\t@" + a.annotationType().getSimpleName()).orElse("") +
-			       "\tpublic " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
+			return Iters.from(annotations).joinAsOptionalStr("\n", "", "\n", a -> "@" + a.annotationType().getSimpleName()).orElse("") +
+			       "public " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
 		}
 	}
 	
 	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent){
 		@Override
 		public String toString(){
-			return "class " + name + " " + (parent != null? "extends " + parent.getSimpleName() + " " : "") + "{\n" +
-			       Iters.from(fields).joinAsStr("\n") + "\n\t\n\t" +
-			       Iters.from(constructors).joinAsStr("\n") +
+			return "class " + name + " " + (parent != null? "extends " + parent.getSimpleName() + " " : "") + "{" +
+			       Iters.concat(
+				            Iters.from(fields),
+				            List.of(""),
+				            Iters.from(constructors)
+			            )
+			            .flatMapArray(e -> e.toString().split("\n"))
+			            .map(String::trim)
+			            .joinAsStr("\n", l -> "\t" + l) +
 			       "\n}";
 		}
 	}
@@ -129,6 +135,5 @@ public final class TempClassGen{
 			throw new RuntimeException("Failed to generate class", e);
 		}
 	}
-	
 	
 }
