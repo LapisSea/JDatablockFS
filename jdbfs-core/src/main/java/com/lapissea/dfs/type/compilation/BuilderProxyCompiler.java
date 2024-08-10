@@ -1,5 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
+import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
@@ -39,14 +41,11 @@ public final class BuilderProxyCompiler{
 		if(!type.needsBuilderObj()){
 			throw new IllegalArgumentException();
 		}
-		if(Log.TRACE){
-			var typ = type.getType();
-			Log.trace("Generating builder for: {}#yellow{}#yellowBright",
-			          typ.getName().substring(0, typ.getName().length() - typ.getSimpleName().length()),
-			          typ.getSimpleName());
-		}
 		
 		var baseClass = type.getType();
+		
+		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
+		
 		var proxyName = baseClass.getName() + BUILDER_PROXY_POSTFIX;
 		
 		try{

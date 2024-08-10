@@ -58,7 +58,7 @@ public final class StructFuzzTest{
 	}
 	
 	private static boolean isFinal(RandomGenerator rand){
-		return false;
+		return rand.nextBoolean();
 	}
 	
 	private static TempClassGen.FieldGen signedInt(String name, RandomGenerator rand){
