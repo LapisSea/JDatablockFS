@@ -439,4 +439,12 @@ public final class Utils{
 		
 		return String.join("_", words);
 	}
+	
+	public static Supplier<String> classPathHeadless(Class<?> typ){
+		return () -> {
+			var name  = typ.getName();
+			var sName = typ.getSimpleName();
+			return name.substring(0, name.length() - sName.length());
+		};
+	}
 }

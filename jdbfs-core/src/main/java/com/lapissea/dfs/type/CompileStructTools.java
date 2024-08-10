@@ -156,6 +156,7 @@ final class CompileStructTools{
 		
 		var encounterKey   = instanceClass.getClassLoader().hashCode() + "/" + instanceClass.getName();
 		var encounterCount = COMPILATION_COUNT.getCount(encounterKey);
+		var again          = encounterCount>0? " (again #" + encounterCount + ")" : "";
 		
 		var printLogLevel = ConfigDefs.PRINT_COMPILATION.resolve();
 		
@@ -178,9 +179,7 @@ final class CompileStructTools{
 			
 			
 			if(printLogLevel.isWithin(ConfigDefs.CompLogLevel.JUST_START)){
-				Log.trace("Requested struct: {}#green{}#greenBright{}",
-				          instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
-				          instanceClass.getSimpleName(), (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+				Log.log("Requested struct: {}#green{}#greenBright{}", Utils.classPathHeadless(instanceClass), instanceClass.getSimpleName(), again);
 			}
 			
 			try{
@@ -234,7 +233,7 @@ final class CompileStructTools{
 					var fullName  = struct.getFullName();
 					var cleanName = struct.cleanName();
 					var path      = fullName.substring(0, fullName.length() - cleanName.length());
-					Log.log("Struct compiled: {}#cyan{}#cyanBright{}", path, struct, (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+					Log.log("Struct compiled: {}#cyan{}#cyanBright{}", path, struct, again);
 				},
 				e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
 			);

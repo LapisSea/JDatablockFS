@@ -431,8 +431,7 @@ public final class DefInstanceCompiler{
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
 				var hash = inter.getClassLoader().hashCode();
 				return List.of(
-					inter.getName().substring(0, inter.getName().length() - inter.getSimpleName().length()),
-					inter.getSimpleName(),
+					Utils.classPathHeadless(inter), inter.getSimpleName(),
 					node.key.includeNames.map(Object::toString).map(s -> "fields: " + s + " - ").orElse(""),
 					cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + RESET
 				);
