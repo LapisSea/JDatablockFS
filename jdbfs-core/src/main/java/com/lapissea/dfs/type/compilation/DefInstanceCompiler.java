@@ -201,8 +201,7 @@ public final class DefInstanceCompiler{
 				return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
 			}
 			
-			
-			Log.trace(
+			ConfigDefs.CompLogLevel.SMALL.log(
 				"Generating completion of {}#cyan - {} {}",
 				() -> List.of(interf.getSimpleName(),
 				              missingGetters.isEmpty()? "" : "missing getters: " + missingGetters,
@@ -426,10 +425,11 @@ public final class DefInstanceCompiler{
 		Key<T> key = node.key;
 		
 		var inter = key.clazz;
-		var hash  = inter.getClassLoader().hashCode();
-		Log.trace(
+		
+		ConfigDefs.CompLogLevel.SMALL.log(
 			"Generating implementation of: {}#cyan{}#cyanBright {}classloader: {}", () -> {
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
+				var hash = inter.getClassLoader().hashCode();
 				return List.of(
 					inter.getName().substring(0, inter.getName().length() - inter.getSimpleName().length()),
 					inter.getSimpleName(),

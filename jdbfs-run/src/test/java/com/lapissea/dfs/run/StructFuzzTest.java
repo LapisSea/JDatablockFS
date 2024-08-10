@@ -1,7 +1,9 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.IOInstance;
@@ -102,7 +104,7 @@ public final class StructFuzzTest{
 	}
 	
 	@Test(dependsOnMethods = "simpleGenClass")
-	public void fuzzGen(){
+	public void fuzzGen() throws LockedFlagSet{
 		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
 			@Override
 			public void applyAction(TempClassGen.ClassGen state, long actionIndex, Object action, RunMark mark) throws IOException{
@@ -133,13 +135,13 @@ public final class StructFuzzTest{
 			}
 		}, FuzzingRunner::noopAction);
 		
-		
-		Plan.start(
-			runner, new FuzzConfig().withName("fuzzChainResize"),
-			new FuzzSequenceSource.LenSeed(69420, 4_000, 1)
-//			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
-		).runAll().assertFail();
-		
+		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
+			Plan.start(
+				runner, new FuzzConfig().withName("fuzzChainResize"),
+				new FuzzSequenceSource.LenSeed(69420, 10_000, 1)
+//				() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
+			).runAll().assertFail();
+		}
 	}
 	
 	public <T extends IOInstance<T>> void testType(TempClassGen.ClassGen def) throws IOException, ReflectiveOperationException{

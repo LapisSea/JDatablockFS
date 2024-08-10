@@ -2,7 +2,6 @@ package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.logging.Log;
@@ -158,6 +157,8 @@ final class CompileStructTools{
 		var encounterKey   = instanceClass.getClassLoader().hashCode() + "/" + instanceClass.getName();
 		var encounterCount = COMPILATION_COUNT.getCount(encounterKey);
 		
+		var printLogLevel = ConfigDefs.PRINT_COMPILATION.resolve();
+		
 		var wh = needsImpl? new WaitHolder() : null;
 		
 		S struct;
@@ -176,9 +177,11 @@ final class CompileStructTools{
 			}
 			
 			
-			if(Log.TRACE) Log.trace("Requested struct: {}#green{}#greenBright{}",
-			                        instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
-			                        instanceClass.getSimpleName(), (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+			if(printLogLevel.isWithin(ConfigDefs.CompLogLevel.JUST_START)){
+				Log.trace("Requested struct: {}#green{}#greenBright{}",
+				          instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
+				          instanceClass.getSimpleName(), (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+			}
 			
 			try{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
@@ -221,23 +224,20 @@ final class CompileStructTools{
 		}, null);
 		
 		
-		if(!GlobalConfig.RELEASE_MODE && Log.WARN){
-			if(!ConfigDefs.PRINT_COMPILATION.resolveVal()){
-				struct.runOnStateDone(
-					() -> {
-						var fullName  = struct.getFullName();
-						var cleanName = struct.cleanName();
-						var path      = fullName.substring(0, fullName.length() - cleanName.length());
-						Log.trace("Struct compiled: {}#cyan{}#cyanBright{}", path, struct, (encounterCount>0? " (again #" + encounterCount + ")" : ""));
-					},
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
-				);
-			}else{
-				struct.runOnStateDone(
-					() -> Log.log(GREEN_BRIGHT + TextUtil.toTable(struct.cleanFullName(), struct.getFields()) + RESET),
-					e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
-				);
-			}
+		if(printLogLevel.isWithin(ConfigDefs.CompLogLevel.SMALL)){
+			struct.runOnStateDone(
+				() -> {
+					if(printLogLevel == ConfigDefs.CompLogLevel.FULL){
+						Log.log(GREEN_BRIGHT + TextUtil.toTable("Struct compiled: " + struct.cleanFullName(), struct.getFields()) + RESET);
+						return;
+					}
+					var fullName  = struct.getFullName();
+					var cleanName = struct.cleanName();
+					var path      = fullName.substring(0, fullName.length() - cleanName.length());
+					Log.log("Struct compiled: {}#cyan{}#cyanBright{}", path, struct, (encounterCount>0? " (again #" + encounterCount + ")" : ""));
+				},
+				e -> Log.warn("Failed to compile struct asynchronously: {}#red\n{}", struct.cleanName(), Utils.errToStackTraceOnDemand(e))
+			);
 		}
 		
 		return struct;

@@ -103,7 +103,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			var typ = new TypeNamed(className, def.clone());
 			
 			var hash = hashCode();
-			Log.trace("Generating template: {} - {}", className, (Supplier<String>)() -> {
+			ConfigDefs.CompLogLevel.JUST_START.log("Generating template: {} - {}", className, (Supplier<String>)() -> {
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN);
 				return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + " " + RESET;
 			});

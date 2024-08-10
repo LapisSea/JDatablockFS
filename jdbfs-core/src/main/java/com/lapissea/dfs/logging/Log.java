@@ -113,8 +113,14 @@ public class Log{
 		return badValues.isEmpty();
 	}
 	
-	public static void log(String msg){
-		if(MIN) LogUtil.println(msg);
+	public static void log(String msg, Object arg1)                          { if(MIN) l(fmt(msg, arg1)); }
+	public static void log(String msg, Object arg1, Object arg2)             { if(MIN) l(fmt(msg, arg1, arg2)); }
+	public static void log(String msg, Object arg1, Object arg2, Object arg3){ if(MIN) l(fmt(msg, arg1, arg2, arg3)); }
+	public static void log(String msg, Object... args)                       { if(MIN) l(fmt(msg, args)); }
+	public static void log(String msg, Supplier<List<?>> lazyArgs)           { if(MIN) l(fmt(msg, lazyArgs)); }
+	public static void log(String msg)                                       { if(MIN) l(msg); }
+	private static void l(String msg){
+		LogUtil.println(msg);
 	}
 	
 	public static void warn(String msg)                                                    { if(WARN) w(fmt(msg)); }

@@ -146,9 +146,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			
-			String encounterKey   = struct.getType().getClassLoader().hashCode() + "/" + struct.getType().getName();
-			var    prevEncounters = compilationCount.getCount(encounterKey);
-			if(Log.TRACE){
+			var printLogLevel = ConfigDefs.PRINT_COMPILATION.resolve();
+			
+			var encounterKey   = struct.getType().getClassLoader().hashCode() + "/" + struct.getType().getName();
+			var prevEncounters = compilationCount.getCount(encounterKey);
+			if(printLogLevel.isWithin(ConfigDefs.CompLogLevel.JUST_START)){
 				var name     = struct.cleanFullName();
 				var smolName = struct.cleanName();
 				var again    = prevEncounters>0? " (again #" + prevEncounters + ")" : "";
@@ -204,7 +206,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				gcDelayer.delay(created, gcDelay.multipliedBy(count - 1));
 			}
 			
-			if(ConfigDefs.PRINT_COMPILATION.resolveVal()){
+			if(printLogLevel.isWithin(ConfigDefs.CompLogLevel.FULL)){
 				created.runOnStateDone(() -> {
 					String s = "Compiled: " + struct.getFullName() + (prevEncounters>0? " (again)" : "") + "\n" +
 					           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +

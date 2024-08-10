@@ -1,11 +1,11 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
@@ -650,7 +650,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			for(var name : names){
-				Log.trace("Checking validity of {}#blueBright", name);
+				ConfigDefs.CompLogLevel.SMALL.log("Checking validity of {}#blueBright", name);
 				try{
 					var cls = Class.forName(
 						name, true,

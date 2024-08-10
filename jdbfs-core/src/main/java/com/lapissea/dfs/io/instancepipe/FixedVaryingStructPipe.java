@@ -1,10 +1,10 @@
 package com.lapissea.dfs.io.instancepipe;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -71,7 +71,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				var cached = cache.get(buff);
 				if(cached != null) return cached;
 				
-				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
+				ConfigDefs.CompLogLevel.JUST_START.log("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
 				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
 				pipe.sizesStr = Iters.from(buff).map(NumberSize::shortName).joinAsStr();

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.type.compilation;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
@@ -45,7 +46,7 @@ public final class WrapperStructs{
 	}
 	
 	private static <T> WrapperRes<T> generateWrapper(Class<T> type){
-		Log.trace("Generated wrapper for {}#purple", type.getTypeName());
+		ConfigDefs.CompLogLevel.SMALL.log("Generated wrapper for {}#purple", type.getTypeName());
 		var typeName  = makeTypeName(type);
 		var className = WrapperStructs.class.getPackageName() + "." + Wrapper.class.getSimpleName() + "€" + typeName;
 		try{
