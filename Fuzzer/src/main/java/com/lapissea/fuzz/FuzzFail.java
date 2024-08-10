@@ -8,8 +8,10 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public sealed interface FuzzFail<State, Act>{
@@ -66,6 +68,7 @@ public sealed interface FuzzFail<State, Act>{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
 			Objects.requireNonNull(timeToFail);
+			if(!FuzzFail.isTrimmed(e)) throw new IllegalArgumentException("Throwable must be trimmed");
 		}
 		
 		@Override
@@ -89,7 +92,7 @@ public sealed interface FuzzFail<State, Act>{
 			if(this == o) return true;
 			if(!(o instanceof Create<?, ?> create)) return false;
 			
-			if(!permissiveThrowableEquals(e, create.e)) return false;
+			if(!e.equals(create.e)) return false;
 			return sequence.equals(create.sequence);
 		}
 	}
@@ -103,6 +106,7 @@ public sealed interface FuzzFail<State, Act>{
 			if(actionIndex<0) throw new IllegalArgumentException("actionIndex must be positive");
 			Objects.requireNonNull(timeToFail);
 			Objects.requireNonNull(badState);
+			if(!FuzzFail.isTrimmed(e)) throw new IllegalArgumentException("Throwable must be trimmed");
 		}
 		
 		@Override
@@ -138,18 +142,22 @@ public sealed interface FuzzFail<State, Act>{
 				Throwable e2, FuzzSequence sequence2, Object action2,
 				long actionIndex2, Duration timeToFail2, Object badState2
 			))) return false;
-			if(!permissiveThrowableEquals(e, e2)) return false;
+			if(!e.equals(e2)) return false;
 			
 			return actionIndex == actionIndex2 &&
 			       sequence.equals(sequence2) &&
 			       Objects.equals(action, action2);
 		}
-		public int localIndex()                                        { return Math.toIntExact(actionIndex - sequence.startIndex()); }
-		public Action<Actio, State> withSequence(FuzzSequence sequence){ return new Action<>(e, sequence, action, actionIndex, timeToFail, badState); }
-		
+		public int localIndex(){ return Math.toIntExact(actionIndex - sequence.startIndex()); }
 	}
 	
 	static void trimErr(Throwable e){
+		trimErr(e, new HashSet<>());
+	}
+	private static void trimErr(Throwable e, Set<Throwable> seen){
+		if(!seen.add(e)){
+			return;
+		}
 		var stack  = e.getStackTrace();
 		var fzName = FuzzingRunner.class.getPackageName() + ".";
 		int end    = 0;
@@ -169,59 +177,47 @@ public sealed interface FuzzFail<State, Act>{
 			){
 				end--;
 			}
-		}catch(ClassNotFoundException ex){ }
+		}catch(ClassNotFoundException ignored){ }
 		
 		stack = Arrays.copyOf(stack, end);
 		
 		e.setStackTrace(stack);
 		
 		for(var er : e.getSuppressed()){
-			trimErr(er);
+			trimErr(er, seen);
 		}
 		
 		var c = e.getCause();
-		if(c != null) trimErr(c);
+		if(c != null){
+			trimErr(c, seen);
+		}
 	}
-	
-	private static boolean permissiveThrowableEquals(Throwable ex1, Throwable ex2){
-		if(ex1 == null || ex2 == null){
-			return ex1 == null && ex2 == null;
-		}
+	static boolean isTrimmed(Throwable e){
+		return isTrimmed(e, new HashSet<>());
+	}
+	private static boolean isTrimmed(Throwable e, Set<Throwable> seen){
+		seen.add(e);
 		
-		if(!Objects.equals(ex1.getClass(), ex2.getClass())) return false;
-		String m1 = ex1.getMessage(), m2 = ex2.getMessage();
-		if(!Objects.equals(m1, m2)){
-			return false;
-		}
-		{
-			Throwable[] s1 = ex1.getSuppressed(), s2 = ex2.getSuppressed();
-			if(s1.length != s2.length) return false;
-			for(int i = 0; i<s1.length; i++){
-				if(!permissiveThrowableEquals(s1[i], s2[i])){
-					return false;
-				}
-			}
-		}
-		Throwable c1 = ex1.getCause(), c2 = ex2.getCause();
-		if(!permissiveThrowableEquals(c1, c2)){
-			return false;
-		}
-		
-		var s1 = ex1.getStackTrace();
-		var s2 = ex2.getStackTrace();
-		
+		var stack  = e.getStackTrace();
 		var fzName = FuzzingRunner.class.getPackageName() + ".";
-		for(int i = 0; i<Math.min(s1.length, s2.length); i++){
-			var el1 = s1[i];
-			var el2 = s2[i];
-			if(
-				el1.getClassName().startsWith(fzName) ||
-				el2.getClassName().startsWith(fzName)
-			) break;
-			if(!el1.equals(el2)){
+		for(var el : stack){
+			if(el.getClassName().startsWith(fzName)){
 				return false;
 			}
 		}
+		
+		for(var er : e.getSuppressed()){
+			if(seen.contains(er)) continue;
+			if(!isTrimmed(er, seen)){
+				return false;
+			}
+		}
+		
+		var c = e.getCause();
+		if(c != null && !seen.contains(c)){
+			return isTrimmed(c, seen);
+		}
+		
 		return true;
 	}
 	
