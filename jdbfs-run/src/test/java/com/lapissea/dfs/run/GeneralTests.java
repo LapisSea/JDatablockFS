@@ -13,7 +13,6 @@ import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -425,15 +424,13 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void optionalValue() throws IOException{
+	void optionalValue() throws IOException, LockedFlagSet{
 		interface Foo extends IOInstance.Def<Foo>{
 			Optional<String> val();
 			static Foo of(Optional<String> val){ return IOInstance.Def.of(Foo.class, val); }
 		}
-		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(true)){
+		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
 			Foo.of(Optional.empty());
-		}catch(LockedFlagSet e){
-			Log.warn("{}", e);
 		}
 		
 		var c   = TestUtils.testCluster();

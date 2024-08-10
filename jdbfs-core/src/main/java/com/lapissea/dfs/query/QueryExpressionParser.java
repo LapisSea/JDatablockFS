@@ -1,8 +1,8 @@
 package com.lapissea.dfs.query;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.InvalidQueryString;
 import com.lapissea.dfs.io.bit.EnumUniverse;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
@@ -121,13 +121,15 @@ public final class QueryExpressionParser{
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
 		QueryCheck compiledCheck = expressionToCheck(filterQuery.type, filterQuery.expression, null);
 		
-		Log.trace("Compiled check for {}#cyan - {#red\"{}\"#}: {}#blue",
-		          (Supplier<Object>)() -> {
-			          if(IOInstance.isInstance(filterQuery.type)){
-				          return Struct.ofUnknown(filterQuery.type).cleanName();
-			          }
-			          return filterQuery.type.getSimpleName();
-		          }, filterQuery.expression, compiledCheck);
+		ConfigDefs.CompLogLevel.SMALL.log(
+			"Compiled check for {}#cyan - {#red\"{}\"#}: {}#blue",
+			(Supplier<Object>)() -> {
+				if(IOInstance.isInstance(filterQuery.type)){
+					return Struct.ofUnknown(filterQuery.type).cleanName();
+				}
+				return filterQuery.type.getSimpleName();
+			}, filterQuery.expression, compiledCheck
+		);
 		
 		return new FilterResult<>(t -> { }, QueryCheck.cached(compiledCheck));
 	}
