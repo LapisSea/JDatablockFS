@@ -99,9 +99,16 @@ public interface FunctionInfo{
 		public List<JType> argumentTypes(){
 			return args;
 		}
+		private Object  defaultEnumValue;
+		private boolean defaultEnumValueCached;
+		
 		@Override
 		public Object defaultEnumValue(){
-			return method.getDefaultValue();
+			if(!defaultEnumValueCached){
+				defaultEnumValue = method.getDefaultValue();
+				defaultEnumValueCached = true;
+			}
+			return defaultEnumValue;
 		}
 	}
 	

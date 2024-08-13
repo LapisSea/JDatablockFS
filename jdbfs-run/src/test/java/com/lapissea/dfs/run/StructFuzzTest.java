@@ -24,10 +24,12 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.random.RandomGenerator;
 
@@ -106,8 +108,10 @@ public final class StructFuzzTest{
 	@Test(dependsOnMethods = "simpleGenClass")
 	public void fuzzGen() throws LockedFlagSet{
 		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
+			private final Set<TempClassGen.ClassGen> encountered = Collections.newSetFromMap(new ConcurrentHashMap<>());
 			@Override
 			public void applyAction(TempClassGen.ClassGen state, long actionIndex, Object action, RunMark mark) throws IOException{
+				if(!encountered.add(state.withName("_"))) return;
 				try{
 					testType(state);
 				}catch(ReflectiveOperationException e){
@@ -117,7 +121,16 @@ public final class StructFuzzTest{
 			
 			@Override
 			public TempClassGen.ClassGen create(RandomGenerator rand, long sequenceIndex, RunMark mark){
-				var fieldCount = rand.nextInt(3);
+				for(int i = 0; i<9; i++){
+					var gen = tryCreate(rand, sequenceIndex, mark);
+					if(!encountered.contains(gen.withName("_"))){
+						return gen;
+					}
+				}
+				return tryCreate(rand, sequenceIndex, mark);
+			}
+			private TempClassGen.ClassGen tryCreate(RandomGenerator rand, long sequenceIndex, RunMark mark){
+				var fieldCount = rand.nextInt(6);
 				
 				var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()
 				                  .toList(e -> fieldTypes.get(e.val()).apply("field" + e.index(), rand));

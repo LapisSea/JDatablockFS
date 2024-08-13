@@ -433,15 +433,36 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	private static <T> String strLoop(String delimiter, String prefix, String suffix, Function<T, String> toString, Iterator<T> iter){
-		var res = new StringJoiner(delimiter, prefix, suffix);
+		StringJoiner result;
+		{
+			var first    = iter.next();
+			var firstStr = toStr(first, toString);
+			
+			if(!iter.hasNext()){
+				if(prefix.length() == 0 && suffix.length() == 0){
+					return firstStr;
+				}
+				return prefix + firstStr + suffix;
+			}
+			
+			result = new StringJoiner(delimiter, prefix, suffix);
+			result.add(firstStr);
+		}
+		
 		do{
-			var    t = iter.next();
-			String str;
-			if(toString == null) str = Objects.toString(t);
-			else str = toString.apply(t);
-			res.add(str);
+			var element = iter.next();
+			var eString = toStr(element, toString);
+			result.add(eString);
 		}while(iter.hasNext());
-		return res.toString();
+		
+		return result.toString();
+	}
+	
+	private static <T> String toStr(T val, Function<T, String> toString){
+		if(toString == null){
+			return Objects.toString(val);
+		}
+		return toString.apply(val);
 	}
 	
 	default <E extends Throwable> boolean noneMatch(UnsafePredicate<T, E> predicate) throws E{

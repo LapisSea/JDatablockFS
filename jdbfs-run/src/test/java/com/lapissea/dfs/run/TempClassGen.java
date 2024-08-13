@@ -37,6 +37,24 @@ public final class TempClassGen{
 			return Iters.from(annotations).joinAsOptionalStr("\n", "", "\n", a -> "@" + a.annotationType().getSimpleName()).orElse("") +
 			       "public " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
 		}
+		@Override
+		public boolean equals(Object o){
+			return this == o ||
+			       o instanceof FieldGen that &&
+			       this.isFinal == that.isFinal &&
+			       this.type.equals(that.type) &&
+			       this.name.equals(that.name) &&
+			       this.annotations.equals(that.annotations) &&
+			       (this.generator == null) == (that.generator == null);
+		}
+		@Override
+		public int hashCode(){
+			int result = name.hashCode();
+			result = 31*result + type.hashCode();
+			result = 31*result + annotations.hashCode();
+			result = 31*result + Boolean.hashCode(isFinal);
+			return result;
+		}
 	}
 	
 	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent){
@@ -52,6 +70,9 @@ public final class TempClassGen{
 			            .map(String::trim)
 			            .joinAsStr("\n", l -> "\t" + l) +
 			       "\n}";
+		}
+		public ClassGen withName(String name){
+			return new ClassGen(name, fields, constructors, parent);
 		}
 	}
 	
