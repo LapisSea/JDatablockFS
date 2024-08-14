@@ -765,7 +765,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP flatMapToInt(Function<T, IterableIntPP> flatten){
-		return new Iters.DefaultIntIterable(){
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
 			@Override
 			public IntIterator iterator(){
 				var src = IterablePP.this.iterator();
@@ -891,7 +893,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP mapToInt(){
-		return new Iters.DefaultIntIterable(){
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
 			@Override
 			public IntIterator iterator(){
 				var iter = IterablePP.this.iterator();
@@ -907,7 +911,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP mapToInt(FunctionOI<T> mapper){
-		return new Iters.DefaultIntIterable(){
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
 			@Override
 			public IntIterator iterator(){
 				var iter = IterablePP.this.iterator();

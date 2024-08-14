@@ -55,8 +55,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 
 import static java.util.Comparator.naturalOrder;
 import static java.util.function.Function.identity;
@@ -251,21 +249,7 @@ public final class FieldCompiler{
 	
 	
 	private static IterablePP<Class<?>> deepClasses(Class<?> clazz){
-		return Iters.nullTerminated(() -> new Supplier<>(){
-			Class<?> c = clazz;
-			@Override
-			public Class<?> get(){
-				if(c == null) return null;
-				var tmp = c;
-				var cp  = c.getSuperclass();
-				if(cp != null && (cp == IOInstance.class || !IOInstance.isInstance(cp))){
-					cp = null;
-				}
-				c = cp == c? null : cp;
-				
-				return tmp;
-			}
-		});
+		return superClasses(clazz).takeWhile(c -> c != IOInstance.class && IOInstance.isInstance(c));
 	}
 	
 	private static final class GetSet{
@@ -446,8 +430,11 @@ public final class FieldCompiler{
 		return type;
 	}
 	
+	private static IterablePP<Class<?>> superClasses(Class<?> clazz){
+		return Iters.iterate(clazz, Objects::nonNull, Class::getSuperclass);
+	}
 	private static IterablePP<Method> allMethods(Class<?> clazz){
-		return Iters.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass).flatMapArray(Class::getDeclaredMethods);
+		return superClasses(clazz).flatMapArray(Class::getDeclaredMethods);
 	}
 	
 	@SuppressWarnings("unchecked")
