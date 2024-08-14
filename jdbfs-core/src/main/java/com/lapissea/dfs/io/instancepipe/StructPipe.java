@@ -346,7 +346,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var ioFCopy = List.copyOf(ioFields);
 			var rr      = new RawRandom(ioFields.hashCode());
 			var fields  = new ArrayList<>(getType().getFields());
-			for(int i = 0; i<100; i++){
+			for(int i = 0; i<20; i++){
 				Collections.shuffle(fields, rr);
 				var f = compiler.compile(type, FieldSet.of(fields), true);
 				if(!ioFCopy.equals(f)){

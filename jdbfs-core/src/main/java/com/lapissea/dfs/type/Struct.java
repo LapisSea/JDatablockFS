@@ -142,7 +142,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private Unmanaged(Class<T> type, boolean runNow){
 			super(type, runNow);
 			hasDynamicFields = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
-			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class);
+			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
 		}
 		
 		public boolean hasDynamicFields(){
@@ -338,6 +338,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private byte    invalidInitialNulls = -1;
 	
 	private NewObj.Instance<T> emptyConstructor;
+	private int                emptyConstructorCounter;
 	
 	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
@@ -381,7 +382,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			canHavePointers = calcCanHavePointers();
 			
 			if(canHaveDefaultConstructor()){
-				findEmptyConstructor();
+				findEmptyConstructor(false);
 			}
 		});
 	}
@@ -670,23 +671,37 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return str;
 	}
 	
+	private static final int CONSTRUCTOR_OPT_THRESHOLD = 100;
+	
 	@Override
 	public NewObj.Instance<T> emptyConstructor(){
 		var ctor = emptyConstructor;
 		if(ctor == null){
-			return findEmptyConstructor();
+			return findEmptyConstructor(false);
 		}
+		var cnt = emptyConstructorCounter;
+		if(cnt<CONSTRUCTOR_OPT_THRESHOLD) incConstructorOpt(cnt);
 		return ctor;
 	}
+	private void incConstructorOpt(int cnt){
+		cnt++;
+		emptyConstructorCounter = cnt;
+		if(cnt == CONSTRUCTOR_OPT_THRESHOLD){
+			findEmptyConstructor(true);
+		}
+	}
 	
-	private NewObj.Instance<T> findEmptyConstructor(){
+	private static Class<?>[] NEW_OBJ_INST_ARGS;
+	
+	private NewObj.Instance<T> findEmptyConstructor(boolean optimized){
 		if(getType().isAnnotationPresent(NoDefaultConstructor.class)){
 			throw new UnsupportedOperationException("NoDefaultConstructor is present");
 		}
 		if(this instanceof Struct.Unmanaged){
 			throw new UnsupportedOperationException("Unmanaged instances can not have default constructor");
 		}
-		NewObj.Instance<T> ctor = Access.findConstructor(getConcreteType(), NewObj.Instance.class);
+		if(NEW_OBJ_INST_ARGS == null) NEW_OBJ_INST_ARGS = Access.getArgs(NewObj.Instance.class);
+		NewObj.Instance<T> ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
 		Objects.requireNonNull(ctor);
 		return emptyConstructor = ctor;
 	}

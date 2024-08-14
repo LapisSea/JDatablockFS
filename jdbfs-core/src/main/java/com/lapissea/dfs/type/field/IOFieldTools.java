@@ -107,7 +107,10 @@ public final class IOFieldTools{
 	
 	@SuppressWarnings("deprecation")
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
-		if(fields.isEmpty()) return new Index(new int[0]);
+		switch(fields.size()){
+			case 0 -> { return new Index(new int[]{}); }
+			case 1 -> { return new Index(new int[]{0}); }
+		}
 		{
 			var struct       = Iters.from(fields).map(IOField::getAccessor).firstNonNull().orElseThrow().getDeclaringStruct();
 			var structType   = struct.getType();

@@ -398,16 +398,25 @@ public final class Iters{
 	public static IterableIntPP range(int start, int endExclusive){
 		if(start == endExclusive) return IterableIntPP.empty();
 		if(endExclusive<start) throw new IllegalArgumentException("endExclusive<start");
-		return () -> new IntIterator(){
-			private int i = start;
+		return new IterableIntPP.SizedPP.Default<>(){
 			@Override
-			public boolean hasNext(){
-				return i<endExclusive;
+			public OptionalInt getSize(){
+				return OptionalInt.of(endExclusive - start);
 			}
 			@Override
-			public int nextInt(){
-				if(!hasNext()) throw new NoSuchElementException();
-				return i++;
+			public IntIterator iterator(){
+				return new IntIterator(){
+					private int i = start;
+					@Override
+					public boolean hasNext(){
+						return i<endExclusive;
+					}
+					@Override
+					public int nextInt(){
+						if(!hasNext()) throw new NoSuchElementException();
+						return i++;
+					}
+				};
 			}
 		};
 	}

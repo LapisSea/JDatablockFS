@@ -74,11 +74,11 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		Type type = accessor.getGenericType(null);
 		
 		long minKnownTypeSize = Long.MAX_VALUE;
-		try{
-			Struct<?>         struct  = Struct.ofUnknown(Utils.typeToRaw(type));
-			SizeDescriptor<?> typDesc = StandardStructPipe.of(struct, STATE_DONE).getSizeDescriptor();
+		var  struct           = Struct.tryOf(Utils.typeToRaw(type));
+		if(struct.isPresent()){
+			SizeDescriptor<?> typDesc = StandardStructPipe.of(struct.get(), STATE_DONE).getSizeDescriptor();
 			minKnownTypeSize = typDesc.getMin(WordSpace.BYTE);
-		}catch(IllegalArgumentException ignored){ }
+		}
 		
 		var refDesc = Reference.standardPipe().getSizeDescriptor();
 		

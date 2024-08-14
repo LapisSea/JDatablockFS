@@ -2,6 +2,7 @@ package com.lapissea.dfs.utils.iterableplus;
 
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.util.ZeroArrays;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -10,7 +11,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.StringJoiner;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
@@ -19,6 +19,26 @@ import java.util.function.IntUnaryOperator;
 
 @SuppressWarnings("unused")
 public interface IterableIntPP{
+	
+	interface SizedPP extends IterableIntPP{
+		static OptionalInt tryGet(IterableIntPP iter){
+			if(iter instanceof SizedPP s){
+				return s.getSize();
+			}
+			return OptionalInt.empty();
+		}
+		
+		abstract class Default<T> extends Iters.DefaultIntIterable implements SizedPP{ }
+		
+		OptionalInt getSize();
+		
+		@Override
+		default int count(){
+			var s = getSize();
+			if(s.isPresent()) return s.getAsInt();
+			return IterableIntPP.super.count();
+		}
+	}
 	
 	final class ArrayIter implements IntIterator{
 		private final int[] data;
@@ -45,7 +65,9 @@ public interface IterableIntPP{
 	}
 	
 	static IterableIntPP empty(){
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return OptionalInt.of(0); }
 			@Override
 			public IntIterator iterator(){
 				return new IntIterator(){
@@ -117,35 +139,18 @@ public interface IterableIntPP{
 		var iter = iterator();
 		if(!iter.hasNext()) return Optional.empty();
 		int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE;
-		while(iter.hasNext()){
+		do{
 			var val = iter.nextInt();
 			max = Math.max(max, val);
 			min = Math.min(min, val);
-		}
+		}while(iter.hasNext());
 		return Optional.of(new Bounds(min, max));
 	}
 	
-	/**
-	 * Use when the count is O(1) or known to be cheap
-	 */
-	default int[] toArrayCounting(){
-		var res  = new int[count()];
-		var iter = iterator();
-		for(int i = 0; i<res.length; i++){
-			res[i] = iter.nextInt();
-		}
-		return res;
-	}
-	
-	default String joinAsStrings()                      { return joinAsStrings(""); }
-	default String joinAsStrings(CharSequence delimiter){ return joinAsStrings(delimiter, "", ""); }
-	default String joinAsStrings(CharSequence delimiter, CharSequence prefix, CharSequence suffix){
-		var res  = new StringJoiner(delimiter, prefix, suffix);
-		var iter = this.iterator();
-		while(iter.hasNext()){
-			res.add(Integer.toString(iter.nextInt()));
-		}
-		return res.toString();
+	default String joinAsStr()                { return joinAsStr(""); }
+	default String joinAsStr(String delimiter){ return joinAsStr(delimiter, "", ""); }
+	default String joinAsStr(String delimiter, String prefix, String suffix){
+		return mapToObj(Integer::toString).joinAsStr(delimiter, prefix, suffix);
 	}
 	
 	default int count(){
@@ -183,8 +188,10 @@ public interface IterableIntPP{
 		return map(other -> other + val);
 	}
 	
-	default IterableIntPP map(IntUnaryOperator map){
-		return new Iters.DefaultIntIterable(){
+	default IterableIntPP.SizedPP map(IntUnaryOperator map){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public IntIterator iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -202,7 +209,9 @@ public interface IterableIntPP{
 		};
 	}
 	default IterableIntPP mapExact(IntToLongFunction map){
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public IntIterator iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -221,7 +230,9 @@ public interface IterableIntPP{
 	}
 	
 	default IterablePP<Integer> box(){
-		return new Iters.DefaultIterable<Integer>(){
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterableIntPP.SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public Iterator<Integer> iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -262,7 +273,9 @@ public interface IterableIntPP{
 	}
 	
 	default <T> IterablePP<T> mapToObj(IntFunction<T> function){
-		return new Iters.DefaultIterable<>(){
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterableIntPP.SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public Iterator<T> iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -303,7 +316,13 @@ public interface IterableIntPP{
 	
 	default IterableIntPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				var siz = SizedPP.tryGet(IterableIntPP.this);
+				if(siz.isPresent()) return OptionalInt.of(Math.max(0, siz.getAsInt() - count));
+				return OptionalInt.empty();
+			}
 			@Override
 			public IntIterator iterator(){
 				var iter = IterableIntPP.this.iterator();
@@ -318,7 +337,13 @@ public interface IterableIntPP{
 	
 	default IterableIntPP limit(int maxLen){
 		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				var siz = SizedPP.tryGet(IterableIntPP.this);
+				if(siz.isPresent()) return OptionalInt.of(Math.min(maxLen, siz.getAsInt()));
+				return OptionalInt.empty();
+			}
 			@Override
 			public IntIterator iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -363,13 +388,25 @@ public interface IterableIntPP{
 		return true;
 	}
 	default int[] toArray(){
-		int[] res  = new int[8];
+		var siz = SizedPP.tryGet(IterableIntPP.this);
+		if(siz.isPresent() && siz.getAsInt() == 0){
+			return ZeroArrays.ZERO_INT;
+		}
+		
+		var iter = iterator();
+		if(!iter.hasNext()){
+			return ZeroArrays.ZERO_INT;
+		}
+		
+		int[] res  = new int[siz.orElse(8)];
 		int   size = 0;
-		var   iter = iterator();
-		while(iter.hasNext()){
+		
+		do{
 			if(size == res.length) res = Utils.growArr(res);
 			res[size++] = iter.nextInt();
-		}
+		}while(iter.hasNext());
+		
+		if(res.length == size) return res;
 		return Arrays.copyOf(res, size);
 	}
 	
@@ -391,7 +428,9 @@ public interface IterableIntPP{
 	}
 	
 	default IterableIntPP sorted(){
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public IntIterator iterator(){
 				var src = IterableIntPP.this;
@@ -418,11 +457,29 @@ public interface IterableIntPP{
 					}
 				};
 			}
+			@Override
+			public int[] toArray(){
+				var src = IterableIntPP.this;
+				var arr = src.toArray();
+				Arrays.sort(arr);
+				return arr;
+			}
 		};
 	}
 	
 	default <T> IterableIntPP sorted(IntFunction<T> map, Comparator<T> compare){
-		return new Iters.DefaultIntIterable(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
+			
+			private int[] sortIter(IterableIntPP src){
+				//TODO: implement int sort without boxing
+				return src.box().sorted((a, b) -> {
+					var av = map.apply(a);
+					var bv = map.apply(b);
+					return compare.compare(av, bv);
+				}).mapToInt().toArray();
+			}
 			@Override
 			public IntIterator iterator(){
 				var src = IterableIntPP.this;
@@ -430,8 +487,7 @@ public interface IterableIntPP{
 					private int[] sorted;
 					private int   i;
 					private int[] sort(){
-						//TODO: implement int sort without boxing
-						return sorted = src.mapToObj(i1 -> i1).sorted((a, b) -> compare.compare(map.apply(a), map.apply(b))).mapToInt().toArray();
+						return sorted = sortIter(src);
 					}
 					@Override
 					public boolean hasNext(){
@@ -447,6 +503,11 @@ public interface IterableIntPP{
 						return s[i++];
 					}
 				};
+			}
+			@Override
+			public int[] toArray(){
+				var src = IterableIntPP.this;
+				return sortIter(src);
 			}
 		};
 	}
@@ -471,7 +532,9 @@ public interface IterableIntPP{
 	}
 	
 	default IterablePP<IterableIntPP.Idx> enumerate(){
-		return new Iters.DefaultIterable<>(){
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterableIntPP.SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public Iterator<IterableIntPP.Idx> iterator(){
 				var src = IterableIntPP.this.iterator();
@@ -491,7 +554,9 @@ public interface IterableIntPP{
 		};
 	}
 	default IterablePP<IterableIntPP.Ldx> enumerateL(){
-		return new Iters.DefaultIterable<>(){
+		return new IterablePP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return IterableIntPP.SizedPP.tryGet(IterableIntPP.this); }
 			@Override
 			public Iterator<IterableIntPP.Ldx> iterator(){
 				var src = IterableIntPP.this.iterator();

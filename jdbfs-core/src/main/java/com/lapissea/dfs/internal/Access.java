@@ -6,12 +6,15 @@ import com.lapissea.dfs.exceptions.MissingConstruct;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.NewObj;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.TriFunction;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.lang.invoke.CallSite;
 import java.lang.invoke.LambdaConversionException;
@@ -28,6 +31,10 @@ import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.LongFunction;
 
 import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
@@ -82,13 +89,54 @@ public final class Access{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
+		return makeLambda(constructor, functionalInterface, true);
+	}
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface, boolean optimized){
 		try{
 			constructor.setAccessible(true);
+			
+			if(!optimized){
+				var unop = Access.<FInter, T>makeLambdaUnop(constructor, functionalInterface);
+				if(unop != null) return unop;
+			}
+			
 			var lookup = getLookup(constructor.getDeclaringClass());
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
 		}
+	}
+	
+	public record DumbConstructorImpl<Interf>(
+		Class<Interf> functionalInterfaceType,
+		Function<Constructor<?>, Interf> make
+	){ }
+	
+	private static <T> T refl(UnsafeSupplier<T, ReflectiveOperationException> get){
+		try{
+			return get.get();
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private static final List<DumbConstructorImpl<?>> DUMB_CONSTRUCTORS = List.of(
+		new DumbConstructorImpl<>(Function.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
+		new DumbConstructorImpl<>(IntFunction.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
+		new DumbConstructorImpl<>(LongFunction.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
+		new DumbConstructorImpl<>(BiFunction.class, ctor -> (a, b) -> refl(() -> ctor.newInstance(a, b))),
+		new DumbConstructorImpl<>(TriFunction.class, ctor -> (a, b, c) -> refl(() -> ctor.newInstance(a, b, c))),
+		new DumbConstructorImpl<>(NewObj.class, ctor -> () -> refl(ctor::newInstance)),
+		new DumbConstructorImpl<>(NewObj.Instance.class, ctor -> () -> refl(() -> (IOInstance<?>)ctor.newInstance()))
+	);
+	
+	public static <FInter, T extends FInter> T makeLambdaUnop(Constructor<?> constructor, Class<FInter> functionalInterface){
+		for(var ctor : DUMB_CONSTRUCTORS){
+			if(ctor.functionalInterfaceType == functionalInterface){
+				return (T)ctor.make.apply(constructor);
+			}
+		}
+		return null;
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, MethodHandles.Lookup lookup, Class<FInter> functionalInterface){
@@ -233,13 +281,16 @@ public final class Access{
 	}
 	
 	
-	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface){
-		Class<?>[] args = getArgs(functionalInterface);
-		return findConstructorArgs(clazz, functionalInterface, args);
+	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized){
+		Class<?>[] args = getArgsU(functionalInterface);
+		return findConstructorArgs(clazz, functionalInterface, optimized, args);
 	}
 	
 	private static final WeakKeyValueMap<Class<?>, Class<?>[]> ARG_CACHE = new WeakKeyValueMap.Sync<>();
-	private static <FInter> Class<?>[] getArgs(Class<FInter> functionalInterface){
+	public static <FInter> Class<?>[] getArgs(Class<FInter> functionalInterface){
+		return getArgsU(functionalInterface).clone();
+	}
+	private static <FInter> Class<?>[] getArgsU(Class<FInter> functionalInterface){
 		var ref = ARG_CACHE.get(functionalInterface);
 		if(ref != null) return ref;
 		
@@ -249,7 +300,7 @@ public final class Access{
 	}
 	
 	@NotNull
-	public static <FInter, T extends FInter> T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
+	public static <FInter, T extends FInter> T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized, Class<?>... parameterTypes){
 		try{
 			Constructor<?> lconst;
 			if(Modifier.isPrivate(clazz.getModifiers())){
@@ -258,7 +309,7 @@ public final class Access{
 				lconst = clazz.getConstructor(parameterTypes);
 			}
 			
-			return makeLambda(lconst, functionalInterface);
+			return makeLambda(lconst, functionalInterface, optimized);
 		}catch(ReflectiveOperationException ce){
 			
 			try{

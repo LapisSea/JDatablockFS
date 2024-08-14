@@ -9,18 +9,36 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 import static java.lang.reflect.Modifier.isStatic;
 
 public final class JorthUtils{
 	
+	private static final Map<Class<?>, Set<String>> ANNOTATION_NAMES_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
 	
 	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry) throws MalformedJorth{
+		var type   = ann.annotationType();
+		var cached = ANNOTATION_NAMES_CACHE.get(type);
+		if(cached != null){
+			scanCached(ann, entry, cached);
+			return;
+		}
 		
-		var c = ann.getClass();
-		for(Method m : ann.annotationType().getMethods()){
+		var names = scanNonCached(ann, entry);
+		ANNOTATION_NAMES_CACHE.put(type, names);
+	}
+	
+	private static Set<String> scanNonCached(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry) throws MalformedJorth{
+		var type  = ann.annotationType();
+		var names = new ArrayList<String>();
+		var c     = ann.getClass();
+		for(Method m : type.getMethods()){
 			if(m.getParameterCount() != 0) continue;
 			if(isStatic(m.getModifiers())) continue;
 			
@@ -38,6 +56,23 @@ public final class JorthUtils{
 				throw new RuntimeException(e);
 			}
 			entry.accept(m.getName(), val);
+			names.add(m.getName());
+		}
+		return Set.copyOf(names);
+	}
+	private static void scanCached(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry, Set<String> names) throws MalformedJorth{
+		var type = ann.annotationType();
+		for(var m : type.getMethods()){
+			var name = m.getName();
+			if(!names.contains(name)) continue;
+			Object val;
+			try{
+				m.setAccessible(true);
+				val = m.invoke(ann);
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
+			entry.accept(name, val);
 		}
 	}
 	
