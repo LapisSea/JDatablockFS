@@ -9,6 +9,7 @@ import com.lapissea.dfs.tools.render.ImGuiUtils;
 import com.lapissea.dfs.tools.render.OpenGLBackend;
 import com.lapissea.dfs.tools.render.RenderBackend;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.UtilL;
@@ -392,7 +393,9 @@ public class DisplayManager implements DataLogger{
 							case DataRenderer.FieldVal<?> inst -> {
 								String str;
 								try{
-									str = inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
+									str = inst.instanceToString(new StringifySettings(
+										false, "{\n\t", "\n}", ": ", ",\n\t"
+									)).orElse("");
 								}catch(Throwable e){
 									str = "<CORRUPT :" + e + ">";
 								}

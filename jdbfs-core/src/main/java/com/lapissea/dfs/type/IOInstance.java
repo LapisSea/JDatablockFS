@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -47,6 +48,28 @@ import static com.lapissea.dfs.type.field.StoragePool.INSTANCE;
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable, Stringify{
 	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.TYPE})
+	@interface StrFormat{
+		
+		@Retention(RetentionPolicy.RUNTIME)
+		@Target({ElementType.TYPE})
+		@interface Custom{
+			String value();
+		}
+		
+		boolean name() default true;
+		boolean curly() default true;
+		boolean fNames() default true;
+		String[] filter() default {};
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.TYPE})
+	@interface Order{
+		String[] value();
+	}
+	
 	/**
 	 * <p>
 	 * This interface is used to declare the object layout of a <i>managed</i> instance. This means any interface that extends
@@ -59,28 +82,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 */
 	@SuppressWarnings("unchecked")
 	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
-		
-		@Retention(RetentionPolicy.RUNTIME)
-		@Target({ElementType.TYPE})
-		@interface Order{
-			String[] value();
-		}
-		
-		@Retention(RetentionPolicy.RUNTIME)
-		@Target({ElementType.TYPE})
-		@interface ToString{
-			
-			@Retention(RetentionPolicy.RUNTIME)
-			@Target({ElementType.TYPE})
-			@interface Format{
-				String value();
-			}
-			
-			boolean name() default true;
-			boolean curly() default true;
-			boolean fNames() default true;
-			String[] filter() default {};
-		}
 		
 		String IMPL_NAME_POSTFIX       = "€Impl";
 		String IMPL_COMPLETION_POSTFIX = "€Full";
@@ -196,7 +197,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static <T extends Def<T>> T of(Class<T> clazz, int arg1){
 			var ctr = DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				return (T)ctr.invokeExact(arg1);
+				return (T)ctr.invoke(arg1);
 			}catch(Throwable e){
 				throw failNew(clazz, e);
 			}
@@ -204,7 +205,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static <T extends Def<T>> T of(Class<T> clazz, long arg1){
 			var ctr = DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				return (T)ctr.invokeExact(arg1);
+				return (T)ctr.invoke(arg1);
 			}catch(Throwable e){
 				throw failNew(clazz, e);
 			}
@@ -278,12 +279,15 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@SuppressWarnings("unchecked")
-		private Struct<SELF> fetchStruct(){
+		private Struct<SELF> fetchStruct(boolean now){
+			if(now){
+				return Struct.of((Class<SELF>)getClass(), StagedInit.STATE_DONE);
+			}
 			return Struct.of((Class<SELF>)getClass());
 		}
 		
 		private void init(){
-			thisStruct = fetchStruct();
+			thisStruct = fetchStruct(true);
 			virtualFields = thisStruct.allocVirtualVarPool(INSTANCE);
 		}
 		
@@ -344,7 +348,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			
 			var s = thisStruct;
 			if(s == null){
-				s = fetchStruct();
+				s = fetchStruct(false);
 				if(s.getEstimatedState() == StagedInit.STATE_DONE){
 					s = getThisStruct();
 				}
@@ -633,7 +637,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			if(readOnly){
 				throw new UnsupportedOperationException();
 			}
-			try(var io = selfIO()){
+			var io = selfIO();
+			try(io){
 				getPipe().write(provider, io, self());
 				var struct = getThisStruct();
 				if(!struct.hasDynamicFields() && struct.getUnmanagedStaticFields().isEmpty()){
@@ -704,7 +709,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	}
 	
 	default String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return getThisStruct().instanceToString(self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
+		return toString(new StringifySettings(doShort, start, end, fieldValueSeparator, fieldSeparator));
+	}
+	default String toString(StringifySettings settings){
+		return getThisStruct().instanceToString(self(), settings);
 	}
 	
 	SELF clone();

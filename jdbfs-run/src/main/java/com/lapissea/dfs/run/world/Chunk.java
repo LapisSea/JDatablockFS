@@ -5,7 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import java.util.ArrayList;
 import java.util.List;
 
-@IOInstance.Def.Order({"x", "y", "grid", "entities"})
+@IOInstance.Order({"x", "y", "grid", "entities"})
 public interface Chunk extends IOInstance.Def<Chunk>{
 	int SIZE = 32;
 	

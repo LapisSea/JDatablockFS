@@ -23,6 +23,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
@@ -601,8 +602,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return instanceToString(ioPool, instance, doShort);
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+			return instanceToString(ioPool, instance, settings.doShort());
 		}
 		@Override
 		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
@@ -688,7 +689,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected abstract IOField<T, ValueType> withVaryingSize(VaryingSize size);
 	
 	@Override
-	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return instanceToString(ioPool, instance, doShort);
+	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return instanceToString(ioPool, instance, settings.doShort());
 	}
 }

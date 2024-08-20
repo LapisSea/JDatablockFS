@@ -4,6 +4,7 @@ import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -21,6 +22,9 @@ import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.type.string.ToStringFormat;
+import com.lapissea.dfs.type.string.ToStringFragment;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
@@ -35,14 +39,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.StringJoiner;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.CompileStructTools.compile;
@@ -164,10 +171,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		@Override
-		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
 			return instanceToString0(
-				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Iters.concat(getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				ioPool, instance, settings,
+				Iters.concat(generatedFields(), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -606,26 +613,99 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return canHavePointers;
 	}
 	
+	private sealed interface ToStrType<T>{
+		record Default<T extends IOInstance<T>>() implements ToStrType<T>{ }
+		
+		record Format<T extends IOInstance<T>>(IOInstance.StrFormat format, IterablePP<IOField<T, ?>> fields) implements ToStrType<T>{ }
+		
+		record Custom<T extends IOInstance<T>>(ToStringFragment format) implements ToStrType<T>{ }
+	}
+	
+	private ToStrType<T> toStrType;
+	
+	private ToStrType<T> computeToStr(){
+		
+		var custom = getType().getAnnotation(IOInstance.StrFormat.Custom.class);
+		if(custom != null){
+			var names = generatedFields().toModSet(IOField::getName);
+			return new ToStrType.Custom<>(ToStringFormat.parse(custom.value(), names));
+		}
+		
+		var form = getType().getAnnotation(IOInstance.StrFormat.class);
+		if(form != null){
+			var generatedFields = generatedFields();
+			var filter          = Set.of(form.filter());
+			if(!filter.isEmpty()){
+				generatedFields = generatedFields.filter(n -> filter.contains(n.getName()));
+			}
+			return new ToStrType.Format<>(form, generatedFields.bake());
+		}
+		
+		return new ToStrType.Default<>();
+	}
+	private IterablePP<IOField<T, ?>> tryOrderFields(IterablePP<IOField<T, ?>> generatedFields){
+		var order = getType().getAnnotation(IOInstance.Order.class);
+		if(order != null){
+			var names   = order.value();
+			var nameSet = new HashSet<>(Arrays.asList(names));
+			if(nameSet.size() != names.length){
+				throw new IllegalArgumentException("Duplicate order names present");
+			}
+			var fs = FieldSet.of(generatedFields);
+			if(fs.size() != names.length){
+				throw new IllegalArgumentException("All fields in order should be defined!");
+			}
+			generatedFields = Iters.from(names).map(fs::requireByName);
+		}
+		return generatedFields;
+	}
+	
 	public String instanceToString(T instance, boolean doShort){
 		return instanceToString(allocVirtualVarPool(IO), instance, doShort);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+		if(toStrType == null) toStrType = computeToStr();
+		return switch(toStrType){
+			case ToStrType.Default<T> f -> {
+				yield instanceToString(ioPool, instance, StringifySettings.ofDoShort(doShort));
+			}
+			case ToStrType.Custom<T> f -> {
+				yield fragmentToStr(ioPool, instance, doShort, f.format);
+			}
+			case ToStrType.Format<T> fmt -> {
+				var format = fmt.format;
+				var curly  = format.curly();
+				var sett   = new StringifySettings(doShort, format.name(), format.fNames(), curly? "{" : "", curly? "}" : "", "=", ", ");
+				yield instanceToString0(ioPool, instance, sett, fmt.fields);
+			}
+		};
 	}
-	public String instanceToString(T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return instanceToString(allocVirtualVarPool(IO), instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+	public String instanceToString(T instance, StringifySettings settings){
+		return instanceToString(allocVirtualVarPool(IO), instance, settings);
 	}
-	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return instanceToString0(
-			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
-		);
+	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return instanceToString0(ioPool, instance, settings, generatedFields());
 	}
 	
-	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, IterablePP<IOField<T, ?>> fields){
-		var    prefix = start;
+	private IterablePP<IOField<T, ?>> generatedFieldsCache;
+	protected IterablePP<IOField<T, ?>> generatedFields(){
+		var c = generatedFieldsCache;
+		if(c == null) c = generatedFieldsCompute();
+		return c;
+	}
+	private IterablePP<IOField<T, ?>> generatedFieldsCompute(){
+		var fs = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+		return generatedFieldsCache = tryOrderFields(fs).bake();
+	}
+	
+	protected String instanceToString0(
+		VarPool<T> ioPool, T instance,
+		StringifySettings settings,
+		IterablePP<IOField<T, ?>> fields
+	){
+		var    prefix = settings.start();
 		String name   = null;
-		if(!doShort){
+		if(settings.showName()){
 			name = cleanName();
 			if(Modifier.isStatic(getType().getModifiers())){
 				var index = name.lastIndexOf('$');
@@ -635,7 +715,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			prefix = name + prefix;
 		}
 		
-		Function<IOField<T, ?>, Optional<String>> fieldMapper = field -> {
+		var str = fields.flatOptionals(field -> {
 			if(SupportedPrimitive.get(field.getType()).orElse(null) == SupportedPrimitive.BOOLEAN){
 				Boolean val = (Boolean)field.get(ioPool, instance);
 				if(val != null){
@@ -648,20 +728,65 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
 					valStr = Optional.of("<UNINITIALIZED>");
 				}else{
-					valStr = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS, start, end, fieldValueSeparator, fieldSeparator);
+					var set = settings.withDoShort(settings.doShort() || TextUtil.USE_SHORT_IN_COLLECTIONS)
+					                  .withShowName(false);
+					valStr = field.instanceToString(ioPool, instance, set);
 				}
 			}catch(Throwable e){
 				valStr = Optional.of("CORRUPTED: " + e.getMessage());
 			}
-			
-			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
-		};
-		var str = fields.flatOptionals(fieldMapper).joinAsStr(fieldSeparator, prefix, end);
+			if(!settings.showFieldNames()) return valStr;
+			return valStr.map(value -> field.getName() + settings.fieldValueSeparator() + value);
+		}).joinAsOptionalStr(settings.fieldSeparator(), prefix, settings.end());
 		
-		if(!doShort){
-			if(str.equals(prefix + end)) return name;
-		}
-		return str;
+		if(str.isPresent()) return str.get();
+		if(settings.showName()) return name;
+		return prefix + settings.end();
+	}
+	
+	private String fragmentToStr(VarPool<T> ioPool, T instance, boolean doShort, ToStringFragment format){
+		return switch(format){
+			case ToStringFragment.Concat frag -> {
+				List<String> res = new ArrayList<>(frag.fragments().size());
+				var          siz = 0;
+				for(var fragment : frag.fragments()){
+					var f = fragmentToStr(ioPool, instance, doShort, fragment);
+					res.add(f);
+					siz += f.length();
+				}
+				var sb = new StringBuilder(siz);
+				for(String re : res) sb.append(re);
+				yield sb.toString();
+			}
+			case ToStringFragment.FieldValue frag -> {
+				var f = getFields().requireByName(frag.name());
+				
+				Optional<String> str;
+				try{
+					str = f.instanceToString(ioPool, instance, doShort);
+				}catch(FieldIsNull e){
+					str = Optional.of("null");
+				}
+				if(str.isPresent()) yield str.get();
+				try{
+					var v = f.get(ioPool, instance);
+					yield doShort?
+					      TextUtil.toShortString(v) :
+					      TextUtil.toString(v);
+				}catch(Throwable e){
+					yield "CORRUPTED: " + e;
+				}
+			}
+			case ToStringFragment.Literal frag -> frag.value();
+			case ToStringFragment.NOOP ignore -> "";
+			case ToStringFragment.OptionalBlock frag -> {
+				if(doShort) yield "";
+				yield fragmentToStr(ioPool, instance, doShort, frag.content());
+			}
+			case ToStringFragment.SpecialValue frag -> switch(frag.value()){
+				case CLASS_NAME -> cleanName();
+			};
+		};
 	}
 	
 	private static final int CONSTRUCTOR_OPT_THRESHOLD = 100;

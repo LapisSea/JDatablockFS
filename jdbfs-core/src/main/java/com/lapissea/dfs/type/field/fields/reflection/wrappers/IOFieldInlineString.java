@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.type.string.StringifySettings;
 
 import java.io.IOException;
 import java.util.List;
@@ -118,7 +119,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 	}
 	
 	@Override
-	public Optional<String> instanceToString(VarPool<CTyp> ioPool, CTyp instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	public Optional<String> instanceToString(VarPool<CTyp> ioPool, CTyp instance, StringifySettings settings){
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
 		return Optional.of('"' + val + '"');

@@ -44,7 +44,7 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFla
 		}
 	}
 	
-	@IOInstance.Def.Order({"seconds", "nanos"})
+	@IOInstance.Order({"seconds", "nanos"})
 	private interface IOInstant extends IOInstance.Def<IOInstant>{
 		
 		static String toString(IOInstant val){

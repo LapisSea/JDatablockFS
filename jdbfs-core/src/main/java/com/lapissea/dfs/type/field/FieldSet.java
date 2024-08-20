@@ -467,7 +467,12 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public IOField<T, ?> requireByName(String name){
-		return byName(name).orElseThrow();
+		var res = byName(name);
+		if(res.isEmpty()) failName(name);
+		return res.get();
+	}
+	private static void failName(String name){
+		throw new NoSuchElementException("Field with name " + name + " is not present");
 	}
 	
 	private Map<String, Integer> getNameLookup(){

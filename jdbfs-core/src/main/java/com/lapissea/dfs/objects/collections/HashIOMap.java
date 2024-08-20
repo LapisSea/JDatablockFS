@@ -50,8 +50,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	static{ Preload.preloadFn(BucketEntry.class, "of", null, null); }
 	
 	@SuppressWarnings({"unchecked"})
-	@Def.ToString.Format("[!!className]{@key: @value}")
-	@Def.Order({"key", "value"})
+	@StrFormat.Custom("[!!className]{@key: @value}")
+	@Order({"key", "value"})
 	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		
 		Struct<BucketEntry<Object, Object>>     STRUCT = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);

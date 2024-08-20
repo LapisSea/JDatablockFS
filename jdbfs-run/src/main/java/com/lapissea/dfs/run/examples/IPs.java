@@ -10,10 +10,10 @@ import com.lapissea.dfs.type.IOInstance;
 import java.io.IOException;
 import java.util.Objects;
 
-public class IPs{
+public final class IPs{
 	
-	@IOInstance.Def.Order({"latitude", "longitude", "v6"})
-	@IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
+	@IOInstance.Order({"latitude", "longitude", "v6"})
+	@IOInstance.StrFormat.Custom("{@v6 at @latitude / @longitude}")
 	public interface IP extends IOInstance.Def<IP>{
 		
 		static IP of(double latitude, double longitude, String v6){

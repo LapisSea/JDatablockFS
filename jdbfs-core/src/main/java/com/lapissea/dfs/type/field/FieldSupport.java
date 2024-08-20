@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -152,7 +153,7 @@ final class FieldSupport{
 	private static String rem(int remaining){ return "... " + remaining + " more"; }
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, StringifySettings settings){
 		Object val;
 		try{
 			val = field.get(ioPool, instance);
@@ -167,12 +168,12 @@ final class FieldSupport{
 		}
 		
 		if(val instanceof IOInstance inst){
-			if("{".equals(start) && "}".equals(end) && "=".equals(fieldValueSeparator) && ", ".equals(fieldSeparator)){
-				return Optional.ofNullable(doShort? inst.toShortString() : inst.toString());
+			if(settings.stringsEqual(StringifySettings.DEFAULT)){
+				return Optional.ofNullable(settings.doShort()? inst.toShortString() : inst.toString());
 			}
 			
 			var struct = inst.getThisStruct();
-			return Optional.of(struct.instanceToString(inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
+			return Optional.of(struct.instanceToString(inst, settings));
 		}
 		
 		if(val.getClass().isArray()){
@@ -189,7 +190,7 @@ final class FieldSupport{
 				var elStr   = primitive? element + "" : Utils.toShortString(element);
 				resLen += 2 + elStr.length();
 				var lenNow = resLen + rem(remaining).length();
-				if(doShort && lenNow>=200){
+				if(settings.doShort() && lenNow>=200){
 					Class<?> type;
 					if(comp.isPrimitive()) type = comp;
 					else{
@@ -203,7 +204,7 @@ final class FieldSupport{
 					}
 					return Optional.of(type.getSimpleName() + "[" + len + "]");
 				}
-				if(lenNow<(doShort? 100 : 200)){
+				if(lenNow<(settings.doShort()? 100 : 200)){
 					res.add(elStr);
 					remaining--;
 				}
@@ -220,7 +221,7 @@ final class FieldSupport{
 				var e = Utils.toShortString(o);
 				resLen += 2 + e.length();
 				var lenNow = resLen + rem(remaining).length();
-				if(doShort && lenNow>=200){
+				if(settings.doShort() && lenNow>=200){
 					var dataName = switch(data){
 						case List<?> ignored -> "List";
 						case Set<?> ignored -> "Set";
@@ -230,7 +231,7 @@ final class FieldSupport{
 					if(type == Object.class) return Optional.of(dataName + "<?>[" + data.size() + "]");
 					return Optional.of(dataName + "<" + type.getSimpleName() + ">[" + data.size() + "]");
 				}
-				if(lenNow<(doShort? 100 : 200)){
+				if(lenNow<(settings.doShort()? 100 : 200)){
 					res.add(e);
 					remaining--;
 				}
@@ -240,7 +241,7 @@ final class FieldSupport{
 		}
 		
 		return Optional.of(
-			doShort?
+			settings.doShort()?
 			Utils.toShortString(val) :
 			TextUtil.toString(val)
 		);

@@ -28,7 +28,7 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	
 	@IOValue
-	@Def.Order({"name", "bound"})
+	@Order({"name", "bound"})
 	public interface ClassArgDef extends IOInstance.Def<ClassArgDef>{
 		String name();
 		IOType bound();
@@ -91,7 +91,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		}
 	}
 	
-	@IOInstance.Def.ToString(name = false, fNames = false, curly = false)
+	@StrFormat(name = false, fNames = false, curly = false)
 	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
 		
 		private static EnumConstant of(Enum<?> e){
@@ -101,8 +101,8 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		String getName();
 	}
 	
-	@IOInstance.Def.ToString(name = false, fNames = false)
-	@IOInstance.Def.Order({"name", "type"})
+	@StrFormat(name = false, fNames = false)
+	@IOInstance.Order({"name", "type"})
 	public interface SealedParent extends IOInstance.Def<SealedParent>{
 		enum Type{
 			EXTEND,

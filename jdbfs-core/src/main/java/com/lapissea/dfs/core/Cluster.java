@@ -182,7 +182,7 @@ public final class Cluster implements DataProvider{
 		private Metadata metadata;
 	}
 	
-	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
+	@IOInstance.StrFormat(name = false, curly = false, fNames = false)
 	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
 		ChunkPointer getVal();
 	}
