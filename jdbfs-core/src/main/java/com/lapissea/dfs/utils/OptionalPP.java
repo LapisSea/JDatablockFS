@@ -79,7 +79,7 @@ public final class OptionalPP<T> implements Serializable{
 		if(!isPresent()){
 			return empty();
 		}else{
-			return OptionalPP.of(Map.entry(key, this.value));
+			return of(Map.entry(key, this.value));
 		}
 	}
 	public <V> OptionalPP<Map.Entry<T, V>> asKeyWith(V value){
@@ -87,7 +87,15 @@ public final class OptionalPP<T> implements Serializable{
 		if(!isPresent()){
 			return empty();
 		}else{
-			return OptionalPP.of(Map.entry(this.value, value));
+			return of(Map.entry(this.value, value));
+		}
+	}
+	public <U> OptionalPP<U> tryCast(Class<? extends U> type){
+		if(isPresent() && type.isInstance(value)){
+			//noinspection unchecked
+			return (OptionalPP<U>)this;
+		}else{
+			return empty();
 		}
 	}
 	public <U, E extends Throwable> OptionalPP<U> map(UnsafeFunction<? super T, ? extends U, E> mapper) throws E{

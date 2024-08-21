@@ -14,21 +14,22 @@ import com.lapissea.util.UtilL;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.SequencedCollection;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -130,19 +131,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		@Override
 		public String toString(){
-			StringJoiner res = new StringJoiner(", ", "FieldSet.Iter{", "}");
-			if(data.length == 0){
-				res.add("EMPTY");
-				return res.toString();
-			}
-			if(hasNext()){
-				var remaining = data.length - cursor;
-				if(remaining>1) res.add("remaining: " + remaining);
-				res.add("next: " + Utils.toShortString(data[cursor]));
-			}else{
-				res.add("END");
-			}
-			return res.toString();
+			return iterStr("FieldSet.Iter", false, hasNext(), cursor);
 		}
 	}
 	
@@ -196,24 +185,28 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		@Override
 		public String toString(){
-			StringJoiner res = new StringJoiner(", ", "FieldSet.ListIter{", "}");
-			if(data.length == 0){
-				res.add("EMPTY");
-				return res.toString();
-			}
-			if(hasPrevious()){
-				var previous = data[cursor - 1];
-				res.add("previous: " + Utils.toShortString(previous));
-			}
-			if(hasNext()){
-				var remaining = data.length - cursor;
-				if(remaining>1) res.add("remaining: " + remaining);
-				res.add("next: " + Utils.toShortString(data[cursor]));
-			}else{
-				res.add("END");
-			}
+			return iterStr("FieldSet.ListIter", hasPrevious(), hasNext(), cursor);
+		}
+	}
+	
+	private String iterStr(String name, boolean prev, boolean next, int cursor){
+		var res = new StringJoiner(", ", name + "{", "}");
+		if(data.length == 0){
+			res.add("EMPTY");
 			return res.toString();
 		}
+		if(prev){
+			var previous = data[cursor - 1];
+			res.add("previous: " + Utils.toShortString(previous));
+		}
+		if(next){
+			var remaining = data.length - cursor;
+			if(remaining>1) res.add("remaining: " + remaining);
+			res.add("next: " + Utils.toShortString(data[cursor]));
+		}else{
+			res.add("END");
+		}
+		return res.toString();
 	}
 	
 	private static final FieldSet<?> EMPTY = new FieldSet<>(new IOField[0]);
@@ -271,7 +264,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		if(data instanceof FieldSet<T> f) return f;
 		
 		var size = data.size();
-		if(size == 1 && data instanceof List<IOField<T, ?>> l){
+		if(size == 1 && data instanceof SequencedCollection<IOField<T, ?>> l){
 			return new FieldSet<>(new IOField[]{l.getFirst()});
 		}
 		
@@ -285,9 +278,9 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	private IOField<T, ?>[] data;
 	private int             hash = -1;
-	private byte            age  = Byte.MIN_VALUE;
+	private boolean         shared;
 	
-	private Map<String, Integer> nameLookup;
+	private ToIntFunction<String> nameLookup;
 	
 	private FieldSet(IOField<T, ?>[] data){
 		this.data = data;
@@ -325,15 +318,27 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	public boolean equals(Collection<?> collection){
 		if(collection == null || collection.size() != size()) return false;
-		return containsAll(collection);
+		
+		var iter = collection.iterator();
+		int i    = 0;
+		while(iter.hasNext()){
+			var o = iter.next();
+			if(o == null || data.length == i){
+				return false;
+			}
+			var el = data[i++];
+			if(!el.equals(o)){
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	public boolean equals(FieldSet<?> that){
 		if(that == null) return false;
 		if(this == that) return true;
 		
-		var thisData = this.data;
-		var thatData = that.data;
+		IOField<?, ?>[] thisData = this.data, thatData = that.data;
 		if(thisData == thatData) return true;
 		
 		var len = thisData.length;
@@ -346,8 +351,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		boolean allSame = true;
 		for(int i = 0; i<len; i++){
-			var thisEl = thisData[i];
-			var thatEl = thatData[i];
+			IOField<?, ?> thisEl = thisData[i], thatEl = thatData[i];
 			if(thisEl == thatEl) continue;
 			allSame = false;
 			if(!thisEl.equals(thatEl)){
@@ -357,26 +361,26 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		//Deduplicate array + short-circuit further equals
 		if(allSame){
-			//noinspection unchecked
-			var tt = (FieldSet<T>)that;
-			
-			if(this.age<Byte.MAX_VALUE) this.age++;
-			if(tt.age<Byte.MAX_VALUE) tt.age++;
-			
-			if(this.age<tt.age){
-				this.data = tt.data;
-				this.nameLookup = tt.nameLookup;
-			}else{
-				tt.data = this.data;
-				tt.nameLookup = this.nameLookup;
-			}
-			
-			if(this.hash != -1) tt.hash = this.hash;
-			else if(that.hash != -1) this.hash = that.hash;
-			
+			share((FieldSet<T>)that);
 		}
 		
 		return true;
+	}
+	private void share(FieldSet<T> that){
+		boolean thisSh = this.shared, thatSh = that.shared;
+		if(thisSh && !thatSh){
+			that.shared = true;
+			that.data = this.data;
+		}else if(!thisSh && thatSh){
+			this.shared = true;
+			this.data = that.data;
+		}else{
+			that.shared = this.shared = true;
+			that.data = this.data;
+		}
+		
+		if(this.hash != -1) that.hash = this.hash;
+		else if(that.hash != -1) this.hash = that.hash;
 	}
 	
 	@Override
@@ -396,18 +400,18 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	@Override
 	public int indexOf(Object o){
 		if(!(o instanceof IOField<?, ?> f)) return -1;
-		if(size() == 1){
-			if(data[0].equals(f)){
-				return 0;
-			}
-			return -1;
-		}
-		var index = getNameLookup().get(f.getName());
-		if(index == null) return -1;
+		return indexOf(f);
+	}
+	public int indexOf(IOField<?, ?> f){
+		if(f == null) return -1;
+		var index = indexByName(f.getName());
+		if(index == -1) return -1;
 		if(data[index].equals(f)){
 			return index;
 		}
-		
+		return oddNameFind(f);
+	}
+	private int oddNameFind(IOField<?, ?> f){
 		for(int i = 0; i<data.length; i++){
 			if(data[i].equals(f)) return i;
 		}
@@ -463,30 +467,102 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public OptionalPP<IOField<T, ?>> byName(String name){
-		return OptionalPP.ofNullable(getNameLookup().get(name)).map(this::get);
+		var idx = indexByName(name);
+		return idx == -1? OptionalPP.empty() : OptionalPP.of(data[idx]);
 	}
 	
 	public IOField<T, ?> requireByName(String name){
-		var res = byName(name);
-		if(res.isEmpty()) failName(name);
-		return res.get();
+		var idx = indexByName(name);
+		if(idx == -1) failName(name);
+		return data[idx];
 	}
 	private static void failName(String name){
 		throw new NoSuchElementException("Field with name " + name + " is not present");
 	}
 	
-	private Map<String, Integer> getNameLookup(){
-		var nl = nameLookup;
-		if(nl == null) nameLookup = nl = buildNameLookup();
-		return nl;
+	private int indexByName(String name){
+		return switch(data.length){
+			case 0 -> -1;
+			case 1 -> data[0].getName().equals(name)? 0 : -1;
+			default -> {
+				var nl = nameLookup;
+				if(nl == null) nl = buildNameLookup();
+				yield nl.applyAsInt(name);
+			}
+		};
+		
 	}
-	private Map<String, Integer> buildNameLookup(){
-		var builder = HashMap.<String, Integer>newHashMap(size());
-		for(int i = 0; i<size(); i++){
-			builder.put(get(i).getName(), i);
+	private ToIntFunction<String> buildNameLookup(){
+		var data = iter().map(IOField::getName).enumerate().toMap(IterablePP.Idx::val, IterablePP.Idx::index);
+		
+		//Only makes sense to try to make a perfect map when there are no hash collisions
+		if(data.size() == Iters.keys(data).mapToInt(String::hashCode).distinct().count()){
+			var perfect = buildNameLookupPerfect(data);
+			if(perfect != null) return nameLookup = perfect;
 		}
-		return Map.copyOf(builder);
+		return nameLookup = name -> data.getOrDefault(name, -1);
 	}
+	
+	private final class PerfectLookup implements ToIntFunction<String>{
+		private final int   off;
+		private final int   modulo;
+		private final int[] values;
+		
+		private PerfectLookup(int off, int modulo, int[] values){
+			this.off = off;
+			this.modulo = modulo;
+			this.values = values;
+		}
+		
+		@Override
+		public int applyAsInt(String str){
+			if(str == null) return -1;
+			
+			var idx = perfectIdx(str, modulo, off);
+			if(idx<0 || idx>=values.length) return -1;
+			
+			var id = values[idx];
+			if(id == -1) return -1;
+			
+			var name = data[id].getName();
+			if(!name.equals(str)) return -1;
+			
+			return id;
+		}
+	}
+	
+	private ToIntFunction<String> buildNameLookupPerfect(Map<String, Integer> builder){
+		int perfectSize  = builder.size(), limit = Math.min(perfectSize*3, perfectSize + 64);
+		var perfectMarks = new BitSet(limit);
+		wh:
+		while(perfectSize<=limit){
+			for(var e : builder.entrySet()){
+				var name = e.getKey();
+				var idx  = perfectIdx(name, perfectSize);
+				if(perfectMarks.get(idx)){
+					perfectMarks.clear();
+					perfectSize++;
+					continue wh;
+				}
+				perfectMarks.set(idx);
+			}
+			
+			var bounds = Iters.ofInts(perfectMarks.stream().toArray()).bounds().orElseThrow();
+			
+			var ids = new int[bounds.max() - bounds.min() + 1];
+			Arrays.fill(ids, -1);
+			
+			var off = bounds.min();
+			for(var e : builder.entrySet()){
+				ids[perfectIdx(e.getKey(), perfectSize, off)] = e.getValue();
+			}
+			return new PerfectLookup(off, perfectSize, ids);
+		}
+		return null;
+	}
+	
+	private static int perfectIdx(String name, int size, int off){ return perfectIdx(name, size) - off; }
+	private static int perfectIdx(String name, int size)         { return Math.floorMod(name.hashCode(), size); }
 	
 	@Override
 	public boolean contains(Object o){
@@ -494,16 +570,20 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return contains(f);
 	}
 	public boolean contains(IOField<?, ?> f){
-		if(size() == 1){
-			return data[0].equals(f);
-		}
+		if(f == null) return false;
+		return switch(data.length){
+			case 0 -> false;
+			case 1 -> data[0].equals(f);
+			default -> {
+				var index = indexByName(f.getName());
+				if(index == -1) yield false;
+				if(data[index].equals(f)){
+					yield true;
+				}
+				yield super.contains(f);
+			}
+		};
 		
-		var index = getNameLookup().get(f.getName());
-		if(index == null) return false;
-		if(data[index].equals(f)){
-			return true;
-		}
-		return super.contains(f);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -525,7 +605,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public <E extends IOField<T, ?>> OptionalPP<? extends E> exactFieldType(Class<E> type, String name){
-		return byName(name).filter(type::isInstance).map(type::cast);
+		return byName(name).tryCast(type);
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
 		var res = exactFieldType(type, name);
