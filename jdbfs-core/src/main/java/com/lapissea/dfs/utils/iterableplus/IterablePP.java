@@ -582,16 +582,33 @@ public interface IterablePP<T> extends Iterable<T>{
 		return new SizedPP.Default<>(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterablePP.this); }
-			private ArrayList<T> sorted;
+			private Object[] sorted;
 			@Override
 			public Iterator<T> iterator(){
-				var l = sorted;
-				if(l == null){
-					l = IterablePP.this.toArrayList();
-					l.sort(comparator);
-					sorted = l;
-				}
-				return l.iterator();
+				return new Iterator<>(){
+					private Object[] result;
+					private int      index;
+					
+					private void compute(){
+						var src = IterablePP.this;
+						var res = src.toArray(Object[]::new);
+						//noinspection unchecked
+						Arrays.sort(res, (Comparator<Object>)comparator);
+						result = res;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						if(result == null) compute();
+						return index<result.length;
+					}
+					@Override
+					public T next(){
+						if(!hasNext()) throw new NoSuchElementException();
+						//noinspection unchecked
+						return (T)result[index++];
+					}
+				};
 			}
 		};
 	}
@@ -613,6 +630,51 @@ public interface IterablePP<T> extends Iterable<T>{
 								return true;
 							}
 						}
+					}
+				};
+			}
+			@Override
+			public SizedPP<T> sorted(Comparator<T> comparator){
+				return new SizedPP.Default<>(){
+					private List<T> computeSorted(){
+						var src = IterablePP.this;
+						var res = new ArrayList<T>(src.toModSet());
+						res.sort(comparator);
+						return res;
+					}
+					@Override
+					public OptionalInt getSize(){ return OptionalInt.empty(); }
+					@Override
+					public Iterator<T> iterator(){
+						return new Iterator<>(){
+							private List<T> result;
+							private int     index;
+							
+							@Override
+							public boolean hasNext(){
+								if(result == null) result = computeSorted();
+								return index<result.size();
+							}
+							@Override
+							public T next(){
+								if(!hasNext()) throw new NoSuchElementException();
+								return result.get(index++);
+							}
+						};
+					}
+					@Override
+					public <T1> T1[] toArray(IntFunction<T1[]> ctor){
+						var data = computeSorted();
+						return data.toArray(ctor);
+					}
+					@Override
+					public List<T> toModList(){
+						return computeSorted();
+					}
+					@Override
+					public List<T> toList(){
+						var data = computeSorted();
+						return List.copyOf(data);
 					}
 				};
 			}

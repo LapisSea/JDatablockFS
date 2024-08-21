@@ -2,6 +2,7 @@ package com.lapissea.dfs.utils.iterableplus;
 
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.util.ZeroArrays;
 
 import java.util.Arrays;
@@ -580,5 +581,39 @@ public interface IterableIntPP{
 	}
 	private static void preIncrementInt(int num){
 		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	
+	
+	default IterableIntPP distinct(){
+		return new Iters.DefaultIntIterable(){
+			@Override
+			public IntIterator iterator(){
+				var src = IterableIntPP.this.iterator();
+				return new Iters.FindingIntIterator(){
+					private final IntHashSet seen = new IntHashSet();
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(!src.hasNext()) return false;
+							var t = src.nextInt();
+							if(seen.add(t)){
+								reportFound(t);
+								return true;
+							}
+						}
+					}
+				};
+			}
+			@Override
+			public int count(){
+				var seen = new IntHashSet();
+				var src  = IterableIntPP.this.iterator();
+				while(src.hasNext()){
+					var v = src.nextInt();
+					seen.add(v);
+				}
+				return seen.size();
+			}
+		};
 	}
 }
