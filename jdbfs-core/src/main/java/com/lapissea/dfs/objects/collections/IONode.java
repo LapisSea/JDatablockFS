@@ -26,6 +26,7 @@ import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
 import com.lapissea.dfs.type.field.access.TypeFlag;
@@ -576,7 +577,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		try{
 			val = Utils.toShortString(getValue());
 		}catch(Throwable e){
-			val = "CORRUPTED: " + e;
+			val = IOFieldTools.corruptedGet(e);
 			valCorrupted = true;
 		}
 		var result = new StringBuilder().append("{").append(Utils.toShortString(val));
@@ -587,7 +588,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 		}catch(Throwable e){
 			if(!valCorrupted){
-				result.append(" -> ").append("CORRUPTED: ").append(e);
+				result.append(" -> ").append(IOFieldTools.corruptedGet(e));
 			}
 		}
 		

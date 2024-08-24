@@ -28,6 +28,7 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -205,7 +206,7 @@ public final class Cluster implements DataProvider{
 		}
 		@Override
 		public String toShortString(){
-			if(db == null) return "<uninitialized>";
+			if(db == null) return IOFieldTools.UNINITIALIZED_FIELD_SIGN;
 			return "{db: " + db.toShortString() + ", " +
 			       freeChunks.size() + " freeChunks, " +
 			       "rootObjects: " + Iters.from(rootObjects).joinAsStr(", ", "[", "]", e -> e.getKey().toString())

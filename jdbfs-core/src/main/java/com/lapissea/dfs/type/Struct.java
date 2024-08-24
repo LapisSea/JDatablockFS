@@ -726,14 +726,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			Optional<String> valStr;
 			try{
 				if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
-					valStr = Optional.of("<UNINITIALIZED>");
+					valStr = Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
 				}else{
 					var set = settings.withDoShort(settings.doShort() || TextUtil.USE_SHORT_IN_COLLECTIONS)
 					                  .withShowName(false);
 					valStr = field.instanceToString(ioPool, instance, set);
 				}
 			}catch(Throwable e){
-				valStr = Optional.of("CORRUPTED: " + e.getMessage());
+				valStr = Optional.of(IOFieldTools.corruptedGet(e));
 			}
 			if(!settings.showFieldNames()) return valStr;
 			return valStr.map(value -> field.getName() + settings.fieldValueSeparator() + value);
@@ -774,7 +774,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					      TextUtil.toShortString(v) :
 					      TextUtil.toString(v);
 				}catch(Throwable e){
-					yield "CORRUPTED: " + e;
+					yield IOFieldTools.corruptedGet(e);
 				}
 			}
 			case ToStringFragment.Literal frag -> frag.value();

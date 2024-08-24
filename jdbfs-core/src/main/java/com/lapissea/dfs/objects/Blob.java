@@ -10,6 +10,7 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.IOUtils;
 
 import java.io.EOFException;
@@ -248,7 +249,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			res.add("size: " + io.getSize());
 			res.add("capacity: " + io.getCapacity());
 		}catch(IOException e){
-			res.add("CORRUPTED: " + e);
+			res.add(IOFieldTools.corruptedGet(e));
 		}
 		return res.toString();
 	}

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.type.field;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.objects.NumberSize;
@@ -439,5 +440,12 @@ public final class IOFieldTools{
 			}
 		}
 		return List.of(buff);
+	}
+	
+	public static final String UNINITIALIZED_FIELD_SIGN = "<Uninitialized>";
+	
+	public static String corruptedGet(Throwable e){
+		var msg = e.getMessage();
+		return "<CORRUPTED: " + (msg == null? Utils.typeToHuman(e.getClass()) : msg) + ">";
 	}
 }

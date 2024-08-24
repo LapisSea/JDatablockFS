@@ -82,7 +82,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		
 		@Override
 		public String toString(){
-			if(type == null) return getClass().getSimpleName() + "<uninitialized>";
+			if(type == null) return getClass().getSimpleName() + IOFieldTools.UNINITIALIZED_FIELD_SIGN;
 			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
 		}
 		@Override
