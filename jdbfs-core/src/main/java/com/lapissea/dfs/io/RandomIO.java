@@ -570,7 +570,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 			@Override
 			public void write(int b) throws IOException{
-				transactionBuffer.writeByte(readAt, pos, b);
+				transactionBuffer.writeByte(pos, b);
 				pos++;
 				if(size<=pos) size = pos + 1;
 			}
@@ -578,7 +578,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			@Override
 			public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
 				for(var e : data){
-					transactionBuffer.write(readAt, e.ioOffset, e.data, e.dataOffset, e.dataLength);
+					transactionBuffer.write(e.ioOffset, e.data, e.dataOffset, e.dataLength);
 				}
 			}
 			@Override
