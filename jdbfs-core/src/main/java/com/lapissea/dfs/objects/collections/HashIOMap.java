@@ -289,6 +289,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				count++;
 				worker.execute(() -> {
 					try{
+						if(!err.isEmpty()) return;
 						semaphore.acquire();
 						if(!err.isEmpty()) return;
 						var view = oldBuckets.subListView(from, to);
