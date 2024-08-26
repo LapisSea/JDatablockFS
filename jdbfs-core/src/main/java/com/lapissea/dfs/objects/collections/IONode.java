@@ -310,33 +310,33 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 		}
 	}
-	
-	@Override
-	public boolean equals(Object o){
-		if(this == o) return true;
-		if(!(o instanceof IONode<?> that)) return false;
-		
-		if(!this.getPointer().equals(that.getPointer())){
-			return false;
-		}
-		if(!this.getTypeDef().equals(that.getTypeDef())){
-			return false;
-		}
-		
-		try{
-			if(!this.getNextPtr().equals(that.getNextPtr())){
-				return false;
-			}
-			if(this.hasValue() != that.hasValue()){
-				return false;
-			}
-			var v1 = this.getValue();
-			var v2 = that.getValue();
-			return Objects.equals(v1, v2);
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
-	}
+
+//	@Override
+//	public boolean equals(Object o){
+//		if(this == o) return true;
+//		if(!(o instanceof IONode<?> that)) return false;
+//
+//		if(!this.getPointer().equals(that.getPointer())){
+//			return false;
+//		}
+//		if(!this.getTypeDef().equals(that.getTypeDef())){
+//			return false;
+//		}
+//
+//		try{
+//			if(!this.getNextPtr().equals(that.getNextPtr())){
+//				return false;
+//			}
+//			if(this.hasValue() != that.hasValue()){
+//				return false;
+//			}
+//			var v1 = this.getValue();
+//			var v2 = that.getValue();
+//			return Objects.equals(v1, v2);
+//		}catch(IOException e){
+//			throw new RuntimeException(e);
+//		}
+//	}
 	
 	@Override
 	public int hashCode(){
