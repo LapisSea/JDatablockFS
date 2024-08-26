@@ -44,7 +44,7 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFl
 		}
 	}
 	
-	@IOInstance.Def.Order({"seconds", "nanos"})
+	@IOInstance.Order({"seconds", "nanos"})
 	private interface IODuration extends IOInstance.Def<IODuration>{
 		
 		static String toString(IODuration val){

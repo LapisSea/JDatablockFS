@@ -351,13 +351,18 @@ public final class MemoryOperations{
 					case ONLY_HEADER_BYTES -> {
 						if(chunk.getCapacity()>3000){
 							if(service == null) service = Executors.newVirtualThreadPerTaskExecutor();
-							service.execute(() -> {
-								try{
-									purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
-								}catch(IOException e){
-									throw new RuntimeException(e);
-								}
-							});
+							for(long off = 0; off<=chunk.getCapacity(); off += 512){
+								var rem = Math.min(chunk.getCapacity() - off, 512 + Chunk.minSafeSize());
+								var pos = chunk.dataStart() + off;
+								
+								service.execute(() -> {
+									try{
+										purgePossibleChunkHeaders(chunk.getDataProvider(), pos, rem);
+									}catch(IOException e){
+										throw new RuntimeException(e);
+									}
+								});
+							}
 						}else{
 							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 						}

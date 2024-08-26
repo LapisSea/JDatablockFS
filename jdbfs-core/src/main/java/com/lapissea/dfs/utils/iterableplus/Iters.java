@@ -370,13 +370,23 @@ public final class Iters{
 		};
 	}
 	public static IterableIntPP ofInts(int element){
-		return () -> new IterableIntPP.SingleIter(element);
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return OptionalInt.of(1); }
+			@Override
+			public IntIterator iterator(){ return new IterableIntPP.SingleIter(element); }
+		};
 	}
 	public static IterableIntPP ofInts(int... data){
 		return switch(data.length){
 			case 0 -> IterableIntPP.empty();
 			case 1 -> ofInts(data[0]);
-			default -> () -> new IterableIntPP.ArrayIter(data);
+			default -> new IterableIntPP.SizedPP.Default<>(){
+				@Override
+				public OptionalInt getSize(){ return OptionalInt.of(data.length); }
+				@Override
+				public IntIterator iterator(){ return new IterableIntPP.ArrayIter(data); }
+			};
 		};
 	}
 	public static IterableLongPP range(long start, long endExclusive){

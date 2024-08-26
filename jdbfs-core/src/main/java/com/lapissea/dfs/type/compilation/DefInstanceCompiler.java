@@ -12,13 +12,6 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.CompilationTools.FieldStub;
 import com.lapissea.dfs.type.compilation.CompilationTools.Style;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.Concat;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.FieldValue;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.Literal;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.NOOP;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.OptionalBlock;
-import com.lapissea.dfs.type.compilation.ToStringFormat.ToStringFragment.SpecialValue;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -34,7 +27,6 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
@@ -62,7 +54,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static com.lapissea.dfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
@@ -376,7 +367,7 @@ public final class DefInstanceCompiler{
 		if(node == null || node.state != ImplNode.State.DONE) node = getNode(key);
 		var ctr = node.dataConstructor;
 		if(ctr == null){
-			throw new RuntimeException("Please add " + IOInstance.Def.Order.class.getName() + " to " + interf.getName());
+			throw new RuntimeException("Please add " + IOInstance.Order.class.getName() + " to " + interf.getName());
 		}
 		return ctr;
 	}
@@ -508,7 +499,7 @@ public final class DefInstanceCompiler{
 			var set = specials.set.get();
 			
 			if(oOrderedFields.isEmpty()){
-				throw new MalformedTemplateStruct(interf.getName() + " has a full setter but no argument order. Please add " + IOInstance.Def.Order.class.getName() + " to the type");
+				throw new MalformedTemplateStruct(interf.getName() + " has a full setter but no argument order. Please add " + IOInstance.Order.class.getName() + " to the type");
 			}
 			
 			var orderedFields = oOrderedFields.get();
@@ -652,23 +643,6 @@ public final class DefInstanceCompiler{
 				
 				generateSpecialToString(interf, writer, specials);
 				
-				stringSaga:
-				{
-					var format = interf.getAnnotation(IOInstance.Def.ToString.Format.class);
-					if(format != null){
-						generateFormatToString(includeNames, includedFields, specials, writer, format, humanName);
-						break stringSaga;
-					}
-					
-					var toStrAnn = interf.getAnnotation(IOInstance.Def.ToString.class);
-					if(toStrAnn == null && includeNames.isPresent()){
-						toStrAnn = Annotations.make(IOInstance.Def.ToString.class);
-					}
-					if(toStrAnn != null){
-						generateStandardToString(humanName, includeNames, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
-						break stringSaga;
-					}
-				}
 				writer.wEnd();
 			}
 			
@@ -725,210 +699,6 @@ public final class DefInstanceCompiler{
 				""",
 			method.getName(),
 			interf.getName());
-	}
-	
-	private static void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
-		var fragment = ToStringFormat.parse(format.value(), Iters.from(fieldInfo).toModList(FieldInfo::name));
-		
-		if(specials.toStr.isEmpty()){
-			generateFormatToString(includeNames, fieldInfo, "toString", true, fragment, writer, humanName);
-		}
-		if(specials.toShortStr.isEmpty()){
-			generateFormatToString(includeNames, fieldInfo, "toShortString", false, fragment, writer, humanName);
-		}
-	}
-	
-	private static void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
-		
-		if(specials.toStr.isEmpty()){
-			generateStandardToString(classHumanName, includeNames, toStrAnn, "toString", fieldInfo, writer);
-		}
-		if(specials.toShortStr.isEmpty()){
-			if(toStrAnn.name()){
-				generateStandardToString(classHumanName, includeNames, Annotations.make(IOInstance.Def.ToString.class, Map.of(
-					"name", false,
-					"curly", toStrAnn.curly(),
-					"fNames", toStrAnn.fNames(),
-					"filter", toStrAnn.filter()
-				)), "toShortString", fieldInfo, writer);
-			}else{
-				writer.write(
-					"""
-						public function toShortString
-							returns #String
-						start
-							get this this
-							call toString
-						end
-						""");
-			}
-		}
-	}
-	
-	private static void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
-		
-		writer.write(
-			"""
-				public function {!}
-					returns #String
-				 start
-					new #StringBuilder
-				""",
-			name
-		);
-		
-		List<ToStringFragment> compact = new ArrayList<>();
-		processFragments(fragment, all, frag -> {
-			if(frag instanceof FieldValue v && !isFieldIncluded(includeNames, v.name())){
-				frag = new Literal("<no " + v.name() + ">");
-			}
-			if(compact.isEmpty()){
-				compact.add(frag);
-				return;
-			}
-			if(frag instanceof Literal l2 && compact.getLast() instanceof Literal l1){
-				compact.set(compact.size() - 1, new Literal(l1.value() + l2.value()));
-				return;
-			}
-			compact.add(frag);
-		}, humanName);
-		
-		executeStringFragment(fieldInfo, new Concat(compact), all, writer, humanName);
-		
-		writer.write(
-			"""
-					call toString
-				end
-				""");
-	}
-	
-	private static void processFragments(ToStringFragment fragment, boolean all, Consumer<ToStringFragment> out, String humanName){
-		switch(fragment){
-			case NOOP ignored -> { }
-			case Concat f -> {
-				for(var child : f.fragments()){
-					processFragments(child, all, out, humanName);
-				}
-			}
-			case Literal f -> out.accept(f);
-			case SpecialValue f -> {
-				switch(f.value()){
-					case CLASS_NAME -> out.accept(new Literal(humanName));
-					case null -> throw new NullPointerException();
-				}
-			}
-			case FieldValue frag -> out.accept(frag);
-			case OptionalBlock f -> {
-				if(all){
-					processFragments(f.content(), true, out, humanName);
-				}
-			}
-		}
-	}
-	
-	private static void executeStringFragment(
-		List<FieldInfo> fieldInfo, ToStringFragment fragment,
-		boolean all, CodeStream writer, String humanName
-	) throws MalformedJorth{
-		switch(fragment){
-			case NOOP ignored -> { }
-			case Concat f -> {
-				for(var child : f.fragments()){
-					executeStringFragment(fieldInfo, child, all, writer, humanName);
-				}
-			}
-			case Literal f -> append(writer, w -> w.write("'{}'", f.value()));
-			case SpecialValue f -> {
-				switch(f.value()){
-					case CLASS_NAME -> append(writer, w -> w.write("'{}'", humanName));
-					case null -> throw new NullPointerException();
-				}
-			}
-			case FieldValue frag -> {
-				var field = Iters.from(fieldInfo).firstMatching(n -> n.name.equals(frag.name())).orElseThrow();
-				append(writer, w -> w.write(
-					"""
-						static call #String valueOf start
-							get this {!}
-						end
-						""", field.name));
-			}
-			case OptionalBlock f -> {
-				if(all){
-					executeStringFragment(fieldInfo, f.content(), true, writer, humanName);
-				}
-			}
-		}
-	}
-	
-	private static void generateStandardToString(String classHumanName, Optional<Set<String>> includeNames, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
-		
-		writer.write(
-			"""
-				public function {!}
-					returns #String
-				start
-					new #StringBuilder
-				""",
-			name
-		);
-		
-		if(toStrAnn.name()){
-			append(writer, w -> w.write("'{}'", classHumanName));
-		}
-		if(toStrAnn.curly()){
-			append(writer, w -> w.write("'{'"));
-		}
-		
-		var     filter = Arrays.asList(toStrAnn.filter());
-		boolean first  = true;
-		for(FieldInfo info : fieldInfo){
-			if(!filter.isEmpty() && !filter.contains(info.name)){
-				continue;
-			}
-			if(!isFieldIncluded(includeNames, info.name)){
-				continue;
-			}
-			
-			if(!first){
-				append(writer, w -> w.write("', '"));
-			}
-			first = false;
-			
-			if(toStrAnn.fNames()){
-				append(writer, w -> w.write("'{}: '", info.name));
-			}
-			
-			append(writer, w -> {
-				w.write(
-					"""
-						static call #String valueOf start
-							get this {!}
-						end
-						""",
-					info.name
-				);
-			});
-		}
-		
-		if(toStrAnn.curly()){
-			append(writer, w -> w.write("'}'"));
-		}
-		
-		writer.write(
-			"""
-					call toString
-				end
-				""");
-	}
-	
-	private static void append(CodeStream writer, UnsafeConsumer<CodeStream, MalformedJorth> val) throws MalformedJorth{
-		writer.write(
-			"""
-				call append start
-				""");
-		val.accept(writer);
-		writer.wEnd();
 	}
 	
 	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
@@ -1021,7 +791,7 @@ public final class DefInstanceCompiler{
 		return Optional.empty();
 	}
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
-		var order = interf.getAnnotation(IOInstance.Def.Order.class);
+		var order = interf.getAnnotation(IOInstance.Order.class);
 		if(order == null){
 			var its = Iters.from(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toModList();
 			if(its.size() != 1) return Optional.empty();

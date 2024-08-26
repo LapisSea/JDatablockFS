@@ -1,6 +1,7 @@
 package com.lapissea.dfs.utils.iterableplus;
 
 import com.lapissea.dfs.Utils;
+import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -408,36 +409,6 @@ public interface IterableLongPP{
 		}
 	}
 	
-	default IterableLongPP distinct(){
-		return new Iters.DefaultLongIterable(){
-			@Override
-			public LongIterator iterator(){
-				return new LongIterator(){
-					private long[] sorted;
-					private int    i;
-					
-					private long[] sort(){
-						return sorted = IterableLongPP.this.box().sorted().mapToLong().toArray();
-					}
-					
-					@Override
-					public boolean hasNext(){
-						var s = sorted;
-						if(s == null) s = sort();
-						return i<s.length;
-					}
-					@Override
-					public long nextLong(){
-						var s = sorted;
-						if(s == null) s = sort();
-						if(i>=s.length) throw new NoSuchElementException();
-						return s[i++];
-					}
-				};
-			}
-		};
-	}
-	
 	record Idx(int index, long val) implements Map.Entry<Integer, Long>{
 		@Override
 		public Integer getKey(){ return index; }
@@ -501,5 +472,30 @@ public interface IterableLongPP{
 	}
 	private static void preIncrementInt(int num){
 		if(num == Integer.MAX_VALUE) throw new IllegalStateException("Too many elements");
+	}
+	
+	
+	default IterableLongPP distinct(){
+		return new Iters.DefaultLongIterable(){
+			@Override
+			public LongIterator iterator(){
+				var src = IterableLongPP.this.iterator();
+				return new Iters.FindingLongIterator(){
+					private final Roaring64Bitmap seen = new Roaring64Bitmap();
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(!src.hasNext()) return false;
+							var t = src.nextLong();
+							if(!seen.contains(t)){
+								seen.addLong(t);
+								reportFound(t);
+								return true;
+							}
+						}
+					}
+				};
+			}
+		};
 	}
 }

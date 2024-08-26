@@ -44,7 +44,7 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 		}
 	}
 	
-	@IOInstance.Def.Order({"date", "time"})
+	@IOInstance.Order({"date", "time"})
 	private interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
 		
 		static String toString(IOLocalDateTime val){

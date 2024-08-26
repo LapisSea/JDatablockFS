@@ -146,7 +146,7 @@ public abstract class CursorIOData implements IOInterface{
 		public void write(int b) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.writeByte(readAt, pos, b);
+				transactionBuff.writeByte(pos, b);
 				pos++;
 				return;
 			}
@@ -164,7 +164,7 @@ public abstract class CursorIOData implements IOInterface{
 		public void write(byte[] b, int off, int len) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.write(readAt, pos, b, off, len);
+				transactionBuff.write(pos, b, off, len);
 				pos += len;
 				return;
 			}
@@ -182,7 +182,7 @@ public abstract class CursorIOData implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				transactionBuff.writeChunks(readAt, writeData);
+				transactionBuff.writeChunks(writeData);
 				return;
 			}
 			
@@ -216,7 +216,7 @@ public abstract class CursorIOData implements IOInterface{
 		@Override
 		public void writeWord(long v, int len) throws IOException{
 			if(transactionOpen){
-				transactionBuff.writeWord(readAt, pos, v, len);
+				transactionBuff.writeWord(pos, v, len);
 				pos += len;
 				return;
 			}

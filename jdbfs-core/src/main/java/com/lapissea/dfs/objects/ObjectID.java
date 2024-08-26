@@ -13,6 +13,7 @@ public sealed interface ObjectID{
 	static ObjectID of(byte id)  { return new BID(id); }
 	
 	@IOValue
+	@IOInstance.StrFormat.Custom("@id")
 	final class SID extends IOInstance.Managed<SID> implements ObjectID{
 		
 		private String id;
@@ -21,18 +22,10 @@ public sealed interface ObjectID{
 		public SID(String id){
 			this.id = Objects.requireNonNull(id);
 		}
-		
-		@Override
-		public String toString(){
-			return id;
-		}
-		@Override
-		public String toShortString(){
-			return id;
-		}
 	}
 	
 	@IOValue
+	@IOInstance.StrFormat.Custom("@id")
 	final class LID extends IOInstance.Managed<LID> implements ObjectID{
 		
 		@IODependency.VirtualNumSize
@@ -42,21 +35,10 @@ public sealed interface ObjectID{
 		public LID(long id){
 			this.id = id;
 		}
-		
-		@Override
-		public String toString(){
-			return id + "";
-		}
-		
-		@Override
-		public String toShortString(){
-			var s = "H" + Long.toHexString(id);
-			var l = toString();
-			return s.length()>=l.length()? l : s;
-		}
 	}
 	
 	@IOValue
+	@IOInstance.StrFormat.Custom("@id")
 	final class BID extends IOInstance.Managed<BID> implements ObjectID{
 		
 		private byte id;
@@ -64,16 +46,6 @@ public sealed interface ObjectID{
 		public BID(){ }
 		public BID(byte id){
 			this.id = id;
-		}
-		
-		@Override
-		public String toString(){
-			return id + "";
-		}
-		
-		@Override
-		public String toShortString(){
-			return Integer.toHexString(Byte.toUnsignedInt(id));
 		}
 	}
 	

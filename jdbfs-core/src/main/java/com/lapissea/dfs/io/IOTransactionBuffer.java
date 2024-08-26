@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io;
 
+import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.WordIO;
-import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.PrimitiveIterator;
 
@@ -29,56 +30,264 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
  */
 public final class IOTransactionBuffer{
 	
-	private record WriteEvent(long offset, byte[] data) implements Comparable<WriteEvent>{
-		long start(){
-			return offset;
-		}
-		long end(){
-			return offset + data.length;
-		}
-		@Override
-		public String toString(){
-			return start() + " - " + end();
-		}
-		@Override
-		public int compareTo(WriteEvent o){
-			return Long.compare(offset, o.offset);
-		}
-	}
-	
-	private final List<WriteEvent>      writeEvents = new ArrayList<>();
-	private final ReadWriteClosableLock lock;
-	
-	public IOTransactionBuffer(){
-		this(true);
-	}
-	public IOTransactionBuffer(boolean threadSafe){
-		lock = threadSafe? ReadWriteClosableLock.reentrant() : ReadWriteClosableLock.noop();
-	}
-	
-	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
-		return x1<=(y2 - 1) && y1<=(x2 - 1);
-	}
-	
 	public interface BaseAccess{
 		int read(long offset, byte[] b, int off, int len) throws IOException;
 	}
 	
-	public int readByte(BaseAccess base, long offset) throws IOException{
+	public record TransactionExport(OptionalPP<Long> setCapacity, List<RandomIO.WriteChunk> writes) implements Serializable{
 		
-		int data;
-		
-		try(var ignored = lock.read()){
-			data = readSingle(offset);
+		public void apply(RandomIO io) throws IOException{
+			switch(writes.size()){
+				case 0 -> { }
+				case 1 -> {
+					var e = writes.getFirst();
+					io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
+				}
+				default -> io.writeAtOffsets(writes);
+			}
+			if(setCapacity.isPresent()){
+				io.setCapacity(setCapacity.get());
+			}
 		}
-		if(data != -1) return data;
 		
-		byte[] b    = {0};
-		int    read = base.read(offset, b, 0, 1);
-		return read != 1? -1 : b[0]&0xFF;
 	}
 	
-	private class LocalOffIndexIter implements PrimitiveIterator.OfInt{
+	private abstract static sealed class WriteEvent implements Comparable<WriteEvent>{
+		final long offset;
+		private WriteEvent(long offset){
+			this.offset = offset;
+			if(offset<0){
+				throw new IllegalArgumentException("offset < 0");
+			}
+		}
+		
+		abstract int length();
+		
+		long start(){ return offset; }
+		long end()  { return offset + length(); }
+		
+		@Override
+		public int compareTo(WriteEvent o){
+			return Long.compare(offset, o.offset);
+		}
+		
+		abstract int read1(int off);
+		abstract long asWord();
+		abstract long readWord(int off, int len);
+		abstract void writeTo(byte[] dest, int off, int len);
+		abstract void writeTo(int localOff, byte[] dest, int off, int len);
+		abstract WriteEvent trim(int newLen);
+		abstract WriteEvent trimStart(int newLen);
+		abstract boolean tryInlineSet(int localOff, long word, int len);
+		abstract boolean tryInlineSet(int localOff, byte[] data, int off, int len);
+		abstract WriteEvent append(byte[] b, int off, int len);
+		abstract WriteEvent append(WriteEvent other);
+		abstract byte[] byteArr();
+		abstract WriteEvent prepend(byte[] b, int off, int len);
+		
+		static final class Word extends WriteEvent{
+			private long data;
+			private byte len;
+			
+			public Word(long offset, long data, int len){ this(offset, data, (byte)len); }
+			public Word(long offset, long data, byte len){
+				super(offset);
+				if(len>8) throw new IllegalArgumentException();
+				this.data = data;
+				this.len = len;
+			}
+			
+			@Override
+			public int length(){ return len; }
+			@Override
+			public int read1(int off){ return (int)(shifted(off)&0xFF); }
+			@Override
+			long asWord(){ return data; }
+			@Override
+			public long readWord(int off, int len){ return shifted(off)&mask(len); }
+			private long shifted(int off){ return data >>> (off*Byte.SIZE); }
+			@Override
+			public void writeTo(byte[] dest, int off, int len){ WordIO.setWord(data, dest, off, len); }
+			@Override
+			public void writeTo(int localOff, byte[] dest, int off, int len){ WordIO.setWord(shifted(localOff), dest, off, len); }
+			@Override
+			public WriteEvent trim(int newLen){
+				if(len<newLen) throw new IllegalArgumentException();
+				return new Word(offset, data&mask(newLen), newLen);
+			}
+			@Override
+			public WriteEvent trimStart(int newLen){
+				if(len<newLen) throw new IllegalArgumentException();
+				var copyOff = len - newLen;
+				var newOff  = offset + copyOff;
+				return new Word(newOff, shifted(copyOff), newLen);
+			}
+			private static long mask(int bytes){ return BitUtils.makeMask(bytes*Byte.SIZE); }
+			@Override
+			boolean tryInlineSet(int localOff, long word, int len){
+				var newLength = localOff + len;
+				if(newLength>8) return false;
+				doSet(localOff, word, len, (byte)newLength);
+				return true;
+			}
+			@Override
+			boolean tryInlineSet(int localOff, byte[] data, int off, int len){
+				var newLength = localOff + len;
+				if(newLength>8) return false;
+				doSet(localOff, WordIO.getWord(data, off, len), len, (byte)newLength);
+				return true;
+			}
+			private void doSet(int localOff, long word, int wLen, byte newLength){
+				var mask = mask(wLen);
+				var offb = (localOff*Byte.SIZE);
+				data = (data&(~(mask<<offb)))|
+				       ((word&mask)<<offb);
+				if(len<newLength){
+					len = newLength;
+				}
+			}
+			@Override
+			WriteEvent append(byte[] b, int off, int len){
+				var newLen = this.len + len;
+				if(newLen<=8){
+					var word = WordIO.getWord(b, off, len);
+					data |= word<<(this.len*Byte.SIZE);
+					this.len = (byte)newLen;
+					return this;
+				}
+				var bb = new byte[newLen];
+				WordIO.setWord(data, bb, 0, this.len);
+				System.arraycopy(b, off, bb, this.len, len);
+				return new Arr(offset, bb);
+			}
+			@Override
+			WriteEvent append(WriteEvent other){
+				var newLen = this.len + other.length();
+				if(newLen<=8){
+					var word = other.asWord();
+					data |= word<<(this.len*Byte.SIZE);
+					this.len = (byte)newLen;
+					return this;
+				}
+				var bb = new byte[newLen];
+				WordIO.setWord(data, bb, 0, this.len);
+				other.writeTo(bb, this.len, other.length());
+				return new Arr(offset, bb);
+			}
+			@Override
+			byte[] byteArr(){
+				byte[] arr = new byte[len];
+				WordIO.setWord(data, arr, 0, len);
+				return arr;
+			}
+			@Override
+			WriteEvent prepend(byte[] b, int off, int len){
+				var newLen = this.len + len;
+				if(newLen<=8){
+					var word = WordIO.getWord(b, off, len);
+					return new Word(offset - len, word|(data<<(len*Byte.SIZE)), newLen);
+				}
+				var bb = new byte[newLen];
+				System.arraycopy(b, off, bb, 0, len);
+				WordIO.setWord(data, bb, len, this.len);
+				return new Arr(offset - len, bb);
+			}
+			@Override
+			public String toString(){ return "W" + start() + " - " + end() + " " + Arrays.toString(byteArr()); }
+		}
+		
+		static final class Arr extends WriteEvent{
+			private byte[] data;
+			
+			public Arr(long offset, byte[] data){
+				super(offset);
+				this.data = data;
+			}
+			@Override
+			public int length(){ return data.length; }
+			@Override
+			public int read1(int off){ return Byte.toUnsignedInt(data[off]); }
+			@Override
+			long asWord(){
+				if(data.length>8) throw new UnsupportedOperationException();
+				return WordIO.getWord(data, 0, data.length);
+			}
+			@Override
+			public long readWord(int off, int len){ return WordIO.getWord(data, off, len); }
+			@Override
+			public void writeTo(byte[] dest, int off, int len){ System.arraycopy(data, 0, dest, off, len); }
+			@Override
+			public void writeTo(int localOff, byte[] dest, int off, int len){ System.arraycopy(data, localOff, dest, off, len); }
+			@Override
+			public WriteEvent trim(int newLen){
+				if(newLen<=8) return new Word(offset, WordIO.getWord(data, 0, newLen), newLen);
+				return new Arr(offset, Arrays.copyOf(data, newLen));
+			}
+			@Override
+			public WriteEvent trimStart(int newLen){
+				var copyOff = data.length - newLen;
+				var newOff  = offset + copyOff;
+				if(newLen<=8){
+					return new Word(newOff, WordIO.getWord(data, copyOff, newLen), newLen);
+				}
+				var bb = new byte[newLen];
+				System.arraycopy(data, copyOff, bb, 0, newLen);
+				return new Arr(newOff, bb);
+			}
+			@Override
+			boolean tryInlineSet(int localOff, long word, int len){
+				var nl = localOff + len;
+				if(nl>data.length) data = Arrays.copyOf(data, nl);
+				WordIO.setWord(word, data, localOff, len);
+				return true;
+			}
+			@Override
+			boolean tryInlineSet(int localOff, byte[] bb, int off, int len){
+				var nl = localOff + len;
+				if(nl>data.length){
+					var old = data;
+					data = new byte[nl];
+					System.arraycopy(old, 0, data, 0, old.length);
+				}
+				System.arraycopy(bb, off, data, localOff, len);
+				return true;
+			}
+			@Override
+			WriteEvent append(byte[] b, int off, int len){
+				var bb = Arrays.copyOf(data, data.length + len);
+				System.arraycopy(b, off, bb, data.length, len);
+				return new Arr(offset, bb);
+			}
+			@Override
+			WriteEvent append(WriteEvent other){
+				var bb = Arrays.copyOf(data, data.length + other.length());
+				other.writeTo(bb, data.length, other.length());
+				return new Arr(offset, bb);
+			}
+			@Override
+			byte[] byteArr(){ return data; }
+			@Override
+			WriteEvent prepend(byte[] b, int off, int len){
+				var newLen = data.length + len;
+				if(newLen<=8){
+					return new Word(
+						offset - len,
+						WordIO.getWord(b, off, len)|
+						WordIO.getWord(data, 0, data.length)<<(len*Byte.SIZE),
+						(byte)newLen
+					);
+				}
+				var bb = new byte[newLen];
+				System.arraycopy(b, off, bb, 0, len);
+				System.arraycopy(data, 0, bb, len, data.length);
+				return new Arr(offset - len, bb);
+			}
+			@Override
+			public String toString(){ return "A" + start() + " - " + end() + " " + Arrays.toString(data); }
+		}
+	}
+	
+	private final class LocalOffIndexIter implements PrimitiveIterator.OfInt{
 		private final long    offset;
 		private final boolean eventStart;
 		
@@ -129,7 +338,120 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	private int readSingle(long offset){
+	private final class BufferedTransaction implements IOTransaction{
+		private final int  startingChunkCount;
+		private final long startingTotalBytes;
+		
+		private final boolean          oldTransactionOpen;
+		private final VarHandle        transactionOpenVar;
+		private final RandomIO.Creator target;
+		
+		public BufferedTransaction(boolean oldTransactionOpen, VarHandle transactionOpenVar, RandomIO.Creator target){
+			startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
+			startingTotalBytes = DEBUG_VALIDATION && oldTransactionOpen? getTotalBytes() : 0;
+			this.oldTransactionOpen = oldTransactionOpen;
+			this.transactionOpenVar = transactionOpenVar;
+			this.target = target;
+		}
+		
+		@Override
+		public int getChunkCount(){
+			return IOTransactionBuffer.this.getChunkCount();
+		}
+		@Override
+		public long getTotalBytes(){
+			return IOTransactionBuffer.this.getTotalBytes();
+		}
+		
+		private void exportData() throws IOException{
+			transactionOpenVar.set(target, oldTransactionOpen);
+			if(!oldTransactionOpen){
+				var data = export();
+				target.io(data::apply);
+			}
+		}
+		
+		private void exportDataDeb() throws IOException{
+			if(oldTransactionOpen){
+				transactionOpenVar.set(target, true);
+				return;
+			}
+			var expected = target.readAll();
+			var data     = export();
+			transactionOpenVar.set(target, false);
+			target.io(data::apply);
+			var actual = target.readAll();
+			if(!Arrays.equals(expected, actual)){
+				var baos = new ByteArrayOutputStream();
+				try(var oos = new ObjectOutputStream(baos)){ oos.writeObject(data); }
+				throw new AssertionError("Transaction before and after apply differs!\n" +
+				                         "Expected: " + Arrays.toString(expected) + "\n" +
+				                         "Actual:   " + Arrays.toString(actual) + "\n" +
+				                         "Transaction:\n" + Base64.getEncoder().encodeToString(baos.toByteArray()));
+			}
+		}
+		
+		@Override
+		public void close() throws IOException{
+			try(var ignore = lock.write()){
+				if(DEBUG_VALIDATION) exportDataDeb();
+				else exportData();
+			}
+		}
+		
+		@Override
+		public String toString(){
+			if(oldTransactionOpen){
+				if(!DEBUG_VALIDATION){
+					return "Transaction{child}";
+				}
+				return "Transaction{Δ count: " + (startingChunkCount - getChunkCount()) + ", Δ bytes: " + (startingTotalBytes - getTotalBytes()) + "}";
+			}
+			return "Transaction{count: " + getChunkCount() + ", bytes: " + getTotalBytes() + "}";
+		}
+	}
+	
+	private static WriteEvent makeEvent(long offset, byte[] b, int off, int len){
+		if(len<=8){
+			return makeWordEvent(offset, WordIO.getWord(b, off, len), len);
+		}
+		byte[] data = new byte[len];
+		System.arraycopy(b, off, data, 0, len);
+		return new WriteEvent.Arr(offset, data);
+	}
+	private static WriteEvent makeWordEvent(long offset, long v, int len){
+		return new WriteEvent.Word(offset, v, len);
+	}
+	
+	private final List<WriteEvent>      writeEvents = new ArrayList<>();
+	private final ReadWriteClosableLock lock;
+	
+	private long modifiedCapacity = -1;
+	
+	public IOTransactionBuffer(){
+		this(true);
+	}
+	public IOTransactionBuffer(boolean threadSafe){
+		lock = threadSafe? ReadWriteClosableLock.reentrant() : ReadWriteClosableLock.noop();
+	}
+	
+	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
+		return x1<=(y2 - 1) && y1<=(x2 - 1);
+	}
+	
+	public int readByte(BaseAccess base, long offset) throws IOException{
+		int data;
+		try(var ignored = lock.read()){
+			data = readByte0(offset);
+		}
+		if(data != -1) return data;
+		
+		byte[] b    = {0};
+		int    read = base.read(offset, b, 0, 1);
+		return read != 1? -1 : b[0]&0xFF;
+	}
+	
+	private int readByte0(long offset){
 		for(var iter = new LocalOffIndexIter(offset, 0, true); iter.hasNext(); ){
 			int i = iter.nextInt();
 			
@@ -138,14 +460,14 @@ public final class IOTransactionBuffer{
 			
 			var localOffsetL = offset - eStart;
 			if(localOffsetL<0){
-				continue;
+				break;
 			}
 			
-			var length = event.data.length;
+			var length = event.length();
 			if(localOffsetL>=length) continue;
 			var localOffset = (int)localOffsetL;
 			
-			return event.data[localOffset]&0xFF;
+			return event.read1(localOffset);
 		}
 		return -1;
 	}
@@ -153,13 +475,6 @@ public final class IOTransactionBuffer{
 	public int read(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		if(len == 0) return 0;
 		try(var ignored = lock.read()){
-			if(len == 1){
-				int byt = readSingle(offset);
-				if(byt != -1){
-					b[off] = (byte)byt;
-					return 1;
-				}
-			}
 			return read0(base, offset, b, off, len);
 		}
 	}
@@ -173,7 +488,6 @@ public final class IOTransactionBuffer{
 				return WordIO.getWord(buf, 0, len);
 			}
 			
-			
 			var newEnd = offset + len;
 			for(var iter = new LocalOffIndexIter(offset, 0, true); iter.hasNext(); ){
 				var i = iter.nextInt();
@@ -181,12 +495,17 @@ public final class IOTransactionBuffer{
 				var event = writeEvents.get(i);
 				
 				var eStart = event.start();
-				if(offset<eStart) continue;
+				if(offset<eStart){
+					if(newEnd<eStart){
+						break;
+					}
+					continue;
+				}
 				
 				var end = event.end();
 				if(end>=newEnd){
 					var eventOffset = (int)(offset - eStart);
-					return WordIO.getWord(event.data, eventOffset, len);
+					return event.readWord(eventOffset, len);
 				}
 				break;
 			}
@@ -212,7 +531,6 @@ public final class IOTransactionBuffer{
 	}
 	
 	private int read0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
-		
 		WriteEvent next;
 		
 		long cursor = offset;
@@ -231,23 +549,18 @@ public final class IOTransactionBuffer{
 				
 				var localOffsetL = cursor - eStart;
 				if(localOffsetL<0){
-					if(next == null) next = event;
-					else{
-						if(next.offset>event.offset){
-							next = event;
-						}
-					}
-					continue;
+					next = event;
+					break;
 				}
 				
-				var length = event.data.length;
+				var length = event.length();
 				if(localOffsetL>=length) continue;
 				var localOffset = (int)localOffsetL;
 				
 				var remaining = length - localOffset;
 				var toCopy    = Math.min(remaining, rem);
 				
-				System.arraycopy(event.data, localOffset, b, localOff, toCopy);
+				event.writeTo(localOffset, b, localOff, toCopy);
 				
 				cursor += toCopy;
 				localOff += toCopy;
@@ -274,12 +587,18 @@ public final class IOTransactionBuffer{
 				if(len == rem) return -1;
 				return len - rem;
 			}
+			if(next != null && rem>0){
+				var length = next.length();
+				var toCopy = Math.min(length, rem);
+				next.writeTo(b, localOff, toCopy);
+				cursor += toCopy;
+				localOff += toCopy;
+				rem -= toCopy;
+			}
 		}
 		if(rem != 0) throw new AssertionError();
 		return len;
 	}
-	
-	private long modifiedCapacity = -1;
 	
 	public long getCapacity(long fallback){
 		try(var ignored = lock.read()){
@@ -317,9 +636,9 @@ public final class IOTransactionBuffer{
 			}
 			if(e.end()>newCapacity){
 				int shrink = (int)(e.end() - newCapacity);
-				assert shrink<e.data.length : newCapacity;
+				assert shrink<e.length() : newCapacity;
 				assert shrink>0;
-				writeEvents.set(i, makeEvent(e.offset, e.data, 0, e.data.length - shrink));
+				writeEvents.set(i, e.trim(e.length() - shrink));
 				continue;
 			}
 			break;
@@ -327,100 +646,69 @@ public final class IOTransactionBuffer{
 		
 	}
 	
-	
-	private static WriteEvent makeEvent(long offset, byte[] b, int off, int len){
-		byte[] data = new byte[len];
-		System.arraycopy(b, off, data, 0, len);
-		return new WriteEvent(offset, data);
+	public void writeByte(long offset, int b) throws IOException{
+		write(offset, new byte[]{(byte)b}, 0, 1);
 	}
-	private static WriteEvent makeWordEvent(long offset, long v, int len){
-		byte[] arr = new byte[len];
-		WordIO.setWord(v, arr, 0, len);
-		return new WriteEvent(offset, arr);
-	}
-	
-	public void writeByte(BaseAccess base, long offset, int b) throws IOException{
-		write(base, offset, new byte[]{(byte)b}, 0, 1);
-	}
-	
-	public void writeChunks(BaseAccess base, Collection<RandomIO.WriteChunk> writeData) throws IOException{
+	public void writeChunks(Collection<RandomIO.WriteChunk> writeData){
 		try(var ignored = lock.write()){
 			for(var e : writeData){
-				write0(base, e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				write0(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 			}
 		}
 	}
-	
-	public void write(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
+	public void write(long offset, byte[] b, int off, int len) throws IOException{
 		try(var ignored = lock.write()){
-			write0(base, offset, b, off, len);
+			write0(offset, b, off, len);
 		}
 	}
-	
-	public void writeWord(BaseAccess base, long offset, long v, int len) throws IOException{
+	public void writeWord(long offset, long v, int len) throws IOException{
 		try(var ignored = lock.write()){
-			var newEnd = offset + len;
-			if(!writeEvents.isEmpty()){
-				if(writeEvents.getFirst().start()>newEnd){
-					writeEvents.addFirst(makeWordEvent(offset, v, len));
-					markIndexDirty(base, 0, offset);
-					return;
-				}
-				if(writeEvents.getLast().end()<offset){
-					writeEvents.add(makeWordEvent(offset, v, len));
-					markIndexDirty(base, writeEvents.size() - 1, offset);
-					return;
-				}
-			}else{
-				writeEvents.add(makeWordEvent(offset, v, len));
-				return;
-			}
-			
-			for(var iter = new LocalOffIndexIter(offset, 0, true); iter.hasNext(); ){
-				var i = iter.nextInt();
-				
-				var event = writeEvents.get(i);
-				if(offset<event.start()) continue;
-				
-				var end = event.end();
-				if(end>=newEnd){
-					var start       = event.start();
-					var eventOffset = (int)(offset - start);
-					WordIO.setWord(v, event.data, eventOffset, len);
-					return;
-				}
-				break;
-			}
-			
-			byte[] arr = new byte[len];
-			WordIO.setWord(v, arr, 0, len);
-			write0(base, offset, arr, 0, len);
+			writeWord0(offset, v, len);
 		}
 	}
 	
-	private void write0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
+	private void writeWord0(long offset, long v, int len){
+		var newEnd = offset + len;
+		if(writeEvents.isEmpty()){
+			writeEvents.add(makeWordEvent(offset, v, len));
+			return;
+		}
+		var offEnd = offset + len;
+		for(var iter = new LocalOffIndexIter(offset, 0, true); iter.hasNext(); ){
+			var i     = iter.nextInt();
+			var event = writeEvents.get(i);
+			var s     = event.start();
+			if(offEnd<s) continue;
+			if(offset<s) continue;
+			
+			var end = event.end();
+			if(end>=newEnd){
+				var start       = event.start();
+				var eventOffset = (int)(offset - start);
+				if(event.tryInlineSet(eventOffset, v, len)){
+					return;
+				}
+			}
+			break;
+		}
+		
+		byte[] arr = new byte[len];
+		WordIO.setWord(v, arr, 0, len);
+		write0(offset, arr, 0, len);
+	}
+	
+	private void write0(long offset, byte[] b, int off, int len){
 		if(len == 0) return;
 		var newStart = offset;
 		var newEnd   = offset + len;
 		try{
-			if(!writeEvents.isEmpty()){
-				if(writeEvents.getFirst().start()>newEnd){
-					writeEvents.addFirst(makeEvent(offset, b, off, len));
-					markIndexDirty(base, 0, offset);
-					return;
-				}
-				if(writeEvents.getLast().end()<newStart){
-					writeEvents.add(makeEvent(offset, b, off, len));
-					markIndexDirty(base, writeEvents.size() - 1, offset);
-					return;
-				}
-			}else{
+			if(writeEvents.isEmpty()){
 				writeEvents.add(makeEvent(offset, b, off, len));
 				return;
 			}
 			
 			for(var iter = new LocalOffIndexIter(newStart, 0, false); iter.hasNext(); ){
-				int i = iter.nextInt();
+				final int i = iter.nextInt();
 				
 				var event = writeEvents.get(i);
 				
@@ -428,57 +716,42 @@ public final class IOTransactionBuffer{
 				var eEnd   = event.end();
 				
 				if(eEnd == newStart){
-					if(checkNext(base, offset, b, off, len, i, event.end() + len)) return;
+					if(checkNext(offset, b, off, len, i, event.end() + len)) return;
 					
-					byte[] data = Arrays.copyOf(event.data, event.data.length + len);
-					System.arraycopy(b, off, data, event.data.length, len);
-					writeEvents.set(i, new WriteEvent(event.offset, data));
-					markIndexDirty(base, i, offset);
+					writeEvents.set(i, event.append(b, off, len));
 					return;
 				}
 				if(newEnd == eStart){
-//					if(checkNext(offset, b, off, len, i, event.end()+len)) return;
-					byte[] data = new byte[event.data.length + len];
-					System.arraycopy(b, off, data, 0, len);
-					System.arraycopy(event.data, 0, data, len, event.data.length);
-					setEventSorted(base, i, new WriteEvent(offset, data), offset);
+					var e = event.prepend(b, off, len);
+					setEventSorted(i, e);
 					return;
 				}
 				if(rangeOverlaps(newStart, newEnd, eStart, eEnd)){
 					
-					var start = Math.min(newStart, eStart);
-					var end   = Math.max(newEnd, eEnd);
+					var joinedEnd = Math.max(newEnd, eEnd);
 					
-					if(checkNext(base, offset, b, off, len, i, end)) return;
+					if(checkNext(offset, b, off, len, i, joinedEnd)) return;
 					
-					//new event completely contains existing event, existing event can be replaced wi
-					if(newStart<eStart && newEnd>eEnd){
-						byte[] data = new byte[len];
-						System.arraycopy(b, off, data, 0, len);
-						setEventSorted(base, i, new WriteEvent(offset, data), offset);
+					//new event completely contains existing event, existing event can be replaced with new one
+					if(newStart<=eStart && newEnd>=eEnd){
+						setEventSorted(i, makeEvent(offset, b, off, len));
 						return;
 					}
 					
-					var size = Math.toIntExact(end - start);
-					
-					var newOff = Math.toIntExact(newStart - start);
-					var eOff   = Math.toIntExact(eStart - start);
-					
-					//existing event completely contains new event, existing event can be modified
-					if(newStart>eStart && newEnd<eEnd){
-						System.arraycopy(b, off, event.data, newOff, len);
-						return;
+					if(newStart>=eStart){
+						var eOff    = Math.toIntExact(newStart - eStart);
+						var success = event.tryInlineSet(eOff, b, off, len);
+						if(success) return;
 					}
 					
-					byte[] data = new byte[size];
-					System.arraycopy(event.data, 0, data, eOff, event.data.length);
-					System.arraycopy(b, off, data, newOff, len);
-					setEventSorted(base, i, new WriteEvent(start, data), offset);
+					mergeWriteEvents(b, off, len, newStart, eStart, joinedEnd, event, i);
 					return;
+				}
+				if(eEnd>newStart){
+					break;
 				}
 			}
 			UtilL.addRemainSorted(writeEvents, makeEvent(offset, b, off, len));
-			markIndexDirty(base, (int)(offset%writeEvents.size()), offset);
 		}finally{
 			if(modifiedCapacity != -1){
 				var last = writeEvents.getLast();
@@ -488,6 +761,69 @@ public final class IOTransactionBuffer{
 			}
 
 //			if(DEBUG_VALIDATION) validate();
+		}
+	}
+	private void mergeWriteEvents(byte[] b, int off, int len, long newStart, long eStart, long joinedEnd, WriteEvent event, int i){
+		var joinedStart = Math.min(newStart, eStart);
+		var joinedSize  = Math.toIntExact(joinedEnd - joinedStart);
+		
+		var newOff = (int)(newStart - joinedStart);
+		var eOff   = (int)(eStart - joinedStart);
+		
+		WriteEvent modEvent;
+		if(joinedSize<=8){
+			var newOffB = newOff*Byte.SIZE;
+			var mask    = BitUtils.makeMask(len*Byte.SIZE);
+			
+			var ew = event.asWord();
+			var w  = WordIO.getWord(b, off, len);
+			
+			modEvent = new WriteEvent.Word(
+				joinedStart,
+				(ew<<(eOff*Byte.SIZE))&(~(mask<<newOffB))|
+				w<<newOffB,
+				joinedSize);
+		}else{
+			byte[] data = new byte[joinedSize];
+			event.writeTo(data, eOff, event.length());
+			System.arraycopy(b, off, data, newOff, len);
+			modEvent = new WriteEvent.Arr(joinedStart, data);
+		}
+		setEventSorted(i, modEvent);
+	}
+	
+	private void setEventSorted(int i, WriteEvent event){
+		var old = writeEvents.set(i, event);
+		if(old.offset == event.offset) return;
+		correctEventOffset(i, event);
+	}
+	private void correctEventOffset(int eventIndex, WriteEvent event){
+		boolean swapped = false;
+		while(eventIndex>0){
+			var prevI = eventIndex - 1;
+			var prev  = writeEvents.get(prevI);
+			if(prev.compareTo(event)>0){
+				Collections.swap(writeEvents, eventIndex, prevI);
+				eventIndex--;
+				swapped = true;
+			}else{
+				if(!swapped) break;
+				return;
+			}
+		}
+		
+		while(true){
+			var nextI = eventIndex + 1;
+			if(nextI>=writeEvents.size()) return;
+			var next = writeEvents.get(nextI);
+			if(event.compareTo(next)>0){
+				Collections.swap(writeEvents, eventIndex, nextI);
+				eventIndex++;
+				swapped = true;
+			}else{
+				if(!swapped) break;
+				return;
+			}
 		}
 	}
 	
@@ -508,91 +844,49 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	private final IntHashSet dirty = new IntHashSet();
-	private       boolean    merging;
-	
-	private void markIndexDirty(BaseAccess base, int i, long jitter) throws IOException{
-		if(writeEvents.size()<64 || merging) return;
-		if(i>0) dirty.add(i - 1);
-		dirty.add(i);
-		merging = true;
-		doMerge(base, jitter);
-		merging = false;
-	}
-	
-	private void doMerge(BaseAccess base, long jitter) throws IOException{
-		var bufs = new ArrayList<WriteEvent>(dirty.size());
-		
-		var addFac = 40;
-		int count  = writeEvents.size()/addFac;
-		for(int i = 0; i<count; i++){
-			var id = (int)(Math.abs(jitter + i*addFac)%(writeEvents.size() - 1));
-			dirty.remove(id);
-			acumMergeBuf(base, id, bufs);
-		}
-		for(var ic : dirty){
-			var i = ic.value;
-			acumMergeBuf(base, i, bufs);
-		}
-		dirty.clear();
-		
-		for(var buf : bufs){
-			write0(base, buf.offset, buf.data, 0, buf.data.length);
-		}
-	}
-	private void acumMergeBuf(BaseAccess base, int i, ArrayList<WriteEvent> bufs) throws IOException{
-		if(i + 1>=writeEvents.size()) return;
-		var e1End    = writeEvents.get(i).end();
-		var e2Start  = writeEvents.get(i + 1).start();
-		var dist     = (int)(e2Start - e1End);
-		var jumpSize = writeEvents.size()/4;
-		if(dist<=jumpSize){
-			var bb   = new byte[dist];
-			var read = read0(base, e1End, bb, 0, bb.length);
-			bufs.add(new WriteEvent(e1End, bb.length != read? Arrays.copyOf(bb, read) : bb));
-		}
-	}
-	
-	private void setEventSorted(BaseAccess base, int i, WriteEvent m, long jitter) throws IOException{
-		var old = writeEvents.set(i, m);
-		if(old.offset == m.offset) return;
-		if(i>0){
-			var prev = writeEvents.get(i - 1);
-			if(prev.compareTo(m)>0){
-				writeEvents.sort(WriteEvent::compareTo);
-				markIndexDirty(base, i - 1, jitter);
-				return;
-			}
-		}
-		if(i + 1<writeEvents.size()){
-			var next = writeEvents.get(i + 1);
-			if(m.compareTo(next)>0){
-				writeEvents.sort(WriteEvent::compareTo);
-				markIndexDirty(base, i + 1, jitter);
-				return;
-			}
-		}
-	}
-	private boolean checkNext(BaseAccess base, long offset, byte[] b, int off, int len, int i, long end) throws IOException{
+	private boolean checkNext(long offset, byte[] b, int off, int len, int i, long writeEnd){
 		while(i<writeEvents.size() - 1){
-			var next = writeEvents.get(i + 1);
+			var iNext = i + 1;
+			var next  = writeEvents.get(iNext);
 			//multi merge
-			var nextOverwrite = (int)(end - next.start());
+			var nextOverwrite = (int)(writeEnd - next.start());
 			if(nextOverwrite>=0){
-				writeEvents.remove(i + 1);
-				if(nextOverwrite>=next.data.length){
+				//If true, then the next event is completely overwritten. Can be removed
+				if(nextOverwrite>=next.length()){
+					writeEvents.remove(iNext);
 					continue;
 				}
-				write0(base, offset, b, off, len);
+				WriteEvent e = next;
+				if(nextOverwrite>0){
+					e = next.trimStart(next.length() - nextOverwrite);
+				}
+				e = e.prepend(b, off, len);
+				assert e.offset == offset : e.offset + " != " + offset;
 				
-				if(nextOverwrite == 0){
-					write0(base, next.offset, next.data, 0, next.data.length);
+				//Make sure expanding next element backwards does not overlap current (i) element. Handle collisions
+				while(i<writeEvents.size() - 1){
+					var current         = writeEvents.get(i);
+					var currentOverride = (int)(current.end() - offset);
+					if(currentOverride<0) break;
+					if(current.offset>=offset){
+						writeEvents.remove(i);
+						iNext--;
+						if(i == 0) break;
+						i--;
+						continue;
+					}
+					if(currentOverride == 0){
+						writeEvents.set(i, current.append(e));
+						writeEvents.remove(iNext);
+						return true;
+					}
+					var combined = trimAndAppend(current, currentOverride, e);
+					writeEvents.set(i, combined);
+					writeEvents.remove(iNext);
 					return true;
 				}
 				
-				byte[] trimmed = new byte[next.data.length - nextOverwrite];
-				System.arraycopy(next.data, nextOverwrite, trimmed, 0, trimmed.length);
-				write0(base, next.offset + nextOverwrite, trimmed, 0, trimmed.length);
+				writeEvents.set(iNext, e);
 				return true;
 			}
 			break;
@@ -600,24 +894,28 @@ public final class IOTransactionBuffer{
 		return false;
 	}
 	
-	public record TransactionExport(OptionalPP<Long> setCapacity, List<RandomIO.WriteChunk> writes) implements Serializable{
-		
-		public void apply(RandomIO io) throws IOException{
-			switch(writes.size()){
-				case 0 -> { }
-				case 1 -> {
-					var e = writes.getFirst();
-					io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
-				}
-				default -> io.writeAtOffsets(writes);
-			}
-			if(setCapacity.isPresent()){
-				io.setCapacity(setCapacity.get());
-			}
+	private static WriteEvent trimAndAppend(WriteEvent first, int firstShrink, WriteEvent append){
+		var        trimLen = first.length() - firstShrink;
+		var        newLen  = trimLen + append.length();
+		WriteEvent combined;
+		if(newLen<=8){
+			var w  = first.readWord(0, trimLen);
+			var w2 = append.asWord();
+			combined = new WriteEvent.Word(first.offset, w|(w2<<(trimLen*Byte.SIZE)), newLen);
+		}else{
+			var data = new byte[newLen];
+			first.writeTo(data, 0, trimLen);
+			append.writeTo(data, trimLen, append.length());
+			combined = new WriteEvent.Arr(first.offset, data);
 		}
-		
+		return combined;
 	}
 	
+	public IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
+		var oldTransactionOpen = (boolean)transactionOpenVar.get(target);
+		transactionOpenVar.set(target, true);
+		return new BufferedTransaction(oldTransactionOpen, transactionOpenVar, target);
+	}
 	public TransactionExport export(){
 		try(var ignored = lock.write()){
 			return export0();
@@ -626,7 +924,7 @@ public final class IOTransactionBuffer{
 	private TransactionExport export0(){
 		var writes = new ArrayList<RandomIO.WriteChunk>(writeEvents.size());
 		for(var e : writeEvents){
-			writes.add(new RandomIO.WriteChunk(e.offset, e.data));
+			writes.add(new RandomIO.WriteChunk(e.offset, e.byteArr()));
 		}
 		
 		var setCapacity = OptionalPP.<Long>empty();
@@ -660,75 +958,10 @@ public final class IOTransactionBuffer{
 		try(var ignored = lock.read()){
 			int sum = 0;
 			for(WriteEvent writeEvent : writeEvents){
-				sum += writeEvent.data.length;
+				sum += writeEvent.length();
 			}
 			return sum;
 		}
 	}
 	
-	public IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
-		var oldTransactionOpen = (boolean)transactionOpenVar.get(target);
-		transactionOpenVar.set(target, true);
-		
-		return new IOTransaction(){
-			private final int  startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
-			private final long startingTotalBytes = DEBUG_VALIDATION && oldTransactionOpen? getTotalBytes() : 0;
-			
-			@Override
-			public int getChunkCount(){
-				return IOTransactionBuffer.this.getChunkCount();
-			}
-			@Override
-			public long getTotalBytes(){
-				return IOTransactionBuffer.this.getTotalBytes();
-			}
-			
-			private void exportData() throws IOException{
-				transactionOpenVar.set(target, oldTransactionOpen);
-				if(!oldTransactionOpen){
-					var data = export();
-					target.io(data::apply);
-				}
-			}
-			
-			private void exportDataDeb() throws IOException{
-				if(oldTransactionOpen){
-					transactionOpenVar.set(target, true);
-					return;
-				}
-				var expected = target.readAll();
-				var data     = export();
-				transactionOpenVar.set(target, false);
-				target.io(data::apply);
-				var actual = target.readAll();
-				if(!Arrays.equals(expected, actual)){
-					var baos = new ByteArrayOutputStream();
-					try(var oos = new ObjectOutputStream(baos)){ oos.writeObject(data); }
-					throw new AssertionError("Transaction before and after apply differs!\n" +
-					                         "Expected: " + Arrays.toString(expected) + "\n" +
-					                         "Actual:   " + Arrays.toString(actual) + "\n" +
-					                         "Transaction:\n" + Base64.getEncoder().encodeToString(baos.toByteArray()));
-				}
-			}
-			
-			@Override
-			public void close() throws IOException{
-				try(var ignore = lock.write()){
-					if(DEBUG_VALIDATION) exportDataDeb();
-					else exportData();
-				}
-			}
-			
-			@Override
-			public String toString(){
-				if(oldTransactionOpen){
-					if(!DEBUG_VALIDATION){
-						return "Transaction{child}";
-					}
-					return "Transaction{Δ count: " + (startingChunkCount - getChunkCount()) + ", Δ bytes: " + (startingTotalBytes - getTotalBytes()) + "}";
-				}
-				return "Transaction{count: " + getChunkCount() + ", bytes: " + getTotalBytes() + "}";
-			}
-		};
-	}
 }

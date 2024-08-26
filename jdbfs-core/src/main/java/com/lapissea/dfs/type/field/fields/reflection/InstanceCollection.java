@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
@@ -178,13 +179,13 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
 			var val = get(ioPool, instance);
 			if(val == null || dataAdapter.getSize(get(ioPool, instance)) == 0){
 				return Optional.empty();
 			}
 			return Optional.of(
-				doShort?
+				settings.doShort()?
 				Utils.toShortString(val) :
 				TextUtil.toString(val)
 			);
@@ -341,13 +342,13 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
 			var val = get(ioPool, instance);
 			if(val == null || dataAdapter.getSize(get(ioPool, instance)) == 0){
 				return Optional.empty();
 			}
 			return Optional.of(
-				doShort?
+				settings.doShort()?
 				Utils.toShortString(val) :
 				TextUtil.toString(val)
 			);

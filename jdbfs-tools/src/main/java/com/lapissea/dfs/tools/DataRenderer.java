@@ -4,6 +4,7 @@ import com.lapissea.dfs.objects.text.AutoText;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.string.StringifySettings;
 
 import java.awt.Color;
 import java.util.List;
@@ -126,11 +127,11 @@ public interface DataRenderer{
 	}
 	
 	record FieldVal<T extends IOInstance<T>>(VarPool<T> ioPool, T instance, IOField<T, ?> field){
-		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		Optional<String> instanceToString(StringifySettings settings){
 			if(field.getType() == byte[].class && instance instanceof AutoText t){
 				return Optional.of(t.getData());
 			}
-			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+			return field.instanceToString(ioPool, instance, settings);
 		}
 	}
 	

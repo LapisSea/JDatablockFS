@@ -20,7 +20,7 @@ import static org.testng.Assert.assertEquals;
 
 public class QueryTests{
 	
-	@IOInstance.Def.Order({"a", "b", "someData"})
+	@IOInstance.Order({"a", "b", "someData"})
 	interface FF extends IOInstance.Def<FF>{
 		static FF of(float a, float b){
 			return IOInstance.Def.of(FF.class, a, b, new byte[69]);

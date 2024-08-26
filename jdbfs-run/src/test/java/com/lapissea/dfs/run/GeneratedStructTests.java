@@ -63,8 +63,8 @@ public class GeneratedStructTests{
 	@Test
 	void simpleString(){
 		
-		@IOInstance.Def.ToString(name = false, fNames = false)
-		@IOInstance.Def.Order({"a", "b"})
+		@IOInstance.StrFormat(name = false, fNames = false)
+		@IOInstance.Order({"a", "b"})
 		interface Dummy extends IOInstance.Def<Dummy>{
 			int a();
 			NumberSize b();
@@ -77,8 +77,8 @@ public class GeneratedStructTests{
 	@Test
 	void orderedString(){
 		
-		@IOInstance.Def.ToString(name = false, fNames = false)
-		@IOInstance.Def.Order({"b", "a"})
+		@IOInstance.StrFormat(name = false, fNames = false)
+		@IOInstance.Order({"b", "a"})
 		interface Dummy extends IOInstance.Def<Dummy>{
 			int a();
 			NumberSize b();
@@ -90,8 +90,8 @@ public class GeneratedStructTests{
 	
 	@Test
 	void formatString(){
-		@IOInstance.Def.ToString.Format("[!!className ]@a -> @b")
-		@IOInstance.Def.Order({"a", "b"})
+		@IOInstance.StrFormat.Custom("[!!className ]@a -> @b")
+		@IOInstance.Order({"a", "b"})
 		interface Dummy extends IOInstance.Def<Dummy>{
 			int a();
 			NumberSize b();
@@ -104,12 +104,13 @@ public class GeneratedStructTests{
 	
 	@Test(expectedExceptions = MalformedToStringFormat.class)
 	void badFormat(){
-		@IOInstance.Def.ToString.Format("@someField")
+		@IOInstance.StrFormat.Custom("@someField")
 		interface Dummy extends IOInstance.Def<Dummy>{
 			int a();
 		}
 		
-		Struct.of(Dummy.class, StagedInit.STATE_DONE);
+		Dummy dummy = IOInstance.Def.of(Dummy.class, 1);
+		dummy.toString();
 	}
 	
 }

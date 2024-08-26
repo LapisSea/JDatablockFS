@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
+import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -482,7 +483,7 @@ public class GeneralTests{
 		assertEquals(none, Foo.of(null));
 	}
 	
-	@Test()
+	@Test
 	void typeValueWithOk() throws IOException{
 		interface Foo extends IOInstance.Def<Foo>{
 			@IONullability(NULLABLE)
@@ -505,5 +506,29 @@ public class GeneralTests{
 		c.roots().provide("none", Foo.of(null));
 		Foo none = c.roots().request("none", Foo.class);
 		assertEquals(none, Foo.of(null));
+	}
+	
+	@IOValue
+	@IOInstance.StrFormat.Custom("<@val>")
+	static class Custom1 extends IOInstance.Managed<Custom1>{
+		int val = 123;
+		public Custom1(){ }
+	}
+	
+	@IOValue
+	@IOInstance.StrFormat(name = false, fNames = false, filter = "val")
+	static class Custom2 extends IOInstance.Managed<Custom2>{
+		int val  = 123;
+		int val2 = 1234;
+		public Custom2(){ }
+	}
+	
+	@Test
+	void toStringInst1(){
+		assertEquals(new Custom1().toString(), "<123>");
+	}
+	@Test
+	void toStringInst2(){
+		assertEquals(new Custom2().toString(), "{123}");
 	}
 }

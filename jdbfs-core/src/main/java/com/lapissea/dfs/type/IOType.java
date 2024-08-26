@@ -5,6 +5,7 @@ import com.lapissea.dfs.SyntheticWildcardType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -264,7 +265,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 		@Override
 		public String toString(){
-			if(args == null) return getClass().getSimpleName() + "<uninitialized>";
+			if(args == null) return getClass().getSimpleName() + IOFieldTools.UNINITIALIZED_FIELD_SIGN;
 			return raw + Iters.from(args).joinAsStr(", ", "<", ">");
 		}
 		@Override

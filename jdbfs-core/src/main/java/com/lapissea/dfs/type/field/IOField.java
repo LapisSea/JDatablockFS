@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
@@ -334,14 +335,14 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	 * @return string of the resolved value or no value if string has no substance
 	 */
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+		return instanceToString(ioPool, instance, StringifySettings.ofDoShort(doShort));
 	}
 	
 	/**
 	 * @return string of the resolved value or no value if string has no substance
 	 */
-	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return FieldSupport.instanceToString(this, ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return FieldSupport.instanceToString(this, ioPool, instance, settings);
 	}
 	
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){

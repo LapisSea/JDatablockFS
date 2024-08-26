@@ -1,20 +1,22 @@
 package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -151,65 +153,45 @@ final class FieldSupport{
 	
 	private static String rem(int remaining){ return "... " + remaining + " more"; }
 	
+	private static final class Arr extends AbstractList<Object>{
+		private final Object arr;
+		private final int    len;
+		private Arr(Object arr, int len){
+			this.arr = arr;
+			this.len = len;
+		}
+		@Override
+		public Object get(int index){ return Array.get(arr, index); }
+		@Override
+		public int size(){ return len; }
+	}
+	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, StringifySettings settings){
 		Object val;
 		try{
 			val = field.get(ioPool, instance);
 		}catch(Throwable e){
-			return Optional.of("CORRUPTED: " + e);
+			return Optional.of(IOFieldTools.corruptedGet(e));
 		}
 		if(val == null){
 			if(field.isNonNullable()){
-				throw new FieldIsNull(field);
+				return Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
 			}
 			return Optional.empty();
 		}
 		
 		if(val instanceof IOInstance inst){
-			if("{".equals(start) && "}".equals(end) && "=".equals(fieldValueSeparator) && ", ".equals(fieldSeparator)){
-				return Optional.ofNullable(doShort? inst.toShortString() : inst.toString());
+			if(settings.stringsEqual(StringifySettings.DEFAULT)){
+				return Optional.ofNullable(settings.doShort()? inst.toShortString() : inst.toString());
 			}
 			
 			var struct = inst.getThisStruct();
-			return Optional.of(struct.instanceToString(inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
+			return Optional.of(struct.instanceToString(inst, settings));
 		}
 		
 		if(val.getClass().isArray()){
-			int resLen = 0, len = Array.getLength(val), remaining = len;
-			if(len == 0) return Optional.empty();
-			
-			var res       = new StringJoiner(", ", "[", "]");
-			var comp      = val.getClass().componentType();
-			var primitive = comp.isPrimitive();
-			
-			var oArr = primitive? null : (Object[])val;
-			for(int i = 0; i<len; i++){
-				var element = oArr != null? oArr[i] : Array.get(val, i);
-				var elStr   = primitive? element + "" : Utils.toShortString(element);
-				resLen += 2 + elStr.length();
-				var lenNow = resLen + rem(remaining).length();
-				if(doShort && lenNow>=200){
-					Class<?> type;
-					if(comp.isPrimitive()) type = comp;
-					else{
-						type = null;
-						for(Object o : oArr){
-							if(o == null) continue;
-							var c = o.getClass();
-							if(type == null) type = c;
-							else type = UtilL.findClosestCommonSuper(type, c);
-						}
-					}
-					return Optional.of(type.getSimpleName() + "[" + len + "]");
-				}
-				if(lenNow<(doShort? 100 : 200)){
-					res.add(elStr);
-					remaining--;
-				}
-			}
-			if(remaining>0) res.add(rem(remaining));
-			return Optional.of(res.toString());
+			val = new Arr(val, Array.getLength(val));
 		}
 		if(val instanceof Collection<?> data){
 			int resLen = 0, remaining = data.size();
@@ -220,17 +202,28 @@ final class FieldSupport{
 				var e = Utils.toShortString(o);
 				resLen += 2 + e.length();
 				var lenNow = resLen + rem(remaining).length();
-				if(doShort && lenNow>=200){
-					var dataName = switch(data){
-						case List<?> ignored -> "List";
-						case Set<?> ignored -> "Set";
-						default -> data.getClass().getSimpleName();
-					};
-					var type = Utils.findClosestCommonSuper(Iters.from(data).nonNulls().map(Object::getClass));
-					if(type == Object.class) return Optional.of(dataName + "<?>[" + data.size() + "]");
-					return Optional.of(dataName + "<" + type.getSimpleName() + ">[" + data.size() + "]");
+				if(settings.doShort() && lenNow>=200){
+					String prefix;
+					if(data instanceof Arr arr){
+						var typ = arr.arr.getClass().componentType();
+						if(Modifier.isFinal(typ.getModifiers()) || SupportedPrimitive.getStrict(typ).isPresent()){
+							prefix = typ.getTypeName();
+						}else{
+							var type = Utils.findClosestCommonSuper(Iters.from(arr).nonNulls().map(Object::getClass));
+							prefix = (type == Object.class? typ : type).getTypeName();
+						}
+					}else{
+						var type = Utils.findClosestCommonSuper(Iters.from(data).nonNulls().map(Object::getClass));
+						var dataName = switch(data){
+							case List<?> ignored -> "List";
+							case Set<?> ignored -> "Set";
+							default -> data.getClass().getSimpleName();
+						};
+						prefix = type == Object.class? dataName + "<?>" : dataName + "<" + type.getSimpleName() + ">";
+					}
+					return Optional.of(prefix + "[" + data.size() + "]");
 				}
-				if(lenNow<(doShort? 100 : 200)){
+				if(lenNow<(settings.doShort()? 100 : 200)){
 					res.add(e);
 					remaining--;
 				}
@@ -240,7 +233,7 @@ final class FieldSupport{
 		}
 		
 		return Optional.of(
-			doShort?
+			settings.doShort()?
 			Utils.toShortString(val) :
 			TextUtil.toString(val)
 		);

@@ -144,7 +144,7 @@ public class GeneralTypeHandlingTests{
 		);
 	}
 	
-	@IOInstance.Def.Order({"name", "data"})
+	@IOInstance.Order({"name", "data"})
 	public interface NamedBlob extends IOInstance.Def<NamedBlob>{
 		String name();
 		@IOCompression(RLE)
@@ -408,7 +408,7 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void testSealedType() throws IOException{
-		@IOInstance.Def.Order({"seal1", "seal2"})
+		@IOInstance.Order({"seal1", "seal2"})
 		interface Container extends IOInstance.Def<Container>{
 			Seal seal1();
 			Seal seal2();

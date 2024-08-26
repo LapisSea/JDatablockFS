@@ -10,6 +10,7 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.IOUtils;
 
 import java.io.EOFException;
@@ -137,7 +138,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void write(int b) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.writeByte(readAt, pos, b);
+				transactionBuff.writeByte(pos, b);
 				pos++;
 				return;
 			}
@@ -150,7 +151,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void write(byte[] b, int off, int len) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactionBuff.write(readAt, pos, b, off, len);
+				transactionBuff.write(pos, b, off, len);
 				pos += len;
 				return;
 			}
@@ -166,7 +167,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				transactionBuff.writeChunks(readAt, writeData);
+				transactionBuff.writeChunks(writeData);
 				return;
 			}
 			data.writeAtOffsets(writeData);
@@ -176,7 +177,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void writeWord(long v, int len) throws IOException{
 			if(len == 0) return;
 			if(transactionOpen){
-				transactionBuff.writeWord(readAt, pos, v, len);
+				transactionBuff.writeWord(pos, v, len);
 			}else{
 				data.setPos(pos).writeWord(v, len);
 			}
@@ -248,7 +249,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 			res.add("size: " + io.getSize());
 			res.add("capacity: " + io.getCapacity());
 		}catch(IOException e){
-			res.add("CORRUPTED: " + e);
+			res.add(IOFieldTools.corruptedGet(e));
 		}
 		return res.toString();
 	}

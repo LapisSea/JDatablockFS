@@ -266,7 +266,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			try{
 				str = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNull e){
-				str = Optional.of("<UNINITIALIZED>");
+				str = Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
 			}
 			return str.map(s -> field.getName() + "=" + s);
 		}).joinAsOptionalStr(" + ", "{", "}");
