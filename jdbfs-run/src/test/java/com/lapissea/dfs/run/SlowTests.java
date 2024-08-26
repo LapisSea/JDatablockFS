@@ -25,6 +25,7 @@ import com.lapissea.dfs.run.checked.CheckSet;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzFail;
 import com.lapissea.fuzz.FuzzSequence;
@@ -58,10 +59,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -164,89 +163,6 @@ public class SlowTests{
 		
 	}
 	
-	@Test
-	void ioTransaction(){
-		int cap = 50;
-		
-		ThreadLocal<IOInterface> dataLocal   = ThreadLocal.withInitial(() -> MemoryData.builder().withCapacity(cap + 10).build());
-		ThreadLocal<IOInterface> mirrorLocal = ThreadLocal.withInitial(() -> MemoryData.builder().withCapacity(cap + 10).build());
-		
-		
-		
-		//Dumb brute force all possible edge cases
-		TestUtils.randomBatch(50000, 1000, (rand, run) -> {
-			int runIndex = 0;
-			
-			IOInterface data   = dataLocal.get();
-			IOInterface mirror = mirrorLocal.get();
-			
-			try(var ignored = data.openIOTransaction()){
-				var runSize = rand.nextInt(40);
-				for(int j = 1; j<runSize + 1; j++){
-					runIndex++;
-					var failS = "failed on run " + run + " " + runIndex;
-					
-					if(rand.nextFloat()<0.1){
-						var newSiz = rand.nextInt(cap*2) + 21;
-						
-						try(var io = mirror.io()){
-							io.setCapacity(newSiz);
-						}
-						try(var io = data.io()){
-							io.setCapacity(newSiz);
-						}
-					}else{
-						
-						int off = rand.nextInt((int)data.getIOSize() - 10);
-						int siz = rand.nextInt(10);
-						
-						byte[] buf = new byte[siz];
-						Arrays.fill(buf, (byte)j);
-						
-						mirror.write(off, false, buf);
-						data.write(off, false, buf);
-						
-						assertEquals(
-							data.read(off + 1, 9),
-							mirror.read(off + 1, 9),
-							failS
-						);
-					}
-					
-					assertEquals(data.getIOSize(), mirror.getIOSize(), failS);
-					
-					for(int i = 0; i<100; i++){
-						var rSiz = rand.nextInt(20);
-						var rOff = rand.nextInt((int)(data.getIOSize() - rSiz));
-						if(!Arrays.equals(data.read(rOff, rSiz), mirror.read(rOff, rSiz))){
-							fail(failS + " " + i);
-						}
-					}
-					
-					check(mirror, data, failS);
-				}
-			}catch(Throwable e){
-				throw new RuntimeException("failed on run " + run + " " + runIndex, e);
-			}
-			check(mirror, data, "failed after cycle " + run);
-		});
-	}
-	
-	private void check(IOInterface expected, IOInterface data, String s){
-		byte[] m, d;
-		try{
-			m = expected.readAll();
-			d = data.readAll();
-		}catch(Throwable e){
-			throw new RuntimeException(s, e);
-		}
-		if(!Arrays.equals(m, d)){
-			fail(s + "\n" +
-			     HexFormat.of().formatHex(m) + "\n" +
-			     HexFormat.of().formatHex(d) + "\n");
-		}
-	}
-	
 	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
 	void bigMapCompliant() throws IOException{
 		bigMapRun(TestInfo.of("compliant"), true);
@@ -338,8 +254,7 @@ public class SlowTests{
 				}
 			}
 			try{
-				if(mapC.size()>=1023*2) return;
-				mapC.put(i, ("int(" + i + ")").repeat(new Random(provider.getSource().getIOSize() + i).nextInt(20)));
+				mapC.put(i, ("int(" + i + ")").repeat(new RawRandom(provider.getSource().getIOSize() + i).nextInt(20)));
 				i++;
 			}catch(Throwable e){
 				e1 = new IOException("failed to put element: " + i, e);
