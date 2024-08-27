@@ -9,6 +9,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -145,8 +146,7 @@ public final class StructFuzzTest{
 				
 				List<Annotation> annotations;
 				if(hasFinal){
-					var names = Iters.from(fields).map(TempClassGen.FieldGen::name).toArray(String[]::new);
-					annotations = List.of(Annotations.make(IOInstance.Order.class, Map.of("value", names)));
+					annotations = List.of(IOFieldTools.orderFromNames(Iters.from(fields).map(TempClassGen.FieldGen::name)));
 				}else{
 					annotations = List.of();
 				}

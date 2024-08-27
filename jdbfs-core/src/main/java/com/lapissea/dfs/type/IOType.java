@@ -206,7 +206,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	}
 	
 	@IOValue
-	@Order({"raw", "args"})
 	public static final class TypeGeneric extends IOType implements RawAndArg{
 		
 		private final TypeRaw      raw;
@@ -287,7 +286,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	}
 	
 	@IOValue
-	@Order({"bound", "isLower"})
 	public static final class TypeWildcard extends IOType{
 		@IONullability(NULLABLE)
 		private final IOType  bound;
@@ -370,7 +368,6 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	}
 	
 	@IOValue
-	@Def.Order({"parent", "name"})
 	public static final class TypeNameArg extends IOType{
 		
 		private final TypeRaw parent;

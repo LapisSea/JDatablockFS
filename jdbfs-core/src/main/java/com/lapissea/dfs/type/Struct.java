@@ -649,8 +649,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return new ToStrType.Default<>();
 	}
 	private IterablePP<IOField<T, ?>> tryOrderFields(IterablePP<IOField<T, ?>> generatedFields){
-		var order = getType().getAnnotation(IOInstance.Order.class);
-		if(order != null){
+		return IOFieldTools.tryGetOrImplyOrder(this).<IterablePP<IOField<T, ?>>>map(order -> {
 			var names = order.value();
 			if(Iters.from(names).hasDuplicates()){
 				throw new IllegalArgumentException("Duplicate order names present");
@@ -659,9 +658,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(fs.size() != names.length){
 				throw new IllegalArgumentException("All fields in order should be defined!");
 			}
-			generatedFields = Iters.from(names).map(fs::requireByName);
-		}
-		return generatedFields;
+			return Iters.from(names).map(fs::requireByName);
+		}).orElse(generatedFields);
 	}
 	
 	public String instanceToString(T instance, boolean doShort){

@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.PerKeyLock;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
@@ -47,7 +48,7 @@ public final class BuilderProxyCompiler{
 		
 		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
 		
-		if(type.getRealFields().size()>1 && !baseClass.isAnnotationPresent(IOInstance.Order.class)){
+		if(type.getRealFields().size()>1 && IOFieldTools.tryGetOrImplyOrder(type).isEmpty()){
 			throw new MalformedStruct("fmt", "Structs with final fields need an {#yellowOrder#} annotation! {}#red does not have one. The order should match the order of fields in the constructor.", baseClass);
 		}
 		
