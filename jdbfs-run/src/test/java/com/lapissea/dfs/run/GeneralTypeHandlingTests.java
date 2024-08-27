@@ -671,7 +671,8 @@ public class GeneralTypeHandlingTests{
 			"testunload",
 			List.of(new TempClassGen.FieldGen("hi", int.class, List.of(Annotations.make(IOValue.class)), false, null)),
 			Set.of(new TempClassGen.CtorType.Empty()),
-			IOInstance.Managed.class
+			IOInstance.Managed.class,
+			List.of()
 		);
 		var unloadedStatus = new boolean[]{false};
 		Cleaner.create().register(def, () -> unloadedStatus[0] = true);

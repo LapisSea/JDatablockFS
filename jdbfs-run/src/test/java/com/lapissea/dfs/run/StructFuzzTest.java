@@ -101,7 +101,8 @@ public final class StructFuzzTest{
 			"testBefore",
 			List.of(new TempClassGen.FieldGen("f1", int.class, anns(IOVal), false, RandomGenerator::nextInt)),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
-			IOInstance.Managed.class
+			IOInstance.Managed.class,
+			List.of()
 		));
 	}
 	
@@ -135,15 +136,27 @@ public final class StructFuzzTest{
 				var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()
 				                  .toList(e -> fieldTypes.get(e.val()).apply("field" + e.index(), rand));
 				
+				boolean hasFinal = Iters.from(fields).anyMatch(TempClassGen.FieldGen::isFinal);
+				
 				Set<TempClassGen.CtorType> constructors = new HashSet<>();
 				if(!fields.isEmpty()) constructors.add(new TempClassGen.CtorType.All());
 				if(Iters.from(fields).noneMatch(TempClassGen.FieldGen::isFinal)) constructors.add(new TempClassGen.CtorType.Empty());
+				if(!hasFinal) constructors.add(new TempClassGen.CtorType.Empty());
+				
+				List<Annotation> annotations;
+				if(hasFinal){
+					var names = Iters.from(fields).map(TempClassGen.FieldGen::name).toArray(String[]::new);
+					annotations = List.of(Annotations.make(IOInstance.Order.class, Map.of("value", names)));
+				}else{
+					annotations = List.of();
+				}
 				
 				return new TempClassGen.ClassGen(
 					"test" + sequenceIndex,
 					fields,
 					constructors,
-					IOInstance.Managed.class
+					IOInstance.Managed.class,
+					annotations
 				);
 			}
 		}, FuzzingRunner::noopAction);

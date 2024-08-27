@@ -11,6 +11,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
@@ -57,7 +58,14 @@ public final class TempClassGen{
 		}
 	}
 	
-	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent){
+	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent, List<Annotation> annotations){
+		public ClassGen{
+			Objects.requireNonNull(name);
+			Objects.requireNonNull(fields);
+			Objects.requireNonNull(constructors);
+			Objects.requireNonNull(annotations);
+		}
+		
 		@Override
 		public String toString(){
 			return "class " + name + " " + (parent != null? "extends " + parent.getSimpleName() + " " : "") + "{" +
@@ -72,7 +80,7 @@ public final class TempClassGen{
 			       "\n}";
 		}
 		public ClassGen withName(String name){
-			return new ClassGen(name, fields, constructors, parent);
+			return new ClassGen(name, fields, constructors, parent, annotations);
 		}
 	}
 	
@@ -97,6 +105,7 @@ public final class TempClassGen{
 	private static byte[] makeClass(ClassLoader cl, ClassGen classGen){
 		try{
 			return Jorth.generateClass(cl, classGen.name, code -> {
+				JorthUtils.writeAnnotations(code, classGen.annotations);
 				if(classGen.parent != null){
 					code.write("extends {}", classGen.parent);
 				}
