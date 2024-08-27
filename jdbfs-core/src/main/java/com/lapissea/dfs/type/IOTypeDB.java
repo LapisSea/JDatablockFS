@@ -1000,19 +1000,19 @@ public sealed interface IOTypeDB{
 	}
 	private IOType tryMergeGeneric(IOType.TypeGeneric t1, IOType.TypeGeneric t2){
 		if(!t1.getRaw().equals(t2.getRaw())){
-			return IOType.of(Object.class);
+			return IOType.TypeRaw.OBJ;
 		}
 		
 		var a1 = new ArrayList<>(t1.getArgs());
 		var a2 = t2.getArgs();
 		if(a1.size() != a2.size()){
-			return IOType.of(Object.class);
+			return IOType.TypeRaw.OBJ;
 		}
 		for(int i = 0; i<a1.size(); i++){
 			var arg1 = a1.get(i);
 			var arg2 = a2.get(i);
 			if(arg1.getClass() != arg2.getClass()){
-				a1.set(i, IOType.of(Object.class));
+				a1.set(i, IOType.TypeRaw.OBJ);
 				continue;
 			}
 			a1.set(i, switch(arg1){
@@ -1025,7 +1025,7 @@ public sealed interface IOTypeDB{
 					var cls = UtilL.findClosestCommonSuper(c1, c2);
 					yield IOType.of(cls);
 				}
-				default -> IOType.of(Object.class);
+				default -> IOType.TypeRaw.OBJ;
 			});
 		}
 		
@@ -1046,11 +1046,11 @@ public sealed interface IOTypeDB{
 				if(type instanceof IOType.TypeGeneric t1 && t instanceof IOType.TypeGeneric t2){
 					type = tryMergeGeneric(t1, t2);
 				}else{
-					type = IOType.of(Object.class);
+					type = IOType.TypeRaw.OBJ;
 				}
 			}
 		}
-		return type != null? type : fallback != null? fallback : IOType.of(Object.class);
+		return type != null? type : fallback != null? fallback : IOType.TypeRaw.OBJ;
 	}
 	
 	default int objToID(Object obj) throws IOException{

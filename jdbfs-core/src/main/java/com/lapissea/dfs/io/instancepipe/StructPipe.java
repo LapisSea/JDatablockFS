@@ -329,12 +329,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		//noinspection unchecked
 		var pipe = StructPipe.of((Class<StructPipe<ProxyBuilder<T>>>)getClass(), struct, STATE_DONE);
 		ConfigDefs.CompLogLevel.SMALL.log("Acquired builder pipe for {}#green", this);
-		
-		if(DEBUG_VALIDATION){
-			var inst = struct.make();
-			inst.build();
-		}
-		
 		return pipe;
 	}
 	

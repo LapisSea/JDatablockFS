@@ -14,6 +14,7 @@ import com.lapissea.util.NotImplementedException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
@@ -76,17 +77,19 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
 			Iters.entries(PRIMITIVE_NAMES).toMap(e -> e.getValue().getName(), Map.Entry::getKey);
 		
+		public static final TypeRaw OBJ = new TypeRaw(Object.class);
+		
+		private static final WeakReference<Class<?>> NO_REF = new WeakReference<>(null);
+		
 		@IOValue
-		private String name;
+		private final String name;
 		
-		private Class<?> typeClassCache;
+		private WeakReference<Class<?>> typeClassCache = NO_REF;
 		
-		
-		public TypeRaw(){ name = ""; }
 		
 		public TypeRaw(Class<?> clazz){
 			this(clazz.getName());
-			typeClassCache = clazz;
+			typeClassCache = new WeakReference<>(clazz);
 		}
 		public TypeRaw(String name){
 			String n;
@@ -149,19 +152,19 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		
 		@Override
 		public Class<?> getTypeClass(IOTypeDB db){
-			var cache = typeClassCache;
+			var cache = typeClassCache.get();
+			cache:
 			if(cache != null){
 				if(db != null && cache.getClassLoader() instanceof TemplateClassLoader cl){
 					var dbcl = db.getTemplateLoader();
 					if(cl != dbcl){
-						//TODO: invalidate cache? Is identity safe due to weak ref?
-						throw new IllegalStateException("Mismatching classloader");
+						break cache;
 					}
 				}
 				return cache;
 			}
 			var loaded = loadClass(db);
-			typeClassCache = loaded;
+			typeClassCache = new WeakReference<>(loaded);
 			return loaded;
 		}
 		
@@ -176,11 +179,14 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				try{
 					var storedO = db.getDefinitionFromClassName(name);
 					if(storedO.map(stored -> !new TypeDef(builtIn).equals(stored)).orElse(false)){
-						Log.trace("{#yellowBuilt in and stored classes are not the same for: #}{}#red\n" +
-						          "\t{#redBuilt in:#} {}\n" +
-						          "\t{#redStored  :#} {}", () -> {
-							return List.of(name, storedO.get(), new TypeDef(builtIn));
-						});
+						Log.trace(
+							"""
+								{#yellowBuilt in and stored classes are not the same for: #}{}#red
+								\t{#redBuilt in:#} {}
+								\t{#redStored  :#} {}""",
+							() -> {
+								return List.of(name, storedO.get(), new TypeDef(builtIn));
+							});
 						throw new ClassNotFoundException();
 					}
 				}catch(IOException e){
@@ -199,13 +205,13 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 	}
 	
+	@IOValue
+	@Order({"raw", "args"})
 	public static final class TypeGeneric extends IOType implements RawAndArg{
-		@IOValue
-		private TypeRaw      raw;
-		@IOValue
-		private List<IOType> args;
 		
-		public TypeGeneric(){ }
+		private final TypeRaw      raw;
+		private final List<IOType> args;
+		
 		public TypeGeneric(TypeRaw raw, List<IOType> args){
 			this.raw = raw;
 			this.args = List.copyOf(args);
@@ -280,13 +286,13 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		public IOType withRaw(Class<?> raw){ return new TypeGeneric(raw, args); }
 	}
 	
+	@IOValue
+	@Order({"bound", "isLower"})
 	public static final class TypeWildcard extends IOType{
-		@IOValue
 		@IONullability(NULLABLE)
-		private IOType  bound;
-		@IOValue
-		private boolean isLower;
-		public TypeWildcard(){ }
+		private final IOType  bound;
+		private final boolean isLower;
+		
 		public TypeWildcard(IOType bound, boolean isLower){
 			this.bound = bound;
 			this.isLower = isLower;
@@ -363,13 +369,13 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 		}
 	}
 	
+	@IOValue
+	@Def.Order({"parent", "name"})
 	public static final class TypeNameArg extends IOType{
-		@IOValue
-		private TypeRaw parent;
-		@IOValue
-		private String  name;
 		
-		public TypeNameArg(){ }
+		private final TypeRaw parent;
+		private final String  name;
+		
 		public TypeNameArg(Class<?> parent, String name){
 			this(new TypeRaw(parent), name);
 		}
@@ -628,7 +634,7 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 	private static boolean argsEqual(List<IOType> a, List<IOType> b){
 		if(a.size() != b.size()){
 			if(a.size() != 0 && b.size() != 0) return false;
-			var obj = IOType.of(Object.class);
+			var obj = TypeRaw.OBJ;
 			for(var arg : a.size() != 0? a : b){
 				if(!arg.equals(obj)){
 					return false;

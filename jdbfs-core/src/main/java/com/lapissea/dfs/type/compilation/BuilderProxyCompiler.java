@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
@@ -46,11 +47,17 @@ public final class BuilderProxyCompiler{
 		
 		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
 		
+		if(type.getRealFields().size()>1 && !baseClass.isAnnotationPresent(IOInstance.Order.class)){
+			throw new MalformedStruct("fmt", "Structs with final fields need an {#yellowOrder#} annotation! {}#red does not have one. The order should match the order of fields in the constructor.", baseClass);
+		}
+		
 		var proxyName = baseClass.getName() + BUILDER_PROXY_POSTFIX;
 		
 		try{
 			var log = JorthLogger.make();
 			var clazzBytes = Jorth.generateClass(baseClass.getClassLoader(), proxyName, writer -> {
+				var fields = type.getRealFields();
+				
 				writer.write(
 					"""
 						extends {0} <{1}>
@@ -58,7 +65,7 @@ public final class BuilderProxyCompiler{
 						""",
 					ProxyBuilder.class, proxyName);
 				
-				for(IOField<T, ?> field : type.getRealFields()){
+				for(IOField<T, ?> field : fields){
 					writeField(writer, field.getAccessor());
 				}
 				
@@ -74,7 +81,7 @@ public final class BuilderProxyCompiler{
 							end
 						end
 						""",
-					baseClass, type.getRealFields(), IOInstance.class);
+					baseClass, fields, IOInstance.class);
 				
 				writer.wEnd();
 			}, log);

@@ -20,7 +20,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	private ContiguousIOList<IONode<T>> data;
 	
 	public IOHashSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
-		super(provider, identity, ((IOType.RawAndArg)typeDef).withArgs(IOType.of(Object.class)));
+		super(provider, identity, ((IOType.RawAndArg)typeDef).withArgs(IOType.TypeRaw.OBJ));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();
