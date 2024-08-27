@@ -222,7 +222,8 @@ public final class TestUtils{
 			className,
 			Iters.from(props).map(p -> new TempClassGen.FieldGen(p.name, p.type, List.of(ioVal), false, null)).toList(),
 			Set.of(new TempClassGen.CtorType.Empty(Iters.from(props).nonNullProps(Prop::val).toMap(Prop::name, Prop::val))),
-			IOInstance.Managed.class
+			IOInstance.Managed.class,
+			List.of()
 		));
 	}
 	

@@ -496,7 +496,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		var data = iter().map(IOField::getName).enumerate().toMap(IterablePP.Idx::val, IterablePP.Idx::index);
 		
 		//Only makes sense to try to make a perfect map when there are no hash collisions
-		if(data.size() == Iters.keys(data).mapToInt(String::hashCode).distinct().count()){
+		if(!Iters.keys(data).mapToInt(String::hashCode).hasDuplicates()){
 			var perfect = buildNameLookupPerfect(data);
 			if(perfect != null) return nameLookup = perfect;
 		}

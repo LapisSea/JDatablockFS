@@ -13,6 +13,15 @@ public class MalformedStruct extends RuntimeException{
 			default -> throw new IllegalStateException();
 		}, e);
 	}
+	public MalformedStruct(String fmt, String message, Object arg1){
+		this(fmt, message, new Object[]{arg1});
+	}
+	public MalformedStruct(String fmt, String message, Object arg1, Object arg2){
+		this(fmt, message, new Object[]{arg1, arg2});
+	}
+	public MalformedStruct(String fmt, String message, Object arg1, Object arg2, Object arg3){
+		this(fmt, message, new Object[]{arg1, arg2, arg3});
+	}
 	public MalformedStruct(String fmt, String message, Object... args){
 		super(switch(fmt){
 			case "fmt" -> Log.fmt(message, args);

@@ -173,6 +173,23 @@ public interface IterablePP<T> extends Iterable<T>{
 		return num;
 	}
 	
+	default boolean hasDuplicates(){
+		OptionalInt size = tryGetSize();
+		HashSet<T>  res;
+		if(size.isPresent()){
+			var siz = size.getAsInt();
+			if(siz == 0) return false;
+			res = HashSet.newHashSet(siz);
+		}else res = new HashSet<>();
+		
+		for(var e : this){
+			if(!res.add(e)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	default OptionalPP<T> reduce(BinaryOperator<T> reducer){
 		var src = iterator();
 		if(!src.hasNext()) return OptionalPP.empty();
@@ -313,9 +330,6 @@ public interface IterablePP<T> extends Iterable<T>{
 		}else res = new HashSet<>();
 		for(T t : this){
 			res.add(t);
-		}
-		if(size.isPresent() && size.getAsInt()>0 && size.getAsInt()>=res.size()*2){
-			res = new HashSet<>(res);
 		}
 		return res;
 	}
@@ -677,6 +691,13 @@ public interface IterablePP<T> extends Iterable<T>{
 						return List.copyOf(data);
 					}
 				};
+			}
+			
+			@Override
+			public int count(){
+				var src = IterablePP.this;
+				var set = src.toModSet();
+				return set.size();
 			}
 		};
 	}

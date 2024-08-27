@@ -41,10 +41,8 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -564,10 +562,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return f == null? realFields = calcRealFields() : f;
 	}
 	private FieldSet<T> calcRealFields(){
-		var fields = getFields();
-		var res    = FieldSet.of(fields.filtered(e -> !e.isVirtual(IO)));
-		if(res.size() == fields.size()) return fields;
-		return res;
+		var fields     = getFields();
+		var realFields = FieldSet.of(tryOrderFields(fields.filtered(e -> !e.isVirtual(IO))));
+		if(realFields.equals(fields)) return fields;
+		return realFields;
 	}
 	
 	public FieldSet<T> getCloneFields(){
@@ -653,9 +651,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private IterablePP<IOField<T, ?>> tryOrderFields(IterablePP<IOField<T, ?>> generatedFields){
 		var order = getType().getAnnotation(IOInstance.Order.class);
 		if(order != null){
-			var names   = order.value();
-			var nameSet = new HashSet<>(Arrays.asList(names));
-			if(nameSet.size() != names.length){
+			var names = order.value();
+			if(Iters.from(names).hasDuplicates()){
 				throw new IllegalArgumentException("Duplicate order names present");
 			}
 			var fs = FieldSet.of(generatedFields);
