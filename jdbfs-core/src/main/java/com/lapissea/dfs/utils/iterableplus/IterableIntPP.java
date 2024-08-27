@@ -163,6 +163,24 @@ public interface IterableIntPP{
 		}
 		return count;
 	}
+	default boolean hasDuplicates(){
+		OptionalInt size = SizedPP.tryGet(this);
+		IntHashSet  res;
+		if(size.isPresent()){
+			var siz = size.getAsInt();
+			if(siz == 0) return false;
+			res = new IntHashSet((int)Math.ceil(siz/0.75), 0.75);
+		}else res = new IntHashSet();
+		
+		var iter = this.iterator();
+		while(iter.hasNext()){
+			var e = iter.nextInt();
+			if(!res.add(e)){
+				return true;
+			}
+		}
+		return false;
+	}
 	
 	IntIterator iterator();
 	
