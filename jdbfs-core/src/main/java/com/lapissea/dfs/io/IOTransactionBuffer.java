@@ -6,15 +6,12 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
-import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -371,31 +368,10 @@ public final class IOTransactionBuffer{
 			}
 		}
 		
-		private void exportDataDeb() throws IOException{
-			if(oldTransactionOpen){
-				transactionOpenVar.set(target, true);
-				return;
-			}
-			var expected = target.readAll();
-			var data     = export();
-			transactionOpenVar.set(target, false);
-			target.io(data::apply);
-			var actual = target.readAll();
-			if(!Arrays.equals(expected, actual)){
-				var baos = new ByteArrayOutputStream();
-				try(var oos = new ObjectOutputStream(baos)){ oos.writeObject(data); }
-				throw new AssertionError("Transaction before and after apply differs!\n" +
-				                         "Expected: " + Arrays.toString(expected) + "\n" +
-				                         "Actual:   " + Arrays.toString(actual) + "\n" +
-				                         "Transaction:\n" + Base64.getEncoder().encodeToString(baos.toByteArray()));
-			}
-		}
-		
 		@Override
 		public void close() throws IOException{
 			try(var ignore = lock.write()){
-				if(DEBUG_VALIDATION) exportDataDeb();
-				else exportData();
+				exportData();
 			}
 		}
 		

@@ -557,10 +557,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return f == null? realFields = calcRealFields() : f;
 	}
 	private FieldSet<T> calcRealFields(){
-		var fields = getFields();
-		var res    = FieldSet.of(fields.filtered(e -> !e.isVirtual(IO)));
-		if(res.size() == fields.size()) return fields;
-		return res;
+		var fields     = getFields();
+		var realFields = FieldSet.of(tryOrderFields(fields.filtered(e -> !e.isVirtual(IO))));
+		if(realFields.equals(fields)) return fields;
+		return realFields;
 	}
 	
 	public FieldSet<T> getCloneFields(){
