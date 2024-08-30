@@ -44,4 +44,8 @@ public final class PPBakedSequence<T> extends AbstractList<T> implements Iterabl
 	public T getFirst(){
 		return data[0];
 	}
+	@Override
+	public int count(){ return data.length; }
+	@Override
+	public long countL(){ return data.length; }
 }

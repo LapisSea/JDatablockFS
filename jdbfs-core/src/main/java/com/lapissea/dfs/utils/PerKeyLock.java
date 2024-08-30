@@ -31,21 +31,22 @@ public final class PerKeyLock<K>{
 	}
 	
 	private Lock lock(K key){
+		Lock lock;
 		mapLock.lock();
 		try{
-			var lock = locks.computeIfAbsent(key, s -> new ReentrantLock());
-			lock.lock();
-			return lock;
+			lock = locks.computeIfAbsent(key, s -> new ReentrantLock());
 		}finally{
 			mapLock.unlock();
 		}
+		lock.lock();
+		return lock;
 	}
 	private void unlock(K key, Lock lock){
 		mapLock.lock();
 		try{
 			var removed = locks.remove(key);
 			lock.unlock();
-			assert removed == lock;
+			assert removed == null || removed == lock : removed + " != " + lock;
 		}finally{
 			mapLock.unlock();
 		}

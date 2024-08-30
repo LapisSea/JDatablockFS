@@ -46,6 +46,7 @@ public class RandomLists{
 	
 	public static void main(Configuration.View conf){
 		var logger = LoggedMemoryUtils.createLoggerFromConfig();
+		var err    = new Throwable[1];
 		try(var exec = Executors.newVirtualThreadPerTaskExecutor()){
 			for(int i = conf.getInt("min", 1), max = conf.getInt("max", 20); i<=max; i++){
 				var listCount = i;
@@ -53,7 +54,12 @@ public class RandomLists{
 				var mem = LoggedMemoryUtils.newLoggedMemory("l" + i, logger);
 				if(conf.getBoolean("async", true)){
 					exec.execute(() -> {
-						runRandomLists(listCount, logger, false, mem, 500);
+						if(err[0] != null) return;
+						try{
+							runRandomLists(listCount, logger, false, mem, 500);
+						}catch(Throwable t){
+							err[0] = t;
+						}
 					});
 					UtilL.sleep(10);
 				}else{
@@ -63,6 +69,7 @@ public class RandomLists{
 		}finally{
 			logger.get().destroy();
 		}
+		if(err[0] != null) throw UtilL.uncheckedThrow(err[0]);
 	}
 	
 	private static void fuzz(){

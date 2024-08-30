@@ -448,11 +448,13 @@ public final class Iters{
 	@SafeVarargs
 	public static <T> IterablePP<T> ofPresent(Optional<T>... data){ return data.length == 0? of() : new ArrayIterable<>(data).flatOptionals(Function.identity()); }
 	
-	public static <T> IterablePP.SizedPP<T> from(OptionalPP<T> element)             { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
-	public static <T> IterablePP.SizedPP<T> from(Optional<T> element)               { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
-	public static <T> IterablePP.SizedPP<T> from(Collection<T> data)                { return new CollectionIterable<>(data); }
-	public static <T> IterablePP.SizedPP<T> from(T[] data)                          { return data.length == 0? of() : new ArrayIterable<>(data); }
-	public static <T> IterablePP<T> from(Iterable<T> data)                          { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
+	public static <T> IterablePP.SizedPP<T> from(OptionalPP<T> element){ return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
+	public static <T> IterablePP.SizedPP<T> from(Optional<T> element)  { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
+	public static <T> IterablePP.SizedPP<T> from(Collection<T> data)   { return new CollectionIterable<>(data); }
+	public static <T> IterablePP.SizedPP<T> from(T[] data)             { return data.length == 0? of() : new ArrayIterable<>(data); }
+	public static <T> IterablePP<T> from(Iterable<T> data)             { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
+	@Deprecated
+	public static <T> IterablePP<T> from(IterablePP<T> data){ return data; }
 	
 	public static <V> IterablePP.SizedPP<V> values(Map<?, V> data)                  { return new CollectionIterable<>(data.values()); }
 	public static <K> IterablePP.SizedPP<K> keys(Map<K, ?> data)                    { return new CollectionIterable<>(data.keySet()); }
