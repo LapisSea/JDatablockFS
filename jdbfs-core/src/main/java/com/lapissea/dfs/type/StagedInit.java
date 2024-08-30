@@ -15,7 +15,6 @@ import com.lapissea.util.UtilL;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.time.Duration;
@@ -202,21 +201,26 @@ public abstract class StagedInit implements Stringify{
 	private void checkErr(){
 		var e = getErr();
 		if(e == null) return;
-		var eCopy = cloneE(e);
-		eCopy.addSuppressed(new WaitException("Exception occurred while initializing: " + this));
-		throw UtilL.uncheckedThrow(eCopy);
+		throwWaitErr(e);
+	}
+	private void throwWaitErr(Throwable e){
+		try{
+			e = cloneE(e);
+		}catch(Exception ignore){
+			throw UtilL.uncheckedThrow(e);
+		}
+		var last = e;
+		while(last.getCause() != null) last = last.getCause();
+		last.addSuppressed(new WaitException("Exception occurred while initializing: " + this));
+		throw UtilL.uncheckedThrow(e);
 	}
 	
-	private static Throwable cloneE(Throwable e){
-		try{
-			var out = new ByteArrayOutputStream();
-			try(var ay = new ObjectOutputStream(out)){
-				ay.writeObject(e);
-			}
-			return (Throwable)new ObjectInputStream(new ByteArrayInputStream(out.toByteArray())).readObject();
-		}catch(IOException|ClassNotFoundException e1){
-			throw new RuntimeException("Failed to clone exception", e1);
+	private static Throwable cloneE(Throwable e) throws Exception{
+		var out = new ByteArrayOutputStream();
+		try(var ay = new ObjectOutputStream(out)){
+			ay.writeObject(e);
 		}
+		return (Throwable)new ObjectInputStream(new ByteArrayInputStream(out.toByteArray())).readObject();
 	}
 	
 	public record StateInfo(int id, String name){

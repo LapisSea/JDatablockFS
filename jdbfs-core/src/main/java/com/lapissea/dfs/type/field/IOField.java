@@ -169,8 +169,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int     typeFlags = -1;
-	private Boolean needsIOPool;
+	private int  typeFlags   = -1;
+	private byte needsIOPool = 2;
 	
 	private final int hashCode;
 	
@@ -358,8 +358,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public String getName(){ return getAccessor().getName(); }
+	@SuppressWarnings("unchecked")
 	@Override
-	public final Class<?> getType(){ return getAccessor().getType(); }
+	public final Class<? extends ValueType> getType(){ return (Class<? extends ValueType>)getAccessor().getType(); }
 	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
 		var acc = getAccessor();
@@ -513,8 +514,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public final int hashCode(){ return hashCode; }
 	
 	public boolean needsIOPool(){
-		if(needsIOPool == null) needsIOPool = calcNeedsIOPool();
-		return needsIOPool;
+		if(needsIOPool == 2) needsIOPool = calcNeedsIOPool()? (byte)1 : 0;
+		return needsIOPool == 1;
 	}
 	private boolean calcNeedsIOPool(){
 		final var depSet  = new HashSet<IOField<T, ?>>(Set.of(this));

@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -39,7 +40,7 @@ public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implemen
 			}
 		}
 		private void failReadOnly(){
-			throw new UnsupportedOperationException("Field for " + getName() + " is final, can not set it!");
+			throw new UnsupportedOperationException(Log.fmt("Field {}#red is final, can not set it!", this));
 		}
 		
 		@Override

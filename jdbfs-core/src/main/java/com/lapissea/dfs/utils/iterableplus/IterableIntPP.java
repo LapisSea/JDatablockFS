@@ -168,7 +168,7 @@ public interface IterableIntPP{
 		IntHashSet  res;
 		if(size.isPresent()){
 			var siz = size.getAsInt();
-			if(siz == 0) return false;
+			if(siz<=1) return false;
 			res = new IntHashSet((int)Math.ceil(siz/0.75), 0.75);
 		}else res = new IntHashSet();
 		

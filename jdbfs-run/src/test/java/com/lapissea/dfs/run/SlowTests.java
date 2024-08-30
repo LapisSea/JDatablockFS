@@ -1,10 +1,13 @@
 package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.MagicID;
+import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.config.FreedMemoryPurgeType;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
+import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -168,8 +171,10 @@ public class SlowTests{
 		bigMapRun(TestInfo.of("compliant"), true);
 	}
 	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
-	void bigMap() throws IOException{
-		bigMapRun(TestInfo.of("fast"), false);
+	void bigMap() throws IOException, LockedFlagSet{
+		try(var ignore = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.temporarySet(FreedMemoryPurgeType.ZERO_OUT)){
+			bigMapRun(TestInfo.of("fast"), false);
+		}
 	}
 	
 	void bigMapRun(TestInfo info, boolean compliantCheck) throws IOException{

@@ -178,7 +178,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		HashSet<T>  res;
 		if(size.isPresent()){
 			var siz = size.getAsInt();
-			if(siz == 0) return false;
+			if(siz<=1) return false;
 			res = HashSet.newHashSet(siz);
 		}else res = new HashSet<>();
 		
