@@ -34,6 +34,7 @@ import static com.lapissea.dfs.logging.Log.debug;
 import static com.lapissea.dfs.logging.Log.warn;
 import static com.lapissea.dfs.type.MemoryWalker.CONTINUE;
 import static com.lapissea.dfs.type.MemoryWalker.END;
+import static com.lapissea.dfs.type.MemoryWalker.HOLDER_COPY;
 import static com.lapissea.dfs.type.MemoryWalker.SAVE;
 
 public class DefragmentManager{
@@ -137,7 +138,7 @@ public class DefragmentManager{
 			@SuppressWarnings({"unchecked", "rawtypes"})
 			@Override
 			public <T extends IOInstance<T>> int log(
-				Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
+				Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 				var ptr = valueReference.getPtr();
 				if(!ptr.equals(toMove) || valueReference.getOffset() != 0){
 					return CONTINUE;
@@ -184,7 +185,7 @@ public class DefragmentManager{
 			}
 			@Override
 			public <T extends IOInstance<T>> int logChunkPointer(
-				Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+				Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder) throws IOException{
 				if(!value.equals(toMove)){
 					return CONTINUE;
 				}
@@ -196,11 +197,16 @@ public class DefragmentManager{
 				}
 				
 				var newPtr = newCh.getPtr();
-				field.set(null, instance, newPtr);
 				ch.addChainTo(toFree);
 				move = new MoveBuffer(toMove, newPtr);
 				
-				return END|SAVE;
+				if(field.isReadOnly()){
+					holder.value = newPtr;
+					return END|HOLDER_COPY;
+				}else{
+					field.set(null, instance, newPtr);
+					return END|SAVE;
+				}
 			}
 		};
 		
@@ -220,7 +226,7 @@ public class DefragmentManager{
 			cluster.rootWalker(new MemoryWalker.PointerRecord(){
 				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Override
-				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
+				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
 						var p    = u.getPointer();
 						var user = findReferenceUser(cluster, p.makeReference());
@@ -260,7 +266,7 @@ public class DefragmentManager{
 					return CONTINUE;
 				}
 				@Override
-				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
 					return CONTINUE;
 				}
 			}, false).walk();
@@ -499,16 +505,20 @@ public class DefragmentManager{
 		
 		var fin = cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 				if(valueReference.getPtr().equals(oldChunk)){
-					field.setReference(instance, new Reference(newChunk, valueReference.getOffset()));
+					field.setReference(instance, Reference.of(newChunk, valueReference.getOffset()));
 					return END|SAVE;
 				}
 				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
 				if(value.equals(oldChunk)){
+					if(field.isReadOnly()){
+						holder.value = newChunk;
+						return END|HOLDER_COPY;
+					}
 					field.set(null, instance, newChunk);
 					return END|SAVE;
 				}
@@ -549,7 +559,7 @@ public class DefragmentManager{
 		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 				var ptr = oldRef.getPtr();
 				if(valueReference.getPtr().equals(ptr)){
 					
@@ -569,7 +579,7 @@ public class DefragmentManager{
 				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
 				return CONTINUE;
 			}
 		}, false).walk();
@@ -583,7 +593,7 @@ public class DefragmentManager{
 		Reference[] found = {null};
 		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder){
 				if(valueReference.equals(ref)){
 					found[0] = instanceReference;
 					return END;
@@ -591,7 +601,7 @@ public class DefragmentManager{
 				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
 				return CONTINUE;
 			}
 		}, false).walk();

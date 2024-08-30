@@ -195,7 +195,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
-					return next.isNull()? new Reference() : next.makeReference();
+					return next.isNull()? Reference.NULL : next.makeReference();
 				}
 				@Override
 				public StructPipe<IONode<T>> getReferencedPipe(IONode<T> instance){

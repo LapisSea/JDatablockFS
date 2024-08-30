@@ -306,7 +306,7 @@ public sealed interface IOTypeDB{
 				this.defs = new HashMap<>(defs);
 				var maxID = Iters.keys(idToTyp).mapToInt().max().orElse(0);
 				this.idToTyp = new IOType[maxID + 1];
-				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
+				idToTyp.forEach((k, v) -> this.idToTyp[k] = v);
 				typToID = Iters.entries(idToTyp).toMap(Map.Entry::getValue, Map.Entry::getKey);
 				this.sealedMultiverse = Iters.entries(sealedMultiverse).toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
 			}
@@ -779,7 +779,7 @@ public sealed interface IOTypeDB{
 			
 			var cached = dataCache.get(id);
 			if(cached != null){
-				return cached.clone();
+				return cached;
 			}
 			
 			var type = data.get(id);

@@ -7,7 +7,6 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
-import com.lapissea.dfs.exceptions.MalformedPipe;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.internal.Access;
@@ -29,7 +28,6 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.type.compilation.BuilderProxyCompiler;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldNames;
@@ -188,7 +186,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created = lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				e.addSuppressed(new MalformedPipe("Failed to compile " + type.getSimpleName() + " for " + struct.getFullName(), e));
 				errors.put(struct, e);
 				throw e;
 			}
@@ -285,13 +282,16 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		this.type = type;
 		init(initNow, () -> {
 			needsBuilderObj = type.needsBuilderObj();
-			var bt = needsBuilderObj? builderObjectTask(initNow) : null;
 			
+			PipeFieldCompiler.Result<T> res;
 			try{
-				this.ioFields = FieldSet.of(compiler.compile(getType(), getType().getFields()));
+				res = compiler.compile(getType(), getType().getFields());
+				this.ioFields = FieldSet.of(res.fields());
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
+			
+			var bt = needsBuilderObj? builderObjectTask(initNow, res.builderMetadata()) : null;
 			
 			if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
 			
@@ -316,21 +316,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}, initNow? null : this::postValidate);
 	}
 	
-	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow){
+	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow, Object builderMetadata){
 		if(initNow){
-			var res = createBuilderPipe();
+			var res = createBuilderPipe(builderMetadata);
 			return CompletableFuture.completedFuture(res);
 		}
-		return CompletableFuture.supplyAsync(this::createBuilderPipe, t -> Runner.run(t, "BP-" + this.toShortString()));
+		return CompletableFuture.supplyAsync(() -> createBuilderPipe(builderMetadata), t -> Runner.run(t, "BP-" + this.toShortString()));
 	}
-	private StructPipe<ProxyBuilder<T>> createBuilderPipe(){
-		var type   = BuilderProxyCompiler.getProxy(getType());
-		var struct = Struct.of(type, STATE_DONE);
+	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
+		var struct = getType().getBuilderObjType(true);
+		
+		Class<?> cls = getSelfClass();
 		//noinspection unchecked
-		var pipe = StructPipe.of((Class<StructPipe<ProxyBuilder<T>>>)getClass(), struct, STATE_DONE);
+		var pipe = StructPipe.of((Class<StructPipe<ProxyBuilder<T>>>)cls, struct, STATE_DONE);
 		ConfigDefs.CompLogLevel.SMALL.log("Acquired builder pipe for {}#green", this);
 		return pipe;
 	}
+	
+	public abstract Class<StructPipe<T>> getSelfClass();
 	
 	protected static class DoNotTest extends RuntimeException{ }
 	
@@ -342,7 +345,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var fields  = new ArrayList<>(getType().getFields());
 			for(int i = 0; i<20; i++){
 				Collections.shuffle(fields, rr);
-				var f = compiler.compile(type, FieldSet.of(fields), true);
+				var f = compiler.compile(type, FieldSet.of(fields), true).fields();
 				if(!ioFCopy.equals(f)){
 					throw new IllegalStateException("Fields with different order do not resolve to the same set!");
 				}
@@ -355,8 +358,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected void postValidate(){
-		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
+		if(TYPE_VALIDATION){
 			var type = getType();
+			if(type instanceof Struct.Unmanaged) return;
 			if(!type.canHaveDefaultConstructor()) return;
 			T inst;
 			try{
@@ -703,7 +707,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	@Override
-	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		if(needsBuilderObj){
 			return readNewByBuilder(provider, src, genericContext);
 		}

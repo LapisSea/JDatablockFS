@@ -12,8 +12,10 @@ import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
+import com.lapissea.dfs.type.compilation.BuilderProxyCompiler;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -51,6 +53,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.CompileStructTools.compile;
 import static com.lapissea.dfs.type.CompileStructTools.getCached;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -347,6 +350,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
+	private Struct<ProxyBuilder<T>> builderObjType;
+	
 	private int hash = -1;
 	
 	short unstableAccess;
@@ -574,7 +579,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private FieldSet<T> calcCloneFields(){
 		return FieldSet.of(getFields().filtered(f -> {
-			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
+			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO) || f.getType() == ChunkPointer.class) return false;
 			var acc = f.getAccessor();
 			if(acc != null){
 				var typ = acc.getType();
@@ -902,6 +907,27 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public boolean needsBuilderObj(){
 		waitForState(STATE_FIELD_MAKE);
 		return needsBuilderObj;
+	}
+	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
+		waitForState(STATE_FIELD_MAKE);
+		var typ = builderObjType;
+		if(typ == null) typ = createBuilderObjType(now);
+		return typ;
+	}
+	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
+		if(!needsBuilderObj) throw new UnsupportedOperationException();
+		var cls = BuilderProxyCompiler.getProxy(this);
+		var typ = now? Struct.of(cls, STATE_DONE) : Struct.of(cls);
+		
+		if(DEBUG_VALIDATION){
+			var cf1 = getCloneFields();
+			var cf2 = typ.getCloneFields();
+			if(Iters.zip(cf1, cf2).anyMatch(e -> !e.getKey().getName().equals(e.getValue().getName()))){
+				throw new MalformedStruct("Clone fields do not match for proxy!\n" + cf1 + "\n" + cf2);
+			}
+		}
+		
+		return builderObjType = typ;
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

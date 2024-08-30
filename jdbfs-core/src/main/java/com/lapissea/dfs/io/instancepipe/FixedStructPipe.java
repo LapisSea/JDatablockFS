@@ -22,7 +22,8 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
 		return (t, structFields, testRun) -> {
 			var sizeFields = sizeFieldStream(structFields).toModSet();
-			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
+			var fields     = fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
+			return new PipeFieldCompiler.Result<>(fields);
 		};
 	}
 	
@@ -54,6 +55,11 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 		super(type, compiler, initNow);
 	}
 	
+	@Override
+	public Class<StructPipe<T>> getSelfClass(){
+		//noinspection unchecked,rawtypes
+		return (Class)FixedStructPipe.class;
+	}
 	@Override
 	protected void postValidate(){
 		if(DEBUG_VALIDATION){

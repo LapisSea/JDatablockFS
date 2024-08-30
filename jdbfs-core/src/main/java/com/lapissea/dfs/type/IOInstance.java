@@ -382,6 +382,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@SuppressWarnings("unchecked")
 		@Override
 		public SELF clone(){
+			var struct = getThisStruct();
+			if(struct.needsBuilderObj()){
+				return immutableDeepClone(struct);
+			}
+			
 			SELF copy;
 			try{
 				copy = (SELF)super.clone();
@@ -390,6 +395,16 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			}
 			deepClone(copy);
 			return copy;
+		}
+		
+		private SELF immutableDeepClone(Struct<SELF> struct){
+			var builderTyp = struct.getBuilderObjType(false);
+			
+			var builder = builderTyp.make();
+			builder.copyFrom(self());
+			builder = builder.clone();//deep clone fields
+			
+			return builder.build();
 		}
 		
 		@SuppressWarnings("unchecked")

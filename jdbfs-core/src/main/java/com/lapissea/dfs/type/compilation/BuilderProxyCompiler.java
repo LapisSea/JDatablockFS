@@ -5,6 +5,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
@@ -58,17 +59,44 @@ public final class BuilderProxyCompiler{
 			var log = JorthLogger.make();
 			var clazzBytes = Jorth.generateClass(baseClass.getClassLoader(), proxyName, writer -> {
 				var fields = type.getRealFields();
-				
+				writer.addImports(Struct.class, ChunkPointer.class);
 				writer.write(
 					"""
 						extends {0} <{1}>
-						public class {!1} start
+						public final class {!1} start
 						""",
 					ProxyBuilder.class, proxyName);
+				
+				writer.write(
+					"""
+						private static final field $STRUCT #Struct
+						
+						function <clinit> start
+							static call #Struct of start
+								class {0}
+							end
+							set {0} $STRUCT
+						end
+						""",
+					proxyName);
 				
 				for(IOField<T, ?> field : fields){
 					writeField(writer, field.getAccessor());
 				}
+				writer.write(
+					"""
+						public function <init>
+						start
+							super start
+								get {0} $STRUCT
+							end
+							template-for #fName in {1} start
+								get #ChunkPointer NULL
+								set this #fName
+							end
+						end
+						""",
+					proxyName, fields.byType(ChunkPointer.class).map(IOField::getName));
 				
 				writer.write(
 					"""

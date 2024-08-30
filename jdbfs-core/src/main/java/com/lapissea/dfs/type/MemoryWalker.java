@@ -73,34 +73,41 @@ public class MemoryWalker{
 		}
 	}
 	
-	private static final int DATA_MASK = 0b00001;
-	public static final  int SAVE      = 0b00001;
+	private static final int DATA_MASK   = 0b000011;
+	public static final  int SAVE        = 0b000001;
+	public static final  int HOLDER_COPY = 0b000010;
 	/**/
-	private static final int FLOW_MASK = 0b00110;
-	public static final  int CONTINUE  = 0b00010;
-	public static final  int END       = 0b00100;
+	private static final int FLOW_MASK   = 0b001100;
+	public static final  int CONTINUE    = 0b000100;
+	public static final  int END         = 0b001000;
 	
 	private static final int INTERNAL_MASK = 0b1000000000000000000000000000000;
 	private static final int NO_RESULT     = 0b1000000000000000000000000000000;
 	
 	
-	private static int getFlow(int flags)       { return flags&FLOW_MASK; }
-	private static boolean shouldSave(int flags){ return UtilL.checkFlag(flags&DATA_MASK, SAVE); }
-	private static boolean hasResult(int result){ return !UtilL.checkFlag(result, NO_RESULT); }
+	private static int getFlow(int flags)             { return flags&FLOW_MASK; }
+	private static int getDataAction(int flags)       { return flags&DATA_MASK; }
+	private static boolean shouldHolderCopy(int flags){ return UtilL.checkFlag(getDataAction(flags), HOLDER_COPY); }
+	private static boolean shouldSave(int flags)      { return UtilL.checkFlag(getDataAction(flags), SAVE); }
+	private static boolean hasResult(int result)      { return !UtilL.checkFlag(result, NO_RESULT); }
 	
 	public interface PointerRecord{
+		
+		class Holder{
+			public Object value;
+		}
 		
 		PointerRecord NOOP = of(r -> { });
 		
 		static PointerRecord of(UnsafeConsumer<Reference, IOException> consumer){
 			return new PointerRecord(){
 				@Override
-				public <I extends IOInstance<I>> int log(Reference instanceReference, I instance, RefField<I, ?> field, Reference valueReference) throws IOException{
+				public <I extends IOInstance<I>> int log(Reference instanceReference, I instance, RefField<I, ?> field, Reference valueReference, Holder holder) throws IOException{
 					consumer.accept(valueReference);
 					return CONTINUE;
 				}
 				@Override
-				public <I extends IOInstance<I>> int logChunkPointer(Reference instanceReference, I instance, IOField<I, ChunkPointer> field, ChunkPointer value) throws IOException{
+				public <I extends IOInstance<I>> int logChunkPointer(Reference instanceReference, I instance, IOField<I, ChunkPointer> field, ChunkPointer value, Holder holder) throws IOException{
 					consumer.accept(value.makeReference());
 					return CONTINUE;
 				}
@@ -110,11 +117,11 @@ public class MemoryWalker{
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException;
+		<T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException;
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException;
+		<T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder) throws IOException;
 	}
 	
 	private final DataProvider  provider;
@@ -151,12 +158,18 @@ public class MemoryWalker{
 	private <T extends IOInstance<T>> int walkStructFull(
 		T instance, Reference instanceReference, StructPipe<T> pipe
 	) throws IOException{
-		return walkStructFull(instance, instanceReference, pipe, false);
+		var holder = new PointerRecord.Holder();
+		var res    = walkStructFull(instance, instanceReference, pipe, false, holder);
+		
+		if(shouldHolderCopy(res)){
+			throw new UnsupportedOperationException();
+		}
+		return res;
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private <T extends IOInstance<T>> int walkStructFull(
-		T instance, Reference reference, StructPipe<T> pipe, boolean inlinedParent
+		T instance, Reference reference, StructPipe<T> pipe, boolean inlinedParent, PointerRecord.Holder parentHolder
 	) throws IOException{
 		if(instance == null || reference.isNull()){
 			return CONTINUE;
@@ -169,6 +182,8 @@ public class MemoryWalker{
 		boolean inlineDirtyButContinue = false;
 		
 		var timer = recordPerformance? new Timer() : null;
+		
+		var holder = new PointerRecord.Holder();
 		
 		try{
 			var fieldOffset = 0L;
@@ -275,8 +290,15 @@ public class MemoryWalker{
 								
 								{
 									if(timer != null) timer.ignoreStart();
-									var res = pointerRecord.log(reference, instance, refField, ref);
+									var res = pointerRecord.log(reference, instance, refField, ref, holder);
 									if(timer != null) timer.ignoreEnd();
+									
+									if(shouldHolderCopy(res)){
+										res = (res&(~DATA_MASK))|SAVE;
+										var val = holder.value;
+										holder.value = null;
+										instance = copyWith(instance, field, val);
+									}
 									
 									checkResult(res);
 									if(shouldSave(res) && getFlow(res) == CONTINUE && inlinedParent && field.getSizeDescriptor().hasFixed()){
@@ -317,8 +339,9 @@ public class MemoryWalker{
 									var instRefField = (RefField<T, T> & RefField.Inst<T, T>)refField;
 									
 									if(timer != null) timer.ignoreStart();
-									var res = walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false);
+									var res = walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false, null);
 									if(timer != null) timer.ignoreEnd();
+									
 									if(shouldSave(res)){
 										throw new NotImplementedException("Saving a referenced instance is not implemented yet");//TODO
 									}
@@ -335,27 +358,18 @@ public class MemoryWalker{
 								
 								if(inst instanceof IOInstance.Unmanaged valueInstance){
 									{
-										var ptr = valueInstance.getPointer();
-										var uRefField = new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
-											@Override
-											public void setReference(T inst, Reference newRef) throws IOException{
-												if(inst != instance) throw new IllegalStateException();
-												valueInstance.notifyReferenceMovement(newRef.asJustChunk(provider));
-											}
-											@Override
-											public Reference getReference(T inst){
-												if(inst != instance) throw new IllegalStateException();
-												return valueInstance.getPointer().makeReference();
-											}
-											@Override
-											public StructPipe<T> getReferencedPipe(T inst){
-												if(inst != instance) throw new IllegalStateException();
-												return valueInstance.getPipe();
-											}
-										};
+										var ptr       = valueInstance.getPointer();
+										var uRefField = getNoIO(instance, valueInstance, field);
 										if(timer != null) timer.ignoreStart();
-										var res = pointerRecord.log(reference, instance, uRefField, ptr.makeReference());
+										var res = pointerRecord.log(reference, instance, uRefField, ptr.makeReference(), holder);
 										if(timer != null) timer.ignoreEnd();
+										
+										if(shouldHolderCopy(res)){
+											res = (res&(~DATA_MASK))|SAVE;
+											var val = holder.value;
+											holder.value = null;
+											instance = copyWith(instance, field, val);
+										}
 										
 										checkResult(res);
 										if(shouldSave(res) && getFlow(res) == CONTINUE && inlinedParent && field.getSizeDescriptor().hasFixed()){
@@ -383,7 +397,7 @@ public class MemoryWalker{
 									}
 									
 									if(timer != null) timer.ignoreStart();
-									var res = walkStructFull(valueInstance, valueInstance.getPointer().makeReference(), valueInstance.getPipe(), false);
+									var res = walkStructFull(valueInstance, valueInstance.getPointer().makeReference(), valueInstance.getPipe(), false, null);
 									if(timer != null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){
@@ -405,16 +419,16 @@ public class MemoryWalker{
 										StructPipe instancePipe = getPipe(dynamicPhase, instance, field, pipe, fieldValueInstance);
 										
 										if(timer != null) timer.ignoreStart();
-										var res = walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), instancePipe, true);
+										var res = walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), instancePipe, true, parentHolder);
 										if(timer != null) timer.ignoreEnd();
 										
-										var result = handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, inst, res);
+										var result = handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, inst, res, parentHolder);
 										if(hasResult(result)) return result;
 									}
 								}
 							}
 							case CHPTR -> {
-								var result = handlePtr(instance, pipe, reference, ioPool, (IOField<T, ChunkPointer>)field, inlinedParent);
+								var result = handlePtr(instance, pipe, reference, ioPool, (IOField<T, ChunkPointer>)field, inlinedParent, parentHolder);
 								if(hasResult(result)) return result;
 							}
 							case POTENTIAL_REF -> {
@@ -437,7 +451,7 @@ public class MemoryWalker{
 											for(IOInstance<?> inst : array){
 												{
 													if(timer != null) timer.ignoreStart();
-													var res = walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true);
+													var res = walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true, null);
 													if(timer != null) timer.ignoreEnd();
 													if(shouldSave(res)){
 														throw new NotImplementedException("Saving an array of instances is not implemented yet");//TODO
@@ -466,12 +480,12 @@ public class MemoryWalker{
 												StructPipe pip = getPipe(dynamicPhase, instance, field, pipe, fieldValue);
 												
 												if(timer != null) timer.ignoreStart();
-												var res = walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), pip, true);
+												var res = walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), pip, true, parentHolder);
 												if(timer != null) timer.ignoreEnd();
 												if(shouldSave(res) && getFlow(res) == CONTINUE && inlinedParent){
 													inlineDirtyButContinue = true;
 												}else{
-													var result = handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, IOInstance<?>>)field, fieldValue, res);
+													var result = handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, IOInstance<?>>)field, fieldValue, res, parentHolder);
 													if(hasResult(result)) return result;
 												}
 											}
@@ -520,6 +534,46 @@ public class MemoryWalker{
 		return CONTINUE;
 	}
 	
+	@SuppressWarnings("rawtypes")
+	private <T extends IOInstance<T>> RefField<T, T> getNoIO(T instance, IOInstance.Unmanaged valueInstance, IOField<T, ?> field){
+		return new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
+			@Override
+			public void setReference(T inst, Reference newRef) throws IOException{
+				if(inst != instance) throw new IllegalStateException();
+				valueInstance.notifyReferenceMovement(newRef.asJustChunk(provider));
+			}
+			@Override
+			public Reference getReference(T inst){
+				if(inst != instance) throw new IllegalStateException();
+				return valueInstance.getPointer().makeReference();
+			}
+			@SuppressWarnings("unchecked")
+			@Override
+			public StructPipe<T> getReferencedPipe(T inst){
+				if(inst != instance) throw new IllegalStateException();
+				return valueInstance.getPipe();
+			}
+		};
+	}
+	
+	private <T extends IOInstance<T>, V> T copyWith(T instance, IOField<T, V> field, Object val){
+		var instanceStruct = instance.getThisStruct();
+		if(!field.isReadOnly()){
+			//noinspection unchecked
+			field.set(null, instance, (V)val);
+			return instance;
+		}
+		
+		var builderStruct = instanceStruct.getBuilderObjType(false);
+		
+		var builder = builderStruct.make();
+		builder.copyFrom(instance);
+		//noinspection unchecked
+		var f = builderStruct.getFields().requireExact((Class<Object>)field.getType(), field.getName());
+		f.set(null, builder, val);
+		return builder.build();
+	}
+	
 	private static final IOField<Chunk, ChunkPointer> CH_NEXT_PTR = Chunk.STRUCT.getFields().requireExact(ChunkPointer.class, "nextPtr");
 	
 	private int walkChunk(Chunk instance) throws IOException{
@@ -527,8 +581,12 @@ public class MemoryWalker{
 		while(true){
 			var nextPtr = ch.getNextPtr();
 			if(nextPtr.isNull()) return CONTINUE;
+			var res = pointerRecord.logChunkPointer(makeChunkRef(ch), ch, CH_NEXT_PTR, ch.getNextPtr(), new PointerRecord.Holder());
 			
-			var res = pointerRecord.logChunkPointer(makeChunkRef(ch), ch, CH_NEXT_PTR, ch.getNextPtr());
+			if(shouldHolderCopy(res)){
+				throw new UnsupportedOperationException();
+			}
+			
 			if(shouldSave(res)){
 				ch.syncStruct();
 			}
@@ -586,18 +644,32 @@ public class MemoryWalker{
 	}
 	
 	private <T extends IOInstance<T>> int handlePtr(
-		T instance, StructPipe<T> pipe, Reference reference, VarPool<T> ioPool, IOField<T, ChunkPointer> ptrField, boolean inlinedParent
+		T instance, StructPipe<T> pipe, Reference reference, VarPool<T> ioPool, IOField<T, ChunkPointer> ptrField, boolean inlinedParent, PointerRecord.Holder holder
 	) throws IOException{
 		var ch = ptrField.get(ioPool, instance);
 		
 		if(!ch.isNull()){
 			{
-				var res = pointerRecord.logChunkPointer(reference, instance, ptrField, ch);
+				var res = pointerRecord.logChunkPointer(reference, instance, ptrField, ch, holder);
 				checkResult(res);
-				if(shouldSave(res)){
-					if(inlinedParent) return SAVE|END;
-					reference.write(provider, false, pipe, instance);
+				
+				switch(getDataAction(res)){
+					case SAVE -> {
+						if(inlinedParent) return SAVE|END;
+						reference.write(provider, false, pipe, instance);
+					}
+					case HOLDER_COPY -> {
+						var val = holder.value;
+						holder.value = null;
+						instance = copyWith(instance, ptrField, val);
+						if(inlinedParent){
+							holder.value = instance;
+							return HOLDER_COPY|END;
+						}
+						reference.write(provider, false, pipe, instance);
+					}
 				}
+				
 				switch(getFlow(res)){
 					case CONTINUE -> { }
 					case END -> { return END; }
@@ -625,8 +697,21 @@ public class MemoryWalker{
 		VarPool<T> ioPool, T instance, StructPipe<T> pipe,
 		boolean inlinedParent, Reference instanceReference,
 		IOField<T, FT> field, FT fieldValue,
-		int res
+		int res, PointerRecord.Holder holder
 	) throws IOException{
+		
+		if(shouldHolderCopy(res)){
+			res = (res&(~DATA_MASK))|SAVE;
+			var val = holder.value;
+			holder.value = null;
+			instance = copyWith(instance, field, val);
+			
+			if(inlinedParent){
+				holder.value = instance;
+				return END|HOLDER_COPY;
+			}
+		}
+		
 		if(shouldSave(res)){
 			if(inlinedParent){
 				return SAVE|END;
@@ -647,7 +732,7 @@ public class MemoryWalker{
 	
 	private void checkResult(int res){
 		if(provider.isReadOnly()){
-			if(shouldSave(res)){
+			if(getDataAction(res) != 0){
 				throw new IllegalStateException("Tried to save on read only walk");
 			}
 		}

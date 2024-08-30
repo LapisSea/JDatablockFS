@@ -467,7 +467,7 @@ public final class Cluster implements DataProvider{
 	}
 	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot, boolean recordStats) throws IOException{
 		if(refRoot){
-			rec.log(new Reference(), null, null, firstChunkPtr().makeReference());
+			rec.log(Reference.NULL, null, null, firstChunkPtr().makeReference(), null);
 		}
 		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), rootPipe(), recordStats, rec);
 	}

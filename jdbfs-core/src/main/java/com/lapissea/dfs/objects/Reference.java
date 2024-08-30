@@ -38,35 +38,45 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	static{
 		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolveValLocking()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields, testRun) -> {
-				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
+				var res = StandardStructPipe.<Reference>compiler().compile(t, structFields);
+				var f   = res.fields();
 				if(
 					f.get(0) instanceof BitFieldMerger<?> m && Iters.from(m.fieldGroup()).toModList(IOField::getName).equals(List.of("offsetSize", "ptrSize")) &&
 					f.get(1).getName().equals("offset") &&
 					f.get(2).getName().equals("ptr")
 				){
-					return f;
+					return res;
 				}
 				
 				throw new ShouldNeverHappenError(f.toString());
 			}, true){
+				
+				private static final int NULL_HEADER = (int)BitFieldMerger.calcIntegrityBits(0, 2, 6);
+				
 				@Override
 				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
+					var off  = instance.getOffset();
+					var ptr1 = instance.getPtr();
 					
-					var off = instance.getOffset();
-					var ptr = instance.getPtr();
+					if(off == 0 && ptr1.isNull()){
+						dest.writeInt1(NULL_HEADER);
+						return;
+					}
 					
 					var offsetSize = NumberSize.bySize(off);
-					var ptrSize    = NumberSize.bySize(ptr);
+					var ptrSize    = NumberSize.bySize(ptr1);
 					
 					var header = offsetSize.ordinal()|(ptrSize.ordinal()<<3);
 					
 					dest.writeInt1(header|(int)BitFieldMerger.calcIntegrityBits(header, 2, 6));
 					offsetSize.write(dest, off);
-					ptrSize.write(dest, ptr);
+					ptrSize.write(dest, ptr1);
 				}
 				@Override
-				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
-					int flags      = src.readUnsignedInt1();
+				public Reference readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+					int flags = src.readUnsignedInt1();
+					if(flags == NULL_HEADER) return Reference.NULL;
+					
 					var offsetSize = NumberSize.ordinal(flags&0b111);
 					var ptrSize    = NumberSize.ordinal((flags >>> 3)&0b111);
 					BitFieldMerger.readIntegrityBits(flags, 8, 6);
@@ -74,18 +84,21 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					var off = offsetSize.read(src);
 					var ptr = ChunkPointer.of(ptrSize.read(src));
 					
-					instance.offset = off;
-					instance.ptr = ptr;
-					return instance;
+					return Reference.of(ptr, off);
+				}
+				@Override
+				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+					return readNew(provider, src, genericContext);
 				}
 			});
 			FixedStructPipe.registerSpecialImpl(STRUCT, () -> new FixedStructPipe<>(STRUCT, (t, structFields, testRun) -> {
-				var f = FixedStructPipe.<Reference>compiler().compile(t, structFields);
+				var res = FixedStructPipe.<Reference>compiler().compile(t, structFields);
+				var f   = res.fields();
 				if(
 					f.get(0).getName().equals("offset") &&
 					f.get(1).getName().equals("ptr")
 				){
-					return f;
+					return res;
 				}
 				
 				throw new ShouldNeverHappenError(f.toString());
@@ -100,18 +113,20 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					dest.writeInt8(ptr.getValue());
 				}
 				@Override
-				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+				public Reference readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 					var off = src.readInt8();
 					var ptr = ChunkPointer.of(src.readInt8());
 					
-					instance.offset = off;
-					instance.ptr = ptr;
-					
-					return instance;
+					return Reference.of(ptr, off);
+				}
+				@Override
+				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+					return readNew(provider, src, genericContext);
 				}
 			});
 		}
 	}
+	
 	
 	private static FixedStructPipe<Reference> FIXED_PIPE;
 	private static StructPipe<Reference>      STANDARD_PIPE;
@@ -151,15 +166,20 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		}
 	}
 	
+	public static final Reference NULL = new Reference(ChunkPointer.NULL, 0);
+	
+	public static Reference of(){
+		return NULL;
+	}
+	public static Reference of(ChunkPointer ptr, long offset){
+		return new Reference(ptr, offset);
+	}
+	
 	@IODependency.VirtualNumSize(name = "ptrSize")
-	private ChunkPointer ptr;
+	private final ChunkPointer ptr;
 	@IODependency.VirtualNumSize(name = "offsetSize")
 	@IOValue.Unsigned
-	private long         offset;
-	
-	public Reference(){
-		this(ChunkPointer.NULL, 0);
-	}
+	private final long         offset;
 	
 	public Reference(ChunkPointer ptr, long offset){
 		super(STRUCT);

@@ -20,7 +20,7 @@ public final class TypedReference extends IOInstance.Managed<TypedReference>{
 	
 	public TypedReference(){
 		super(STRUCT);
-		ref = new Reference();
+		ref = Reference.NULL;
 	}
 	
 	public TypedReference(Reference ref, int id){

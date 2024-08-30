@@ -22,7 +22,7 @@ public sealed interface CheckedPipe{
 		private final StandardStructPipe<T> check, test;
 		
 		public Standard(StandardStructPipe<T> check, StandardStructPipe<T> test){
-			super(check.getType(), (type, structFields, testRun) -> check.getSpecificFields(), true);
+			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), true);
 			this.check = check;
 			this.test = test;
 		}
@@ -30,6 +30,10 @@ public sealed interface CheckedPipe{
 		@Override
 		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 			doWriteC(check, test, count, provider, dest, ioPool, instance);
+		}
+		@Override
+		public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			return readNewC(check, test, count, provider, src, genericContext);
 		}
 		@Override
 		protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -47,7 +51,7 @@ public sealed interface CheckedPipe{
 		private final FixedStructPipe<T> check, test;
 		
 		public Fixed(FixedStructPipe<T> check, FixedStructPipe<T> test){
-			super(check.getType(), (type, structFields, testRun) -> check.getSpecificFields(), true);
+			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), true);
 			this.check = check;
 			this.test = test;
 		}
@@ -59,6 +63,10 @@ public sealed interface CheckedPipe{
 		@Override
 		protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			return doReadC(check, test, count, ioPool, provider, src, instance, genericContext);
+		}
+		@Override
+		public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			return readNewC(check, test, count, provider, src, genericContext);
 		}
 		@Override
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
@@ -84,12 +92,19 @@ public sealed interface CheckedPipe{
 		count[1]++;
 		return checkedRead(check, test, ioPool, provider, src, instance, genericContext);
 	}
-	private static <T extends IOInstance<T>> void skipC(StructPipe<T> check, StructPipe<T> test, int[] count, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private static <T extends IOInstance<T>> T readNewC(StructPipe<T> check, StructPipe<T> test, int[] count, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		if(count[2]>MAX_COUNT){
+			return test.readNew(provider, src, genericContext);
+		}
+		count[2]++;
+		return checkedReadNew(check, test, provider, src, genericContext);
+	}
+	private static <T extends IOInstance<T>> void skipC(StructPipe<T> check, StructPipe<T> test, int[] count, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		if(count[3]>MAX_COUNT){
 			test.skip(provider, src, genericContext);
 			return;
 		}
-		count[2]++;
+		count[3]++;
 		checkedSkip(check, test, provider, src, genericContext);
 	}
 	
@@ -125,6 +140,19 @@ public sealed interface CheckedPipe{
 		check.write(provider, buff, read);
 		var ba = new ContentInputStream.BA(buff.toByteArray());
 		test.doRead(ioPool, provider, ba, instance, genericContext);
+		
+		if(ba.readRemaining().length != 0 || !Objects.equals(read, instance)){
+			throw new IllegalStateException(TextUtil.toString("Test and check do not match!", check, "\n", instance, "\n", read));
+		}
+		return instance;
+	}
+	
+	private static <T extends IOInstance<T>> T checkedReadNew(StructPipe<T> check, StructPipe<T> test, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var instance = check.readNew(provider, src, genericContext);
+		var buff     = new ContentOutputBuilder();
+		check.write(provider, buff, instance);
+		var ba   = new ContentInputStream.BA(buff.toByteArray());
+		var read = test.readNew(provider, ba, genericContext);
 		
 		if(ba.readRemaining().length != 0 || !Objects.equals(read, instance)){
 			throw new IllegalStateException(TextUtil.toString("Test and check do not match!", check, "\n", instance, "\n", read));

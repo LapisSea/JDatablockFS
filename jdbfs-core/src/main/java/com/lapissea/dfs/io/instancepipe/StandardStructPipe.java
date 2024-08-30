@@ -25,10 +25,13 @@ import static com.lapissea.dfs.type.field.StoragePool.IO;
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields, testRun) -> IOFieldTools.stepFinal(structFields, List.of(
-			IOFieldTools::dependencyReorder,
-			IOFieldTools::mergeBitSpace
-		));
+		return (t, structFields, testRun) -> {
+			var fields = IOFieldTools.stepFinal(structFields, List.of(
+				IOFieldTools::dependencyReorder,
+				IOFieldTools::mergeBitSpace
+			));
+			return new PipeFieldCompiler.Result<>(fields);
+		};
 	}
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
@@ -67,6 +70,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		super(type, compiler(), initNow);
 	}
 	
+	@Override
+	public Class<StructPipe<T>> getSelfClass(){
+		//noinspection unchecked,rawtypes
+		return (Class)StandardStructPipe.class;
+	}
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
