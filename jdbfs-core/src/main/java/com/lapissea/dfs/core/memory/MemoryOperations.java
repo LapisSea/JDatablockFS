@@ -282,8 +282,6 @@ public final class MemoryOperations{
 		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
-	private static final FreedMemoryPurgeType PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolveLocking();
-	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();
 		var provider = data.iterator().next().getDataProvider();
@@ -319,7 +317,8 @@ public final class MemoryOperations{
 			writeChunks.add(chunk.writeHeaderToBuf());
 		}
 		
-		var purgeTransaction = PURGE_ACCIDENTAL != FreedMemoryPurgeType.NO_OP? provider.getSource().openIOTransaction() : null;
+		var purgeAccidental  = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
+		var purgeTransaction = purgeAccidental != FreedMemoryPurgeType.NO_OP? provider.getSource().openIOTransaction() : null;
 		
 		if(!toDestroy.isEmpty()){
 			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
@@ -345,9 +344,9 @@ public final class MemoryOperations{
 			}
 		}
 		ExecutorService service = null;
-		if(PURGE_ACCIDENTAL != FreedMemoryPurgeType.NO_OP) try{
+		if(purgeAccidental != FreedMemoryPurgeType.NO_OP) try{
 			for(Chunk chunk : oks){
-				switch(PURGE_ACCIDENTAL){
+				switch(purgeAccidental){
 					case ONLY_HEADER_BYTES -> {
 						if(chunk.getCapacity()>3000){
 							if(service == null) service = Executors.newVirtualThreadPerTaskExecutor();
