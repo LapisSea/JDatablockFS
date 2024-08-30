@@ -708,6 +708,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		waitForState(STATE_IO_FIELD);
 		if(needsBuilderObj){
 			return readNewByBuilder(provider, src, genericContext);
 		}
