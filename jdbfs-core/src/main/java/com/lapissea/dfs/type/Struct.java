@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -820,13 +821,22 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private NewObj.Instance<T> findEmptyConstructor(boolean optimized){
 		if(getType().isAnnotationPresent(NoDefaultConstructor.class)){
-			throw new UnsupportedOperationException("NoDefaultConstructor is present");
+			throw new UnsupportedOperationException("NoDefaultConstructor is present for: " + this);
 		}
 		if(this instanceof Struct.Unmanaged){
-			throw new UnsupportedOperationException("Unmanaged instances can not have default constructor");
+			throw new UnsupportedOperationException("Unmanaged instances can not have default constructor: " + this);
 		}
 		if(NEW_OBJ_INST_ARGS == null) NEW_OBJ_INST_ARGS = Access.getArgs(NewObj.Instance.class);
-		NewObj.Instance<T> ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		
+		NewObj.Instance<T> ctor;
+		try{
+			ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		}catch(MissingConstructor e){
+			if(needsBuilderObj()){
+				throw new UnsupportedOperationException("Final field types may not have a default constructor: " + this, e);
+			}
+			throw e;
+		}
 		Objects.requireNonNull(ctor);
 		return emptyConstructor = ctor;
 	}
@@ -909,13 +919,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return needsBuilderObj;
 	}
 	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
-		waitForState(STATE_FIELD_MAKE);
 		var typ = builderObjType;
 		if(typ == null) typ = createBuilderObjType(now);
 		return typ;
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
-		if(!needsBuilderObj) throw new UnsupportedOperationException();
+		if(!needsBuilderObj()) throw new UnsupportedOperationException();
 		var cls = BuilderProxyCompiler.getProxy(this);
 		var typ = now? Struct.of(cls, STATE_DONE) : Struct.of(cls);
 		

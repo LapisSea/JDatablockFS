@@ -3,6 +3,7 @@ package com.lapissea.dfs.run;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
@@ -12,6 +13,7 @@ import static org.testng.Assert.assertTrue;
 public class TypeGenTests{
 	
 	interface DefaultImplType extends IOInstance.Def<DefaultImplType>{
+		@IONullability(IONullability.Mode.NULLABLE)
 		IOList<Integer> list();
 	}
 	

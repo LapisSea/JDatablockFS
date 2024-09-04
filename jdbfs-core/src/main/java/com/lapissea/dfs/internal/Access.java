@@ -2,7 +2,7 @@ package com.lapissea.dfs.internal;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
-import com.lapissea.dfs.exceptions.MissingConstruct;
+import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
@@ -325,7 +325,7 @@ public final class Access{
 					case 1 -> "argument of " + parameterTypes[0];
 					default -> "arguments of " + Arrays.toString(parameterTypes);
 				};
-				var e = new MissingConstruct("fmt", "{}#red does not have a valid constructor or \"of\" static method with {}#yellow", clazz.getName(), argStr);
+				var e = new MissingConstructor("fmt", "{}#red does not have a valid constructor or \"of\" static method with {}#yellow", clazz.getName(), argStr);
 				e.addSuppressed(ce);
 				e.addSuppressed(ofe);
 				throw e;

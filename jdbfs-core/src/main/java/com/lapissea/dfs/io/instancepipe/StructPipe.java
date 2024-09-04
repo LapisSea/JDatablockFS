@@ -316,6 +316,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}, initNow? null : this::postValidate);
 	}
 	
+	private boolean needsBuilderObj(){
+		waitForState(STATE_IO_FIELD);
+		return needsBuilderObj;
+	}
 	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow, Object builderMetadata){
 		if(initNow){
 			var res = createBuilderPipe(builderMetadata);
@@ -692,10 +696,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException;
 	
 	
+	private Map<FieldDependency.Ticket<T>, FieldDependency.Ticket<ProxyBuilder<T>>> proxyDepMapping = Map.of();
+	public FieldDependency.Ticket<ProxyBuilder<T>> mapToProxy(FieldDependency.Ticket<T> ticket){
+		var cached = proxyDepMapping.get(ticket);
+		if(cached != null) return cached;
+		
+		var names  = ticket.readFields().mapped(IOField::getName);
+		var mapped = getBuilderPipe().getFieldDependency().getDeps(names);
+		
+		var map = new HashMap<>(proxyDepMapping);
+		map.put(ticket, mapped);
+		proxyDepMapping = Map.copyOf(map);
+		
+		return mapped;
+	}
+	
 	public final T readNewSelective(DataProvider provider, ContentReader src, Set<String> names, GenericContext genericContext) throws IOException{
 		return readNewSelective(provider, src, getFieldDependency().getDeps(names), genericContext, false);
 	}
 	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext, boolean strictHolder) throws IOException{
+		if(needsBuilderObj()){
+			var pipe     = getBuilderPipe();
+			var mTicket  = mapToProxy(depTicket);
+			var builtObj = pipe.readNewSelective(provider, src, mTicket, genericContext, strictHolder);
+			if(strictHolder && type.isDefinition()){
+				return builderToStrictPartial(mTicket, builtObj);
+			}
+			return builtObj.build();
+		}
+		
 		T instance;
 		if(strictHolder && type.isDefinition()){
 			instance = type.partialImplementation(depTicket.readFields()).make();
@@ -706,10 +735,30 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return instance;
 	}
 	
+	//TODO: implement new partial from partial builder
+	private T builderToStrictPartial(FieldDependency.Ticket<ProxyBuilder<T>> mTicket, ProxyBuilder<T> builtObj){
+		var fields = mTicket.readFields();
+		
+		//noinspection rawtypes,unchecked
+		var ctor = IOInstance.Def.partialDataConstructor(
+			(Class)type.getType(),
+			fields.mapped(IOField::getName).toSet(),
+			false
+		);
+		
+		var args = fields.mapped(f -> f.get(null, builtObj)).toArray(Object[]::new);
+		try{
+			var res = ctor.invokeWithArguments(args);
+			//noinspection unchecked
+			return (T)res;
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
+	}
+	
 	@Override
 	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		waitForState(STATE_IO_FIELD);
-		if(needsBuilderObj){
+		if(needsBuilderObj()){
 			return readNewByBuilder(provider, src, genericContext);
 		}
 		T instance = type.make();

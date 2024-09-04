@@ -18,6 +18,7 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.NotImplementedException;
 
 public final class BuilderProxyCompiler{
 	
@@ -45,7 +46,8 @@ public final class BuilderProxyCompiler{
 			throw new IllegalArgumentException();
 		}
 		
-		var baseClass = type.getType();
+		var baseClass     = type.getType();
+		var concreteClass = type.getConcreteType();
 		
 		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
 		
@@ -57,9 +59,19 @@ public final class BuilderProxyCompiler{
 		
 		try{
 			var log = JorthLogger.make();
-			var clazzBytes = Jorth.generateClass(baseClass.getClassLoader(), proxyName, writer -> {
+			var clazzBytes = Jorth.generateClass(concreteClass.getClassLoader(), proxyName, writer -> {
 				var fields = type.getRealFields();
 				writer.addImports(Struct.class, ChunkPointer.class);
+				
+				var parms = baseClass.getTypeParameters();
+				for(var parm : parms){
+					var bounds = parm.getBounds();
+					if(bounds.length != 1){
+						throw new NotImplementedException("Implement multi bound type variable");
+					}
+					writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+				}
+				
 				writer.write(
 					"""
 						extends {0} <{1}>
@@ -110,7 +122,7 @@ public final class BuilderProxyCompiler{
 							end
 						end
 						""",
-					baseClass, fields, IOInstance.class);
+					concreteClass, fields, IOInstance.class);
 				
 				writer.wEnd();
 			}, log);
@@ -122,10 +134,10 @@ public final class BuilderProxyCompiler{
 			}
 			
 			//noinspection unchecked
-			return (Class<ProxyBuilder<T>>)Access.privateLookupIn(baseClass)
+			return (Class<ProxyBuilder<T>>)Access.privateLookupIn(concreteClass)
 			                                     .defineClass(clazzBytes);
 		}catch(MalformedJorth e){
-			throw new RuntimeException("Failed to generate proxy", e);
+			throw new RuntimeException("Failed to generate proxy for " + baseClass.getTypeName(), e);
 		}catch(IllegalAccessException e){
 			throw new RuntimeException(e);
 		}

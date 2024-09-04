@@ -253,6 +253,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
 			return DefInstanceCompiler.dataConstructor(type);
 		}
+		static <T extends Def<T>, A1> MethodHandle partialDataConstructor(Class<T> type, Set<String> names, boolean fullCtor){
+			return DefInstanceCompiler.dataConstructor(new DefInstanceCompiler.Key<>(type, Optional.of(names)), fullCtor);
+		}
 		
 		static <T extends Def<T>> Class<T> partialImplementation(Class<T> type, Set<String> includedFieldNames){
 			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Optional.of(includedFieldNames)));
