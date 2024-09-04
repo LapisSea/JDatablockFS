@@ -167,7 +167,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
 			}
 			stack.push(type);
-			writer.visitTypeInsn(CHECKCAST, type.jvmSignatureStr());
+			writer.visitTypeInsn(CHECKCAST, type.dims() == 0? type.raw().slashed() : type.jvmDescriptorStr());
 		}
 	}
 	

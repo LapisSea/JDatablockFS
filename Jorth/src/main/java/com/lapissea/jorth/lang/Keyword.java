@@ -14,6 +14,7 @@ public enum Keyword implements KeyedEnum{
 	RETURNS,
 	GET,
 	SET,
+	CAST,
 	EXTENDS,
 	IMPLEMENTS,
 	PERMITS,

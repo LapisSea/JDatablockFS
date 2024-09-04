@@ -46,4 +46,10 @@ public class WTFIsMyBytecode<ARG>{
 	public int compareTo(ARG o){
 		return 0;
 	}
+	public String cast(Object o){
+		var a = (String)o;
+		var b = (String[])o;
+		var c = (List<String>)o;
+		return a;
+	}
 }
