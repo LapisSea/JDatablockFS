@@ -369,7 +369,7 @@ public final class IOFieldTools{
 	public static boolean canHaveNullAnnotation(AnnotatedType field){
 		var typ = field.getType();
 		if(typ.isPrimitive()) return false;
-		return isGeneric(field) || typ.isArray() ||
+		return isGeneric(field) || typ.isArray() || UtilL.instanceOf(typ, Collection.class) ||
 		       Iters.concat(
 			       Iters.of(IOInstance.class, Enum.class, Type.class),
 			       FieldCompiler.getWrapperTypes(),

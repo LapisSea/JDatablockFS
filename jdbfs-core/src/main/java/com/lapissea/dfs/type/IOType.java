@@ -178,14 +178,14 @@ public abstract sealed class IOType extends IOInstance.Managed<IOType>{
 				var builtIn = Class.forName(name);
 				try{
 					var storedO = db.getDefinitionFromClassName(name);
-					if(storedO.map(stored -> !new TypeDef(builtIn).equals(stored)).orElse(false)){
+					if(storedO.map(stored -> !TypeDef.of(builtIn).equals(stored)).orElse(false)){
 						Log.trace(
 							"""
 								{#yellowBuilt in and stored classes are not the same for: #}{}#red
 								\t{#redBuilt in:#} {}
 								\t{#redStored  :#} {}""",
 							() -> {
-								return List.of(name, storedO.get(), new TypeDef(builtIn));
+								return List.of(name, storedO.get(), TypeDef.of(builtIn));
 							});
 						throw new ClassNotFoundException();
 					}

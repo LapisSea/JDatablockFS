@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -66,7 +67,7 @@ public final class TemplateClassLoader extends ClassLoader{
 					
 					if(!name.startsWith("java.")) try{
 						var builtIn = db.getDefinitionFromClassName(name);
-						if(builtIn.map(stored -> !new TypeDef(c2).equals(stored)).orElse(false)){
+						if(builtIn.map(stored -> !TypeDef.of(c2).equals(stored)).orElse(false)){
 							c1 = null;//Discard mismatching built in class
 						}
 					}catch(IOException e){
@@ -90,18 +91,17 @@ public final class TemplateClassLoader extends ClassLoader{
 	@Override
 	protected Class<?> findClass(String className) throws ClassNotFoundException{
 		TypeDef def = getDef(className);
-		if(def.isUnmanaged()){
+		if(def.unmanaged){
 			throw new UnsupportedOperationException(className + " is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
 		}
 		
-		if(!def.isIoInstance() && !def.isEnum() && !def.isJustInterface()){
+		if(!def.ioInstance && !def.isEnum() && !def.justInterface){
 			throw new UnsupportedOperationException("Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() + " or Enum or just an interface");
 		}
 		
-		var classData = CLASS_DATA_CACHE.get(new TypeNamed(className, def));
+		var typ       = new TypeNamed(className, def);
+		var classData = CLASS_DATA_CACHE.get(typ);
 		if(classData == null){
-			var typ = new TypeNamed(className, def.clone());
-			
 			var hash = hashCode();
 			ConfigDefs.CompLogLevel.JUST_START.log("Generating template: {} - {}", className, (Supplier<String>)() -> {
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN);
@@ -132,21 +132,21 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private byte[] jorthGenerate(TypeNamed classType){
-		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
+		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.fields));
 		
 		var log = JorthLogger.make();
 		try{
 			var bytecode = Jorth.generateClass(this, classType.name, writer -> {
-				for(var typeArg : classType.def.getTypeArgs()){
+				for(var typeArg : classType.def.typeArgs){
 					var type = typeArg.bound().generic(db);
 					writer.write("type-arg {!} {}", typeArg.name(), type);
 				}
 				
-				if(classType.def.isIoInstance()){
+				if(classType.def.ioInstance){
 					generateIOInstance(classType, writer);
 				}else if(classType.def.isEnum()){
 					generateEnum(classType, writer);
-				}else if(classType.def.isJustInterface()){
+				}else if(classType.def.justInterface){
 					generateJustAnInterface(classType, writer);
 				}else{
 					throw new NotImplementedException(classType.name);
@@ -192,7 +192,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		boolean extend = true;
 		
-		var parent = classType.def.getSealedParent();
+		var parent = classType.def.sealedParent;
 		if(parent != null){
 			ensureLoadedSealParent(parent.name());
 			switch(parent.type()){
@@ -204,10 +204,10 @@ public final class TemplateClassLoader extends ClassLoader{
 			}
 		}
 		
-		var fields = classType.def.getFields();
+		var fields = classType.def.fields;
 		
 		if(!fields.isEmpty()){
-			var order = classType.def.getFieldOrder().mapToObj(fields::get).toList(TypeDef.FieldDef::getName);
+			var order = Iters.from(classType.def.fieldOrder).map(fields::get).toList(fieldDef -> fieldDef.name);
 			//noinspection deprecation
 			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}
@@ -242,28 +242,28 @@ public final class TemplateClassLoader extends ClassLoader{
 			writer.write("@{}", IOValue.class);
 			
 			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
-				field.getType().getTypeClass(db)
+				field.isDynamic? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
+				field.type.getTypeClass(db)
 			))){
-				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());
+				writer.write("@{} start value {!} end", IONullability.class, field.nullability.toString());
 			}
-			if(field.isDynamic()){
+			if(field.isDynamic){
 				writer.write("@{}", IOValue.Generic.class);
 			}
-			if(field.isUnsigned()){
+			if(field.unsigned){
 				writer.write("@{}", IOValue.Unsigned.class);
 			}
-			if(field.isUnsafe()){
+			if(field.unsafe){
 				writer.write("@{}", IOUnsafeValue.class);
 			}
-			if(field.getReferenceType() != null){
-				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());
+			if(field.referenceType != null){
+				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.referenceType.toString());
 			}
-			if(!field.getDependencies().isEmpty()){
-				stringsAnnotation(writer, IODependency.class, field.getDependencies());
+			if(!field.dependencies.isEmpty()){
+				stringsAnnotation(writer, IODependency.class, field.dependencies);
 			}
 			
-			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));
+			writer.write("private field {!} {}", field.name, field.type.generic(db));
 		}
 		writer.wEnd();
 	}
@@ -271,7 +271,7 @@ public final class TemplateClassLoader extends ClassLoader{
 	private void generateJustAnInterface(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writePermits(classType, writer);
 		
-		var parent = classType.def.getSealedParent();
+		var parent = classType.def.sealedParent;
 		if(parent != null){
 			ensureLoadedSealParent(parent.name());
 			switch(parent.type()){

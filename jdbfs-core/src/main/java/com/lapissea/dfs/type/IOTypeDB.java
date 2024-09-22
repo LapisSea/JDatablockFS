@@ -154,15 +154,15 @@ public sealed interface IOTypeDB{
 			private void recordType(IOType type){
 				for(var typeRaw : type.collectRaws(this)){
 					if(!defs.containsKey(typeRaw.getName())){
-						var def = new TypeDef(type.getTypeClass(this));
-						if(!def.isUnmanaged()){
+						var def = TypeDef.of(type.getTypeClass(this));
+						if(!def.unmanaged){
 							defs.putIfAbsent(typeRaw.getName(), def);
 						}else{
 							defs.put(typeRaw.getName(), null);
 						}
 						
-						for(TypeDef.FieldDef field : def.getFields()){
-							recordType(field.getType());
+						for(TypeDef.FieldDef field : def.fields){
+							recordType(field.type);
 						}
 					}
 				}
@@ -597,7 +597,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
-			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
+			newDefs.entrySet().removeIf(e -> !e.getValue().ioInstance);
 			if(newDefs.isEmpty()) return;
 			
 			class Validated{
@@ -610,7 +610,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			var names = Iters.entries(newDefs)
-			                 .filter(e -> !e.getValue().isUnmanaged())
+			                 .filter(e -> !e.getValue().unmanaged)
 			                 .map(e -> e.getKey().typeName)
 			                 .toModSet();
 			
@@ -619,7 +619,7 @@ public sealed interface IOTypeDB{
 			
 			var fieldMap =
 				Iters.entries(newDefs)
-				     .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
+				     .filter(e -> e.getValue().ioInstance && !e.getValue().unmanaged)
 				     .map(e -> {
 					     Struct<?> typ;
 					     try{
@@ -739,8 +739,8 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			var def    = new TypeDef(typ);
-			var parent = def.getSealedParent();
+			var def    = TypeDef.of(typ);
+			var parent = def.sealedParent;
 			if(parent != null){
 				recordType(builtIn, IOType.of(switch(parent.type()){
 					case EXTEND -> typ.getSuperclass();
@@ -750,7 +750,7 @@ public sealed interface IOTypeDB{
 				}), newDefs);
 			}
 			
-			if(!def.isUnmanaged() && (def.isIoInstance() || def.isEnum() || def.isJustInterface())){
+			if(!def.unmanaged && (def.ioInstance || def.isEnum() || def.justInterface)){
 				newDefs.put(typeName, def);
 			}
 			
@@ -758,15 +758,15 @@ public sealed interface IOTypeDB{
 				recordType(builtIn, arg, newDefs);
 			}
 			
-			if(def.isUnmanaged()) return;
+			if(def.unmanaged) return;
 			
 			if(TYPE_VALIDATION){
 				StandardStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type, false);
 			}
 			
 			
-			for(TypeDef.FieldDef field : def.getFields()){
-				recordType(builtIn, field.getType(), newDefs);
+			for(TypeDef.FieldDef field : def.fields){
+				recordType(builtIn, field.type, newDefs);
 			}
 		}
 		

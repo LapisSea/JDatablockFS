@@ -10,6 +10,7 @@ import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
@@ -44,6 +45,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -662,7 +664,20 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 			var fs = FieldSet.of(generatedFields);
 			if(fs.size() != names.length){
-				throw new IllegalArgumentException("All fields in order should be defined!");
+				throw new IllegalArgumentException(Log.fmt(
+					"""
+						All fields in order should be defined for {}#red!
+							Fields: {}#yellow
+							Order:  {}#red""",
+					getType().getName(),
+					Iters.concat(
+						fs.mapped(IOField::getName).sortedBy(s -> {
+							var i = Arrays.asList(names).indexOf(s);
+							return i == -1? Integer.MAX_VALUE : i;
+						})
+					),
+					names
+				));
 			}
 			return Iters.from(names).map(fs::requireByName);
 		}).orElse(generatedFields);

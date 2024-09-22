@@ -352,7 +352,7 @@ public final class Cluster implements DataProvider{
 			if(name.isEmpty()) continue;
 			try{
 				var def = db.getDefinitionFromClassName(name).orElseThrow();
-				if(!def.isIoInstance() || def.isUnmanaged()) continue;
+				if(!def.ioInstance || def.unmanaged) continue;
 				var clazz = tLoader.loadClass(name);
 				if(clazz.getClassLoader() != tLoader){
 					continue;

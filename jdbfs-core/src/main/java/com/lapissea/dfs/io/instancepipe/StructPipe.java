@@ -281,7 +281,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
 		this.type = type;
 		init(initNow, () -> {
-			needsBuilderObj = type.needsBuilderObj();
+			needsBuilderObj = this.type.needsBuilderObj();
 			
 			PipeFieldCompiler.Result<T> res;
 			try{
