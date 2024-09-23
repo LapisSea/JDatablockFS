@@ -5,6 +5,7 @@ import com.lapissea.dfs.SyntheticWildcardType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;

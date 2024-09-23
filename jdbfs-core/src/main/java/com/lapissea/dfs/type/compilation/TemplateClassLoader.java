@@ -6,7 +6,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.TypeDef;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.access.AnnotatedType;

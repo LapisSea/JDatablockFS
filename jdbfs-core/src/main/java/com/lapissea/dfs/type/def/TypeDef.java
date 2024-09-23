@@ -1,12 +1,12 @@
-package com.lapissea.dfs.type;
+package com.lapissea.dfs.type.def;
 
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.type.field.FieldNames;
-import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
-import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
@@ -22,94 +22,6 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 @IOValue
 @IOInstance.Order({"ioInstance", "unmanaged", "justInterface", "fields", "fieldOrder", "enumConstants", "permits", "sealedParent", "typeArgs"})
 public final class TypeDef extends IOInstance.Managed<TypeDef>{
-	
-	@IOValue
-	@Order({"name", "bound"})
-	public interface ClassArgDef extends IOInstance.Def<ClassArgDef>{
-		String name();
-		IOType bound();
-		
-		static ClassArgDef of(String name, IOType bound){
-			return Def.of(ClassArgDef.class, name, bound);
-		}
-	}
-	
-	@IOValue
-	@Order({"type", "name", "isDynamic", "unsigned", "unsafe", "dependencies", "referenceType", "nullability"})
-	public static final class FieldDef extends IOInstance.Managed<FieldDef>{
-		public final IOType       type;
-		public final String       name;
-		public final boolean      isDynamic;
-		public final boolean      unsigned;
-		public final boolean      unsafe;
-		public final List<String> dependencies;
-		
-		@IONullability(NULLABLE)
-		public final IOValue.Reference.PipeType referenceType;
-		public final IONullability.Mode         nullability;
-		
-		public FieldDef(IOType type, String name, boolean isDynamic, boolean unsigned, boolean unsafe, List<String> dependencies, IOValue.Reference.PipeType referenceType, IONullability.Mode nullability){
-			this.type = Objects.requireNonNull(type);
-			this.name = Objects.requireNonNull(name);
-			this.isDynamic = isDynamic;
-			this.unsigned = unsigned;
-			this.unsafe = unsafe;
-			this.dependencies = List.copyOf(dependencies);
-			this.referenceType = referenceType;
-			this.nullability = Objects.requireNonNull(nullability);
-		}
-		
-		public FieldDef(IOField<?, ?> field){
-			type = IOType.of(field.getAccessor().getGenericType(null));
-			name = field.getName();
-			nullability = IOFieldTools.getNullability(field);
-			isDynamic = IOFieldTools.isGeneric(field);
-			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
-			var deps = field.getDependencies().iter().toModSet(IOField::getName);
-			if(field.getType().isArray()) deps.remove(FieldNames.collectionLen(field.getAccessor()));
-			if(isDynamic) deps.remove(FieldNames.genericID(field.getAccessor()));
-			dependencies = List.copyOf(deps);
-			unsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
-			unsafe = field.getAccessor().hasAnnotation(IOUnsafeValue.class);
-		}
-		
-		@Override
-		public String toString(){
-			if(type == null) return getClass().getSimpleName() + IOFieldTools.UNINITIALIZED_FIELD_SIGN;
-			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type + (dependencies.isEmpty()? "" : "(deps = [" + String.join(", ", dependencies) + "])");
-		}
-		@Override
-		public String toShortString(){
-			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability.shortName : "") + ": " + Utils.toShortString(type);
-		}
-	}
-	
-	@StrFormat(name = false, fNames = false, curly = false)
-	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
-		
-		private static EnumConstant of(Enum<?> e){
-			return Def.of(EnumConstant.class, e.name());
-		}
-		
-		String getName();
-	}
-	
-	@StrFormat(name = false, fNames = false)
-	@IOInstance.Order({"name", "type"})
-	public interface SealedParent extends IOInstance.Def<SealedParent>{
-		enum Type{
-			EXTEND,
-			JUST_INTERFACE
-		}
-		
-		static SealedParent of(String name, Type type){
-			return IOInstance.Def.of(SealedParent.class, name, type);
-		}
-		
-		String name();
-		Type type();
-	}
-	
 	
 	public final  boolean            ioInstance;
 	public final  boolean            unmanaged;
@@ -150,7 +62,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
 				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
-				fields = structFields.mapped(FieldDef::new).toList();
+				fields = structFields.mapped(FieldDef::of).toList();
 				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).iterIds().box().toList();
 			}
 		}

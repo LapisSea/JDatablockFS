@@ -15,6 +15,8 @@ import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.objects.collections.LinkedIOList;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
+import com.lapissea.dfs.type.def.FieldDef;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -161,7 +163,7 @@ public sealed interface IOTypeDB{
 							defs.put(typeRaw.getName(), null);
 						}
 						
-						for(TypeDef.FieldDef field : def.fields){
+						for(FieldDef field : def.fields){
 							recordType(field.type);
 						}
 					}
@@ -462,7 +464,8 @@ public sealed interface IOTypeDB{
 					ContiguousIOList.class,
 					LinkedIOList.class,
 					HashIOMap.class,
-					}){
+					IOType.class
+				}){
 					registerBuiltIn(db, c);
 				}
 				
@@ -765,7 +768,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			
-			for(TypeDef.FieldDef field : def.fields){
+			for(FieldDef field : def.fields){
 				recordType(builtIn, field.type, newDefs);
 			}
 		}
