@@ -217,8 +217,8 @@ public interface IterablePP<T> extends Iterable<T>{
 		return min(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> min(){
-		//noinspection unchecked
-		return min((a, b) -> ((Comparable<T>)a).compareTo(b));
+		//noinspection unchecked,rawtypes
+		return ((IterablePP)this).min(Comparator.naturalOrder());
 	}
 	default OptionalPP<T> min(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.minBy(comparator));
@@ -231,8 +231,8 @@ public interface IterablePP<T> extends Iterable<T>{
 		return max(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> max(){
-		//noinspection unchecked
-		return max((a, b) -> ((Comparable<T>)a).compareTo(b));
+		//noinspection unchecked,rawtypes
+		return ((IterablePP)this).max(Comparator.naturalOrder());
 	}
 	default OptionalPP<T> max(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.maxBy(comparator));

@@ -52,7 +52,7 @@ public class CacheOutOfSync extends IOException{
 		else{
 			sb.append("Mismatching fields:\n");
 			var names = List.of("Name", "Cached", "Actual");
-			var lens  = Iters.from(names).mapToInt(n -> Iters.from(bad).mapToInt(m -> m.get(n).length() + 1).max().orElse(0)).toArray();
+			var lens  = Iters.from(names).mapToInt(n -> Iters.from(bad).mapToInt(m -> m.get(n).length() + 1).max(0)).toArray();
 			for(var m : bad){
 				sb.append('\t');
 				for(int i = 0; i<names.size(); i++){

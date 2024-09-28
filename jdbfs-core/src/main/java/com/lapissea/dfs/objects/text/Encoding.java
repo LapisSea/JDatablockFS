@@ -129,8 +129,8 @@ class Encoding{
 			while(table.length>1<<bits) bits++;
 			assert table.length == (1<<bits);
 			
-			int offset = Iters.range(0, table.length).map(i -> table[i]).min().orElseThrow();
-			int end    = Iters.range(0, table.length).map(i -> table[i]).max().orElse(-2) + 1;
+			int offset = Iters.range(0, table.length).map(i -> table[i]).min(0);
+			int end    = Iters.range(0, table.length).map(i -> table[i]).max(-2) + 1;
 			
 			var indexTable = new byte[end - offset];
 			Arrays.fill(indexTable, (byte)0xFF);

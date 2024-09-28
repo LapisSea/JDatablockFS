@@ -239,7 +239,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(isSealed()){
 			var permits = this.permits.clone();
 			if(permits.length>0){
-				int startsPos = Iters.of(permits).mapToInt(String::length).min().orElse(0) - 1;
+				int startsPos = Iters.of(permits).mapToInt(String::length).min(0) - 1;
 				while(startsPos>0){
 					var start = permits[0].substring(0, startsPos);
 					var c     = start.charAt(start.length() - 1);

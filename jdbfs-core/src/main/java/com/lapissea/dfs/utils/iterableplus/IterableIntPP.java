@@ -116,6 +116,7 @@ public interface IterableIntPP{
 		return sum;
 	}
 	
+	default int min(int defaultValue){ return min().orElse(defaultValue); }
 	default OptionalInt min(){
 		var iter = iterator();
 		if(!iter.hasNext()) return OptionalInt.empty();
@@ -125,6 +126,7 @@ public interface IterableIntPP{
 		}
 		return OptionalInt.of(res);
 	}
+	default int max(int defaultValue){ return max().orElse(defaultValue); }
 	default OptionalInt max(){
 		var iter = iterator();
 		if(!iter.hasNext()) return OptionalInt.empty();

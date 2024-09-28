@@ -269,7 +269,7 @@ public final class IOFieldTools{
 						data.add(new String[]{"No reason??"});
 					}
 					
-					int[] lengths = new int[Iters.from(data).mapToInt(s -> s.length).max().orElse(0)];
+					int[] lengths = new int[Iters.from(data).mapToInt(s -> s.length).max(0)];
 					for(var line : data){
 						for(int i = 0; i<line.length; i++){
 							lengths[i] = Math.max(lengths[i], line[i].length() + 1);
