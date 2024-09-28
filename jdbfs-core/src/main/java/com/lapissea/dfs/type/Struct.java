@@ -8,6 +8,7 @@ import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
@@ -681,7 +682,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return instanceToString(allocVirtualVarPool(IO), instance, settings);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		return instanceToString0(ioPool, instance, settings, generatedFields());
+		IterablePP<IOField<T, ?>> fields;
+		try{
+			fields = generatedFields();
+		}catch(Throwable e){
+			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+			Log.warn("Failed to generate fields! {}", e);
+		}
+		return instanceToString0(ioPool, instance, settings, fields);
 	}
 	
 	private IterablePP<IOField<T, ?>> generatedFieldsCache;

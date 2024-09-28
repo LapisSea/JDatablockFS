@@ -18,7 +18,7 @@ public sealed interface CheckedPipe{
 	
 	final class Standard<T extends IOInstance<T>> extends StandardStructPipe<T> implements CheckedPipe{
 		
-		private final int[]                 count = new int[3];
+		private final int[]                 count = new int[4];
 		private final StandardStructPipe<T> check, test;
 		
 		public Standard(StandardStructPipe<T> check, StandardStructPipe<T> test){
@@ -43,7 +43,7 @@ public sealed interface CheckedPipe{
 	
 	final class Fixed<T extends IOInstance<T>> extends FixedStructPipe<T> implements CheckedPipe{
 		
-		private final int[]              count = new int[3];
+		private final int[]              count = new int[4];
 		private final FixedStructPipe<T> check, test;
 		
 		public Fixed(FixedStructPipe<T> check, FixedStructPipe<T> test){
