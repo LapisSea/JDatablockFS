@@ -1678,7 +1678,11 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 								if(comp == float.class){
-									var inst   = (float[])field.get(ioPool, instance);
+									var inst = (float[])field.get(ioPool, instance);
+									if(inst == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
 									var arrSiz = inst.length;
 									
 									if(size == arrSiz*4L){
@@ -1695,7 +1699,11 @@ public class BinaryGridRenderer implements DataRenderer{
 									}
 								}
 								if(comp == String.class){
-									var o    = field.get(ioPool, instance);
+									var o = field.get(ioPool, instance);
+									if(o == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
 									var inst = isList? (List<String>)o : Arrays.asList((String[])o);
 									if(inst == null) continue;
 									var arrSiz = inst.size();
@@ -1713,8 +1721,12 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 								if(comp.isEnum()){
-									var        instO  = field.get(ioPool, instance);
-									List<Enum> inst   = isList? (List<Enum>)instO : Arrays.asList((Enum[])instO);
+									var o = field.get(ioPool, instance);
+									if(o == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
+									List<Enum> inst   = isList? (List<Enum>)o : Arrays.asList((Enum[])o);
 									var        arrSiz = inst.size();
 									
 									int bitOffset = 0;
