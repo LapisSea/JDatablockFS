@@ -6,10 +6,12 @@ import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.util.ZeroArrays;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.IntConsumer;
@@ -186,27 +188,47 @@ public interface IterableIntPP{
 	
 	IntIterator iterator();
 	
-	default IterableLongPP addOverflowFiltered(long val){
-		return mapToLong().addOverflowFiltered(val);
+	default IterableLongPP addOverflowFiltered(long addend){
+		return mapToLong().addOverflowFiltered(addend);
 	}
-	default IterableIntPP addOverflowFiltered(int val){
+	default IterableIntPP addOverflowFiltered(int addend){
 		return filter(other -> {
-			var added = other + (long)val;
+			var added = other + (long)addend;
 			return added>=Integer.MIN_VALUE && added<=Integer.MAX_VALUE;
-		}).map(other -> other + val);
+		}).map(other -> other + addend);
 	}
-	default IterableLongPP addExact(long val){
-		return mapToLong(other -> Math.addExact(other, val));
+	default IterableLongPP addExact(long addend){
+		return mapToLong(other -> Math.addExact(other, addend));
 	}
-	default IterableLongPP add(long val){
-		return mapToLong(other -> other + val);
+	default IterableLongPP add(long addend){
+		return mapToLong(other -> other + addend);
 	}
 	
-	default IterableIntPP addExact(int val){
-		return map(other -> Math.addExact(other, val));
+	default IterableIntPP addExact(int addend){
+		return map(other -> Math.addExact(other, addend));
 	}
-	default IterableIntPP add(int val){
-		return map(other -> other + val);
+	default IterableIntPP add(int addend){
+		return map(other -> other + addend);
+	}
+	
+	default IterableIntPP mulExact(int multiplier){
+		return map(other -> Math.multiplyExact(other, multiplier));
+	}
+	default IterableIntPP mul(int multiplier){
+		return map(other -> other*multiplier);
+	}
+	default IterableLongPP mulExact(long multiplier){
+		return mapToLong(other -> Math.multiplyExact(other, multiplier));
+	}
+	default IterableLongPP mul(long multiplier){
+		return mapToLong(other -> other*multiplier);
+	}
+	
+	default IterableIntPP divExact(int divisor){
+		return map(other -> Math.divideExact(other, divisor));
+	}
+	default IterableIntPP div(int divisor){
+		return map(other -> other/divisor);
 	}
 	
 	default IterableIntPP.SizedPP map(IntUnaryOperator map){
@@ -334,6 +356,87 @@ public interface IterableIntPP{
 		};
 	}
 	
+	default IterableIntPP.SizedPP flatMap(IntFunction<IterableIntPP> flatten){
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				int size = 0;
+				var src  = IterableIntPP.this.iterator();
+				while(src.hasNext()){
+					var t = src.nextInt();
+					var sizO = switch(flatten.apply(t)){
+						case Collection<?> c -> OptionalInt.of(c.size());
+						case SizedPP s -> s.getSize();
+						default -> OptionalInt.empty();
+					};
+					if(sizO.isEmpty()) return OptionalInt.empty();
+					var siz = sizO.getAsInt();
+					
+					var lSize = size + (long)siz;
+					if(lSize>Integer.MAX_VALUE) return OptionalInt.empty();
+					size = (int)lSize;
+				}
+				return OptionalInt.of(size);
+			}
+			@Override
+			public IntIterator iterator(){
+				var src = IterableIntPP.this.iterator();
+				return new Iters.FindingIntIterator(){
+					private IntIterator flat;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(flat == null || !flat.hasNext()){
+								if(!src.hasNext()) return false;
+								flat = flatten.apply(src.nextInt()).iterator();
+								continue;
+							}
+							reportFound(flat.nextInt());
+							return true;
+						}
+					}
+				};
+			}
+		};
+	}
+	
+	default IterableIntPP.SizedPP flatMapArray(IntFunction<int[]> flatten){
+		return new IterableIntPP.SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				int size = 0;
+				var src  = IterableIntPP.this.iterator();
+				while(src.hasNext()){
+					var t     = src.nextInt();
+					var siz   = flatten.apply(t).length;
+					var lSize = size + (long)siz;
+					if(lSize>Integer.MAX_VALUE) return OptionalInt.empty();
+					size = (int)lSize;
+				}
+				return OptionalInt.of(size);
+			}
+			@Override
+			public IntIterator iterator(){
+				var src = IterableIntPP.this.iterator();
+				return new Iters.FindingIntIterator(){
+					private int[] data;
+					private int   index;
+					@Override
+					protected boolean doNext(){
+						while(true){
+							if(data == null || data.length == index){
+								if(!src.hasNext()) return false;
+								data = Objects.requireNonNull(flatten.apply(src.nextInt()));
+								continue;
+							}
+							reportFound(data[index++]);
+							return true;
+						}
+					}
+				};
+			}
+		};
+	}
 	
 	default IterableIntPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
@@ -408,6 +511,34 @@ public interface IterableIntPP{
 		}
 		return true;
 	}
+	
+	default char[] toCharArray(){
+		var siz = SizedPP.tryGet(IterableIntPP.this);
+		if(siz.isPresent() && siz.getAsInt() == 0){
+			return ZeroArrays.ZERO_CHAR;
+		}
+		
+		var iter = iterator();
+		if(!iter.hasNext()){
+			return ZeroArrays.ZERO_CHAR;
+		}
+		
+		char[] res  = new char[siz.orElse(8)];
+		int    size = 0;
+		
+		do{
+			if(size == res.length) res = Utils.growArr(res);
+			var i = iter.nextInt();
+			var c = (char)i;
+			if(c != i){
+				throw new IllegalStateException("\"" + i + "\" is not a valid character value");
+			}
+			res[size++] = c;
+		}while(iter.hasNext());
+		
+		if(res.length == size) return res;
+		return Arrays.copyOf(res, size);
+	}
 	default int[] toArray(){
 		var siz = SizedPP.tryGet(IterableIntPP.this);
 		if(siz.isPresent() && siz.getAsInt() == 0){
@@ -429,6 +560,15 @@ public interface IterableIntPP{
 		
 		if(res.length == size) return res;
 		return Arrays.copyOf(res, size);
+	}
+	default IntHashSet toModSet(){
+		var siz  = SizedPP.tryGet(IterableIntPP.this);
+		var set  = new IntHashSet((int)(siz.orElse(8)/0.75f), 0.75f);
+		var iter = iterator();
+		while(iter.hasNext()){
+			set.add(iter.nextInt());
+		}
+		return set;
 	}
 	
 	default void forEach(IntConsumer consumer){

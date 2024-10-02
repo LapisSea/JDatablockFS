@@ -344,6 +344,9 @@ public final class Utils{
 	public static int[] growArr(int[] res){
 		return Arrays.copyOf(res, calcNextSize(res.length));
 	}
+	public static char[] growArr(char[] res){
+		return Arrays.copyOf(res, calcNextSize(res.length));
+	}
 	public static long[] growArr(long[] res){
 		return Arrays.copyOf(res, calcNextSize(res.length));
 	}
