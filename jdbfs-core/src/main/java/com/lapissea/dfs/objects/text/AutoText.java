@@ -213,7 +213,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	
 	private byte[] generateBytes() throws IOException{
 		byte[] buff = new byte[encoding.calcSize(data)];
-		writeTextBytes(new ContentOutputStream.BA(buff));
+		encoding.write(new ContentOutputStream.BA(buff), data);
 		return buff;
 	}
 	
@@ -221,17 +221,9 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	private void setTextBytes(byte[] bytes) throws IOException{
 		dataSrc = bytes;
 		StringBuilder sb = new StringBuilder(charCount);
-		readTextBytes(new ContentInputStream.BA(bytes), sb);
+		encoding.read(new ContentInputStream.BA(bytes), charCount, sb);
 		data = sb.toString();
 	}
-	
-	public void writeTextBytes(ContentWriter dest) throws IOException{
-		encoding.write(dest, data);
-	}
-	public void readTextBytes(ContentInputStream src, StringBuilder dest) throws IOException{
-		encoding.read(src, charCount, dest);
-	}
-	
 	
 	@NotNull
 	@Override
