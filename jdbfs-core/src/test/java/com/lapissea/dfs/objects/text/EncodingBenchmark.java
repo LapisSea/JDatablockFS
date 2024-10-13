@@ -1,6 +1,5 @@
 package com.lapissea.dfs.objects.text;
 
-import com.lapissea.dfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -51,7 +50,7 @@ public class EncodingBenchmark{
 	@Setup(Level.Iteration)
 	public void setup(){
 //		testStrings = Iters.of(AutoText.class, String.class, Encoding.class, Cluster.class, Iters.class, UtilL.class).toList(Class::getName);
-		testStrings = Iters.from(CharEncoding.values()).toList(e -> e.format.randomString(random, 50, 50));
+		testStrings = Iters.from(Encoding.values()).toList(e -> e.format.randomString(random, 50, 50));
 	}
 	
 	private String getRandomTestString(){
@@ -59,8 +58,8 @@ public class EncodingBenchmark{
 	}
 	
 	@Benchmark
-	public CharEncoding findBest(){
+	public Encoding findBest(){
 		String testString = getRandomTestString();
-		return CharEncoding.findBest(testString);
+		return Encoding.findBest(testString);
 	}
 }

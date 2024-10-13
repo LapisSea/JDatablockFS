@@ -6,6 +6,7 @@ import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -29,9 +30,38 @@ import static java.nio.charset.CodingErrorAction.REPORT;
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-class Encoding{
+enum Encoding{
+	BASE_16_UPPER(new TableCoding(
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+		'A', 'B', 'C', 'D', 'E', 'F'
+	)),
+	BASE_16_LOWER(new TableCoding(
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+		'a', 'b', 'c', 'd', 'e', 'f'
+	)),
+	BASE_32_UPPER(new TableCoding(
+		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+		'0', '1', '2', '3', '4', '5'
+	)),
+	BASE_32_LOWER(new TableCoding(
+		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+		'0', '1', '2', '3', '4', '5'
+	)),
+	BASE_64(new TableCoding(
+		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
+	)),
+	BASE_64_CNAME(new TableCoding(
+		//Variation of base 64 optimized for storing class names and fields.
+		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+		'0', '1', '2', '3', '4', '5', '_', '$', '[', ';', '.', FieldNames.GENERATED_FIELD_SEPARATOR
+	)),
+	LATIN1(new Latin1Coding()),
+	UTF8(new UTF8Coding());
 	
-	public sealed interface Coding{
+	sealed interface Coding{
 		void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException;
 		void write(ContentWriter dest, String str) throws IOException;
 		boolean canEncode(String str);
@@ -41,12 +71,13 @@ class Encoding{
 	}
 	
 	private static final class UTF8Coding implements Coding{
+		private static final CharsetDecoder DECODER = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
 		@Override
 		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
 			char[] buff      = new char[Math.min(1024, charCount)];
 			int    remaining = charCount;
 			
-			try(Reader reader = new InputStreamReader(src, UTF_8_DEC)){
+			try(Reader reader = new InputStreamReader(src, DECODER)){
 				while(remaining>0){
 					int read = reader.read(buff, 0, Math.min(buff.length, remaining));
 					if(read == -1) throw new EOFException();
@@ -122,12 +153,23 @@ class Encoding{
 	}
 	
 	private static final class TableCoding implements Coding{
+		
+		private static final class Range{
+			private char from, to;
+			private Range(char from, char to){
+				this.from = from;
+				this.to = to;
+			}
+			@Override
+			public String toString(){ return from + "-" + to; }
+		}
+		
 		private final byte[] indexTable;
 		private final char[] chars, ranges;
 		private final int offset, bits;
 		private final int blockCharCount, blockBytes;
 		
-		private final BitSet bs;
+		private final BitSet validPoints;
 		
 		private TableCoding(char... table){
 			assert table.length<=Byte.MAX_VALUE;
@@ -159,8 +201,8 @@ class Encoding{
 			this.blockCharCount = blockCharCount;
 			this.blockBytes = blockBytes;
 			
-			bs = new BitSet();
-			for(var c : chars) bs.set(c);
+			validPoints = new BitSet();
+			for(var c : chars) validPoints.set(c);
 		}
 		
 		private static int calcOptimizedBlockCount(int bits){
@@ -184,15 +226,6 @@ class Encoding{
 			return optimizedBlockCount;
 		}
 		
-		private static final class Range{
-			private char from, to;
-			private Range(char from, char to){
-				this.from = from;
-				this.to = to;
-			}
-			@Override
-			public String toString(){ return from + "-" + to; }
-		}
 		private static List<Range> buildRanges(char[] table){
 			List<Range> ranges = new ArrayList<>();
 			cLoop:
@@ -242,7 +275,6 @@ class Encoding{
 		
 		private static void validateRanges(char[] table, List<Range> ranges){
 			for(char c = Character.MIN_VALUE; c<Character.MAX_VALUE; c++){
-				
 				boolean oldR = false;
 				for(char t : table){
 					if(t == c){
@@ -288,7 +320,7 @@ class Encoding{
 					}
 				}
 				var res = new String(buff);
-				if(CharEncoding.findBest(res).format == this){
+				if(Encoding.findBest(res).format == this){
 					return res;
 				}
 			}
@@ -387,7 +419,7 @@ class Encoding{
 		@Override
 		public boolean canEncode(String s){
 			for(int ci = 0, l = s.length(); ci<l; ci++){
-				if(!bs.get(s.charAt(ci))){
+				if(!validPoints.get(s.charAt(ci))){
 					return false;
 				}
 			}
@@ -395,8 +427,6 @@ class Encoding{
 		}
 		
 	}
-	
-	private static final CharsetDecoder UTF_8_DEC = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
 	
 	private static boolean isLatin1Compatible(String str){
 		for(int i = 0, l = str.length(); i<l; i++){
@@ -418,81 +448,51 @@ class Encoding{
 				buff[i] = (char)(Math.pow(random.nextFloat(), 4)*maxVal);
 			}
 			var res = new String(buff);
-			if(CharEncoding.findBest(res).format == user){
+			if(Encoding.findBest(res).format == user){
 				return res;
 			}
 		}
 	}
 	
-	enum CharEncoding{
-		BASE_16_UPPER(new TableCoding(
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'A', 'B', 'C', 'D', 'E', 'F'
-		)),
-		BASE_16_LOWER(new TableCoding(
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'a', 'b', 'c', 'd', 'e', 'f'
-		)),
-		BASE_32_UPPER(new TableCoding(
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'0', '1', '2', '3', '4', '5'
-		)),
-		BASE_32_LOWER(new TableCoding(
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'0', '1', '2', '3', '4', '5'
-		)),
-		BASE_64(new TableCoding(
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
-		)),
-		BASE_64_CNAME(new TableCoding(
-			//Variation of base 64 optimized for storing class names and fields.
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'0', '1', '2', '3', '4', '5', '_', '$', '[', ';', '.', FieldNames.GENERATED_FIELD_SEPARATOR
-		)),
-		LATIN1(new Latin1Coding()),
-		UTF8(new UTF8Coding());
-		
-		public static final CharEncoding DEFAULT = LATIN1;
-		
-		private static final CharEncoding[] SORTED =
-			Iters.from(CharEncoding.values()).sortedByD(c -> c.format.sizeWeight()).toArray(CharEncoding[]::new);
-		public static CharEncoding findBest(String data){
-			return switch(data.length()){
-				case 0 -> DEFAULT;
-				case 1 -> {
-					var c = data.charAt(0);
-					if(isLatin1Compatible(c)) yield LATIN1;
-					if(!Character.isSurrogate(c)) yield UTF8;
-					throw fail();
-				}
-				default -> {
-					for(var encoding : SORTED){
-						if(encoding.format.canEncode(data)){
-							yield encoding;
-						}
+	
+	public static final Encoding DEFAULT = LATIN1;
+	
+	private static final Encoding[] SORTED =
+		Iters.from(Encoding.values()).sortedByD(c -> c.format.sizeWeight()).toArray(Encoding[]::new);
+	
+	public static Encoding findBest(String data){
+		return switch(data.length()){
+			case 0 -> DEFAULT;
+			case 1 -> {
+				var c = data.charAt(0);
+				if(isLatin1Compatible(c)) yield LATIN1;
+				if(!Character.isSurrogate(c)) yield UTF8;
+				throw fail(data);
+			}
+			default -> {
+				for(var encoding : SORTED){
+					if(encoding.format.canEncode(data)){
+						yield encoding;
 					}
-					throw new IllegalArgumentException();
 				}
-			};
-		}
-		private static RuntimeException fail(){
-			throw new RuntimeException("Unable to encode string");
-		}
-		
-		public final Coding format;
-		CharEncoding(Coding format){ this.format = format; }
-		
-		public int calcSize(String str){
-			return format.calcSize(str);
-		}
-		public void write(ContentWriter dest, String str) throws IOException{
-			format.write(dest, str);
-		}
-		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
-			format.read(src, charCount, dest);
-		}
+				throw fail(data);
+			}
+		};
+	}
+	private static IllegalStateException fail(String data){
+		return new IllegalStateException(Log.fmt("{#red\"{}\"#} is not a valid UTF-8 string", data));
+	}
+	
+	public final Coding format;
+	Encoding(Coding format){ this.format = format; }
+	
+	public int calcSize(String str){
+		return format.calcSize(str);
+	}
+	public void write(ContentWriter dest, String str) throws IOException{
+		format.write(dest, str);
+	}
+	public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
+		format.read(src, charCount, dest);
 	}
 }
