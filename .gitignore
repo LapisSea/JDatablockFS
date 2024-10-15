@@ -14,8 +14,10 @@
 !pom.xml
 
 !/.idea/
-!*.iml
-!*/*.iml
 !/runDir/
+!/.github/
 
 /*/target/
+
+*.iml
+

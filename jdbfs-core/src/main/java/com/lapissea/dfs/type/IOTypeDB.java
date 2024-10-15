@@ -296,7 +296,7 @@ public sealed interface IOTypeDB{
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
 					this.cl2id = Map.copyOf(cl2id);
-					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max().orElse(0);
+					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max(0);
 					id2cl = new Class[maxId];
 					this.cl2id.forEach((t, i) -> id2cl[i] = t);
 				}
@@ -306,7 +306,7 @@ public sealed interface IOTypeDB{
 			
 			private Fixed(Map<String, TypeDef> defs, Map<Integer, IOType> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
-				var maxID = Iters.keys(idToTyp).mapToInt().max().orElse(0);
+				var maxID = Iters.keys(idToTyp).mapToInt().max(0);
 				this.idToTyp = new IOType[maxID + 1];
 				idToTyp.forEach((k, v) -> this.idToTyp[k] = v);
 				typToID = Iters.entries(idToTyp).toMap(Map.Entry::getValue, Map.Entry::getKey);

@@ -93,6 +93,7 @@ public interface IterableLongPP{
 		return sum;
 	}
 	
+	default long min(int defaultValue){ return min().orElse(defaultValue); }
 	default OptionalLong min(){
 		var iter = iterator();
 		if(!iter.hasNext()) return OptionalLong.empty();
@@ -102,6 +103,7 @@ public interface IterableLongPP{
 		}
 		return OptionalLong.of(res);
 	}
+	default long max(int defaultValue){ return max().orElse(defaultValue); }
 	default OptionalLong max(){
 		var iter = iterator();
 		if(!iter.hasNext()) return OptionalLong.empty();

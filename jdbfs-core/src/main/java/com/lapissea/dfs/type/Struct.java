@@ -177,9 +177,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		@Override
 		public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+			IterablePP<IOField<T, ?>> fields;
+			try{
+				fields = generatedFields();
+			}catch(Throwable e){
+				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+			}
 			return instanceToString0(
 				ioPool, instance, settings,
-				Iters.concat(generatedFields(), instance.listUnmanagedFields())
+				Iters.concat(fields, instance.listUnmanagedFields())
 			);
 		}
 		
@@ -707,7 +713,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return instanceToString(allocVirtualVarPool(IO), instance, settings);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		return instanceToString0(ioPool, instance, settings, generatedFields());
+		IterablePP<IOField<T, ?>> fields;
+		try{
+			fields = generatedFields();
+		}catch(Throwable e){
+			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+		}
+		return instanceToString0(ioPool, instance, settings, fields);
 	}
 	
 	private IterablePP<IOField<T, ?>> generatedFieldsCache;

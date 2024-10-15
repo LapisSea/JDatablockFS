@@ -424,9 +424,9 @@ public final class ConfigTools{
 	///
 	
 	public static <T extends Enum<T>> Flag.FEnum<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.FEnum<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
-	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Flag.FEnum<T> defaultVal)     { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.FEnum<T> flagEV(String name, T defaultVal)                { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Flag.FEnum<T> defaultVal){ return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagEV(String name, T defaultVal)           { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.FEnum<T> flagE(String name, Supplier<T> valueMaker)  { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
 	
 	
 	public record ConfEntry(String name, String val){
@@ -445,7 +445,7 @@ public final class ConfigTools{
 	public static String configFlagsToTable(Collection<ConfEntry> values, int padding, boolean grouping){
 		var padStr = " ".repeat(padding);
 		
-		var nameLen = Iters.from(values).map(ConfEntry::name).mapToInt(String::length).max().orElse(0);
+		var nameLen = Iters.from(values).map(ConfEntry::name).mapToInt(String::length).max(0);
 		
 		var singles = new ArrayList<ConfEntry>();
 		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();

@@ -24,6 +24,7 @@ import java.util.StringJoiner;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntFunction;
@@ -217,8 +218,8 @@ public interface IterablePP<T> extends Iterable<T>{
 		return min(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> min(){
-		//noinspection unchecked
-		return min((a, b) -> ((Comparable<T>)a).compareTo(b));
+		//noinspection unchecked,rawtypes
+		return ((IterablePP)this).min(Comparator.naturalOrder());
 	}
 	default OptionalPP<T> min(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.minBy(comparator));
@@ -231,8 +232,8 @@ public interface IterablePP<T> extends Iterable<T>{
 		return max(Comparator.comparing(sortProperty));
 	}
 	default OptionalPP<T> max(){
-		//noinspection unchecked
-		return max((a, b) -> ((Comparable<T>)a).compareTo(b));
+		//noinspection unchecked,rawtypes
+		return ((IterablePP)this).max(Comparator.naturalOrder());
 	}
 	default OptionalPP<T> max(Comparator<? super T> comparator){
 		return reduce(BinaryOperator.maxBy(comparator));
@@ -848,9 +849,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP flatMapToInt(Function<T, IterableIntPP> flatten){
-		return new IterableIntPP.SizedPP.Default<>(){
-			@Override
-			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
+		return new Iters.DefaultIntIterable(){
 			@Override
 			public IntIterator iterator(){
 				var src = IterablePP.this.iterator();
@@ -1258,6 +1257,15 @@ public interface IterablePP<T> extends Iterable<T>{
 				};
 			}
 		};
+	}
+	
+	default void forEachI(ObjIntConsumer<T> action){
+		int i = 0;
+		for(T t : this){
+			action.accept(t, i);
+			preIncrementInt(i);
+			i++;
+		}
 	}
 	
 	private static void preIncrementLong(long index){

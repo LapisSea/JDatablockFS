@@ -11,6 +11,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
+import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -34,11 +35,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.fields.BitField;
-import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
@@ -50,8 +47,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.StreamUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -59,10 +54,8 @@ import org.joml.SimplexNoise;
 
 import java.awt.Color;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
@@ -396,7 +389,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		var rectWidth = bestRange.toRect(ctx.renderCtx).width;
 		
-		var textData = field.getType() == byte[].class && instance instanceof AutoText;
+		var textData = ((Class<?>)field.getType()) == byte[].class && instance instanceof AutoText;
 		
 		Optional<String> str      = textData? Optional.of(((AutoText)instance).getData()) : field.instanceToString(ioPool, instance, false);
 		Optional<String> shortStr = textData? str : Optional.empty();
@@ -1434,7 +1427,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					}catch(Throwable ignored){ }
 					drawByteRangesForced(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
 					
-					throw e;
+					throw new TypeIOFail("Failed to recover virtual fields", instance.getClass(), e);
 				}
 			}
 			while(true){
@@ -1685,51 +1678,18 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 								if(comp == float.class){
-									var inst   = (float[])field.get(ioPool, instance);
+									var inst = (float[])field.get(ioPool, instance);
+									if(inst == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
 									var arrSiz = inst.length;
 									
 									if(size == arrSiz*4L){
-										long  arrOffset = 0;
-										int[] index     = {0};
-										var f = IOFieldPrimitive.make(new FieldAccessor<T>(){
-											@Override
-											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
-												return Map.of();
-											}
-											@Override
-											public int getTypeID(){
-												return TypeFlag.ID_OBJECT;
-											}
-											@Override
-											public boolean genericTypeHasArgs(){ return false; }
-											@Override
-											public Struct<T> getDeclaringStruct(){
-												return instance.getThisStruct();
-											}
-											@NotNull
-											@Override
-											public String getName(){
-												return "[" + index[0] + "]";
-											}
-											@Override
-											public Type getGenericType(GenericContext genericContext){
-												return Float.class;
-											}
-											@Override
-											public Object get(VarPool<T> ioPool, T instance){
-												return inst[index[0]];
-											}
-											@Override
-											public void set(VarPool<T> ioPool, T instance, Object value){
-												throw new UnsupportedOperationException();
-											}
-											@Override
-											public boolean isReadOnly(){ return false; }
-										});
+										long arrOffset = 0;
 										for(int i = 0; i<arrSiz; i++){
-											index[0] = i;
 											annotateByteField(
-												ctx, ioPool, instance, f,
+												ctx, ioPool, instance, BGRUtils.floatArrayElement(instance, i, inst),
 												col,
 												reference,
 												DrawUtils.Range.fromSize(fieldOffset + arrOffset, 4));
@@ -1739,54 +1699,20 @@ public class BinaryGridRenderer implements DataRenderer{
 									}
 								}
 								if(comp == String.class){
-									var inst = (String[])field.get(ioPool, instance);
+									var o = field.get(ioPool, instance);
+									if(o == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
+									var inst = isList? (List<String>)o : Arrays.asList((String[])o);
 									if(inst == null) continue;
-									var arrSiz = inst.length;
+									var arrSiz = inst.size();
 									
-									long  arrOffset = 0;
-									int[] index     = {0};
-									var f = new NoIOField<T, String>(new FieldAccessor<>(){
-										@Override
-										public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
-											return Map.of();
-										}
-										@Override
-										public Struct<T> getDeclaringStruct(){
-											return instance.getThisStruct();
-										}
-										@Override
-										public int getTypeID(){
-											return TypeFlag.ID_OBJECT;
-										}
-										@Override
-										public boolean genericTypeHasArgs(){ return false; }
-										@NotNull
-										@Override
-										public String getName(){
-											return "[" + index[0] + "]";
-										}
-										@Override
-										public Type getGenericType(GenericContext genericContext){
-											return String.class;
-										}
-										@Override
-										public Object get(VarPool<T> ioPool, T instance){
-											return inst[index[0]];
-										}
-										@Override
-										public void set(VarPool<T> ioPool, T instance, Object value){
-											throw new UnsupportedOperationException();
-										}
-										@Override
-										public boolean isReadOnly(){ return false; }
-									}, SizeDescriptor.Unknown.of((ioPool1, prov, value) -> {
-										throw new ShouldNeverHappenError();
-									}));
+									long arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
-										index[0] = i;
-										var siz = AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst[i]), WordSpace.BYTE);
+										var siz = AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst.get(i)), WordSpace.BYTE);
 										annotateByteField(
-											ctx, ioPool, instance, f,
+											ctx, ioPool, instance, BGRUtils.stringArrayElement(instance, i, inst),
 											col,
 											reference,
 											DrawUtils.Range.fromSize(fieldOffset + arrOffset, siz));
@@ -1795,59 +1721,25 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 								if(comp.isEnum()){
-									var        instO  = field.get(ioPool, instance);
-									List<Enum> inst   = isList? (List<Enum>)instO : Arrays.asList((Enum[])instO);
+									var o = field.get(ioPool, instance);
+									if(o == null){
+										annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+										continue;
+									}
+									List<Enum> inst   = isList? (List<Enum>)o : Arrays.asList((Enum[])o);
 									var        arrSiz = inst.size();
 									
 									int bitOffset = 0;
 									drawByteRanges(rctx, List.of(DrawUtils.Range.fromSize(trueOffset, size)), col, false, true);
+									if(!annotate) continue;
 									
 									var universe  = EnumUniverse.ofUnknown(comp);
 									var arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
 										var bCol = ColorUtils.makeCol(typeHash, field);
-										var siz  = universe.bitSize;
-										
-										var ii = i;
-										var bit = new BitField.NoIO<T, Enum>(new FieldAccessor<T>(){
-											@Override
-											public int getTypeID(){
-												return TypeFlag.ID_OBJECT;
-											}
-											@Override
-											public Struct<T> getDeclaringStruct(){
-												return instance.getThisStruct();
-											}
-											@Override
-											public boolean genericTypeHasArgs(){ return false; }
-											@NotNull
-											@Override
-											public String getName(){
-												return "[" + ii + "]";
-											}
-											@Override
-											public Object get(VarPool<T> ioPool, T instance){
-												return inst.get(ii);
-											}
-											@Override
-											public void set(VarPool<T> ioPool, T instance, Object value){
-												throw new UnsupportedOperationException();
-											}
-											@Override
-											public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
-												return Map.of();
-											}
-											@Override
-											public Type getGenericType(GenericContext genericContext){
-												return comp;
-											}
-											@Override
-											public boolean isReadOnly(){ return false; }
-										}, SizeDescriptor.Fixed.of(WordSpace.BIT, siz));
-										
-										if(annotate)
-											annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset + arrOffset);
-										bitOffset += siz;
+										var bit  = BGRUtils.enumListElement(instance, i, inst, comp);
+										annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, universe.bitSize, reference, fieldOffset + arrOffset);
+										bitOffset += universe.bitSize;
 										while(bitOffset>=8){
 											bitOffset -= 8;
 											arrOffset++;
@@ -1863,8 +1755,11 @@ public class BinaryGridRenderer implements DataRenderer{
 							}
 							
 							if(typ == String.class){
-								if(annotate){
+								if(!annotate) continue;
+								try{
 									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true, noPtr);
+								}catch(Throwable e){
+									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
 								}
 								continue;
 							}
