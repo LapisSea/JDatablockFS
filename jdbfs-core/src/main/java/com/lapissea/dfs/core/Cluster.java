@@ -340,9 +340,15 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
-	private void scanTypeDB(){
-		var db    = metadata.db;
-		var names = db.listStoredTypeDefinitionNames();
+	private void scanTypeDB() throws MalformedClusterData{
+		var db = metadata.db;
+		
+		Set<String> names;
+		try{
+			names = db.listStoredTypeDefinitionNames();
+		}catch(Throwable e){
+			throw new MalformedClusterData("Failed to read list of stored types ", e);
+		}
 		if(names.isEmpty()) return;
 		
 		var tLoader = db.getTemplateLoader();
