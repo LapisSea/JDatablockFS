@@ -316,7 +316,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}, initNow? null : this::postValidate);
 	}
 	
-	private boolean needsBuilderObj(){
+	boolean needsBuilderObj(){
 		waitForState(STATE_IO_FIELD);
 		return needsBuilderObj;
 	}
@@ -774,7 +774,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return builtObj.build();
 	}
 	
-	private StructPipe<ProxyBuilder<T>> getBuilderPipe(){
+	public StructPipe<ProxyBuilder<T>> getBuilderPipe(){
 		var pipe = builderPipe;
 		if(pipe != null) return pipe;
 		waitForStateDone();
@@ -1035,6 +1035,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldDependency.Ticket<T> deps, T instance, GenericContext genericContext) throws IOException{
 		var fields = deps.readFields();
+		if(DEBUG_VALIDATION) validateReadTo(fields);
 		if(fields.isEmpty()){
 			return;
 		}
@@ -1064,6 +1065,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				field.skip(ioPool, provider, src, instance, genericContext);
 			}catch(IOException e){
 				throw fail(field, e, "Failed to skip");
+			}
+		}
+	}
+	
+	private void validateReadTo(FieldSet<T> fields){
+		for(IOField<T, ?> field : fields.flatMapped(IOField::iterUnpackedFields)){
+			if(field.isReadOnly()){
+				throw new UnsupportedOperationException("Field " + field + " is read-only, can not modify it!");
 			}
 		}
 	}

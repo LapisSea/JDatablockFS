@@ -339,7 +339,7 @@ public class MemoryWalker{
 									var instRefField = (RefField<T, T> & RefField.Inst<T, T>)refField;
 									
 									if(timer != null) timer.ignoreStart();
-									var res = walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false, null);
+									var res = walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false, parentHolder);
 									if(timer != null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){
@@ -397,7 +397,7 @@ public class MemoryWalker{
 									}
 									
 									if(timer != null) timer.ignoreStart();
-									var res = walkStructFull(valueInstance, valueInstance.getPointer().makeReference(), valueInstance.getPipe(), false, null);
+									var res = walkStructFull(valueInstance, valueInstance.getPointer().makeReference(), valueInstance.getPipe(), false, parentHolder);
 									if(timer != null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){
@@ -451,7 +451,7 @@ public class MemoryWalker{
 											for(IOInstance<?> inst : array){
 												{
 													if(timer != null) timer.ignoreStart();
-													var res = walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true, null);
+													var res = walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true, parentHolder);
 													if(timer != null) timer.ignoreEnd();
 													if(shouldSave(res)){
 														throw new NotImplementedException("Saving an array of instances is not implemented yet");//TODO

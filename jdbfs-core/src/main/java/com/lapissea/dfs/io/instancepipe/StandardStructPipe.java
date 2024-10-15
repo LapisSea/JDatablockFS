@@ -225,6 +225,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			readNew(provider, src, genericContext);
 			return;
 		}
+		if(skip.needsInstance && needsBuilderObj()){
+			getBuilderPipe().skip(provider, src, genericContext);
+			return;
+		}
 		
 		var pool = skip.needsPool? makeIOPool() : null;
 		var inst = skip.needsInstance? getType().make() : null;

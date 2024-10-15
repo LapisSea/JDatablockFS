@@ -59,10 +59,20 @@ public final class FieldDef extends IOInstance.Managed<FieldDef>{
 	@Override
 	public String toString(){
 		if(type == null) return getClass().getSimpleName() + IOFieldTools.UNINITIALIZED_FIELD_SIGN;
-		return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type + (dependencies.isEmpty()? "" : "(deps = [" + String.join(", ", dependencies) + "])");
+		return "{" +
+		       name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " +
+		       type + (dependencies.isEmpty()? "" : "(deps = [" + String.join(", ", dependencies) + "])") +
+		       "}";
 	}
 	@Override
 	public String toShortString(){
-		return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability.shortName : "") + ": " + Utils.toShortString(type);
+		return "{" +
+		       name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability.shortName : "") + ": " +
+		       Utils.toShortString(type) +
+		       "}";
+	}
+	
+	public String getName(){
+		return name;
 	}
 }

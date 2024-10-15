@@ -1,10 +1,10 @@
 package com.lapissea.dfs.type.def;
 
 import com.lapissea.dfs.SealedUtil;
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -15,81 +15,161 @@ import com.lapissea.util.UtilL;
 import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-@IOValue
-@IOInstance.Order({"ioInstance", "unmanaged", "justInterface", "fields", "fieldOrder", "enumConstants", "permits", "sealedParent", "typeArgs"})
-public final class TypeDef extends IOInstance.Managed<TypeDef>{
+public sealed interface TypeDef{
 	
-	public final  boolean            ioInstance;
-	public final  boolean            unmanaged;
-	public final  boolean            justInterface;
-	public final  List<FieldDef>     fields;
-	public final  List<Integer>      fieldOrder;
-	@IONullability(NULLABLE)
-	private final List<EnumConstant> enumConstants;
-	@IONullability(NULLABLE)
-	private final List<String>       permits;
-	@IONullability(NULLABLE)
-	public final  SealedParent       sealedParent;
-	public final  List<ClassArgDef>  typeArgs;
-	
-	public TypeDef(
-		boolean ioInstance, boolean unmanaged, boolean justInterface, List<FieldDef> fields, List<Integer> fieldOrder,
-		List<EnumConstant> enumConstants, List<String> permits, SealedParent sealedParent, List<ClassArgDef> typeArgs
-	){
-		this.ioInstance = ioInstance;
-		this.unmanaged = unmanaged;
-		this.justInterface = justInterface;
-		this.fields = List.copyOf(fields);
-		this.fieldOrder = List.copyOf(fieldOrder);
-		this.enumConstants = enumConstants == null? null : List.copyOf(enumConstants);
-		this.permits = permits == null? null : List.copyOf(permits);
-		this.sealedParent = sealedParent;
-		this.typeArgs = List.copyOf(typeArgs);
+	@IOValue
+	final class Relations extends IOInstance.Managed<Relations>{
+		
+		private static final Relations NONE = new Relations(List.of(), null, List.of());
+		
+		public final List<String>      permittedSubclasses;
+		@IONullability(NULLABLE)
+		public final SealedParent      sealedParent;
+		public final List<ClassArgDef> typeArgs;
+		
+		public Relations(List<String> permittedSubclasses, SealedParent sealedParent, List<ClassArgDef> typeArgs){
+			this.permittedSubclasses = List.copyOf(permittedSubclasses);
+			this.sealedParent = sealedParent;
+			this.typeArgs = List.copyOf(typeArgs);
+		}
+		@Override
+		public String toString(){
+			if(equals(NONE)) return "NONE";
+			var res = new StringJoiner(", ", "{", "}");
+			if(!permittedSubclasses.isEmpty()) res.add(switch(permittedSubclasses.size()){
+				case 1 -> "permits: " + permittedSubclasses;
+				default -> {
+					int matching = calcMatching();
+					yield Iters.concat1N(
+						permittedSubclasses.getFirst(),
+						Iters.from(permittedSubclasses).skip(1).map(n -> n.substring(matching))
+					).joinAsStr(", ", "permits: [", "]");
+				}
+			});
+			if(sealedParent != null) res.add("parent: " + sealedParent);
+			if(!typeArgs.isEmpty()) res.add("typeArgs: " + typeArgs);
+			return res.toString();
+		}
+		private int calcMatching(){
+			var minLen    = Iters.from(permittedSubclasses).mapToInt(String::length).min().orElse(0);
+			var lastMaker = 0;
+			for(int i = 0; i<minLen; i++){
+				var c = permittedSubclasses.getFirst().charAt(i);
+				if(c == '.' || c == '$') lastMaker = i;
+				var i1 = i;
+				if(Iters.from(permittedSubclasses).skip(1).anyMatch(name -> name.charAt(i1) != c)){
+					return lastMaker;
+				}
+			}
+			return 0;
+		}
 	}
 	
-	public static TypeDef of(Class<?> type){
+	non-sealed interface DUnknown extends TypeDef, IOInstance.Def<DUnknown>{
+		DUnknown INSTANCE = IOInstance.Def.of(DUnknown.class);
+	}
+	
+	non-sealed interface DUnmanaged extends TypeDef, IOInstance.Def<DUnmanaged>{
+		DUnmanaged INSTANCE = IOInstance.Def.of(DUnmanaged.class);
+	}
+	
+	@IOValue
+	final class DEnum extends IOInstance.Managed<DEnum> implements TypeDef{
 		
-		Objects.requireNonNull(type);
-		var ioInstance = IOInstance.isInstance(type);
-		var unmanaged  = IOInstance.isUnmanaged(type);
+		public final List<String> enumConstants;
 		
-		List<FieldDef> fields     = List.of();
-		List<Integer>  fieldOrder = List.of();
-		if(ioInstance){
-			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
-				var structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
-				fields = structFields.mapped(FieldDef::of).toList();
-				fieldOrder = IOFieldTools.computeDependencyIndex(structFields).iterIds().box().toList();
-			}
+		public DEnum(List<String> enumConstants){
+			this.enumConstants = Objects.requireNonNull(enumConstants);
+		}
+	}
+	
+	@IOValue
+	final class DJustInterface extends IOInstance.Managed<DJustInterface> implements TypeDef{
+		public final Relations relations;
+		
+		public DJustInterface(Relations relations){ this.relations = relations; }
+		
+		@Override
+		public Relations getRelations(){
+			return relations;
+		}
+	}
+	
+	@IOValue
+	final class DInstance extends IOInstance.Managed<DJustInterface> implements TypeDef{
+		public final List<FieldDef> fields;
+		public final List<Integer>  fieldOrder;
+		public final Relations      relations;
+		
+		public DInstance(
+			List<FieldDef> fields, List<Integer> fieldOrder, Relations relations
+		){
+			this.fields = List.copyOf(fields);
+			this.fieldOrder = List.copyOf(fieldOrder);
+			this.relations = Objects.requireNonNull(relations);
+		}
+		@Override
+		public Relations getRelations(){
+			return relations;
+		}
+		@Override
+		public List<FieldDef> getFields(){
+			return fields;
+		}
+	}
+	
+	static TypeDef of(Class<?> type){
+		
+		if(IOInstance.isUnmanaged(type)){
+			return DUnmanaged.INSTANCE;
 		}
 		
-		List<EnumConstant> enumConstants = null;
 		if(type.isEnum()){
 			//noinspection unchecked,rawtypes
 			var consts = ((Class<Enum>)type).getEnumConstants();
-			enumConstants = Iters.from(consts).map(EnumConstant::of).toList();
+			return new DEnum(Iters.from(consts).map(Enum::name).toList());
 		}
 		
-		List<String> permits = null;
+		Objects.requireNonNull(type);
+		
+		boolean ioInstance    = IOInstance.isInstance(type);
+		boolean justInterface = !ioInstance && type.isInterface();
+		
+		if(justInterface){
+			return new DJustInterface(computeRelations(type));
+		}
+		if(!ioInstance){
+			return DUnknown.INSTANCE;
+		}
+		
+		return makeInst(type);
+	}
+	
+	private static DInstance makeInst(Class<?> type){
+		Relations relations = computeRelations(type);
+		if(Modifier.isAbstract(type.getModifiers()) && !UtilL.instanceOf(type, IOInstance.Def.class)){
+			return new DInstance(List.of(), List.of(), relations);
+		}
+		
+		FieldSet<?>    structFields = Struct.ofUnknown(type, Struct.STATE_FIELD_MAKE).getFields();
+		List<FieldDef> fields       = structFields.mapped(FieldDef::of).toList();
+		List<Integer>  fieldOrder   = IOFieldTools.computeDependencyIndex(structFields).iterIds().box().toList();
+		
+		return new DInstance(fields, fieldOrder, relations);
+	}
+	
+	private static Relations computeRelations(Class<?> type){
+		List<String> permits = List.of();
 		if(isSealedCached(type)){
 			var src = SealedUtil.getPermittedSubclasses(type);
 			permits = Iters.from(src).map(Class::getName).toList();
 		}
 		
-		SealedParent sealedParent = ioInstance? getSealedParent(type) : null;
-		
-		var justInterface = !ioInstance && enumConstants == null && type.isInterface();
-		
-		List<ClassArgDef> typeArgs = getTypeArgs(type);
-		
-		return new TypeDef(ioInstance, unmanaged, justInterface, fields, fieldOrder, enumConstants, permits, sealedParent, typeArgs);
-	}
-	
-	private static SealedParent getSealedParent(Class<?> type){
 		SealedParent sealedParent = null;
 		Class<?>     superclass   = type.getSuperclass();
 		if(superclass != null && isSealedCached(superclass)){
@@ -104,69 +184,24 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 				sealedParent = sp;
 			}
 		}
-		return sealedParent;
-	}
-	
-	private static List<ClassArgDef> getTypeArgs(Class<?> type){
-		return Iters.from(type.getTypeParameters()).map(arg -> {
+		
+		var typeArgs = Iters.from(type.getTypeParameters()).map(arg -> {
 			var bounds = arg.getBounds();
 			if(bounds.length != 1){
 				throw new NotImplementedException("Multiple bounds not implemented: " + type.getName());
 			}
 			return ClassArgDef.of(arg.getName(), IOType.of(bounds[0]));
 		}).toList();
-	}
-	
-	public boolean isEnum()  { return enumConstants != null; }
-	public boolean isSealed(){ return permits != null; }
-	
-	public List<String> getPermittedSubclasses(){
-		return permits == null? List.of() : permits;
-	}
-	
-	public List<EnumConstant> getEnumConstants(){
-		return enumConstants == null? List.of() : enumConstants;
-	}
-	
-	@Override
-	public String toShortString(){
-		return toString();
-	}
-	@Override
-	public String toString(){
-		StringBuilder sb = new StringBuilder();
-		if(ioInstance) sb.append("IO");
-		if(unmanaged) sb.append("U");
-		if(justInterface) sb.append("I");
-		if(isSealed()){
-			var permits = this.permits.toArray(String[]::new);
-			if(permits.length>0){
-				int startsPos = Iters.from(permits).mapToInt(String::length).min().orElse(0) - 1;
-				while(startsPos>0){
-					var start = permits[0].substring(0, startsPos);
-					var c     = start.charAt(start.length() - 1);
-					if(c == '.'){
-						startsPos = 0;
-						break;
-					}
-					if(c == '$' && Iters.from(permits).allMatch(s -> s.startsWith(start))){
-						break;
-					}
-					startsPos--;
-				}
-				for(int i = 0; i<permits.length; i++){
-					permits[i] = startsPos>0 && i>0? permits[i].substring(startsPos) : Utils.classNameToHuman(permits[i]);
-				}
-			}
-			sb.append(Iters.from(permits).joinAsStr(", ", "->[", "]"));
-		}
-		sb.append('{');
-		if(!getEnumConstants().isEmpty()){
-			sb.append(Iters.from(getEnumConstants()).joinAsStr(", "));
-		}
-		sb.append(Iters.from(fields).joinAsStr(", ", FieldDef::toShortString));
-		sb.append('}');
 		
-		return sb.toString();
+		if(Objects.equals(Relations.NONE.permittedSubclasses, permits) &&
+		   Objects.equals(Relations.NONE.sealedParent, sealedParent) &&
+		   Objects.equals(Relations.NONE.typeArgs, typeArgs)){
+			return Relations.NONE;
+		}
+		return new Relations(permits, sealedParent, typeArgs);
 	}
+	
+	default Relations getRelations()  { return Relations.NONE; }
+	default boolean isSealed()        { return !getRelations().permittedSubclasses.isEmpty(); }
+	default List<FieldDef> getFields(){ return List.of(); }
 }

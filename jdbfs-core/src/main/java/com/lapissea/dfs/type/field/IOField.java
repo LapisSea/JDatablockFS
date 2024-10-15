@@ -544,6 +544,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public boolean isReadOnly(){
-		return accessor.isReadOnly();
+		return accessor != null && accessor.isReadOnly();
 	}
 }

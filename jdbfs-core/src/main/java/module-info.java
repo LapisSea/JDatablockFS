@@ -34,6 +34,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.type.field.access to JDatablockFS.tools, JDatablockFS.run, jlapisutil;
 	exports com.lapissea.dfs.type.compilation to jlapisutil, JDatablockFS.run;
 	opens com.lapissea.dfs.type.compilation to jlapisutil, JDatablockFS.run;
+	opens com.lapissea.dfs.type.def to jlapisutil;
 	
 	exports com.lapissea.dfs.type.field.fields.reflection to JDatablockFS.tools, jlapisutil;
 	exports com.lapissea.dfs.logging to JDatablockFS.tools, JDatablockFS.run;

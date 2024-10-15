@@ -1419,7 +1419,22 @@ public class BinaryGridRenderer implements DataRenderer{
 					var virtuals = FieldSet.of(pipe.getSpecificFields().filtered(f -> f.iterUnpackedFields().anyMatch(f2 -> f2.isVirtual(IO))));
 					var dep      = pipe.getFieldDependency();
 					var deps     = dep.getDeps(virtuals);
-					pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));
+					
+					if(deps.readFields().iter().flatMap(IOField::iterUnpackedFields).anyMatch(IOField::isReadOnly)){
+						var bpipe = pipe.getBuilderPipe();
+						var type  = bpipe.getType();
+						var bdeps = bpipe.getFieldDependency().getDeps(deps.readFields().iter().map(IOField::getName));
+						
+						var builder = type.make();
+						var pool    = bpipe.makeIOPool();
+						bpipe.readDeps(pool, ctx.provider, io, bdeps, builder, generics(instance, parentGenerics));
+						
+						for(IOField virtual : virtuals.iter().flatMap(IOField::iterUnpackedFields).filter(f -> f.isVirtual(IO))){
+							virtual.set(ioPool, null, type.getFields().requireByName(virtual.getName()).get(pool, builder));
+						}
+					}else{
+						pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));
+					}
 				}catch(Throwable e){
 					var size = 1L;
 					try{

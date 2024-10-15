@@ -28,6 +28,7 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -358,7 +359,7 @@ public final class Cluster implements DataProvider{
 			if(name.isEmpty()) continue;
 			try{
 				var def = db.getDefinitionFromClassName(name).orElseThrow();
-				if(!def.ioInstance || def.unmanaged) continue;
+				if(!(def instanceof TypeDef.DInstance)) continue;
 				var clazz = tLoader.loadClass(name);
 				if(clazz.getClassLoader() != tLoader){
 					continue;

@@ -13,4 +13,7 @@ public interface ClassArgDef extends IOInstance.Def<ClassArgDef>{
 	static ClassArgDef of(String name, IOType bound){
 		return Def.of(ClassArgDef.class, name, bound);
 	}
+	static String toString(ClassArgDef def){
+		return def.name() + ": " + def.bound();
+	}
 }
