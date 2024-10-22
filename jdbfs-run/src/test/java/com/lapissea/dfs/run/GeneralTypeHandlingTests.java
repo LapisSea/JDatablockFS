@@ -74,21 +74,13 @@ public class GeneralTypeHandlingTests{
 		}
 		
 		StructPipe<T> pipe;
-		try{
-			pipe = StandardStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStruct ignored){
-			pipe = null;
-		}
-		if(pipe != null){
-			pipe.checkTypeIntegrity();
-		}
+		pipe = StandardStructPipe.of(struct, STATE_DONE);
+		pipe.checkTypeIntegrity();
 		try{
 			pipe = FixedStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStruct ignored){
-			pipe = null;
-		}
-		if(pipe != null){
 			pipe.checkTypeIntegrity();
+		}catch(UnsupportedStructLayout e){
+			Log.info("Unsupported fixed layout for {}:\n\t{}", struct, e);
 		}
 	}
 	

@@ -275,6 +275,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public final SizeDescriptor<T> sizeDescriptorSafe(){
 		var d = descriptor;
 		if(d != null) return d;
+		return blockingGet();
+	}
+	private SizeDescriptor<T> blockingGet(){
 		var struct = declaringStruct();
 		if(struct != null){
 			struct.waitForState(Struct.STATE_INIT_FIELDS);

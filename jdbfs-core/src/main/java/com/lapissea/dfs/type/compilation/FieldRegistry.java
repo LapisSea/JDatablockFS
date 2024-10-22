@@ -273,30 +273,37 @@ final class FieldRegistry{
 			throw fail(type.getTypeName());
 		}
 		var res = compatible.create(field);
-		if(DEBUG_VALIDATION){
-			var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
-			var makedUnsafe = res.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
-			if(usesUnsafe != makedUnsafe){
-				throw new ShouldNeverHappenError(res.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
-			}
-			
-			var typs = compatible.listFieldTypes();
-			if(!typs.contains(res.getClass())){
-				throw new RuntimeException(
-					"Type " + res.getClass().getName() + "\nAllowed:\n" +
-					Iters.from(typs).joinAsStr("\n", Class::getName)
-				);
-			}
-			
-			var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
-			if(allCompatible.size()>1){
-				throw new RuntimeException(
-					"Ambiguous usage picking\n" +
-					allCompatible.joinAsStr("\n", u -> "\t" + u.getClass().getName())
-				);
-			}
-		}
+		if(DEBUG_VALIDATION) checkField(field, compatible, res);
 		return res;
+	}
+	
+	private static <T extends IOInstance<T>> void checkField(FieldAccessor<T> field, FieldUsage usedUsage, IOField<T, ?> toCheck){
+		
+		var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
+		var makedUnsafe = toCheck.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
+		if(usesUnsafe != makedUnsafe){
+			throw new ShouldNeverHappenError(toCheck.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
+		}
+		
+		var types = usedUsage.listFieldTypes();
+		if(!types.contains(toCheck.getClass())){
+			throw new RuntimeException(
+				"The IOField type is not listed within the FieldUsage field types!\n" +
+				"Field type:   " + toCheck.getClass().getName() + "\n" +
+				"Listed types: " + Iters.from(types).joinAsStr(Class::getName)
+			);
+		}
+		
+		var ann  = GetAnnotation.from(field);
+		var type = field.getGenericType(null);
+		
+		var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
+		if(allCompatible.size()>1){
+			throw new RuntimeException(
+				"Ambiguous usage picking\n" +
+				allCompatible.joinAsStr("\n", u -> "\t" + u.getClass().getName())
+			);
+		}
 	}
 	
 	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS

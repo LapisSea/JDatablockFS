@@ -174,6 +174,7 @@ public final class StructFuzzTest{
 //		LogUtil.println(def);
 //		LogUtil.println(def.name());
 		
+		//noinspection unchecked
 		var typ    = (Class<T>)TempClassGen.gen(def);
 		var struct = Struct.of(typ, STATE_DONE);
 		var pipe   = StandardStructPipe.of(struct, STATE_DONE);
