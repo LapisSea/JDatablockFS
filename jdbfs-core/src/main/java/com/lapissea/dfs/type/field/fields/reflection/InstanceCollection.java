@@ -80,8 +80,10 @@ public class InstanceCollection{
 		public boolean isCompatible(Type type, GetAnnotation annotations){
 			if(!(type instanceof ParameterizedType parmType)) return false;
 			if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
-			var args = parmType.getActualTypeArguments();
-			return IOInstance.isManaged(Objects.requireNonNull(IOType.of(args[0])).getTypeClass(null));
+			var args     = parmType.getActualTypeArguments();
+			var listType = Objects.requireNonNull(IOType.of(args[0])).getTypeClass(null);
+			return IOInstance.isManaged(listType) ||
+			       SealedUtil.getSealedUniverse(listType, false).flatMap(SealedUtil.SealedInstanceUniverse::ofUnknown).isPresent();
 		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field){

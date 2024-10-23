@@ -458,6 +458,7 @@ public sealed interface IOTypeDB{
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
+					FieldDef.IOAnnotation.class,
 					PersistentDB.class,
 					IOInstance.class,
 					ObjectID.class,
@@ -468,8 +469,13 @@ public sealed interface IOTypeDB{
 				}){
 					registerBuiltIn(db, c);
 				}
-				
-				var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
+				{
+					var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
+					Iters.from(uni.universe()).sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
+						db.toID(uni.root(), cls, true);
+					});
+				}
+				var uni = SealedUtil.getSealedUniverse(FieldDef.IOAnnotation.class, false).orElseThrow();
 				Iters.from(uni.universe()).sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
 					db.toID(uni.root(), cls, true);
 				});
@@ -923,7 +929,10 @@ public sealed interface IOTypeDB{
 			var touchU =
 				(MemoryOnlyDB.Basic.MemUniverse<T>)
 					sealedMultiverseTouch.computeIfAbsent(rootType, t -> new MemoryOnlyDB.Basic.MemUniverse<>(newId));
-			return touchU.newId(type);
+			
+			var id = touchU.newId(type);
+//			Log.trace("Touched sealed universe of {#yellow{}~#} with type {#yellowBright{}~#}. ID = {}", rootType, type, id);
+			return id;
 		}
 		
 		@SuppressWarnings("unchecked")

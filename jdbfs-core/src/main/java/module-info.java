@@ -30,6 +30,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.utils.iterableplus;
 	exports com.lapissea.dfs.type.string;
 	exports com.lapissea.dfs.type.compilation.helpers;
+	exports com.lapissea.dfs.type.def;
 	
 	exports com.lapissea.dfs.type.field.access to JDatablockFS.tools, JDatablockFS.run, jlapisutil;
 	exports com.lapissea.dfs.type.compilation to jlapisutil, JDatablockFS.run;

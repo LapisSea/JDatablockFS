@@ -8,9 +8,6 @@ import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.def.FieldDef;
 import com.lapissea.dfs.type.def.TypeDef;
-import com.lapissea.dfs.type.field.Annotations;
-import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
@@ -257,26 +254,27 @@ public final class TemplateClassLoader extends ClassLoader{
 		for(var field : fields){
 			writer.write("@{}", IOValue.class);
 			
-			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
-				field.type.getTypeClass(db)
-			))){
-				writer.write("@{} start value {!} end", IONullability.class, field.nullability.toString());
-			}
-			if(field.isDynamic){
-				writer.write("@{}", IOValue.Generic.class);
-			}
-			if(field.unsigned){
-				writer.write("@{}", IOValue.Unsigned.class);
-			}
-			if(field.unsafe){
-				writer.write("@{}", IOUnsafeValue.class);
-			}
-			if(field.referenceType != null){
-				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.referenceType.toString());
-			}
-			if(!field.dependencies.isEmpty()){
-				stringsAnnotation(writer, IODependency.class, field.dependencies);
+			for(var annO : field.annotations){
+				switch(annO){
+					case FieldDef.IOAnnotation.AnDependencies ann -> {
+						stringsAnnotation(writer, IODependency.class, ann.names());
+					}
+					case FieldDef.IOAnnotation.AnGeneric ignore -> {
+						writer.write("@{}", IOValue.Generic.class);
+					}
+					case FieldDef.IOAnnotation.AnNullability ann -> {
+						writer.write("@{} start value {!} end", IONullability.class, ann.mode);
+					}
+					case FieldDef.IOAnnotation.AnReferenceType ann -> {
+						writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, ann.type);
+					}
+					case FieldDef.IOAnnotation.AnUnsafe ignore -> {
+						writer.write("@{}", IOUnsafeValue.class);
+					}
+					case FieldDef.IOAnnotation.AnUnsigned ignore -> {
+						writer.write("@{}", IOValue.Unsigned.class);
+					}
+				}
 			}
 			
 			writer.write("private field {!} {}", field.name, field.type.generic(db));

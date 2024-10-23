@@ -42,6 +42,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
+import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.GcDelayer;
 import com.lapissea.dfs.utils.KeyCounter;
@@ -423,6 +424,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}else{
 					builder.skipField(field);
 				}
+				continue;
+			}
+			if(field instanceof InstanceCollection.InlineField<?, ?, ?> colField){
+				builder.dynamic(); //TODO: make this skip field if it is a no pointer sealed collection
 				continue;
 			}
 			
