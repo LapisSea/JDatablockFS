@@ -199,7 +199,7 @@ public class InstanceCollection{
 		
 		private final ObjectPipe<CollectionType, Void> refPipe;
 		
-		@SuppressWarnings({"unchecked", "rawtypes"})
+		@SuppressWarnings({"rawtypes"})
 		public ReferenceField(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> dataAdapterType){
 			super(accessor, SizeDescriptor.Fixed.empty());
 			dataAdapter = makeAdapter(accessor, dataAdapterType);

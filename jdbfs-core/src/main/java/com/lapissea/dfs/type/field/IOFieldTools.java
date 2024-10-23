@@ -228,7 +228,10 @@ public final class IOFieldTools{
 		return getNullability(holder, NOT_NULL);
 	}
 	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
-		return holder.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
+		return getNullabilityOpt(holder).orElse(defaultMode);
+	}
+	public static Optional<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
+		return holder.getAnnotation(IONullability.class).map(IONullability::value);
 	}
 	
 	public static boolean isGenerated(IOField<?, ?> field){

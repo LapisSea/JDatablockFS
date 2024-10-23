@@ -486,7 +486,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 			
-			throw new NotImplementedException(field + " (" + type.getName() + ") not handled");
+			throw new NotImplementedException(field + " (" + accessor.getGenericType(null).getTypeName() + ") not handled");
 		}
 		
 		if(getType() instanceof Struct.Unmanaged<?> u && u.hasDynamicFields()){
