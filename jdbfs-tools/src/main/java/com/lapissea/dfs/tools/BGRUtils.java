@@ -55,6 +55,8 @@ class BGRUtils{
 			public void set(VarPool<T> ioPool, T instance1, Object value){
 				throw new UnsupportedOperationException();
 			}
+			@Override
+			public boolean isReadOnly(){ return true; }
 		});
 	}
 	static <T extends IOInstance<T>> NoIOField<T, String> stringArrayElement(T instance, int index, List<String> data){
@@ -90,6 +92,8 @@ class BGRUtils{
 			public void set(VarPool<T> ioPool, T instance1, Object value){
 				throw new UnsupportedOperationException();
 			}
+			@Override
+			public boolean isReadOnly(){ return true; }
 		}, SizeDescriptor.Unknown.of((ioPool1, prov, value) -> {
 			throw new ShouldNeverHappenError();
 		}));
@@ -125,6 +129,8 @@ class BGRUtils{
 			public Type getGenericType(GenericContext genericContext){
 				return type;
 			}
+			@Override
+			public boolean isReadOnly(){ return true; }
 		}, SizeDescriptor.Fixed.of(WordSpace.BIT, EnumUniverse.ofUnknown(type).bitSize));
 	}
 }

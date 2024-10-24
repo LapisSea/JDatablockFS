@@ -383,7 +383,8 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 						}while(iterCursor != index + 1);
 						
 						if(!full && depTicket != null){
-							return node.readValueSelective(depTicket, true);
+							var t = node.readValueSelective(depTicket, true);
+							return (T)t.val();
 						}
 						return node.getValue();
 					};

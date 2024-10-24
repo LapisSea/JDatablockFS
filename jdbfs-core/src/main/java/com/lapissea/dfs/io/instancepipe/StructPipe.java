@@ -7,10 +7,10 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
-import com.lapissea.dfs.exceptions.MalformedPipe;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
@@ -41,6 +42,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
+import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.GcDelayer;
 import com.lapissea.dfs.utils.KeyCounter;
@@ -70,6 +72,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -184,7 +187,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created = lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				e.addSuppressed(new MalformedPipe("Failed to compile " + type.getSimpleName() + " for " + struct.getFullName(), e));
 				errors.put(struct, e);
 				throw e;
 			}
@@ -272,16 +274,25 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private FieldDependency<T> fieldDependency;
 	
-	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2;
+	private StructPipe<ProxyBuilder<T>> builderPipe;
+	private boolean                     needsBuilderObj;
+	
+	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2, LOCAL_DATA = 3;
 	
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
 		this.type = type;
 		init(initNow, () -> {
+			needsBuilderObj = this.type.needsBuilderObj();
+			
+			PipeFieldCompiler.Result<T> res;
 			try{
-				this.ioFields = FieldSet.of(compiler.compile(getType(), getType().getFields()));
+				res = compiler.compile(getType(), getType().getFields());
+				this.ioFields = FieldSet.of(res.fields());
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
+			
+			var bt = needsBuilderObj? builderObjectTask(initNow, res.builderMetadata()) : null;
 			
 			if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
 			
@@ -298,9 +309,36 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
+			setInitState(LOCAL_DATA);
+			if(bt != null){
+				builderPipe = bt.join();
+			}
 			//Do not post validate now, will create issues with recursive types. It is called in registration
 		}, initNow? null : this::postValidate);
 	}
+	
+	boolean needsBuilderObj(){
+		waitForState(STATE_IO_FIELD);
+		return needsBuilderObj;
+	}
+	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow, Object builderMetadata){
+		if(initNow){
+			var res = createBuilderPipe(builderMetadata);
+			return CompletableFuture.completedFuture(res);
+		}
+		return CompletableFuture.supplyAsync(() -> createBuilderPipe(builderMetadata), t -> Runner.run(t, "BP-" + this.toShortString()));
+	}
+	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
+		var struct = getType().getBuilderObjType(true);
+		
+		Class<?> cls = getSelfClass();
+		//noinspection unchecked
+		var pipe = StructPipe.of((Class<StructPipe<ProxyBuilder<T>>>)cls, struct, STATE_DONE);
+		ConfigDefs.CompLogLevel.SMALL.log("Acquired builder pipe for {}#green", this);
+		return pipe;
+	}
+	
+	public abstract Class<StructPipe<T>> getSelfClass();
 	
 	protected static class DoNotTest extends RuntimeException{ }
 	
@@ -312,7 +350,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var fields  = new ArrayList<>(getType().getFields());
 			for(int i = 0; i<20; i++){
 				Collections.shuffle(fields, rr);
-				var f = compiler.compile(type, FieldSet.of(fields), true);
+				var f = compiler.compile(type, FieldSet.of(fields), true).fields();
 				if(!ioFCopy.equals(f)){
 					throw new IllegalStateException("Fields with different order do not resolve to the same set!");
 				}
@@ -325,8 +363,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected void postValidate(){
-		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
+		if(TYPE_VALIDATION){
 			var type = getType();
+			if(type instanceof Struct.Unmanaged) return;
 			if(!type.canHaveDefaultConstructor()) return;
 			T inst;
 			try{
@@ -385,6 +424,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}else{
 					builder.skipField(field);
 				}
+				continue;
+			}
+			if(field instanceof InstanceCollection.InlineField<?, ?, ?> colField){
+				builder.dynamic(); //TODO: make this skip field if it is a no pointer sealed collection
 				continue;
 			}
 			
@@ -448,7 +491,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 			
-			throw new NotImplementedException(field + " (" + type.getName() + ") not handled");
+			throw new NotImplementedException(field + " (" + accessor.getGenericType(null).getTypeName() + ") not handled");
 		}
 		
 		if(getType() instanceof Struct.Unmanaged<?> u && u.hasDynamicFields()){
@@ -462,7 +505,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	
 	public CommandSet getReferenceWalkCommands(){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		return referenceWalkCommands;
 	}
 	
@@ -472,7 +515,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			super.listStates(),
 			Iters.of(
 				new StateInfo(STATE_IO_FIELD, "IO_FIELD"),
-				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC")
+				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC"),
+				new StateInfo(LOCAL_DATA, "LOCAL_DATA")
 			)
 		);
 	}
@@ -657,10 +701,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException;
 	
 	
+	private Map<FieldDependency.Ticket<T>, FieldDependency.Ticket<ProxyBuilder<T>>> proxyDepMapping = Map.of();
+	public FieldDependency.Ticket<ProxyBuilder<T>> mapToProxy(FieldDependency.Ticket<T> ticket){
+		var cached = proxyDepMapping.get(ticket);
+		if(cached != null) return cached;
+		
+		var names  = ticket.readFields().mapped(IOField::getName);
+		var mapped = getBuilderPipe().getFieldDependency().getDeps(names);
+		
+		var map = new HashMap<>(proxyDepMapping);
+		map.put(ticket, mapped);
+		proxyDepMapping = Map.copyOf(map);
+		
+		return mapped;
+	}
+	
 	public final T readNewSelective(DataProvider provider, ContentReader src, Set<String> names, GenericContext genericContext) throws IOException{
 		return readNewSelective(provider, src, getFieldDependency().getDeps(names), genericContext, false);
 	}
 	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext, boolean strictHolder) throws IOException{
+		if(needsBuilderObj()){
+			var pipe     = getBuilderPipe();
+			var mTicket  = mapToProxy(depTicket);
+			var builtObj = pipe.readNewSelective(provider, src, mTicket, genericContext, strictHolder);
+			if(strictHolder && type.isDefinition()){
+				return builderToStrictPartial(mTicket, builtObj);
+			}
+			return builtObj.build();
+		}
+		
 		T instance;
 		if(strictHolder && type.isDefinition()){
 			instance = type.partialImplementation(depTicket.readFields()).make();
@@ -671,14 +740,50 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return instance;
 	}
 	
+	//TODO: implement new partial from partial builder
+	private T builderToStrictPartial(FieldDependency.Ticket<ProxyBuilder<T>> mTicket, ProxyBuilder<T> builtObj){
+		var fields = mTicket.readFields();
+		
+		//noinspection rawtypes,unchecked
+		var ctor = IOInstance.Def.partialDataConstructor(
+			(Class)type.getType(),
+			fields.mapped(IOField::getName).toSet(),
+			false
+		);
+		
+		var args = fields.mapped(f -> f.get(null, builtObj)).toArray(Object[]::new);
+		try{
+			var res = ctor.invokeWithArguments(args);
+			//noinspection unchecked
+			return (T)res;
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
+	}
+	
 	@Override
-	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		if(needsBuilderObj()){
+			return readNewByBuilder(provider, src, genericContext);
+		}
 		T instance = type.make();
 		try{
 			return doRead(makeIOPool(), provider, src, instance, genericContext);
 		}catch(IOException e){
 			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
+	}
+	private T readNewByBuilder(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var pipe     = getBuilderPipe();
+		var builtObj = pipe.readNew(provider, src, genericContext);
+		return builtObj.build();
+	}
+	
+	public StructPipe<ProxyBuilder<T>> getBuilderPipe(){
+		var pipe = builderPipe;
+		if(pipe != null) return pipe;
+		waitForStateDone();
+		return Objects.requireNonNull(builderPipe);
 	}
 	
 	public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -712,7 +817,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public final void earlyCheckNulls(VarPool<T> ioPool, T instance){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		if(earlyNullChecks == null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
@@ -795,7 +900,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private boolean hasGenerators(){
-		waitForStateDone();
+		waitForState(LOCAL_DATA);
 		return generators != null;
 	}
 	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
@@ -935,6 +1040,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldDependency.Ticket<T> deps, T instance, GenericContext genericContext) throws IOException{
 		var fields = deps.readFields();
+		if(DEBUG_VALIDATION) validateReadTo(fields);
 		if(fields.isEmpty()){
 			return;
 		}
@@ -964,6 +1070,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				field.skip(ioPool, provider, src, instance, genericContext);
 			}catch(IOException e){
 				throw fail(field, e, "Failed to skip");
+			}
+		}
+	}
+	
+	private void validateReadTo(FieldSet<T> fields){
+		for(IOField<T, ?> field : fields.flatMapped(IOField::iterUnpackedFields)){
+			if(field.isReadOnly()){
+				throw new UnsupportedOperationException("Field " + field + " is read-only, can not modify it!");
 			}
 		}
 	}
@@ -1033,7 +1147,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					     .map(fields::requireByName)
 					     .firstMatching(n -> n.getType() == NumberSize.class)//dependency that is a numsize
 					     .filter(f -> {
-						     if(f.isVirtual() || f.nullable()) return false;
+						     if(f.isVirtual() || f.nullable() || f.isReadOnly()) return false;
 						     return f.getAccessor().get(null, inst) == null;
 					     })
 					     .ifPresent(f -> {
@@ -1043,7 +1157,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					     });
 				}
 				
-				if(field.getType() == String.class){
+				if(field.getType() == String.class && !field.isReadOnly()){
 					field.getAccessor().set(null, inst, field + " : this is a test");
 				}
 			}

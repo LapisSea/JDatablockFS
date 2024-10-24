@@ -235,9 +235,9 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 		
 		for(ElementType el : asListView(arr)){
 			if(DEBUG_VALIDATION){
-				try(var buff = makeSizedBuff(provider, dest, el)){
-					elementIO.write(provider, buff, el);
-				}
+				var buff = makeSizedBuff(provider, dest, el);
+				elementIO.write(provider, buff, el);
+				buff.close(); // do not use finally because if there was an error, we do not want to submit the partial data anyways
 			}else{
 				elementIO.write(provider, dest, el);
 			}

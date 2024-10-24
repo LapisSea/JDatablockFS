@@ -464,7 +464,13 @@ public final class Iters{
 	public static <T> IterablePP.SizedPP<T> from(Optional<T> element)  { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
 	public static <T> IterablePP.SizedPP<T> from(Collection<T> data)   { return new CollectionIterable<>(data); }
 	public static <T> IterablePP.SizedPP<T> from(T[] data)             { return data.length == 0? of() : new ArrayIterable<>(data); }
-	public static <T> IterablePP<T> from(Iterable<T> data)             { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
+	public static <T> IterablePP<T> from(Iterable<T> data){
+		return switch(data){
+			case Collection<T> col -> new CollectionIterable<>(col);
+			case IterablePP<T> iter -> iter;
+			default -> data::iterator;
+		};
+	}
 	@Deprecated
 	public static <T> IterablePP<T> from(IterablePP<T> data){ return data; }
 	

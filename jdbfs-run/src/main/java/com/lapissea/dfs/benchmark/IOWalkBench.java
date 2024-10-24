@@ -36,11 +36,11 @@ public class IOWalkBench{
 	private final Cluster                    cluster;
 	final         MemoryWalker.PointerRecord rec = new MemoryWalker.PointerRecord(){
 		@Override
-		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
+		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder){
 			return MemoryWalker.CONTINUE;
 		}
 		@Override
-		public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+		public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value, Holder holder){
 			return MemoryWalker.CONTINUE;
 		}
 	};

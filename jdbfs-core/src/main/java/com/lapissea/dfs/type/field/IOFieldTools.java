@@ -7,6 +7,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.InternalDataOrder;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.DepSort;
@@ -56,6 +57,7 @@ import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.Utils.None;
 import static com.lapissea.dfs.Utils.Some;
+import static com.lapissea.dfs.type.field.StoragePool.IO;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
@@ -226,7 +228,10 @@ public final class IOFieldTools{
 		return getNullability(holder, NOT_NULL);
 	}
 	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
-		return holder.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
+		return getNullabilityOpt(holder).orElse(defaultMode);
+	}
+	public static Optional<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
+		return holder.getAnnotation(IONullability.class).map(IONullability::value);
 	}
 	
 	public static boolean isGenerated(IOField<?, ?> field){
@@ -367,7 +372,7 @@ public final class IOFieldTools{
 	public static boolean canHaveNullAnnotation(AnnotatedType field){
 		var typ = field.getType();
 		if(typ.isPrimitive()) return false;
-		return isGeneric(field) || typ.isArray() ||
+		return isGeneric(field) || typ.isArray() || UtilL.instanceOf(typ, Collection.class) ||
 		       Iters.concat(
 			       Iters.of(IOInstance.class, Enum.class, Type.class),
 			       FieldCompiler.getWrapperTypes(),
@@ -447,5 +452,35 @@ public final class IOFieldTools{
 	public static String corruptedGet(Throwable e){
 		var msg = e.getMessage();
 		return "<CORRUPTED: " + (msg == null? Utils.typeToHuman(e.getClass()) : msg) + ">";
+	}
+	
+	public static Optional<IOInstance.Order> tryGetOrImplyOrder(Struct<?> type){
+		var clazz = type.getType();
+		var ann   = clazz.getAnnotation(IOInstance.Order.class);
+		if(ann != null) return Optional.of(ann);
+		
+		var fields = type.getFields().filtered(e -> !e.isVirtual(IO)).bake();
+		if(fields.size()<=1){
+			return Optional.of(orderFromNames(fields.map(IOField::getName)));
+		}
+		var types = fields.map(t -> t.getGenericType(null));
+		if(types.hasDuplicates()){
+			return Optional.empty();
+		}
+		var typeSet = types.toModSet();
+		
+		return Iters.from(clazz.getConstructors())
+		            .filter(c -> Modifier.isPublic(c.getModifiers()))
+		            .map(c -> Iters.from(c.getGenericParameterTypes()))
+		            .filter(c -> c.count() == fields.size() && !c.hasDuplicates())
+		            .firstMatching(c -> c.toModSet().equals(typeSet))
+		            .map(typesOrder -> {
+			            var typeLookup = fields.toModMap(f -> f.getGenericType(null), Function.identity());
+			            var names      = typesOrder.map(typeLookup::get).map(IOField::getName);
+			            return orderFromNames(names);
+		            });
+	}
+	public static IOInstance.Order orderFromNames(IterablePP<String> names){
+		return Annotations.make(IOInstance.Order.class, Map.of("value", names.toArray(String[]::new)));
 	}
 }

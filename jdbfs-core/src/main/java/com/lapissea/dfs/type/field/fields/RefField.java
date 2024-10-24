@@ -132,7 +132,7 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 						if(allowExternalMod && getNullability() == DEFAULT_IF_NULL){
 							val = newDefault();
 						}else{
-							return new Reference();
+							return Reference.NULL;
 						}
 					}
 					

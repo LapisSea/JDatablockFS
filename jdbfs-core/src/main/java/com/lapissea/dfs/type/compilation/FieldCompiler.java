@@ -301,17 +301,20 @@ public final class FieldCompiler{
 			var    p    = e.getValue();
 			
 			Map<Class<? extends Annotation>, ? extends Annotation> annotations =
-				Iters.of(p.getter, p.setter).flatMapArray(Method::getAnnotations).distinct()
-				     .toMap(Annotation::annotationType, identity());
+				p.iter().flatMapArray(Method::getAnnotations).distinct().toMap(Annotation::annotationType, identity());
 			
-			Type type = getType(p.getter.getGenericReturnType(), GetAnnotation.from(annotations));
+			Method setter = p.setter, getter = p.getter;
 			
-			Type setType = p.setter.getGenericParameterTypes()[0];
-			if(!Utils.genericInstanceOf(type, setType)){
-				throw new IllegalField("fmt", "{}#red is not a valid argument in\n{}#yellow", setType, p.setter);
+			Type type = getType(getter.getGenericReturnType(), GetAnnotation.from(annotations));
+			
+			if(setter != null){
+				Type setType = setter.getGenericParameterTypes()[0];
+				if(!Utils.genericInstanceOf(type, setType)){
+					throw new IllegalField(setType + " is not a valid argument in\n" + setter);
+				}
 			}
 			
-			fields.add(FunctionalReflectionAccessor.make(struct, name, p.getter, p.setter, annotations, type));
+			fields.add(FunctionalReflectionAccessor.make(struct, name, getter, Optional.ofNullable(setter), annotations, type));
 		}
 		return fields;
 	}
@@ -376,8 +379,8 @@ public final class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
-		Iters.entries(functionFields).filter(e -> e.getValue().iter().anyIs(null))
-		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": " + (e.getValue().getter == null? "getter" : "setter") + " missing")
+		Iters.entries(functionFields).filter(e -> e.getValue().getter == null)
+		     .joinAsOptionalStr("\n", e -> "\t" + e.getKey() + ": getter is missing!")
 		     .ifPresent(invalidFields -> {
 			     throw new IllegalField("fmt", "Invalid transient (getter+setter, no field) IOField(s) for {}#yellow:\n{}#red",
 			                            cl.getName(), invalidFields);

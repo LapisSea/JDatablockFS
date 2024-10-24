@@ -550,11 +550,13 @@ public class GeneralTypeHandlingTests{
 	
 	public interface GenericChild<A> extends IOInstance.Def<GenericChild<A>>{
 		ContiguousIOList<A> list();
+		void list(ContiguousIOList<A> list);
 	}
 	
 	
 	public interface GenericArg extends IOInstance.Def<GenericArg>{
 		GenericChild<String> strings();
+		void strings(GenericChild<String> strings);
 //		GenericChild<ObjectID> ids();
 //		GenericChild<T> generic();
 	}

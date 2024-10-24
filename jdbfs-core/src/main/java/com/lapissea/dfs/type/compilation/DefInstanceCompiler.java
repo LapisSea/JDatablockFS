@@ -16,7 +16,7 @@ import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
-import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.dfs.utils.PerKeyLock;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.BytecodeUtils;
@@ -45,7 +45,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +59,7 @@ import java.util.function.Function;
 import static com.lapissea.dfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
 import static com.lapissea.dfs.type.compilation.JorthUtils.writeAnnotations;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class DefInstanceCompiler{
@@ -75,9 +76,9 @@ public final class DefInstanceCompiler{
 						writer.write(
 							"""
 								class A start
-									
+								
 									field a #String
-									
+								
 									function a
 										arg a int
 										returns int
@@ -119,39 +120,38 @@ public final class DefInstanceCompiler{
 	
 	record CompletionInfo<T extends IOInstance<T>>(
 		Class<T> base, Class<T> completed,
-		Set<String> completedGetters, Set<String> completedSetters
+		Set<String> completedGetters
 	){
 		record Weak<T extends IOInstance<T>>(
 			WeakReference<Class<T>> base, WeakReference<Class<T>> completed,
-			Set<String> completedGetters, Set<String> completedSetters
+			Set<String> completedGetters
 		){
 			CompletionInfo<T> deref(){
 				var base      = this.base.get();
 				var completed = this.completed.get();
 				if(base == null || completed == null) return null;
-				return new CompletionInfo<>(base, completed, completedGetters, completedSetters);
+				return new CompletionInfo<>(base, completed, completedGetters);
 			}
 		}
 		Weak<T> weakRef(){
-			return new Weak<>(new WeakReference<>(base), new WeakReference<>(completed), completedGetters, completedSetters);
+			return new Weak<>(new WeakReference<>(base), new WeakReference<>(completed), completedGetters);
 		}
 		
 		CompletionInfo{
 			Objects.requireNonNull(base);
 			Objects.requireNonNull(completed);
 			Objects.requireNonNull(completedGetters);
-			Objects.requireNonNull(completedSetters);
 		}
 		
-		private static final WeakHashMap<Class<?>, CompletionInfo.Weak<?>> COMPLETION_CACHE = new WeakHashMap<>();
-		private static final ReadWriteClosableLock                         COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
+		private static final Map<Class<?>, CompletionInfo.Weak<?>> COMPLETION_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
+		private static final PerKeyLock<Class<?>>                  COMPLETION_LOCK  = new PerKeyLock<>();
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
 			var c = getCached(interf);
 			if(c != null) return c;
 			
-			try(var ignored = COMPLETION_LOCK.write()){
+			return COMPLETION_LOCK.syncGet(interf, () -> {
 				var cachedWeak = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
 				if(cachedWeak != null){
 					var cached = cachedWeak.deref();
@@ -161,15 +161,13 @@ public final class DefInstanceCompiler{
 				var complete = (CompletionInfo<T>)complete(interf);
 				COMPLETION_CACHE.put(interf, complete.weakRef());
 				return complete;
-			}
+			});
 		}
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> getCached(Class<T> interf){
-			try(var ignored = COMPLETION_LOCK.read()){
-				var cached = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
-				if(cached != null) return cached.deref();
-			}
+			var cached = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
+			if(cached != null) return cached.deref();
 			return null;
 		}
 		
@@ -180,26 +178,19 @@ public final class DefInstanceCompiler{
 			collectMethods(interf, getters, setters);
 			var style = checkStyles(getters, setters);
 			
-			var missingGetters = new HashSet<String>();
-			var missingSetters = new HashSet<String>();
+			var getterNames    = Iters.from(getters).map(FieldStub::varName);
+			var setterNames    = Iters.from(setters).map(FieldStub::varName);
+			var missingGetters = setterNames.filter(getterNames::noneEquals).toSet();
 			
-			Iters.concat(getters, setters).map(FieldStub::varName).distinct().forEach(name -> {
-				if(Iters.from(getters).noneMatch(s -> s.varName().equals(name))) missingGetters.add(name);
-				if(Iters.from(setters).noneMatch(s -> s.varName().equals(name))) missingSetters.add(name);
-			});
-			
-			if(missingGetters.isEmpty() && missingSetters.isEmpty()){
-				return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
+			if(missingGetters.isEmpty()){
+				return new CompletionInfo<>(interf, interf, Set.of());
 			}
 			
 			ConfigDefs.CompLogLevel.SMALL.log(
-				"Generating completion of {}#cyan - {} {}",
-				() -> List.of(interf.getSimpleName(),
-				              missingGetters.isEmpty()? "" : "missing getters: " + missingGetters,
-				              missingSetters.isEmpty()? "" : "missing setters: " + missingSetters
-				));
+				"Generating completion of {}#cyan - {}",
+				() -> List.of(interf.getSimpleName(), missingGetters.isEmpty()? "" : "missing getters: " + missingGetters)
+			);
 			
-			var getterMap = Iters.from(getters).toModMap(FieldStub::varName, Function.identity());
 			var setterMap = Iters.from(setters).toModMap(FieldStub::varName, Function.identity());
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
@@ -230,17 +221,6 @@ public final class DefInstanceCompiler{
 					
 					unmappedClassFn(writer, interf);
 					
-					for(String name : missingSetters){
-						writer.write(
-							"""
-								function {!0}
-									arg arg1 {1}
-								end
-								""",
-							style.mapSetter(name),
-							getterMap.get(name).type()
-						);
-					}
 					for(String name : missingGetters){
 						writer.write(
 							"""
@@ -265,7 +245,7 @@ public final class DefInstanceCompiler{
 				
 				//noinspection unchecked
 				var completed = (Class<T>)Access.privateLookupIn(interf).defineClass(file);
-				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters), Set.copyOf(missingSetters));
+				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters));
 			}catch(IllegalAccessException|MalformedJorth e){
 				throw new RuntimeException(e);
 			}
@@ -299,7 +279,8 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private record Result<T extends IOInstance<T>>(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields){ }
+	private record Result<T extends IOInstance<T>>(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields,
+	                                               Optional<List<FieldInfo>> oPartialFields){ }
 	
 	private static final class ImplNode<T extends IOInstance<T>>{
 		enum State{
@@ -312,6 +293,7 @@ public final class DefInstanceCompiler{
 		private final Key<T>       key;
 		private       Class<T>     impl;
 		private       MethodHandle dataConstructor;
+		private       MethodHandle partialDataConstructor;
 		
 		public ImplNode(Key<T> key){
 			this.key = key;
@@ -319,15 +301,15 @@ public final class DefInstanceCompiler{
 		
 		private void init(Result<T> result){
 			this.impl = result.impl;
-			if(result.oOrderedFields.isPresent()){
-				List<FieldInfo> ordered = result.oOrderedFields.get();
-				
-				try{
-					var ctr = impl.getConstructor(Iters.from(ordered).map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
-					dataConstructor = Access.makeMethodHandle(ctr);
-				}catch(NoSuchMethodException e){
-					throw new ShouldNeverHappenError(e);
-				}
+			dataConstructor = result.oOrderedFields.map(this::getCtor).orElse(null);
+			partialDataConstructor = result.oPartialFields.map(this::getCtor).orElse(null);
+		}
+		private MethodHandle getCtor(List<FieldInfo> fields){
+			try{
+				var ctr = impl.getConstructor(Iters.from(fields).map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
+				return Access.makeMethodHandle(ctr);
+			}catch(NoSuchMethodException e){
+				throw new ShouldNeverHappenError(e);
 			}
 		}
 	}
@@ -362,14 +344,27 @@ public final class DefInstanceCompiler{
 	
 	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Class<T> interf){
 		var key = new Key<>(interf);
+		return dataConstructor(key, true);
+	}
+	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Key<T> key, boolean fullCtor){
 		@SuppressWarnings("unchecked")
 		var node = (ImplNode<T>)CACHE.get(key);
-		if(node == null || node.state != ImplNode.State.DONE) node = getNode(key);
-		var ctr = node.dataConstructor;
-		if(ctr == null){
-			throw new RuntimeException("Please add " + IOInstance.Order.class.getName() + " to " + interf.getName());
+		if(node == null || node.state != ImplNode.State.DONE){
+			node = getNode(key);
 		}
-		return ctr;
+		MethodHandle ctor;
+		if(fullCtor){
+			ctor = node.dataConstructor;
+		}else{
+			if(key.includeNames.isEmpty()){
+				throw new IllegalArgumentException("Partial constructor can only exist on a partial implementation");
+			}
+			ctor = node.partialDataConstructor;
+		}
+		if(ctor == null){
+			throw new RuntimeException(Log.fmt("Please add {}#yellow to {}#red", IOInstance.Order.class.getName(), key.clazz.getName()));
+		}
+		return ctor;
 	}
 	
 	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf){
@@ -467,7 +462,9 @@ public final class DefInstanceCompiler{
 			for(int i = 0; ; i++){
 				try{
 					var cls = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName, i);
-					return new Result<>(cls, orderedFields);
+					
+					var ordered = orderedFields.flatMap(oFields -> includeNames.map(inc -> Iters.from(oFields).filter(f -> inc.contains(f.name)).toList()));
+					return new Result<>(cls, orderedFields, ordered);
 				}catch(LinkageError e){
 					if(!e.getMessage().contains("duplicate class definition")){
 						throw new RuntimeException(e);
@@ -567,7 +564,7 @@ public final class DefInstanceCompiler{
 						public class #typ.impl start
 						""", parmsStr);
 				
-				unmappedClassFn(writer, completion.base);
+				defineStatics(writer, completion.base);
 				
 				for(var info : fieldInfo){
 					if(isFieldIncluded(includeNames, info.name)){
@@ -578,13 +575,19 @@ public final class DefInstanceCompiler{
 					}
 				}
 				
-				defineStatics(writer);
-				
 				
 				var includedFields  = includeNames.map(include -> Iters.from(fieldInfo).filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
 				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> Iters.from(o).filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
 				
-				generateDefaultConstructor(writer, includedFields);
+				if(Iters.from(fieldInfo).allMatch(
+					f -> f.setter.isPresent() ||
+					     Iters.from(f.annotations).anyMatch(a -> a instanceof IONullability n && n.value() == NULLABLE) ||
+					     List.of(ChunkPointer.class, Optional.class).contains(Utils.typeToRaw(f.type))
+				)){
+					generateDefaultConstructor(writer, includedFields);
+				}else{
+					int a000 = 0;
+				}
 				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
 				if(includeNames.isPresent()){
 					generateDataConstructor(writer, includedOrdered, includeNames, humanName);//Included only fields constructor
@@ -660,16 +663,16 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void unmappedClassFn(CodeStream writer, Class<T> baseClazz) throws MalformedJorth{
+	private static void unmappedClassFn(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
 				public static function {}
-					returns {}
+					returns #Class
 				start
 					class {}
 				end
 				""",
-			GET_UNMAPPED_CLASS_FN, Class.class, baseClazz
+			GET_UNMAPPED_CLASS_FN, baseClazz
 		);
 	}
 	
@@ -740,7 +743,7 @@ public final class DefInstanceCompiler{
 						get #typ.impl $STRUCT
 					end
 				""",
-			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type)).asCollection()
+			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
 		);
 		
 		for(int i = 0; i<orderedFields.size(); i++){
@@ -818,7 +821,7 @@ public final class DefInstanceCompiler{
 		return Optional.of(ordered);
 	}
 	
-	private static void defineStatics(CodeStream writer) throws MalformedJorth{
+	private static void defineStatics(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
 				private static final field $STRUCT #Struct
@@ -830,6 +833,8 @@ public final class DefInstanceCompiler{
 					set #typ.impl $STRUCT
 				end
 				""");
+		
+		unmappedClassFn(writer, baseClazz);
 	}
 	
 	private static void implementUserAccess(CodeStream writer, FieldInfo info, String classHumanName) throws MalformedJorth{
@@ -841,13 +846,7 @@ public final class DefInstanceCompiler{
 				case RAW -> setter.varName();
 			};
 		});
-		var setterName = info.setter.map(s -> s.method().getName()).orElseGet(() -> {
-			var setter = info.getter.orElseThrow();
-			return switch(setter.style()){
-				case NAMED -> "get" + TextUtil.firstToUpperCase(setter.varName());
-				case RAW -> setter.varName();
-			};
-		});
+		var setterName = info.setter.map(s -> s.method().getName());
 		writer.write(
 			"""
 				@ #IOValue start name '{!2}' end
@@ -863,31 +862,33 @@ public final class DefInstanceCompiler{
 			info.name
 		);
 		
-		writer.write(
-			"""
-				@ #IOValue start name '{!2}' end
-				@ #Override
-				public function {!0}
-					arg arg1 {1}
-				start
-					get #arg arg1
-				""",
-			setterName,
-			info.type,
-			info.name
-		);
-		
-		if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
-			JorthUtils.nullCheckDup(writer, fieldNullMsg(info, classHumanName));
+		if(setterName.isPresent()){
+			writer.write(
+				"""
+					@ #IOValue start name '{!2}' end
+					@ #Override
+					public function {!0}
+						arg arg1 {1}
+					start
+						get #arg arg1
+					""",
+				setterName.get(),
+				info.type,
+				info.name
+			);
+			
+			if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+				JorthUtils.nullCheckDup(writer, fieldNullMsg(info, classHumanName));
+			}
+			
+			writer.write(
+				"""
+						set this {!}
+					end
+					""",
+				info.name
+			);
 		}
-		
-		writer.write(
-			"""
-					set this {!}
-				end
-				""",
-			info.name
-		);
 	}
 	
 	private static String fieldNullMsg(FieldInfo info, String classHumanName){
@@ -936,9 +937,9 @@ public final class DefInstanceCompiler{
 	
 	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
 		writeAnnotations(writer, info.annotations);
-		
 		writer.write(
-			"private field {!} {}",
+			"private {} field {!} {}",
+			info.setter.isEmpty()? "final" : "",
 			info.name,
 			info.type
 		);
@@ -1065,7 +1066,7 @@ public final class DefInstanceCompiler{
 				     .joinAsStr("\n", s -> "\t" + s.method().getName() + ":\t" + s.style())
 			);
 		}
-		return styles.keySet().iterator().next();
+		return Iters.keys(styles).getFirst();
 	}
 	
 	private static void checkAnnotations(List<FieldInfo> fields){

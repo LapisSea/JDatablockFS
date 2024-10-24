@@ -10,10 +10,12 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,7 +48,8 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 					rule, (max, ptr, actual, s) -> {
 						s.steps.add(new Step(max, ptr));
 						s.sb.append(actual.size.shortName);
-					}, new State(new ArrayList<>(), new StringBuilder()),
+					},
+					new State(new ArrayList<>(), new StringBuilder()),
 					s -> new State(new ArrayList<>(s.steps), new StringBuilder(s.sb))
 				);
 				var pipe  = new FixedVaryingStructPipe<>(type, intercept);
@@ -121,22 +124,51 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			//noinspection rawtypes,unchecked
 			FieldSet<T> sizeFields = FieldSet.of((Iterable)sizeFieldStream(structFields));
 			
-			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual, state) -> {
-				if(actual.size != max) state[0] = false;
-			}, new boolean[]{true}, boolean[]::clone);
+			record State(List<NumberSize> ruleReply, boolean[] effectivelyAllMax){ }
+			var snitchRule = VaryingSize.Provider.intercept(
+				rule, (max, ptr, actual, state) -> {
+					if(actual.size != max) state.effectivelyAllMax[0] = false;
+					state.ruleReply.add(actual.size);
+				},
+				new State(new ArrayList<>(), new boolean[]{true}),
+				s -> new State(new ArrayList<>(s.ruleReply), s.effectivelyAllMax.clone())
+			);
 			
 			var result = fixedFields(t, structFields, sizeFields::contains, f -> {
 				return f.forceMaxAsFixedSize(snitchRule);
 			});
-			boolean effectivelyAllMax = snitchRule.getState()[0];
-			if(effectivelyAllMax){
+			var state = snitchRule.getState();
+			if(state.effectivelyAllMax[0]){
 				throw new UseFixed();
 			}
-			return result;
+			return new PipeFieldCompiler.Result<>(result, state.ruleReply);
 		}, true);
 		if(type instanceof Struct.Unmanaged){
 			throw new IllegalArgumentException("Unmanaged types are not supported");
 		}
+	}
+	
+	@Override
+	public Class<StructPipe<T>> getSelfClass(){
+		//noinspection unchecked,rawtypes
+		return (Class)FixedVaryingStructPipe.class;
+	}
+	
+	@Override
+	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
+		//noinspection unchecked
+		var ruleReply = (List<NumberSize>)builderMetadata;
+		var struct    = getType().getBuilderObjType(true);
+		
+		FixedVaryingStructPipe<ProxyBuilder<T>> pipe;
+		try{
+			pipe = new FixedVaryingStructPipe<>(struct, VaryingSize.Provider.repeat(ruleReply));
+			pipe.sizesStr = Iters.from(ruleReply).map(NumberSize::shortName).joinAsStr();
+		}catch(UseFixed e){
+			throw new ShouldNeverHappenError(e);
+		}
+		ConfigDefs.CompLogLevel.SMALL.log("Acquired builder FixedVaryingStructPipe for {}#green with {}#purpleBright", getType(), ruleReply);
+		return pipe;
 	}
 	
 	@Override
