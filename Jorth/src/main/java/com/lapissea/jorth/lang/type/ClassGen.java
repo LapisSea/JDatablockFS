@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
@@ -244,7 +244,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	public static void writeAnnotations(Collection<AnnGen> annotations, BiFunction<String, Boolean, AnnotationVisitor> visitor){
-		for(AnnGen(ClassName annType, Map<String, Object> args) : annotations){
+		for(var ann : annotations){
+			ClassName           annType = ann.type();
+			Map<String, Object> args    = ann.args();
+			
 			var annWriter = visitor.apply(new GenericType(annType).jvmDescriptorStr(), true);
 			for(var e : args.entrySet()){
 				var argName  = e.getKey();
@@ -313,6 +316,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	public ClassType type(){
 		return type;
 	}
+	@Override
+	public boolean isPrimitive(){
+		return false;
+	}
 	
 	@Override
 	public boolean isFinal(){
@@ -333,7 +340,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{
 		var fun = functions.get(signature);
 		if(fun != null) return fun;
-		throw new MalformedJorth("Function of " + signature + " does not exist");
+		throw new MalformedJorth("Function of " + signature + " does not exist in " + name.dotted());
 	}
 	@Override
 	public Stream<? extends FunctionInfo> getFunctionsByName(String name){

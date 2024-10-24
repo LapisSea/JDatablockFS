@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.info;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.JType;
@@ -99,9 +99,16 @@ public interface FunctionInfo{
 		public List<JType> argumentTypes(){
 			return args;
 		}
+		private Object  defaultEnumValue;
+		private boolean defaultEnumValueCached;
+		
 		@Override
 		public Object defaultEnumValue(){
-			return method.getDefaultValue();
+			if(!defaultEnumValueCached){
+				defaultEnumValue = method.getDefaultValue();
+				defaultEnumValueCached = true;
+			}
+			return defaultEnumValue;
 		}
 	}
 	

@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="DisplayHost" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.tools.server.DisplayHost" />
-    <module name="jdatablockfs.tools" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.tools.server.DisplayHost" />
+    <module name="run" />
     <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Ddfs.tools.renderer.errorLogLevel=STACK -Ddfs.tools.jitWarmup=false -Ddfs.tools.drawDebug=false -DinitialData=sessions.dfs" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />
     <extension name="coverage">
       <pattern>
-        <option name="PATTERN" value="com.lapissea.cfs.tools.logging.*" />
+        <option name="PATTERN" value="com.lapissea.dfs.tools.logging.*" />
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>

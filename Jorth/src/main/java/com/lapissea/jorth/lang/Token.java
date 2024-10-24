@@ -1,13 +1,14 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.BracketType;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.util.ZeroArrays;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public sealed interface Token{
 	
@@ -16,11 +17,10 @@ public sealed interface Token{
 			if(this.keyword != keyword) throw new MalformedJorth("Required keyword is " + keyword + " but got " + this.keyword);
 		}
 		
-		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == Word.class){
-				return Optional.of((T)new Word(line, keyword.name().toLowerCase()));
+				return Optional.of(type.cast(new Word(line, keyword.key())));
 			}
 			return Token.super.as(type);
 		}
@@ -49,6 +49,13 @@ public sealed interface Token{
 				)
 			);
 		}
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(line, value.name())));
+			}
+			return Token.super.as(type);
+		}
 	}
 	
 	record Word(int line, String value) implements Token{
@@ -56,15 +63,14 @@ public sealed interface Token{
 			return value.equals(check);
 		}
 		
-		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == ClassWord.class){
-				return Optional.of((T)new ClassWord(line, ClassName.dotted(value)));
+				return Optional.of(type.cast(new ClassWord(line, ClassName.dotted(value))));
 			}
 			if(type == SmolWord.class){
 				if(value.length() == 1){
-					return Optional.of((T)new SmolWord(line, value.charAt(0)));
+					return Optional.of(type.cast(new SmolWord(line, value.charAt(0))));
 				}else{
 					return Optional.empty();
 				}
@@ -82,14 +88,13 @@ public sealed interface Token{
 			return value == check;
 		}
 		
-		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == Word.class){
-				return Optional.of((T)new Word(line, value + ""));
+				return Optional.of(type.cast(new Word(line, value + "")));
 			}
 			if(type == ClassWord.class){
-				return Optional.of((T)new ClassWord(line, ClassName.dotted(value + "")));
+				return Optional.of(type.cast(new ClassWord(line, ClassName.dotted(value + ""))));
 			}
 			return Token.super.as(type);
 		}
@@ -110,11 +115,10 @@ public sealed interface Token{
 			return new ClassWord(line, imported);
 		}
 		
-		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == Word.class){
-				return Optional.of((T)new Word(line, value.dotted()));
+				return Optional.of(type.cast(new Word(line, value.dotted())));
 			}
 			return Token.super.as(type);
 		}
@@ -126,17 +130,32 @@ public sealed interface Token{
 			SUPER, EXTENDS
 		}
 		
-		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == Word.class){
-				return Optional.of((T)new Word(line, "?"));
+				return Optional.of(type.cast(new Word(line, "?")));
 			}
 			return Token.super.as(type);
 		}
 	}
 	
-	record StrValue(int line, String value) implements Token{ }
+	record StrValue(int line, String value) implements Token{
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(
+					line,
+					"'" +
+					value.replace("\"", "\\\"")
+					     .replace("\n", "\\n")
+					     .replace("\r", "\\r")
+					     .replace("\t", "\\t")
+					+ "'"
+				)));
+			}
+			return Token.super.as(type);
+		}
+	}
 	
 	sealed interface NumToken extends Token{
 		
@@ -155,17 +174,40 @@ public sealed interface Token{
 		}
 		
 		Number getNum();
+		@Override
+		default <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(line(), getNum().toString())));
+			}
+			return Token.super.as(type);
+		}
 	}
 	
 	
-	record Null(int line) implements Token{ }
+	record Null(int line) implements Token{
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(line(), "null")));
+			}
+			return Token.super.as(type);
+		}
+	}
 	
-	record Bool(int line, boolean value) implements Token{ }
+	record Bool(int line, boolean value) implements Token{
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(line(), value + "")));
+			}
+			return Token.super.as(type);
+		}
+	}
 	
 	record BracketedSet(int line, BracketType type, List<Token> contents) implements Token{
 		public Object singleTypeUnpack() throws MalformedJorth{
 			if(contents.isEmpty()) return ZeroArrays.ZERO_OBJECT;
-			return switch(contents.get(0)){
+			return switch(contents.getFirst()){
 				case Token.NumToken.IntVal t -> {
 					var val = new int[contents.size()];
 					for(int i = 0; i<val.length; i++){
@@ -194,8 +236,20 @@ public sealed interface Token{
 					}
 					yield val;
 				}
-				default -> throw new MalformedJorth("Illegal token type " + contents.get(0) + " inside bracket block");
+				default -> throw new MalformedJorth("Illegal token type " + contents.getFirst() + " inside bracket block");
 			};
+		}
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type == Word.class){
+				return Optional.of(type.cast(new Word(
+					line(),
+					this.type.open +
+					contents.stream().map(t -> t.as(Word.class).orElseThrow().value).collect(Collectors.joining(" ")) +
+					this.type.close
+				)));
+			}
+			return Token.super.as(type);
 		}
 	}
 	

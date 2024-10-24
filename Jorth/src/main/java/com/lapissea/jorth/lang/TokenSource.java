@@ -1,8 +1,8 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.BracketType;
-import com.lapissea.jorth.EndOfCode;
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.EndOfCode;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
@@ -40,6 +40,12 @@ public interface TokenSource{
 				readNext();
 				return !(e instanceof EndOfCode);
 			}
+			
+			@Override
+			public String restRaw(){
+				throw new UnsupportedOperationException();
+			}
+			
 			@Override
 			public Token readToken(boolean required) throws MalformedJorth{
 				readNext();
@@ -82,6 +88,14 @@ public interface TokenSource{
 			}
 			
 			@Override
+			public String restRaw() throws MalformedJorth{
+				var line = source.line();
+				var rest = source.restRaw();
+				listener.accept(new Token.Word(line, rest));
+				return rest;
+			}
+			
+			@Override
 			public Token peekToken(boolean required) throws MalformedJorth{
 				return source.peekToken(required);
 			}
@@ -118,7 +132,7 @@ public interface TokenSource{
 					for(var part : c){
 						listener.accept(part);
 					}
-					listener.accept(new Token.SmolWord(c.isEmpty()? b.line() : c.get(c.size() - 1).line(), b.type().close));
+					listener.accept(new Token.SmolWord(c.isEmpty()? b.line() : c.getLast().line(), b.type().close));
 				}, () -> listener.accept(t));
 				return t;
 			}
@@ -165,6 +179,8 @@ public interface TokenSource{
 	default Token peekToken() throws MalformedJorth{
 		return peekToken(true);
 	}
+	
+	String restRaw() throws MalformedJorth;
 	
 	Token readToken(boolean required) throws MalformedJorth;
 	Token peekToken(boolean required) throws MalformedJorth;

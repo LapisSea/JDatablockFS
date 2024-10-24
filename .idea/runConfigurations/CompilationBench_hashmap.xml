@@ -1,8 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="CompilationBench.hashmap" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.cfs.benchmark.CompilationBench.hashmap" working-dir="$MODULE_WORKING_DIR$" benchmark-type="METHOD" benchmark-class="com.lapissea.cfs.benchmark.CompilationBench" isAlternativeJrePathEnabled="false">
-    <module name="jdatablockfs.run" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
-</component>

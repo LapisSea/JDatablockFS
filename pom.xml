@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	
 	<properties>
-		<java.version>20</java.version>
+		<java.version>21</java.version>
 		<maven.compiler.release>${java.version}</maven.compiler.release>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
@@ -18,20 +18,23 @@
 		<maven-gpg-plugin-version>3.0.1</maven-gpg-plugin-version>
 		<maven-source-plugin-version>3.2.1</maven-source-plugin-version>
 		
+		<jmh.version>1.37</jmh.version>
+		
 		<child-build-dir>../target</child-build-dir>
 	</properties>
 	
-	<groupId>com.github.lapissea.jdatablockfs</groupId>
+	<groupId>lapissea.jdatablockfs</groupId>
 	<artifactId>JDatablockFS</artifactId>
 	<packaging>pom</packaging>
 	
 	<version>1.0</version>
 	
 	<modules>
-		<module>jdatablockfs.core</module>
-		<module>jdatablockfs.run</module>
-		<module>jdatablockfs.tools</module>
+		<module>/jdbfs-core</module>
+		<module>/jdbfs-run</module>
+		<module>/jdbfs-tools</module>
 		<module>Jorth</module>
+		<module>Fuzzer</module>
 	</modules>
 	
 	<dependencyManagement>
@@ -44,7 +47,19 @@
 			<dependency>
 				<groupId>org.testng</groupId>
 				<artifactId>testng</artifactId>
-				<version>7.8.0</version>
+				<version>7.9.0</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.openjdk.jmh</groupId>
+				<artifactId>jmh-core</artifactId>
+				<version>${jmh.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.openjdk.jmh</groupId>
+				<artifactId>jmh-generator-annprocess</artifactId>
+				<version>${jmh.version}</version>
 				<scope>test</scope>
 			</dependency>
 		</dependencies>

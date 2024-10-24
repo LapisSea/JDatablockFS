@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -23,10 +23,21 @@ public interface KeyedEnum{
 		private final CNode<E>[]     smolNames;
 		private final Class<E>       type;
 		
+		private final int minLen, maxLen;
+		
 		private Lookup(Class<E> type, Map<String, E> names, CNode<E>[] smolNames){
 			this.names = names;
 			this.smolNames = smolNames;
 			this.type = type;
+			
+			if(names.isEmpty()){
+				minLen = 0;
+				maxLen = 0;
+			}else{
+				var lens = names.keySet().stream().mapToInt(String::length).summaryStatistics();
+				minLen = lens.getMin();
+				maxLen = lens.getMax();
+			}
 		}
 		
 		private static <E extends Enum<E>> Lookup<E> make(Class<E> t){
@@ -37,9 +48,18 @@ public interface KeyedEnum{
 			var names = HashMap.<String, E>newHashMap(values.size());
 			int count = 0;
 			for(var value : values){
-				String key = value instanceof KeyedEnum e? e.key() : value.name().toLowerCase();
-				if(key.length() == 1) count++;
-				else names.put(key, value);
+				if(value instanceof KeyedEnum e){
+					String key = e.key();
+					if(key.length() == 1) count++;
+					else names.put(key, value);
+				}else{
+					String key = value.name();
+					if(key.length() == 1) count += 2;
+					else{
+						names.put(key.toLowerCase(), value);
+						names.put(key, value);
+					}
+				}
 			}
 			
 			//noinspection unchecked
@@ -101,13 +121,12 @@ public interface KeyedEnum{
 		}
 		
 		private E byStr(String key){
-			var e = names.get(key);
-			if(e != null) return e;
+			var len = key.length();
+			if(len == 1) return byChar(key.charAt(0));
+			if(len<minLen) return null;
+			if(len>maxLen) return null;
 			
-			if(key.length() == 1){
-				return byChar(key.charAt(0));
-			}
-			return null;
+			return names.get(key);
 		}
 		
 		private E byChar(char key){

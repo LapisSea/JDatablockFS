@@ -1,16 +1,15 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All tests no debug" type="TestNG">
-    <module name="jdatablockfs.run" />
     <shortenClasspath name="NONE" />
     <option name="SUITE_NAME" value="" />
-    <option name="PACKAGE_NAME" value="com.lapissea.cfs" />
+    <option name="PACKAGE_NAME" value="com.lapissea" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
     <option name="GROUP_NAME" value="" />
     <option name="TEST_OBJECT" value="PACKAGE" />
     <option name="VM_PARAMETERS" value="-DdeleteOk=true" />
     <option name="PARAMETERS" value="-parallel methods -threadcount 12" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/run/test" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/runDir/test" />
     <option name="OUTPUT_DIRECTORY" value="" />
     <option name="PROPERTIES_FILE" value="" />
     <properties />

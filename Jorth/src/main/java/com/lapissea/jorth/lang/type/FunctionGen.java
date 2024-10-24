@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
@@ -206,13 +206,13 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
 		int counter = isStatic()? 0 : 1;
-		for(ArgInfo(var type, var argName) : args){
-			var info = type.getBaseType();
-			this.args.put(argName, new Arg(type, info, argName, counter));
+		for(var arg : args){
+			var info = arg.type.getBaseType();
+			this.args.put(arg.name, new Arg(arg.type, info, arg.name, counter));
 			counter += info.slots;
 		}
 		
-		if(owner.type == ClassType.INTERFACE){
+		if(owner.type == ClassType.INTERFACE && !access.contains(Access.STATIC)){
 			this.access.add(Access.ABSTRACT);
 		}
 		if(name.equals("<clinit>")){
@@ -583,7 +583,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public void loadFloatOp(float value){
-		code().stack.push(GenericType.BOOL);
+		code().stack.push(GenericType.FLOAT);
 		writer.visitLdcInsn(value);
 	}
 	

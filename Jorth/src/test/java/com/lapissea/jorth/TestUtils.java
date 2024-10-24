@@ -1,5 +1,6 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -18,7 +19,7 @@ public class TestUtils{
 			);
 			
 			generator.accept(writer);
-			writer.write("end");
+			writer.wEnd();
 		});
 	}
 	

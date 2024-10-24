@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.jorth.lang.info.FunctionInfo.Signature;
@@ -63,6 +63,10 @@ public interface ClassInfo{
 		@Override
 		public ClassType type(){
 			return ClassType.CLASS;
+		}
+		@Override
+		public boolean isPrimitive(){
+			return false;
 		}
 		@Override
 		public boolean isFinal(){
@@ -287,6 +291,10 @@ public interface ClassInfo{
 			return ClassType.CLASS;
 		}
 		@Override
+		public boolean isPrimitive(){
+			return clazz.isPrimitive();
+		}
+		@Override
 		public boolean isFinal(){
 			return Modifier.isFinal(clazz.getModifiers());
 		}
@@ -319,6 +327,8 @@ public interface ClassInfo{
 	ClassName name();
 	ClassInfo superType() throws MalformedJorth;
 	ClassType type();
+	
+	boolean isPrimitive();
 	
 	boolean isFinal();
 	List<GenericType> interfaces();

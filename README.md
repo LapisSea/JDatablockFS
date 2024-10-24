@@ -1,5 +1,7 @@
 # JDatablockFS
 
+[![Java CI with Maven](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml/badge.svg)](https://github.com/LapisSea/JDatablockFS/actions/workflows/maven.yml)
+
 ### Description:
 
 A java library that aims to store arbitrary data in a format that is compact, easily modifiable and flexible.
@@ -35,7 +37,7 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 ### IPSet example:
 
-This shows very simple list of ipv6 and their cordinates on earth. (made up data)
+This shows a very simple list of ipv6 and their cordinates on earth. (made up data)
 
 _You can find the complete code of the example in `/jdatablockfs.run/src/main/java/com/lapissea/cfs/run/examples/IPs.java`_
 
@@ -43,19 +45,19 @@ _You can find the complete code of the example in `/jdatablockfs.run/src/main/ja
 //Setting up classes
 public static class IP extends IOInstance.Managed<IP>{
 	@IOValue
-	double latitude
+	double latitude;
 	@IOValue
 	double longitude;
-	
+
 	@IOValue
 	String v6;
-	
+
 	//Every IOInstance needs an empty constructor
-	public IP(){}
+	public IP(){ }
 	public IP(double latitude, double longitude, String v6){
-		this.latitude=latitude;
-		this.longitude=longitude;
-		this.v6=v6;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.v6 = v6;
 	}
 }
 ```
@@ -63,20 +65,24 @@ public static class IP extends IOInstance.Managed<IP>{
 Create database and add sample data:
 
 ```java
-//init and create new Cluster with in memory (byte[]) data
-Cluster cluster=Cluster.init(MemoryData.empty());
+class Example{
+	public static void main(String[] args){
+		//init and create new Cluster with in memory (byte[]) data
+		Cluster cluster = Cluster.init(MemoryData.empty());
 
-//Ask root provider for list of IPs with the id of "my ips"
-IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
+		//Ask root provider for list of IPs with the id of "my ips"
+		IOList<IP> ips = cluster.roots().request("my ips", IOList.class, IP.class);
 
-//Adding sample data to database:
-ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
+		//Adding sample data to database:
+		ips.add(new IP(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+		ips.add(new IP(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
+	}
+}
 ```
 
 Details:
 
-`cluster.getRootProvider().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
+`cluster.roots().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
 
 `ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically created and allocated by the rootProvider.
 
@@ -85,25 +91,29 @@ Details:
 _Alternative IP type definition with an interface_
 
 ```java
-@IOInstance.Def.Order({"latitude", "longitude", "v6"})
-@IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
+
+@IOInstance.Order({"latitude", "longitude", "v6"})
+@IOInstance.StrFormat.Custom("{@v6 at @latitude / @longitude}")
 public interface IP extends IOInstance.Def<IP>{
-	
+
 	static IP of(double latitude, double longitude, String v6){
 		return IOInstance.Def.of(IP.class, latitude, longitude, v6);
 	}
-	
+
 	double latitude();
 	double longitude();
 	String v6();
 }
 ```
 
-This is just an interface. It infers the fields from the contents of the interface. Every non static/default/private function is considered a getter/setter. Getters and setters can have multiple formats. (eg: `double getLatitude()` or `void setV6(String v6)`) A getter or setter is required for a field but not both of them.
+This is just an interface. It infers the fields from the contents of the interface. Every non static/default/private function is considered a getter/setter. Getters and setters can have multiple formats. (eg:
+`double getLatitude()` or `void setV6(String v6)`) A getter or setter is required for a field but not both of them.
 
 - `IOInstance.Def` is the base type of template type (or definition type)
-- `IOInstance.Def.Order` is an annotation that is required if the type needs a `void setAll(<all fields>)` or needs to be constructed with data. (aka `IOInstance.Def.of(<type>, <all field values in order>`)
-- `IOInstance.Def.ToString.Format` or `IOInstance.Def.ToString` are optional and just give the ability to customize the field in a friendly way. Alternatively a `static String toString(<type> instance){...}` can be added to write a custom toString
+- `IOInstance.Order` is an annotation that is required if the type needs a `void setAll(<all fields>)` or needs to be constructed with data. (aka
+  `IOInstance.Def.of(<type>, <all field values in order>`)
+- `IOInstance.StrFormat.Custom` or `IOInstance.StrFormat` are optional and just give the ability to customize the field in a friendly way. Alternatively a
+  `static String toString(<type> instance){...}` can be added to write a custom toString
 - `static IP of(...)` is just a convenience function that is completely optional. It just makes it more pleasing to manually make an instance. It is a replacement for `new IP(...)`
 
 Note that this creates implementation(s) as needed. This may provide a performance increase and clarity in a context where only partial access to data is needed. (such as finding an object by a spesific field) This is because manually creating a perfect instance is annoying and clumsy. Simply defining what fields you need offloads the annoying bolierplate work to the code generation mechanism inside the library.
@@ -117,13 +127,18 @@ NOTE: You *can* create your own implementation of an interface like this, but it
 Simply paste this in to your pom.xml
 
 ```xml
+
 <dependencies>
 	<dependency>
-		<groupId>com.github.lapissea.jdatablockfs</groupId>
+		<groupId>lapissea.jdatablockfs</groupId>
 		<artifactId>core</artifactId>
 		<version>1.0</version>
 	</dependency>
 </dependencies>
+```
+
+```xml
+
 <repositories>
 	<repository>
 		<id>lapissnap</id>
@@ -138,7 +153,8 @@ Simply paste this in to your pom.xml
 </repositories>
 ```
 
-Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `com.github.lapissea.jdatablockfs` with the id `core` and the `1.0` version.
+Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `lapissea.jdatablockfs` with the id `core` and the
+`1.0` version.
 
 ---
 
@@ -153,7 +169,7 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 
 ---
 
-### Note: Documentation is unfinished!!
+___Note: Documentation is unfinished!!___
 
 **Please create an issue and ask a question about anything that is not clear! I'm just 1 guy, and it's hard to know what may be complicated or unclear when I've designed it. Thanks ☺️**
 
@@ -163,12 +179,14 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 
 - `Cluster`: This acts like the root for a file. It takes an `IOInterface` and provides access to objects inside. Use `Cluster.init(...)` to create a new empty cluster on an IOInterface
 - `IOInterface`: An interface that provides the lowest level interactions that are required for functioning of this library.
-- `MemoryData`: An in memory implementation of IOInterface. Creation example: `MemoryData.builder().withRaw(new byte[]{1,2,3}).build()`
+- `MemoryData`: An in memory implementation of IOInterface. Creation example: `MemoryData.of(new byte[]{1,2,3})`
 - `IOFileData`: An implementation of IOInterface. Maps to `java.io.File` (WARNING: This is unfinished, please use MemoryData for now)
 
 
 - `IOInstance`: Class that is required to extend any object that needs to be stored. Fields and setters/getters inside it can be marked with `@IOValue` to be marked as things that should be stored
-- `IOInstance.Unmanaged` Class that is like `IOInstance` except its contents may be unmanaged. Aka it has to manage the serialization, allocation of data and description of references and data types manually. A normal IOInstance is fully managed. Other parts of the library fully manage its data but in limited ways. Things like self referencing nodes, Lists, Maps, Sets or any more complicated data structure probably should be Unmanaged as such structures require more control than a base IOInstance can provide (and can do more efficient IO operations like reading a specific field). There are limitations to an unmanaged instance. Since it may contain code, it can not be serialized and its class has to be available in the classpath in order for a file to be (fully) readable. On the same note, since there is custom behaviour, the library can not make certain assumptions about the object like an exact size (`@IOValueUnmanaged` may help with this) or if copying or reallocation of an instance can be performed.
+- `IOInstance.Unmanaged` Class that is like
+  `IOInstance` except its contents may be unmanaged. Aka it has to manage the serialization, allocation of data and description of references and data types manually. A normal IOInstance is fully managed. Other parts of the library fully manage its data but in limited ways. Things like self referencing nodes, Lists, Maps, Sets or any more complicated data structure probably should be Unmanaged as such structures require more control than a base IOInstance can provide (and can do more efficient IO operations like reading a specific field). There are limitations to an unmanaged instance. Since it may contain code, it can not be serialized and its class has to be available in the classpath in order for a file to be (fully) readable. On the same note, since there is custom behaviour, the library can not make certain assumptions about the object like an exact size (
+  `@IOValueUnmanaged` may help with this) or if copying or reallocation of an instance can be performed.
 
 
 - `IOList`: A disk based `List`. It has implementations similar to `ArrayList` and `LinkedList`
@@ -178,14 +196,28 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 - `@IOValue`: This is the most basic annotation. It signifies that a value should be serialized.
 - `@IONullability`: This annotation specified what kind of nullability is accepted. Every `IOValue` without this annotation is `NOT_NULL`.
 	- When a field is `NOT_NULL` and is null, then the object it is in will be considered invalid and the library will refuse to store it.
-	- When this annotation has `NULLABLE`, a new field of type boolean will be added to the instance under the hood. Its value represents if the relevant field is null or not. It is automatically managed by the library.
+	- When this annotation has
+	  `NULLABLE`, a new field of type boolean will be added to the instance under the hood. Its value represents if the relevant field is null or not. It is automatically managed by the library.
 	- When this annotation has `DEFAULT_IF_NULL` then a value will be stored as its default value. (0, false, empty constructor, empty array, etc...)
-- `@IOValue.Reference`: This annotation suggests to the library that this field should not be inlined and should be stored as a reference. (This is useful if an object is going to be stored in a list. When an object is in a list, the list greatly benefits from an object whose size can be fixed and can be stored inline with the list data)
-- `@IOValue.OverrideType`: This annotation specifies that the type of field should be replaced with a compatible type. For example if there is an IOList and a specific implementation is desired then `@IOValue.OverrideType(FooList.class)` can be used
-- `@IODependency`: This annotation specifies that this field requires another `IOField` to be read/written correctly. This will change the way the memory of an IOInstance is organised. If used incorrectly this annotation can create dependency loops what will make the instance of an invalid format. This annotation should probably not be used unless there is a specific need for it.
-- `@IODependency.VirtualNumSize`: This annotation can be used on a field of a numeric type. It creates a virtual field of `NumberSize` what enables the number to be stored in less bytes than its max value requires. A name can be specified for the `NumberSize` field. If 2 fields share the same name, their `NumberSize` field will be shared.
+-
+
+`@IOValue.Reference`: This annotation suggests to the library that this field should not be inlined and should be stored as a reference. (This is useful if an object is going to be stored in a list. When an object is in a list, the list greatly benefits from an object whose size can be fixed and can be stored inline with the list data)
+
+- `@IOValue.OverrideType`: This annotation specifies that the type of field should be replaced with a compatible type. For example if there is an IOList and a specific implementation is desired then
+  `@IOValue.OverrideType(FooList.class)` can be used
+- `@IODependency`: This annotation specifies that this field requires another
+  `IOField` to be read/written correctly. This will change the way the memory of an IOInstance is organised. If used incorrectly this annotation can create dependency loops what will make the instance of an invalid format. This annotation should probably not be used unless there is a specific need for it.
+- `@IODependency.VirtualNumSize`: This annotation can be used on a field of a numeric type. It creates a virtual field of
+  `NumberSize` what enables the number to be stored in less bytes than its max value requires. A name can be specified for the `NumberSize` field. If 2 fields share the same name, their
+  `NumberSize` field will be shared.
 - `@IODependency.NumSize`: This annotation has the same effect as `IODependency.VirtualNumSize` except it does not create a virtual field but references the name of another field.
-- `@IOType.Dynamic`: This annotation enables the field to have a value whose class does not match the field exactly. This freedom comes at the cost of needing an extra typeID virtual field and any stored value will need to have its class layout stored on file what can create a lot of non-useful data. Use this annotation only when needed.
+-
+
+`@IOType.Dynamic`: This annotation enables the field to have a value whose class does not match the field exactly. This freedom comes at the cost of needing an extra typeID virtual field and any stored value will need to have its class layout stored on file what can create a lot of non-useful data. Use this annotation only when needed.
+
 - `@IOValueUnmanaged`: This annotation can be used on static methods inside an `IOInstance.Unmanaged` to mark that function as a static unmanaged field factory.
 
 ---
+
+
+Author: LapisSea
