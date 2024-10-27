@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
@@ -38,7 +37,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	}
 	
 	private final EnumUniverse<E> enumUniverse;
-	private final Supplier<E>     createDefaultIfNull;
+	private final E               defaultValue;
 	
 	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
@@ -49,7 +48,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
-		createDefaultIfNull = enumUniverse::getFirst;
+		defaultValue = enumUniverse.getFirst();
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
@@ -58,7 +57,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	
 	@Override
 	public E get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, createDefaultIfNull);
+		return getNullable(ioPool, instance, defaultValue);
 	}
 	@Override
 	public boolean isNull(VarPool<T> ioPool, T instance){

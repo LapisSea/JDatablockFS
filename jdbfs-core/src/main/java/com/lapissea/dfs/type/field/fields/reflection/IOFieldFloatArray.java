@@ -64,7 +64,7 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 	private static final float[] DEFAULT_VAL = new float[0];
 	@Override
 	public float[] get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
 	@Override

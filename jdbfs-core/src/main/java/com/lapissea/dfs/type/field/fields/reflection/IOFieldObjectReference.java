@@ -84,7 +84,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 	
 	@Override
 	public ValueType get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> null);
+		return getNullable(ioPool, instance, (ValueType)null);
 	}
 	@Override
 	public boolean isNull(VarPool<T> ioPool, T instance){

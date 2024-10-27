@@ -61,7 +61,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 	private static final boolean[] DEFAULT_VAL = new boolean[0];
 	@Override
 	public boolean[] get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
 	@Override
