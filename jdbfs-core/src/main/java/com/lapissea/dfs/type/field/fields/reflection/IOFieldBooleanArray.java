@@ -53,6 +53,10 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 			return arr == null? 0 : BitUtils.bitsToBytes(arr.length);
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	private static final boolean[] DEFAULT_VAL = new boolean[0];
 	@Override

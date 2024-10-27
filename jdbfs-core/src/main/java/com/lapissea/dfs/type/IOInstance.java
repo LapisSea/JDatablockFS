@@ -745,6 +745,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);
 	}
+	static boolean isInstanceOrSealed(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.class) ||
+		       SealedUtil.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent();
+	}
 	
 	static boolean isUnmanaged(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);

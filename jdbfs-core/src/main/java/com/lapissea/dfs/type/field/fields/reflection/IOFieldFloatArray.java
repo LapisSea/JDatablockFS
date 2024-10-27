@@ -52,6 +52,10 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 		}));
 	}
 	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
+	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		arraySize = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));

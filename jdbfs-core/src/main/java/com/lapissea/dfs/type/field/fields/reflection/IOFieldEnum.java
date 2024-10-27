@@ -51,6 +51,10 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		}
 		createDefaultIfNull = enumUniverse::getFirst;
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.PRIMITIVE_OR_ENUM);
+	}
 	
 	@Override
 	public E get(VarPool<T> ioPool, T instance){

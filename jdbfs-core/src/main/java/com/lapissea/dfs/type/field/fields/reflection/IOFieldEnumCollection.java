@@ -125,6 +125,10 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 			return byteCount(adapter.getSize(col));
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	@SuppressWarnings({"rawtypes"})
 	private static <E extends Enum<E>, C> CollectionAdapter<E, C> makeAdapter(FieldAccessor<?> accessor, Class<? extends CollectionAdapter> adapterType){

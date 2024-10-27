@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -138,8 +139,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return siz;
 			});
 			
-			var nextAccessor = new BasicFieldAccessor<IONode<T>>(null, "next",
-			                                                     List.of(Annotations.makeNullability(IONullability.Mode.NULLABLE))){
+			var nextAccessor = new BasicFieldAccessor<IONode<T>>(null, "next", List.of(
+				Annotations.makeNullability(IONullability.Mode.NULLABLE)
+			)){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					if(genericContext == null) return IONode.class;
@@ -178,6 +180,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			};
 			
 			var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){
+				@Override
+				protected Set<TypeFlag> computeTypeFlags(){
+					return Iters.of(TypeFlag.IO_INSTANCE).nonNulls().toModSet();
+				}
 				@Override
 				public void setReference(IONode<T> instance, Reference newRef){
 					if(newRef.getOffset() != 0) throw new NotImplementedException();

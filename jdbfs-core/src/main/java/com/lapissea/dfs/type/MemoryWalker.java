@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.CommandSet.*;
@@ -281,7 +282,7 @@ public class MemoryWalker{
 						switch(cmd){
 							case REF_FIELD -> {
 								var dynamic    = field.typeFlag(IOField.DYNAMIC_FLAG);
-								var isInstance = field.typeFlag(IOField.IOINSTANCE_FLAG);
+								var isInstance = field.typeFlag(IOField.IO_INSTANCE_FLAG);
 								
 								RefField<T, T> refField = (RefField<T, T>)field;
 								var            ref      = refField.getReference(instance);
@@ -435,7 +436,7 @@ public class MemoryWalker{
 								
 								Class<?> type = accessor.getType();
 								
-								var isInstance = field.typeFlag(IOField.IOINSTANCE_FLAG);
+								var isInstance = field.typeFlag(IOField.IO_INSTANCE_FLAG);
 								
 								{
 									if(type.isArray()){
@@ -537,6 +538,10 @@ public class MemoryWalker{
 	@SuppressWarnings("rawtypes")
 	private <T extends IOInstance<T>> RefField<T, T> getNoIO(T instance, IOInstance.Unmanaged valueInstance, IOField<T, ?> field){
 		return new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
+			@Override
+			protected Set<TypeFlag> computeTypeFlags(){
+				throw NotImplementedException.infer();//TODO: implement .computeTypeFlags()
+			}
 			@Override
 			public void setReference(T inst, Reference newRef) throws IOException{
 				if(inst != instance) throw new IllegalStateException();

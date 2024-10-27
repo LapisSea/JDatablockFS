@@ -58,6 +58,11 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	}
 	
 	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of();
+	}
+	
+	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		

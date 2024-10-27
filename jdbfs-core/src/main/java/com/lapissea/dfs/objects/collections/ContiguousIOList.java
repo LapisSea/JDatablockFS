@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
@@ -244,6 +245,10 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
+		}
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of(TypeFlag.IO_INSTANCE);
 		}
 	}
 	

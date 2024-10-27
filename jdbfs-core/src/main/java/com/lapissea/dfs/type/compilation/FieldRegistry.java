@@ -18,6 +18,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -207,7 +208,7 @@ final class FieldRegistry{
 							     return Optional.empty();
 						     }
 						     var superC = (ParameterizedType)fieldType.getGenericSuperclass();
-						     if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+						     if(!List.of(NullFlagCompanyField.class, IOFieldWrapper.class).contains(Utils.typeToRaw(superC))){
 							     return Optional.empty();
 						     }
 						     var args = superC.getActualTypeArguments();

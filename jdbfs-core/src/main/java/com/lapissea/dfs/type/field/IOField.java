@@ -27,8 +27,10 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -40,6 +42,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -163,11 +166,22 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	private SizeDescriptor<T> descriptor;
 	
-	public static final int DYNAMIC_FLAG           = 1<<0;
-	public static final int IOINSTANCE_FLAG        = 1<<1;
-	public static final int PRIMITIVE_OR_ENUM_FLAG = 1<<2;
-	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
-	public static final int HAS_GENERATED_NAME     = 1<<4;
+	public static final int DYNAMIC_FLAG            = 1<<0;
+	public static final int IO_INSTANCE_FLAG        = 1<<1;
+	public static final int PRIMITIVE_OR_ENUM_FLAG  = 1<<2;
+	public static final int HAS_NO_POINTERS_FLAG    = 1<<3;
+	public static final int HAS_GENERATED_NAME_FLAG = 1<<4;
+	
+	public enum TypeFlag{
+		DYNAMIC(DYNAMIC_FLAG),
+		IO_INSTANCE(IO_INSTANCE_FLAG),
+		PRIMITIVE_OR_ENUM(PRIMITIVE_OR_ENUM_FLAG),
+		HAS_NO_POINTERS(HAS_NO_POINTERS_FLAG),
+		HAS_GENERATED_NAME(HAS_GENERATED_NAME_FLAG);
+		
+		public final int bit;
+		TypeFlag(int flag){ this.bit = flag; }
+	}
 	
 	private int  typeFlags   = -1;
 	private byte needsIOPool = 2;
@@ -196,15 +210,53 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		lateDataInitialized = true;
 	}
 	
+	public final boolean typeFlag(TypeFlag flag){
+		return typeFlag(flag.bit);
+	}
 	public final boolean typeFlag(int flag){
 		return (typeFlags()&flag) == flag;
 	}
 	
 	public final int typeFlags(){
 		var f = typeFlags;
-		if(f == -1) f = typeFlags = FieldSupport.typeFlags(this);
+		if(f == -1) f = typeFlags = typeFlagsCalc();
 		return f;
 	}
+	
+	private int typeFlagsCalc(){
+		var flagsA = EnumSet.noneOf(TypeFlag.class);
+		flagsA.addAll(computeTypeFlags());
+		if(getAccessor() != null && IOFieldTools.isGenerated(this)){
+			flagsA.add(TypeFlag.HAS_GENERATED_NAME);
+		}
+		
+		
+		var fB     = FieldSupport.typeFlags(this);
+		var flagsB = EnumSet.allOf(TypeFlag.class);
+		flagsB.removeIf(t -> !UtilL.checkFlag(fB, t.bit));
+		
+		if(!flagsA.equals(flagsB)){
+			UtilL.sleep(600);
+			synchronized(IOField.class){
+				LogUtil.println("Field:     ", this, this.getGenericType(null));
+				LogUtil.println("Field type:", this.getClass());
+				LogUtil.println("Expected:", flagsB);
+				LogUtil.println("Actual:  ", flagsA);
+				FieldSupport.typeFlags(this);
+				computeTypeFlags();
+				throw new ShouldNeverHappenError();
+			}
+		}
+		
+		int res = 0;
+		for(var flag : flagsA){
+			res |= flag.bit;
+		}
+		return res;
+	}
+	
+	protected abstract Set<TypeFlag> computeTypeFlags();
+	
 	
 	public boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
@@ -224,6 +276,19 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return switch(getNullability()){
 			case NOT_NULL, NULLABLE -> rawGet(ioPool, instance) == null;
 			case DEFAULT_IF_NULL -> false;
+		};
+	}
+	
+	protected final ValueType getNullable(VarPool<T> ioPool, T instance, ValueType defaultValue){
+		var value = rawGet(ioPool, instance);
+		if(value != null) return value;
+		return switch(getNullability()){
+			case NOT_NULL -> throw new FieldIsNull(this);
+			case NULLABLE -> null;
+			case DEFAULT_IF_NULL -> {
+				set(ioPool, instance, defaultValue);
+				yield defaultValue;
+			}
 		};
 	}
 	

@@ -27,6 +27,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -257,6 +258,11 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 		initLateData(FieldSet.of(Iters.from(group).flatMap(IOField::getDependencies)));
 		generators = IOFieldTools.fieldsToGenerators(group);
+	}
+	
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of();
 	}
 	
 	@Override

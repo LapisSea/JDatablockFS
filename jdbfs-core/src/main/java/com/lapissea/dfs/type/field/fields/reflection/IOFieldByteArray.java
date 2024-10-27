@@ -62,6 +62,10 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 			return arr == null? 0 : arr.length;
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	@Override
 	public void init(FieldSet<T> fields){

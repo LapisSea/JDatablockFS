@@ -63,6 +63,10 @@ public final class IOFieldIntArray<T extends IOInstance<T>> extends NullFlagComp
 			return arr.length*(long)nSiz.bytes;
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	private static final int[] DEFAULT_VAL = new int[0];
 	@Override

@@ -22,6 +22,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -109,6 +110,13 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			));
 		}
 		createDefaultIfNull = () -> instancePipe.getType().make();
+	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Iters.of(
+			TypeFlag.IO_INSTANCE,
+			instancePipe.getType().getCanHavePointers()? null : TypeFlag.HAS_NO_POINTERS
+		).nonNulls().toModSet();
 	}
 	
 	@Override

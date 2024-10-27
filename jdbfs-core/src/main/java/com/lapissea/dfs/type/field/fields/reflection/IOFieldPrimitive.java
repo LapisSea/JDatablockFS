@@ -569,6 +569,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			super(field, SizeDescriptor.Fixed.of(BIT, 1));
 		}
 		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of(TypeFlag.PRIMITIVE_OR_ENUM);
+		}
+		
 		public boolean getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getBoolean(ioPool, instance);
 		}
@@ -691,5 +696,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	@Override
 	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
 		return instanceToString(ioPool, instance, settings.doShort());
+	}
+	
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.PRIMITIVE_OR_ENUM);
 	}
 }

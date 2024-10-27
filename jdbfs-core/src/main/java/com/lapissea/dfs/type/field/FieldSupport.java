@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -245,7 +246,7 @@ final class FieldSupport{
 		if(accessor == null) return typeFlags;
 		
 		if(IOFieldTools.isGenerated(field)){
-			typeFlags |= HAS_GENERATED_NAME;
+			typeFlags |= HAS_GENERATED_NAME_FLAG;
 		}
 		
 		var typeGen = accessor.getGenericType(null);
@@ -281,18 +282,26 @@ final class FieldSupport{
 		
 		var rawType = Utils.typeToRaw(typeGen);
 		
-		if(IOInstance.isInstance(rawType)){
-			typeFlags |= IOINSTANCE_FLAG;
+		if(IOInstance.isInstanceOrSealed(rawType)){
+			typeFlags |= IO_INSTANCE_FLAG;
 			
-			if(!isDynamic && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
+			if(!IOFieldTools.isGeneric(accessor) && !(field instanceof RefField) && !Struct.canUnknownHavePointers(rawType)){
 				typeFlags |= HAS_NO_POINTERS_FLAG;
 			}
 		}
 		if(SupportedPrimitive.isAny(rawType) || rawType.isEnum()){
-			typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+			if(SupportedPrimitive.isAny(accessor.getType()) || accessor.getType().isEnum()){
+				typeFlags |= PRIMITIVE_OR_ENUM_FLAG;
+			}else{
+				typeFlags |= HAS_NO_POINTERS_FLAG;
+			}
 		}
 		
 		if(UtilL.instanceOf(rawType, Type.class)){
+			typeFlags |= HAS_NO_POINTERS_FLAG;
+		}
+		
+		if(!(field instanceof RefField) && rawType == String.class || WrapperStructs.isWrapperType(rawType)){
 			typeFlags |= HAS_NO_POINTERS_FLAG;
 		}
 		

@@ -91,6 +91,10 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 			throw new MalformedStruct("DEFAULT_IF_NULL is not supported on dynamic fields!");
 		}
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.DYNAMIC);
+	}
 	
 	@Override
 	public void init(FieldSet<CTyp> fields){

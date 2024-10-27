@@ -181,7 +181,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				fields = generatedFields();
 			}catch(Throwable e){
-				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 			}
 			return instanceToString0(
 				ioPool, instance, settings,
@@ -717,7 +717,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		try{
 			fields = generatedFields();
 		}catch(Throwable e){
-			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 		}
 		return instanceToString0(ioPool, instance, settings, fields);
 	}
@@ -729,7 +729,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return c;
 	}
 	private IterablePP<IOField<T, ?>> generatedFieldsCompute(){
-		var fs = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+		var fs = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 		return generatedFieldsCache = tryOrderFields(fs).bake();
 	}
 	
