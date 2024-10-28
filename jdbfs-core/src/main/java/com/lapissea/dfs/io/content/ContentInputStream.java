@@ -20,11 +20,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			source = first;
 		}
 		
-		@Override
-		public long getOffset(){
-			return -1;
-		}
-		
 		private boolean shouldPop(int val){
 			return val<0 && other != null;
 		}
@@ -102,11 +97,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public long getOffset(){
-			return pos;
-		}
-		
-		@Override
 		public int available(){
 			return ba.length - pos;
 		}
@@ -143,11 +133,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + "{" + bb.position() + "/" + bb.limit() + "}";
-		}
-		
-		@Override
-		public long getOffset(){
-			return bb.position();
 		}
 		
 		@Override
@@ -205,13 +190,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			return in.read();
 		}
 		
-		@Override
-		public long getOffset(){
-			return -1;
-		}
 	}
-	
-	public abstract long getOffset() throws IOException;
 	
 	@Override
 	public ContentInputStream inStream(){

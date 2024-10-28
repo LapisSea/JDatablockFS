@@ -60,9 +60,4 @@ public class RandomInputStream extends ContentInputStream{
 		return this.getClass().getSimpleName() + "{" + TextUtil.toString(io) + '}';
 	}
 	
-	@Override
-	public long getOffset() throws IOException{
-		return io.getPos();
-	}
-	
 }
