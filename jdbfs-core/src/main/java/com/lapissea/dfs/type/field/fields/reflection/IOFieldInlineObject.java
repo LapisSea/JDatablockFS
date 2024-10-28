@@ -64,7 +64,8 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
 				Behaviour.of(IOValue.Reference.class, BehaviourSupport::reference),
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability)
+				Behaviour.<IONullability, T>of(IONullability.class, BehaviourSupport::ioNullability)
+				         .disableIf((field, ann) -> !IOInstance.isManaged(field.getType()) || field.hasAnnotation(IOValue.Reference.class))
 			);
 		}
 	}

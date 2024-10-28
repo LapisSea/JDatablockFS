@@ -55,7 +55,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
+				Behaviour.noop(IONullability.class),
 				Behaviour.of(IOValue.Generic.class, BehaviourSupport::genericID),
 				Behaviour.of(IOValue.Reference.class, BehaviourSupport::referenceCompanion)
 			);

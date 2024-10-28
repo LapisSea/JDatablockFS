@@ -50,6 +50,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -132,6 +133,21 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			public Behaviour<A, T> withDeps(BiFunction<FieldAccessor<T>, A, Set<String>> dependencyNames){
 				return new Behaviour<>(annotationType, generateFields, Optional.of(dependencyNames));
+			}
+			public Behaviour<A, T> disableIf(BiPredicate<FieldAccessor<T>, A> filter){
+				return new Behaviour<>(
+					annotationType,
+					(fieldAccessor, annotation) -> {
+						if(filter.test(fieldAccessor, annotation)) return BehaviourRes.non();
+						return generateFields.apply(fieldAccessor, annotation);
+					},
+					dependencyNames.map(names -> {
+						return (fieldAccessor, annotation) -> {
+							if(filter.test(fieldAccessor, annotation)) return Set.of();
+							return names.apply(fieldAccessor, annotation);
+						};
+					})
+				);
 			}
 			
 			public Optional<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){

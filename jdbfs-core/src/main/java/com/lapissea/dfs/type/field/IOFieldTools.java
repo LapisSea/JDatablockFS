@@ -26,7 +26,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -369,16 +368,6 @@ public final class IOFieldTools{
 		return f.getDeclaringClass().isAnnotationPresent(IOValue.class);
 	}
 	
-	public static boolean canHaveNullAnnotation(AnnotatedType field){
-		var typ = field.getType();
-		if(typ.isPrimitive()) return false;
-		return isGeneric(field) || typ.isArray() || UtilL.instanceOf(typ, Collection.class) ||
-		       Iters.concat(
-			       Iters.of(IOInstance.class, Enum.class, Type.class),
-			       FieldCompiler.getWrapperTypes(),
-			       Iters.from(SupportedPrimitive.values()).map(p -> p.wrapper)
-		       ).anyMatch(c -> UtilL.instanceOf(typ, c));
-	}
 	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
 		var nam = size.name();
 		if(nam.isEmpty()){
