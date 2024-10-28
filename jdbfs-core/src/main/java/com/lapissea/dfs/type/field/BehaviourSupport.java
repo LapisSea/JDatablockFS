@@ -173,7 +173,6 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> collectionLength(FieldAccessor<T> field){
-		if(field.hasAnnotation(IOValue.Reference.class)) return BehaviourRes.non();
 		var type   = field.getType();
 		var isList = type == List.class || type == ArrayList.class;
 		if(!type.isArray() && !isList){
