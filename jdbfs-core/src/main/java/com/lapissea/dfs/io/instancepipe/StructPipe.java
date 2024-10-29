@@ -85,6 +85,10 @@ import static com.lapissea.util.ConsoleColors.RESET;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
+	/**
+	 * This annotation specifies that the defined type contains critical information within the static initializer.<br>
+	 * If a type has this annotation, it is going to be loaded and initialized before a pipe for it is created.
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
 	public @interface Special{ }
@@ -363,23 +367,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected void postValidate(){
-		if(TYPE_VALIDATION){
-			var type = getType();
-			if(type instanceof Struct.Unmanaged) return;
-			if(!type.canHaveDefaultConstructor()) return;
-			T inst;
+		if(TYPE_VALIDATION) doPostValidate();
+	}
+	private void doPostValidate(){
+		var type = getType();
+		if(type instanceof Struct.Unmanaged) return;
+		if(!type.canHaveDefaultConstructor()) return;
+		T inst;
+		try{
+			inst = type.make();
+		}catch(Throwable e){
+			inst = null;
+		}
+		if(inst != null){
 			try{
-				inst = type.make();
-			}catch(Throwable e){
-				inst = null;
-			}
-			if(inst != null){
-				try{
-					checkTypeIntegrity(inst, true);
-				}catch(FieldIsNull|InvalidGenericArgument ignored){
-				}catch(IOException e){
-					throw new RuntimeException(Log.fmt("Failed to check integrity of: {}#red", type.cleanFullName()), e);
-				}
+				checkTypeIntegrity(inst, true);
+			}catch(FieldIsNull|InvalidGenericArgument ignored){
+			}catch(IOException e){
+				throw new RuntimeException(Log.fmt("Failed to check integrity of: {}#red", type.cleanFullName()), e);
 			}
 		}
 	}
@@ -1175,11 +1180,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
+		var bytes  = getSizeDescriptor().calcUnknown(makeIOPool(), man, inst, WordSpace.BYTE);
+		var secret = new RawRandom().nextLong();
+		
 		T instRead;
 		try{
-			var ch = AllocateTicket.withData(this, man, inst).submit(man);
-			write(ch, inst);
+			var ch = AllocateTicket.bytes(bytes + 8).submit(man);
+			try(var io = ch.io()){
+				write(man, io, inst);
+				io.writeInt8(secret);
+			}
 			instRead = readNew(ch, null);
+			try(var io = ch.io()){
+				skip(man, io, null);
+				var readSecret = io.readInt8();
+				if(readSecret != secret){
+					throw new IOException("Failed to correctly skip");
+				}
+			}
 		}catch(IOException e){
 			throw new MalformedObject("Failed object IO " + getType(), e);
 		}
