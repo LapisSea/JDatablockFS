@@ -81,6 +81,6 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		src.skipExact(getFixedDescriptor().get());
+		src.skipExact(getFixedDescriptor().get(WordSpace.BYTE));
 	}
 }
