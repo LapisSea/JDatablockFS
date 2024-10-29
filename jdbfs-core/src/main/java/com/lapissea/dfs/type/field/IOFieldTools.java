@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.InternalDataOrder;
@@ -221,6 +222,17 @@ public final class IOFieldTools{
 		return acc;
 	}
 	
+	public static boolean isNullable(GetAnnotation holder){
+		return isNullable(new AnnotatedType(){
+			@Override
+			public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+				var ann = holder.get(IONullability.class);
+				return ann == null? Map.of() : Map.of(IONullability.class, ann);
+			}
+			@Override
+			public Type getGenericType(GenericContext genericContext){ return null; }
+		});
+	}
 	public static boolean isNullable(AnnotatedType holder){
 		return getNullability(holder) == NULLABLE;
 	}

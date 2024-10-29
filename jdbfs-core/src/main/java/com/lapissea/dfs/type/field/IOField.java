@@ -47,7 +47,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -60,10 +62,24 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
+			
+			private final BiPredicate<Type, GetAnnotation> extraFilter;
+			
 			@SuppressWarnings("rawtypes")
 			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this(type, fieldTypes, (type0, annotations) -> true);
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, Predicate<GetAnnotation> annotationFilter){
+				this(type, fieldTypes, (type0, annotations) -> annotationFilter.test(annotations));
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, BiPredicate<Type, GetAnnotation> extraFilter){
 				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
+				this.extraFilter = Objects.requireNonNull(extraFilter);
 			}
 			
 			public final Class<Typ> getType(){
@@ -72,7 +88,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			@Override
 			public final boolean isCompatible(Type type, GetAnnotation annotations){
-				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
+				return UtilL.instanceOf(Utils.typeToRaw(type), getType()) && extraFilter.test(type, annotations);
 			}
 			@Override
 			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);

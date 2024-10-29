@@ -39,6 +39,7 @@ import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -364,6 +365,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return readValue();
 	}
 	
+	@Nullable
 	RandomIO getValueDataIO() throws IOException{
 		var io = selfIO();
 		try{
@@ -399,9 +401,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private T readValue() throws IOException{
-		var io = getValueDataIO();
-		if(io == null) return null;
-		try(io){
+		try(var io = getValueDataIO()){
+			if(io == null) return null;
 			if(io.remaining() == 0){
 				return null;
 			}
