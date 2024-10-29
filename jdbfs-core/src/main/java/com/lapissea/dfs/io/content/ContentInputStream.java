@@ -84,11 +84,13 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		@Override
 		public long readWord(int len) throws IOException{
-			int rem = available();
-			if(rem<len) throw new EOFException();
-			var val = WordIO.getWord(ba, pos, len);
-			pos += len;
-			return val;
+			try{
+				var val = WordIO.getWord(ba, pos, len);
+				pos += len;
+				return val;
+			}catch(IndexOutOfBoundsException err){
+				throw new EOFException();
+			}
 		}
 		
 		@Override

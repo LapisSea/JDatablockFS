@@ -13,10 +13,8 @@ import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.nio.CharBuffer;
-import java.nio.charset.CharsetDecoder;
+import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -30,7 +28,7 @@ import static java.nio.charset.CodingErrorAction.REPORT;
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-enum Encoding{
+public enum Encoding{
 	BASE_16_UPPER(new TableCoding(
 		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 		'A', 'B', 'C', 'D', 'E', 'F'
@@ -71,21 +69,21 @@ enum Encoding{
 	}
 	
 	private static final class UTF8Coding implements Coding{
-		private static final CharsetDecoder DECODER = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
 		@Override
 		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
-			char[] buff      = new char[Math.min(1024, charCount)];
-			int    remaining = charCount;
+			var buff      = new char[Math.min(1024, charCount)];
+			int remaining = charCount;
 			
-			try(Reader reader = new InputStreamReader(src, DECODER)){
-				while(remaining>0){
-					int read = reader.read(buff, 0, Math.min(buff.length, remaining));
-					if(read == -1) throw new EOFException();
-					dest.append(buff, 0, read);
-					remaining -= read;
-				}
+			var decoder = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
+			var reader  = Channels.newReader(Channels.newChannel(src), decoder, (int)(buff.length*1.1));
+			while(remaining>0){
+				int read = reader.read(buff, 0, Math.min(buff.length, remaining));
+				if(read == -1) throw new EOFException();
+				dest.append(buff, 0, read);
+				remaining -= read;
 			}
 		}
+		
 		@Override
 		public void write(ContentWriter dest, String str) throws IOException{
 			var en = UTF_8.newEncoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
