@@ -4,6 +4,7 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
@@ -13,6 +14,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -20,6 +22,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
@@ -27,8 +32,8 @@ import java.util.random.RandomGenerator;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 8, time = 500, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 40, time = 300, timeUnit = TimeUnit.MILLISECONDS)
-@Fork(10)
+@Measurement(iterations = 20, time = 300, timeUnit = TimeUnit.MILLISECONDS)
+@Fork(15)
 public class EncodingBenchmark{
 	
 	public static void main(String[] args) throws RunnerException{
@@ -47,6 +52,10 @@ public class EncodingBenchmark{
 //		}
 	}
 	
+	public enum DataType{
+		RANDOM, STABLE
+	}
+	
 	public enum EncodingVal{
 		ALL(Encoding.values()),
 		BASE_16_UPPER(Encoding.BASE_16_UPPER),
@@ -58,64 +67,111 @@ public class EncodingBenchmark{
 		LATIN1(Encoding.LATIN1),
 		UTF8(Encoding.UTF8);
 		
-		final Encoding[] values;
-		EncodingVal(Encoding... values){ this.values = values; }
+		final Encoding[]                values;
+		final EnumMap<Encoding, String> stable;
+		
+		EncodingVal(Encoding... values){
+			this.values = values;
+			var stableRandom = new RawRandom(Arrays.hashCode(values));
+			stable = new EnumMap<Encoding, String>(Iters.from(values).toMap(e -> e, enc -> genStr(stableRandom, enc)));
+		}
 	}
 	
-	private List<Encoding> encodings;
-	private List<String>   testStrings;
-	private int[]          byteSizes;
-	private List<byte[]>   encodedData;
+	record CodingInfo(Encoding encoding, String text, int byteSize, byte[] encoded){ }
+	
+	private List<CodingInfo> infos;
 	
 	private final RandomGenerator random = new RawRandom();
+	
+	@Param("STABLE")
+	private DataType dataType;
 	
 	@Param
 	private EncodingVal encoding;
 	
+	private boolean doShuffle = true;
+	private Thread  shufler;
+	
+	@Setup
+	public void start(){
+		if(dataType == DataType.RANDOM){
+			LogUtil.println("RANDOMIZING DATA");
+			shufler = Thread.ofPlatform().name("shufler").daemon(true).start(() -> {
+				try{
+					while(doShuffle){
+						Thread.sleep(10);
+						if(doShuffle) generateInfos();
+					}
+				}catch(InterruptedException ignored){ }finally{
+					LogUtil.println("NOT RANDOMIZING DATA");
+				}
+			});
+		}
+	}
+	
+	@TearDown
+	public void end(){
+		doShuffle = false;
+		if(shufler != null) shufler.interrupt();
+		shufler = null;
+	}
+	
 	@Setup(Level.Iteration)
 	public void setup(){
-		encodings = List.of(encoding.values);
-		
-		testStrings = Iters.from(encodings).toList(e -> e.format.randomString(random, 50, 50));
-		byteSizes = Iters.zip(encodings, testStrings).mapToInt(e -> e.getKey().calcSize(e.getValue())).toArray();
-		encodedData = Iters.zip(encodings, testStrings).map(e -> {
+		generateInfos();
+	}
+	
+	private void generateInfos(){
+		infos = Iters.of(encoding.values).toList(coding -> {
+			var text = switch(dataType){
+				case RANDOM -> genStr(random, coding);
+				case STABLE -> encoding.stable.get(coding);
+			};
+			
 			var dest = new ContentOutputBuilder();
 			try{
-				e.getKey().write(dest, e.getValue());
-			}catch(IOException ex){
-				throw new RuntimeException(ex);
-			}
-			return dest.toByteArray();
-		}).toList();
+				coding.write(dest, text);
+			}catch(IOException ex){ throw new UncheckedIOException(ex); }
+			
+			return new CodingInfo(coding, text, coding.calcSize(text), dest.toByteArray());
+		});
+	}
+	
+	private static String genStr(RandomGenerator random, Encoding coding){
+		return coding.format.randomString(random, 50, 50);
+	}
+	
+	private CodingInfo randomInfo(){
+		var infos = this.infos;
+		return infos.get(random.nextInt(infos.size()));
 	}
 	
 	@Benchmark
-	public ContentOutputBuilder encode() throws IOException{
-		var i = random.nextInt(testStrings.size());
+	public byte[] write() throws IOException{
+		var info = randomInfo();
 		
-		var testString = testStrings.get(i);
-		var encoding   = encodings.get(i);
-		
-		var dest = new ContentOutputBuilder(byteSizes[i]);
-		encoding.write(dest, testString);
-		return dest;
+		var dest = new ContentOutputBuilder(info.byteSize);
+		info.encoding.write(dest, info.text);
+		return dest.toByteArray();
 	}
 	
 	@Benchmark
-	public StringBuilder decode() throws IOException{
-		var i = random.nextInt(testStrings.size());
+	public String read() throws IOException{
+		var info = randomInfo();
+
+//		var buff = CharBuffer.allocate(info.text.length());
+//		info.encoding.read(new ContentInputStream.BA(info.encoded), buff);
+//		return buff.flip().toString();
 		
-		var chars    = testStrings.get(i).length();
-		var encoding = encodings.get(i);
-		
-		var dest = new StringBuilder(chars);
-		encoding.read(new ContentInputStream.BA(encodedData.get(i)), chars, dest);
-		return dest;
+		var chars = info.text.length();
+		var dest  = new StringBuilder(chars);
+		info.encoding.read(new ContentInputStream.BA(info.encoded), chars, dest);
+		return dest.toString();
 	}
 	
 	@Benchmark
 	public Encoding findBest(){
-		String testString = testStrings.get(random.nextInt(testStrings.size()));
-		return Encoding.findBest(testString);
+		var info = randomInfo();
+		return Encoding.findBest(info.text);
 	}
 }
