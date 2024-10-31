@@ -23,6 +23,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.CharBuffer;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
@@ -31,7 +32,7 @@ import java.util.random.RandomGenerator;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Warmup(iterations = 8, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations = 6, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 20, time = 300, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(15)
 public class EncodingBenchmark{
@@ -158,15 +159,15 @@ public class EncodingBenchmark{
 	@Benchmark
 	public String read() throws IOException{
 		var info = randomInfo();
-
-//		var buff = CharBuffer.allocate(info.text.length());
-//		info.encoding.read(new ContentInputStream.BA(info.encoded), buff);
-//		return buff.flip().toString();
 		
-		var chars = info.text.length();
-		var dest  = new StringBuilder(chars);
-		info.encoding.read(new ContentInputStream.BA(info.encoded), chars, dest);
-		return dest.toString();
+		var buff = CharBuffer.allocate(info.text.length());
+		info.encoding.read(new ContentInputStream.BA(info.encoded), buff);
+		return buff.flip().toString();
+
+//		var chars = info.text.length();
+//		var dest  = new StringBuilder(chars);
+//		info.encoding.read(new ContentInputStream.BA(info.encoded), chars, dest);
+//		return dest.toString();
 	}
 	
 	@Benchmark

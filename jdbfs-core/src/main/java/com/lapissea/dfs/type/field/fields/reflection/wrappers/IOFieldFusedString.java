@@ -25,6 +25,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.StringifySettings;
 
 import java.io.IOException;
+import java.nio.CharBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -165,9 +166,9 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 		int      cc    = charCountField.getValue(ioPool, instance);
 		var      bytes = bytesField.getValue(ioPool, instance);
 		
-		var sb = new StringBuilder(cc);
-		enc.read(new LimitedContentReader(src, bytes), cc, sb);
-		var data = sb.toString();
+		var buff = CharBuffer.allocate(cc);
+		enc.read(new LimitedContentReader(src, bytes), buff);
+		var data = buff.flip().toString();
 		
 		set(ioPool, instance, data);
 	}

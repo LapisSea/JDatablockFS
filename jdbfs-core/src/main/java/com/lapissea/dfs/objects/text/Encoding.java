@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.text;
 
 import com.lapissea.dfs.exceptions.IllegalBitValue;
+import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -60,7 +61,7 @@ public enum Encoding{
 	UTF8(new UTF8Coding());
 	
 	sealed interface Coding{
-		void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException;
+		void read(ContentInputStream src, CharBuffer dest) throws IOException;
 		void write(ContentWriter dest, String str) throws IOException;
 		boolean canEncode(String str);
 		int calcSize(String str);
@@ -70,16 +71,15 @@ public enum Encoding{
 	
 	private static final class UTF8Coding implements Coding{
 		@Override
-		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
-			var buff      = new char[Math.min(1024, charCount)];
+		public void read(ContentInputStream src, CharBuffer dest) throws IOException{
+			int charCount = dest.remaining();
 			int remaining = charCount;
 			
 			var decoder = UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT);
-			var reader  = Channels.newReader(Channels.newChannel(src), decoder, (int)(buff.length*1.1));
+			var reader  = Channels.newReader(Channels.newChannel(src), decoder, (int)(Math.min(1024, charCount)*1.1));
 			while(remaining>0){
-				int read = reader.read(buff, 0, Math.min(buff.length, remaining));
+				int read = reader.read(dest);
 				if(read == -1) throw new EOFException();
-				dest.append(buff, 0, read);
 				remaining -= read;
 			}
 		}
@@ -119,17 +119,15 @@ public enum Encoding{
 	
 	private static final class Latin1Coding implements Coding{
 		@Override
-		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
-			var data = src.readInts1(charCount);
-			dest.append(new CharSequence(){
-				@Override
-				public int length(){ return data.length; }
-				@Override
-				public char charAt(int index){ return (char)Byte.toUnsignedInt(data[index]); }
-				@Override
-				public CharSequence subSequence(int start, int end){ throw new UnsupportedOperationException(); }
-			});
+		public void read(ContentInputStream src, CharBuffer dest) throws IOException{
+			int charCount = dest.remaining();
+			var buff      = src.readInts1(charCount);
+			
+			for(byte b : buff){
+				dest.put((char)Byte.toUnsignedInt(b));
+			}
 		}
+		
 		@Override
 		public void write(ContentWriter dest, String str) throws IOException{
 			dest.write(str.getBytes(ISO_8859_1));
@@ -162,10 +160,12 @@ public enum Encoding{
 			public String toString(){ return from + "-" + to; }
 		}
 		
+		private static final int blockCharCount = 8;
+		
 		private final byte[] indexTable;
 		private final char[] chars, ranges;
 		private final int offset, bits;
-		private final int blockCharCount, blockBytes;
+		private final int blockBytes;
 		
 		private final BitSet validPoints;
 		
@@ -189,14 +189,14 @@ public enum Encoding{
 			var ranges = buildRanges(table);
 			
 			int blockCharCount = calcOptimizedBlockCount(bits);
-			int blockBytes     = blockCharCount*bits/Byte.SIZE;
+			assert blockCharCount == TableCoding.blockCharCount;
+			int blockBytes = blockCharCount*bits/Byte.SIZE;
 			
 			this.indexTable = indexTable;
 			this.offset = offset;
 			this.chars = table.clone();
 			this.bits = bits;
 			this.ranges = Iters.from(ranges).flatMapToInt(r -> Iters.ofInts(r.from, r.to)).toCharArray();
-			this.blockCharCount = blockCharCount;
 			this.blockBytes = blockBytes;
 			
 			validPoints = new BitSet();
@@ -217,7 +217,7 @@ public enum Encoding{
 			int optimizedBlockFillRepeats = 1;
 			while(true){
 				var newOptimizedBlockCount = optimizedBlockCount*(optimizedBlockFillRepeats + 1);
-				if(newOptimizedBlockCount*bits>Long.SIZE) break;
+				if(newOptimizedBlockCount>8 || newOptimizedBlockCount*bits>Long.SIZE) break;
 				optimizedBlockFillRepeats++;
 			}
 			optimizedBlockCount *= optimizedBlockFillRepeats;
@@ -363,21 +363,17 @@ public enum Encoding{
 			}
 		}
 		
+		private static final int ARR_OFF = MyUnsafe.UNSAFE.arrayBaseOffset(char[].class);
+		
 		@Override
-		public void read(ContentInputStream w, int charCount, StringBuilder sb) throws IOException{
-			int i = 0;
+		public void read(ContentInputStream src, CharBuffer dest) throws IOException{
+			int charCount = dest.remaining();
+			int i         = 0;
 			if(charCount>=blockCharCount){
-				var mask = makeMask(bits);
-				
-				char[] dest = new char[blockCharCount];
-				
-				while(charCount - i>=blockCharCount){
-					var acum = w.readWord(blockBytes);
-					for(int j = 0; j<blockCharCount; j++){
-						dest[j] = decode((int)((acum>>(bits*j))&mask));
-					}
-					sb.append(dest);
-					i += blockCharCount;
+				if(dest.hasArray()){
+					i = readBlocksDirect(src, dest, charCount);
+				}else{
+					i = readBlocks(src, dest, charCount);
 				}
 			}
 			
@@ -387,14 +383,14 @@ public enum Encoding{
 			var remainingBits = remainingChars*bits;
 			if(remainingBits<64){
 				var  bytes = bitsToBytes(remainingBits);
-				long data  = w.readWord(bytes);
+				long data  = src.readWord(bytes);
 				
 				var buf  = new char[remainingChars];
-				var mask = makeMask(bits);
+				var mask = chars.length - 1;
 				for(var j = 0; j<remainingChars; j++){
-					buf[j] = decode((int)((data>>(bits*j))&mask));
+					buf[j] = chars[(int)((data>>(bits*j))&mask)];
 				}
-				sb.append(buf);
+				dest.put(buf);
 				
 				var ones = bytes*Byte.SIZE - remainingBits;
 				if(ones>0){
@@ -406,14 +402,60 @@ public enum Encoding{
 				return;
 			}
 			
-			try(var stream = new BitInputStream(w, remainingBits)){
+			try(var stream = new BitInputStream(src, remainingBits)){
 				var buf = new char[Math.min(remainingChars, 32)];
 				for(var j = 0; j<remainingChars; j++){
-					buf[j] = decode((int)stream.readBits(bits));
+					buf[j] = chars[(int)stream.readBits(bits)];
 				}
-				sb.append(buf);
+				dest.put(buf);
 			}
 		}
+		private int readBlocks(ContentInputStream src, CharBuffer dest, int charCount) throws IOException{
+			var mask = chars.length - 1;
+			
+			var buf = new char[blockCharCount];
+			
+			var blockCount = charCount/blockCharCount;
+			
+			for(int j = 0; j<blockCount; j++){
+				var acum = src.readWord(blockBytes);
+				
+				for(int inner = 0; inner<blockCharCount; inner++){
+					var idx = (acum>>(bits*inner))&mask;
+					var c   = MyUnsafe.UNSAFE.getChar(chars, ARR_OFF + (idx<<1));
+					buf[inner] = c;
+				}
+				
+				dest.put(buf);
+			}
+			
+			return blockCount*blockCharCount;
+		}
+		private int readBlocksDirect(ContentInputStream src, CharBuffer dest, int charCount) throws IOException{
+			var mask = chars.length - 1;
+			
+			var arr = dest.array();
+			var off = ARR_OFF + ((long)(dest.position() + dest.arrayOffset())<<1);
+			
+			var blockCount = charCount/blockCharCount;
+			
+			for(int j = 0; j<blockCount; j++){
+				var acum = src.readWord(blockBytes);
+				
+				for(int inner = 0; inner<blockCharCount; inner++){
+					var idx = (acum>>(bits*inner))&mask;
+					var c   = MyUnsafe.UNSAFE.getChar(chars, ARR_OFF + (idx<<1));
+					MyUnsafe.UNSAFE.putChar(arr, off + inner*2L, c);
+				}
+				
+				off += blockCharCount*2;
+			}
+			
+			var i = blockCount*blockCharCount;
+			dest.position(dest.position() + i);
+			return i;
+		}
+		
 		@Override
 		public boolean canEncode(String s){
 			for(int ci = 0, l = s.length(); ci<l; ci++){
@@ -490,7 +532,7 @@ public enum Encoding{
 	public void write(ContentWriter dest, String str) throws IOException{
 		format.write(dest, str);
 	}
-	public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
-		format.read(src, charCount, dest);
+	public void read(ContentInputStream src, CharBuffer dest) throws IOException{
+		format.read(src, dest);
 	}
 }
