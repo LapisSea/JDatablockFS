@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
@@ -29,6 +30,8 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import org.assertj.core.api.AssertionsForClassTypes;
+import org.assertj.core.api.OptionalAssert;
 import org.testng.ITestResult;
 
 import java.io.IOException;
@@ -196,21 +199,26 @@ public final class TestUtils{
 	}
 	
 	
-	public interface Task{
-		void run(RandomGenerator r, long iter);
+	public interface Task<E extends Exception>{
+		void run(RandomGenerator r, long iter) throws E;
 	}
 	
-	public static void randomBatch(int totalTasks, int batch, Task task){
+	public static <E extends Exception> void randomBatch(int totalTasks, Task<E> task){
 		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
-		randomBatch(name, totalTasks, batch, task);
+		randomBatch(name, totalTasks, 1, task);
 	}
 	
-	public static void randomBatch(String name, int totalTasks, int batch, Task task){
+	public static <E extends Exception> void randomBatch(int totalTasks, int sequenceLength, Task<E> task){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
+		randomBatch(name, totalTasks, sequenceLength, task);
+	}
+	
+	public static <E extends Exception> void randomBatch(String name, int totalTasks, int sequenceLength, Task<E> task){
 		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
 		), FuzzingRunner::noopAction);
 		
-		fuz.runAndAssert(new FuzzConfig().withName(name), 69, totalTasks, batch);
+		fuz.runAndAssert(new FuzzConfig().withName(name), name.hashCode(), totalTasks, sequenceLength);
 	}
 	
 	
@@ -313,5 +321,9 @@ public final class TestUtils{
 		var mem = LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
 		mem.write(true, new byte[MagicID.size()]);
 		return mem;
+	}
+	
+	public static <VALUE> OptionalAssert<VALUE> assertThat(OptionalPP<VALUE> actual){
+		return AssertionsForClassTypes.assertThat(actual.opt());
 	}
 }
