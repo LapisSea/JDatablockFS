@@ -19,7 +19,6 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LateInit;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -40,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 
@@ -50,7 +50,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 final class FieldRegistry{
 	
-	private static final LateInit.Safe<List<FieldUsage>> USAGES = Runner.async(new Supplier<>(){
+	private static final CompletableFuture<List<FieldUsage>> USAGES = Runner.async(new Supplier<>(){
 		@Override
 		public List<FieldUsage> get(){
 			Log.trace("{#yellowBrightDiscovering IOFields#}");
@@ -58,15 +58,15 @@ final class FieldRegistry{
 			var log = Log.TRACE && !ConfigUtils.configBoolean(FieldRegistry.class.getName() + "#printed", false);
 			if(log) System.setProperty(FieldRegistry.class.getName() + "#printed", "true");
 			
-			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
+			var tasks = new ConcurrentLinkedDeque<CompletableFuture<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
 			var lines = log? new ConcurrentLinkedDeque<String>() : null;
 			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
 			while(!tasks.isEmpty()){
 				var any = tasks.removeIf(c -> {
-					if(!c.isInitialized()) return false;
-					c.get().ifPresent(
+					if(!c.isDone()) return false;
+					c.join().ifPresent(
 						e -> scanned.put(e.getKey(), e.getValue())
 					);
 					return true;
@@ -90,7 +90,7 @@ final class FieldRegistry{
 			if(lines != null) lines.add(Log.fmt(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
+		private static void scan(Class<?> type, Deque<CompletableFuture<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
 			if(type.getSimpleName().contains("NoIO")){
 				log("Ignoring \"NoIO\" {#blackBright{}~#}", type, lines);
 				return;
@@ -99,7 +99,7 @@ final class FieldRegistry{
 				var usage = getFieldUsage(type);
 				if(usage.isPresent()){
 					log("Sealed {#blackBright{}~#} has usage, ignoring children", type, lines);
-					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
+					tasks.add(CompletableFuture.completedFuture(usage));
 					return;
 				}
 				log("Scanning sealed {#blackBright{}~#} children", type, lines);
@@ -174,7 +174,7 @@ final class FieldRegistry{
 		}
 	});
 	
-	private static List<FieldUsage> getData(){ return USAGES.isInitialized() || !Log.TRACE? USAGES.get() : getDataLogged(); }
+	private static List<FieldUsage> getData(){ return USAGES.isDone() || !Log.TRACE? USAGES.join() : getDataLogged(); }
 	
 	private static Map<Class<?>, Set<FieldUsage>> getProducers(){
 		class Cache{
@@ -228,7 +228,7 @@ final class FieldRegistry{
 	private static List<FieldUsage> getDataLogged(){
 		Log.trace("Waiting for FieldRegistry...");
 		var start = System.nanoTime();
-		var data  = USAGES.get();
+		var data  = USAGES.join();
 		var end   = System.nanoTime();
 		Log.trace("Waited {}ms for FieldRegistry", (end - start)/1000_000D);
 		return data;
@@ -273,30 +273,37 @@ final class FieldRegistry{
 			throw fail(type.getTypeName());
 		}
 		var res = compatible.create(field);
-		if(DEBUG_VALIDATION){
-			var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
-			var makedUnsafe = res.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
-			if(usesUnsafe != makedUnsafe){
-				throw new ShouldNeverHappenError(res.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
-			}
-			
-			var typs = compatible.listFieldTypes();
-			if(!typs.contains(res.getClass())){
-				throw new RuntimeException(
-					"Type " + res.getClass().getName() + "\nAllowed:\n" +
-					Iters.from(typs).joinAsStr("\n", Class::getName)
-				);
-			}
-			
-			var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
-			if(allCompatible.size()>1){
-				throw new RuntimeException(
-					"Ambiguous usage picking\n" +
-					allCompatible.joinAsStr("\n", u -> "\t" + u.getClass().getName())
-				);
-			}
-		}
+		if(DEBUG_VALIDATION) checkField(field, compatible, res);
 		return res;
+	}
+	
+	private static <T extends IOInstance<T>> void checkField(FieldAccessor<T> field, FieldUsage usedUsage, IOField<T, ?> toCheck){
+		
+		var usesUnsafe  = field.hasAnnotation(IOUnsafeValue.class);
+		var makedUnsafe = toCheck.getClass().isAnnotationPresent(IOUnsafeValue.Mark.class);
+		if(usesUnsafe != makedUnsafe){
+			throw new ShouldNeverHappenError(toCheck.getClass().getTypeName() + " has IOUnsafeValue but the type is not marked as such");
+		}
+		
+		var types = usedUsage.listFieldTypes();
+		if(!types.contains(toCheck.getClass())){
+			throw new RuntimeException(
+				"The IOField type is not listed within the FieldUsage field types!\n" +
+				"Field type:   " + toCheck.getClass().getName() + "\n" +
+				"Listed types: " + Iters.from(types).joinAsStr(Class::getName)
+			);
+		}
+		
+		var ann  = GetAnnotation.from(field);
+		var type = field.getGenericType(null);
+		
+		var allCompatible = Iters.from(getData()).filter(usage -> usage.isCompatible(type, ann)).asCollection();
+		if(allCompatible.size()>1){
+			throw new RuntimeException(
+				"Ambiguous usage picking\n" +
+				allCompatible.joinAsStr("\n", u -> "\t" + u.getClass().getName())
+			);
+		}
 	}
 	
 	private static final Set<Class<? extends Annotation>> CONSUMABLE_ANNOTATIONS

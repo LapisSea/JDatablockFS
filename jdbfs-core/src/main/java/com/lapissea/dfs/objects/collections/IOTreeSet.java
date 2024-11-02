@@ -141,7 +141,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	);
 	
 	public IOTreeSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
-		super(provider, identity, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.of(Object.class)));
+		super(provider, identity, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.TypeRaw.OBJ));
 		
 		if(isSelfDataEmpty()){
 			allocateNulls();

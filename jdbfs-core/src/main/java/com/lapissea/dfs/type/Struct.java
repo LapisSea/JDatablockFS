@@ -5,14 +5,19 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.CompileStructTools.MakeStruct;
+import com.lapissea.dfs.type.compilation.BuilderProxyCompiler;
 import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -40,6 +45,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +56,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.CompileStructTools.compile;
 import static com.lapissea.dfs.type.CompileStructTools.getCached;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -170,9 +177,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		@Override
 		public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+			IterablePP<IOField<T, ?>> fields;
+			try{
+				fields = generatedFields();
+			}catch(Throwable e){
+				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+			}
 			return instanceToString0(
 				ioPool, instance, settings,
-				Iters.concat(generatedFields(), instance.listUnmanagedFields())
+				Iters.concat(fields, instance.listUnmanagedFields())
 			);
 		}
 		
@@ -338,12 +351,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private boolean[] hasPools;
 	
 	private boolean canHavePointers;
+	private boolean needsBuilderObj;
 	private byte    invalidInitialNulls = -1;
 	
 	private NewObj.Instance<T> emptyConstructor;
 	private int                emptyConstructorCounter;
 	
 	private Map<FieldSet<T>, Struct<T>> partialCache;
+	
+	private Struct<ProxyBuilder<T>> builderObjType;
 	
 	private int hash = -1;
 	
@@ -364,7 +380,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			setInitState(STATE_CONCRETE_TYPE);
 			
 			fields = FieldCompiler.compile(this);
+			needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
+			
 			setInitState(STATE_FIELD_MAKE);
+			
 			for(var field : fields){
 				try{
 					field.init(fields);
@@ -373,7 +392,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					throw new RuntimeException("Failed to init " + field, e);
 				}
 			}
+			
 			setInitState(STATE_INIT_FIELDS);
+			
 			poolObjectsSize = calcPoolObjectsSize();
 			poolPrimitivesSize = calcPoolPrimitivesSize();
 			hasPools = calcHasPools();
@@ -567,7 +588,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private FieldSet<T> calcCloneFields(){
 		return FieldSet.of(getFields().filtered(f -> {
-			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
+			if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO) || f.getType() == ChunkPointer.class) return false;
 			var acc = f.getAccessor();
 			if(acc != null){
 				var typ = acc.getType();
@@ -602,7 +623,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			          .orElse(true);
 		}
 		var s = ofUnknown(instanceClass, STATE_DONE);
-		return s.canHavePointers;
+		return s.getCanHavePointers();
 	}
 	
 	@Override
@@ -642,19 +663,30 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return new ToStrType.Default<>();
 	}
 	private IterablePP<IOField<T, ?>> tryOrderFields(IterablePP<IOField<T, ?>> generatedFields){
-		var order = getType().getAnnotation(IOInstance.Order.class);
-		if(order != null){
+		return IOFieldTools.tryGetOrImplyOrder(this).<IterablePP<IOField<T, ?>>>map(order -> {
 			var names = order.value();
 			if(Iters.from(names).hasDuplicates()){
 				throw new IllegalArgumentException("Duplicate order names present");
 			}
 			var fs = FieldSet.of(generatedFields);
 			if(fs.size() != names.length){
-				throw new IllegalArgumentException("All fields in order should be defined!");
+				throw new IllegalArgumentException(Log.fmt(
+					"""
+						All fields in order should be defined for {}#red!
+							Fields: {}#yellow
+							Order:  {}#red""",
+					getType().getName(),
+					Iters.concat(
+						fs.mapped(IOField::getName).sortedBy(s -> {
+							var i = Arrays.asList(names).indexOf(s);
+							return i == -1? Integer.MAX_VALUE : i;
+						})
+					),
+					names
+				));
 			}
-			generatedFields = Iters.from(names).map(fs::requireByName);
-		}
-		return generatedFields;
+			return Iters.from(names).map(fs::requireByName);
+		}).orElse(generatedFields);
 	}
 	
 	public String instanceToString(T instance, boolean doShort){
@@ -681,7 +713,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return instanceToString(allocVirtualVarPool(IO), instance, settings);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		return instanceToString0(ioPool, instance, settings, generatedFields());
+		IterablePP<IOField<T, ?>> fields;
+		try{
+			fields = generatedFields();
+		}catch(Throwable e){
+			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+		}
+		return instanceToString0(ioPool, instance, settings, fields);
 	}
 	
 	private IterablePP<IOField<T, ?>> generatedFieldsCache;
@@ -810,18 +848,28 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private NewObj.Instance<T> findEmptyConstructor(boolean optimized){
 		if(getType().isAnnotationPresent(NoDefaultConstructor.class)){
-			throw new UnsupportedOperationException("NoDefaultConstructor is present");
+			throw new UnsupportedOperationException("NoDefaultConstructor is present for: " + this);
 		}
 		if(this instanceof Struct.Unmanaged){
-			throw new UnsupportedOperationException("Unmanaged instances can not have default constructor");
+			throw new UnsupportedOperationException("Unmanaged instances can not have default constructor: " + this);
 		}
 		if(NEW_OBJ_INST_ARGS == null) NEW_OBJ_INST_ARGS = Access.getArgs(NewObj.Instance.class);
-		NewObj.Instance<T> ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		
+		NewObj.Instance<T> ctor;
+		try{
+			ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		}catch(MissingConstructor e){
+			if(needsBuilderObj()){
+				throw new UnsupportedOperationException("Final field types may not have a default constructor: " + this, e);
+			}
+			throw e;
+		}
 		Objects.requireNonNull(ctor);
 		return emptyConstructor = ctor;
 	}
 	public boolean canHaveDefaultConstructor(){
-		return !(this instanceof Struct.Unmanaged) &&
+		return !needsBuilderObj() &&
+		       !(this instanceof Struct.Unmanaged) &&
 		       !getType().isAnnotationPresent(NoDefaultConstructor.class);
 	}
 	
@@ -835,17 +883,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return invalidInitialNulls = 0;
 		}
 		
-		waitForStateDone();
+		waitForState(STATE_INIT_FIELDS);
 		
-		boolean inv = false;
-		if(fields.unpackedStream().anyMatch(f -> f.getNullability() == NOT_NULL)){
-			var obj  = make();
-			var pool = allocVirtualVarPool(IO);
-			inv = fields.unpackedStream()
-			            .filter(f -> f.getNullability() == NOT_NULL)
-			            .anyMatch(f -> f.isNull(pool, obj));
-		}
-		return invalidInitialNulls = (byte)(inv? 1 : 0);
+		var nonNullables = fields.unpackedStream().filter(IOField::isNonNullable);
+		if(nonNullables.isEmpty()) return invalidInitialNulls = 0;
+		var obj          = make();
+		var pool         = allocVirtualVarPool(IO);
+		var invalidNulls = nonNullables.filter(f -> f.isNull(pool, obj));
+		invalidNulls.filter(IOField::isReadOnly).joinAsOptionalStr(", ").ifPresent(errFields -> {
+			throw new MalformedStruct("fmt", "The following fields from {}#red are not allowed to be null: {}#red", this, errFields);
+		});
+		return invalidInitialNulls = (byte)(invalidNulls.hasAny()? 1 : 0);
 	}
 	
 	@Nullable
@@ -891,6 +939,31 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public boolean isDefinition(){
 		waitForState(STATE_CONCRETE_TYPE);
 		return isDefinition;
+	}
+	
+	public boolean needsBuilderObj(){
+		waitForState(STATE_FIELD_MAKE);
+		return needsBuilderObj;
+	}
+	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
+		var typ = builderObjType;
+		if(typ == null) typ = createBuilderObjType(now);
+		return typ;
+	}
+	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
+		if(!needsBuilderObj()) throw new UnsupportedOperationException();
+		var cls = BuilderProxyCompiler.getProxy(this);
+		var typ = now? Struct.of(cls, STATE_DONE) : Struct.of(cls);
+		
+		if(DEBUG_VALIDATION){
+			var cf1 = getCloneFields();
+			var cf2 = typ.getCloneFields();
+			if(Iters.zip(cf1, cf2).anyMatch(e -> !e.getKey().getName().equals(e.getValue().getName()))){
+				throw new MalformedStruct("Clone fields do not match for proxy!\n" + cf1 + "\n" + cf2);
+			}
+		}
+		
+		return builderObjType = typ;
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

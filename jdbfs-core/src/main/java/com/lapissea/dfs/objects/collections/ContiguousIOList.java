@@ -200,6 +200,8 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				throw new RuntimeException(e);
 			}
 		}
+		@Override
+		public boolean isReadOnly(){ return false; }
 	}
 	
 	private static class UnmanagedField<T extends IOInstance.Unmanaged<T>> extends RefField.NoIO<ContiguousIOList<T>, T>{

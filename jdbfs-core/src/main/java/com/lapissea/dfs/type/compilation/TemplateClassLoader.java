@@ -6,20 +6,18 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOTypeDB;
 import com.lapissea.dfs.type.InternalDataOrder;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.TypeDef;
-import com.lapissea.dfs.type.field.Annotations;
-import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.type.field.access.AnnotatedType;
+import com.lapissea.dfs.type.def.FieldDef;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
 
@@ -66,7 +64,7 @@ public final class TemplateClassLoader extends ClassLoader{
 					
 					if(!name.startsWith("java.")) try{
 						var builtIn = db.getDefinitionFromClassName(name);
-						if(builtIn.map(stored -> !new TypeDef(c2).equals(stored)).orElse(false)){
+						if(builtIn.map(stored -> !TypeDef.of(c2).equals(stored)).orElse(false)){
 							c1 = null;//Discard mismatching built in class
 						}
 					}catch(IOException e){
@@ -90,18 +88,28 @@ public final class TemplateClassLoader extends ClassLoader{
 	@Override
 	protected Class<?> findClass(String className) throws ClassNotFoundException{
 		TypeDef def = getDef(className);
-		if(def.isUnmanaged()){
-			throw new UnsupportedOperationException(className + " is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
+		
+		switch(def){
+			case TypeDef.DEnum ignore -> { }
+			case TypeDef.DInstance ignore -> { }
+			case TypeDef.DJustInterface ignore -> { }
+			case TypeDef.DUnknown ignore -> {
+				throw new UnsupportedOperationException(
+					"Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() +
+					" or Enum or just an interface"
+				);
+			}
+			case TypeDef.DUnmanaged ignore -> {
+				throw new UnsupportedOperationException(
+					className + " is unmanaged! All unmanaged types must be present! " +
+					"Unmanaged types may contain mechanism not understood by the base IO engine."
+				);
+			}
 		}
 		
-		if(!def.isIoInstance() && !def.isEnum() && !def.isJustInterface()){
-			throw new UnsupportedOperationException("Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() + " or Enum or just an interface");
-		}
-		
-		var classData = CLASS_DATA_CACHE.get(new TypeNamed(className, def));
+		var typ       = new TypeNamed(className, def);
+		var classData = CLASS_DATA_CACHE.get(typ);
 		if(classData == null){
-			var typ = new TypeNamed(className, def.clone());
-			
 			var hash = hashCode();
 			ConfigDefs.CompLogLevel.JUST_START.log("Generating template: {} - {}", className, (Supplier<String>)() -> {
 				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN);
@@ -132,25 +140,24 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private byte[] jorthGenerate(TypeNamed classType){
-		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
+		if(PRINT_GENERATING_INFO) logGenerateInfo(classType);
 		
 		var log = JorthLogger.make();
 		try{
 			var bytecode = Jorth.generateClass(this, classType.name, writer -> {
-				for(var typeArg : classType.def.getTypeArgs()){
+				for(var typeArg : classType.def.getRelations().typeArgs){
 					var type = typeArg.bound().generic(db);
 					writer.write("type-arg {!} {}", typeArg.name(), type);
 				}
 				
-				if(classType.def.isIoInstance()){
-					generateIOInstance(classType, writer);
-				}else if(classType.def.isEnum()){
-					generateEnum(classType, writer);
-				}else if(classType.def.isJustInterface()){
-					generateJustAnInterface(classType, writer);
-				}else{
-					throw new NotImplementedException(classType.name);
+				switch(classType.def){
+					case TypeDef.DEnum def -> generateEnum(classType.name, def, writer);
+					case TypeDef.DInstance def -> generateIOInstance(classType.name, def, writer);
+					case TypeDef.DJustInterface def -> generateJustAnInterface(classType.name, def, writer);
+					case TypeDef.DUnknown ignore -> throw new UnsupportedOperationException("Can not generate unkown type");
+					case TypeDef.DUnmanaged ignore -> throw new UnsupportedOperationException("Can not generate unmanaged type");
 				}
+				
 			}, log == null? null : log::log);
 			if(log != null) Log.log(log.output());
 			ClassGenerationCommons.dumpClassName(classType.name, bytecode);
@@ -161,17 +168,23 @@ public final class TemplateClassLoader extends ClassLoader{
 		}
 	}
 	
-	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorth{
+	private static void logGenerateInfo(TypeNamed classType){
+		Struct typ = Struct.ofUnknown(classType.def.getClass());
+		var    str = typ.instanceToString((IOInstance<?>)classType.def, StringifySettings.DEFAULT);
+		LogUtil.println("generating", "\n" + classType.name + ": " + str);
+	}
+	
+	private void generateEnum(String name, TypeDef.DEnum def, CodeStream writer) throws MalformedJorth{
 		writer.write(
 			"""
-				public enum {!} start
+				public enum {!0} start
+					template-for #e in {1} start
+						enum #e
+					end
+				end
 				""",
-			classType.name
+			name, def.enumConstants
 		);
-		for(var constant : classType.def.getEnumConstants()){
-			writer.write("enum {!}", constant.getName());
-		}
-		writer.wEnd();
 	}
 	
 	private static void stringsAnnotation(CodeStream code, Class<? extends Annotation> type, Collection<String> values) throws MalformedJorth{
@@ -185,14 +198,14 @@ public final class TemplateClassLoader extends ClassLoader{
 		);
 	}
 	
-	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
-		writer.addImportAs(classType.name, "genClassName");
+	private void generateIOInstance(String name, TypeDef.DInstance def, CodeStream writer) throws MalformedJorth{
+		writer.addImportAs(name, "genClassName");
 		
-		writePermits(classType, writer);
+		writePermits(def, writer);
 		
 		boolean extend = true;
 		
-		var parent = classType.def.getSealedParent();
+		var parent = def.getRelations().sealedParent;
 		if(parent != null){
 			ensureLoadedSealParent(parent.name());
 			switch(parent.type()){
@@ -204,10 +217,10 @@ public final class TemplateClassLoader extends ClassLoader{
 			}
 		}
 		
-		var fields = classType.def.getFields();
+		var fields = def.fields;
 		
 		if(!fields.isEmpty()){
-			var order = classType.def.getFieldOrder().mapToObj(fields::get).toList(TypeDef.FieldDef::getName);
+			var order = Iters.from(def.fieldOrder).map(fields::get).toList(FieldDef::getName);
 			//noinspection deprecation
 			stringsAnnotation(writer, InternalDataOrder.class, order);
 		}
@@ -216,7 +229,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		writer.addImport(Struct.class);
 		writer.write("public class #genClassName start");
-		if(extend && !classType.def.isSealed()){
+		if(extend && !def.isSealed()){
 			writer.write(
 				"""
 					private static final field $STRUCT #Struct
@@ -241,37 +254,38 @@ public final class TemplateClassLoader extends ClassLoader{
 		for(var field : fields){
 			writer.write("@{}", IOValue.class);
 			
-			if(IOFieldTools.canHaveNullAnnotation(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(Annotations.make(IOValue.Generic.class)) : List.of(),
-				field.getType().getTypeClass(db)
-			))){
-				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());
-			}
-			if(field.isDynamic()){
-				writer.write("@{}", IOValue.Generic.class);
-			}
-			if(field.isUnsigned()){
-				writer.write("@{}", IOValue.Unsigned.class);
-			}
-			if(field.isUnsafe()){
-				writer.write("@{}", IOUnsafeValue.class);
-			}
-			if(field.getReferenceType() != null){
-				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());
-			}
-			if(!field.getDependencies().isEmpty()){
-				stringsAnnotation(writer, IODependency.class, field.getDependencies());
+			for(var annO : field.annotations){
+				switch(annO){
+					case FieldDef.IOAnnotation.AnDependencies ann -> {
+						stringsAnnotation(writer, IODependency.class, ann.names());
+					}
+					case FieldDef.IOAnnotation.AnGeneric ignore -> {
+						writer.write("@{}", IOValue.Generic.class);
+					}
+					case FieldDef.IOAnnotation.AnNullability ann -> {
+						writer.write("@{} start value {!} end", IONullability.class, ann.mode);
+					}
+					case FieldDef.IOAnnotation.AnReferenceType ann -> {
+						writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, ann.type);
+					}
+					case FieldDef.IOAnnotation.AnUnsafe ignore -> {
+						writer.write("@{}", IOUnsafeValue.class);
+					}
+					case FieldDef.IOAnnotation.AnUnsigned ignore -> {
+						writer.write("@{}", IOValue.Unsigned.class);
+					}
+				}
 			}
 			
-			writer.write("private field {!} {}", field.getName(), field.getType().generic(db));
+			writer.write("private field {!} {}", field.name, field.type.generic(db));
 		}
 		writer.wEnd();
 	}
 	
-	private void generateJustAnInterface(TypeNamed classType, CodeStream writer) throws MalformedJorth{
-		writePermits(classType, writer);
+	private void generateJustAnInterface(String name, TypeDef.DJustInterface def, CodeStream writer) throws MalformedJorth{
+		writePermits(def, writer);
 		
-		var parent = classType.def.getSealedParent();
+		var parent = def.relations.sealedParent;
 		if(parent != null){
 			ensureLoadedSealParent(parent.name());
 			switch(parent.type()){
@@ -281,7 +295,7 @@ public final class TemplateClassLoader extends ClassLoader{
 				case JUST_INTERFACE -> writer.write("implements {!}", parent.name());
 			}
 		}
-		writer.write("public interface {!} start end", classType.name);
+		writer.write("public interface {!} start end", name);
 	}
 	
 	private void ensureLoadedSealParent(String pName){
@@ -292,11 +306,9 @@ public final class TemplateClassLoader extends ClassLoader{
 		}
 	}
 	
-	private static void writePermits(TypeNamed classType, CodeStream writer) throws MalformedJorth{
-		if(classType.def.isSealed()){
-			for(var subclass : classType.def.getPermittedSubclasses()){
-				writer.write("permits {!}", subclass);
-			}
+	private static void writePermits(TypeDef def, CodeStream writer) throws MalformedJorth{
+		for(var subclass : def.getRelations().permittedSubclasses){
+			writer.write("permits {!}", subclass);
 		}
 	}
 	

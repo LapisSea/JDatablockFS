@@ -8,9 +8,25 @@
 /httpRequests/
 
 saveactions_settings.xml
-/dictionaries/
 jarRepositories.xml
 JPAMappingSettings.xml
-uiDesigner.xml
 git_toolbox_prj.xml
 /copyright/
+
+misc.xml
+compiler.xml
+**/workspace.xml
+**/tasks.xml
+**/usage.statistics.xml
+**/dictionaries
+**/shelf
+**/contentModel.xml
+
+# Sensitive or high-churn files
+**/dataSources/
+**/dataSources.ids
+**/dataSources.local.xml
+**/sqlDataSources.xml
+**/dynamic.xml
+**/uiDesigner.xml
+**/dbnavigator.xml

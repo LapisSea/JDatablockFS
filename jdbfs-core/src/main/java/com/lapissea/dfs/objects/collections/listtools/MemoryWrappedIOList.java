@@ -5,7 +5,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -64,7 +63,7 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-		if(typeConstructor == null) throw new UnsupportedEncodingException();
+		if(typeConstructor == null) throw new UnsupportedOperationException();
 		T t = typeConstructor.get();
 		if(initializer != null){
 			initializer.accept(t);
@@ -75,7 +74,7 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
-		if(typeConstructor == null) throw new UnsupportedEncodingException();
+		if(typeConstructor == null) throw new UnsupportedOperationException();
 		if(data instanceof ArrayList<T> l) l.ensureCapacity(Math.toIntExact(l.size() + count));
 		for(long i = 0; i<count; i++){
 			addNew(initializer);

@@ -377,6 +377,9 @@ public final class Iters{
 			public IntIterator iterator(){ return new IterableIntPP.SingleIter(element); }
 		};
 	}
+	public static IterableIntPP ofInts(char... data){
+		return range(0, data.length).map(i -> data[i]);
+	}
 	public static IterableIntPP ofInts(int... data){
 		return switch(data.length){
 			case 0 -> IterableIntPP.empty();
@@ -405,9 +408,16 @@ public final class Iters{
 			}
 		};
 	}
+	public static IterableIntPP rangeInclusive(int start, int end){
+		return range(start, end + 1, 1);
+	}
 	public static IterableIntPP range(int start, int endExclusive){
+		return range(start, endExclusive, 1);
+	}
+	public static IterableIntPP range(int start, int endExclusive, int step){
 		if(start == endExclusive) return IterableIntPP.empty();
 		if(endExclusive<start) throw new IllegalArgumentException("endExclusive<start");
+		if(step<=0) throw new IllegalArgumentException("Step must be greater than 0");
 		return new IterableIntPP.SizedPP.Default<>(){
 			@Override
 			public OptionalInt getSize(){
@@ -424,7 +434,9 @@ public final class Iters{
 					@Override
 					public int nextInt(){
 						if(!hasNext()) throw new NoSuchElementException();
-						return i++;
+						var li = i;
+						i = li + step;
+						return li;
 					}
 				};
 			}
@@ -452,7 +464,13 @@ public final class Iters{
 	public static <T> IterablePP.SizedPP<T> from(Optional<T> element)  { return element.isEmpty()? of() : new SingleIterable<>(element.get()); }
 	public static <T> IterablePP.SizedPP<T> from(Collection<T> data)   { return new CollectionIterable<>(data); }
 	public static <T> IterablePP.SizedPP<T> from(T[] data)             { return data.length == 0? of() : new ArrayIterable<>(data); }
-	public static <T> IterablePP<T> from(Iterable<T> data)             { return data instanceof Collection<T> c? new CollectionIterable<>(c) : data::iterator; }
+	public static <T> IterablePP<T> from(Iterable<T> data){
+		return switch(data){
+			case Collection<T> col -> new CollectionIterable<>(col);
+			case IterablePP<T> iter -> iter;
+			default -> data::iterator;
+		};
+	}
 	@Deprecated
 	public static <T> IterablePP<T> from(IterablePP<T> data){ return data; }
 	

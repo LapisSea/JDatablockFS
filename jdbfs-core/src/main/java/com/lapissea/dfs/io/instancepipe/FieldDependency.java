@@ -22,8 +22,12 @@ public class FieldDependency<T extends IOInstance<T>>{
 		boolean fullRead,
 		FieldSet<T> writeFields,
 		FieldSet<T> readFields,
-		List<IOField.ValueGeneratorInfo<T, ?>> generators
-	){ }
+		List<IOField.ValueGeneratorInfo<T, ?>> generators,
+		int hash
+	){
+		@Override
+		public int hashCode(){ return hash; }
+	}
 	
 	
 	private Map<IOField<T, ?>, Ticket<T>> singleDependencyCache = Map.of();
@@ -35,7 +39,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		this.allFields = allFields;
 	}
 	
-	public Ticket<T> getDeps(Set<String> names){
+	public Ticket<T> getDeps(Iterable<String> names){
 		return getDeps(FieldSet.of(Iters.from(names).map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
@@ -54,7 +58,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		return field;
 	}
 	private Ticket<T> emptyTicket(){
-		return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
+		return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of(), -1);
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
@@ -76,7 +80,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		}
 		selectedFields.forEach(this::checkExistenceOfField);
 		if(selectedFields.size() == allFields.size()){
-			return new Ticket<>(true, true, allFields, allFields, collectGenerators(allFields));
+			return new Ticket<>(true, true, allFields, allFields, collectGenerators(allFields), allFields.hashCode());
 		}
 		var writeFields = new ArrayList<IOField<T, ?>>();
 		var readFields  = new ArrayList<IOField<T, ?>>();
@@ -186,7 +190,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		var w = fieldSetToOrderedList(allFields, writeFields);
 		var r = fieldSetToOrderedList(allFields, readFields);
 		var g = collectGenerators(writeFields);
-		return new Ticket<>(w.equals(allFields), r.equals(allFields), w, r, g);
+		return new Ticket<>(w.equals(allFields), r.equals(allFields), w, r, g, w.hashCode()^r.hashCode());
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){

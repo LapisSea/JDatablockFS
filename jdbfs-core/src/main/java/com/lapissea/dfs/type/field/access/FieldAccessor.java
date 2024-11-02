@@ -52,4 +52,6 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedT
 	default boolean canBeNull(){
 		return true;
 	}
+	
+	boolean isReadOnly();
 }

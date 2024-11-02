@@ -61,10 +61,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		Struct<BucketEntry<Object, Object>>     STRUCT = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
 		StructPipe<BucketEntry<Object, Object>> PIPE   = StandardStructPipe.of(STRUCT);
 		
-		static <K, V> BucketEntry<K, V> of(){
-			return (BucketEntry<K, V>)STRUCT.make();
-		}
-		
 		static <K, V> BucketEntry<K, V> of(K key, V value){
 			//noinspection rawtypes
 			class Cache{
@@ -417,16 +413,15 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private record KeyResult<K>(K key, boolean hasValue){ }
 	private static <K, V> KeyResult<K> readKey(IONode<BucketEntry<K, V>> n) throws IOException{
-		if(keyVar == null){
-			//noinspection unchecked
-			keyVar = Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
-			               .getFields()
-			               .requireByName("key");
-		}
+		if(keyVar == null) initKey();
 		
-		var be = BucketEntry.<K, V>of();
-		if(!n.readValueField(be, keyVar)) return new KeyResult<>(null, false);
-		return new KeyResult<>(be.key(), true);
+		var res = n.readValueField(keyVar);
+		if(res.empty()) return new KeyResult<>(null, false);
+		var v = res.val();
+		return new KeyResult<>(v.key(), true);
+	}
+	private static void initKey(){
+		keyVar = BucketEntry.STRUCT.getFields().requireByName("key");
 	}
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{

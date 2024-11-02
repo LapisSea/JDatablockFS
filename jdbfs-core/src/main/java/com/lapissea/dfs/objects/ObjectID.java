@@ -16,9 +16,8 @@ public sealed interface ObjectID{
 	@IOInstance.StrFormat.Custom("@id")
 	final class SID extends IOInstance.Managed<SID> implements ObjectID{
 		
-		private String id;
+		private final String id;
 		
-		public SID(){ }
 		public SID(String id){
 			this.id = Objects.requireNonNull(id);
 		}
@@ -29,9 +28,8 @@ public sealed interface ObjectID{
 	final class LID extends IOInstance.Managed<LID> implements ObjectID{
 		
 		@IODependency.VirtualNumSize
-		private long id;
+		private final long id;
 		
-		public LID(){ }
 		public LID(long id){
 			this.id = id;
 		}
@@ -41,9 +39,8 @@ public sealed interface ObjectID{
 	@IOInstance.StrFormat.Custom("@id")
 	final class BID extends IOInstance.Managed<BID> implements ObjectID{
 		
-		private byte id;
+		private final byte id;
 		
-		public BID(){ }
 		public BID(byte id){
 			this.id = id;
 		}

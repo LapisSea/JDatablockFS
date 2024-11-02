@@ -20,11 +20,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			source = first;
 		}
 		
-		@Override
-		public long getOffset(){
-			return -1;
-		}
-		
 		private boolean shouldPop(int val){
 			return val<0 && other != null;
 		}
@@ -89,21 +84,18 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		@Override
 		public long readWord(int len) throws IOException{
-			int rem = available();
-			if(rem<len) throw new EOFException();
-			var val = WordIO.getWord(ba, pos, len);
-			pos += len;
-			return val;
+			try{
+				var val = WordIO.getWord(ba, pos, len);
+				pos += len;
+				return val;
+			}catch(IndexOutOfBoundsException err){
+				throw new EOFException();
+			}
 		}
 		
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + "{" + pos + "/" + ba.length + "}";
-		}
-		
-		@Override
-		public long getOffset(){
-			return pos;
 		}
 		
 		@Override
@@ -143,11 +135,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + "{" + bb.position() + "/" + bb.limit() + "}";
-		}
-		
-		@Override
-		public long getOffset(){
-			return bb.position();
 		}
 		
 		@Override
@@ -205,13 +192,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			return in.read();
 		}
 		
-		@Override
-		public long getOffset(){
-			return -1;
-		}
 	}
-	
-	public abstract long getOffset() throws IOException;
 	
 	@Override
 	public ContentInputStream inStream(){

@@ -39,6 +39,7 @@ import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -120,6 +121,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 						throw new RuntimeException(e);
 					}
 				}
+				@Override
+				public boolean isReadOnly(){ return false; }
 			};
 			
 			SizeDescriptor<IONode<T>> valDesc = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
@@ -171,6 +174,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 						throw new RuntimeException(e);
 					}
 				}
+				@Override
+				public boolean isReadOnly(){ return false; }
 			};
 			
 			var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){
@@ -191,7 +196,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
-					return next.isNull()? new Reference() : next.makeReference();
+					return next.isNull()? Reference.NULL : next.makeReference();
 				}
 				@Override
 				public StructPipe<IONode<T>> getReferencedPipe(IONode<T> instance){
@@ -360,6 +365,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return readValue();
 	}
 	
+	@Nullable
 	RandomIO getValueDataIO() throws IOException{
 		var io = selfIO();
 		try{
@@ -395,9 +401,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private T readValue() throws IOException{
-		var io = getValueDataIO();
-		if(io == null) return null;
-		try(io){
+		try(var io = getValueDataIO()){
+			if(io == null) return null;
 			if(io.remaining() == 0){
 				return null;
 			}
@@ -641,42 +646,46 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return new LinkedValueIterator<>(this);
 	}
 	
-	@SuppressWarnings({"rawtypes", "unchecked"})
-	public boolean readValueField(T dest, IOField<?, ?> field) throws IOException{
-		if(DEBUG_VALIDATION) validateField(dest, field);
-		if(!hasValue()) return false;
-		return readValueSelective(dest, ((ValueStorage.InstanceBased)valueStorage).depTicket(field));
+	public record ValResult<T>(boolean empty, T val){
+		public static final ValResult<?> EMPTY = new ValResult<>(true, null);
 	}
-	
-	public T readValueSelective(FieldDependency.Ticket<?> depTicket, boolean strictHolder) throws IOException{
-		if(!hasValue()) return null;
-		var based = (ValueStorage.InstanceBased)valueStorage;
-		try(var io = selfIO()){
-			io.skipExact(valueStart());
-			return (T)based.readNewSelective(io, depTicket, strictHolder);
-		}
+	public static <T> ValResult<T> emptyValResult(){
+		//noinspection unchecked
+		return (ValResult<T>)ValResult.EMPTY;
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public boolean readValueSelective(T dest, FieldDependency.Ticket<?> depTicket) throws IOException{
-		if(!hasValue()) return false;
-		var based = (ValueStorage.InstanceBased)valueStorage;
-		try(var io = selfIO()){
-			io.skipExact(valueStart());
-			based.readSelective(io, (IOInstance)dest, depTicket);
-		}
-		return true;
+	public ValResult<T> readValueField(IOField<?, ?> field) throws IOException{
+		return (ValResult<T>)readValueSelective(((ValueStorage.InstanceBased)valueStorage).depTicket(field));
 	}
 	
-	private void validateField(T dest, IOField<?, ?> field){
-		var struct = field.getAccessor().getDeclaringStruct();
-		if(!UtilL.instanceOf(dest.getClass(), struct.getType())){
-			throw new ClassCastException(dest.getClass() + " is not compatible with " + field);
-		}
-		if(!(valueStorage instanceof ValueStorage.InstanceBased)){
-			throw new UnsupportedOperationException("Node with type of " + valueStorage.getType().getType() + " is not a valid instance");
+	public <TI extends IOInstance<TI>> ValResult<TI> readValueSelective(FieldDependency.Ticket<TI> depTicket, boolean strictHolder) throws IOException{
+		if(!hasValue()) return emptyValResult();
+		
+		//noinspection unchecked
+		var based = (ValueStorage.InstanceBased<TI>)valueStorage;
+		try(var io = selfIO()){
+			io.skipExact(valueStart());
+			var       res = based.readNewSelective(io, depTicket, strictHolder);
+			Class<TI> typ = based.getType().getType();
+			typ.cast(res);
+			return new ValResult<>(false, res);
 		}
 	}
+	
+	public <TI extends IOInstance<TI>> ValResult<TI> readValueSelective(FieldDependency.Ticket<TI> depTicket) throws IOException{
+		if(!hasValue()) return emptyValResult();
+		//noinspection unchecked
+		var based = (ValueStorage.InstanceBased<TI>)valueStorage;
+		try(var io = selfIO()){
+			io.skipExact(valueStart());
+			var       res = based.readNewSelective(io, depTicket, false);
+			Class<TI> typ = based.getType().getType();
+			typ.cast(res);
+			return new ValResult<>(false, res);
+		}
+	}
+	
 	@Override
 	public OptionalInt tryGetSize(){
 		boolean next;

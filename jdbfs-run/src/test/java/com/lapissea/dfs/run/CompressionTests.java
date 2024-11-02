@@ -1,6 +1,5 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -16,7 +15,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 
 import static com.lapissea.dfs.run.TestUtils.randomBatch;
-import static org.testng.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class CompressionTests{
 	
@@ -27,7 +26,7 @@ public class CompressionTests{
 	
 	@Test(dataProvider = "comps")
 	void directIntegrity(IOCompression.Type type){
-		randomBatch(500, 100, (r, iter) -> {
+		randomBatch(500, (r, iter) -> {
 			try{
 				byte[] raw;
 				if(iter == 0){
@@ -52,7 +51,7 @@ public class CompressionTests{
 				byte[] compressed   = type.pack(raw);
 				byte[] uncompressed = type.unpack(compressed);
 				
-				assertEquals(uncompressed, raw, "Failed on " + iter);
+				assertThat(uncompressed).as(() -> "Equality on iteration " + iter).containsExactly(raw);
 			}catch(AssertionError e){
 				throw e;
 			}catch(Throwable e){
@@ -95,13 +94,7 @@ public class CompressionTests{
 				struct.getFields().requireExact(byte[].class, "data")
 				      .set(null, instance, bytes);
 				
-				var data = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
-				var ch   = AllocateTicket.bytes(120).submit(data);
-				
-				pipe.write(ch, instance);
-				var read = pipe.readNew(ch, null);
-				
-				assertEquals(instance, read);
+				TestUtils.checkPipeInOutEquality(pipe, instance);
 			}
 		), FuzzingRunner::noopAction);
 		

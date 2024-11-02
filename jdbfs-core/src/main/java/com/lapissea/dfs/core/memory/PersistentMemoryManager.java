@@ -60,9 +60,10 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		public ChunkChainIO get(int index){ return data[index]; }
 		private ChunkChainIO pop(){
 			var d   = data;
-			var s   = --size;
+			var s   = size - 1;
 			var old = d[s];
 			d[s] = null;
+			size = s;
 			return old;
 		}
 		

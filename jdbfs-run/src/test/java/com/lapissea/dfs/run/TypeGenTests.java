@@ -3,15 +3,16 @@ package com.lapissea.dfs.run;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class TypeGenTests{
 	
 	interface DefaultImplType extends IOInstance.Def<DefaultImplType>{
+		@IONullability(IONullability.Mode.NULLABLE)
 		IOList<Integer> list();
 	}
 	
@@ -26,9 +27,8 @@ public class TypeGenTests{
 	
 	@Test
 	void overrideType(){
-		var type = DefaultImplType.class;
-		assertTrue(IOList.class.isAnnotationPresent(IOValue.OverrideType.DefaultImpl.class));
-		var struct = Struct.of(type, Struct.STATE_DONE);
+		assertThat(IOList.class).hasAnnotation(IOValue.OverrideType.DefaultImpl.class);
+		var struct = Struct.of(DefaultImplType.class, Struct.STATE_DONE);
 		struct.emptyConstructor().make();
 	}
 	
@@ -41,17 +41,17 @@ public class TypeGenTests{
 			var a = 69;
 			var b = 420;
 			simpleInstance.setNum(a);
-			assertEquals(simpleInstance.getNum(), a);
+			assertThat(simpleInstance).extracting("num").isEqualTo(a);
 			simpleInstance.setNum(b);
-			assertEquals(simpleInstance.getNum(), b);
+			assertThat(simpleInstance).extracting("num").isEqualTo(b);
 		}
 		{
 			var a = "Hello object";
 			var b = Double.valueOf(420.69);
 			simpleInstance.setDyn(a);
-			assertEquals(simpleInstance.getDyn(), a);
+			assertThat(simpleInstance).extracting("dyn").isEqualTo(a);
 			simpleInstance.setDyn(b);
-			assertEquals(simpleInstance.getDyn(), b);
+			assertThat(simpleInstance).extracting("dyn").isEqualTo(b);
 		}
 	}
 	

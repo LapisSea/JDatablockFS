@@ -11,7 +11,6 @@ import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -26,6 +25,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.nio.CharBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -41,7 +41,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			super(STRUCT, true);
 		}
 		
-		private static final EnumUniverse<CharEncoding> CHAR_ENCODING_UNIVERSE = EnumUniverse.of(CharEncoding.class);
+		private static final EnumUniverse<Encoding> CHAR_ENCODING_UNIVERSE = EnumUniverse.of(Encoding.class);
 		
 		static{
 			if(CHAR_ENCODING_UNIVERSE.bitSize != 3) throw new AssertionError();
@@ -160,20 +160,20 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){ return sizeDescriptor; }
 	};
 	
-	private String       data;
-	private byte[]       dataSrc;
+	private String   data;
+	private byte[]   dataSrc;
 	@IOValue
-	private CharEncoding encoding;
+	private Encoding encoding;
 	@IOValue
 	@IOValue.Unsigned
 	@IODependency.VirtualNumSize(name = "numSize")
-	private int          charCount;
+	private int      charCount;
 	
 	
 	public AutoText(){
 		super(STRUCT);
 		data = "";
-		encoding = CharEncoding.DEFAULT;
+		encoding = Encoding.DEFAULT;
 		charCount = 0;
 	}
 	
@@ -184,7 +184,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	public void setData(@NotNull String newData){
 		Objects.requireNonNull(newData);
 		
-		encoding = CharEncoding.findBest(newData);
+		encoding = Encoding.findBest(newData);
 		charCount = newData.length();
 		data = newData;
 		dataSrc = null;
@@ -196,7 +196,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		dataSrc = null;
 	}
 	@IOValue
-	private void setEncoding(CharEncoding encoding){
+	private void setEncoding(Encoding encoding){
 		this.encoding = encoding;
 		dataSrc = null;
 	}
@@ -213,25 +213,17 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	
 	private byte[] generateBytes() throws IOException{
 		byte[] buff = new byte[encoding.calcSize(data)];
-		writeTextBytes(new ContentOutputStream.BA(buff));
+		encoding.write(new ContentOutputStream.BA(buff), data);
 		return buff;
 	}
 	
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
 		dataSrc = bytes;
-		StringBuilder sb = new StringBuilder(charCount);
-		readTextBytes(new ContentInputStream.BA(bytes), sb);
-		data = sb.toString();
+		var buff = CharBuffer.allocate(charCount);
+		encoding.read(new ContentInputStream.BA(bytes), buff);
+		data = buff.flip().toString();
 	}
-	
-	public void writeTextBytes(ContentWriter dest) throws IOException{
-		encoding.write(dest, data);
-	}
-	public void readTextBytes(ContentInputStream src, StringBuilder dest) throws IOException{
-		encoding.read(src, charCount, dest);
-	}
-	
 	
 	@NotNull
 	@Override

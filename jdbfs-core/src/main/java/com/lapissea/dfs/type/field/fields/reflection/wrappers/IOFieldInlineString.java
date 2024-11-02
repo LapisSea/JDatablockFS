@@ -9,6 +9,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -25,7 +26,9 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
-		public Usage(){ super(String.class, Set.of(IOFieldInlineString.class)); }
+		public Usage(){
+			super(String.class, Set.of(IOFieldInlineString.class), IOFieldTools::isNullable);
+		}
 		@Override
 		public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field){
 			return new IOFieldInlineString<>(field);
@@ -47,12 +50,12 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends Nu
 			nullable()? 0 : desc.getMin(),
 			desc.getMax(),
 			(ioPool, prov, inst) -> {
-				var val = getWrapped(ioPool, inst);
+				var val = get(ioPool, inst);
 				if(val == null){
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
-				return AutoText.PIPE.calcUnknownSize(prov, val, desc.getWordSpace());
+				return AutoText.PIPE.calcUnknownSize(prov, new AutoText(val), desc.getWordSpace());
 			}
 		));
 	}

@@ -15,6 +15,8 @@ import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.objects.collections.LinkedIOList;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.compilation.TemplateClassLoader;
+import com.lapissea.dfs.type.def.FieldDef;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -154,15 +156,15 @@ public sealed interface IOTypeDB{
 			private void recordType(IOType type){
 				for(var typeRaw : type.collectRaws(this)){
 					if(!defs.containsKey(typeRaw.getName())){
-						var def = new TypeDef(type.getTypeClass(this));
-						if(!def.isUnmanaged()){
+						var def = TypeDef.of(type.getTypeClass(this));
+						if(!isUnmng(def)){
 							defs.putIfAbsent(typeRaw.getName(), def);
 						}else{
 							defs.put(typeRaw.getName(), null);
 						}
 						
-						for(TypeDef.FieldDef field : def.getFields()){
-							recordType(field.getType());
+						for(FieldDef field : def.getFields()){
+							recordType(field.type);
 						}
 					}
 				}
@@ -294,7 +296,7 @@ public sealed interface IOTypeDB{
 				private final Map<Class<T>, Integer> cl2id;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
 					this.cl2id = Map.copyOf(cl2id);
-					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max().orElse(0);
+					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max(0);
 					id2cl = new Class[maxId];
 					this.cl2id.forEach((t, i) -> id2cl[i] = t);
 				}
@@ -304,9 +306,9 @@ public sealed interface IOTypeDB{
 			
 			private Fixed(Map<String, TypeDef> defs, Map<Integer, IOType> idToTyp, Map<Class<?>, Basic.MemUniverse<?>> sealedMultiverse){
 				this.defs = new HashMap<>(defs);
-				var maxID = Iters.keys(idToTyp).mapToInt().max().orElse(0);
+				var maxID = Iters.keys(idToTyp).mapToInt().max(0);
 				this.idToTyp = new IOType[maxID + 1];
-				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
+				idToTyp.forEach((k, v) -> this.idToTyp[k] = v);
 				typToID = Iters.entries(idToTyp).toMap(Map.Entry::getValue, Map.Entry::getKey);
 				this.sealedMultiverse = Iters.entries(sealedMultiverse).toMap(Map.Entry::getKey, u -> new MemUniverse<>(u.getValue().cl2id));
 			}
@@ -456,17 +458,24 @@ public sealed interface IOTypeDB{
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
+					FieldDef.IOAnnotation.class,
 					PersistentDB.class,
 					IOInstance.class,
 					ObjectID.class,
 					ContiguousIOList.class,
 					LinkedIOList.class,
 					HashIOMap.class,
-					}){
+					IOType.class
+				}){
 					registerBuiltIn(db, c);
 				}
-				
-				var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
+				{
+					var uni = SealedUtil.getSealedUniverse(IOType.class, false).orElseThrow();
+					Iters.from(uni.universe()).sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
+						db.toID(uni.root(), cls, true);
+					});
+				}
+				var uni = SealedUtil.getSealedUniverse(FieldDef.IOAnnotation.class, false).orElseThrow();
 				Iters.from(uni.universe()).sorted(Comparator.comparing(Class::getName)).forEach(cls -> {
 					db.toID(uni.root(), cls, true);
 				});
@@ -597,7 +606,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
-			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
+			newDefs.entrySet().removeIf(e -> !isInst(e.getValue()));
 			if(newDefs.isEmpty()) return;
 			
 			class Validated{
@@ -610,7 +619,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			var names = Iters.entries(newDefs)
-			                 .filter(e -> !e.getValue().isUnmanaged())
+			                 .filter(e -> !isUnmng(e.getValue()))
 			                 .map(e -> e.getKey().typeName)
 			                 .toModSet();
 			
@@ -619,7 +628,7 @@ public sealed interface IOTypeDB{
 			
 			var fieldMap =
 				Iters.entries(newDefs)
-				     .filter(e -> e.getValue().isIoInstance() && !e.getValue().isUnmanaged())
+				     .filter(e -> isInst(e.getValue()))
 				     .map(e -> {
 					     Struct<?> typ;
 					     try{
@@ -739,8 +748,8 @@ public sealed interface IOTypeDB{
 				return;
 			}
 			
-			var def    = new TypeDef(typ);
-			var parent = def.getSealedParent();
+			var def    = TypeDef.of(typ);
+			var parent = def.getRelations().sealedParent;
 			if(parent != null){
 				recordType(builtIn, IOType.of(switch(parent.type()){
 					case EXTEND -> typ.getSuperclass();
@@ -749,8 +758,13 @@ public sealed interface IOTypeDB{
 					                            .orElseThrow();
 				}), newDefs);
 			}
-			
-			if(!def.isUnmanaged() && (def.isIoInstance() || def.isEnum() || def.isJustInterface())){
+			if(switch(def){
+				case TypeDef.DEnum ignore -> true;
+				case TypeDef.DInstance ignore -> true;
+				case TypeDef.DJustInterface ignore -> true;
+				case TypeDef.DUnknown ignore -> false;
+				case TypeDef.DUnmanaged ignore -> false;
+			}){
 				newDefs.put(typeName, def);
 			}
 			
@@ -758,15 +772,15 @@ public sealed interface IOTypeDB{
 				recordType(builtIn, arg, newDefs);
 			}
 			
-			if(def.isUnmanaged()) return;
+			if(isUnmng(def)) return;
 			
 			if(TYPE_VALIDATION){
 				StandardStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type, false);
 			}
 			
 			
-			for(TypeDef.FieldDef field : def.getFields()){
-				recordType(builtIn, field.getType(), newDefs);
+			for(FieldDef field : def.getFields()){
+				recordType(builtIn, field.type, newDefs);
 			}
 		}
 		
@@ -779,7 +793,7 @@ public sealed interface IOTypeDB{
 			
 			var cached = dataCache.get(id);
 			if(cached != null){
-				return cached.clone();
+				return cached;
 			}
 			
 			var type = data.get(id);
@@ -915,7 +929,10 @@ public sealed interface IOTypeDB{
 			var touchU =
 				(MemoryOnlyDB.Basic.MemUniverse<T>)
 					sealedMultiverseTouch.computeIfAbsent(rootType, t -> new MemoryOnlyDB.Basic.MemUniverse<>(newId));
-			return touchU.newId(type);
+			
+			var id = touchU.newId(type);
+//			Log.trace("Touched sealed universe of {#yellow{}~#} with type {#yellowBright{}~#}. ID = {}", rootType, type, id);
+			return id;
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -1000,19 +1017,19 @@ public sealed interface IOTypeDB{
 	}
 	private IOType tryMergeGeneric(IOType.TypeGeneric t1, IOType.TypeGeneric t2){
 		if(!t1.getRaw().equals(t2.getRaw())){
-			return IOType.of(Object.class);
+			return IOType.TypeRaw.OBJ;
 		}
 		
 		var a1 = new ArrayList<>(t1.getArgs());
 		var a2 = t2.getArgs();
 		if(a1.size() != a2.size()){
-			return IOType.of(Object.class);
+			return IOType.TypeRaw.OBJ;
 		}
 		for(int i = 0; i<a1.size(); i++){
 			var arg1 = a1.get(i);
 			var arg2 = a2.get(i);
 			if(arg1.getClass() != arg2.getClass()){
-				a1.set(i, IOType.of(Object.class));
+				a1.set(i, IOType.TypeRaw.OBJ);
 				continue;
 			}
 			a1.set(i, switch(arg1){
@@ -1025,7 +1042,7 @@ public sealed interface IOTypeDB{
 					var cls = UtilL.findClosestCommonSuper(c1, c2);
 					yield IOType.of(cls);
 				}
-				default -> IOType.of(Object.class);
+				default -> IOType.TypeRaw.OBJ;
 			});
 		}
 		
@@ -1046,11 +1063,11 @@ public sealed interface IOTypeDB{
 				if(type instanceof IOType.TypeGeneric t1 && t instanceof IOType.TypeGeneric t2){
 					type = tryMergeGeneric(t1, t2);
 				}else{
-					type = IOType.of(Object.class);
+					type = IOType.TypeRaw.OBJ;
 				}
 			}
 		}
-		return type != null? type : fallback != null? fallback : IOType.of(Object.class);
+		return type != null? type : fallback != null? fallback : IOType.TypeRaw.OBJ;
 	}
 	
 	default int objToID(Object obj) throws IOException{
@@ -1116,5 +1133,12 @@ public sealed interface IOTypeDB{
 				throw new RuntimeException(ex);
 			}
 		}
+	}
+	
+	private static boolean isUnmng(TypeDef def){
+		return def instanceof TypeDef.DUnmanaged;
+	}
+	private static boolean isInst(TypeDef def){
+		return def instanceof TypeDef.DInstance;
 	}
 }

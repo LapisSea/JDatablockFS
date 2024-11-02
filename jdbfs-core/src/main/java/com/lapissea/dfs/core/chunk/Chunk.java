@@ -11,6 +11,7 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.io.instancepipe.PipeFieldCompiler;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
@@ -130,15 +131,18 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 		
 		public OptimizedChunkPipe(){
-			super(STRUCT, (type, f, testRun) -> List.of(
-				BitFieldMerger.of(List.of(
-					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
-					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
-				)),
-				f.requireExact(long.class, "capacity"),
-				f.requireExact(long.class, "size"),
-				f.requireExact(ChunkPointer.class, "nextPtr")
-			), true);
+			super(STRUCT, (type, f, testRun) -> {
+				var fields = List.of(
+					BitFieldMerger.of(List.of(
+						(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
+						(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
+					)),
+					f.requireExact(long.class, "capacity"),
+					f.requireExact(long.class, "size"),
+					f.requireExact(ChunkPointer.class, "nextPtr")
+				);
+				return new PipeFieldCompiler.Result<>(fields);
+			}, true);
 		}
 		
 		@Override

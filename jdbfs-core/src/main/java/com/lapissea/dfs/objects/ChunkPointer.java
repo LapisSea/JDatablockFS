@@ -188,7 +188,7 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 		return makeReference(0);
 	}
 	public Reference makeReference(long offset){
-		return new Reference(this, offset);
+		return Reference.of(this, offset);
 	}
 	
 	public void requireNonNull(){

@@ -20,6 +20,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ public final class BehaviourSupport{
 	private static <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 		if(field.hasAnnotation(IOValue.Reference.class)) return false;
 		var typ = field.getType();
-		if(typ.isArray() || UtilL.instanceOf(typ, Type.class)) return true;
+		if(typ.isArray() || UtilL.instanceOf(typ, Collection.class) || UtilL.instanceOf(typ, Type.class)) return true;
 		if(IOInstance.isInstance(typ)){
 			return IOInstance.isManaged(typ);
 		}

@@ -28,6 +28,7 @@ import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -340,9 +341,15 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
-	private void scanTypeDB(){
-		var db    = metadata.db;
-		var names = db.listStoredTypeDefinitionNames();
+	private void scanTypeDB() throws MalformedClusterData{
+		var db = metadata.db;
+		
+		Set<String> names;
+		try{
+			names = db.listStoredTypeDefinitionNames();
+		}catch(Throwable e){
+			throw new MalformedClusterData("Failed to read list of stored types ", e);
+		}
 		if(names.isEmpty()) return;
 		
 		var tLoader = db.getTemplateLoader();
@@ -352,7 +359,7 @@ public final class Cluster implements DataProvider{
 			if(name.isEmpty()) continue;
 			try{
 				var def = db.getDefinitionFromClassName(name).orElseThrow();
-				if(!def.isIoInstance() || def.isUnmanaged()) continue;
+				if(!(def instanceof TypeDef.DInstance)) continue;
 				var clazz = tLoader.loadClass(name);
 				if(clazz.getClassLoader() != tLoader){
 					continue;
@@ -467,7 +474,7 @@ public final class Cluster implements DataProvider{
 	}
 	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot, boolean recordStats) throws IOException{
 		if(refRoot){
-			rec.log(new Reference(), null, null, firstChunkPtr().makeReference());
+			rec.log(Reference.NULL, null, null, firstChunkPtr().makeReference(), null);
 		}
 		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), rootPipe(), recordStats, rec);
 	}

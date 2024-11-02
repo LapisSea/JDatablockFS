@@ -11,10 +11,9 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import org.testng.annotations.Test;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
-import static org.testng.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class GeneratedStructTests{
 	
@@ -26,7 +25,7 @@ public class GeneratedStructTests{
 		}
 		
 		var s = Struct.of(Dummy.class, StagedInit.STATE_DONE);
-		assertEquals(Set.of("a", "b"), s.getFields().stream().map(IOField::getName).collect(Collectors.toSet()));
+		assertThat(s.getFields().mapped(IOField::getName)).containsExactlyInAnyOrder("a", "b");
 	}
 	
 	@Test(expectedExceptions = NullPointerException.class)
@@ -71,7 +70,7 @@ public class GeneratedStructTests{
 		}
 		
 		var s = IOInstance.Def.of(Dummy.class, 69, NumberSize.SHORT);
-		assertEquals("{69, SHORT}", s.toString());
+		assertThat(s).asString().isEqualTo("{69, SHORT}");
 	}
 	
 	@Test
@@ -85,7 +84,7 @@ public class GeneratedStructTests{
 		}
 		
 		var s = IOInstance.Def.of(Dummy.class, NumberSize.SHORT, 69);
-		assertEquals("{SHORT, 69}", s.toString());
+		assertThat(s).asString().isEqualTo("{SHORT, 69}");
 	}
 	
 	@Test
@@ -98,8 +97,8 @@ public class GeneratedStructTests{
 		}
 		
 		var s = IOInstance.Def.of(Dummy.class, 69, NumberSize.SHORT);
-		assertEquals("Dummy 69 -> SHORT", s.toString());
-		assertEquals("69 -> SHORT", s.toShortString());
+		assertThat(s.toString()).asString().isEqualTo("Dummy 69 -> SHORT");
+		assertThat(s.toShortString()).asString().isEqualTo("69 -> SHORT");
 	}
 	
 	@Test(expectedExceptions = MalformedToStringFormat.class)

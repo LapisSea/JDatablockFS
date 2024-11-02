@@ -9,6 +9,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
@@ -34,7 +35,6 @@ import java.util.function.BiFunction;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
-import static org.testng.Assert.assertEquals;
 
 public final class StructFuzzTest{
 	
@@ -60,7 +60,7 @@ public final class StructFuzzTest{
 	}
 	
 	private static boolean isFinal(RandomGenerator rand){
-		return false;
+		return rand.nextBoolean();
 	}
 	
 	private static TempClassGen.FieldGen signedInt(String name, RandomGenerator rand){
@@ -145,8 +145,7 @@ public final class StructFuzzTest{
 				
 				List<Annotation> annotations;
 				if(hasFinal){
-					var names = Iters.from(fields).map(TempClassGen.FieldGen::name).toArray(String[]::new);
-					annotations = List.of(Annotations.make(IOInstance.Order.class, Map.of("value", names)));
+					annotations = List.of(IOFieldTools.orderFromNames(Iters.from(fields).map(TempClassGen.FieldGen::name)));
 				}else{
 					annotations = List.of();
 				}
@@ -174,6 +173,7 @@ public final class StructFuzzTest{
 //		LogUtil.println(def);
 //		LogUtil.println(def.name());
 		
+		//noinspection unchecked
 		var typ    = (Class<T>)TempClassGen.gen(def);
 		var struct = Struct.of(typ, STATE_DONE);
 		var pipe   = StandardStructPipe.of(struct, STATE_DONE);
@@ -188,12 +188,7 @@ public final class StructFuzzTest{
 		
 		for(int i = 0; i<50; i++){
 			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
-			
-			pipe.write(ch, inst);
-			
-			var read = pipe.readNew(ch, null);
-			
-			assertEquals(read, inst, "" + i);
+			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
 		}
 	}
 	

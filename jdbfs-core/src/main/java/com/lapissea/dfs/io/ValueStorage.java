@@ -114,7 +114,7 @@ public sealed interface ValueStorage<T>{
 			var startPos = io.getPos();
 			var root     = readNew(io);
 			
-			var rootRef = new Reference(ChunkPointer.of(69), 420);
+			var rootRef = Reference.of(ChunkPointer.of(69), 420);
 			var dirty   = FixedInstance.structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
 			if(dirty){
 				write(io.setPos(startPos), root);
@@ -196,7 +196,7 @@ public sealed interface ValueStorage<T>{
 			pipe.write(provider, dest, src);
 		}
 		
-		private static final Reference DUMMY = new Reference(ChunkPointer.of(Long.MAX_VALUE), 420);
+		private static final Reference DUMMY = Reference.of(ChunkPointer.of(Long.MAX_VALUE), 420);
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
 			var ptrs = new ArrayList<ChunkPointer>();
@@ -218,21 +218,21 @@ public sealed interface ValueStorage<T>{
 			var rec = new MemoryWalker.PointerRecord(){
 				boolean dirty;
 				@Override
-				public <IO extends IOInstance<IO>> int log(Reference instanceReference, IO instance, RefField<IO, ?> field, Reference valueReference) throws IOException{
+				public <IO extends IOInstance<IO>> int log(Reference instanceReference, IO instance, RefField<IO, ?> field, Reference valueReference, Holder holder) throws IOException{
 					if(rootRef == valueReference) throw new ShouldNeverHappenError();
 					if(!valueReference.isNull()){
 						ptrs.add(valueReference.getPtr());
 						
 						if(dereferenceWrite && instance == root && field.nullable()){
 							field.set(null, instance, null);
-							field.setReference(instance, new Reference());
+							field.setReference(instance, Reference.NULL);
 							dirty = true;
 						}
 					}
 					return MemoryWalker.CONTINUE;
 				}
 				@Override
-				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value){
+				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value, Holder holder){
 					return MemoryWalker.CONTINUE;
 				}
 			};
@@ -331,7 +331,7 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
 			var pos = dest.getPos();
-			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
+			var ref = dest.remaining() == 0? Reference.NULL : readInline(dest);
 			if(ref.isNull()){
 				dest.setPos(pos);
 				dest.ensureCapacity(pos + refPipe.getFixedDescriptor().get(WordSpace.BYTE));
@@ -349,7 +349,7 @@ public sealed interface ValueStorage<T>{
 			}
 			
 			if(dereferenceWrite){
-				refPipe.write(provider, io.setPos(startPos), new Reference());
+				refPipe.write(provider, io.setPos(startPos), Reference.NULL);
 			}
 			
 			if(pipe.getType().getCanHavePointers()){
@@ -474,7 +474,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			writeInline(dest, src == null? new Reference() : src.getPointer().makeReference());
+			writeInline(dest, src == null? Reference.NULL : src.getPointer().makeReference());
 		}
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
@@ -643,7 +643,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
-			var ref = dest.remaining() == 0? new Reference() : readInline(dest);
+			var ref = dest.remaining() == 0? Reference.NULL : readInline(dest);
 			if(ref.isNull()){
 				//TODO: create mechanism for assumed fixed field first, then if growth needed switch to explicit next size
 				var d = new AutoText(src);
@@ -662,7 +662,7 @@ public sealed interface ValueStorage<T>{
 				return List.of();
 			}
 			if(dereferenceWrite){
-				this.writeInline(io.setPos(startPos), new Reference());
+				this.writeInline(io.setPos(startPos), Reference.NULL);
 			}
 			return List.of(ref.getPtr());
 		}
@@ -990,7 +990,7 @@ public sealed interface ValueStorage<T>{
 			}
 			var root = pipe.readNew(provider, io, ctx);
 			
-			var rootRef = new Reference(ChunkPointer.of(69), 420);
+			var rootRef = Reference.of(ChunkPointer.of(69), 420);
 			var dirty   = FixedInstance.structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
 			if(dirty){
 				write(io.setPos(startPos), root);

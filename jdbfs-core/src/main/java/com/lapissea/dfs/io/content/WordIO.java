@@ -1,5 +1,7 @@
 package com.lapissea.dfs.io.content;
 
+import com.lapissea.dfs.logging.Log;
+
 public final class WordIO{
 	
 	public static long getWord(byte[] data, int off, int len){
@@ -33,6 +35,6 @@ public final class WordIO{
 	}
 	
 	private static RuntimeException fail(int len){
-		return new IllegalArgumentException("The length of a word must be in the range of 0-8" + len);
+		return new IllegalArgumentException(Log.fmt("The length of a word must be in the range of {#green0-8#} but is {}#red", len));
 	}
 }
