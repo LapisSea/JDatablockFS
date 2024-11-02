@@ -35,7 +35,6 @@ import java.util.function.BiFunction;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
-import static org.testng.Assert.assertEquals;
 
 public final class StructFuzzTest{
 	
@@ -189,12 +188,7 @@ public final class StructFuzzTest{
 		
 		for(int i = 0; i<50; i++){
 			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
-			
-			pipe.write(ch, inst);
-			
-			var read = pipe.readNew(ch, null);
-			
-			assertEquals(read, inst, "" + i);
+			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
 		}
 	}
 	

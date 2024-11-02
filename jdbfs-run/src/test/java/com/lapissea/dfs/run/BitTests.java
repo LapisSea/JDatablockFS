@@ -12,7 +12,7 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 
-import static org.testng.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class BitTests{
 	
@@ -45,7 +45,7 @@ public class BitTests{
 				in.readBits(rbs);
 			}
 			
-			assertEquals(rbs, bs, "" + i);
+			assertThat(rbs).containsExactly(bs);
 		});
 	}
 	
@@ -68,7 +68,7 @@ public class BitTests{
 					in.readBits(rbs);
 				}
 				
-				assertEquals(rbs, bs, siz + " " + actionIndex);
+				assertThat(rbs).as(() -> "Size: " + siz).containsExactly(bs);
 			}
 		});
 	}

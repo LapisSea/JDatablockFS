@@ -7,7 +7,6 @@ import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.LinkedIOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.OptionalPP;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -16,7 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static org.testng.Assert.assertEquals;
+import static com.lapissea.dfs.run.TestUtils.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class QueryTests{
 	
@@ -96,41 +96,42 @@ public class QueryTests{
 	void comparison(IOList<FF> list) throws IOException{
 		fillFF(list);
 		
-		assertEquals(OptionalPP.of(2F), list.query(Set.of("a"), el -> el.a()>1).first().map(FF::a));
 		
-		assertEquals(OptionalPP.of(FF.of(1, 5)), list.query("a is 1").first());
-		assertEquals(OptionalPP.of(FF.of(5, 1)), list.query("b is 1").first());
-		assertEquals(OptionalPP.of(FF.of(2, 4)), list.query("a is not 1").first());
+		assertThat(list.query(Set.of("a"), el -> el.a()>1).first().map(FF::a)).hasValue(2F);
 		
-		assertEquals(OptionalPP.of(FF.of(3, 3)), list.query("a > 2").first());
-		assertEquals(OptionalPP.of(FF.of(4, 2)), list.query("a >= 3 && b <= 2").first());
-		assertEquals(OptionalPP.of(FF.of(4, 2)), list.query("a >= 3").filter("b <= 2").first());
+		assertThat(list.query("a is 1").first()).hasValue(FF.of(1, 5));
+		assertThat(list.query("b is 1").first()).hasValue(FF.of(5, 1));
+		assertThat(list.query("a is not 1").first()).hasValue(FF.of(2, 4));
+		
+		assertThat(list.query("a > 2").first()).hasValue(FF.of(3, 3));
+		assertThat(list.query("a >= 3 && b <= 2").first()).hasValue(FF.of(4, 2));
+		assertThat(list.query("a >= 3").filter("b <= 2").first()).hasValue(FF.of(4, 2));
 		
 		for(long i = 0; i<list.size(); i++){
-			assertEquals(OptionalPP.of(list.get(i)), list.query("a == {}", i + 1).first());
-			assertEquals(OptionalPP.of(list.get(i)), list.query("a == {}+1", i).first());
+			assertThat(list.query("a == {}", i + 1).first()).hasValue(list.get(i));
+			assertThat(list.query("a == {}+1", i).first()).hasValue(list.get(i));
 		}
 		
-		assertEquals(3, list.query("a > 2").count());
-		assertEquals(2, list.query("a == 2 || a == 3").count());
+		assertThat(list.query("a > 2").count()).isEqualTo(3);
+		assertThat(list.query("a == 2 || a == 3").count()).isEqualTo(2);
 		
-		assertEquals(OptionalPP.of(FF.of(3, 3)), list.query("a == b").any());
+		assertThat(list.query("a == b").any()).hasValue(FF.of(3, 3));
 		
-		assertEquals(OptionalPP.of(FF.of(2, 4)), list.query("a%2==0").first());
-		assertEquals(2, list.query("a%2==0").count());
-		assertEquals(3, list.query("a%2!=0").count());
+		assertThat(list.query("a%2==0").first()).hasValue(FF.of(2, 4));
+		assertThat(list.query("a%2==0").count()).isEqualTo(2);
+		assertThat(list.query("a%2!=0").count()).isEqualTo(3);
 		
-		assertEquals(List.of(FF.of(2, 4), FF.of(4, 2)), list.query("a%2==0").all().toList());
+		assertThat(list.query("a%2==0").all().toList()).isEqualTo(List.of(FF.of(2, 4), FF.of(4, 2)));
 		
-		assertEquals(List.of(2F, 4F), list.query("a%2==0").<List<Float>>map("a").all().toList());
+		assertThat(list.query("a%2==0").<List<Float>>map("a").all().toList()).isEqualTo(List.of(2F, 4F));
 	}
 	
 	@Test(dataProvider = "stringyLists")
 	void inTest(IOList<StringyBoi> list) throws IOException{
 		fillStringy(list);
-		assertEquals(1, list.query("str in strs").count());
-		assertEquals(2, list.query("'mama' in str").count());
-		assertEquals(OptionalPP.empty(), list.query("str is null").any());
+		assertThat(list.query("str in strs").count()).isEqualTo(1);
+		assertThat(list.query("'mama' in str").count()).isEqualTo(2);
+		assertThat(list.query("str is null").any()).isEmpty();
 	}
 	
 }

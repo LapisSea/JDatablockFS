@@ -30,7 +30,6 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import org.testng.Assert;
@@ -60,8 +59,7 @@ import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.dfs.type.field.annotations.IOCompression.Type.RLE;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class GeneralTypeHandlingTests{
 	
@@ -118,14 +116,15 @@ public class GeneralTypeHandlingTests{
 		Cluster.init(data).roots().request("hello!", EnumContainer.class);
 		return data.readAll();
 	}
-	public static void use(byte[] data) throws IOException{
+	public static <T extends IOInstance<T>> void use(byte[] data) throws IOException{
 		var cluster = new Cluster(MemoryData.of(data));
 		
-		var r         = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
-		var container = (IOInstance<?>)r.request();
+		var r = cluster.roots().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
+		//noinspection unchecked
+		var container = (T)r.request();
 		
-		IOField f = container.getThisStruct().getFields().requireByName("r");
-		assertEquals(f.instanceToString(null, container, false).orElse(null), "A");
+		var f = container.getThisStruct().getFields().requireByName("r");
+		assertThat(f.instanceToString(null, container, false)).hasValue("A");
 	}
 	
 	@Test
@@ -153,12 +152,7 @@ public class GeneralTypeHandlingTests{
 				aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 				""".getBytes(UTF_8)
 		);
-		provider.roots().provide(1, blob);
-		var read = provider.roots().request(1, NamedBlob.class);
-
-//		assertTrue("Compression not working", chunk.chainSize()<64);
-		
-		assertEquals(blob, read);
+		TestUtils.checkRootsInOutEquality(provider, 1, blob);
 	}
 	
 	@DataProvider(name = "templateTypes")
@@ -244,11 +238,12 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dataProvider = "enumHolders")
-	<T extends IOInstance.Def<T>, E extends Enum<E>> void enumIntegrity(Class<T> type, Class<E> eType){
+	<T extends IOInstance.Def<T>, E extends Enum<E>> void enumIntegrity(Class<T> type, Class<E> eType) throws IOException{
 		var r    = new Random(69420);
 		var info = EnumUniverse.of(eType);
 		var pip  = StandardStructPipe.of(type);
 		var data = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
+		var mem  = AllocateTicket.bytes(64).submit(data);
 		for(int i = 0; i<1000; i++){
 			
 			var set = IOInstance.Def.of(
@@ -258,12 +253,8 @@ public class GeneralTypeHandlingTests{
 				 .toList()
 			);
 			
-			try(var io = data.getSource().io()){
-				io.setPos(0);
-				pip.write(data, io, set);
-				io.setPos(0);
-				var read = pip.readNew(data, io, null);
-				assertEquals("Failed equality on " + i, set, read);
+			try{
+				TestUtils.checkPipeInOutEquality(mem, pip, set);
 			}catch(IOException e){
 				throw new RuntimeException(i + "", e);
 			}
@@ -303,17 +294,22 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dataProvider = "longTypes")
-	<T extends IOInstance.Def<T>> void testLongClass(LongTyp<T> typ) throws IOException{
-		var provider = TestUtils.testChunkProvider(typ);
-		var hold     = StandardStructPipe.of(typ.typ);
-		var chunk    = AllocateTicket.bytes(64).submit(provider);
-		
-		for(var val : (IterablePP<T>)() -> new Random(42069).longs(10000).mapToObj(typ.func).iterator()){
-			hold.write(chunk, val);
-			var read = hold.readNew(chunk, null);
-			
-			assertEquals(read, val);
-		}
+	<T extends IOInstance.Def<T>> void testLongClass(LongTyp<T> typ){
+		var hold = StandardStructPipe.of(typ.typ);
+		var chunks = ThreadLocal.withInitial(() -> {
+			try{
+				var provider = Cluster.emptyMem();
+				return AllocateTicket.bytes(64).submit(provider);
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		});
+		TestUtils.randomBatch("testLongClass" + typ, 10_000, (r, i) -> {
+			var chunk = chunks.get();
+			var l     = r.nextLong();
+			var val   = typ.func.apply(l);
+			TestUtils.checkPipeInOutEquality(chunk, hold, val);
+		});
 	}
 	
 	@Test
@@ -332,11 +328,7 @@ public class GeneralTypeHandlingTests{
 				LocalTime.ofNanoOfDay(Math.abs(rand.nextLong())%86399999999999L)
 			);
 			var val = IOInstance.Def.of(LocDateTime.class, tim);
-			
-			hold.write(chunk, val);
-			var read = hold.readNew(chunk, null);
-			
-			assertEquals(read, val);
+			TestUtils.checkPipeInOutEquality(chunk, hold, val);
 		}
 	}
 	
@@ -390,13 +382,11 @@ public class GeneralTypeHandlingTests{
 	@Test
 	void wrapperListing(){
 		var actual = Set.copyOf(FieldCompiler.getWrapperTypes());
-		var expected = Set.of(
+		assertThat(actual).containsExactlyInAnyOrder(
 			byte[].class, int[].class, float[].class, boolean[].class,
 			String.class, Duration.class, Instant.class,
 			LocalDate.class, LocalTime.class, LocalDateTime.class
 		);
-		
-		assertEquals(expected, actual);
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
@@ -405,33 +395,25 @@ public class GeneralTypeHandlingTests{
 		interface Container extends IOInstance.Def<Container>{
 			Seal seal1();
 			Seal seal2();
+			static Container of(Seal seal1, Seal seal2){
+				return IOInstance.Def.of(Container.class, seal1, seal2);
+			}
 		}
 		
 		var provider = TestUtils.testCluster();
-		var hold     = StandardStructPipe.of(Container.class);
+		var pipe     = StandardStructPipe.of(Container.class);
 		var chunk    = AllocateTicket.bytes(64).submit(provider);
-		{
-			var val = IOInstance.Def.of(Container.class, new Seal.A(69), new Seal.C(1, 2, 3));
-			
-			hold.write(chunk, val);
-			var read = hold.readNew(chunk, null);
-			
-			assertEquals(read, val);
-		}
-		{
-			var val = IOInstance.Def.of(Container.class, new Seal.C(4, 5, -6), new Seal.D(420.69F));
-			
-			hold.write(chunk, val);
-			var read = hold.readNew(chunk, null);
-			
-			assertEquals(read, val);
-		}
+		TestUtils.checkPipeInOutEquality(chunk, pipe, Container.of(new Seal.A(69), new Seal.C(1, 2, 3)));
+		TestUtils.checkPipeInOutEquality(chunk, pipe, Container.of(new Seal.C(4, 5, -6), new Seal.D(420.69F)));
 		chunk.freeChaining();
+		
+		var now = Instant.now();
 		
 		IOList<Seal> list = provider.roots().request("list", IOList.class, Seal.class);
 		list.add(new Seal.A(69));
-		list.add(new Seal.B(Instant.now()));
+		list.add(new Seal.B(now));
 		list.add(new Seal.C(4, 2, 0));
+		assertThat(list).containsExactly(new Seal.A(69), new Seal.B(now), new Seal.C(4, 2, 0));
 	}
 	
 	private static class OrderTestType extends IOInstance.Managed<OrderTestType>{
@@ -475,10 +457,7 @@ public class GeneralTypeHandlingTests{
 		typ.ignoredFrames = 0;
 		typ.diffBottomCount = 10_000;
 		
-		var cluster = Cluster.emptyMem();
-		cluster.roots().provide(1, typ);
-		var read = cluster.roots().require(1, OrderTestType.class);
-		assertEquals(typ, read);
+		TestUtils.checkRootsInOutEquality(typ);
 	}
 	
 	
@@ -506,9 +485,9 @@ public class GeneralTypeHandlingTests{
 		var aPipe = StandardStructPipe.of(ValuesAnn.class);
 		var bPipe = StandardStructPipe.of(ClassAnn.class);
 		{
-			var an = aPipe.getSpecificFields().stream().map(IOField::getName).toList();
-			var bn = bPipe.getSpecificFields().stream().map(IOField::getName).toList();
-			assertEquals(an, bn);
+			var an = aPipe.getSpecificFields().mapped(IOField::getName);
+			var bn = bPipe.getSpecificFields().mapped(IOField::getName);
+			assertThat(an).containsExactlyElementsOf(bn);
 		}
 		
 		var a = new ValuesAnn();
@@ -523,10 +502,8 @@ public class GeneralTypeHandlingTests{
 		
 		ClassAnn b = bPipe.readNew(val, null);
 		
-		assertEquals(a.link, b.link);
-		assertEquals(a.str, b.str);
-		assertEquals(a.list, b.list);
-		assertArrayEquals(a.ints, b.ints);
+		assertThat(a).extracting("link", "str", "list", "ints")
+		             .containsExactly(b.link, b.str, b.list, b.ints);
 	}
 	
 	@Test(expectedExceptions = IllegalField.class)
@@ -569,8 +546,8 @@ public class GeneralTypeHandlingTests{
 		var strings = data.strings().list();
 		strings.add("foo");
 		strings.add("bar");
-		assertEquals(List.of("foo", "bar"), strings.iter().toModList());
-		assertEquals(IOType.of(ContiguousIOList.class, String.class), strings.getTypeDef());
+		assertThat(strings).containsExactly("foo", "bar");
+		assertThat(strings.getTypeDef()).isEqualTo(IOType.of(ContiguousIOList.class, String.class));
 	}
 	
 	@Test(dependsOnMethods = "genericPropagation", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
@@ -638,14 +615,7 @@ public class GeneralTypeHandlingTests{
 		var instance = struct.make();
 		((IOField<T, Object>)struct.getFields().requireByName("val")).set(null, instance, val);
 		
-		var prov  = com.lapissea.dfs.core.DataProvider.newVerySimpleProvider();
-		var chunk = AllocateTicket.bytes(64).submit(prov);
-		
-		pipe.write(chunk, instance);
-		
-		var read = pipe.readNew(chunk, null);
-		
-		Assert.assertEquals(read, instance);
+		TestUtils.checkPipeInOutEquality(pipe, instance);
 	}
 	
 	@Test

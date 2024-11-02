@@ -30,7 +30,6 @@ import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzConfig;
-import com.lapissea.fuzz.FuzzFail;
 import com.lapissea.fuzz.FuzzSequence;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import com.lapissea.fuzz.FuzzingRunner;
@@ -44,6 +43,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
+import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
@@ -74,8 +74,7 @@ import static com.lapissea.dfs.run.FuzzingUtils.stableRun;
 import static com.lapissea.dfs.run.FuzzingUtils.stableRunAndSave;
 import static com.lapissea.dfs.run.TestUtils.optionallyLogged;
 import static com.lapissea.dfs.run.TestUtils.optionallyLoggedMemory;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class SlowTests{
 	
@@ -87,7 +86,7 @@ public class SlowTests{
 		var logger = new LateInit<>(() -> DataLogger.Blank.INSTANCE);
 //		var logger=LoggedMemoryUtils.createLoggerFromConfig();
 		
-		TestUtils.randomBatch(300000, 1000, (r, iter) -> {
+		TestUtils.randomBatch(300000, (r, iter) -> {
 			try{
 				List<RandomIO.WriteChunk> allWrites;
 				if(iter == 0){
@@ -151,9 +150,9 @@ public class SlowTests{
 						System.arraycopy(write.data(), 0, valid, Math.toIntExact(write.ioOffset()), write.dataLength());
 					}
 					if(!Arrays.equals(read, valid)){
-						fail(iter + "\n" +
-						     IntStream.range(0, valid.length).mapToObj(a -> (valid[a] + "")).collect(Collectors.joining()) + "\n" +
-						     IntStream.range(0, read.length).mapToObj(a -> (read[a] + "")).collect(Collectors.joining()));
+						Assert.fail(iter + "\n" +
+						            IntStream.range(0, valid.length).mapToObj(a -> (valid[a] + "")).collect(Collectors.joining()) + "\n" +
+						            IntStream.range(0, read.length).mapToObj(a -> (read[a] + "")).collect(Collectors.joining()));
 					}
 					
 				}
@@ -643,13 +642,10 @@ public class SlowTests{
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
 		
-		var fails = runner.run(69, 50000, 2000);
-		if(fails.isEmpty()) return;
-		LogUtil.printlnEr(FuzzFail.report(fails));
-		
-		var stability = runner.establishFailStability(fails.getFirst(), 15);
-		runner.runStable(stability);
-		fail("There were fails!");
+		stableRun(
+			Plan.start(runner, 69, 50000, 2000),
+			"fuzzHashMap"
+		);
 	}
 	
 	sealed interface BlobAction{
@@ -695,10 +691,10 @@ public class SlowTests{
 					}
 				}
 				
-				assertEquals(state.blob.getIOSize(), state.mem.getIOSize());
+				assertThat(state.blob.getIOSize()).as("ioSize does not match").isEqualTo(state.mem.getIOSize());
 				var a = state.blob.readAll();
 				var b = state.mem.readAll();
-				assertEquals(a, b);
+				assertThat(a).containsExactly(b);
 			}
 			
 			@Override
@@ -818,9 +814,7 @@ public class SlowTests{
 				var expected = ref.readAll();
 				var r        = state.roots.get(action.rootID());
 				var actual   = r == null? new byte[0] : r.readAll();
-				if(!Arrays.equals(actual, expected)){
-					assertEquals(actual, expected, TextUtil.toString("\n", actual, "\n", expected));
-				}
+				assertThat(actual).as(() -> TextUtil.toString("\n", actual, "\n", expected)).containsExactly(expected);
 			}
 			@Override
 			public State create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
