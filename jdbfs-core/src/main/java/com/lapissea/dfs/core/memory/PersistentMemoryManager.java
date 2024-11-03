@@ -12,6 +12,7 @@ import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.utils.OptionalPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,7 +42,7 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private boolean adding, allowFreeRemove = true;
 	
-	private static final class Node extends AbstractList<ChunkChainIO>{
+	private static final class Node extends AbstractList<ChunkChainIO> implements IterablePPSource<ChunkChainIO>{
 		private       ChunkChainIO[] data = new ChunkChainIO[1];
 		private       int            size;
 		private final Thread         thread;
@@ -59,8 +61,12 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		@Override
 		public ChunkChainIO get(int index){ return data[index]; }
 		private ChunkChainIO pop(){
-			var d   = data;
-			var s   = size - 1;
+			var d = data;
+			var s = size - 1;
+			if(s<0){
+				return null;
+			}
+			
 			var old = d[s];
 			d[s] = null;
 			size = s;
@@ -69,6 +75,8 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		@Override
 		public int size(){ return size; }
+		@Override
+		public OptionalInt tryGetSize(){ return OptionalInt.of(size); }
 	}
 	
 	
@@ -115,8 +123,23 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		var s  = getStack();
 		var ch = s.pop();
 		if(ch != chain){
-			throw new IllegalStateException();
+			failNotifyEnd(s, ch, chain);
 		}
+	}
+	private static void failNotifyEnd(Node stack, ChunkChainIO popped, ChunkChainIO chain){
+		if(popped == null){
+			throw new IllegalStateException("There is nothing that should have ended!");
+		}
+		
+		var found = stack.iter().enumerate().firstMatching(e -> e.val() == chain);
+		if(found.isPresent()){
+			var count = stack.size() - found.get().index();
+			stack.add(popped);
+			throw new IllegalStateException("Chain is closed in wrong order! There is " + count + " open chains ahead!");
+		}
+		
+		stack.add(popped);
+		throw new IllegalStateException("Chain was already closed!");
 	}
 	
 	private void block(){
