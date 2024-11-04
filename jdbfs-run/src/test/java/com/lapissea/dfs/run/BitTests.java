@@ -11,6 +11,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,7 +46,9 @@ public class BitTests{
 				in.readBits(rbs);
 			}
 			
-			assertThat(rbs).containsExactly(bs);
+			if(!Arrays.equals(rbs, bs)){
+				assertThat(rbs).containsExactly(bs);
+			}
 		});
 	}
 	

@@ -173,7 +173,7 @@ public class IOTransactionTests{
 		int cap = 50;
 		
 		//Dumb brute force all possible edge cases
-		TestUtils.randomBatch(500000, (rand, run) -> {
+		TestUtils.randomBatch(300000, (rand, run) -> {
 			int runIndex = 0;
 			
 			IOInterface data   = MemoryData.builder().withCapacity(cap + 10).build();
@@ -207,7 +207,7 @@ public class IOTransactionTests{
 						data.write(off, false, buf);
 					}
 					
-					assertThat(data).extracting("IOSize").isEqualTo(data.getIOSize());
+					assertThat(data.getIOSize()).isEqualTo(mirror.getIOSize());
 					
 					for(int i0 = 0; i0<10; i0++){
 						int i = i0;

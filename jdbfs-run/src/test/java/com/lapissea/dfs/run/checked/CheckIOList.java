@@ -3,6 +3,7 @@ package com.lapissea.dfs.run.checked;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafePredicate;
@@ -34,7 +35,11 @@ public class CheckIOList<T> implements IOList<T>{
 		copyTestDataTo(tdCopy::add);
 		assertThat(tdCopy.size()).as("Number of iterated elements does not match the reported size").isEqualTo(reference.size());
 		
-		assertThat(tdCopy).containsExactlyElementsOf(reference);
+		if(!tdCopy.equals(reference)){
+			assertThat(tdCopy).as("Elements do not match reference")
+			                  .containsExactlyElementsOf(reference);
+			throw new ShouldNeverHappenError("Element equality should not pass");
+		}
 	}
 	
 	private <E extends Exception> void copyTestDataTo(UnsafeConsumer<T, E> dest) throws IOException, E{
