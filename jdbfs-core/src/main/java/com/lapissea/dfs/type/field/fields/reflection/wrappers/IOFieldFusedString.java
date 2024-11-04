@@ -87,6 +87,10 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 		super(accessor);
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, value) -> bytesField.getValue(ioPool, value)));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	@Override
 	public void init(FieldSet<CTyp> ioFields){
