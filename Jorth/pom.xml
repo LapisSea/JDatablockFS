@@ -14,7 +14,7 @@
 	</parent>
 	
 	<properties>
-		<asmVersion>9.7</asmVersion>
+		<asmVersion>9.7.1</asmVersion>
 	</properties>
 	
 	<dependencies>
