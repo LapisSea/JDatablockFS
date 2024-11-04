@@ -24,6 +24,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -52,22 +53,37 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive{
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive, IOFieldFusedString{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
 			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
+			
+			private final BiPredicate<Type, GetAnnotation> extraFilter;
+			
 			@SuppressWarnings("rawtypes")
 			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this(type, fieldTypes, (type0, annotations) -> true);
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, Predicate<GetAnnotation> annotationFilter){
+				this(type, fieldTypes, (type0, annotations) -> annotationFilter.test(annotations));
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, BiPredicate<Type, GetAnnotation> extraFilter){
 				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
+				this.extraFilter = Objects.requireNonNull(extraFilter);
 			}
 			
 			public final Class<Typ> getType(){
@@ -76,7 +92,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			@Override
 			public final boolean isCompatible(Type type, GetAnnotation annotations){
-				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
+				return UtilL.instanceOf(Utils.typeToRaw(type), getType()) && extraFilter.test(type, annotations);
 			}
 			@Override
 			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);

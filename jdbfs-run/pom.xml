@@ -10,13 +10,13 @@
 		<version>1.0</version>
 	</parent>
 	
-	<artifactId>run</artifactId>
+	<artifactId>jdbfs-run</artifactId>
 	<version>1.0</version>
 	
 	<dependencies>
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
-			<artifactId>tools</artifactId>
+			<artifactId>jdbfs-tools</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
@@ -28,7 +28,10 @@
 		<dependency>
 			<groupId>org.testng</groupId>
 			<artifactId>testng</artifactId>
-			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>

@@ -5,8 +5,10 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.run.checked.CheckIOList;
@@ -21,6 +23,7 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
@@ -29,6 +32,9 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import org.assertj.core.api.Assertions;
+import org.assertj.core.api.AssertionsForClassTypes;
+import org.assertj.core.api.OptionalAssert;
 import org.testng.ITestResult;
 
 import java.io.IOException;
@@ -36,6 +42,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -45,7 +52,6 @@ import java.util.random.RandomGenerator;
 import static com.lapissea.dfs.logging.Log.trace;
 import static com.lapissea.dfs.logging.Log.warn;
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
-import static org.testng.Assert.assertEquals;
 
 public final class TestUtils{
 	
@@ -144,7 +150,7 @@ public final class TestUtils{
 				throw new RuntimeException("Failed to read object with data", e);
 			}
 			
-			assertEquals(read, obj);
+			Assertions.assertThat(read).as("Complex object check must result in equality").isEqualTo(obj);
 		};
 		
 		var mem = makeRawMem(info);
@@ -196,21 +202,23 @@ public final class TestUtils{
 	}
 	
 	
-	public interface Task{
-		void run(RandomGenerator r, long iter);
+	public interface Task<E extends Exception>{
+		void run(RandomGenerator r, long iter) throws E;
 	}
 	
-	public static void randomBatch(int totalTasks, int batch, Task task){
+	public static <E extends Exception> void randomBatch(int totalTasks, Task<E> task){
 		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
-		randomBatch(name, totalTasks, batch, task);
+		randomBatch(name, totalTasks, task);
 	}
 	
-	public static void randomBatch(String name, int totalTasks, int batch, Task task){
-		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
+	public static <E extends Exception> void randomBatch(String name, int totalTasks, Task<E> task){
+		var fuz = new FuzzingRunner<RandomGenerator, Object, E>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
 		), FuzzingRunner::noopAction);
-		
-		fuz.runAndAssert(new FuzzConfig().withName(name), 69, totalTasks, batch);
+		var conf  = new FuzzConfig().withName(name);
+		var fails = fuz.run(conf, name.hashCode(), totalTasks, totalTasks/conf.maxWorkers());
+		if(fails.isEmpty()) return;
+		throw new RuntimeException("Failed fuzzing action", fails.getFirst().e());
 	}
 	
 	
@@ -313,5 +321,62 @@ public final class TestUtils{
 		var mem = LoggedMemoryUtils.newLoggedMemory(name, Lazy.LOGGER);
 		mem.write(true, new byte[MagicID.size()]);
 		return mem;
+	}
+	
+	public static <VALUE> OptionalAssert<VALUE> assertThat(OptionalPP<VALUE> actual){
+		return AssertionsForClassTypes.assertThat(actual.opt());
+	}
+	
+	public static <T extends IOInstance<T>> void checkPipeInOutEquality(StructPipe<T> pipe, T value) throws IOException{
+		var ch     = DataProvider.newVerySimpleProvider();
+		var memory = AllocateTicket.bytes(128).submit(ch);
+		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value);
+	}
+	
+	public static <Prov extends DataProvider.Holder & RandomIO.Creator, T extends IOInstance<T>>
+	void checkPipeInOutEquality(Prov memory, StructPipe<T> pipe, T value) throws IOException{
+		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value);
+	}
+	public static <T extends IOInstance<T>>
+	void checkPipeInOutEquality(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value) throws IOException{
+		try{
+			try(var io = memory.io()){
+				pipe.write(provider, io, value);
+				io.trim();
+			}
+		}catch(IOException e){
+			throw new IOException("Failed to write " + value + " for comparison", e);
+		}
+		T read;
+		try{
+			read = pipe.readNew(provider, memory, null);
+		}catch(IOException e){
+			throw new IOException("Failed to read data for comparison", e);
+		}
+		Assertions.assertThat(read)
+		          .as("read value not the same").isEqualTo(value)
+		          .as("values should not of same identity").isNotSameAs(value);
+	}
+	
+	public static <T extends IOInstance<T>> void checkRootsInOutEquality(T value) throws IOException{
+		var cluster = Cluster.emptyMem();
+		checkRootsInOutEquality(cluster, 1, value);
+	}
+	public static <T extends IOInstance<T>> void checkRootsInOutEquality(Cluster cluster, int id, T value) throws IOException{
+		Objects.requireNonNull(value);
+		try{
+			cluster.roots().provide(id, value);
+		}catch(IOException e){
+			throw new IOException("Failed to provide root value: " + value, e);
+		}
+		T read;
+		try{
+			read = cluster.roots().request(id, value.getThisStruct().getType());
+		}catch(IOException e){
+			throw new IOException("Failed to retrieve root value with id: " + id, e);
+		}
+		Assertions.assertThat(read)
+		          .as("retrieved root value not the same").isEqualTo(value)
+		          .as("values should not of same identity").isNotSameAs(value);
 	}
 }

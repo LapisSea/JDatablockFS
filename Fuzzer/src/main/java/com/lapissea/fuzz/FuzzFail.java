@@ -135,6 +135,12 @@ public sealed interface FuzzFail<State, Act>{
 			return note();
 		}
 		
+		private static String getStackTraceAsString(Throwable e){
+			var sw = new StringWriter();
+			e.printStackTrace(new PrintWriter(sw));
+			return sw.toString();
+		}
+		
 		@Override
 		public boolean equals(Object o){
 			if(this == o) return true;
@@ -142,7 +148,21 @@ public sealed interface FuzzFail<State, Act>{
 				Throwable e2, FuzzSequence sequence2, Object action2,
 				long actionIndex2, Duration timeToFail2, Object badState2
 			))) return false;
-			if(!e.equals(e2)) return false;
+			boolean overridesEquals;
+			try{
+				var obj = e.getClass().getMethod("equals", Object.class);
+				overridesEquals = obj.getDeclaringClass() != Object.class;
+			}catch(NoSuchMethodException ex){
+				throw new RuntimeException(ex);
+			}
+			if(overridesEquals){
+				if(!e.equals(e2)) return false;
+			}else{
+				var s1 = getStackTraceAsString(e);
+				var s2 = getStackTraceAsString(e2);
+				if(!s1.equals(s2)) return false;
+			}
+			
 			
 			return actionIndex == actionIndex2 &&
 			       sequence.equals(sequence2) &&

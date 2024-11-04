@@ -52,11 +52,11 @@ public final class Runner{
 	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolveLocking();
 	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolveValLocking();
 	
-	private static int             virtualChoke = 0;
-	private static boolean         chokeWarningEmited;
-	private static ExecutorService platformExecutor;
-	private static Instant         lastTask;
-	private static Thread          watcher;
+	private static volatile int             virtualChoke = 0;
+	private static          boolean         chokeWarningEmited;
+	private static          ExecutorService platformExecutor;
+	private static volatile Instant         lastTask;
+	private static volatile Thread          watcher;
 	
 	private static ExecutorService getPlatformExecutor(){
 		if(platformExecutor == null) makeExecutor();
@@ -245,8 +245,8 @@ public final class Runner{
 	 * @param task the constructor/generator of some data
 	 * @return a new {@link LateInit} with no checked exception.
 	 */
-	public static <T> LateInit.Safe<T> async(Supplier<T> task){
-		return new LateInit.Safe<>(task, run);
+	public static <T> CompletableFuture<T> async(Supplier<T> task){
+		return CompletableFuture.supplyAsync(task, run);
 	}
 	
 	/**

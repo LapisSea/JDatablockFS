@@ -1,7 +1,6 @@
 package com.lapissea.jorth;
 
 import com.lapissea.util.LogUtil;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -10,7 +9,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
@@ -22,12 +20,12 @@ import java.util.stream.Collectors;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
-import static org.testng.AssertJUnit.assertTrue;
-import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class JorthTests{
+	public interface UnsafeBiPredicate<T, U, E extends Exception>{
+		boolean test(T t, U u) throws E;
+	}
 	
 	static{
 		Thread.startVirtualThread(() -> new Jorth(null, null));
@@ -65,98 +63,6 @@ public class JorthTests{
 			return str;
 		}
 	}
-
-//	//TODO: Implement math
-//	@Test(expectedExceptions = NotImplementedException.class)
-//	void mathClass() throws ReflectiveOperationException{
-//
-//		var className = "jorth.Gen$$";
-//
-//		var cls = generateAndLoadInstance(className, writer -> {
-//			//define class
-//			writer.write("public class {!} start", className);
-//
-//			var types = List.of("byte", "short", "int", "long", "float", "double");
-//			for(int i = 0; i<types.size(); i++){
-//				var type1 = types.get(i);
-//				for(int j = 0; j<types.size(); j++){
-//					var type2 = types.get(j);
-//
-//					String returnType;
-//					var    k = Math.max(i, j);
-//					if((k == 4 || k == 5) && (i == 3 || j == 3)){
-//						returnType = "double";
-//					}else{
-//						returnType = types.get(k);
-//					}
-//
-//					for(var e : Map.of(
-//						"add", "+",
-//						"sub", "-",
-//						"div", "/",
-//						"mul", "*"
-//					).entrySet()){
-//						writer.write(
-//							"""
-//								static function {!}
-//									arg arg1 {}
-//									arg arg2 {}
-//									returns {}
-//								start
-//									get #arg arg1
-//									get #arg arg2
-//									{!}
-//								end
-//								""",
-//							e.getKey(),
-//							type1, type2, returnType,
-//							e.getValue());
-//					}
-//				}
-//			}
-//		});
-//
-//		Object ival;
-//
-//
-//		ival = cls.getMethod("add", int.class, int.class).invoke(null, 10, 2);
-//		assertEquals(12, ival);
-//
-//		ival = cls.getMethod("sub", int.class, int.class).invoke(null, 10, 2);
-//		assertEquals(8, ival);
-//
-//		ival = cls.getMethod("mul", int.class, int.class).invoke(null, 10, 2);
-//		assertEquals(20, ival);
-//
-//		ival = cls.getMethod("div", int.class, int.class).invoke(null, 10, 2);
-//		assertEquals(5, ival);
-//
-//
-//		ival = cls.getMethod("add", float.class, float.class).invoke(null, 10, 0.2F);
-//		assertEquals(10 + 0.2F, ival);
-//
-//		ival = cls.getMethod("sub", float.class, float.class).invoke(null, 10, 0.2F);
-//		assertEquals(10 - 0.2F, ival);
-//
-//		ival = cls.getMethod("mul", float.class, float.class).invoke(null, 10, 0.2F);
-//		assertEquals(10*0.2F, ival);
-//
-//		ival = cls.getMethod("div", float.class, float.class).invoke(null, 10, 0.2F);
-//		assertEquals(10/0.2F, ival);
-//
-//
-//		ival = cls.getMethod("add", double.class, double.class).invoke(null, 10, 0.2D);
-//		assertEquals(10 + 0.2D, ival);
-//
-//		ival = cls.getMethod("sub", double.class, double.class).invoke(null, 10, 0.2D);
-//		assertEquals(10 - 0.2D, ival);
-//
-//		ival = cls.getMethod("mul", double.class, double.class).invoke(null, 10, 0.2D);
-//		assertEquals(10*0.2D, ival);
-//
-//		ival = cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
-//		assertEquals(10/0.2D, ival);
-//	}
 	
 	@Test
 	void comparisonTest() throws ReflectiveOperationException{
@@ -181,17 +87,27 @@ public class JorthTests{
 					typ);
 			}
 		});
-		
 		var testStr = cls.getMethod("compare", String.class, String.class);
-		assertEquals(false, testStr.invoke(null, "0", "1"));
-		assertEquals(true, testStr.invoke(null, "1", "1"));
-		assertEquals(false, testStr.invoke(null, null, "1"));
-		assertEquals(false, testStr.invoke(null, "0", null));
-		assertEquals(true, testStr.invoke(null, null, null));
+		UnsafeBiPredicate<String, String, ReflectiveOperationException> testStrFn = (a, b) -> {
+			var res = testStr.invoke(null, a, b);
+			assertThat(res).as("Compare should return boolean").isInstanceOf(Boolean.class);
+			return (boolean)res;
+		};
+		
+		assertThat(testStrFn.test("0", "1")).isFalse();
+		assertThat(testStrFn.test("1", "1")).isTrue();
+		assertThat(testStrFn.test(null, "1")).isFalse();
+		assertThat(testStrFn.test("0", null)).isFalse();
+		assertThat(testStrFn.test(null, null)).isTrue();
 		
 		var test = cls.getMethod("compare", int.class, int.class);
-		assertEquals(false, test.invoke(null, 11, 10));
-		assertEquals(true, test.invoke(null, 10, 10));
+		UnsafeBiPredicate<Integer, Integer, ReflectiveOperationException> testFn = (a, b) -> {
+			var res = test.invoke(null, a, b);
+			assertThat(res).as("Compare should return boolean").isInstanceOf(Boolean.class);
+			return (boolean)res;
+		};
+		assertThat(testFn.test(11, 10)).isFalse();
+		assertThat(testFn.test(10, 10)).isTrue();
 	}
 	
 	@Test
@@ -221,9 +137,9 @@ public class JorthTests{
 		
 		var test = cls.getMethod("test", int.class);
 		
-		assertEquals("lmao 0", test.invoke(null, 0));
-		assertEquals("ay", test.invoke(null, 1));
-		assertEquals("lmao 2", test.invoke(null, 2));
+		assertThat(test.invoke(null, 0)).isEqualTo("lmao 0");
+		assertThat(test.invoke(null, 1)).isEqualTo("ay");
+		assertThat(test.invoke(null, 2)).isEqualTo("lmao 2");
 	}
 	
 	@Test
@@ -247,7 +163,7 @@ public class JorthTests{
 					start
 						get #arg obj
 						call flag
-						
+					
 						static call {} staticFlag
 					end
 					
@@ -274,12 +190,12 @@ public class JorthTests{
 				TestCls.class.getName());
 		});
 		TestCls test = new TestCls();
-		assertFalse(test.flag);
+		assertThat(test.flag).isFalse();
 		cls.getMethod("testFlag", TestCls.class).invoke(null, test);
-		assertTrue(test.flag);
+		assertThat(test.flag).isTrue();
 		
 		var inst = cls.getConstructor().newInstance();
-		assertEquals("ay lmao", cls.getMethod("useCall").invoke(inst));
+		assertThat(cls.getMethod("useCall").invoke(inst)).isEqualTo("ay lmao");
 		
 		cls.getMethod("printToConsole").invoke(null);
 	}
@@ -324,10 +240,7 @@ public class JorthTests{
 		
 		cls.getMethod("init", String.class).invoke(inst, msg);
 		
-		var str = inst.toString();
-		
-		LogUtil.println(cls, "says", str);
-		assertEquals(msg, str);
+		assertThat(inst).asString().isEqualTo(msg);
 	}
 	
 	@Test
@@ -350,9 +263,9 @@ public class JorthTests{
 			LogUtil.println(field.toString(), field.getGenericType().toString());
 		}
 		
-		assertFalse(cls.getField("noArray").getType().isArray());
-		assertTrue(cls.getField("1dArray").getType().isArray());
-		assertTrue(cls.getField("2dArray").getType().componentType().isArray());
+		assertThat(cls.getField("noArray").getType().isArray()).isFalse();
+		assertThat(cls.getField("1dArray").getType().isArray()).isTrue();
+		assertThat(cls.getField("2dArray").getType().componentType().isArray()).isTrue();
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
@@ -405,8 +318,8 @@ public class JorthTests{
 		});
 		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		var b = (DefaultAnn)cls.getField("b").getDeclaredAnnotations()[0];
-		assertEquals(321, a.value());
-		assertEquals(123, b.value());
+		assertThat(a.value()).isEqualTo(321);
+		assertThat(b.value()).isEqualTo(123);
 	}
 	
 	@Test
@@ -423,8 +336,8 @@ public class JorthTests{
 					"""
 			);
 		});
-		EnumAnn a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
-		assertEquals(RetentionPolicy.CLASS, a.value());
+		var a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
+		assertThat(a.value()).isEqualTo(RetentionPolicy.CLASS);
 	}
 	
 	@Test
@@ -443,10 +356,10 @@ public class JorthTests{
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
 		LogUtil.println((Object[])anns);
-		assertEquals(1, anns.length);
+		assertThat(anns).hasSize(1);
 		var ann = (MultiAnn)anns[0];
-		assertEquals("xD", ann.lol());
-		assertEquals(141, ann.value());
+		assertThat(ann.lol()).isEqualTo("xD");
+		assertThat(ann.value()).isEqualTo(141);
 	}
 	
 	@Test
@@ -465,10 +378,10 @@ public class JorthTests{
 		});
 		var anns = cls.getMethod("test").getAnnotations();
 		LogUtil.println((Object[])anns);
-		assertEquals(1, anns.length);
+		assertThat(anns).hasSize(1);
 		var ann = (MultiAnn)anns[0];
-		assertEquals("xD", ann.lol());
-		assertEquals(141, ann.value());
+		assertThat(ann.lol()).isEqualTo("xD");
+		assertThat(ann.value()).isEqualTo(141);
 	}
 	@Test
 	void classAnnotation() throws ReflectiveOperationException{
@@ -487,10 +400,10 @@ public class JorthTests{
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);
-		assertEquals(1, anns.length);
+		assertThat(anns).hasSize(1);
 		var ann = (MultiAnn)anns[0];
-		assertEquals("xD", ann.lol());
-		assertEquals(141, ann.value());
+		assertThat(ann.lol()).isEqualTo("xD");
+		assertThat(ann.value()).isEqualTo(141);
 	}
 	
 	@Test
@@ -512,12 +425,11 @@ public class JorthTests{
 		
 		var constr = cls.getConstructor();
 		var inst   = constr.newInstance();
-		var str    = inst.toString();
 		
 		var expected = new ISayHello().toString();
 		
-		LogUtil.println(cls, "says", str);
-		assertEquals(str, expected);
+		LogUtil.println(cls, "says", inst);
+		assertThat(inst).asString().isEqualTo(expected);
 	}
 	
 	@Test
@@ -539,10 +451,9 @@ public class JorthTests{
 		
 		var constr = cls.getConstructor();
 		var inst   = constr.newInstance();
-		var str    = inst.toString();
 		
-		LogUtil.println(cls, "says", str);
-		assertEquals(msg, str);
+		LogUtil.println(cls, "says", inst);
+		assertThat(inst).asString().isEqualTo(msg);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -562,7 +473,7 @@ public class JorthTests{
 		});
 		cls.getEnumConstants();
 		
-		assertEquals(List.of("FOO", "BAR"), EnumSet.allOf((Class<T>)cls).stream().map(Enum::name).toList());
+		assertThat(EnumSet.allOf((Class<T>)cls).stream().map(Enum::name)).containsExactly("FOO", "BAR");
 	}
 	
 	@Test
@@ -580,10 +491,10 @@ public class JorthTests{
 					""",
 				className);
 		});
-		assertTrue(cls.isInterface());
+		assertThat(cls).isInterface();
 		var hello = cls.getMethod("hello");
 		LogUtil.println(hello);
-		assertTrue(Modifier.isAbstract(hello.getModifiers()));
+		assertThat(Modifier.isAbstract(hello.getModifiers())).as("Method should be abstract").isTrue();
 	}
 	
 	@Test
@@ -603,7 +514,7 @@ public class JorthTests{
 		var expected = String.class;
 		var actual   = cls.getMethod("getCls").invoke(null);
 		
-		assertEquals(actual, expected);
+		assertThat(actual).isEqualTo(expected);
 	}
 	@Test
 	void superArgs() throws ReflectiveOperationException{
@@ -615,13 +526,13 @@ public class JorthTests{
 				"""
 					extends {!1}
 					public class {!0} start
-						
+					
 						function <init> start
 							super start
 								'{2}'
 							end
 						end
-						
+					
 					end
 					""",
 				className,
@@ -632,10 +543,9 @@ public class JorthTests{
 		
 		var constr = cls.getConstructor();
 		var inst   = constr.newInstance();
-		var str    = inst.toString();
 		
-		LogUtil.println(cls, "says", str);
-		assertEquals(expectedStr, str);
+		LogUtil.println(cls, "says", inst);
+		assertThat(inst).asString().isEqualTo(expectedStr);
 	}
 	
 	@Test
@@ -651,8 +561,8 @@ public class JorthTests{
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
 		
-		assertEquals(Optional.class, generic.getRawType());
-		assertArrayEquals(new Type[]{String.class}, generic.getActualTypeArguments());
+		assertThat(generic.getRawType()).isEqualTo(Optional.class);
+		assertThat(generic.getActualTypeArguments()).containsExactly(String.class);
 	}
 	
 	@Test(dependsOnMethods = "genericFieldDefine")
@@ -676,8 +586,8 @@ public class JorthTests{
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
 		
-		assertEquals(Optional.class, generic.getRawType());
-		assertArrayEquals(new Type[]{String.class}, generic.getActualTypeArguments());
+		assertThat(generic.getRawType()).isEqualTo(Optional.class);
+		assertThat(generic.getActualTypeArguments()).containsExactly(String.class);
 	}
 	
 	static class Typ{ }
@@ -692,20 +602,20 @@ public class JorthTests{
 		{
 			var fun = JorthTests.class.getDeclaredMethod("upper", List.class);
 			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-			assertArrayEquals(typ.getLowerBounds(), new Type[]{});
-			assertArrayEquals(typ.getUpperBounds(), new Type[]{Typ.class});
+			assertThat(typ.getLowerBounds()).isEmpty();
+			assertThat(typ.getUpperBounds()).containsExactly(Typ.class);
 		}
 		{
 			var fun = JorthTests.class.getDeclaredMethod("lower", List.class);
 			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-			assertArrayEquals(typ.getLowerBounds(), new Type[]{Typ.class});
-			assertArrayEquals(typ.getUpperBounds(), new Type[]{Object.class});
+			assertThat(typ.getLowerBounds()).containsExactly(Typ.class);
+			assertThat(typ.getUpperBounds()).containsExactly(Object.class);
 		}
 		{
 			var fun = JorthTests.class.getDeclaredMethod("wild", List.class);
 			var typ = (WildcardType)((ParameterizedType)fun.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-			assertArrayEquals(typ.getLowerBounds(), new Type[]{});
-			assertArrayEquals(typ.getUpperBounds(), new Type[]{Object.class});
+			assertThat(typ.getLowerBounds()).isEmpty();
+			assertThat(typ.getUpperBounds()).containsExactly(Object.class);
 		}
 		
 		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
@@ -732,17 +642,17 @@ public class JorthTests{
 		{
 			var funCtrl = JorthTests.class.getDeclaredMethod("upper", List.class);
 			var fun     = cls.getDeclaredMethod("upper", List.class);
-			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+			assertThat(fun).extracting("genericParameterTypes").isEqualTo(funCtrl.getGenericParameterTypes());
 		}
 		{
 			var funCtrl = JorthTests.class.getDeclaredMethod("lower", List.class);
 			var fun     = cls.getDeclaredMethod("lower", List.class);
-			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+			assertThat(fun).extracting("genericParameterTypes").isEqualTo(funCtrl.getGenericParameterTypes());
 		}
 		{
 			var funCtrl = JorthTests.class.getDeclaredMethod("wild", List.class);
 			var fun     = cls.getDeclaredMethod("wild", List.class);
-			assertEquals(fun.getGenericParameterTypes()[0], funCtrl.getGenericParameterTypes()[0]);
+			assertThat(fun).extracting("genericParameterTypes").isEqualTo(funCtrl.getGenericParameterTypes());
 		}
 	}
 	
@@ -765,9 +675,8 @@ public class JorthTests{
 		});
 		
 		var permits = cls.getPermittedSubclasses();
-		Assert.assertNotNull(permits);
-		var names = Arrays.stream(permits).map(Class::getName).collect(Collectors.toSet());
-		Assert.assertEquals(names, Set.of("child1", "child2"));
+		assertThat(permits).isNotNull();
+		assertThat(Arrays.stream(permits).map(Class::getName)).containsExactlyInAnyOrder("child1", "child2");
 	}
 	
 	@Test
@@ -786,10 +695,10 @@ public class JorthTests{
 		});
 		
 		var parms = cls.getTypeParameters();
-		assertEquals(1, parms.length);
+		assertThat(parms).hasSize(1);
 		var parm = parms[0];
-		assertEquals("T", parm.getName());
-		assertArrayEquals(new Type[]{CharSequence.class}, parm.getBounds());
+		assertThat(parm.getName()).isEqualTo("T");
+		assertThat(parm.getBounds()).containsExactly(CharSequence.class);
 	}
 	
 	@Test(dependsOnMethods = "parmClass")
@@ -801,12 +710,12 @@ public class JorthTests{
 				"""
 					type-arg T #CharSequence
 					public class ParmClass start
-						
+					
 						function takeArg
 							arg tList #List<T>
 						start
 						end
-						
+					
 					end
 					"""
 			);
@@ -814,13 +723,13 @@ public class JorthTests{
 		
 		var meth  = cls.getMethod("takeArg", List.class);
 		var parms = meth.getGenericParameterTypes();
-		assertEquals(1, parms.length);
-		assertTrue("Parameter is not a ParameterizedType", parms[0] instanceof ParameterizedType);
+		assertThat(parms).hasSize(1);
+		assertThat(parms[0]).isInstanceOf(ParameterizedType.class);
 		var arg1 = ((ParameterizedType)parms[0]).getActualTypeArguments()[0];
-		assertTrue("T is not a TypeVariable", arg1 instanceof TypeVariable);
+		assertThat(arg1).isInstanceOf(TypeVariable.class);
 		var targ = (TypeVariable<?>)arg1;
-		assertEquals("T", targ.getName());
-		assertArrayEquals(new Type[]{CharSequence.class}, targ.getBounds());
+		assertThat(targ.getName()).isEqualTo("T");
+		assertThat(targ.getBounds()).containsExactly(CharSequence.class);
 	}
 	
 	@Test(dependsOnMethods = "parmClass")
@@ -831,9 +740,9 @@ public class JorthTests{
 				"""
 					type-arg T #CharSequence
 					public class ParmClass start
-						
+					
 						field arg T
-						
+					
 					end
 					"""
 			);
@@ -841,10 +750,10 @@ public class JorthTests{
 		
 		var field = cls.getField("arg");
 		var type  = field.getGenericType();
-		assertTrue("Type is not a TypeVariable", type instanceof TypeVariable);
+		assertThat(type).isInstanceOf(TypeVariable.class);
 		var ttyp = (TypeVariable<?>)type;
-		assertEquals("T", ttyp.getName());
-		assertArrayEquals(new Type[]{CharSequence.class}, ttyp.getBounds());
+		assertThat(ttyp.getName()).isEqualTo("T");
+		assertThat(ttyp.getBounds()).containsExactly(CharSequence.class);
 	}
 	
 	private record Prop(String name, Class<?> type, Object defaultVal){ }
@@ -867,14 +776,14 @@ public class JorthTests{
 			writer.write(
 				"""
 					class {0} start
-						
+					
 						template-for #field in {1} start
 							public field #field.name #field.type
 						end
-						
+					
 						function <init> start
 							super
-							
+					
 							template-for #field in {1} start
 								#field.defaultVal set this #field.name
 							end
@@ -885,18 +794,13 @@ public class JorthTests{
 			);
 		});
 		
-		assertEquals(
-			props.stream().map(Prop::name).collect(Collectors.toSet()),
-			Arrays.stream(cls.getFields()).map(Field::getName).collect(Collectors.toSet())
-		);
+		assertThat(Arrays.stream(cls.getFields()).map(Field::getName))
+			.containsExactlyInAnyOrderElementsOf(props.stream().map(Prop::name).toList());
 		
 		var inst = cls.getConstructor().newInstance();
 		for(Field field : cls.getFields()){
-			assertEquals(
-				"Invalid default value for " + field.getName(),
-				props.stream().filter(f -> f.name.equals(field.getName())).map(Prop::defaultVal).findAny().orElseThrow(),
-				field.get(inst)
-			);
+			var expected = props.stream().filter(f -> f.name.equals(field.getName())).findAny().orElseThrow().defaultVal;
+			assertThat(field.get(inst)).as("Invalid default value for " + field.getName()).isEqualTo(expected);
 		}
 	}
 	
@@ -909,7 +813,7 @@ public class JorthTests{
 			writer.write(
 				"""
 					class {0} start
-						
+					
 						template-for #name in {1} start
 							public field #name int
 						end
@@ -919,9 +823,6 @@ public class JorthTests{
 			);
 		});
 		
-		assertEquals(
-			names,
-			Arrays.stream(cls.getFields()).map(Field::getName).collect(Collectors.toSet())
-		);
+		assertThat(Arrays.stream(cls.getFields()).map(Field::getName)).containsExactlyInAnyOrderElementsOf(names);
 	}
 }

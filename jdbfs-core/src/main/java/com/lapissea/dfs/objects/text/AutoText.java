@@ -25,6 +25,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.nio.CharBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -219,9 +220,9 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
 		dataSrc = bytes;
-		StringBuilder sb = new StringBuilder(charCount);
-		encoding.read(new ContentInputStream.BA(bytes), charCount, sb);
-		data = sb.toString();
+		var buff = CharBuffer.allocate(charCount);
+		encoding.read(new ContentInputStream.BA(bytes), buff);
+		data = buff.flip().toString();
 	}
 	
 	@NotNull

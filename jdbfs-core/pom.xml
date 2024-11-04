@@ -10,7 +10,7 @@
 		<version>1.0</version>
 	</parent>
 	
-	<artifactId>core</artifactId>
+	<artifactId>jdbfs-core</artifactId>
 	<version>1.0</version>
 	
 	<dependencies>
@@ -48,6 +48,10 @@
 			<groupId>org.testng</groupId>
 			<artifactId>testng</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
 		</dependency>
 	</dependencies>
 	
