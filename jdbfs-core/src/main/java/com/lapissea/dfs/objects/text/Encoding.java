@@ -1,7 +1,6 @@
 package com.lapissea.dfs.objects.text;
 
 import com.lapissea.dfs.exceptions.IllegalBitValue;
-import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -23,6 +22,7 @@ import java.util.List;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 import static com.lapissea.dfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.dfs.io.bit.BitUtils.makeMask;
 import static java.nio.charset.CodingErrorAction.REPORT;
@@ -363,7 +363,7 @@ public enum Encoding{
 			}
 		}
 		
-		private static final int ARR_OFF = MyUnsafe.UNSAFE.arrayBaseOffset(char[].class);
+		private static final int CHAR_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(char[].class);
 		
 		@Override
 		public void read(ContentInputStream src, CharBuffer dest) throws IOException{
@@ -422,7 +422,7 @@ public enum Encoding{
 				
 				for(int inner = 0; inner<blockCharCount; inner++){
 					var idx = (acum>>(bits*inner))&mask;
-					var c   = MyUnsafe.UNSAFE.getChar(chars, ARR_OFF + (idx<<1));
+					var c   = UNSAFE.getChar(chars, CHAR_ARRAY_OFFSET + (idx<<1));
 					buf[inner] = c;
 				}
 				
@@ -435,7 +435,7 @@ public enum Encoding{
 			var mask = chars.length - 1;
 			
 			var arr = dest.array();
-			var off = ARR_OFF + ((long)(dest.position() + dest.arrayOffset())<<1);
+			var off = CHAR_ARRAY_OFFSET + ((long)(dest.position() + dest.arrayOffset())<<1);
 			
 			var blockCount = charCount/blockCharCount;
 			
@@ -444,8 +444,8 @@ public enum Encoding{
 				
 				for(int inner = 0; inner<blockCharCount; inner++){
 					var idx = (acum>>(bits*inner))&mask;
-					var c   = MyUnsafe.UNSAFE.getChar(chars, ARR_OFF + (idx<<1));
-					MyUnsafe.UNSAFE.putChar(arr, off + inner*2L, c);
+					var c   = UNSAFE.getChar(chars, CHAR_ARRAY_OFFSET + (idx<<1));
+					UNSAFE.putChar(arr, off + inner*2L, c);
 				}
 				
 				off += blockCharCount*2;

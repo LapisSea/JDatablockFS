@@ -768,10 +768,6 @@ public final class MemoryOperations{
 	}
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
-		//TODO: re-enable this once DataProvider.withRouter is replaced with proper router
-//		assert firstChunk.getDataProvider()==context;
-//		assert target.getDataProvider()==context;
-		
 		var ptr = firstChunk.getPtr();
 		
 		var prev = new PhysicalChunkWalker(context.getFirstChunk())
