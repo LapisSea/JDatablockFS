@@ -22,6 +22,7 @@ import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 
 import static com.lapissea.dfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
@@ -42,6 +43,10 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 			case FLEXIBLE -> StandardStructPipe.of(struct);
 		};
 		
+	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.IO_INSTANCE);
 	}
 	
 	@Override
@@ -79,7 +84,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 	
 	@Override
 	public ValueType get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> null);
+		return getNullable(ioPool, instance, (ValueType)null);
 	}
 	@Override
 	public boolean isNull(VarPool<T> ioPool, T instance){

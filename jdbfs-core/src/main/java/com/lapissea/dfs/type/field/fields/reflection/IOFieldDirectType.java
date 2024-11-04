@@ -43,9 +43,7 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IONullability.class, (field1, ann1) -> {
-					return BehaviourSupport.ioNullability(field1, ann1);
-				}),
+				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
 				Behaviour.of(IOValue.class, (field, ann) -> {
 					return new BehaviourRes<>(
 						List.of(
@@ -81,6 +79,10 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	public IOFieldDirectType(FieldAccessor<T> accessor){
 		super(accessor);
 		initSizeDescriptor(SizeDescriptor.Fixed.empty());
+	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
 	}
 	
 	@Override

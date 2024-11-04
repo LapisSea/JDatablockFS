@@ -458,7 +458,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				type = Utils.typeToRaw(valTyp);
 			}
 			
-			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
+			if(field.typeFlag(IOField.IO_INSTANCE_FLAG)){
 				if(Struct.canUnknownHavePointers(type)){
 					builder.potentialReference();
 				}else{

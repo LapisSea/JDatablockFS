@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -69,14 +70,17 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){
-		if(!IOFieldTools.canHaveNullAnnotation(field)){
-			throw new MalformedStruct("fmt", "{}#red is not a supported field", field);
-		}
 		if(SupportedPrimitive.get(field.getType()).isPresent() && ann.value() == DEFAULT_IF_NULL){
 			throw new MalformedStruct("fmt", "Wrapper type on {}#yellow does not support {}#red mode", field, DEFAULT_IF_NULL);
 		}
 		
-		if(!IOFieldTools.isNullable(field) || !canHaveNullabilityField(field)) return BehaviourRes.non();
+		if(!IOFieldTools.isNullable(field)){
+			return BehaviourRes.non();
+		}
+		
+		if(!canHaveNullabilityField(field)){
+			throw new ShouldNeverHappenError();//TODO: remove this when fully tested
+		}
 		
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Boolean>(
 			StoragePool.IO,
@@ -169,7 +173,6 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> collectionLength(FieldAccessor<T> field){
-		if(field.hasAnnotation(IOValue.Reference.class)) return BehaviourRes.non();
 		var type   = field.getType();
 		var isList = type == List.class || type == ArrayList.class;
 		if(!type.isArray() && !isList){

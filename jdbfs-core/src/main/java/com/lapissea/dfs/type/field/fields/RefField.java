@@ -10,15 +10,18 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldObjectReference;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
 import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -45,7 +48,13 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> inlineSizeDescriptor){
 			super(accessor, inlineSizeDescriptor);
 		}
-		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Iters.of(
+				IOFieldTools.isGeneric(this)? TypeFlag.DYNAMIC : null,
+				TypeFlag.IO_INSTANCE
+			).nonNulls().toModSet();
+		}
 		@Override
 		public void allocate(T instance, DataProvider provider, GenericContext genericContext){
 			throw new UnsupportedOperationException();
@@ -57,6 +66,10 @@ public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOF
 		
 		public NoIOObj(FieldAccessor<T> accessor, SizeDescriptor<T> inlineSizeDescriptor){
 			super(accessor, inlineSizeDescriptor);
+		}
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return IOFieldTools.isGeneric(this)? Set.of(TypeFlag.DYNAMIC) : Set.of();
 		}
 		
 		@Override
