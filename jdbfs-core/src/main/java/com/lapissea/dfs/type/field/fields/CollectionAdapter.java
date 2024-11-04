@@ -30,6 +30,10 @@ import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
 public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 	
+	public interface CollectionContainer<ElementType, CollectionType>{
+		CollectionAdapter<ElementType, CollectionType> getCollectionAddapter();
+	}
+	
 	public interface ElementIOImpl<E>{
 		
 		final class PipeImpl<E extends IOInstance<E>> implements ElementIOImpl<E>{
@@ -86,6 +90,10 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 				}
 			}
 			
+			public Class<E> getRoot(){
+				return root;
+			}
+			
 			private StructPipe<E> getPipe(E element){
 				return pipeMap.get(element.getClass());
 			}
@@ -96,8 +104,8 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 			@Override
 			public Class<E> componentType(){
 				return root;
-				
 			}
+			
 			@Override
 			public long calcByteSize(DataProvider provider, E element){
 				if(element == null) return 1;

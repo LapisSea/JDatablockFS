@@ -107,7 +107,8 @@ public class InstanceCollection{
 	}
 	
 	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends NullFlagCompanyField<T, CollectionType>{
+		extends NullFlagCompanyField<T, CollectionType>
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -192,10 +193,13 @@ public class InstanceCollection{
 				TextUtil.toString(val)
 			);
 		}
+		@Override
+		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}
 	
 	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends RefField.ReferenceCompanion<T, CollectionType>{
+		extends RefField.ReferenceCompanion<T, CollectionType>
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -355,6 +359,8 @@ public class InstanceCollection{
 				TextUtil.toString(val)
 			);
 		}
+		@Override
+		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
