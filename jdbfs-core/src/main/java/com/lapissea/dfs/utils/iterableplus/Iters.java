@@ -246,6 +246,36 @@ public final class Iters{
 		}
 	}
 	
+	private record EntryIterable<K, V>(Object... data) implements IterablePP.SizedPP<Map.Entry<K, V>>{
+		private static final class Iter<K, V> implements Iterator<Map.Entry<K, V>>{
+			private       int      pos;
+			private final Object[] data;
+			private Iter(Object[] data){ this.data = data; }
+			@Override
+			public boolean hasNext(){ return pos<data.length; }
+			@SuppressWarnings("unchecked")
+			@Override
+			public Map.Entry<K, V> next(){
+				if(!hasNext()) throw new NoSuchElementException();
+				var k = (K)data[pos];
+				var v = (V)data[pos + 1];
+				pos += 2;
+				return new AbstractMap.SimpleEntry<>(k, v);
+			}
+		}
+		
+		@Override
+		public Iterator<Map.Entry<K, V>> iterator(){
+			return new Iter<>(data);
+		}
+		@Override
+		public OptionalInt getSize(){
+			return OptionalInt.of(data.length>>1);
+		}
+		@Override
+		public String toString(){ return Iters.toString(this); }
+	}
+	
 	private static final class FlatArrIterator<T> implements Iterator<T>{
 		private final Iterable<? extends T>[] iterables;
 		
@@ -477,6 +507,31 @@ public final class Iters{
 	public static <V> IterablePP.SizedPP<V> values(Map<?, V> data)                  { return new CollectionIterable<>(data.values()); }
 	public static <K> IterablePP.SizedPP<K> keys(Map<K, ?> data)                    { return new CollectionIterable<>(data.keySet()); }
 	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(Map<K, V> data){ return new CollectionIterable<>(data.entrySet()); }
+	
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1){
+		return new SingleIterable<>(new AbstractMap.SimpleEntry<>(k1, v1));
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2){
+		return new EntryIterable<>(k1, v1, k2, v2);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3, k4, v4);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3, k4, v4, k5, v5);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7);
+	}
+	public static <K, V> IterablePP.SizedPP<Map.Entry<K, V>> entries(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8){
+		return new EntryIterable<>(k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8);
+	}
 	
 	public static <T> IterablePP.SizedPP<T> rangeMap(int fromInclusive, int toExclusive, IntFunction<T> mapping){
 		if(fromInclusive>toExclusive) throw new IllegalArgumentException(fromInclusive + " > " + toExclusive);
