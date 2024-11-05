@@ -75,8 +75,6 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE("purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	
-	Flag.FBool USE_UNSAFE_LOOKUP = flagB("useUnsafeForAccess", true);
-	
 	Flag.FBool DISABLE_TRANSACTIONS = flagB("io.disableTransactions", false);
 	Flag.FBool SYNCHRONOUS_FILE_IO  = flagB("io.synchronousFileIO", false);
 	

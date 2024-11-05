@@ -1,17 +1,14 @@
 package com.lapissea.dfs.internal;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.exceptions.MissingAccessConsent;
 import com.lapissea.dfs.exceptions.MissingConstructor;
-import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.NewObj;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -27,46 +24,51 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 
-import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
-import static java.lang.invoke.MethodHandles.Lookup.*;
+import static java.lang.invoke.MethodHandles.Lookup.MODULE;
+import static java.lang.invoke.MethodHandles.Lookup.PRIVATE;
+import static java.lang.invoke.MethodHandles.Lookup.PUBLIC;
 
 @SuppressWarnings("unchecked")
 public final class Access{
-	
-	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolveValLocking();
-	
-	private static long calcModesOffset(){
-		@SuppressWarnings("all")
-		final class Mirror{
-			Class<?> lookupClass;
-			Class<?> prevLookupClass;
-			int      allowedModes;
-			
-			volatile ProtectionDomain cachedProtectionDomain;
-			
-			Mirror(Class<?> lookupClass, Class<?> prevLookupClass, int allowedModes){
-				this.lookupClass = lookupClass;
-				this.prevLookupClass = prevLookupClass;
-				this.allowedModes = allowedModes;
-			}
-		}
+	public enum Mode{
+		PUBLIC(MethodHandles.Lookup.PUBLIC),
+		MODULE(MethodHandles.Lookup.MODULE),
+		PACKAGE(MethodHandles.Lookup.PACKAGE),
+		PROTECTED(MethodHandles.Lookup.PROTECTED),
+		PRIVATE(MethodHandles.Lookup.PRIVATE),
+		ORIGINAL(MethodHandles.Lookup.ORIGINAL),
+		UNCONDITIONAL(MethodHandles.Lookup.UNCONDITIONAL),
+		;
 		
-		long offset;
-		try{
-			offset = MyUnsafe.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes"));
-		}catch(NoSuchFieldException e){
-			throw new RuntimeException(e);
-		}
-		return offset;
+		final int flag;
+		Mode(int flag){ this.flag = flag; }
+	}
+	
+	private static final Map<Class<?>, MethodHandles.Lookup> PRIVATE_LOOKUPS = new ConcurrentHashMap<>();
+	
+	public static void addLookup(MethodHandles.Lookup lookup){
+		if((lookup.lookupModes()&(PRIVATE|MODULE)) != (PRIVATE|MODULE)) badLookup(lookup);
+		PRIVATE_LOOKUPS.put(lookup.lookupClass(), lookup);
+	}
+	private static void badLookup(MethodHandles.Lookup lookup){
+		var modes = Iters.from(Mode.values())
+		                 .filter(e -> UtilL.checkFlag(lookup.lookupModes(), e.flag))
+		                 .joinAsStr(", ", "[", "]");
+		
+		throw new IllegalArgumentException(
+			Log.fmt("Lookup of {}#red must have {#yellow[PRIVATE, MODULE]#} access but has {}#yellow!", lookup, modes)
+		
+		);
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
@@ -81,7 +83,7 @@ public final class Access{
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
 		try{
 			method.setAccessible(true);
-			var lookup = getLookup(method.getDeclaringClass());
+			var lookup = getLookup(method.getDeclaringClass(), Mode.PRIVATE, Mode.MODULE);
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda for method " + method + " with " + functionalInterface, e);
@@ -100,7 +102,7 @@ public final class Access{
 				if(unop != null) return unop;
 			}
 			
-			var lookup = getLookup(constructor.getDeclaringClass());
+			var lookup = getLookup(constructor.getDeclaringClass(), Mode.PRIVATE, Mode.MODULE);
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
@@ -178,67 +180,92 @@ public final class Access{
 		return methods.getFirst();
 	}
 	
-	public static MethodHandles.Lookup privateLookupIn(Class<?> clazz) throws IllegalAccessException{
+	private static MethodHandles.Lookup privateLookupIn(Class<?> clazz) throws IllegalAccessException{
+		var lookup = getPrivateLookup(clazz);
+		if(lookup != null) return lookup;
+		
+		if(tryLoad(clazz)){
+			lookup = getPrivateLookup(clazz);
+			if(lookup != null) return lookup;
+		}
+		
+		return MethodHandles.publicLookup();
+
+//		try{
+//			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+//		}catch(IllegalAccessException e){
+//			var tc         = Utils.getCallee(0);
+//			var thisModule = tc.getModule().getName();
+//			if(!e.getMessage().contains(thisModule + " does not read ")){
+//				throw e;
+//			}
+//			allowModule(clazz);
+//			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+//		}
+	}
+	private static boolean tryLoad(Class<?> clazz){
+		if(tryLoad(MethodHandles.publicLookup(), clazz)){
+			return true;
+		}
+		if(Iters.entries(PRIVATE_LOOKUPS)
+		        .filter(e -> e.getKey().getClassLoader() == clazz.getClassLoader() &&
+		                     e.getKey().getPackageName().equals(clazz.getPackageName()))
+		        .map(Map.Entry::getValue)
+		        .anyMatch(lookup -> tryLoad(lookup, clazz))){
+			return true;
+		}
+		for(var lookup : PRIVATE_LOOKUPS.values()){
+			if(tryLoad(lookup, clazz)){
+				return true;
+			}
+		}
+		return false;
+	}
+	private static boolean tryLoad(MethodHandles.Lookup lookup, Class<?> clazz){
 		try{
-			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
-		}catch(IllegalAccessException e){
-			var tc         = Utils.getCallee(0);
-			var thisModule = tc.getModule().getName();
-			if(!e.getMessage().contains(thisModule + " does not read ")){
-				throw e;
-			}
-			allowModule(clazz);
-			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+			lookup.ensureInitialized(clazz);
+		}catch(Throwable e){
+			return false;
 		}
+		return true;
+	}
+	private static MethodHandles.Lookup getPrivateLookup(Class<?> clazz) throws IllegalAccessException{
+		var givenLookup = PRIVATE_LOOKUPS.get(clazz);
+		if(givenLookup != null){
+			assert givenLookup.lookupClass() == clazz;
+			return givenLookup;
+		}
+		var outer = clazz;
+		while(true){
+			outer = outer.getEnclosingClass();
+			if(outer == null) break;
+			
+			var outerLookup = PRIVATE_LOOKUPS.get(outer);
+			if(outerLookup != null){
+				assert outerLookup.lookupClass() == outer;
+				return MethodHandles.privateLookupIn(clazz, outerLookup);
+			}
+		}
+		return null;
 	}
 	
-	private static MethodHandles.Lookup getLookup(Class<?> clazz) throws IllegalAccessException{
-		var lookup = privateLookupIn(clazz);
-		if(lookup.hasFullPrivilegeAccess()){
-			return lookup;
-		}
+	public static MethodHandles.Lookup getLookup(Class<?> clazz, Mode... requiredModes) throws IllegalAccessException{
+		var lookup       = privateLookupIn(clazz);
+		var missingModes = Iters.from(requiredModes).filter(m -> (lookup.lookupModes()&m.flag) == 0);
+		missingModes.joinAsOptionalStr(", ", "[", "]")
+		            .ifPresent(missing -> {
+			            throw new MissingAccessConsent(
+				            "fmt",
+				            "No consent was provided for {}#red and required attributes can not be accessed!\n" +
+				            "  {#yellowNote:#} Have you added {#greenstatic{ allowFullAccess(MethodHandles.lookup()); }#} to your class?",
+				            clazz
+			            );
+		            });
 		
-		var local = MethodHandles.lookup();
-		if(USE_UNSAFE_LOOKUP){
-			local = MethodHandles.privateLookupIn(clazz, local);
-			corruptPermissions(local);
-			return local;
-		}else{
-			throw new NotImplementedException("Ask for consent not implemented");//TODO implement consent
+		if(requiredModes.length == 0){
+			return lookup.dropLookupMode(PUBLIC);
 		}
-	}
-	
-	private static void corruptPermissions(MethodHandles.Lookup lookup){
-		int allModes = PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL;
-		
-		if(lookup.lookupModes() == allModes){
-			return;
-		}
-		
-		//Ensure only intended/relevant lookup is corrupted
-		checkTarget:
-		{
-			var cls = lookup.lookupClass();
-			
-			for(var consentClass : List.of(IOInstance.class, StructPipe.class, ChunkPointer.class)){
-				if(UtilL.instanceOf(cls, consentClass)){
-					break checkTarget;
-				}
-			}
-			
-			throw new SecurityException("Unsafe attempt of lookup modification: " + lookup);
-		}
-		
-		//calculate objectFieldOffset every time as JVM may not keep a constant for a field
-		long offset = calcModesOffset();
-		
-		UNSAFE.getAndSetInt(lookup, offset, allModes);
-		if(lookup.lookupModes() != allModes){
-			throw new ShouldNeverHappenError();
-		}
-		if(!lookup.hasFullPrivilegeAccess()){
-			throw new ShouldNeverHappenError();
-		}
+		return lookup;
 	}
 	
 	private static void allowModule(Class<?> clazz){
@@ -253,31 +280,39 @@ public final class Access{
 	
 	public static VarHandle makeVarHandle(Field field){
 		try{
-			var lookup = getLookup(field.getDeclaringClass());
+			var lookup = getLookup(field.getDeclaringClass(), Mode.PRIVATE);
 			field.setAccessible(true);
 			return lookup.unreflectVarHandle(field);
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create VarHandle\n" + field, e);
+			throw failMakeHandle("failed to create VarHandle\nField: " + field, e);
 		}
 	}
 	
-	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> method){
+	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> constructor){
 		try{
-			var lookup = privateLookupIn(method.getDeclaringClass());
-			method.setAccessible(true);
-			return lookup.unreflectConstructor(method);
+			var lookup = getLookup(constructor.getDeclaringClass());
+			constructor.setAccessible(true);
+			return lookup.unreflectConstructor(constructor);
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create MethodHandle\n" + method, e);
+			throw failMakeHandle("failed to create MethodHandle\nConstructor: " + constructor, e);
 		}
 	}
 	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
-			var lookup = privateLookupIn(method.getDeclaringClass());
+			var lookup = getLookup(method.getDeclaringClass());
 			method.setAccessible(true);
 			return lookup.unreflect(method);
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create MethodHandle\n" + method, e);
+			throw failMakeHandle("failed to create MethodHandle\nMethod: " + method, e);
 		}
+	}
+	private static RuntimeException failMakeHandle(String message, Throwable e){
+		var er = new RuntimeException(message, e);
+		if(e instanceof MissingAccessConsent mac){
+			mac.addSuppressed(er);
+			throw mac;
+		}
+		throw er;
 	}
 	
 	

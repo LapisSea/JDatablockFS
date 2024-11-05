@@ -60,6 +60,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.ParameterizedType;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -84,6 +85,10 @@ import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.util.ConsoleColors.RESET;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
+	
+	protected static void allowFullAccess(MethodHandles.Lookup lookup){
+		Access.addLookup(lookup);
+	}
 	
 	/**
 	 * This annotation specifies that the defined type contains critical information within the static initializer.<br>

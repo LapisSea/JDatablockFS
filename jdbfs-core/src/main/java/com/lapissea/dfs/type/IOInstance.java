@@ -31,6 +31,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -263,6 +264,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
+		static{ allowFullAccess(MethodHandles.lookup()); }
+		
+		protected static void allowFullAccess(MethodHandles.Lookup lookup){
+			Access.addLookup(lookup);
+		}
 		
 		private Struct<SELF>  thisStruct;
 		private VarPool<SELF> virtualFields;
@@ -457,6 +463,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public interface DynamicFields<SELF extends Unmanaged<SELF>>{
 			@NotNull
 			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
+		}
+		
+		protected static void allowFullAccess(MethodHandles.Lookup lookup){
+			Access.addLookup(lookup);
 		}
 		
 		private final DataProvider   provider;
@@ -715,7 +725,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return getIdentity().hashCode();
 		}
 	}
-	
 	
 	Struct<SELF> getThisStruct();
 	
