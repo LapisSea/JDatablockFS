@@ -60,6 +60,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -95,12 +98,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
-		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
-			P make(Struct<T> type, boolean runNow);
-		}
-		
 		private final Map<Struct<T>, Supplier<P>> specials = new HashMap<>();
-		private final PipeConstructor<T, P>       lConstructor;
+		private final Constructor<P>              constructor;
 		private final Class<?>                    type;
 		
 		private static class CompileInfo{
@@ -113,7 +112,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
-				lConstructor = Access.makeLambda(type.getConstructor(Struct.class, boolean.class), PipeConstructor.class);
+				//noinspection unchecked
+				constructor = (Constructor<P>)type.getConstructor(Struct.class, boolean.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
@@ -148,7 +148,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
-		@SuppressWarnings("unchecked")
 		private P createPipe(Struct<T> struct, boolean runNow){
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
@@ -176,23 +175,21 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var special = specials.get(struct);
 				if(special != null){
 					var specialInst = special.get();
-					if(DEBUG_VALIDATION){
-						var check = lConstructor.make(struct, runNow);
-						created = switch(check){
-							case StandardStructPipe<?> p ->
-								(P)new CheckedPipe.Standard<>((StandardStructPipe<T>)check, (StandardStructPipe<T>)specialInst);
-							case FixedStructPipe<?> p -> (P)new CheckedPipe.Fixed<>((FixedStructPipe<T>)check, (FixedStructPipe<T>)specialInst);
-							default -> check;
-						};
-					}else{
-						created = specialInst;
-					}
+					if(DEBUG_VALIDATION) created = makeCheckedSpecialPipe(struct, runNow, specialInst);
+					else created = specialInst;
 				}else{
-					created = lConstructor.make(struct, runNow);
+					created = constructor.newInstance(struct, runNow);
 				}
-			}catch(Throwable e){
+			}catch(InvocationTargetException|ExceptionInInitializerError outerError){
+				var cause = outerError.getCause();
+				if(cause == null){
+					cause = new IllegalStateException("Exception cause should not be null", outerError);
+				}
+				errors.put(struct, cause);
+				throw UtilL.uncheckedThrow(cause);
+			}catch(ReflectiveOperationException e){
 				errors.put(struct, e);
-				throw e;
+				throw new RuntimeException("Failed to instantiate pipe", e);
 			}
 			
 			//TODO: replace put/remove with scoped value as temporary storage before putting. Avoid potentially invalid result
@@ -229,6 +226,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}, e -> Log.warn("Failed to compile: {}#yellow asynchronously because:\n\t{}#red", created, Utils.errToStackTraceOnDemand(e)));
 			}
 			
+			return created;
+		}
+		
+		@SuppressWarnings("unchecked")
+		private P makeCheckedSpecialPipe(Struct<T> struct, boolean runNow, P specialInst) throws ReflectiveOperationException{
+			P   created;
+			var check = constructor.newInstance(struct, runNow);
+			created = switch(check){
+				case StandardStructPipe<?> p -> (P)new CheckedPipe.Standard<>((StandardStructPipe<T>)check, (StandardStructPipe<T>)specialInst);
+				case FixedStructPipe<?> p -> (P)new CheckedPipe.Fixed<>((FixedStructPipe<T>)check, (FixedStructPipe<T>)specialInst);
+				default -> check;
+			};
 			return created;
 		}
 		

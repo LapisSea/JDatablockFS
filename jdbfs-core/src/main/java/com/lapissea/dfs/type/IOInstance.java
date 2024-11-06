@@ -191,7 +191,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		static <T extends Def<T>> T of(Class<T> clazz){
-			return Struct.of(clazz).make();
+			return Struct.of(clazz, Struct.STATE_CONCRETE_TYPE).make();
 		}
 		
 		static <T extends Def<T>> T of(Class<T> clazz, int arg1){
