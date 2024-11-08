@@ -9,7 +9,6 @@ import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.exceptions.TypeIOFail;
-import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -51,6 +50,7 @@ import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -60,7 +60,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
@@ -113,7 +112,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
 				//noinspection unchecked
-				constructor = (Constructor<P>)type.getConstructor(Struct.class, boolean.class);
+				constructor = (Constructor<P>)type.getConstructor(Struct.class, int.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
@@ -125,13 +124,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private final Duration                      gcDelay          = ConfigDefs.DELAY_COMP_OBJ_GC.resolveLocking();
 		private final GcDelayer                     gcDelayer        = gcDelay.isZero()? null : new GcDelayer();
 		
-		P make(Struct<T> struct, boolean runNow){
+		P make(Struct<T> struct, int syncStage){
 			var cached = pipes.get(struct);
 			if(cached != null) return cached;
-			return lockingMake(struct, runNow);
+			return lockingMake(struct, syncStage);
 		}
 		
-		private P lockingMake(Struct<T> struct, boolean runNow){
+		private P lockingMake(Struct<T> struct, int syncStage){
 			var info = locks.computeIfAbsent(struct, __ -> new CompileInfo());
 			try(var ignored = info.lock.open()){
 				var cached = pipes.get(struct);
@@ -142,13 +141,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 				info.recursiveCompilingDepth++;
 				
-				return createPipe(struct, runNow);
+				return createPipe(struct, syncStage);
 			}finally{
 				locks.remove(struct);
 			}
 		}
 		
-		private P createPipe(Struct<T> struct, boolean runNow){
+		private P createPipe(Struct<T> struct, int syncStage){
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			
@@ -175,10 +174,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var special = specials.get(struct);
 				if(special != null){
 					var specialInst = special.get();
-					if(DEBUG_VALIDATION) created = makeCheckedSpecialPipe(struct, runNow, specialInst);
+					if(DEBUG_VALIDATION) created = makeCheckedSpecialPipe(struct, syncStage, specialInst);
 					else created = specialInst;
 				}else{
-					created = constructor.newInstance(struct, runNow);
+					created = constructor.newInstance(struct, syncStage);
 				}
 			}catch(InvocationTargetException|ExceptionInInitializerError outerError){
 				var cause = outerError.getCause();
@@ -194,7 +193,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			//TODO: replace put/remove with scoped value as temporary storage before putting. Avoid potentially invalid result
 			pipes.put(struct, created);
-			if(runNow){
+			if(syncStage == STATE_DONE){
 				try{
 					created.postValidate();
 				}catch(Throwable e){
@@ -230,9 +229,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		@SuppressWarnings("unchecked")
-		private P makeCheckedSpecialPipe(Struct<T> struct, boolean runNow, P specialInst) throws ReflectiveOperationException{
+		private P makeCheckedSpecialPipe(Struct<T> struct, int syncStage, P specialInst) throws ReflectiveOperationException{
 			P   created;
-			var check = constructor.newInstance(struct, runNow);
+			var check = constructor.newInstance(struct, syncStage);
 			created = switch(check){
 				case StandardStructPipe<?> p -> (P)new CheckedPipe.Standard<>((StandardStructPipe<T>)check, (StandardStructPipe<T>)specialInst);
 				case FixedStructPipe<?> p -> (P)new CheckedPipe.Fixed<>((FixedStructPipe<T>)check, (FixedStructPipe<T>)specialInst);
@@ -252,7 +251,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct, int minRequestedStage){
 		try{
 			var group = (StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-			var pipe  = group.make(struct, minRequestedStage == STATE_DONE);
+			var pipe  = group.make(struct, minRequestedStage);
 			pipe.waitForState(minRequestedStage);
 			return pipe;
 		}catch(Throwable e){
@@ -264,7 +263,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
 		try{
 			var group = (StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-			return group.make(struct, false);
+			return group.make(struct, STATE_NOT_STARTED);
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);
 		}
@@ -292,42 +291,50 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2, LOCAL_DATA = 3;
 	
-	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
+	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, int syncStage) throws E{
 		this.type = type;
-		init(initNow, () -> {
-			needsBuilderObj = this.type.needsBuilderObj();
-			
-			PipeFieldCompiler.Result<T> res;
-			try{
-				res = compiler.compile(getType(), getType().getFields());
-				this.ioFields = FieldSet.of(res.fields());
-			}catch(Exception e){
-				throw UtilL.uncheckedThrow(e);
-			}
-			
-			var bt = needsBuilderObj? builderObjectTask(initNow, res.builderMetadata()) : null;
-			
-			if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
-			
-			fieldDependency = new FieldDependency<>(ioFields);
-			setInitState(STATE_IO_FIELD);
-			
-			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
-			setInitState(STATE_SIZE_DESC);
-			
-			generators = Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(ioFields));
-			
-			referenceWalkCommands = generateReferenceWalkCommands();
-			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
-				getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
-				             .toList()
-			);
-			setInitState(LOCAL_DATA);
-			if(bt != null){
-				builderPipe = bt.join();
+		ObjectHolder<CompletableFuture<StructPipe<ProxyBuilder<T>>>> builderTask = new ObjectHolder<>();
+		init(syncStage, runStage -> {
+			switch(runStage){
+				case STATE_IO_FIELD -> {
+					needsBuilderObj = this.type.needsBuilderObj();
+					
+					PipeFieldCompiler.Result<T> res;
+					try{
+						res = compiler.compile(getType(), getType().getFields());
+						this.ioFields = FieldSet.of(res.fields());
+					}catch(Exception e){
+						throw UtilL.uncheckedThrow(e);
+					}
+					
+					builderTask.obj = needsBuilderObj? builderObjectTask(syncStage == STATE_DONE, res.builderMetadata()) : null;
+					
+					if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
+					
+					fieldDependency = new FieldDependency<>(ioFields);
+				}
+				case STATE_SIZE_DESC -> {
+					sizeDescription = Objects.requireNonNull(createSizeDescriptor());
+				}
+				case LOCAL_DATA -> {
+					generators = Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(ioFields));
+					
+					referenceWalkCommands = generateReferenceWalkCommands();
+					earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
+						getNonNulls().filter(f -> generators == null || Iters.from(generators).noneMatch(gen -> gen.field() == f))
+						             .toList()
+					);
+				}
+				case STATE_DONE -> {
+					var bt = builderTask.obj;
+					if(bt != null){
+						builderPipe = bt.join();
+					}
+				}
+				default -> throw new NotImplementedException();
 			}
 			//Do not post validate now, will create issues with recursive types. It is called in registration
-		}, initNow? null : this::postValidate);
+		}, syncStage == STATE_DONE? null : this::postValidate);
 	}
 	
 	boolean needsBuilderObj(){
@@ -1224,6 +1231,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public String toString(){
 		return shortPipeName(getClass()) + "(" + type.cleanName() + ")";
 	}
+	@Override
+	public String toShortString(){ return toString(); }
 	
 	protected static String shortPipeName(Class<?> cls){
 		var pipName = cls.getSimpleName();

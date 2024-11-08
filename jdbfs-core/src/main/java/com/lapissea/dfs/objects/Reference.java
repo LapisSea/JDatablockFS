@@ -14,6 +14,7 @@ import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
@@ -49,7 +50,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 				}
 				
 				throw new ShouldNeverHappenError(f.toString());
-			}, true){
+			}, StagedInit.STATE_NOT_STARTED){
 				
 				private static final int NULL_HEADER = (int)BitFieldMerger.calcIntegrityBits(0, 2, 6);
 				
@@ -102,7 +103,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 				}
 				
 				throw new ShouldNeverHappenError(f.toString());
-			}, true){
+			}, StagedInit.STATE_NOT_STARTED){
 				@Override
 				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
 					

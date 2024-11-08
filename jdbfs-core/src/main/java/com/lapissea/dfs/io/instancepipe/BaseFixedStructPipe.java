@@ -28,8 +28,8 @@ import static java.util.function.Predicate.not;
 
 public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public <E extends Exception> BaseFixedStructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
-		super(type, compiler, initNow);
+	public <E extends Exception> BaseFixedStructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, int syncStage) throws E{
+		super(type, compiler, syncStage);
 	}
 	
 	

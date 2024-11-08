@@ -27,7 +27,7 @@ import static com.lapissea.util.ConsoleColors.RESET;
 final class CompileStructTools{
 	
 	interface MakeStruct<T extends IOInstance<T>, S extends Struct<T>>{
-		S make(Class<T> type, boolean runNow);
+		S make(Class<T> type, int syncStage);
 	}
 	
 	private static class WaitHolder{
@@ -132,7 +132,7 @@ final class CompileStructTools{
 	
 	
 	@SuppressWarnings("unchecked")
-	static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, MakeStruct<T, S> newStruct, boolean runNow){
+	static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, MakeStruct<T, S> newStruct, int syncStage){
 		if(!IOInstance.isInstance(instanceClass)){
 			throw new ClassCastException(instanceClass.getName() + " is not an " + IOInstance.class.getSimpleName());
 		}
@@ -149,7 +149,7 @@ final class CompileStructTools{
 			if(instanceClass.getName().endsWith(IOInstance.Def.IMPL_NAME_POSTFIX) && UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
 				var unmapped = IOInstance.Def.unmap((Class<? extends IOInstance.Def<?>>)instanceClass);
 				if(unmapped.isPresent()){
-					return compile((Class<T>)unmapped.get(), newStruct, runNow);
+					return compile((Class<T>)unmapped.get(), newStruct, syncStage);
 				}
 			}
 		}
@@ -186,11 +186,11 @@ final class CompileStructTools{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
 				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, wh);
 				
-				if(runNow) lock.getLock().unlock();
+				lock.getLock().unlock();
 				try{
-					struct = newStruct.make(instanceClass, runNow);
+					struct = newStruct.make(instanceClass, syncStage);
 				}finally{
-					if(runNow) lock.getLock().lock();
+					lock.getLock().lock();
 				}
 				
 				var old = STRUCT_CACHE.put(instanceClass, struct);

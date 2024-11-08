@@ -19,6 +19,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -63,19 +64,37 @@ public abstract class StagedInit implements Stringify{
 	
 	private Map<Integer, String> statesCache;
 	
-	protected void init(boolean runNow, Runnable init){
-		init(runNow, init, null);
+	protected interface Init{
+		void init(int state);
 	}
-	protected void init(boolean runNow, Runnable init, Runnable postValidate){
-		if(runNow){
+	protected void init(int runTillState, Init multiInit, Runnable postValidate){
+		
+		var stages = new ArrayDeque<>(
+			listStates().mapToInt(StateInfo::id)
+			            .removing(STATE_ERROR, STATE_NOT_STARTED, STATE_START)
+			            .sorted()
+			            .box().asCollection()
+		);
+		boolean syncStart = runTillState>STATE_NOT_STARTED;
+		if(syncStart){
 			if(DEBUG_VALIDATION) validateStates();
-			try{
-				initInfo.ctxThread = Thread.currentThread();
+			
+			initInfo.ctxThread = Thread.currentThread();
+			
+			setInitState(STATE_START);
+			
+			Integer stage;
+			while((stage = stages.peekFirst()) != null){
+				if(stage>runTillState){
+					break;
+				}
+				stages.removeFirst();
 				
-				setInitState(STATE_START);
-				init.run();
-				setInitState(STATE_DONE);
-				
+				multiInit.init(stage);
+				setInitState(stage);
+			}
+			
+			if(stages.isEmpty()){
 				if(postValidate != null){
 					try{
 						postValidate.run();
@@ -83,10 +102,10 @@ public abstract class StagedInit implements Stringify{
 						Log.trace("{}#red has attempted to validate but it requires itself. Giving up.", this);//TODO: a better way?
 					}
 				}
-			}finally{
 				initInfo = null;
+				return;
 			}
-			return;
+			initInfo.ctxThread = null;
 		}
 		
 		Runner.run(() -> {
@@ -94,9 +113,12 @@ public abstract class StagedInit implements Stringify{
 			try{
 				initInfo.ctxThread = Thread.currentThread();
 				
-				setInitState(STATE_START);
-				init.run();
-				setInitState(STATE_DONE);
+				if(!syncStart) setInitState(STATE_START);
+				
+				for(var stage : stages){
+					multiInit.init(stage);
+					setInitState(stage);
+				}
 				
 				if(postValidate != null){
 					postValidate.run();
@@ -126,11 +148,13 @@ public abstract class StagedInit implements Stringify{
 	
 	private void validateNewState(int state){
 		if(getStateName(state).isEmpty()){
-			throw new IllegalArgumentException("Unknown state: " + state);
+			throw new IllegalArgumentException(Log.fmt("Unknown state: {}#red", state));
 		}
 		var ts = this.state;
 		if(state<=ts){
-			throw new IllegalArgumentException("State must advance! Current state: " + stateToString(ts) + ", Requested state: " + stateToString(state));
+			throw new IllegalArgumentException(
+				Log.fmt("State must advance! Current state: {}#yellow, New state: {}#red", stateToString(ts), stateToString(state))
+			);
 		}
 	}
 	

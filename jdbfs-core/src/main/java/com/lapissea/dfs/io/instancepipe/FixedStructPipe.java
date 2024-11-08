@@ -48,11 +48,11 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	private Map<IOField<T, NumberSize>, NumberSize> maxValues;
 	private boolean                                 maxValuesInited = false;
 	
-	public FixedStructPipe(Struct<T> type, boolean initNow){
-		this(type, compiler(), initNow);
+	public FixedStructPipe(Struct<T> type, int syncStage){
+		this(type, compiler(), syncStage);
 	}
-	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
-		super(type, compiler, initNow);
+	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, int syncStage){
+		super(type, compiler, syncStage);
 	}
 	
 	@Override

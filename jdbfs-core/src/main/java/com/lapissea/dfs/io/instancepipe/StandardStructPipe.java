@@ -63,11 +63,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
 	}
 	
-	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
-		super(type, compiler, initNow);
+	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, int syncStage){
+		super(type, compiler, syncStage);
 	}
-	public StandardStructPipe(Struct<T> type, boolean initNow){
-		super(type, compiler(), initNow);
+	public StandardStructPipe(Struct<T> type, int syncStage){
+		super(type, compiler(), syncStage);
 	}
 	
 	@Override
