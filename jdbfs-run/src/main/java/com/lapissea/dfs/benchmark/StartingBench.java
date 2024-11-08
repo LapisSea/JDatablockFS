@@ -15,27 +15,53 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.results.format.ResultFormatType;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
 public class StartingBench{
 	
+	
+	public static void main(String[] args) throws Exception{
+		if(args.length == 0){
+			System.out.print("Enter mode: ");
+			args = new Scanner(System.in).nextLine().trim().split(" ", 2);
+		}
+		var opt  = new OptionsBuilder().include(StartingBench.class.getSimpleName());
+		var mode = args.length>=1? args[0] : "";
+		if(mode.equals("json")){
+			opt.resultFormat(ResultFormatType.JSON);
+			var date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH-mm_dd-MM-yyyy"));
+			opt.result("benchmarks/" + StartingBench.class.getSimpleName() + " " + date + ".json");
+		}
+		opt.jvmArgsAppend("-Dmode=" + mode);
+		new Runner(opt.build()).run();
+	}
+	
 	static Sampling.Exec exec;
 	
 	@Setup(Level.Trial)
 	public void start(){
-//		exec = Sampling.sampleThread("samples.json", false, null);
-//		exec.waitStarted();
+		if(System.getProperty("mode").equals("sample")){
+			exec = Sampling.sampleThread("samples.json", false, null, false);
+			exec.waitStarted();
+			System.out.println("Sampling...");
+		}
 	}
 	@TearDown(Level.Trial)
 	public void end(){
-//		exec.waitEnded();
+		if(exec != null) exec.waitEnded();
 	}
 	
 	@Benchmark
-	@Fork(value = 200, warmups = 1)
+	@Fork(value = 400, warmups = 1)
 	@Warmup(iterations = 0)
 	@Measurement(iterations = 1)
 	@BenchmarkMode(Mode.SingleShotTime)
@@ -46,7 +72,7 @@ public class StartingBench{
 		}catch(Throwable e){
 			throw new RuntimeException(e);
 		}
-//		exec.end();
+		if(exec != null) exec.end();
 	}
 	
 }

@@ -6,26 +6,27 @@ import com.lapissea.dfs.io.content.ContentWriter;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
 public final class MagicID{
 	
-	private static final ByteBuffer MAGIC_ID = ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
+	private static final byte[]     BYTES    = "BYT-BAE".getBytes(US_ASCII);
+	private static final ByteBuffer MAGIC_ID = ByteBuffer.wrap(BYTES);
 	
 	public static int size(){
-		return MAGIC_ID.limit();
+		return BYTES.length;
 	}
 	public static ByteBuffer get(){
 		return MAGIC_ID.asReadOnlyBuffer();
 	}
 	
 	public static void read(ContentReader src) throws InvalidMagicID{
-		ByteBuffer magicId;
 		try{
-			magicId = ByteBuffer.wrap(src.readInts1(size()));
-			if(!magicId.equals(MAGIC_ID)){
-				throw new InvalidMagicID("ID: " + UTF_8.decode(magicId));
+			byte[] readIdBytes = src.readInts1(size());
+			if(!Arrays.equals(readIdBytes, BYTES)){
+				throw new InvalidMagicID("ID: " + new String(readIdBytes, US_ASCII));
 			}
 		}catch(IOException e){
 			throw new InvalidMagicID("There is no valid magic id, was Cluster.init called?", e);

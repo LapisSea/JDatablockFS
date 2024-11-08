@@ -8,6 +8,7 @@ import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
+import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.ValueStorage.StorageRule;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -418,7 +419,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			varyingBuffer = newVarying;
 			writeManagedFields();
 			
-			try(var io = getPointer().makeReference().addOffset(headSiz).io(getDataProvider())){
+			try(var io = RangeIO.of(getPointer().dereference(getDataProvider()), headSiz, Long.MAX_VALUE)){
 				
 				for(long i = 0; i<size(); i++){
 					var newDataStart = i*newElemenSize;

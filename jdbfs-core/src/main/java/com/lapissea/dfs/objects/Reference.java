@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.RandomIO;
-import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -156,17 +155,6 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		STANDARD_PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
-	private record IOContext(Reference ref, DataProvider provider) implements RandomIO.Creator{
-		@Override
-		public RandomIO io() throws IOException{
-			return ref.io(provider);
-		}
-		@Override
-		public String toString(){
-			return "{" + provider + " @ " + ref + "}";
-		}
-	}
-	
 	public static final Reference NULL = new Reference(ChunkPointer.NULL, 0);
 	
 	public static Reference of(){
@@ -189,18 +177,19 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");
 	}
 	
-	public RandomIO.Creator withContext(DataProvider provider){
-		return new IOContext(this, provider);
-	}
-	public RandomIO.Creator withContext(DataProvider.Holder holder){
-		return new IOContext(this, holder.getDataProvider());
-	}
-	
 	public RandomIO io(DataProvider.Holder holder) throws IOException{
 		return io(holder.getDataProvider());
 	}
 	public RandomIO io(DataProvider provider) throws IOException{
-		return RangeIO.of(ptr.dereference(provider), offset, Long.MAX_VALUE);
+		var chunk = ptr.dereference(provider);
+		var io    = chunk.io();
+		try{
+			io.skipExact(offset);
+		}catch(Throwable e){
+			io.close();
+			throw e;
+		}
+		return io;
 	}
 	
 	public void io(DataProvider provider, UnsafeConsumer<RandomIO, IOException> session) throws IOException{

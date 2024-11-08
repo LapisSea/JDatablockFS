@@ -61,17 +61,24 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 		
 		protected final DataProvider          context;
-		private final   List<AllocStrategy>   allocs;
-		private final   List<AllocToStrategy> allocTos;
+		private         List<AllocStrategy>   allocs;
+		private         List<AllocToStrategy> allocTos;
 		
 		public StrategyImpl(DataProvider context){
 			this.context = context;
-			this.allocs = List.copyOf(createAllocs());
-			this.allocTos = List.copyOf(createAllocTos());
 		}
 		
 		protected abstract List<AllocStrategy> createAllocs();
 		protected abstract List<AllocToStrategy> createAllocTos();
+		
+		private List<AllocStrategy> getAllocs(){
+			var v = allocs;
+			return v != null? v : (allocs = List.copyOf(createAllocs()));
+		}
+		private List<AllocToStrategy> getAllocTos(){
+			var v = allocTos;
+			return v != null? v : (allocTos = List.copyOf(createAllocTos()));
+		}
 		
 		@Override
 		public DataProvider getDataProvider(){
@@ -89,6 +96,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			if(DEBUG_VALIDATION){
 				MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			}
+			
+			var allocTos = getAllocTos();
 			
 			var last = target;
 			
@@ -155,7 +164,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			
 			tryStrategies:
 			{
-				for(var alloc : allocs){
+				for(var alloc : getAllocs()){
 					chunk = alloc.alloc(context, ticket, false);
 					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
@@ -176,7 +185,7 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public boolean canAlloc(AllocateTicket ticket) throws IOException{
-			for(var alloc : allocs){
+			for(var alloc : getAllocs()){
 				var chunk = alloc.alloc(context, ticket, true);
 				if(chunk != null){
 					return true;
