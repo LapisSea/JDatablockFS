@@ -72,4 +72,8 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default boolean anyIs(T value)     { return iter().anyIs(value); }
 	default boolean noneEquals(T value){ return iter().noneEquals(value); }
 	default boolean anyEquals(T value) { return iter().anyEquals(value); }
+	
+	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
+		return iter().firstMatching(predicate);
+	}
 }

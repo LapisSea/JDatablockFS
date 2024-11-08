@@ -6,6 +6,7 @@ import com.lapissea.dfs.utils.function.FunctionOI;
 import com.lapissea.dfs.utils.function.FunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -298,6 +299,19 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return List.copyOf(res);
 	}
+	@SuppressWarnings("unchecked")
+	default <T1> T1[] toArray(Class<T1> type){
+		var size = tryGetSize().orElse(8);
+		var res  = (T1[])Array.newInstance(type, size);
+		if(size == 0) return res;
+		int siz = 0;
+		for(var t : this){
+			if(res.length == siz) res = Utils.growArr(res);
+			res[siz++] = (T1)t;
+		}
+		if(res.length == siz) return res;
+		return Arrays.copyOf(res, siz);
+	}
 	
 	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
 		var  size = tryGetSize().orElse(8);
@@ -408,13 +422,21 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
+	default <L extends Collection<T>> L asCollection(IntFunction<L> constructor){
+		var siz    = tryGetSize().orElse(0);
+		L   result = constructor.apply(siz);
+		for(T t : this){
+			result.add(t);
+		}
+		return result;
+	}
 	
 	default PPCollection<T> asCollection(){
 		return new PPCollection<>(this, tryGetSize());
 	}
 	default PPBakedSequence<T> bake(){
 		//noinspection unchecked
-		return new PPBakedSequence<>((T[])toArray(Object[]::new));
+		return new PPBakedSequence<>((T[])toArray(Object.class));
 	}
 	
 	default String joinAsStr()                                              { return joinAsStr("", "", "", null); }
@@ -624,6 +646,10 @@ public interface IterablePP<T> extends Iterable<T>{
 						return (T)result[index++];
 					}
 				};
+			}
+			@Override
+			public SizedPP<T> reverse(){
+				return IterablePP.this.sorted(comparator.reversed());
 			}
 		};
 	}
@@ -1266,6 +1292,38 @@ public interface IterablePP<T> extends Iterable<T>{
 			preIncrementInt(i);
 			i++;
 		}
+	}
+	
+	default SizedPP<T> reverse(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterablePP.this); }
+			@Override
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private Object[] data;
+					private int      i = -2;
+					
+					private void init(){
+						data = IterablePP.this.toArray(Object.class);
+						i = data.length - 1;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						if(i == -2) init();
+						return i>=0;
+					}
+					@Override
+					public T next(){
+						if(i == -2) init();
+						if(i == -1) throw new NoSuchElementException();
+						//noinspection unchecked
+						return (T)data[i--];
+					}
+				};
+			}
+		};
 	}
 	
 	private static void preIncrementLong(long index){

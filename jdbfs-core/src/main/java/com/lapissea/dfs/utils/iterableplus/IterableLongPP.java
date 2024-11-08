@@ -277,6 +277,24 @@ public interface IterableLongPP{
 	default IterableLongPP filterIntRange(){
 		return filter(v -> v>=Integer.MIN_VALUE && v<=Integer.MAX_VALUE);
 	}
+	
+	default IterableLongPP retaining(long... toKeep){
+		return filter(i -> {
+			for(var j : toKeep){
+				if(i == j) return true;
+			}
+			return false;
+		});
+	}
+	default IterableLongPP removing(long... toRemove){
+		return filter(i -> {
+			for(var j : toRemove){
+				if(i == j) return false;
+			}
+			return true;
+		});
+	}
+	
 	default IterableLongPP filter(LongPredicate filter){
 		return new Iters.DefaultLongIterable(){
 			@Override

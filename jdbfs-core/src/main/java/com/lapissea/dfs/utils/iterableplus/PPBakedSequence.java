@@ -45,6 +45,10 @@ public final class PPBakedSequence<T> extends AbstractList<T> implements Iterabl
 		return data[0];
 	}
 	@Override
+	public SizedPP<T> reverse(){
+		return Iters.from(data).reverse();
+	}
+	@Override
 	public int count(){ return data.length; }
 	@Override
 	public long countL(){ return data.length; }
