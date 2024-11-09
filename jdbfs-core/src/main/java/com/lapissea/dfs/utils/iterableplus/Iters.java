@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.SequencedCollection;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -165,9 +166,16 @@ public final class Iters{
 		}
 		@Override
 		public <T1> T1[] toArray(IntFunction<T1[]> ctor){ return data.toArray(ctor); }
+		@Override
+		public SizedPP<T> reverse(){
+			if(data instanceof SequencedCollection<T> sequenced){
+				return new CollectionIterable<>(sequenced.reversed());
+			}
+			return SizedPP.super.reverse();
+		}
 	}
 	
-	private record ArrayIterable<T>(T[] data) implements IterablePP.SizedPP<T>{
+	private record ArrayIterable<T>(T[] data, boolean reversedFlag) implements IterablePP.SizedPP<T>{
 		private static final class Iter<T> implements Iterator<T>{
 			private final T[] data;
 			private       int index;
@@ -181,6 +189,25 @@ public final class Iters{
 				return data[i];
 			}
 		}
+		
+		private static final class IterReverse<T> implements Iterator<T>{
+			private final T[] data;
+			private       int index;
+			public IterReverse(T[] data){
+				this.data = data;
+				index = this.data.length - 1;
+			}
+			@Override
+			public boolean hasNext(){ return index>=0; }
+			@Override
+			public T next(){
+				if(index<0) throw new NoSuchElementException();
+				return data[index--];
+			}
+		}
+		
+		private ArrayIterable(T[] data){ this(data, false); }
+		
 		@Override
 		public Iterator<T> iterator(){
 			return new Iter<>(data);
@@ -203,6 +230,10 @@ public final class Iters{
 			var res = ctor.apply(data.length);
 			System.arraycopy(data, 0, res, 0, data.length);
 			return res;
+		}
+		@Override
+		public SizedPP<T> reverse(){
+			return new ArrayIterable<>(data, !reversedFlag);
 		}
 	}
 	
@@ -244,6 +275,8 @@ public final class Iters{
 			res[0] = (T1)element;
 			return res;
 		}
+		@Override
+		public SizedPP<T> reverse(){ return this; }
 	}
 	
 	private record EntryIterable<K, V>(Object... data) implements IterablePP.SizedPP<Map.Entry<K, V>>{

@@ -6,6 +6,7 @@ import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.util.ZeroArrays;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -107,6 +108,16 @@ public interface IterableIntPP{
 			}
 		}
 		return OptionalInt.empty();
+	}
+	
+	default boolean anyIs(int needle){
+		var iter = iterator();
+		while(iter.hasNext()){
+			if(iter.nextInt() == needle){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	default int sum(){
@@ -291,6 +302,29 @@ public interface IterableIntPP{
 				};
 			}
 		};
+	}
+	
+	default IterableIntPP retaining(BitSet toKeep){
+		return filter(toKeep::get);
+	}
+	default IterableIntPP retaining(int... toKeep){
+		return filter(i -> {
+			for(int j : toKeep){
+				if(i == j) return true;
+			}
+			return false;
+		});
+	}
+	default IterableIntPP removing(BitSet toRemove){
+		return filter(i -> !toRemove.get(i));
+	}
+	default IterableIntPP removing(int... toRemove){
+		return filter(i -> {
+			for(int j : toRemove){
+				if(i == j) return false;
+			}
+			return true;
+		});
 	}
 	
 	default IterableIntPP filter(IntPredicate filter){

@@ -38,7 +38,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	
 	private static final class AutoTextPipe extends StandardStructPipe<AutoText>{
 		public AutoTextPipe(){
-			super(STRUCT, true);
+			super(STRUCT, STATE_DONE);
 		}
 		
 		private static final EnumUniverse<Encoding> CHAR_ENCODING_UNIVERSE = EnumUniverse.of(Encoding.class);

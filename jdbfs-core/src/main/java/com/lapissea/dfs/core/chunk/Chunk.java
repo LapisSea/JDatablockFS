@@ -142,7 +142,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 					f.requireExact(ChunkPointer.class, "nextPtr")
 				);
 				return new PipeFieldCompiler.Result<>(fields);
-			}, true);
+			}, STATE_NOT_STARTED);
 		}
 		
 		@Override

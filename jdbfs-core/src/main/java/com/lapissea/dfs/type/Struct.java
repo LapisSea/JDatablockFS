@@ -32,6 +32,7 @@ import com.lapissea.dfs.type.string.ToStringFormat;
 import com.lapissea.dfs.type.string.ToStringFragment;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
@@ -143,15 +144,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				throw new ClassCastException(instanceClass.getName() + " is not unmanaged!");
 			}
 			
-			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, false);
+			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, StagedInit.STATE_NOT_STARTED);
 		}
 		
 		private final NewUnmanaged<T> unmanagedConstructor;
 		private final boolean         hasDynamicFields;
 		private       FieldSet<T>     unmanagedStaticFields;
 		
-		private Unmanaged(Class<T> type, boolean runNow){
-			super(type, runNow);
+		private Unmanaged(Class<T> type, int syncStage){
+			super(type, syncStage);
 			hasDynamicFields = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
 			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
 		}
@@ -219,7 +220,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
 		validateStructType(instanceClass);
-		var s = structOfType((Class<? extends IOInstance>)instanceClass, minRequestedStage == STATE_DONE);
+		var s = structOfType((Class<? extends IOInstance>)instanceClass, minRequestedStage);
 		s.waitForState(minRequestedStage);
 		return s;
 	}
@@ -245,7 +246,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return Optional.empty();
 		}
 		
-		var s = structOfType((Class<? extends IOInstance>)instanceClass, false);
+		var s = structOfType((Class<? extends IOInstance>)instanceClass, STATE_NOT_STARTED);
 		return Optional.of(s);
 	}
 	
@@ -277,7 +278,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 */
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
 		try{
-			var s = structOfType(instanceClass, minRequestedStage == STATE_DONE);
+			var s = structOfType(instanceClass, minRequestedStage);
 			s.waitForState(minRequestedStage);
 			return s;
 		}catch(Throwable e){
@@ -305,14 +306,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 */
 	public static <T extends IOInstance<T>> Struct<T> of(@NotNull Class<T> instanceClass){
 		try{
-			return structOfType(instanceClass, false);
+			return structOfType(instanceClass, STATE_NOT_STARTED);
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);
 		}
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct<T> structOfType(Class<T> instanceClass, boolean runNow){
+	private static <T extends IOInstance<T>> Struct<T> structOfType(Class<T> instanceClass, int syncStage){
 		Objects.requireNonNull(instanceClass);
 		
 		var cached = getCached(instanceClass);
@@ -324,7 +325,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
 		
-		return compile(instanceClass, (MakeStruct<T, Struct<T>>)Struct::new, runNow);
+		return compile(instanceClass, (MakeStruct<T, Struct<T>>)Struct::new, syncStage);
 	}
 	
 	public record FieldStruct<T extends IOInstance<T>>
@@ -367,43 +368,46 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public static final int STATE_CONCRETE_TYPE = 1, STATE_FIELD_MAKE = 2, STATE_INIT_FIELDS = 3;
 	
-	private Struct(Class<T> type, boolean runNow){
+	private Struct(Class<T> type, int syncStage){
 		this.type = Objects.requireNonNull(type);
-		init(runNow, () -> {
-			calcHash();
-			
-			var idef = isDefinition = IOInstance.Def.isDefinition(type);
-			if(idef){
-				concreteType = DefInstanceCompiler.getImpl(type);
-			}else concreteType = type;
-			
-			setInitState(STATE_CONCRETE_TYPE);
-			
-			fields = FieldCompiler.compile(this);
-			needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
-			
-			setInitState(STATE_FIELD_MAKE);
-			
-			for(var field : fields){
-				try{
-					field.init(fields);
-					Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
-				}catch(Throwable e){
-					throw new RuntimeException("Failed to init " + field, e);
+		init(syncStage, runStage -> {
+			switch(runStage){
+				case STATE_CONCRETE_TYPE -> {
+					calcHash();
+					
+					var idef = isDefinition = IOInstance.Def.isDefinition(type);
+					if(idef){
+						concreteType = DefInstanceCompiler.getImpl(type);
+					}else concreteType = type;
 				}
+				case STATE_FIELD_MAKE -> {
+					fields = FieldCompiler.compile(this);
+					needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
+				}
+				case STATE_INIT_FIELDS -> {
+					for(var field : fields){
+						try{
+							field.init(fields);
+							Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
+						}catch(Throwable e){
+							throw new RuntimeException("Failed to init " + field, e);
+						}
+					}
+					
+				}
+				case STATE_DONE -> {
+					poolObjectsSize = calcPoolObjectsSize();
+					poolPrimitivesSize = calcPoolPrimitivesSize();
+					hasPools = calcHasPools();
+					canHavePointers = calcCanHavePointers();
+					
+					if(canHaveDefaultConstructor()){
+						findEmptyConstructor(false);
+					}
+				}
+				default -> throw new NotImplementedException();
 			}
-			
-			setInitState(STATE_INIT_FIELDS);
-			
-			poolObjectsSize = calcPoolObjectsSize();
-			poolPrimitivesSize = calcPoolPrimitivesSize();
-			hasPools = calcHasPools();
-			canHavePointers = calcCanHavePointers();
-			
-			if(canHaveDefaultConstructor()){
-				findEmptyConstructor(false);
-			}
-		});
+		}, null);
 	}
 	
 	
