@@ -95,11 +95,15 @@ public final class StructFuzzTest{
 			}
 		);
 	}
-	@Test
-	void simpleGenClass() throws ReflectiveOperationException, IOException{
+	
+	@org.testng.annotations.DataProvider
+	Object[][] yn(){ return new Object[][]{{false}, {true}}; }
+	
+	@Test(dataProvider = "yn")
+	void simpleGenClass(boolean isFinal) throws ReflectiveOperationException, IOException{
 		testType(new TempClassGen.ClassGen(
 			"testBefore",
-			List.of(new TempClassGen.FieldGen("f1", int.class, anns(IOVal), false, RandomGenerator::nextInt)),
+			List.of(new TempClassGen.FieldGen("f1", int.class, anns(IOVal), isFinal, RandomGenerator::nextInt)),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of()

@@ -86,7 +86,7 @@ public final class TempClassGen{
 	
 	public static Class<IOInstance<?>> gen(ClassGen classGen){
 		try{
-			var cl = new ClassLoader(){
+			var cl = new ClassLoader(TempClassGen.class.getClassLoader()){
 				static{ ClassLoader.registerAsParallelCapable(); }
 				
 				@Override
