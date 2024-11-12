@@ -45,6 +45,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
@@ -56,6 +57,14 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePPSource<IONode<T>>{
+	static{ allowFullAccess(MethodHandles.lookup()); }
+	
+	private static final class Info{
+		@SuppressWarnings("unchecked")
+		private static final Struct<IONode<Object>> STRUCT               = (Struct<IONode<Object>>)(Object)Struct.of(IONode.class, Struct.STATE_FIELD_MAKE);
+		private static final IOField<?, NumberSize> NEXT_SIZE_FIELD      = STRUCT.getFields().requireExact(NumberSize.class, "nextSize");
+		private static final int                    NEXT_SIZE_FIELD_SIZE = (int)getNextSizeField().getSizeDescriptor().requireMax(WordSpace.BYTE);
+	}
 	
 	private static final class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
@@ -219,16 +228,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		};
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static final Struct<IONode<Object>> STRUCT = (Struct<IONode<Object>>)(Object)Struct.of(IONode.class);
-	
 	private static final TypeCheck NODE_TYPE_CHECK = new TypeCheck(
 		IONode.class,
 		(type, db) -> { }
 	);
-	
-	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD      = STRUCT.getFields().requireExact(NumberSize.class, "nextSize");
-	private static final int                    NEXT_SIZE_FIELD_SIZE = (int)getNextSizeField().getSizeDescriptor().requireMax(WordSpace.BYTE);
 	
 	private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 		return NumberSize.bySize(provider.getSource().getIOSize()).next();
@@ -303,7 +306,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@SuppressWarnings("unchecked")
 	public IONode(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
-		super((Struct<IONode<T>>)(Object)STRUCT, provider, identity, typeDef, NODE_TYPE_CHECK);
+		super((Struct<IONode<T>>)(Object)Info.STRUCT, provider, identity, typeDef, NODE_TYPE_CHECK);
 		
 		var magnetProvider = provider.withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getPointer().getValue())));
 		
@@ -377,7 +380,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		try{
 			var s = io.getSize();
 			if(s == 0) return null;
-			if(s<NEXT_SIZE_FIELD_SIZE) return null;
+			if(s<Info.NEXT_SIZE_FIELD_SIZE) return null;
 			if(DEBUG_VALIDATION){
 				if(!getPipe().getSpecificFields().getFirst().equals(getNextSizeField())){
 					throw new ShouldNeverHappenError();
@@ -446,10 +449,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	boolean hasValue() throws IOException{
 		try(var io = selfIO()){
-			if(io.remaining()<NEXT_SIZE_FIELD_SIZE){
+			if(io.remaining()<Info.NEXT_SIZE_FIELD_SIZE){
 				return false;
 			}
-			io.skipExact(NEXT_SIZE_FIELD_SIZE);
+			io.skipExact(Info.NEXT_SIZE_FIELD_SIZE);
 			if(io.remaining()<nextSize.bytes){
 				return false;
 			}
@@ -524,11 +527,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@SuppressWarnings("unchecked")
 	private static <T> IOField<IONode<T>, NumberSize> getNextSizeField(){
-		return (IOField<IONode<T>, NumberSize>)NEXT_SIZE_FIELD;
+		return (IOField<IONode<T>, NumberSize>)Info.NEXT_SIZE_FIELD;
 	}
 	
 	private int valueStart(){
-		return NEXT_SIZE_FIELD_SIZE + nextSize.bytes;
+		return Info.NEXT_SIZE_FIELD_SIZE + nextSize.bytes;
 	}
 	
 	public void setNext(IONode<T> next) throws IOException{
@@ -563,7 +566,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 		
 		try(var io = selfIO()){
-			io.skipExact(NEXT_SIZE_FIELD_SIZE);
+			io.skipExact(Info.NEXT_SIZE_FIELD_SIZE);
 			nextSize.write(io, ptr);
 		}
 	}

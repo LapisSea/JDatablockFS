@@ -584,11 +584,11 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public String readNew(ContentReader src) throws IOException{
-			return AutoText.PIPE.readNew(provider, src, null).getData();
+			return AutoText.Info.PIPE.readNew(provider, src, null).getData();
 		}
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
-			AutoText.PIPE.write(provider, dest, new AutoText(src));
+			AutoText.Info.PIPE.write(provider, dest, new AutoText(src));
 		}
 		@Override
 		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
@@ -604,11 +604,11 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			var d = AutoText.PIPE.getSizeDescriptor();
+			var d = AutoText.Info.PIPE.getSizeDescriptor();
 			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value) -> {
 				var str = (String)accessor.get(ioPool, value);
 				if(str == null) return 0;
-				return AutoText.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
+				return AutoText.Info.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
 			}));
 		}
 		@Override
@@ -638,7 +638,7 @@ public sealed interface ValueStorage<T>{
 			if(ref.isNull()){
 				return null;
 			}
-			return ref.readNew(provider, AutoText.PIPE, null).getData();
+			return ref.readNew(provider, AutoText.Info.PIPE, null).getData();
 		}
 		
 		@Override
@@ -647,11 +647,11 @@ public sealed interface ValueStorage<T>{
 			if(ref.isNull()){
 				//TODO: create mechanism for assumed fixed field first, then if growth needed switch to explicit next size
 				var d = new AutoText(src);
-				var t = AllocateTicket.bytes(AutoText.PIPE.calcUnknownSize(provider, d, WordSpace.BYTE))
-				                      .withDataPopulated(AutoText.PIPE, d);
+				var t = AllocateTicket.bytes(AutoText.Info.PIPE.calcUnknownSize(provider, d, WordSpace.BYTE))
+				                      .withDataPopulated(AutoText.Info.PIPE, d);
 				writeNew(dest, t, provider, refPipe);
 			}else{
-				ref.write(provider, true, AutoText.PIPE, new AutoText(src));
+				ref.write(provider, true, AutoText.Info.PIPE, new AutoText(src));
 			}
 		}
 		@Override
@@ -770,11 +770,11 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, Object> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			var d = AutoText.PIPE.getSizeDescriptor();
+			var d = AutoText.Info.PIPE.getSizeDescriptor();
 			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value) -> {
 				var str = (String)accessor.get(ioPool, value);
 				if(str == null) return 0;
-				return AutoText.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
+				return AutoText.Info.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
 			}));
 		}
 		

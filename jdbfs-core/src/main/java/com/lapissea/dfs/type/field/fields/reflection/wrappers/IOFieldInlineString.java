@@ -42,7 +42,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		super(accessor);
 		
 		
-		var desc = AutoText.PIPE.getSizeDescriptor();
+		var desc = AutoText.Info.PIPE.getSizeDescriptor();
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of(
 			desc.getWordSpace(),
@@ -54,7 +54,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
-				return AutoText.PIPE.calcUnknownSize(prov, new AutoText(val), desc.getWordSpace());
+				return AutoText.Info.PIPE.calcUnknownSize(prov, new AutoText(val), desc.getWordSpace());
 			}
 		));
 	}

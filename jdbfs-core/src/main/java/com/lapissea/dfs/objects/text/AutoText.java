@@ -22,19 +22,23 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.nio.CharBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.dfs.objects.text.AutoText.Info.PIPE;
+import static com.lapissea.dfs.objects.text.AutoText.Info.STRUCT;
 
 @StructPipe.Special
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
-	public static final Struct<AutoText> STRUCT = Struct.of(AutoText.class);
+	public static final class Info{
+		public static final Struct<AutoText>     STRUCT = Struct.of(AutoText.class);
+		public static final StructPipe<AutoText> PIPE   = StandardStructPipe.of(STRUCT);
+	}
+	
 	
 	private static final class AutoTextPipe extends StandardStructPipe<AutoText>{
 		public AutoTextPipe(){
@@ -116,48 +120,36 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		}
 	}
 	
-	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
-	
-	static{
-		if(DEBUG_VALIDATION){
-			var check = "numSize + encoding 1 byte textBytes:len NS(numSize): 0-4 bytes charCount NS(numSize): 0-4 bytes textBytes ? bytes ";
-			var sb    = new StringBuilder(check.length());
-			STRUCT.waitForState(Struct.STATE_INIT_FIELDS);
-			var p = StandardStructPipe.of(STRUCT);
-			for(var specificField : p.getSpecificFields()){
-				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
-			}
-			var res = sb.toString();
-			if(!check.equals(res)){
-				throw UtilL.exitWithErrorMsg(check + "\n" + res);
-			}
-		}
-	}
-	
 	public static final ObjectPipe.NoPool<String> STR_PIPE = new ObjectPipe.NoPool<>(){
-		private final BasicSizeDescriptor<String, Void> sizeDescriptor;
+		private BasicSizeDescriptor<String, Void> sizeDescriptor;
 		
-		{
-			var desc = AutoText.PIPE.getSizeDescriptor();
-			sizeDescriptor = BasicSizeDescriptor.Unknown.of(
-				desc.getWordSpace(), desc.getMin(), desc.getMax(),
-				(pool, prov, value) -> desc.calcUnknown(null, null, new AutoText(value), desc.getWordSpace()));
+		private static BasicSizeDescriptor<String, Void> createSizeDescriptor(){
+			var desc      = PIPE.getSizeDescriptor();
+			var wordSpace = desc.getWordSpace();
+			return BasicSizeDescriptor.Unknown.of(
+				wordSpace, desc.getMin(), desc.getMax(),
+				(pool, prov, value) -> {
+					return desc.calcUnknown(null, null, new AutoText(value), wordSpace);
+				});
 		}
 		
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, String instance) throws IOException{
-			AutoText.PIPE.write(provider, dest, new AutoText(instance));
+			PIPE.write(provider, dest, new AutoText(instance));
 		}
 		@Override
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			AutoText.PIPE.skip(provider, src, null);
+			PIPE.skip(provider, src, null);
 		}
 		@Override
 		public String readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			return AutoText.PIPE.readNew(provider, src, null).getData();
+			return PIPE.readNew(provider, src, null).getData();
 		}
 		@Override
-		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){ return sizeDescriptor; }
+		public BasicSizeDescriptor<String, Void> getSizeDescriptor(){
+			if(sizeDescriptor == null) sizeDescriptor = createSizeDescriptor();
+			return sizeDescriptor;
+		}
 	};
 	
 	private String   data;

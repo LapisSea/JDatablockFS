@@ -83,7 +83,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		@Override
 		public long calcByteSize(DataProvider provider, String element){
-			return AutoText.PIPE.calcUnknownSize(provider, new AutoText(element), WordSpace.BYTE);
+			return AutoText.Info.PIPE.calcUnknownSize(provider, new AutoText(element), WordSpace.BYTE);
 		}
 		@Override
 		public OptionalLong getFixedByteSize(){
@@ -91,15 +91,15 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, String element) throws IOException{
-			AutoText.PIPE.write(provider, dest, new AutoText(element));
+			AutoText.Info.PIPE.write(provider, dest, new AutoText(element));
 		}
 		@Override
 		public String read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			return AutoText.PIPE.readNew(provider, src, genericContext).getData();
+			return AutoText.Info.PIPE.readNew(provider, src, genericContext).getData();
 		}
 		@Override
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			AutoText.PIPE.skip(provider, src, genericContext);
+			AutoText.Info.PIPE.skip(provider, src, genericContext);
 		}
 	}
 	

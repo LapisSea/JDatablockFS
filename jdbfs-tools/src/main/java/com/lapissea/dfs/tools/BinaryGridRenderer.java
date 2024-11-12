@@ -1813,7 +1813,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									
 									long arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
-										var siz = AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst.get(i)), WordSpace.BYTE);
+										var siz = AutoText.Info.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst.get(i)), WordSpace.BYTE);
 										annotateByteField(
 											ctx, ioPool, instance, BGRUtils.stringArrayElement(instance, i, inst),
 											col,
@@ -1864,7 +1864,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(typ == String.class){
 								if(!annotate) continue;
 								try{
-									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true, noPtr);
+									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.Info.PIPE, null, true, noPtr);
 								}catch(Throwable e){
 									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
 								}

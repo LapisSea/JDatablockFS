@@ -296,8 +296,8 @@ public class GeneralTests{
 		
 		var text = new AutoText(data);
 		
-		AutoText.PIPE.write(chunk, text);
-		var read = AutoText.PIPE.readNew(chunk, null);
+		AutoText.Info.PIPE.write(chunk, text);
+		var read = AutoText.Info.PIPE.readNew(chunk, null);
 		
 		assertThat(read).as(() -> "Text should match. Bytes: " + Iters.rangeMap(0, data.length(), i -> (int)data.charAt(i)))
 		                .isEqualTo(text);
