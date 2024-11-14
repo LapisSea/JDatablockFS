@@ -301,8 +301,9 @@ public final class Access{
 	
 	public static VarHandle makeVarHandle(Field field){
 		try{
-			var requiredMode = Iters.of(Mode.PRIVATE, Mode.PROTECTED, Mode.PUBLIC)
-			                        .firstMatching(m -> (field.getModifiers()&m.flag) != 0).orElseThrow();
+			var requiredMode = Iters.of(Mode.PRIVATE, Mode.PROTECTED, Mode.PACKAGE, Mode.PUBLIC)
+			                        .firstMatching(m -> (field.getModifiers()&m.flag) != 0)
+			                        .orElse(Mode.PACKAGE);
 			
 			var lookup = getLookup(field.getDeclaringClass(), requiredMode);
 			return lookup.unreflectVarHandle(field);
