@@ -147,14 +147,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, StagedInit.STATE_NOT_STARTED);
 		}
 		
-		private final NewUnmanaged<T> unmanagedConstructor;
+		private       NewUnmanaged<T> unmanagedConstructor;
 		private final boolean         hasDynamicFields;
 		private       FieldSet<T>     unmanagedStaticFields;
 		
 		private Unmanaged(Class<T> type, int syncStage){
 			super(type, syncStage);
 			hasDynamicFields = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
-			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
 		}
 		
 		public boolean hasDynamicFields(){
@@ -162,7 +161,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
-			return unmanagedConstructor.make(provider, identity, type);
+			var ctor = unmanagedConstructor;
+			if(ctor == null) ctor = initConstructor();
+			return ctor.make(provider, identity, type);
+		}
+		private NewUnmanaged<T> initConstructor(){
+			return unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
 		}
 		
 		@Deprecated

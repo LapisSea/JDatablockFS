@@ -31,6 +31,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.GenericDeclaration;
@@ -711,7 +712,7 @@ public final class DefInstanceCompiler{
 				public function <init>
 				start
 					super start
-						get #typ.impl $STRUCT
+						static call #typ.impl $STRUCT
 					end
 				""");
 		
@@ -741,7 +742,7 @@ public final class DefInstanceCompiler{
 					end
 				start
 					super start
-						get #typ.impl $STRUCT
+						static call #typ.impl $STRUCT
 					end
 				""",
 			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
@@ -825,15 +826,30 @@ public final class DefInstanceCompiler{
 	private static void defineStatics(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
-				private static final field $STRUCT #Struct
+				private static field $V_STRUCT #Struct
+				
+				private static function $STRUCT
+					returns #Struct
+				start
+					static call {} isNull start
+						get #typ.impl $V_STRUCT
+					end
+					if start
+						static call #Struct of start
+							class #typ.impl
+						end
+						set #typ.impl $V_STRUCT
+					end
+					get #typ.impl $V_STRUCT
+				end
 				
 				function <clinit> start
-					static call #Struct of start
-						class #typ.impl
+					static call {} allowFullAccess start
+						static call {} lookup
 					end
-					set #typ.impl $STRUCT
 				end
-				""");
+				""",
+			Objects.class, IOInstance.Managed.class, MethodHandles.class);
 		
 		unmappedClassFn(writer, baseClazz);
 	}

@@ -24,11 +24,13 @@ import com.lapissea.util.WeakValueHashMap;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import static com.lapissea.util.ConsoleColors.*;
@@ -232,23 +234,47 @@ public final class TemplateClassLoader extends ClassLoader{
 		if(extend && !def.isSealed()){
 			writer.write(
 				"""
-					private static final field $STRUCT #Struct
+					private static field $V_STRUCT #Struct<{0}>
 					
-					function <clinit> start
-						static call #Struct of start
-							class #genClassName
+					private static function $STRUCT
+						returns #Struct<{0}>
+					start
+						static call {1} isNull start
+							get {0} $V_STRUCT
 						end
-						set #genClassName $STRUCT
+						if start
+							static call #Struct of start
+								class {0}
+							end
+							set {0} $V_STRUCT
+						end
+						get {0} $V_STRUCT
 					end
 					
+					function <clinit> start
+						static call {2} allowFullAccess start
+							static call {3} lookup
+						end
+					end
 					
 					public function <init>
 					start
 						super start
-							get #genClassName $STRUCT
+							static call {0} $STRUCT
 						end
 					end
-					""");
+					""",
+				name, Objects.class, IOInstance.Managed.class, MethodHandles.class);
+		}else{
+			writer.write(
+				"""
+					function <clinit> start
+						static call {0} allowFullAccess start
+							static call {1} lookup
+						end
+					end
+					""",
+				IOInstance.Managed.class, MethodHandles.class);
 		}
 		
 		for(var field : fields){

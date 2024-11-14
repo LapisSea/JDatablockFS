@@ -7,7 +7,10 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.NewObj;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
@@ -25,6 +28,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,14 +64,15 @@ public final class Access{
 		if((lookup.lookupModes()&(PRIVATE|MODULE)) != (PRIVATE|MODULE)) badLookup(lookup);
 		PRIVATE_LOOKUPS.put(lookup.lookupClass(), lookup);
 	}
+	private static IterablePP<Mode> getModes(MethodHandles.Lookup lookup){
+		return Iters.from(Mode.values())
+		            .filter(e -> UtilL.checkFlag(lookup.lookupModes(), e.flag));
+	}
 	private static void badLookup(MethodHandles.Lookup lookup){
-		var modes = Iters.from(Mode.values())
-		                 .filter(e -> UtilL.checkFlag(lookup.lookupModes(), e.flag))
-		                 .joinAsStr(", ", "[", "]");
+		var modes = getModes(lookup).joinAsStr(", ", "[", "]");
 		
 		throw new IllegalArgumentException(
 			Log.fmt("Lookup of {}#red must have {#yellow[PRIVATE, MODULE]#} access but has {}#yellow!", lookup, modes)
-		
 		);
 	}
 	
@@ -180,60 +185,41 @@ public final class Access{
 		return methods.getFirst();
 	}
 	
-	private static MethodHandles.Lookup privateLookupIn(Class<?> clazz) throws IllegalAccessException{
-		var lookup = getPrivateLookup(clazz);
-		if(lookup != null) return lookup;
+	private static MethodHandles.Lookup getBestLookup(Class<?> clazz, boolean clinitCall) throws IllegalAccessException{
+		if(getPrivateLookup(clazz, clinitCall) instanceof Some(var lookup)){
+			return lookup;
+		}
 		
-		if(tryLoad(clazz)){
-			lookup = getPrivateLookup(clazz);
-			if(lookup != null) return lookup;
+		var parents = Iters.values(PRIVATE_LOOKUPS).filter(e -> UtilL.instanceOf(e.lookupClass(), clazz));
+		if(parents.matchFirst() instanceof Some(var parentLookup)){
+			try{
+				return MethodHandles.privateLookupIn(clazz, parentLookup);
+			}catch(IllegalAccessException ignore){ }
+		}
+		
+		var moduleValues  = Iters.values(PRIVATE_LOOKUPS).filter(e -> e.lookupClass().getModule().equals(clazz.getModule())).bake();
+		var packageValues = moduleValues.filter(e -> e.lookupClass().getPackageName().equals(clazz.getPackageName()));
+		
+		if(packageValues.matchFirst() instanceof Some(var packageSibling)){
+			try{
+				return MethodHandles.privateLookupIn(clazz, packageSibling);
+			}catch(IllegalAccessException ignore){ }
+		}
+		
+		if(moduleValues.matchFirst() instanceof Some(var moduleAccess)){
+			try{
+				return MethodHandles.privateLookupIn(clazz, moduleAccess);
+			}catch(IllegalAccessException ignore){ }
 		}
 		
 		return MethodHandles.publicLookup();
-
-//		try{
-//			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
-//		}catch(IllegalAccessException e){
-//			var tc         = Utils.getCallee(0);
-//			var thisModule = tc.getModule().getName();
-//			if(!e.getMessage().contains(thisModule + " does not read ")){
-//				throw e;
-//			}
-//			allowModule(clazz);
-//			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
-//		}
 	}
-	private static boolean tryLoad(Class<?> clazz){
-		if(tryLoad(MethodHandles.publicLookup(), clazz)){
-			return true;
-		}
-		if(Iters.entries(PRIVATE_LOOKUPS)
-		        .filter(e -> e.getKey().getClassLoader() == clazz.getClassLoader() &&
-		                     e.getKey().getPackageName().equals(clazz.getPackageName()))
-		        .map(Map.Entry::getValue)
-		        .anyMatch(lookup -> tryLoad(lookup, clazz))){
-			return true;
-		}
-		for(var lookup : PRIVATE_LOOKUPS.values()){
-			if(tryLoad(lookup, clazz)){
-				return true;
-			}
-		}
-		return false;
-	}
-	private static boolean tryLoad(MethodHandles.Lookup lookup, Class<?> clazz){
-		try{
-			lookup.ensureInitialized(clazz);
-		}catch(Throwable e){
-			return false;
-		}
-		return true;
-	}
-	private static MethodHandles.Lookup getPrivateLookup(Class<?> clazz) throws IllegalAccessException{
+	
+	private static Match<MethodHandles.Lookup> getPrivateLookup(Class<?> clazz, boolean clinitCall) throws IllegalAccessException{
 		var givenLookup = PRIVATE_LOOKUPS.get(clazz);
 		if(givenLookup != null){
 			assert givenLookup.lookupClass() == clazz;
-			return givenLookup;
+			return Match.of(givenLookup);
 		}
 		var outer = clazz;
 		while(true){
@@ -241,47 +227,84 @@ public final class Access{
 			if(outer == null) break;
 			
 			var outerLookup = PRIVATE_LOOKUPS.get(outer);
+			if(clinitCall && outerLookup == null){
+				Utils.ensureClassLoaded(outer);
+				outerLookup = PRIVATE_LOOKUPS.get(outer);
+			}
 			if(outerLookup != null){
 				assert outerLookup.lookupClass() == outer;
-				return MethodHandles.privateLookupIn(clazz, outerLookup);
+				var lookup = MethodHandles.privateLookupIn(clazz, outerLookup);
+				return Match.of(lookup);
 			}
 		}
-		return null;
+		return Match.empty();
 	}
 	
 	public static MethodHandles.Lookup getLookup(Class<?> clazz, Mode... requiredModes) throws IllegalAccessException{
-		var lookup       = privateLookupIn(clazz);
-		var missingModes = Iters.from(requiredModes).filter(m -> (lookup.lookupModes()&m.flag) == 0);
-		missingModes.joinAsOptionalStr(", ", "[", "]")
-		            .ifPresent(missing -> {
-			            throw new MissingAccessConsent(
-				            "fmt",
-				            "No consent was provided for {}#red and required attributes can not be accessed!\n" +
-				            "  {#yellowNote:#} Have you added {#greenstatic{ allowFullAccess(MethodHandles.lookup()); }#} to your class?",
-				            clazz
-			            );
-		            });
+		if(requiredModes.length == 1 && requiredModes[0] == Mode.PUBLIC){
+			return MethodHandles.publicLookup();
+		}
+		var lookup = getBestLookup(clazz, false);
+		
+		if(lookup == MethodHandles.publicLookup()){
+			Utils.ensureClassLoaded(clazz);
+			lookup = getBestLookup(clazz, true);
+			if(lookup != MethodHandles.publicLookup()){
+				return lookup;
+			}
+		}
+		
+		var modes        = (lookup == MethodHandles.publicLookup()? Iters.of(Mode.PUBLIC) : getModes(lookup)).asCollection();
+		var missingModes = Iters.from(requiredModes).filter(m -> !modes.contains(m));
+		if(missingModes.hasAny()){
+			String snippet = clazz.isInterface()?
+			                 "{#greenVoid _acc = IOInstance.allowFullAccessI(MethodHandles.lookup());#}" :
+			                 "{#greenstatic{ allowFullAccess(MethodHandles.lookup()); }#}";
+			
+			throw new MissingAccessConsent(
+				"fmt",
+				"""
+					No consent was provided for {}#red and required attributes can not be accessed!
+					  Requested modes: {}#yellow
+					  Available modes: {}#red
+					  {#yellowNote:#} Have you added {}#green to your {}?""",
+				clazz,
+				missingModes.joinAsStr(", "),
+				modes.joinAsStr(", "),
+				snippet, clazz.isInterface()? "interface" : "class"
+			);
+		}
 		
 		if(requiredModes.length == 0){
 			return lookup.dropLookupMode(PUBLIC);
-		}
-		return lookup;
-	}
-	
-	private static void allowModule(Class<?> clazz){
-		var classModule = clazz.getModule();
-		var tc          = Utils.getCallee(0);
-		var thisModule  = tc.getModule();
-		if(!thisModule.canRead(classModule)){
-			thisModule.addReads(classModule);
-			thisModule.addOpens(tc.getPackageName(), classModule);
+		}else{
+			var toStrip = EnumSet.allOf(Mode.class);
+			toStrip.removeAll(List.of(Mode.ORIGINAL, Mode.UNCONDITIONAL));
+			
+			while(!toStrip.isEmpty()){
+				var current = lookup;
+				var okStrips = Iters.from(toStrip).filter(mode -> {
+					var nm     = current.dropLookupMode(mode.flag);
+					var sModes = getModes(nm).toSet();
+					return Iters.from(requiredModes).allMatch(sModes::contains);
+				}).matchFirst();
+				if(okStrips instanceof Some(var okMode)){
+					lookup = current.dropLookupMode(okMode.flag);
+					toStrip.remove(okMode);
+				}else{
+					break;
+				}
+			}
+			return lookup;
 		}
 	}
 	
 	public static VarHandle makeVarHandle(Field field){
 		try{
-			var lookup = getLookup(field.getDeclaringClass(), Mode.PRIVATE);
-			field.setAccessible(true);
+			var requiredMode = Iters.of(Mode.PRIVATE, Mode.PROTECTED, Mode.PUBLIC)
+			                        .firstMatching(m -> (field.getModifiers()&m.flag) != 0).orElseThrow();
+			
+			var lookup = getLookup(field.getDeclaringClass(), requiredMode);
 			return lookup.unreflectVarHandle(field);
 		}catch(Throwable e){
 			throw failMakeHandle("failed to create VarHandle\nField: " + field, e);
@@ -307,12 +330,12 @@ public final class Access{
 		}
 	}
 	private static RuntimeException failMakeHandle(String message, Throwable e){
-		var er = new RuntimeException(message, e);
 		if(e instanceof MissingAccessConsent mac){
+			var er = new RuntimeException(message);
 			mac.addSuppressed(er);
 			throw mac;
 		}
-		throw er;
+		throw new RuntimeException(message, e);
 	}
 	
 	

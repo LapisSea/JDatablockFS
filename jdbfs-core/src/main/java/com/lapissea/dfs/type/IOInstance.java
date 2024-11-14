@@ -767,4 +767,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		var isUnmanaged = UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance && !isUnmanaged;
 	}
+	
+	
+	static Void allowFullAccessI(MethodHandles.Lookup lookup){
+		Access.addLookup(lookup);
+		return null;
+	}
 }

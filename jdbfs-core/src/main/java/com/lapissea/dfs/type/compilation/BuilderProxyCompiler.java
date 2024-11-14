@@ -20,6 +20,9 @@ import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 
+import java.lang.invoke.MethodHandles;
+import java.util.Objects;
+
 public final class BuilderProxyCompiler{
 	
 	public static final String BUILDER_PROXY_POSTFIX = "€Builder";
@@ -81,16 +84,30 @@ public final class BuilderProxyCompiler{
 				
 				writer.write(
 					"""
-						private static final field $STRUCT #Struct
+						private static field $V_STRUCT #Struct<{0}>
+						
+						private static function $STRUCT
+							returns #Struct<{0}>
+						start
+							static call {1} isNull start
+								get {0} $V_STRUCT
+							end
+							if start
+								static call #Struct of start
+									class {0}
+								end
+								set {0} $V_STRUCT
+							end
+							get {0} $V_STRUCT
+						end
 						
 						function <clinit> start
-							static call #Struct of start
-								class {0}
+							static call {2} allowFullAccess start
+								static call {3} lookup
 							end
-							set {0} $STRUCT
 						end
 						""",
-					proxyName);
+					proxyName, Objects.class, IOInstance.Managed.class, MethodHandles.class);
 				
 				for(IOField<T, ?> field : fields){
 					writeField(writer, field.getAccessor());
@@ -100,7 +117,7 @@ public final class BuilderProxyCompiler{
 						public function <init>
 						start
 							super start
-								get {0} $STRUCT
+								static call {0} $STRUCT
 							end
 							template-for #fName in {1} start
 								get #ChunkPointer NULL

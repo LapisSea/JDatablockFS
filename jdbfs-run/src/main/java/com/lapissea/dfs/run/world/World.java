@@ -2,13 +2,16 @@ package com.lapissea.dfs.run.world;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.stream.IntStream;
 
 public final class World{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	public static void main(String[] args) throws IOException{
 		LoggedMemoryUtils.simpleLoggedMemorySession(mem -> {
