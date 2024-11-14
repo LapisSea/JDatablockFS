@@ -11,7 +11,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -24,14 +23,14 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
 		
-		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		public Funct(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType){
 			super(struct, field, name, genericType);
 			
-			getter.ifPresent(get -> validateGetter(genericType, get));
-			setter.ifPresent(set -> validateSetter(genericType, set));
+			if(getter != null) validateGetter(genericType, getter);
+			if(setter != null) validateSetter(genericType, setter);
 			
-			this.getter = getter.map(ExactFieldAccessor::findParent).map(this::makeGetter).orElse(null);
-			this.setter = setter.map(ExactFieldAccessor::findParent).map(this::makeSetter).orElse(null);
+			this.getter = getter != null? makeGetter(findParent(getter)) : null;
+			this.setter = setter != null? makeSetter(findParent(setter)) : null;
 		}
 		
 		@Override
@@ -136,7 +135,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	
 	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends Funct<CTyp>{
 		
-		public PtrFunc(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
+		public PtrFunc(Struct<CTyp> struct, Field field, Method getter, Method setter, String name){
 			super(struct, field, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
@@ -174,16 +173,13 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
+		var noFn = getter == null && setter == null;
 		if(genericType == ChunkPointer.class){
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new Ptr<>(struct, field, name);
-			}
+			if(noFn) return new Ptr<>(struct, field, name);
 			return new PtrFunc<>(struct, field, getter, setter, name);
 		}else{
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new UnsafeAccessor<>(struct, field, name, genericType);
-			}
+			if(noFn) return new UnsafeAccessor<>(struct, field, name, genericType);
 			return new UnsafeAccessor.Funct<>(struct, field, getter, setter, name, genericType);
 		}
 	}

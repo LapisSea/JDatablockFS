@@ -55,7 +55,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					
 					var annotations = Iters.concat(
 						Iters.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
-						Iters.from(anns).flatOptionals(field::getAnnotation)
+						Iters.from(anns).flatOptionalsM(field::getAnnotation)
 					).toList();
 					
 					var genType = field.getGenericType(null);

@@ -37,7 +37,7 @@ public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType ext
 		super(accessor, SizeDescriptor.Fixed.empty());
 		
 		struct = (Struct<ValueType>)Struct.ofUnknown(getType());
-		var typ = accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
+		var typ = accessor.getAnnotation(IOValue.Reference.class).orElseThrow().dataPipeType();
 		instancePipe = switch(typ){
 			case FIXED -> FixedStructPipe.of(struct, STATE_IO_FIELD);
 			case FLEXIBLE -> StandardStructPipe.of(struct);

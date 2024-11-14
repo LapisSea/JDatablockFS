@@ -46,6 +46,9 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default <L> IterablePP<L> flatOptionals(Function<T, Optional<L>> map){
 		return iter().flatOptionals(map);
 	}
+	default <L> IterablePP<L> flatOptionalsM(Function<T, Match<L>> map){
+		return iter().flatOptionalsM(map);
+	}
 	
 	default <L> IterablePP<L> mapped(Function<T, L> mapper){
 		return iter().map(mapper);

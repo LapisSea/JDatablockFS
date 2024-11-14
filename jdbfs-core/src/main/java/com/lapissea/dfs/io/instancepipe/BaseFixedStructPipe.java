@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.util.List;
@@ -50,9 +51,9 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
+		if(sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStrM(", ") instanceof Some(var badFields)){
 			throw new IllegalField("fmt", "{}#red should not have dependencies", badFields);
-		});
+		}
 		
 		return sizeFieldStream(structFields)
 			       .distinct()
@@ -72,7 +73,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected static <T extends IOInstance<T>> IterablePP<IOField<T, NumberSize>> sizeFieldStream(FieldSet<T> structFields){
-		return structFields.flatOptionals(f -> IOFieldTools.getDynamicSize(f.getAccessor()));
+		return structFields.flatOptionalsM(f -> IOFieldTools.getDynamicSize(f.getAccessor()));
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){

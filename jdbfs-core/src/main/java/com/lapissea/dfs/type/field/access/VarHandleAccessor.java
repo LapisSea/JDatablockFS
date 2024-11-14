@@ -6,13 +6,13 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.util.Nullable;
 
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -23,14 +23,14 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
 		
-		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		public Funct(Struct<CTyp> struct, Field field, @Nullable Method getter, @Nullable Method setter, String name, Type genericType){
 			super(struct, field, name, genericType);
 			
-			getter.ifPresent(get -> validateGetter(genericType, get));
-			setter.ifPresent(set -> validateSetter(genericType, set));
+			if(getter != null) validateGetter(genericType, getter);
+			if(setter != null) validateSetter(genericType, setter);
 			
-			this.getter = getter.map(ExactFieldAccessor::findParent).map(this::makeGetter).orElse(null);
-			this.setter = setter.map(ExactFieldAccessor::findParent).map(this::makeSetter).orElse(null);
+			this.getter = getter != null? makeGetter(findParent(getter)) : null;
+			this.setter = setter != null? makeSetter(findParent(setter)) : null;
 		}
 		
 		@Override
@@ -135,11 +135,11 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	
 	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor.Funct<CTyp>{
 		
-		public PtrFunc(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
+		public PtrFunc(Struct<CTyp> struct, Field field, Method getter, Method setter, String name){
 			super(struct, field, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
+		public long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num = (ChunkPointer)get(ioPool, instance);
 			if(num == null) fail();
 			return num.getValue();
@@ -148,7 +148,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 		}
 		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
+		public void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, ChunkPointer.of(value));
 		}
 	}
@@ -173,16 +173,13 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
+		var noFn = getter == null && setter == null;
 		if(genericType == ChunkPointer.class){
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new Ptr<>(struct, field, name);
-			}
+			if(noFn) return new Ptr<>(struct, field, name);
 			return new PtrFunc<>(struct, field, getter, setter, name);
 		}else{
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new VarHandleAccessor<>(struct, field, name, genericType);
-			}
+			if(noFn) return new VarHandleAccessor<>(struct, field, name, genericType);
 			return new VarHandleAccessor.Funct<>(struct, field, getter, setter, name, genericType);
 		}
 	}

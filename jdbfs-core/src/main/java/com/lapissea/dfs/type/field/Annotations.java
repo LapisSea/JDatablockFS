@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -67,9 +68,9 @@ public abstract class Annotations{
 			}
 		}).toMap(Map.Entry::getKey, Map.Entry::getValue);
 		
-		Iters.keys(values).firstNotMatching(safeValues::containsKey).ifPresent(v -> {
+		if(Iters.keys(values).firstNotMatchingM(safeValues::containsKey) instanceof Some(var v)){
 			throw new IllegalArgumentException(annotationType.getTypeName() + " does not have value: \"" + v + '"');
-		});
+		}
 		
 		int hash = Iters.entries(values).mapToInt(element -> {
 			int    res;

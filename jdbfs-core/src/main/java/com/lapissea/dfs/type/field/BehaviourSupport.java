@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -180,11 +181,14 @@ public final class BehaviourSupport{
 		}
 		Set<Class<? extends Annotation>> annotationTouch = new HashSet<>();
 		
-		var arrayLenSize = field.getAnnotation(IODependency.ArrayLenSize.class);
-		arrayLenSize.map(Annotation::annotationType).ifPresent(annotationTouch::add);
-		
-		var arrayLengthSizeName = arrayLenSize.map(IODependency.ArrayLenSize::name)
-		                                      .orElseGet(() -> FieldNames.numberSize(FieldNames.name(FieldNames.collectionLen(field))));
+		var    arrayLenSize = field.getAnnotation(IODependency.ArrayLenSize.class);
+		String arrayLengthSizeName;
+		if(arrayLenSize instanceof Some(var ann)){
+			annotationTouch.add(ann.annotationType());
+			arrayLengthSizeName = ann.name();
+		}else{
+			arrayLengthSizeName = FieldNames.numberSize(FieldNames.name(FieldNames.collectionLen(field)));
+		}
 		
 		boolean needsNumSize = type == int[].class;
 		

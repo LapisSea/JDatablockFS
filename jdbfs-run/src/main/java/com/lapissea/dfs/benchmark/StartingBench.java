@@ -61,7 +61,7 @@ public class StartingBench{
 	}
 	
 	@Benchmark
-	@Fork(value = 400, warmups = 1)
+	@Fork(value = 600, warmups = 5)
 	@Warmup(iterations = 0)
 	@Measurement(iterations = 1)
 	@BenchmarkMode(Mode.SingleShotTime)

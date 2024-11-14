@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -332,11 +333,11 @@ final class FieldRegistry{
 		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filter(acc::hasAnnotation).toModSet();
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
-				behaviour.generateFields(acc).ifPresent(res -> {
+				if(behaviour.generateFields(acc) instanceof Some(var res)){
 					result.addAll(res.fields());
 					activeAnns.remove(behaviour.annotationType());
 					activeAnns.removeAll(res.touchedAnnotations());
-				});
+				}
 			}
 		}
 		
@@ -363,11 +364,14 @@ final class FieldRegistry{
 		var acc  = field.getAccessor();
 		
 		var deps = new HashSet<String>();
-		acc.getAnnotation(IODependency.class).ifPresent(ann -> deps.addAll(Arrays.asList(ann.value())));
+		if(acc.getAnnotation(IODependency.class) instanceof Some(var ann)){
+			deps.addAll(Arrays.asList(ann.value()));
+		}
 		
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
-				behaviour.getDependencyNames(acc).ifPresent(deps::addAll);
+				if(!(behaviour.getDependencyNames(acc) instanceof Some(var names))) continue;
+				deps.addAll(names);
 			}
 		}
 		return deps;

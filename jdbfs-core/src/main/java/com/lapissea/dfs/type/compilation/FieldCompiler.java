@@ -33,6 +33,7 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -272,13 +273,13 @@ public final class FieldCompiler{
 		var functionFields = new HashMap<String, GetSet>();
 		
 		hangingMethods.removeIf(hangingMethod -> {
-			var stub = CompilationTools.asStub(hangingMethod);
-			stub.ifPresent(st -> {
-				var p = functionFields.computeIfAbsent(st.varName(), n -> new GetSet());
-				if(st.isGetter()) p.getter = hangingMethod;
+			if(CompilationTools.asStub(hangingMethod) instanceof Some(var stub)){
+				var p = functionFields.computeIfAbsent(stub.varName(), n -> new GetSet());
+				if(stub.isGetter()) p.getter = hangingMethod;
 				else p.setter = hangingMethod;
-			});
-			return stub.isPresent();
+				return true;
+			}
+			return false;
 		});
 		
 		checkInvalidFunctionOnlyFields(functionFields, cl);
@@ -352,8 +353,8 @@ public final class FieldCompiler{
 				var getter = pickGSMethod(ioMethods, field, true);
 				var setter = pickGSMethod(ioMethods, field, false);
 				
-				getter.ifPresent(reportField);
-				setter.ifPresent(reportField);
+				if(getter != null) reportField.accept(getter);
+				if(setter != null) reportField.accept(setter);
 				
 				Type   type      = getType(field);
 				String fieldName = getFieldName(field);
@@ -370,12 +371,12 @@ public final class FieldCompiler{
 		}
 		return fields;
 	}
-	private static Optional<Method> pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean getter){
+	private static Method pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean getter){
 		return ioMethods.firstMatching(m -> {
-			if(!IOFieldTools.isIOField(m)) return false;
-			var name = CompilationTools.asStub(m).filter(s -> s.isGetter() == getter).map(CompilationTools.FieldStub::varName);
-			return name.filter(n -> n.equals(getFieldName(field))).isPresent();
-		});
+			return IOFieldTools.isIOField(m) &&
+			       (getter? CompilationTools.asGetterStub(m) : CompilationTools.asSetterStub(m)) instanceof Some(var stub) &&
+			       stub.varName().equals(getFieldName(field));
+		}).orElse(null);
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
