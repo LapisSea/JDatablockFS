@@ -24,6 +24,8 @@ import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -179,18 +181,21 @@ public final class IOFieldTools{
 		return res;
 	}
 	
-	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
-		Optional<String> dynSiz = Iters.ofPresent(
-			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
-			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
+	public static <T extends IOInstance<T>> Match<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
+		String sizeName;
+		if(field.getAnnotation(IODependency.NumSize.class) instanceof Some(var ann)){
+			sizeName = ann.value();
+		}else if(field.getAnnotation(IODependency.VirtualNumSize.class) instanceof Some(var ann)){
+			sizeName = getNumSizeName(field, ann);
+		}else if(field.getAnnotation(IODependency.class) instanceof Some(var ann) && Iters.from(ann.value()).anyEquals(FieldNames.numberSize(field))){
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			Iters.from(field.getAnnotation(IODependency.class)).flatMapArray(IODependency::value).firstMatching(name -> name.equals(FieldNames.numberSize(field)))
-		).findFirst();
-		
-		if(dynSiz.isEmpty()) return Optional.empty();
-		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
+			sizeName = FieldNames.numberSize(field);
+		}else{
+			return Match.empty();
+		}
+		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, sizeName);
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("Missing or invalid field should have been checked in annotation logic");
-		return opt;
+		return Match.of(opt.get());
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
@@ -241,7 +246,7 @@ public final class IOFieldTools{
 	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
 		return getNullabilityOpt(holder).orElse(defaultMode);
 	}
-	public static Optional<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
+	public static Match<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
 		return holder.getAnnotation(IONullability.class).map(IONullability::value);
 	}
 	

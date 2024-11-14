@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="DisplayHost no gl" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.tools.server.DisplayHost" />
-    <module name="tools" />
+    <module name="jdbfs-tools" />
     <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Ddfs.tools.emulateNoGL=true" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />
     <extension name="coverage">

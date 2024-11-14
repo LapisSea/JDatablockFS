@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Example: IPs" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.run.examples.IPs" />
-    <module name="run" />
+    <module name="jdbfs-run" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />
     <method v="2">
       <option name="Make" enabled="true" />

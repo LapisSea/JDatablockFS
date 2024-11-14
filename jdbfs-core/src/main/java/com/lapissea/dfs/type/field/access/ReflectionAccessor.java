@@ -1,27 +1,22 @@
 package com.lapissea.dfs.type.field.access;
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.util.UtilL;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.Optional;
 
-public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor.ReadOnly<CTyp>{
+public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
 	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
-		public Ptr(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
+		public Ptr(Struct<CTyp> struct, Field field, Method getter, Method setter, String name){
 			super(struct, field, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
@@ -39,7 +34,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
 		if(genericType == ChunkPointer.class){
 			return new Ptr<>(struct, field, getter, setter, name);
 		}else{
@@ -47,53 +42,35 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 		}
 	}
 	
-	private final Type     genericType;
-	private final Class<?> rawType;
-	private final int      typeId;
-	private final boolean  genericTypeHasArgs;
+	private final boolean genericTypeHasArgs;
 	
-	private final Field        field;
-	private final MethodHandle getter;
-	private final MethodHandle setter;
+	private final Field  field;
+	private final Method getter;
+	private final Method setter;
 	
-	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		super(struct, name, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
+	public ReflectionAccessor(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType){
+		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		this.field = field;
-		this.genericType = genericType;
-		this.rawType = Utils.typeToRaw(this.genericType);
-		typeId = TypeFlag.getId(rawType);
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
-		getter.ifPresent(get -> validateGetter(genericType, get));
-		setter.ifPresent(set -> validateSetter(genericType, set));
+		if(getter != null) validateGetter(genericType, getter);
+		if(setter != null) validateSetter(genericType, setter);
 		
-		this.getter = getter.map(ExactFieldAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-		this.setter = setter.map(ExactFieldAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.getter = getter != null? ExactFieldAccessor.findParent(getter) : null;
+		this.setter = setter != null? ExactFieldAccessor.findParent(setter) : null;
+		
+		if(this.getter != null) this.getter.setAccessible(true);
+		if(this.setter != null) this.setter.setAccessible(true);
+		field.setAccessible(true);
 	}
 	
-	@Override
-	public Class<?> getType(){
-		return rawType;
-	}
-	@Override
-	public int getTypeID(){
-		return typeId;
-	}
 	@Override
 	public boolean genericTypeHasArgs(){
 		return genericTypeHasArgs;
 	}
 	
 	@Override
-	public Type getGenericType(GenericContext genericContext){
-		if(genericContext == null){
-			return genericType;
-		}
-		return genericContext.resolveType(genericType);
-	}
-	
-	@Override
-	public Object get(VarPool<CTyp> ioPool, CTyp instance){
+	public Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return getter.invoke(instance);
@@ -106,7 +83,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
+	public void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -120,7 +97,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
+	public double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (double)getter.invoke(instance);
@@ -133,7 +110,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
+	public void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -147,7 +124,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
+	public float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (float)getter.invoke(instance);
@@ -160,7 +137,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
+	public void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -174,7 +151,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
+	public byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (byte)getter.invoke(instance);
@@ -187,7 +164,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
+	public void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -201,7 +178,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
+	public boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (boolean)getter.invoke(instance);
@@ -214,7 +191,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+	public void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -229,7 +206,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	
 	
 	@Override
-	public long getLong(VarPool<CTyp> ioPool, CTyp instance){
+	public long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (long)getter.invoke(instance);
@@ -242,7 +219,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
+	public void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -256,7 +233,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public int getInt(VarPool<CTyp> ioPool, CTyp instance){
+	public int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (int)getter.invoke(instance);
@@ -269,7 +246,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
+	public void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -283,7 +260,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public short getShort(VarPool<CTyp> ioPool, CTyp instance){
+	public short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter != null){
 				return (Short)getter.invoke(instance);
@@ -296,7 +273,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
+	public void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		try{
 			if(setter != null){
 				setter.invoke(instance, value);
@@ -310,7 +287,28 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ba
 	}
 	
 	@Override
-	public boolean canBeNull(){
-		return !rawType.isPrimitive();
+	protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
+		try{
+			if(getter != null){
+				return (Character)getter.invoke(instance);
+			}else{
+				return field.getChar(instance);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	@Override
+	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
+		try{
+			if(setter != null){
+				setter.invoke(instance, value);
+			}else{
+				checkReadOnlyField();
+				field.setChar(instance, value);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
 	}
 }

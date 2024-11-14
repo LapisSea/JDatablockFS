@@ -19,6 +19,7 @@ import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.PerKeyLock;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -991,11 +992,11 @@ public final class DefInstanceCompiler{
 				set = Optional.of(method);
 				continue;
 			}
-			
-			CompilationTools.asStub(method).ifPresentOrElse(
-				st -> (st.isGetter()? getters : setters).add(st),
-				() -> { throw new MalformedTemplateStruct(method + " is not a setter or a getter!"); }
-			);
+			if(CompilationTools.asStub(method) instanceof Some(var stub)){
+				(stub.isGetter()? getters : setters).add(stub);
+			}else{
+				throw new MalformedTemplateStruct(method + " is not a setter or a getter!");
+			}
 		}
 		
 		return new Specials(set, toStr, toShortStr);

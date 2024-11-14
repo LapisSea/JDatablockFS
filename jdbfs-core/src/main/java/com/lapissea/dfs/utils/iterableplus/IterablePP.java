@@ -109,6 +109,14 @@ public interface IterablePP<T> extends Iterable<T>{
 		throw new NoSuchElementException();
 	}
 	
+	default Match<T> matchFirst(){
+		for(T element : this){
+			if(element == null) continue;
+			return Match.of(element);
+		}
+		return Match.empty();
+	}
+	
 	default Optional<T> findFirst(){
 		for(T element : this){
 			if(element == null) continue;
@@ -135,6 +143,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return Optional.empty();
 	}
+	default <E extends Throwable> Match<T> firstNotMatchingM(UnsafePredicate<T, E> predicate) throws E{
+		return Match.from(firstNotMatching(predicate));
+	}
 	default <E extends Throwable> Optional<T> firstNotMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
 			if(element == null) continue;
@@ -143,6 +154,9 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		}
 		return Optional.empty();
+	}
+	default <E extends Throwable> Match<T> firstMatchingM(UnsafePredicate<T, E> predicate) throws E{
+		return Match.from(firstMatching(predicate));
 	}
 	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
@@ -451,6 +465,24 @@ public interface IterablePP<T> extends Iterable<T>{
 		return strLoop(delimiter, prefix, suffix, toString, iter);
 	}
 	
+	default Match<String> joinAsOptionalStrM()                                              { return joinAsOptionalStrM("", "", "", null); }
+	default Match<String> joinAsOptionalStrM(String delimiter)                              { return joinAsOptionalStrM(delimiter, "", "", null); }
+	default Match<String> joinAsOptionalStrM(Function<T, String> toString)                  { return joinAsOptionalStrM("", "", "", toString); }
+	default Match<String> joinAsOptionalStrM(String delimiter, Function<T, String> toString){ return joinAsOptionalStrM(delimiter, "", "", toString); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Match<String> joinAsOptionalStrM(String delimiter, String prefix, String suffix){ return joinAsOptionalStrM(delimiter, prefix, suffix, null); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Match<String> joinAsOptionalStrM(String delimiter, String prefix, String suffix, Function<T, String> toString){
+		var iter = iterator();
+		if(!iter.hasNext()) return Match.empty();
+		var res = strLoop(delimiter, prefix, suffix, toString, iter);
+		return Match.of(res);
+	}
+	
 	default Optional<String> joinAsOptionalStr()                                              { return joinAsOptionalStr("", "", "", null); }
 	default Optional<String> joinAsOptionalStr(String delimiter)                              { return joinAsOptionalStr(delimiter, "", "", null); }
 	default Optional<String> joinAsOptionalStr(Function<T, String> toString)                  { return joinAsOptionalStr("", "", "", toString); }
@@ -585,6 +617,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default IterablePP<T> filterNot(Predicate<T> filter){
+		return filter(filter.negate());
+	}
 	default IterablePP<T> filter(Predicate<T> filter){
 		return new Iters.DefaultIterable<>(){
 			@Override
@@ -827,6 +862,10 @@ public interface IterablePP<T> extends Iterable<T>{
 				};
 			}
 		};
+	}
+	
+	default <L> IterablePP<L> flatOptionalsM(Function<T, Match<L>> map){
+		return flatOptionals(e -> map.apply(e).opt());
 	}
 	default <L> IterablePP<L> flatOptionals(Function<T, Optional<L>> map){
 		return new Iters.DefaultIterable<>(){

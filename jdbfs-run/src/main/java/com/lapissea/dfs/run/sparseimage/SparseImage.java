@@ -10,16 +10,11 @@ import java.io.IOException;
 import java.util.Random;
 import java.util.stream.LongStream;
 
-import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
-import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
-import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
-import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
-
 public final class SparseImage{
 	
 	public static void main(String[] args) throws Exception{
-		
-		LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
+
+//		LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
 		LogUtil.println("Start");
 		
 		var config = new Configuration();

@@ -149,6 +149,9 @@ public final class PPCollection<T> implements IterablePP.SizedPP<T>, Collection<
 	public String toString(){
 		if(empty == TRUE) return "[]";
 		if(computed != null) return TextUtil.toString(computed);
+		if(computedSet != null){
+			return Iters.from(computedSet).joinAsStr(", ", "{", "}", TextUtil::toShortString);
+		}
 		return "[<?>]";
 	}
 	@Override

@@ -28,6 +28,7 @@ import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -166,10 +167,14 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				);
 			}
 			
-			public Optional<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){
-				return accessor.getAnnotation(annotationType).map(a -> generateFields.apply(accessor, a));
+			public Match<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){
+				if(accessor.getAnnotation(annotationType) instanceof Match.Some<A>(var ann)){
+					return Match.of(generateFields.apply(accessor, ann));
+				}else{
+					return Match.empty();
+				}
 			}
-			public Optional<Set<String>> getDependencyNames(FieldAccessor<T> accessor){
+			public Match<Set<String>> getDependencyNames(FieldAccessor<T> accessor){
 				return accessor.getAnnotation(annotationType).map(ann -> {
 					if(dependencyNames.isPresent()){
 						return dependencyNames.get().apply(accessor, ann);

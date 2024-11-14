@@ -75,6 +75,12 @@ public class WeakKeyValueMap<K, V>{
 	public IterablePP<Map.Entry<K, V>> iter(){
 		return derefIter(Iters.entries(data));
 	}
+	public IterablePP<K> iterKey(){
+		return iter().map(Map.Entry::getKey);
+	}
+	public IterablePP<V> iterVal(){
+		return iter().map(Map.Entry::getValue);
+	}
 	protected IterablePP<Map.Entry<K, V>> derefIter(IterablePP<Map.Entry<K, WeakReference<V>>> iter){
 		return iter.map(e -> {
 			var k = e.getKey();
