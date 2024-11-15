@@ -91,76 +91,15 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> virtualNumSize(FieldAccessor<T> field, IODependency.VirtualNumSize ann){
-		var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
-		
-		var min = ann.min();
-		var max = ann.max();
-		
-		var vf = new VirtualFieldDefinition<>(
+		return new BehaviourRes<>(new VirtualFieldDefinition<>(
 			IO,
 			IOFieldTools.getNumSizeName(field, ann),
 			NumberSize.class,
-			new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
-				private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					var len = unsigned? calcMaxVal(ioPool, inst, deps) : calcMinMaxVal(ioPool, inst, deps);
-					return NumberSize.bySize(len, unsigned);
-				}
-				private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					return switch(deps.size()){
-						case 1 -> deps.get(0).getLong(ioPool, inst);
-						case 2 -> {
-							long a = deps.get(0).getLong(ioPool, inst);
-							long b = deps.get(1).getLong(ioPool, inst);
-							yield Math.max(a, b);
-						}
-						default -> {
-							long best = 0;
-							for(var d : deps){
-								long newVal = d.getLong(ioPool, inst);
-								if(newVal>best){
-									best = newVal;
-								}
-							}
-							yield best;
-						}
-					};
-				}
-				private long calcMinMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					return switch(deps.size()){
-						case 1 -> deps.get(0).getLong(ioPool, inst);
-						case 2 -> {
-							long a   = deps.get(0).getLong(ioPool, inst);
-							long b   = deps.get(1).getLong(ioPool, inst);
-							var  min = Math.min(a, b);
-							var  max = Math.max(a, b);
-							yield Math.abs(min)>Math.abs(max)? min : max;
-						}
-						default -> {
-							long min = Long.MAX_VALUE;
-							long max = Long.MIN_VALUE;
-							for(var d : deps){
-								long newVal = d.getLong(ioPool, inst);
-								min = Math.min(min, newVal);
-								max = Math.max(max, newVal);
-							}
-							yield Math.abs(min)>Math.abs(max)? min : max;
-						}
-					};
-				}
-				
-				@Override
-				public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-					var raw  = val == null? calcMax(ioPool, inst, deps) : val;
-					var size = raw.max(min);
-					
-					if(size.greaterThan(max)){
-						throw new RuntimeException(size + " can't fit in to " + max);
-					}
-					return size;
-				}
-			});
-		
-		return new BehaviourRes<>(vf);
+			new GetNumberSize.Uninitialized<T>(
+				ann.min(), ann.max(),
+				field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class
+			)
+		));
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> reference(FieldAccessor<T> field){
@@ -194,14 +133,19 @@ public final class BehaviourSupport{
 		
 		var lenField = new VirtualFieldDefinition<>(
 			IO, FieldNames.collectionLen(field), int.class,
-			(VirtualFieldDefinition.GetterFilter<T, Integer>)(ioPool, instance, dependencies, value) -> {
-				if(value>0) return value;
-				var collection = instance == null? null : field.get(ioPool, instance);
-				if(collection != null){
-					if(isList) return ((List<?>)collection).size();
-					return Array.getLength(collection);
+			new VirtualFieldDefinition.GetterFilter<T, Integer>(){
+				@Override
+				public Integer filter(VarPool<T> ioPool, T instance, Integer value){
+					if(value>0) return value;
+					var collection = instance == null? null : field.get(ioPool, instance);
+					if(collection != null){
+						if(isList) return ((List<?>)collection).size();
+						return Array.getLength(collection);
+					}
+					return 0;
 				}
-				return 0;
+				@Override
+				public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
 			},
 			List.of(
 				Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),

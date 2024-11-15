@@ -1,6 +1,5 @@
 package com.lapissea.dfs.type.field.access;
 
-import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
@@ -12,34 +11,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 
-public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
-	
-	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
-		
-		public Ptr(Struct<CTyp> struct, Field field, Method getter, Method setter, String name){
-			super(struct, field, getter, setter, name, ChunkPointer.class);
-		}
-		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null) fail();
-			return num.getValue();
-		}
-		private void fail(){
-			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-		}
-		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, ChunkPointer.of(value));
-		}
-	}
+public final class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
-		if(genericType == ChunkPointer.class){
-			return new Ptr<>(struct, field, getter, setter, name);
-		}else{
-			return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
-		}
+		return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
 	}
 	
 	private final boolean genericTypeHasArgs;

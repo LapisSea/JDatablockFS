@@ -9,7 +9,6 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition.GetterFilter;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -53,10 +52,8 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	}
 	
 	private final VirtualFieldDefinition<CTyp, Object> type;
-	private final GetterFilter<CTyp, Object>           filter;
-	private       List<FieldAccessor<CTyp>>            dependencies;
-	
-	public final TypeOff typeOff;
+	private       GetterFilter<CTyp, Object>           filter;
+	public final  TypeOff                              typeOff;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, TypeOff typeOff){
 		super(struct, type.name, type.type, type.annotations, false);
@@ -72,13 +69,11 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	
 	public void init(IOField<CTyp, ?> field){
 		if(filter != null){
-			if(dependencies != null){
-				throw new IllegalStateException();
-			}
-			dependencies = getDeclaringStruct()
-				               .getFields()
-				               .filtered(f -> f.isDependency(field))
-				               .toList(IOField::getAccessor);
+			var users = getDeclaringStruct()
+				            .getFields()
+				            .iterDependentOn(field)
+				            .toList(IOField::getAccessor);
+			filter = filter.withUsers(users);
 		}
 	}
 	
@@ -86,7 +81,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 		long rawVal = getTargetPool(ioPool, instance).getLong(this);
 		if(filter == null) return rawVal;
-		return (long)filter.filter(ioPool, instance, dependencies, rawVal);
+		return (long)filter.filter(ioPool, instance, rawVal);
 	}
 	@Override
 	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
@@ -97,7 +92,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 		int rawVal = getTargetPool(ioPool, instance).getInt(this);
 		if(filter == null) return rawVal;
-		return (int)filter.filter(ioPool, instance, dependencies, rawVal);
+		return (int)filter.filter(ioPool, instance, rawVal);
 	}
 	@Override
 	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){ getTargetPool(ioPool, instance).setInt(this, value); }
@@ -136,7 +131,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		var pool   = getTargetPool(ioPool, instance, true);
 		var rawVal = pool == null? null : pool.get(this);
 		if(filter == null) return rawVal;
-		return filter.filter(ioPool, instance, dependencies, rawVal);
+		return filter.filter(ioPool, instance, rawVal);
 	}
 	@Override
 	protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
