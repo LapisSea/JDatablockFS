@@ -21,7 +21,8 @@ import java.util.Objects;
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
-		T filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
+		T filter(VarPool<IO> ioPool, IO instance, T value);
+		GetterFilter<IO, T> withUsers(List<FieldAccessor<IO>> users);
 	}
 	
 	public final StoragePool         storagePool;

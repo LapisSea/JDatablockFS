@@ -1,7 +1,6 @@
 package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.internal.Access;
-import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
@@ -18,7 +17,7 @@ import java.util.function.Function;
 
 public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
-	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
+	public static final class Funct<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
 		
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
@@ -133,55 +132,11 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		}
 	}
 	
-	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor.Funct<CTyp>{
-		
-		public PtrFunc(Struct<CTyp> struct, Field field, Method getter, Method setter, String name){
-			super(struct, field, getter, setter, name, ChunkPointer.class);
-		}
-		@Override
-		public long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null) fail();
-			return num.getValue();
-		}
-		private void fail(){
-			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-		}
-		@Override
-		public void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, ChunkPointer.of(value));
-		}
-	}
-	
-	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
-		
-		public Ptr(Struct<CTyp> struct, Field field, String name){
-			super(struct, field, name, ChunkPointer.class);
-		}
-		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null) fail();
-			return num.getValue();
-		}
-		private void fail(){
-			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-		}
-		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, ChunkPointer.of(value));
-		}
-	}
-	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
-		var noFn = getter == null && setter == null;
-		if(genericType == ChunkPointer.class){
-			if(noFn) return new Ptr<>(struct, field, name);
-			return new PtrFunc<>(struct, field, getter, setter, name);
-		}else{
-			if(noFn) return new VarHandleAccessor<>(struct, field, name, genericType);
-			return new VarHandleAccessor.Funct<>(struct, field, getter, setter, name, genericType);
+		if(getter == null && setter == null){
+			return new VarHandleAccessor<>(struct, field, name, genericType);
 		}
+		return new VarHandleAccessor.Funct<>(struct, field, getter, setter, name, genericType);
 	}
 	
 	private final VarHandle handle;
