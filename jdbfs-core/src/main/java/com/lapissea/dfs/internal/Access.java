@@ -107,11 +107,6 @@ public final class Access{
 		}
 	}
 	
-	public record DumbConstructorImpl<Interf>(
-		Class<Interf> functionalInterfaceType,
-		Function<Constructor<?>, Interf> make
-	){ }
-	
 	private static <T> T refl(UnsafeSupplier<T, ReflectiveOperationException> get){
 		try{
 			return get.get();
@@ -120,22 +115,18 @@ public final class Access{
 		}
 	}
 	
-	private static final List<DumbConstructorImpl<?>> DUMB_CONSTRUCTORS = List.of(
-		new DumbConstructorImpl<>(Function.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
-		new DumbConstructorImpl<>(IntFunction.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
-		new DumbConstructorImpl<>(LongFunction.class, ctor -> o -> refl(() -> ctor.newInstance(o))),
-		new DumbConstructorImpl<>(BiFunction.class, ctor -> (a, b) -> refl(() -> ctor.newInstance(a, b))),
-		new DumbConstructorImpl<>(TriFunction.class, ctor -> (a, b, c) -> refl(() -> ctor.newInstance(a, b, c))),
-		new DumbConstructorImpl<>(NewObj.class, ctor -> () -> refl(ctor::newInstance)),
-		new DumbConstructorImpl<>(NewObj.Instance.class, ctor -> () -> refl(() -> (IOInstance<?>)ctor.newInstance()))
-	);
-	
-	public static <FInter, T extends FInter> T makeLambdaUnop(Constructor<?> constructor, Class<FInter> functionalInterface){
-		for(var ctor : DUMB_CONSTRUCTORS){
-			if(ctor.functionalInterfaceType == functionalInterface){
-				return (T)ctor.make.apply(constructor);
-			}
+	public static <FInter, T extends FInter> T makeLambdaUnop(Constructor<?> ctor, Class<FInter> functionalInterface){
+		if(functionalInterface == NewObj.class) return (T)(NewObj<?>)() -> refl(ctor::newInstance);
+		if(functionalInterface == NewObj.Instance.class){
+			//noinspection rawtypes
+			return (T)(NewObj.Instance)() -> refl(() -> (IOInstance<?>)ctor.newInstance());
 		}
+		if(functionalInterface == Function.class) return (T)(Function<?, ?>)o -> refl(() -> ctor.newInstance(o));
+		if(functionalInterface == IntFunction.class) return (T)(IntFunction<?>)o -> refl(() -> ctor.newInstance(o));
+		if(functionalInterface == LongFunction.class) return (T)(LongFunction<?>)o -> refl(() -> ctor.newInstance(o));
+		if(functionalInterface == BiFunction.class) return (T)(BiFunction<?, ?, ?>)(a, b) -> refl(() -> ctor.newInstance(a, b));
+		if(functionalInterface == TriFunction.class) return (T)(TriFunction<?, ?, ?, ?>)(a, b, c) -> refl(() -> ctor.newInstance(a, b, c));
+		
 		return null;
 	}
 	
