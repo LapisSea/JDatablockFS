@@ -246,9 +246,9 @@ public final class DefInstanceCompiler{
 				}
 				
 				//noinspection unchecked
-				var completed = (Class<T>)Access.getLookup(interf, Access.Mode.PACKAGE).defineClass(file);
+				var completed = (Class<T>)Access.defineClass(interf, file);
 				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters));
-			}catch(IllegalAccessException|MalformedJorth e){
+			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}
 		}
@@ -659,8 +659,8 @@ public final class DefInstanceCompiler{
 			}
 			
 			//noinspection unchecked
-			return (Class<T>)Access.getLookup(interf, Access.Mode.PACKAGE).defineClass(file);
-		}catch(IllegalAccessException|MalformedJorth e){
+			return (Class<T>)Access.defineClass(interf, file);
+		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate implementation for: " + interf.getName(), e);
 		}
 	}

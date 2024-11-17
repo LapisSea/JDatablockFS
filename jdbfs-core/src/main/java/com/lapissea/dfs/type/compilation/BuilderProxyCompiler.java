@@ -151,12 +151,9 @@ public final class BuilderProxyCompiler{
 			}
 			
 			//noinspection unchecked
-			return (Class<ProxyBuilder<T>>)Access.getLookup(concreteClass, Access.Mode.PACKAGE)
-			                                     .defineClass(clazzBytes);
+			return (Class<ProxyBuilder<T>>)Access.defineClass(concreteClass, clazzBytes);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate proxy for " + baseClass.getTypeName(), e);
-		}catch(IllegalAccessException e){
-			throw new RuntimeException(e);
 		}
 	}
 	
