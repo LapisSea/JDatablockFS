@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.FunctionalReflectionAccessor;
+import com.lapissea.dfs.type.field.access.FunctionalVarHandleAccessor;
 import com.lapissea.dfs.type.field.access.ReflectionAccessor;
 import com.lapissea.dfs.type.field.access.UnsafeAccessor;
 import com.lapissea.dfs.type.field.access.VarHandleAccessor;
@@ -33,6 +34,7 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -315,7 +317,10 @@ public final class FieldCompiler{
 				}
 			}
 			
-			fields.add(FunctionalReflectionAccessor.make(struct, name, getter, Optional.ofNullable(setter), annotations, type));
+			fields.add(switch(FIELD_ACCESS){
+				case UNSAFE, VAR_HANDLE -> new FunctionalVarHandleAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+				case REFLECTION -> new FunctionalReflectionAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+			});
 		}
 		return fields;
 	}

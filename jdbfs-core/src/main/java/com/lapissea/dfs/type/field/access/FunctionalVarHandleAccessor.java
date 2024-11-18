@@ -2,33 +2,33 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Map;
 
-public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
 	private final int      typeID;
 	private final boolean  genericTypeHasArgs;
 	
-	private final Method getter;
-	private final Method setter;
+	private final MethodHandle getter;
+	private final MethodHandle setter;
 	
-	public FunctionalReflectionAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
-	                                    Method getter, Match<Method> setter, String name, Type genericType){
+	public FunctionalVarHandleAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
+	                                   Method getter, Match<Method> setter, String name, Type genericType){
 		super(struct, name, annotations);
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(genericType);
@@ -41,9 +41,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		if(getter.getParameterCount() != 0){
 			throw new MalformedStruct("fmt", "Getter must not have arguments: {}#red", getter);
 		}
-		getter.setAccessible(true);
-		
-		this.getter = getter;
+		this.getter = Access.makeMethodHandle(getter);
 		this.setter = switch(setter){
 			case Match.Some(var fn) -> {
 				if(!Utils.genericInstanceOf(fn.getReturnType(), Void.TYPE)){
@@ -55,8 +53,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 				if(!Utils.genericInstanceOf(fn.getGenericParameterTypes()[0], genericType)){
 					throw new MalformedStruct("fmt", "Setter argument is {}#red but {}#yellow is required\nSetter: {}#red", fn.getGenericParameterTypes()[0], genericType, fn);
 				}
-				fn.setAccessible(true);
-				yield fn;
+				yield Access.makeMethodHandle(fn);
 			}
 			default -> null;
 		};
@@ -82,18 +79,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	private static RuntimeException fail(Throwable e){
-		switch(e){
-			case IllegalAccessException err -> throw new ShouldNeverHappenError(err);
-			case InvocationTargetException err -> {
-				if(err.getCause() != null) throw UtilL.uncheckedThrow(err.getCause());
-				throw new RuntimeException(err);
-			}
-			case ExceptionInInitializerError err -> {
-				if(err.getCause() != null) throw UtilL.uncheckedThrow(err.getCause());
-				throw new RuntimeException(err);
-			}
-			default -> throw UtilL.uncheckedThrow(e);
-		}
+		throw UtilL.uncheckedThrow(e);
 	}
 	
 	@Override
