@@ -343,8 +343,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow, Object builderMetadata){
 		if(initNow){
-			var res = createBuilderPipe(builderMetadata);
-			return CompletableFuture.completedFuture(res);
+			try{
+				var res = createBuilderPipe(builderMetadata);
+				return CompletableFuture.completedFuture(res);
+			}catch(Throwable err){
+				return CompletableFuture.failedFuture(err);
+			}
 		}
 		return CompletableFuture.supplyAsync(() -> createBuilderPipe(builderMetadata), t -> Runner.run(t, "BP-" + this.toShortString()));
 	}

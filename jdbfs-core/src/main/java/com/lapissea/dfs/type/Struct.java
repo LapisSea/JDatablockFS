@@ -221,7 +221,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
 		validateStructType(instanceClass);
 		var s = structOfType((Class<? extends IOInstance>)instanceClass, minRequestedStage);
-		s.waitForState(minRequestedStage);
+		assert s.getEstimatedState()>=minRequestedStage;
 		return s;
 	}
 	
@@ -279,7 +279,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
 		try{
 			var s = structOfType(instanceClass, minRequestedStage);
-			s.waitForState(minRequestedStage);
+			assert s.getEstimatedState()>=minRequestedStage;
 			return s;
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);

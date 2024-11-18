@@ -13,8 +13,6 @@ import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -26,9 +24,8 @@ public final class WrapperStructs{
 	
 	public record WrapperRes<T>(Struct<Wrapper<T>> struct, Function<T, Wrapper<T>> constructor){ }
 	
-	private static       ConcurrentHashMap<Class<?>, WrapperRes<?>> WRAPPER_STRUCT_CACHE = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<Class<?>, WrapperRes<?>> WRAPPER_STRUCT_CACHE = new ConcurrentHashMap<>();
 	private static final Function<Class<?>, WrapperRes<?>>          generateWrapper      = WrapperStructs::generateWrapper;
-	private static final Lock                                       GEN_LOCK             = new ReentrantLock();
 	
 	public static <T> boolean isWrapperType(Class<T> type){
 		return FieldCompiler.getWrapperTypes().contains(type);
@@ -59,11 +56,11 @@ public final class WrapperStructs{
 						public final class {!0} start
 							@ #IOValue
 							private field val {1}
-							
+						
 							public function <init> start
 								super start end
 							end
-							
+						
 							public function <init>
 								arg val {1}
 							start
@@ -71,13 +68,13 @@ public final class WrapperStructs{
 								get #arg val
 								set this val
 							end
-							
+						
 							public function get
 								returns #Object
 							start
 								get this val
 							end
-							
+						
 							@ #Override
 							public function toString
 								returns #String
