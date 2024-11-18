@@ -623,6 +623,7 @@ public class GeneralTypeHandlingTests{
 		var unloadedStatus = loadTestClass();
 		for(int i = 0; i<20; i++){
 			System.gc();
+			UtilL.sleep(1);
 			if(unloadedStatus[0]){
 				return;
 			}
@@ -639,11 +640,12 @@ public class GeneralTypeHandlingTests{
 			IOInstance.Managed.class,
 			List.of()
 		);
-		var unloadedStatus = new boolean[]{false};
-		Cleaner.create().register(def, () -> unloadedStatus[0] = true);
-		
 		//noinspection unchecked
-		var typ    = (Class<T>)TempClassGen.gen(def);
+		var typ = (Class<T>)TempClassGen.gen(def);
+		
+		var unloadedStatus = new boolean[]{false};
+		Cleaner.create().register(typ, () -> unloadedStatus[0] = true);
+		
 		var struct = Struct.of(typ, STATE_DONE);
 		StandardStructPipe.of(struct, STATE_DONE);
 		return unloadedStatus;
