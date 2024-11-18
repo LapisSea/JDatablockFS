@@ -37,6 +37,10 @@ public final class Access{
 	private static final CopyOnWriteArrayList<AccessProvider> ACCESS_PROVIDERS   = new CopyOnWriteArrayList<>();
 	private static final AccessProvider                       UNOPTIMIZED_ACCESS = new AccessProvider.UnoptimizedAccessProvider();
 	
+	static{
+		ACCESS_PROVIDERS.add(new AccessProvider.DirectLookup(MethodHandles.publicLookup()));
+	}
+	
 	public static void addLookup(MethodHandles.Lookup lookup){
 		AccessUtils.requireModes(lookup, Mode.PRIVATE, Mode.MODULE);
 		ACCESS_PROVIDERS.add(new AccessProvider.DirectLookup(lookup));
@@ -171,9 +175,10 @@ public final class Access{
 			}
 		}
 		if(err == null) err = new ArrayList<>();
-		throw new RuntimeException(Iters.concat1N(
+		var msg = Iters.concat1N(
 			Log.fmt(errorMessage, value),
 			err
-		).joinAsStr("\n"));
+		).joinAsStr("\n");
+		throw new RuntimeException(msg);
 	}
 }

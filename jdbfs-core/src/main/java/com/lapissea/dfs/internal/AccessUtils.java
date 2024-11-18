@@ -48,12 +48,12 @@ public final class AccessUtils{
 		return true;
 	}
 	
-	static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz, Mode[] modes){
+	static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz, Mode[] modes) throws IllegalAccessException{
 		MethodHandles.Lookup actualLookup;
 		try{
 			actualLookup = MethodHandles.privateLookupIn(clazz, lookup);
 		}catch(IllegalAccessException e){
-			throw new RuntimeException(Log.fmt("{}#red is not accessible from {}#orange", clazz, lookup), e);
+			throw new IllegalAccessException(Log.fmt("{}#red is not accessible from {}#yellow: {}", clazz, lookup, e.getMessage()));
 		}
 		
 		return AccessUtils.stripModes(actualLookup, modes);

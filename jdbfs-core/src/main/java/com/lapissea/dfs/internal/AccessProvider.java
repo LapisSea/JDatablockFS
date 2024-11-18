@@ -85,7 +85,7 @@ public interface AccessProvider{
 	
 	abstract class LookupAccessProvider implements AccessProvider{
 		
-		protected abstract MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct;
+		protected abstract MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException;
 		
 		@Override
 		public VarHandle unreflect(Field field) throws IllegalAccessException, Defunct{
@@ -202,7 +202,7 @@ public interface AccessProvider{
 		}
 		
 		@Override
-		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct{
+		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException{
 			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
 			var lookup = getLookup();
 			return AccessUtils.adaptLookupTo(lookup, clazz, modes);
@@ -264,7 +264,7 @@ public interface AccessProvider{
 		public DirectLookup(MethodHandles.Lookup lookup){ this.lookup = Objects.requireNonNull(lookup); }
 		
 		@Override
-		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes){
+		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws IllegalAccessException{
 			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
 			return AccessUtils.adaptLookupTo(lookup, clazz, modes);
 		}
