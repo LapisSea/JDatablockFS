@@ -2,7 +2,6 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.MalformedStruct;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -20,32 +19,6 @@ import java.util.Objects;
 import static java.util.function.Function.identity;
 
 public abstract class BasicFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
-	
-	public abstract static class ReadOnly<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
-		
-		private final boolean readOnlyField;
-		
-		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Collection<Annotation> annotations, boolean readOnlyField){
-			super(declaringStruct, name, annotations);
-			this.readOnlyField = readOnlyField;
-		}
-		protected ReadOnly(Struct<CTyp> declaringStruct, String name, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
-			super(declaringStruct, name, annotations);
-			this.readOnlyField = readOnlyField;
-		}
-		
-		protected void checkReadOnlyField(){
-			if(readOnlyField){
-				failReadOnly();
-			}
-		}
-		private void failReadOnly(){
-			throw new UnsupportedOperationException(Log.fmt("Field {}#red is final, can not set it!", this));
-		}
-		
-		@Override
-		public boolean isReadOnly(){ return readOnlyField; }
-	}
 	
 	protected static void validateSetter(Type fieldType, Method func){
 		if(!Utils.genericInstanceOf(func.getReturnType(), Void.TYPE)){

@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -41,7 +42,7 @@ import static com.lapissea.dfs.type.field.access.TypeFlag.*;
  * types. For example, if an {@link Integer} type is passed to the {@link FieldAccessor#set} function of a {@code long} accessor, then this class will unbox the
  * {@link Integer} in to an int and widen it to a long. This value will then be passed on to the {@link ExactFieldAccessor#setExactLong} function
  */
-public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor.ReadOnly<CTyp>{
+public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	protected static Method findParent(Method method){
 		var cl = method.getDeclaringClass();
@@ -65,9 +66,11 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	private final Class<?> rawType;
 	private final int      typeID;
 	private final boolean  genericTypeHasArgs;
+	private final boolean  readOnlyField;
 	
 	public ExactFieldAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
-		super(struct, name, annotations, readOnlyField);
+		super(struct, name, annotations);
+		this.readOnlyField = readOnlyField;
 		
 		Class<?> type = Utils.typeToRaw(genericType);
 		
@@ -77,6 +80,17 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		this.rawType = Utils.typeToRaw(this.genericType);
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 	}
+	
+	protected final void checkReadOnlyField(){
+		if(readOnlyField){
+			failReadOnly();
+		}
+	}
+	private void failReadOnly(){
+		throw new UnsupportedOperationException(Log.fmt("Field {}#red is final, can not set it!", this));
+	}
+	@Override
+	public final boolean isReadOnly(){ return readOnlyField; }
 	
 	@Override
 	public boolean genericTypeHasArgs(){
