@@ -498,7 +498,7 @@ public enum Encoding{
 	public static final Encoding DEFAULT = LATIN1;
 	
 	private static final Encoding[] SORTED =
-		Iters.from(Encoding.values()).sortedByD(c -> c.format.sizeWeight()).toArray(Encoding[]::new);
+		Iters.from(Encoding.class).sortedByD(c -> c.format.sizeWeight()).toArray(Encoding[]::new);
 	
 	public static Encoding findBest(String data){
 		return switch(data.length()){
