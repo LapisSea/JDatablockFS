@@ -6,6 +6,7 @@ import com.lapissea.util.TextUtil;
 
 import java.util.AbstractMap;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -536,6 +537,9 @@ public final class Iters{
 	}
 	@Deprecated
 	public static <T> IterablePP<T> from(IterablePP<T> data){ return data; }
+	public static <T extends Enum<T>> IterablePP.SizedPP<T> from(Class<T> element){
+		return from(EnumSet.allOf(element));
+	}
 	
 	public static <V> IterablePP.SizedPP<V> values(Map<?, V> data)                  { return new CollectionIterable<>(data.values()); }
 	public static <K> IterablePP.SizedPP<K> keys(Map<K, ?> data)                    { return new CollectionIterable<>(data.keySet()); }

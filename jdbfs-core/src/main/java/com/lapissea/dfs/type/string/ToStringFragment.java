@@ -18,7 +18,7 @@ public sealed interface ToStringFragment{
 	record SpecialValue(SpecialValue.Value value) implements ToStringFragment{
 		
 		public static Optional<SpecialValue> of(String name){
-			return Iters.from(SpecialValue.Value.values())
+			return Iters.from(SpecialValue.Value.class)
 			            .firstMatching(v -> v.name.equalsIgnoreCase(name))
 			            .map(SpecialValue::new);
 		}
