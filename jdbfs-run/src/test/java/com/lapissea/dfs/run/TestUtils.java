@@ -228,7 +228,9 @@ public final class TestUtils{
 		var ioVal = Annotations.make(IOValue.class);
 		return TempClassGen.gen(new TempClassGen.ClassGen(
 			className,
-			Iters.from(props).map(p -> new TempClassGen.FieldGen(p.name, p.type, List.of(ioVal), false, null)).toList(),
+			Iters.from(props).map(p -> new TempClassGen.FieldGen(
+				p.name, TempClassGen.VisiblityGen.PUBLIC, false, p.type, List.of(ioVal), null
+			)).toList(),
 			Set.of(new TempClassGen.CtorType.Empty(Iters.from(props).nonNullProps(Prop::val).toMap(Prop::name, Prop::val))),
 			IOInstance.Managed.class,
 			List.of()

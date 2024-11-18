@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.run.TempClassGen.VisiblityGen;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.Annotations;
@@ -65,28 +66,31 @@ public final class StructFuzzTest{
 	
 	private static TempClassGen.FieldGen signedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, int.class, anns(IOVal, opt(rand, vns)), isFinal(rand),
+			name, getVisibility(), isFinal(rand), int.class, anns(IOVal, opt(rand, vns)),
 			RandomGenerator::nextInt
 		);
+	}
+	private static VisiblityGen getVisibility(){
+		return VisiblityGen.PUBLIC;
 	}
 	
 	private static TempClassGen.FieldGen unsignedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, int.class, anns(IOVal, Unsigned, opt(rand, vns)), isFinal(rand),
+			name, getVisibility(), isFinal(rand), int.class, anns(IOVal, Unsigned, opt(rand, vns)),
 			r -> r.nextInt(Integer.MAX_VALUE)
 		);
 	}
 	
 	private static TempClassGen.FieldGen string(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, String.class, anns(IOVal, opt(rand, Nullable)), isFinal(rand),
+			name, getVisibility(), isFinal(rand), String.class, anns(IOVal, opt(rand, Nullable)),
 			r -> Iters.rand(r, r.nextInt(100), 0, 255)
 			          .mapToObj(i -> Character.toString((char)i)).joinAsStr()
 		);
 	}
 	private static TempClassGen.FieldGen generic(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, Object.class, anns(IOVal, Gen, opt(rand, Nullable)), isFinal(rand),
+			name, getVisibility(), isFinal(rand), Object.class, anns(IOVal, Gen, opt(rand, Nullable)),
 			r -> switch(rand.nextInt(3)){
 				case 0 -> rand.nextInt();
 				case 1 -> "hello world";
@@ -97,23 +101,34 @@ public final class StructFuzzTest{
 	}
 	
 	@org.testng.annotations.DataProvider
-	Object[][] yn(){ return new Object[][]{{false}, {true}}; }
+	Object[][] yn(){
+		return Iters.from(VisiblityGen.class)
+		            .flatMap(v -> List.of(new Object[]{true, v}, new Object[]{false, v}))
+		            .toArray(Object[].class);
+	}
+	
+	private final Set<TempClassGen.ClassGen> simpleEncounter = new HashSet<>();
 	
 	@Test(dataProvider = "yn")
-	void simpleGenClass(boolean isFinal) throws ReflectiveOperationException, IOException{
-		testType(new TempClassGen.ClassGen(
+	void simpleGenClass(boolean isFinal, VisiblityGen visiblity) throws ReflectiveOperationException, IOException{
+		var gen = new TempClassGen.ClassGen(
 			"testBefore",
-			List.of(new TempClassGen.FieldGen("f1", int.class, anns(IOVal), isFinal, RandomGenerator::nextInt)),
+			List.of(new TempClassGen.FieldGen("f1", visiblity, isFinal, int.class, anns(IOVal), RandomGenerator::nextInt)),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of()
-		));
+		);
+		testType(gen);
+		simpleEncounter.add(gen);
 	}
 	
 	@Test(dependsOnMethods = "simpleGenClass")
 	public void fuzzGen() throws LockedFlagSet{
 		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
 			private final Set<TempClassGen.ClassGen> encountered = Collections.newSetFromMap(new ConcurrentHashMap<>());
+			
+			{ encountered.addAll(simpleEncounter); }
+			
 			@Override
 			public void applyAction(TempClassGen.ClassGen state, long actionIndex, Object action, RunMark mark) throws IOException{
 				if(!encountered.add(state.withName("_"))) return;

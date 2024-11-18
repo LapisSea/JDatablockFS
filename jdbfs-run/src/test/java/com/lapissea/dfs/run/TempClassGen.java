@@ -32,17 +32,27 @@ public final class TempClassGen{
 		record All() implements CtorType{ }
 	}
 	
-	public record FieldGen(String name, Type type, Iterable<Annotation> annotations, boolean isFinal, Function<RandomGenerator, Object> generator){
+	public enum VisiblityGen{
+		PRIVATE,
+		PROTECTED,
+		PUBLIC
+	}
+	
+	public record FieldGen(
+		String name, VisiblityGen visibility, boolean isFinal, Type type,
+		Iterable<Annotation> annotations, Function<RandomGenerator, Object> generator
+	){
 		@Override
 		public String toString(){
 			return Iters.from(annotations).joinAsOptionalStr("\n", "", "\n", a -> "@" + a.annotationType().getSimpleName()).orElse("") +
-			       "public " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
+			       visibility.toString().toLowerCase() + " " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
 		}
 		@Override
 		public boolean equals(Object o){
 			return this == o ||
 			       o instanceof FieldGen that &&
 			       this.isFinal == that.isFinal &&
+			       this.visibility == that.visibility &&
 			       this.type.equals(that.type) &&
 			       this.name.equals(that.name) &&
 			       this.annotations.equals(that.annotations) &&
@@ -114,7 +124,7 @@ public final class TempClassGen{
 				for(FieldGen field : classGen.fields){
 					JorthUtils.writeAnnotations(code, field.annotations);
 					if(field.isFinal) code.write("final");
-					code.write("public field {!} {}", field.name, field.type);
+					code.write("{} field {!} {}", field.visibility, field.name, field.type);
 				}
 				
 				for(var ctor : classGen.constructors){
