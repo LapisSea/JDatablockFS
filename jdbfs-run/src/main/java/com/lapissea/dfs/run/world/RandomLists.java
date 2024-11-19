@@ -10,6 +10,7 @@ import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.run.Configuration;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
@@ -22,6 +23,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -31,7 +33,8 @@ import java.util.random.RandomGenerator;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
-public class RandomLists{
+public final class RandomLists{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	public static void main(String[] args){
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER|LogUtil.Init.USE_CALL_THREAD);

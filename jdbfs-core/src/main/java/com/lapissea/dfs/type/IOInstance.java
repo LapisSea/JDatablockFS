@@ -1,11 +1,13 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -18,8 +20,10 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -255,17 +259,38 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return DefInstanceCompiler.dataConstructor(type);
 		}
 		static <T extends Def<T>, A1> MethodHandle partialDataConstructor(Class<T> type, Set<String> names, boolean fullCtor){
-			return DefInstanceCompiler.dataConstructor(new DefInstanceCompiler.Key<>(type, Optional.of(names)), fullCtor);
+			return DefInstanceCompiler.dataConstructor(new DefInstanceCompiler.Key<>(type, Match.of(names)), fullCtor);
 		}
 		
 		static <T extends Def<T>> Class<T> partialImplementation(Class<T> type, Set<String> includedFieldNames){
-			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Optional.of(includedFieldNames)));
+			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Match.of(includedFieldNames)));
 		}
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
 		static{ allowFullAccess(MethodHandles.lookup()); }
 		
+		protected static void registerAccess(Class<?> lookupProvider){
+			allowFullAccess0(lookupProvider, true);
+		}
+		private static void registerAccess(Class<?> lookupProvider, boolean selfCheck){
+			allowFullAccess0(lookupProvider, selfCheck);
+		}
+		private static void allowFullAccess0(Class<?> lookupProvider, boolean selfCheck){
+			var provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider);
+			if(selfCheck){
+				var callee = Utils.getCallee(2);
+				
+				try{
+					provider.adapt(callee, Access.Mode.PRIVATE, Access.Mode.MODULE);
+				}catch(IllegalAccessException e){
+					throw new IllegalStateException("The AccessProvider does not give appropriate lookup permissions", e);
+				}catch(AccessProvider.Defunct e){
+					throw new ShouldNeverHappenError(e);
+				}
+			}
+			Access.registerProvider(new AccessProvider.WeaklyProvidedLookup(lookupProvider));
+		}
 		protected static void allowFullAccess(MethodHandles.Lookup lookup){
 			Access.addLookup(lookup);
 		}

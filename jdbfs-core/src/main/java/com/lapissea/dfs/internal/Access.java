@@ -1,5 +1,6 @@
 package com.lapissea.dfs.internal;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
@@ -17,7 +18,11 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class Access{
 	public enum Mode{
@@ -37,16 +42,57 @@ public final class Access{
 	private static final CopyOnWriteArrayList<AccessProvider> ACCESS_PROVIDERS   = new CopyOnWriteArrayList<>();
 	private static final AccessProvider                       UNOPTIMIZED_ACCESS = new AccessProvider.UnoptimizedAccessProvider();
 	
+	private static final ThreadPoolExecutor GC_EXEC = new ThreadPoolExecutor(
+		0, 1, 200, TimeUnit.MILLISECONDS,
+		new ArrayBlockingQueue<>(2),
+		new ThreadPoolExecutor.DiscardPolicy()
+	);
+	
 	static{
-		ACCESS_PROVIDERS.add(new AccessProvider.DirectLookup(MethodHandles.publicLookup()));
+		registerProvider(new AccessProvider.DirectLookup(MethodHandles.publicLookup()));
+	}
+	
+	public static void registerProvider(AccessProvider provider){
+		ACCESS_PROVIDERS.add(provider);
+		if(GC_EXEC.getQueue().size()>0){
+			return;
+		}
+		clean();
+	}
+	private static void clean(){
+		GC_EXEC.execute(() -> {
+			System.gc();
+			try{
+				Thread.sleep(200);
+			}catch(InterruptedException e){ throw new RuntimeException(e); }
+			removeDefunct();
+		});
+	}
+	
+	private static final ReentrantLock ACCESS_LOCK = new ReentrantLock();//Lock is just here to prevent duplicate work on threaded situations
+	private static void removeDefunct(){
+		ACCESS_LOCK.lock();
+		try{
+			var toRemove = Iters.from(ACCESS_PROVIDERS)
+			                    .filter(prov -> prov.getDefunctState() == AccessProvider.DefunctState.DEFUNCT)
+			                    .toModSet();
+			if(toRemove.isEmpty()) return;
+			ACCESS_PROVIDERS.removeAll(toRemove);
+		}finally{
+			ACCESS_LOCK.unlock();
+		}
 	}
 	
 	public static void addLookup(MethodHandles.Lookup lookup){
-		AccessUtils.requireModes(lookup, Mode.PRIVATE, Mode.MODULE);
-		ACCESS_PROVIDERS.add(new AccessProvider.DirectLookup(lookup));
+		try{
+			AccessUtils.requireModes(lookup, Mode.PRIVATE, Mode.MODULE);
+		}catch(IllegalAccessException e){
+			throw new IllegalArgumentException(e);
+		}
+		registerProvider(new AccessProvider.DirectLookup(lookup));
 	}
 	
-	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
+	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface) throws IllegalAccessException{
 		var match = Iters.from(type.getMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
 		if(match.isEmpty()){
 			match = Iters.from(type.getDeclaredMethods()).filter(m -> m.getName().equals(name)).limit(2).toModList();
@@ -55,13 +101,13 @@ public final class Access{
 		return makeLambda(match.getFirst(), functionalInterface);
 	}
 	
-	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
+	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface) throws IllegalAccessException{
 		return access(AccessProvider::makeLambda, method, functionalInterface, "failed to create lambda\n  Method: {}#red", true);
 	}
-	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface) throws IllegalAccessException{
 		return makeLambda(constructor, functionalInterface, true);
 	}
-	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface, boolean optimized){
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface, boolean optimized) throws IllegalAccessException{
 		return access(AccessProvider::makeLambda, constructor, functionalInterface, "failed to create lambda\n  Constructor: {}#red", optimized);
 	}
 	
@@ -77,21 +123,24 @@ public final class Access{
 		}
 	}
 	
-	public static VarHandle makeVarHandle(Field field){
+	public static VarHandle makeVarHandle(Field field) throws IllegalAccessException{
 		return access(AccessProvider::unreflect, field, "failed to create VarHandle\n  Field: {}#red", true);
 	}
-	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> constructor){
+	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> constructor) throws IllegalAccessException{
 		return access(AccessProvider::unreflect, constructor, "failed to create MethodHandle\n  Constructor: {}#red", true);
 	}
-	public static MethodHandle makeMethodHandle(@NotNull Method method){
+	public static MethodHandle makeMethodHandle(@NotNull Method method) throws IllegalAccessException{
 		return access(AccessProvider::unreflect, method, "failed to create MethodHandle\n  Method: {}#red", true);
 	}
-	public static Class<?> defineClass(Class<?> target, byte[] bytecode){
+	public static Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException{
 		return access(AccessProvider::defineClass, target, bytecode, "failed to define class\n  Target: {}#red", true);
+	}
+	public static AccessProvider findAccess(Class<?> target, Mode... modes) throws IllegalAccessException{
+		return access(AccessProvider::adapt, target, modes, "failed to find AccessProvider\n  Target: {}#red", true);
 	}
 	
 	
-	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized){
+	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized) throws IllegalAccessException{
 		Class<?>[] args = getArgsU(functionalInterface);
 		return findConstructorArgs(clazz, functionalInterface, optimized, args);
 	}
@@ -111,7 +160,7 @@ public final class Access{
 	
 	@NotNull
 	public static <FInter, T extends FInter>
-	T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized, Class<?>... parameterTypes){
+	T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized, Class<?>... parameterTypes) throws IllegalAccessException{
 		try{
 			Constructor<?> lconst;
 			if(Modifier.isPrivate(clazz.getModifiers())){
@@ -121,6 +170,8 @@ public final class Access{
 			}
 			
 			return makeLambda(lconst, functionalInterface, optimized);
+		}catch(IllegalAccessException e){
+			throw e;
 		}catch(ReflectiveOperationException ce){
 			
 			try{
@@ -153,14 +204,40 @@ public final class Access{
 		T call(AccessProvider acc, V1 value1, V2 value2) throws IllegalAccessException, LambdaConversionException, AccessProvider.Defunct;
 	}
 	
-	private static <T, V1, V2> T access(AccessLambda2<T, V1, V2> fn, V1 value1, V2 value2, String errorMessage, boolean optimized){
+	private static <T, V1, V2> T access(AccessLambda2<T, V1, V2> fn, V1 value1, V2 value2, String errorMessage, boolean optimized) throws IllegalAccessException{
 		return access((acc, v1) -> fn.call(acc, v1, value2), value1, errorMessage, optimized);
 	}
-	private static <T, V> T access(AccessLambda<T, V> fn, V value, String errorMessage, boolean optimized){
+	private static <T, V> T access(AccessLambda<T, V> fn, V value, String errorMessage, boolean optimized) throws IllegalAccessException{
 		if(!optimized){
 			try{
 				return fn.call(UNOPTIMIZED_ACCESS, value);
 			}catch(Throwable ignore){ }
+		}
+		
+		var index = (int)(Math.random()*(ACCESS_PROVIDERS.size() - 1));
+		try{
+			if(ACCESS_PROVIDERS.get(index).getDefunctState() == AccessProvider.DefunctState.DEFUNCT){
+				removeDefunct();
+			}
+		}catch(IndexOutOfBoundsException ignore){ }
+		
+		for(var it = ACCESS_PROVIDERS.iterator(); it.hasNext(); ){
+			var provider = it.next();
+			try{
+				return fn.call(provider, value);
+			}catch(AccessProvider.Defunct e){
+				removeDefunct();
+				it = ACCESS_PROVIDERS.iterator();
+			}catch(IllegalAccessException|LambdaConversionException ignored){ }
+		}
+		
+		// load and try again
+		switch(value){
+			case Class<?> cl -> Utils.ensureClassLoaded(cl);
+			case Method v -> Utils.ensureClassLoaded(v.getDeclaringClass());
+			case Field v -> Utils.ensureClassLoaded(v.getDeclaringClass());
+			case Constructor<?> v -> Utils.ensureClassLoaded(v.getDeclaringClass());
+			default -> { }
 		}
 		
 		List<Throwable> err = null;
@@ -174,11 +251,12 @@ public final class Access{
 				err.add(e);
 			}
 		}
-		if(err == null) err = new ArrayList<>();
+		
 		var msg = Iters.concat1N(
 			Log.fmt(errorMessage, value),
-			err
+			err == null? List.of() : err
 		).joinAsStr("\n");
-		throw new RuntimeException(msg);
+		
+		throw new IllegalAccessException(msg);
 	}
 }

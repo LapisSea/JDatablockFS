@@ -33,6 +33,12 @@ import java.util.function.Supplier;
 
 public interface AccessProvider{
 	
+	enum DefunctState{
+		NEVER,
+		MAYBE,
+		DEFUNCT
+	}
+	
 	class Defunct extends Exception{ }
 	
 	class UnoptimizedAccessProvider implements AccessProvider{
@@ -55,6 +61,15 @@ public interface AccessProvider{
 		
 		@Override
 		public Class<?> defineClass(Class<?> target, byte[] bytecode){ throw new UnsupportedOperationException(); }
+		@Override
+		public AccessProvider adapt(Class<?> target, Mode[] modes) throws IllegalAccessException{
+			if(AccessUtils.isPublicMode(modes)) return this;
+			var lookup = MethodHandles.privateLookupIn(target, MethodHandles.publicLookup());
+			AccessUtils.requireModes(lookup, modes);
+			return new DirectLookup(lookup);
+		}
+		@Override
+		public DefunctState getDefunctState(){ return DefunctState.NEVER; }
 		
 		private static <T> T refl(UnsafeSupplier<T, ReflectiveOperationException> get){
 			try{
@@ -85,7 +100,15 @@ public interface AccessProvider{
 	
 	abstract class LookupAccessProvider implements AccessProvider{
 		
-		protected abstract MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException;
+		protected abstract MethodHandles.Lookup getLookup() throws Defunct;
+		
+		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException{
+			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
+			var lookup       = getLookup();
+			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz, modes);
+			AccessUtils.requireModes(targetLookup, modes);
+			return targetLookup;
+		}
 		
 		@Override
 		public VarHandle unreflect(Field field) throws IllegalAccessException, Defunct{
@@ -124,6 +147,13 @@ public interface AccessProvider{
 		public Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct{
 			var lookup = getLookup(target, Mode.PACKAGE);
 			return lookup.defineClass(bytecode);
+		}
+		
+		@Override
+		public AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException, Defunct{
+			var lookup = getLookup(target, modes);
+			AccessUtils.requireModes(lookup, modes);
+			return new DirectLookup(lookup);
 		}
 		
 		
@@ -175,10 +205,6 @@ public interface AccessProvider{
 			if(!UtilL.instanceOf(lookupProvider, Supplier.class)){
 				throw new IllegalArgumentException(Log.fmt("{}#red must be a Supplier<MethodHandles.Lookup>", lookupProvider.getName()));
 			}
-			if(Iters.from(lookupProvider.getConstructors()).noneMatch(c -> c.getParameterCount() == 0)){
-				throw new IllegalArgumentException(Log.fmt("{}#red must have an empty constructor", lookupProvider.getName()));
-			}
-			
 			
 			classLoader = new WeakReference<>(lookupProvider.getClassLoader());
 			lookupProviderPath = lookupProvider.getName();
@@ -202,13 +228,7 @@ public interface AccessProvider{
 		}
 		
 		@Override
-		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException{
-			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
-			var lookup = getLookup();
-			return AccessUtils.adaptLookupTo(lookup, clazz, modes);
-		}
-		
-		private MethodHandles.Lookup getLookup() throws Defunct{
+		protected MethodHandles.Lookup getLookup() throws Defunct{
 			var cached = lookupRef.get();
 			if(cached != null) return cached;
 			
@@ -224,7 +244,7 @@ public interface AccessProvider{
 			try{
 				ctor = clazz.getConstructor();
 			}catch(NoSuchMethodException e){
-				throw new ShouldNeverHappenError(e);
+				throw new IllegalArgumentException(Log.fmt("{}#red must have an empty constructor", clazz.getName()));
 			}
 			Supplier<MethodHandles.Lookup> supplier;
 			try{
@@ -255,6 +275,20 @@ public interface AccessProvider{
 				throw new RuntimeException(e);
 			}
 		}
+		
+		@Override
+		public String toString(){
+			var cached = lookupRef.get();
+			if(cached != null) return "Weak{" + cached + "}";
+			if(classLoader.refersTo(null)){
+				return "Weak{DEFUNCT: " + lookupProviderPath + "}";
+			}
+			return "Weak{" + lookupProviderPath + "}";
+		}
+		@Override
+		public DefunctState getDefunctState(){
+			return classLoader.refersTo(null)? DefunctState.DEFUNCT : DefunctState.MAYBE;
+		}
 	}
 	
 	class DirectLookup extends LookupAccessProvider{
@@ -264,10 +298,13 @@ public interface AccessProvider{
 		public DirectLookup(MethodHandles.Lookup lookup){ this.lookup = Objects.requireNonNull(lookup); }
 		
 		@Override
-		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws IllegalAccessException{
-			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
-			return AccessUtils.adaptLookupTo(lookup, clazz, modes);
+		protected MethodHandles.Lookup getLookup(){ return lookup; }
+		@Override
+		public String toString(){
+			return "Direct{" + lookup + "}";
 		}
+		@Override
+		public DefunctState getDefunctState(){ return DefunctState.NEVER; }
 	}
 	
 	VarHandle unreflect(Field field) throws IllegalAccessException, Defunct;
@@ -280,4 +317,8 @@ public interface AccessProvider{
 		throws IllegalAccessException, Defunct, LambdaConversionException;
 	
 	Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct;
+	
+	AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException, Defunct;
+	
+	DefunctState getDefunctState();
 }

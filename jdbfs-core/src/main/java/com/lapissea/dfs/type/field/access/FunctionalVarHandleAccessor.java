@@ -28,7 +28,7 @@ public class FunctionalVarHandleAccessor<CTyp extends IOInstance<CTyp>> extends 
 	private final MethodHandle setter;
 	
 	public FunctionalVarHandleAccessor(Struct<CTyp> struct, Map<Class<? extends Annotation>, ? extends Annotation> annotations,
-	                                   Method getter, Match<Method> setter, String name, Type genericType){
+	                                   Method getter, Match<Method> setter, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, annotations);
 		this.genericType = genericType;
 		this.rawType = Utils.typeToRaw(genericType);

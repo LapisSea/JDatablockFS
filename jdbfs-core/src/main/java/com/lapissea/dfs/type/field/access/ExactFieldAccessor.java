@@ -98,7 +98,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@SuppressWarnings("unchecked")
-	protected final Function<CTyp, Object> makeGetter(Method m){
+	protected final Function<CTyp, Object> makeGetter(Method m) throws IllegalAccessException{
 		var typ = m.getReturnType();
 		if(typ == short.class) return Access.makeLambda(m, FunctionOS.class);
 		if(typ == char.class) return Access.makeLambda(m, FunctionOC.class);
@@ -111,7 +111,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return Access.makeLambda(m, Function.class);
 	}
 	@SuppressWarnings("unchecked")
-	protected final BiConsumer<CTyp, Object> makeSetter(Method m){
+	protected final BiConsumer<CTyp, Object> makeSetter(Method m) throws IllegalAccessException{
 		var typ = m.getParameterTypes()[0];
 		if(typ == short.class) return Access.makeLambda(m, ConsumerOS.class);
 		if(typ == char.class) return Access.makeLambda(m, ConsumerOC.class);

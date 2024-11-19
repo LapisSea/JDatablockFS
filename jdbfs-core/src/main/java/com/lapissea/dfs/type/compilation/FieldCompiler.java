@@ -318,7 +318,16 @@ public final class FieldCompiler{
 			}
 			
 			fields.add(switch(FIELD_ACCESS){
-				case UNSAFE, VAR_HANDLE -> new FunctionalVarHandleAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+				case UNSAFE, VAR_HANDLE -> {
+					try{
+						yield new FunctionalVarHandleAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+					}catch(IllegalAccessException ex){
+						throw new IllegalField(
+							"fmt", "Could not make VarHandle accessor for field {#red{}.{}#}! Cause:\n{}",
+							struct.getType().getName(), name, ex
+						);
+					}
+				}
 				case REFLECTION -> new FunctionalReflectionAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
 			});
 		}

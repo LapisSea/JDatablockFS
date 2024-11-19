@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,31 +67,36 @@ public final class StructFuzzTest{
 	
 	private static TempClassGen.FieldGen signedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(), isFinal(rand), int.class, anns(IOVal, opt(rand, vns)),
+			name, getVisibility(rand), isFinal(rand), int.class, anns(IOVal, opt(rand, vns)),
 			RandomGenerator::nextInt
 		);
 	}
-	private static VisiblityGen getVisibility(){
-		return VisiblityGen.PUBLIC;
+	
+	private static final List<VisiblityGen> ALL_VIS = List.copyOf(EnumSet.allOf(VisiblityGen.class));
+	private static VisiblityGen getVisibility(RandomGenerator rand){
+		if(rand.nextInt(5) == 0){
+			return VisiblityGen.PUBLIC;
+		}
+		return ALL_VIS.get(rand.nextInt(ALL_VIS.size()));
 	}
 	
 	private static TempClassGen.FieldGen unsignedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(), isFinal(rand), int.class, anns(IOVal, Unsigned, opt(rand, vns)),
+			name, getVisibility(rand), isFinal(rand), int.class, anns(IOVal, Unsigned, opt(rand, vns)),
 			r -> r.nextInt(Integer.MAX_VALUE)
 		);
 	}
 	
 	private static TempClassGen.FieldGen string(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(), isFinal(rand), String.class, anns(IOVal, opt(rand, Nullable)),
+			name, getVisibility(rand), isFinal(rand), String.class, anns(IOVal, opt(rand, Nullable)),
 			r -> Iters.rand(r, r.nextInt(100), 0, 255)
 			          .mapToObj(i -> Character.toString((char)i)).joinAsStr()
 		);
 	}
 	private static TempClassGen.FieldGen generic(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(), isFinal(rand), Object.class, anns(IOVal, Gen, opt(rand, Nullable)),
+			name, getVisibility(rand), isFinal(rand), Object.class, anns(IOVal, Gen, opt(rand, Nullable)),
 			r -> switch(rand.nextInt(3)){
 				case 0 -> rand.nextInt();
 				case 1 -> "hello world";

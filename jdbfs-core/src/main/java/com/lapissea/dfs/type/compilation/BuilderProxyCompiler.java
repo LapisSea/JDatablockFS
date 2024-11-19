@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
@@ -19,6 +20,7 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Objects;
@@ -30,8 +32,8 @@ public final class BuilderProxyCompiler{
 	private static final WeakKeyValueMap<Class<?>, Class<? extends ProxyBuilder<?>>> CACHE      = new WeakKeyValueMap.Sync<>();
 	private static final PerKeyLock<Class<?>>                                        CACHE_LOCK = new PerKeyLock<>();
 	
-	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Class<T> type){ return getProxy(Struct.of(type)); }
-	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Struct<T> type){
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Class<T> type) throws IllegalAccessException{ return getProxy(Struct.of(type)); }
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Struct<T> type) throws IllegalAccessException{
 		return CACHE_LOCK.syncGet(type.getType(), () -> {
 			var cls = type.getType();
 			//noinspection unchecked
@@ -44,13 +46,16 @@ public final class BuilderProxyCompiler{
 		});
 	}
 	
-	private static <T extends IOInstance<T>> Class<ProxyBuilder<T>> compileProxy(Struct<T> type){
+	private static <T extends IOInstance<T>> Class<ProxyBuilder<T>> compileProxy(Struct<T> type) throws IllegalAccessException{
 		if(!type.needsBuilderObj()){
 			throw new IllegalArgumentException();
 		}
 		
 		var baseClass     = type.getType();
 		var concreteClass = type.getConcreteType();
+		
+		
+		AccessProvider concreteClassAccess = Access.findAccess(concreteClass, Access.Mode.PACKAGE);
 		
 		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
 		
@@ -101,11 +106,6 @@ public final class BuilderProxyCompiler{
 							get {0} $V_STRUCT
 						end
 						
-						function <clinit> start
-							static call {2} allowFullAccess start
-								static call {3} lookup
-							end
-						end
 						""",
 					proxyName, Objects.class, IOInstance.Managed.class, MethodHandles.class);
 				
@@ -150,8 +150,12 @@ public final class BuilderProxyCompiler{
 				BytecodeUtils.printClass(clazzBytes);
 			}
 			
-			//noinspection unchecked
-			return (Class<ProxyBuilder<T>>)Access.defineClass(concreteClass, clazzBytes);
+			try{
+				//noinspection unchecked
+				return (Class<ProxyBuilder<T>>)concreteClassAccess.defineClass(concreteClass, clazzBytes);
+			}catch(IllegalAccessException|AccessProvider.Defunct e){
+				throw new ShouldNeverHappenError(e);
+			}
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate proxy for " + baseClass.getTypeName(), e);
 		}

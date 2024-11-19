@@ -166,7 +166,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return ctor.make(provider, identity, type);
 		}
 		private NewUnmanaged<T> initConstructor(){
-			return unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
+			try{
+				return unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
+			}catch(IllegalAccessException e){
+				throw new RuntimeException("Could not create constructor for " + cleanFullName(), e);
+			}
 		}
 		
 		@Deprecated
@@ -868,6 +872,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		NewObj.Instance<T> ctor;
 		try{
 			ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		}catch(IllegalAccessException e){
+			if(emptyConstructor != null){
+				if(optimized) Log.warn("Warning! Could not create optimized constructor for: {}#red! Cause:\n{}", cleanFullName(), e);
+				return emptyConstructor;
+			}
+			if(!optimized) throw new RuntimeException("Constructor could not be created!", e);
+			try{
+				ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, false, NEW_OBJ_INST_ARGS);
+			}catch(IllegalAccessException ex){
+				throw new RuntimeException("Constructor could not be created!", ex);
+			}
 		}catch(MissingConstructor e){
 			if(needsBuilderObj()){
 				throw new UnsupportedOperationException("Final field types may not have a default constructor: " + this, e);
@@ -962,7 +977,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
 		if(!needsBuilderObj()) throw new UnsupportedOperationException();
-		var cls = BuilderProxyCompiler.getProxy(this);
+		Class<ProxyBuilder<T>> cls;
+		try{
+			cls = BuilderProxyCompiler.getProxy(this);
+		}catch(IllegalAccessException e){
+			throw new RuntimeException("Could not create proxy for: " + this, e);
+		}
 		var typ = now? Struct.of(cls, STATE_DONE) : Struct.of(cls);
 		
 		if(DEBUG_VALIDATION){

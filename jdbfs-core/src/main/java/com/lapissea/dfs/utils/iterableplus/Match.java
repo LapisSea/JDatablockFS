@@ -23,6 +23,8 @@ public sealed interface Match<T>{
 		public T orElseThrow(){
 			throw new NoSuchElementException("No value present");
 		}
+		@Override
+		public boolean isEmpty(){ return true; }
 	}
 	
 	record Some<T>(T val) implements Match<T>{
@@ -37,6 +39,8 @@ public sealed interface Match<T>{
 		public Optional<T> opt(){ return Optional.of(val); }
 		@Override
 		public T orElseThrow(){ return val; }
+		@Override
+		public boolean isEmpty(){ return false; }
 	}
 	
 	static <T> Match<T> empty(){
@@ -64,4 +68,6 @@ public sealed interface Match<T>{
 	
 	Optional<T> opt();
 	T orElseThrow();
+	boolean isEmpty();
+	default boolean isPresent(){ return !isEmpty(); }
 }

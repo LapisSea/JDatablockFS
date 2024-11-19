@@ -39,7 +39,7 @@ public class ReadOnlyTests{
 	}
 	
 	@Test(dependsOnMethods = "simpleInstanceStruct")
-	public void generateProxy(){
+	public void generateProxy() throws IllegalAccessException{
 		var res     = BuilderProxyCompiler.getProxy(Simple.class);
 		var bStruct = Struct.of(res, STATE_DONE);
 		var b       = bStruct.make();

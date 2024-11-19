@@ -1,5 +1,6 @@
 package com.lapissea.dfs.internal;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.internal.Access.Mode;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -48,18 +49,39 @@ public final class AccessUtils{
 		return true;
 	}
 	
-	static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz, Mode[] modes) throws IllegalAccessException{
+	public static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz, Mode[] modes) throws IllegalAccessException{
 		MethodHandles.Lookup actualLookup;
-		try{
-			actualLookup = MethodHandles.privateLookupIn(clazz, lookup);
-		}catch(IllegalAccessException e){
-			throw new IllegalAccessException(Log.fmt("{}#red is not accessible from {}#yellow: {}", clazz, lookup, e.getMessage()));
+		if(lookup.lookupClass() == clazz){
+			actualLookup = lookup;
+		}else{
+			look:
+			try{
+				actualLookup = MethodHandles.privateLookupIn(clazz, lookup);
+			}catch(IllegalAccessException e){
+				var thisModule = Utils.getCallee(0).getModule();
+				var thatModule = clazz.getModule();
+				
+				if(thisModule == lookup.lookupClass().getModule() &&
+				   e.getMessage().startsWith("module " + thisModule.getName() + " does not read module " + thatModule.getName())){
+					thisModule.addReads(thatModule);
+					try{
+						actualLookup = MethodHandles.privateLookupIn(clazz, lookup);
+						break look;
+					}catch(IllegalAccessException e2){
+						throw fail(clazz, lookup, e2);
+					}
+				}
+				throw fail(clazz, lookup, e);
+			}
 		}
 		
 		return AccessUtils.stripModes(actualLookup, modes);
 	}
+	private static IllegalAccessException fail(Class<?> clazz, MethodHandles.Lookup lookup, IllegalAccessException e){
+		return new IllegalAccessException(Log.fmt("{}#red is not accessible from {}#yellow: {}", clazz, lookup, e.getMessage()));
+	}
 	
-	static void requireModes(MethodHandles.Lookup lookup, Mode... requiredModes){
+	static void requireModes(MethodHandles.Lookup lookup, Mode... requiredModes) throws IllegalAccessException{
 		if(!hasModes(lookup, requiredModes)){
 			badLookup(lookup);
 		}
@@ -70,15 +92,15 @@ public final class AccessUtils{
 		return Iters.from(requiredModes).allMatch(actualModes::contains);
 	}
 	
-	private static void badLookup(MethodHandles.Lookup lookup){
+	private static void badLookup(MethodHandles.Lookup lookup) throws IllegalAccessException{
 		var modes = getModes(lookup).joinAsStr(", ", "[", "]");
 		
-		throw new IllegalArgumentException(
+		throw new IllegalAccessException(
 			Log.fmt("Lookup of {}#red must have {#yellow[PRIVATE, MODULE]#} access but has {}#yellow!", lookup, modes)
 		);
 	}
 	
-	static Mode modeFromModifiers(int modifiers){
+	public static Mode modeFromModifiers(int modifiers){
 		return Iters.of(Mode.PRIVATE, Mode.PROTECTED, Mode.PACKAGE, Mode.PUBLIC)
 		            .firstMatching(m -> (modifiers&m.flag) != 0)
 		            .orElse(Mode.PACKAGE);

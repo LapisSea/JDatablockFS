@@ -1,5 +1,7 @@
 package com.lapissea.dfs.type.field.access;
 
+import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessUtils;
 import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -22,7 +24,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
 		
-		public Funct(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType){
+		public Funct(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
 			super(struct, field, name, genericType);
 			
 			if(getter != null) validateGetter(genericType, getter);
@@ -132,7 +134,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		}
 	}
 	
-	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType){
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
 		if(getter == null && setter == null){
 			return new UnsafeAccessor<>(struct, field, name, genericType);
 		}
@@ -142,9 +144,10 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	private final Class<?> declaringClass;
 	private final long     fieldOffset;
 	
-	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
+	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		declaringClass = field.getDeclaringClass();
+		Access.findAccess(field.getDeclaringClass(), AccessUtils.modeFromModifiers(field.getModifiers()));
 		fieldOffset = MyUnsafe.objectFieldOffset(field);
 	}
 	
