@@ -198,6 +198,18 @@ public interface AccessProvider{
 		private final WeakReference<ClassLoader>          classLoader;
 		private       WeakReference<MethodHandles.Lookup> lookupRef;
 		
+		public WeaklyProvidedLookup(Class<?> lookupProvider, Class<?> calleeCheck){
+			this(lookupProvider);
+			
+			try{
+				adapt(calleeCheck, Access.Mode.PRIVATE, Access.Mode.MODULE);
+			}catch(IllegalAccessException e){
+				throw new IllegalStateException("The AccessProvider does not give appropriate lookup permissions", e);
+			}catch(AccessProvider.Defunct e){
+				throw new ShouldNeverHappenError(e);
+			}
+		}
+		
 		public WeaklyProvidedLookup(Class<?> lookupProvider){
 			if(lookupProvider.isHidden()){
 				throw new IllegalArgumentException(Log.fmt("{}#red can not be hidden (is lambda?)", lookupProvider.getName()));

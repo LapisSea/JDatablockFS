@@ -22,7 +22,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 public final class Access{
 	public enum Mode{
@@ -69,18 +68,8 @@ public final class Access{
 		});
 	}
 	
-	private static final ReentrantLock ACCESS_LOCK = new ReentrantLock();//Lock is just here to prevent duplicate work on threaded situations
 	private static void removeDefunct(){
-		ACCESS_LOCK.lock();
-		try{
-			var toRemove = Iters.from(ACCESS_PROVIDERS)
-			                    .filter(prov -> prov.getDefunctState() == AccessProvider.DefunctState.DEFUNCT)
-			                    .toModSet();
-			if(toRemove.isEmpty()) return;
-			ACCESS_PROVIDERS.removeAll(toRemove);
-		}finally{
-			ACCESS_LOCK.unlock();
-		}
+		ACCESS_PROVIDERS.removeIf(prov -> prov.getDefunctState() == AccessProvider.DefunctState.DEFUNCT);
 	}
 	
 	public static void addLookup(MethodHandles.Lookup lookup){

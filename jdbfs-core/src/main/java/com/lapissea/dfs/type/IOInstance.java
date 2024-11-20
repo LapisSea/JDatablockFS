@@ -23,7 +23,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -271,25 +270,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static{ allowFullAccess(MethodHandles.lookup()); }
 		
 		protected static void registerAccess(Class<?> lookupProvider){
-			allowFullAccess0(lookupProvider, true);
+			registerAccess0(lookupProvider, true);
 		}
-		private static void registerAccess(Class<?> lookupProvider, boolean selfCheck){
-			allowFullAccess0(lookupProvider, selfCheck);
-		}
-		private static void allowFullAccess0(Class<?> lookupProvider, boolean selfCheck){
-			var provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider);
-			if(selfCheck){
-				var callee = Utils.getCallee(2);
-				
-				try{
-					provider.adapt(callee, Access.Mode.PRIVATE, Access.Mode.MODULE);
-				}catch(IllegalAccessException e){
-					throw new IllegalStateException("The AccessProvider does not give appropriate lookup permissions", e);
-				}catch(AccessProvider.Defunct e){
-					throw new ShouldNeverHappenError(e);
-				}
-			}
-			Access.registerProvider(new AccessProvider.WeaklyProvidedLookup(lookupProvider));
+		protected static void registerAccess(Class<?> lookupProvider, boolean selfCheck){
+			registerAccess0(lookupProvider, selfCheck);
 		}
 		protected static void allowFullAccess(MethodHandles.Lookup lookup){
 			Access.addLookup(lookup);
@@ -797,5 +781,24 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	static Void allowFullAccessI(MethodHandles.Lookup lookup){
 		Access.addLookup(lookup);
 		return null;
+	}
+	static Void registerAccessI(Class<?> lookupProvider){
+		registerAccess0(lookupProvider, true);
+		return null;
+	}
+	static Void registerAccessI(Class<?> lookupProvider, boolean selfCheck){
+		registerAccess0(lookupProvider, selfCheck);
+		return null;
+	}
+	
+	private static void registerAccess0(Class<?> lookupProvider, boolean selfCheck){
+		AccessProvider provider;
+		if(selfCheck){
+			var callee = Utils.getCallee(2);
+			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider, callee);
+		}else{
+			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider);
+		}
+		Access.registerProvider(provider);
 	}
 }
