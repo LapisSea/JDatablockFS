@@ -7,7 +7,6 @@ import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
-import java.lang.invoke.LambdaConversionException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -38,8 +37,8 @@ public final class Access{
 		Mode(int flag){ this.flag = flag; }
 	}
 	
-	private static final CopyOnWriteArrayList<AccessProvider> ACCESS_PROVIDERS   = new CopyOnWriteArrayList<>();
-	private static final AccessProvider                       UNOPTIMIZED_ACCESS = new AccessProvider.UnoptimizedAccessProvider();
+	private static final List<AccessProvider> ACCESS_PROVIDERS   = new CopyOnWriteArrayList<>();
+	private static final AccessProvider       UNOPTIMIZED_ACCESS = new AccessProvider.UnoptimizedAccessProvider();
 	
 	private static final ThreadPoolExecutor GC_EXEC = new ThreadPoolExecutor(
 		0, 1, 200, TimeUnit.MILLISECONDS,
@@ -53,10 +52,10 @@ public final class Access{
 	
 	public static void registerProvider(AccessProvider provider){
 		ACCESS_PROVIDERS.add(provider);
-		if(GC_EXEC.getQueue().size()>0){
-			return;
+		
+		if(GC_EXEC.getQueue().size() == 0){
+			clean();
 		}
-		clean();
 	}
 	private static void clean(){
 		GC_EXEC.execute(() -> {
@@ -69,7 +68,8 @@ public final class Access{
 	}
 	
 	private static void removeDefunct(){
-		ACCESS_PROVIDERS.removeIf(prov -> prov.getDefunctState() == AccessProvider.DefunctState.DEFUNCT);
+		while(AccessProvider.DEFUNCT_REF_QUEUE.poll() != null) ;
+		ACCESS_PROVIDERS.removeIf(AccessProvider::isDefunct);
 	}
 	
 	public static void addLookup(MethodHandles.Lookup lookup){
@@ -186,11 +186,11 @@ public final class Access{
 	
 	
 	private interface AccessLambda<T, V>{
-		T call(AccessProvider acc, V value) throws IllegalAccessException, LambdaConversionException, AccessProvider.Defunct;
+		T call(AccessProvider acc, V value) throws IllegalAccessException, AccessProvider.Defunct;
 	}
 	
 	private interface AccessLambda2<T, V1, V2>{
-		T call(AccessProvider acc, V1 value1, V2 value2) throws IllegalAccessException, LambdaConversionException, AccessProvider.Defunct;
+		T call(AccessProvider acc, V1 value1, V2 value2) throws IllegalAccessException, AccessProvider.Defunct;
 	}
 	
 	private static <T, V1, V2> T access(AccessLambda2<T, V1, V2> fn, V1 value1, V2 value2, String errorMessage, boolean optimized) throws IllegalAccessException{
@@ -203,21 +203,14 @@ public final class Access{
 			}catch(Throwable ignore){ }
 		}
 		
-		var index = (int)(Math.random()*(ACCESS_PROVIDERS.size() - 1));
-		try{
-			if(ACCESS_PROVIDERS.get(index).getDefunctState() == AccessProvider.DefunctState.DEFUNCT){
-				removeDefunct();
-			}
-		}catch(IndexOutOfBoundsException ignore){ }
+		checkClean();
 		
-		for(var it = ACCESS_PROVIDERS.iterator(); it.hasNext(); ){
-			var provider = it.next();
+		for(var provider : ACCESS_PROVIDERS){
 			try{
 				return fn.call(provider, value);
 			}catch(AccessProvider.Defunct e){
-				removeDefunct();
-				it = ACCESS_PROVIDERS.iterator();
-			}catch(IllegalAccessException|LambdaConversionException ignored){ }
+				ACCESS_PROVIDERS.remove(provider);
+			}catch(IllegalAccessException ignored){ }
 		}
 		
 		// load and try again
@@ -235,7 +228,7 @@ public final class Access{
 				return fn.call(provider, value);
 			}catch(AccessProvider.Defunct e){
 				ACCESS_PROVIDERS.remove(provider);
-			}catch(IllegalAccessException|LambdaConversionException e){
+			}catch(IllegalAccessException e){
 				if(err == null) err = new ArrayList<>();
 				err.add(e);
 			}
@@ -247,5 +240,26 @@ public final class Access{
 		).joinAsStr("\n");
 		
 		throw new IllegalAccessException(msg);
+	}
+	
+	private static void checkClean(){
+		boolean cleanup = false;
+		while(AccessProvider.DEFUNCT_REF_QUEUE.poll() != null){
+			cleanup = true;
+		}
+		
+		if(!cleanup){
+			var index = (int)(Math.random()*(ACCESS_PROVIDERS.size() - 1));
+			try{
+				var acc = ACCESS_PROVIDERS.get(index);
+				if(acc.isDefunct()){
+					cleanup = true;
+				}
+			}catch(IndexOutOfBoundsException ignore){ }
+		}
+		
+		if(cleanup){
+			removeDefunct();
+		}
 	}
 }
