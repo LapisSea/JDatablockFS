@@ -100,7 +100,6 @@ public interface AccessProvider{
 		protected abstract MethodHandles.Lookup getLookup() throws Defunct;
 		
 		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException{
-			if(AccessUtils.isPublicMode(modes)) return MethodHandles.publicLookup();
 			var lookup       = getLookup();
 			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz, modes);
 			AccessUtils.requireModes(targetLookup, modes);
