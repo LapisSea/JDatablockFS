@@ -12,14 +12,11 @@ import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.ValueStorage.StorageRule;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.io.instancepipe.FieldDependency;
 import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
-import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.CommandSet;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -842,37 +839,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var eSiz    = getElementSize();
 		if(eSiz == 0) return size();
 		return (size - headSiz)/eSiz;
-	}
-	
-	@Override
-	public Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields -> {
-			var                       size = size();
-			FieldDependency.Ticket<?> depTicket;
-			if(storage instanceof ValueStorage.InstanceBased<?> i){
-				depTicket = i.depTicket(readFields);
-			}else depTicket = null;
-			
-			return new QuerySupport.AccessIterator<T>(){
-				long cursor;
-				
-				@SuppressWarnings("rawtypes")
-				@Override
-				public QuerySupport.Accessor<T> next(){
-					if(cursor>=size) return null;
-					var index = cursor++;
-					return full -> {
-						checkSize(index);
-						try(var io = ioAtElement(index)){
-							if(!full && depTicket != null && storage instanceof ValueStorage.InstanceBased i){
-								return (T)i.readNewSelective(io, depTicket, true);
-							}
-							return storage.readNew(io);
-						}
-					};
-				}
-			};
-		}));
 	}
 	
 	@Override
