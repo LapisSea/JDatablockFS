@@ -24,6 +24,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.type.field;
 	exports com.lapissea.dfs.type.field.fields;
 	exports com.lapissea.dfs.exceptions;
+	exports com.lapissea.dfs.query;
 	exports com.lapissea.dfs.utils;
 	exports com.lapissea.dfs.utils.function;
 	exports com.lapissea.dfs.utils.iterableplus;

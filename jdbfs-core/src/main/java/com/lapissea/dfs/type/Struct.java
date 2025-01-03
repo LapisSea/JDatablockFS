@@ -39,6 +39,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -55,6 +56,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -79,6 +81,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		//Preload for faster first start
 		Preload.preload(DefInstanceCompiler.class);
 		Preload.preload(FieldCompiler.class);
+	}
+	
+	public interface FieldRef<T extends IOInstance<T>, V> extends Function<T, V>, Serializable{
+	
 	}
 	
 	/**
