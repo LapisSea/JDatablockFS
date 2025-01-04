@@ -26,7 +26,7 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<T> open(FieldNames fieldNames){
+		public QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException{
 			return data.openQuery(fieldNames);
 		}
 	}
@@ -40,7 +40,7 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<T> open(FieldNames fieldNames){
+		public QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException{
 			var source = parent.open(addNames(fieldNames));
 			return new QueryableData.QuerySource<>(){
 				private T       val;
@@ -218,7 +218,7 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<R> open(FieldNames fieldNames){
+		public QueryableData.QuerySource<R> open(FieldNames fieldNames) throws IOException{
 			var parent = this.parent.open(fieldNames.add(mapper));
 			return new QueryableData.QuerySource<>(){
 				@Override
@@ -252,7 +252,7 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<R> open(FieldNames fieldNames){
+		public QueryableData.QuerySource<R> open(FieldNames fieldNames) throws IOException{
 			var parent = this.parent.open(new FieldNames());
 			return new QueryableData.QuerySource<>(){
 				@Override

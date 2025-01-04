@@ -130,5 +130,5 @@ public interface Query<T>{
 		return new Queries.Mapped<>(this, mapper);
 	}
 	
-	QueryableData.QuerySource<T> open(FieldNames fieldNames);
+	QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException;
 }

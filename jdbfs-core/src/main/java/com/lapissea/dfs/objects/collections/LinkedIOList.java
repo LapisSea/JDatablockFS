@@ -4,6 +4,10 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.ValueStorage;
+import com.lapissea.dfs.io.instancepipe.FieldDependency;
+import com.lapissea.dfs.query.Queries;
+import com.lapissea.dfs.query.Query;
+import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.Struct;
@@ -344,5 +348,52 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	@Override
 	public void free(long index){
 		throw NotImplementedException.infer();//TODO: implement LinkedIOList.free()
+	}
+	
+	private final class QSource implements QueryableData.QuerySource<T>{
+		
+		private final FieldDependency.Ticket<?> depTicket;
+		
+		private final IOIterator<IONode<T>> iter;
+		private       IONode<T>             node;
+		
+		public QSource(Query.FieldNames fieldNames) throws IOException{
+			if(!fieldNames.isEmpty() && valueStorage instanceof ValueStorage.InstanceBased<?> i){
+				var t = i.depTicket(fieldNames.set());
+				depTicket = t.fullRead()? null : t;
+			}else depTicket = null;
+			
+			var head = getHead();
+			if(head == null) iter = IOIterator.Iter.emptyIter();
+			else iter = head.iterator();
+		}
+		
+		@Override
+		public boolean step() throws IOException{
+			if(!iter.hasNext()) return false;
+			node = iter.ioNext();
+			return true;
+		}
+		@Override
+		public T fullEntry() throws IOException{
+			return node.getValue();
+		}
+		@Override
+		public T fieldEntry() throws IOException{
+			if(depTicket == null){
+				return node.getValue();
+			}
+			var t = node.readValueSelective(depTicket, true);
+			return (T)t.val();
+		}
+		@Override
+		public void close() throws IOException{
+			node = null;
+		}
+	}
+	
+	@Override
+	public Query<T> query(){
+		return new Queries.All<>(QSource::new);
 	}
 }
