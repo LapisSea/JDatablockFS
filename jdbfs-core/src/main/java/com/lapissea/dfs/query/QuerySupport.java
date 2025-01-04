@@ -3,6 +3,7 @@ package com.lapissea.dfs.query;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Match;
 
 import java.io.Serializable;
@@ -12,7 +13,25 @@ import java.util.Objects;
 
 public final class QuerySupport{
 	
+	private static final WeakKeyValueMap<Struct.FieldRef<?, ?>, IOField<?, ?>> IOF_CACHE = new WeakKeyValueMap.Sync<>();
+	
 	static <T extends IOInstance<T>, V> IOField<T, ?> asIOField(Struct.FieldRef<T, V> ref){
+		var cached = IOF_CACHE.get(ref);
+		if(cached != null){
+			//noinspection unchecked
+			return (IOField<T, ?>)cached;
+		}
+		
+		var val = asIOFieldPure(ref);
+		IOF_CACHE.put(ref, val);
+		return val;
+	}
+	
+	static <T extends IOInstance<T>, V> IOField<T, ?> asIOFieldPure(Struct.FieldRef<T, V> ref){
+		if(!ref.getClass().isHidden()){
+			throw new IllegalArgumentException(ref.getClass() + " must be a JVM produced lambda");
+		}
+		
 		var lambda = asSerializedLambda(ref);
 		
 		var implClassName = lambda.getImplClass();

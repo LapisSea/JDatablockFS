@@ -5,6 +5,8 @@ import com.lapissea.dfs.objects.collections.listtools.IOListCached;
 import com.lapissea.dfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.dfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.dfs.objects.collections.listtools.MemoryWrappedIOList;
+import com.lapissea.dfs.query.Queries;
+import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
@@ -31,7 +33,7 @@ import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
-public interface IOList<T> extends IterablePPSource<T>, QueryableData<T>{
+public interface IOList<T> extends IterablePPSource<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -650,8 +652,7 @@ public interface IOList<T> extends IterablePPSource<T>, QueryableData<T>{
 	@Override
 	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 	
-	@Override
-	default QuerySource<T> openQuery(){
-		return QuerySource.fromIter(iterator());
+	default Query<T> query(){
+		return new Queries.All<>(fieldNames -> QueryableData.QuerySource.fromIter(iterator()));
 	}
 }

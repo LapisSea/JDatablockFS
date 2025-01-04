@@ -9,6 +9,7 @@ import java.io.IOException;
 public interface QueryableData<T>{
 	
 	interface QuerySource<T> extends Closeable{
+		
 		static <T> QuerySource<T> fromIter(IOIterator<T> iter){
 			return new QuerySource<>(){
 				
@@ -37,9 +38,9 @@ public interface QueryableData<T>{
 		}
 		
 		boolean step() throws IOException;
-		T fullEntry();
-		T fieldEntry();
+		T fullEntry() throws IOException;
+		T fieldEntry() throws IOException;
 	}
 	
-	QuerySource<T> openQuery();
+	QuerySource<T> openQuery(Query.FieldNames fieldNames);
 }

@@ -83,7 +83,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		Preload.preload(FieldCompiler.class);
 	}
 	
-	public interface FieldRef<T extends IOInstance<T>, V> extends Function<T, V>, Serializable{
+	public interface FieldRef<T, V> extends Function<T, V>, Serializable{
 	
 	}
 	

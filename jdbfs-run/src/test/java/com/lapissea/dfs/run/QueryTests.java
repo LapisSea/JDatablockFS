@@ -5,7 +5,6 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.LinkedIOList;
-import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.DataProvider;
@@ -97,16 +96,19 @@ public class QueryTests{
 	
 	@Test(expectedExceptions = IllegalArgumentException.class)
 	void badFieldRef(){
-		Query.<FF, Float>byField(aa -> aa.a() + 1, m -> m>10);
+		var list = IOList.wrap(List.of(FF.of(0, 0)));
+		list.query().byField(aa -> aa.a() + 1, m -> m>10);
 	}
 	
 	@Test
 	void ffByField(){
-		Query.byField(FF::a, m -> m>10);
+		var list = IOList.wrap(List.of(FF.of(0, 0)));
+		list.query().byField(FF::a, m -> m>10);
 	}
 	@Test
 	void numstrByField(){
-		Query.byField(NumberedString::num, m -> m == 10);
+		var list = IOList.wrap(List.of(new NumberedString(1, "one")));
+		list.query().byField(NumberedString::num, m -> m == 10);
 	}
 	
 	@Test
@@ -120,9 +122,9 @@ public class QueryTests{
 			new NumberedString(11, "WORLD")
 		));
 		
-		var query = Query.byFieldEq(NumberedString::num, 10).map(NumberedString::val);
+		var query = list.query().byFieldEq(NumberedString::num, 10).mapF(NumberedString::val);
 		
-		var match = query.findFirst(list);
+		var match = query.first();
 		
 		assertThat(match).hasValue("HELLO");
 	}
@@ -132,23 +134,16 @@ public class QueryTests{
 		fillFF(list);
 		
 		
-		assertThat(Query.byField(FF::a, a -> a>1).map(FF::a).findFirst(list)).hasValue(2F);
+		assertThat(list.query().byField(FF::a, a -> a>1).mapF(FF::a).first()).hasValue(2F);
 		
-		assertThat(Query.byFieldEq(FF::a, 1F).findFirst(list)).hasValue(FF.of(1, 5));
-		assertThat(Query.byFieldEq(FF::b, 1F).findFirst(list)).hasValue(FF.of(5, 1));
+		assertThat(list.query().byFieldEq(FF::a, 1F).first()).hasValue(FF.of(1, 5));
+		assertThat(list.query().byFieldEq(FF::b, 1F).first()).hasValue(FF.of(5, 1));
 		
-		assertThat(Query.byFieldNEq(FF::a, 1F).findFirst(list)).hasValue(FF.of(2, 4));
+		assertThat(list.query().byFieldNEq(FF::a, 1F).first()).hasValue(FF.of(2, 4));
 		
-		assertThat(Query.byField(FF::a, a -> a>2).findFirst(list)).hasValue(FF.of(3, 3));
+		assertThat(list.query().byField(FF::a, a -> a>2).first()).hasValue(FF.of(3, 3));
+		assertThat(list.query().byField(FF::a, a -> a>=3).byField(FF::b, b -> b<=2).first()).hasValue(FF.of(4, 2));
 
-//		assertThat(list.query("a >= 3 && b <= 2").first()).hasValue(FF.of(4, 2));
-//		assertThat(list.query("a >= 3").filter("b <= 2").first()).hasValue(FF.of(4, 2));
-//
-//		for(long i = 0; i<list.size(); i++){
-//			assertThat(list.query("a == {}", i + 1).first()).hasValue(list.get(i));
-//			assertThat(list.query("a == {}+1", i).first()).hasValue(list.get(i));
-//		}
-//
 //		assertThat(list.query("a > 2").count()).isEqualTo(3);
 //		assertThat(list.query("a == 2 || a == 3").count()).isEqualTo(2);
 //
