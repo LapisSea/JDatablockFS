@@ -14,8 +14,9 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class QueryTests{
 	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
@@ -130,34 +131,72 @@ public class QueryTests{
 	}
 	
 	@Test(dataProvider = "ffLists")
-	void comparison(IOList<FF> list) throws IOException{
+	void testAFirst(IOList<FF> list) throws IOException{
 		fillFF(list);
 		
+		assertThat(list.query().byField(FF::a, a -> a>2).first()).hasValue(FF.of(3, 3));
+	}
+	@Test(dataProvider = "ffLists")
+	void testAThenMapFirst(IOList<FF> list) throws IOException{
+		fillFF(list);
 		
 		assertThat(list.query().byField(FF::a, a -> a>1).mapF(FF::a).first()).hasValue(2F);
+	}
+	
+	@Test(dataProvider = "ffLists")
+	void testABEqualFirst(IOList<FF> list) throws IOException{
+		fillFF(list);
 		
 		assertThat(list.query().byFieldEq(FF::a, 1F).first()).hasValue(FF.of(1, 5));
 		assertThat(list.query().byFieldEq(FF::b, 1F).first()).hasValue(FF.of(5, 1));
 		
 		assertThat(list.query().byFieldNEq(FF::a, 1F).first()).hasValue(FF.of(2, 4));
-		
-		assertThat(list.query().byField(FF::a, a -> a>2).first()).hasValue(FF.of(3, 3));
-		assertThat(list.query().byField(FF::a, a -> a>=3).byField(FF::b, b -> b<=2).first()).hasValue(FF.of(4, 2));
-
-//		assertThat(list.query("a > 2").count()).isEqualTo(3);
-//		assertThat(list.query("a == 2 || a == 3").count()).isEqualTo(2);
-//
-//		assertThat(list.query("a == b").any()).hasValue(FF.of(3, 3));
-//
-//		assertThat(list.query("a%2==0").first()).hasValue(FF.of(2, 4));
-//		assertThat(list.query("a%2==0").count()).isEqualTo(2);
-//		assertThat(list.query("a%2!=0").count()).isEqualTo(3);
-//
-//		assertThat(list.query("a%2==0").all().toList()).isEqualTo(List.of(FF.of(2, 4), FF.of(4, 2)));
-//
-//		assertThat(list.query("a%2==0").<List<Float>>map("a").all().toList()).isEqualTo(List.of(2F, 4F));
 	}
-//
+	
+	@Test(dataProvider = "ffLists")
+	void testAThenBFirst(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		assertThat(list.query().byField(FF::a, a -> a>=3).byField(FF::b, b -> b<=2).first()).hasValue(FF.of(4, 2));
+	}
+	
+	@Test(dataProvider = "ffLists")
+	void testACount(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		assertThat(list.query().byField(FF::a, a -> a>2).count()).isEqualTo(3);
+	}
+	
+	@Test(dataProvider = "ffLists")
+	void biTestABSameFirst(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		assertThat(list.query().byFields(FF::a, FF::b, Objects::equals).first()).hasValue(FF.of(3, 3));
+	}
+	@Test(dataProvider = "ffLists")
+	void biTestABSameCount(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		assertThat(list.query().byFields(FF::a, FF::b, (a, b) -> a == 2 || b == 3).count()).isEqualTo(2);
+	}
+	@Test(dataProvider = "ffLists")
+	void evenAToList(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		var aEven = list.query().byField(FF::a, a -> a%2 == 0);
+		assertThat(aEven.allToList()).containsExactly(FF.of(2, 4), FF.of(4, 2));
+		assertThat(aEven.mapF(FF::a).allToList()).containsExactly(2F, 4F);
+	}
+	
+	@Test(dataProvider = "ffLists")
+	void multishotQuery(IOList<FF> list) throws IOException{
+		fillFF(list);
+		
+		var aEven = list.query().byField(FF::a, a -> a%2 == 0);
+		assertThat(aEven.first()).hasValue(FF.of(2, 4));
+		assertThat(aEven.count()).isEqualTo(2);
+	}
+
 //	@Test(dataProvider = "stringyLists")
 //	void inTest(IOList<StringyBoi> list) throws IOException{
 //		fillStringy(list);
@@ -165,5 +204,5 @@ public class QueryTests{
 //		assertThat(list.query("'mama' in str").count()).isEqualTo(2);
 //		assertThat(list.query("str is null").any()).isEmpty();
 //	}
-
+	
 }

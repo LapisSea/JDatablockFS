@@ -6,10 +6,14 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.iterableplus.Match;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -19,17 +23,31 @@ public interface Query<T>{
 		
 		private final HashSet<String> names = new HashSet<>(2);
 		
-		public <T extends IOInstance<T>> FieldNames add(IOField<T, ?> field){
-			return add(field.getName());
+		public <T extends IOInstance<T>> FieldNames add(Collection<IOField<T, ?>> fields){
+			for(IOField<T, ?> field : fields){
+				names.add(field.getName());
+			}
+			return this;
 		}
-		public FieldNames add(String name){
-			names.add(name);
+		public <T extends IOInstance<T>> FieldNames add(IOField<T, ?> field){
+			names.add(field.getName());
 			return this;
 		}
 		
 		public boolean isEmpty(){ return names.isEmpty(); }
 		
 		public Set<String> set(){ return names; }
+	}
+	
+	default List<T> allToList() throws IOException{
+		var res = new ArrayList<T>();
+		try(var data = open(new FieldNames())){
+			while(data.step()){
+				var full = data.fullEntry();
+				res.add(full);
+			}
+		}
+		return res;
 	}
 	
 	default Match<T> firstM() throws IOException{ return Match.from(first()); }
@@ -43,6 +61,24 @@ public interface Query<T>{
 		}
 		return Optional.empty();
 	}
+	default T firstNullable() throws IOException{
+		try(var data = open(new FieldNames())){
+			if(data.step()){
+				return data.fullEntry();
+			}
+		}
+		return null;
+	}
+	
+	default long count() throws IOException{
+		long count = 0;
+		try(var data = open(new FieldNames())){
+			while(data.step()){
+				count++;
+			}
+		}
+		return count;
+	}
 	
 	default <V> Query<T> byFieldNEq(Struct.FieldRef<T, V> ref, V needle){
 		return byField(ref, hay -> !Objects.equals(hay, needle));
@@ -54,6 +90,20 @@ public interface Query<T>{
 	default <V> Query<T> byField(Struct.FieldRef<T, V> ref, Predicate<V> match){
 		var field = QuerySupport.asIOField((Struct.FieldRef)ref);
 		return new Queries.ByField(this, field, match);
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	default <V1, V2> Query<T> byFields(Struct.FieldRef<T, V1> ref1, Struct.FieldRef<T, V2> ref2, BiPredicate<V1, V2> match){
+		var f1 = QuerySupport.asIOField((Struct.FieldRef)ref1);
+		var f2 = QuerySupport.asIOField((Struct.FieldRef)ref2);
+		return this.byFields(List.of(ref1, ref2), el -> match.test((V1)f1.get(null, (IOInstance)el), (V2)f2.get(null, (IOInstance)el)));
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	default Query<T> byFields(List<Struct.FieldRef<T, ?>> refs, Predicate<T> match){
+		var fields = new ArrayList<IOField>(refs.size());
+		for(Struct.FieldRef<T, ?> ref : refs){
+			fields.add(QuerySupport.asIOField((Struct.FieldRef)ref));
+		}
+		return new Queries.ByFields(this, List.of(), fields, List.of(match));
 	}
 	
 	/**
