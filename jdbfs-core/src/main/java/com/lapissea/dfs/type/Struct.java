@@ -523,8 +523,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String cleanName()    { return stripDef(getType().getSimpleName()); }
 	public String cleanFullName(){ return stripDef(getFullName()); }
 	private String stripDef(String name){
-		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
+		if(IOInstance.Def.isDefinition(getType())){
 			var index = name.indexOf(IOInstance.Def.IMPL_COMPLETION_POSTFIX);
+			
 			index = Math.min(index, name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX, index == -1? 0 : index));
 			if(index != -1){
 				name = name.substring(0, index);
@@ -782,7 +783,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					valStr = field.instanceToString(ioPool, instance, set);
 				}
 			}catch(Throwable e){
-				valStr = Optional.of(IOFieldTools.corruptedGet(e));
+				//Tried to get excluded field
+				if(IOInstance.Def.isDefinitionImplementation(getType()) && e instanceof UnsupportedOperationException){
+					valStr = Optional.empty();
+				}else{
+					valStr = Optional.of(IOFieldTools.corruptedGet(e));
+				}
 			}
 			if(!settings.showFieldNames()) return valStr;
 			return valStr.map(value -> field.getName() + settings.fieldValueSeparator() + value);
