@@ -1,5 +1,6 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeFunctionOL;
@@ -210,6 +211,13 @@ public final class OptionalPP<T> implements Serializable{
 	
 	public Optional<T> opt(){
 		return Optional.ofNullable(value);
+	}
+	
+	public Match<T> match(){
+		if(isPresent()){
+			return Match.of(value);
+		}
+		return Match.empty();
 	}
 }
 	
