@@ -35,20 +35,6 @@ public class QueryTests{
 	}
 	
 	@IOValue
-	static class StringyBoi extends IOInstance.Managed<StringyBoi>{
-		String       str;
-		List<String> strs;
-		byte[]       someData;
-		
-		public StringyBoi(){ }
-		public StringyBoi(String str, List<String> strs){
-			this.str = str;
-			this.strs = strs;
-			someData = new byte[69];
-		}
-	}
-	
-	@IOValue
 	static class NumberedString extends IOInstance.Managed<NumberedString>{
 		private final int    num;
 		private final String val;
@@ -73,10 +59,6 @@ public class QueryTests{
 	Object[][] ffLists() throws IOException{
 		return lists(FF.class);
 	}
-	@DataProvider
-	Object[][] stringyLists() throws IOException{
-		return lists(StringyBoi.class);
-	}
 	private void fillFF(IOList<FF> list) throws IOException{
 		list.addAll(List.of(
 			FF.of(1, 5),
@@ -84,14 +66,6 @@ public class QueryTests{
 			FF.of(3, 3),
 			FF.of(4, 2),
 			FF.of(5, 1)
-		));
-	}
-	private void fillStringy(IOList<StringyBoi> list) throws IOException{
-		list.addAll(List.of(
-			new StringyBoi("Jomama", List.of("foo", "bar")),
-			new StringyBoi("bar", List.of("foo", "bar")),
-			new StringyBoi("420", List.of()),
-			new StringyBoi("mamamia", List.of("69"))
 		));
 	}
 	
@@ -196,13 +170,5 @@ public class QueryTests{
 		assertThat(aEven.first()).hasValue(FF.of(2, 4));
 		assertThat(aEven.count()).isEqualTo(2);
 	}
-
-//	@Test(dataProvider = "stringyLists")
-//	void inTest(IOList<StringyBoi> list) throws IOException{
-//		fillStringy(list);
-//		assertThat(list.query("str in strs").count()).isEqualTo(1);
-//		assertThat(list.query("'mama' in str").count()).isEqualTo(2);
-//		assertThat(list.query("str is null").any()).isEmpty();
-//	}
 	
 }
