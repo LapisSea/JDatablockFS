@@ -146,7 +146,7 @@ final class CompileStructTools{
 			if(Modifier.isAbstract(instanceClass.getModifiers())){
 				throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
 			}
-			if(instanceClass.getName().endsWith(IOInstance.Def.IMPL_NAME_POSTFIX) && UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+			if(IOInstance.Def.isDefinitionImplementation(instanceClass) && !instanceClass.getName().contains(IOInstance.Def.IMPL_FIELDS_MARK)){
 				var unmapped = IOInstance.Def.unmap((Class<? extends IOInstance.Def<?>>)instanceClass);
 				if(unmapped.isPresent()){
 					return compile((Class<T>)unmapped.get(), newStruct, syncStage);

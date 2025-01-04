@@ -568,7 +568,7 @@ public final class DefInstanceCompiler{
 		
 		var implName = interf.getName() +
 		               IOInstance.Def.IMPL_NAME_POSTFIX + (numAddon != 0? "~" + numAddon : "") +
-		               includeNames.map(n -> Iters.from(n).joinAsStr("_", "€€fields~", "")).orElse("");
+		               includeNames.map(n -> Iters.from(n).joinAsStr("_", IOInstance.Def.IMPL_FIELDS_MARK, "")).orElse("");
 		
 		var log = JorthLogger.make();
 		try{

@@ -45,6 +45,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
+import java.util.regex.Pattern;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.INSTANCE;
@@ -89,6 +90,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		String IMPL_NAME_POSTFIX       = "€Impl";
 		String IMPL_COMPLETION_POSTFIX = "€Full";
+		String IMPL_FIELDS_MARK        = "€€fields~";
+		
+		Pattern IMPL_PATTERN_CHECK = Pattern.compile(IMPL_NAME_POSTFIX + "\\d*(" + IMPL_FIELDS_MARK + "\\w+)?$");
 		
 		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
@@ -253,6 +257,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		static boolean isDefinition(Class<?> c){
 			return c.isInterface() && UtilL.instanceOf(c, IOInstance.Def.class);
+		}
+		static boolean isDefinitionImplementation(Class<?> c){
+			return !c.isInterface() && UtilL.instanceOf(c, IOInstance.Def.class) && IMPL_PATTERN_CHECK.matcher(c.getName()).find();
 		}
 		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
 			return DefInstanceCompiler.dataConstructor(type);
