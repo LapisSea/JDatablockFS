@@ -878,7 +878,8 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		public QSource(Query.FieldNames fieldNames){
 			if(!fieldNames.isEmpty() && storage instanceof ValueStorage.InstanceBased<?> i){
-				depTicket = i.depTicket(fieldNames.set());
+				var t = i.depTicket(fieldNames.set());
+				depTicket = t.fullRead()? null : t;
 			}else{
 				depTicket = null;
 			}
@@ -904,8 +905,13 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		@Override
 		public T fieldEntry() throws IOException{
 			if(readState == NONE){
-				val = readPartial();
-				readState = FIELD;
+				if(depTicket == null){
+					val = get(index);
+					readState = FULL;
+				}else{
+					val = readPartial();
+					readState = FIELD;
+				}
 			}
 			return val;
 		}
