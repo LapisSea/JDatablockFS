@@ -523,13 +523,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String cleanName()    { return stripDef(getType().getSimpleName()); }
 	public String cleanFullName(){ return stripDef(getFullName()); }
 	private String stripDef(String name){
-		if(IOInstance.Def.isDefinition(getType())){
+		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
 			var index = name.indexOf(IOInstance.Def.IMPL_COMPLETION_POSTFIX);
-			
-			index = Math.min(index, name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX, index == -1? 0 : index));
 			if(index != -1){
 				name = name.substring(0, index);
 			}
+			name = IOInstance.Def.IMPL_PATTERN_CHECK.matcher(name).replaceFirst("");
 		}
 		return name;
 	}
