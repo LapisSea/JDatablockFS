@@ -7,41 +7,18 @@ import com.lapissea.dfs.utils.iterableplus.Match;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 public interface Query<T>{
 	
-	class FieldNames{
-		
-		private final HashSet<String> names = new HashSet<>(2);
-		
-		public <T extends IOInstance<T>> FieldNames add(Collection<IOField<T, ?>> fields){
-			for(IOField<T, ?> field : fields){
-				names.add(field.getName());
-			}
-			return this;
-		}
-		public <T extends IOInstance<T>> FieldNames add(IOField<T, ?> field){
-			names.add(field.getName());
-			return this;
-		}
-		
-		public boolean isEmpty(){ return names.isEmpty(); }
-		
-		public Set<String> set(){ return names; }
-	}
-	
 	default List<T> allToList() throws IOException{
 		var res = new ArrayList<T>();
-		try(var data = open(new FieldNames())){
+		try(var data = open(new QueryFields())){
 			while(data.step()){
 				var full = data.fullEntry();
 				res.add(full);
@@ -52,7 +29,7 @@ public interface Query<T>{
 	
 	default Match<T> firstM() throws IOException{ return Match.from(first()); }
 	default Optional<T> first() throws IOException{
-		try(var data = open(new FieldNames())){
+		try(var data = open(new QueryFields())){
 			while(data.step()){
 				var full = data.fullEntry();
 				if(full == null) continue;
@@ -62,7 +39,7 @@ public interface Query<T>{
 		return Optional.empty();
 	}
 	default T firstNullable() throws IOException{
-		try(var data = open(new FieldNames())){
+		try(var data = open(new QueryFields())){
 			if(data.step()){
 				return data.fullEntry();
 			}
@@ -72,7 +49,7 @@ public interface Query<T>{
 	
 	default long count() throws IOException{
 		long count = 0;
-		try(var data = open(new FieldNames())){
+		try(var data = open(new QueryFields())){
 			while(data.step()){
 				count++;
 			}
@@ -130,5 +107,5 @@ public interface Query<T>{
 		return new Queries.Mapped<>(this, mapper);
 	}
 	
-	QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException;
+	QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException;
 }

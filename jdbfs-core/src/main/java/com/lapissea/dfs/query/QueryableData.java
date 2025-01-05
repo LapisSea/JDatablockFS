@@ -42,5 +42,5 @@ public interface QueryableData<T>{
 		T fieldEntry() throws IOException;
 	}
 	
-	QuerySource<T> openQuery(Query.FieldNames fieldNames) throws IOException;
+	QuerySource<T> openQuery(QueryFields queryFields) throws IOException;
 }

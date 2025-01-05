@@ -653,6 +653,6 @@ public interface IOList<T> extends IterablePPSource<T>{
 	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 	
 	default Query<T> query(){
-		return new Queries.All<>(fieldNames -> QueryableData.QuerySource.fromIter(iterator()));
+		return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
 	}
 }

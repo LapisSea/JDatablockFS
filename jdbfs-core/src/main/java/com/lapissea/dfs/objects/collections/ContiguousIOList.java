@@ -20,6 +20,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
+import com.lapissea.dfs.query.QueryFields;
 import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.CommandSet;
 import com.lapissea.dfs.type.GenericContext;
@@ -876,9 +877,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		private int readState;
 		private T   val;
 		
-		public QSource(Query.FieldNames fieldNames){
-			if(!fieldNames.isEmpty() && storage instanceof ValueStorage.InstanceBased<?> i){
-				var t = i.depTicket(fieldNames.set());
+		public QSource(QueryFields queryFields){
+			if(!queryFields.isEmpty() && storage instanceof ValueStorage.InstanceBased<?> i){
+				var t = i.depTicket(queryFields.set());
 				depTicket = t.fullRead()? null : t;
 			}else{
 				depTicket = null;

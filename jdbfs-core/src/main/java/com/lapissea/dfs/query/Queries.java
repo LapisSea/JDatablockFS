@@ -26,8 +26,8 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException{
-			return data.openQuery(fieldNames);
+		public QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException{
+			return data.openQuery(queryFields);
 		}
 	}
 	
@@ -40,8 +40,9 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<T> open(FieldNames fieldNames) throws IOException{
-			var source = parent.open(addNames(fieldNames));
+		public QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException{
+			addFields(queryFields);
+			var source = parent.open(queryFields);
 			return new QueryableData.QuerySource<>(){
 				private T       val;
 				private boolean full;
@@ -83,7 +84,7 @@ public final class Queries{
 			};
 		}
 		
-		protected abstract FieldNames addNames(FieldNames fieldNames);
+		protected abstract void addFields(QueryFields queryFields);
 		
 		protected abstract boolean test(T fe);
 	}
@@ -100,9 +101,7 @@ public final class Queries{
 		}
 		
 		@Override
-		protected FieldNames addNames(FieldNames fieldNames){
-			return fieldNames.add(field);
-		}
+		protected void addFields(QueryFields queryFields){ queryFields.add(field); }
 		@Override
 		protected boolean test(T fe){
 			var val = field.get(null, fe);
@@ -161,9 +160,7 @@ public final class Queries{
 		}
 		
 		@Override
-		protected FieldNames addNames(FieldNames fieldNames){
-			return fieldNames.add(fields);
-		}
+		protected void addFields(QueryFields queryFields){ queryFields.add(fields); }
 		@Override
 		protected boolean test(T fe){
 			for(var pair : fieldPairs){
@@ -218,8 +215,9 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<R> open(FieldNames fieldNames) throws IOException{
-			var parent = this.parent.open(fieldNames.add(mapper));
+		public QueryableData.QuerySource<R> open(QueryFields queryFields) throws IOException{
+			queryFields.add(mapper);
+			var parent = this.parent.open(queryFields);
 			return new QueryableData.QuerySource<>(){
 				@Override
 				public void close() throws IOException{
@@ -252,8 +250,8 @@ public final class Queries{
 		}
 		
 		@Override
-		public QueryableData.QuerySource<R> open(FieldNames fieldNames) throws IOException{
-			var parent = this.parent.open(new FieldNames());
+		public QueryableData.QuerySource<R> open(QueryFields queryFields) throws IOException{
+			var parent = this.parent.open(new QueryFields());
 			return new QueryableData.QuerySource<>(){
 				@Override
 				public void close() throws IOException{

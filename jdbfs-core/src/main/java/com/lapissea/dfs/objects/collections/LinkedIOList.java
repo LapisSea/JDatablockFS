@@ -7,6 +7,7 @@ import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
 import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
+import com.lapissea.dfs.query.QueryFields;
 import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.RuntimeType;
@@ -357,9 +358,9 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		private final IOIterator<IONode<T>> iter;
 		private       IONode<T>             node;
 		
-		public QSource(Query.FieldNames fieldNames) throws IOException{
-			if(!fieldNames.isEmpty() && valueStorage instanceof ValueStorage.InstanceBased<?> i){
-				var t = i.depTicket(fieldNames.set());
+		public QSource(QueryFields queryFields) throws IOException{
+			if(!queryFields.isEmpty() && valueStorage instanceof ValueStorage.InstanceBased<?> i){
+				var t = i.depTicket(queryFields.set());
 				depTicket = t.fullRead()? null : t;
 			}else depTicket = null;
 			
