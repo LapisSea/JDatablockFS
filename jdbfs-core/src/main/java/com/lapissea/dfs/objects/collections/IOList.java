@@ -652,6 +652,10 @@ public interface IOList<T> extends IterablePPSource<T>{
 	@Override
 	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 	
+	default Query<T> where(Query.Test<T> test)                                           { return query().where(test); }
+	default Query<T> where(Query.Test<T> test1, Query.Test<T> test2)                     { return query().where(test1, test2); }
+	default Query<T> where(Query.Test<T> test1, Query.Test<T> test2, Query.Test<T> test3){ return query().where(test1, test2, test3); }
+	default Query<T> where(List<Query.Test<T>> tests)                                    { return query().where(tests); }
 	default Query<T> query(){
 		return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
 	}

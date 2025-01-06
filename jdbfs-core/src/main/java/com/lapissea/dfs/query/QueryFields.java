@@ -11,24 +11,34 @@ import java.util.List;
 
 public class QueryFields{
 	
-	private final List<IOField<?, ?>> names = new ArrayList<>(4);
+	private final List<IOField<?, ?>> fields = new ArrayList<>(4);
 	
-	public <T extends IOInstance<T>> void add(Collection<IOField<T, ?>> fields){
-		for(var field : fields){
-			add(field);
-		}
-	}
-	public <T extends IOInstance<T>> void add(IOField<T, ?> field){
-		names.add(field);
+	private boolean markedUnknown;
+	
+	public void markUnknown(){
+		markedUnknown = true;
+		fields.clear();
 	}
 	
-	public boolean isEmpty(){ return names.isEmpty(); }
+	public void add(Collection<? extends IOField<?, ?>> fields){
+		if(markedUnknown) return;
+		this.fields.addAll(fields);
+	}
+	public void add(IOField<?, ?> field){
+		if(markedUnknown) return;
+		fields.add(field);
+	}
+	
+	public boolean isEmpty(){ return markedUnknown || fields.isEmpty(); }
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public <T extends IOInstance<T>> FieldSet<T> set(){ return FieldSet.of((Collection)names); }
+	public <T extends IOInstance<T>> FieldSet<T> set(){
+		return markedUnknown? FieldSet.of() : FieldSet.of((Collection)fields);
+	}
 	
 	@Override
 	public String toString(){
-		return Iters.from(names).distinct().map(IOField::getName).joinAsStr(", ", "{", "}");
+		if(markedUnknown) return "{???}";
+		return Iters.from(fields).distinct().map(IOField::getName).joinAsStr(", ", "{", "}");
 	}
 }

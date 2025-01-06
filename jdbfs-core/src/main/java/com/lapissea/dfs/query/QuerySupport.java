@@ -15,11 +15,11 @@ public final class QuerySupport{
 	
 	private static final WeakKeyValueMap<Struct.FieldRef<?, ?>, IOField<?, ?>> IOF_CACHE = new WeakKeyValueMap.Sync<>();
 	
-	static <T extends IOInstance<T>, V> IOField<T, ?> asIOField(Struct.FieldRef<T, V> ref){
+	static <T extends IOInstance<T>, V> IOField<T, V> asIOField(Struct.FieldRef<T, V> ref){
 		var cached = IOF_CACHE.get(ref);
 		if(cached != null){
 			//noinspection unchecked
-			return (IOField<T, ?>)cached;
+			return (IOField<T, V>)cached;
 		}
 		
 		var val = asIOFieldPure(ref);
@@ -27,7 +27,7 @@ public final class QuerySupport{
 		return val;
 	}
 	
-	static <T extends IOInstance<T>, V> IOField<T, ?> asIOFieldPure(Struct.FieldRef<T, V> ref){
+	static <T extends IOInstance<T>, V> IOField<T, V> asIOFieldPure(Struct.FieldRef<T, V> ref){
 		if(!ref.getClass().isHidden()){
 			throw new IllegalArgumentException(ref.getClass() + " must be a JVM produced lambda");
 		}
@@ -70,7 +70,8 @@ public final class QuerySupport{
 		var struct = (Struct<T>)Struct.ofUnknown(implClass, Struct.STATE_FIELD_MAKE);
 		
 		if(struct.getFields().byName(memberName).match() instanceof Match.Some<IOField<T, ?>>(var field)){
-			return field;
+			//noinspection unchecked
+			return (IOField<T, V>)field;
 		}
 		
 		throw new IllegalArgumentException("No matching fields from " + implClassName + "::" + memberName);

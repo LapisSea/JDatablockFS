@@ -2,14 +2,10 @@ package com.lapissea.dfs.query;
 
 
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -31,11 +27,11 @@ public final class Queries{
 		}
 	}
 	
-	public abstract static class FieldTested<T extends IOInstance<T>> implements Query<T>{
+	public abstract static class TestedQuery<T> implements Query<T>{
 		
 		protected final Query<T> parent;
 		
-		public FieldTested(Query<T> parent){
+		public TestedQuery(Query<T> parent){
 			this.parent = Objects.requireNonNull(parent);
 		}
 		
@@ -89,87 +85,26 @@ public final class Queries{
 		protected abstract boolean test(T fe);
 	}
 	
-	public static class ByField<T extends IOInstance<T>, VT> extends FieldTested<T>{
+	public static class Filtered<T> extends TestedQuery<T>{
 		
-		private final IOField<T, VT> field;
-		private final Predicate<VT>  match;
+		private final List<Test<T>>       tests;
+		private final List<IOField<?, ?>> fields;
 		
-		public ByField(Query<T> parent, IOField<T, VT> field, Predicate<VT> match){
+		public Filtered(Query<T> parent, List<Test<T>> tests){
 			super(parent);
-			this.field = Objects.requireNonNull(field);
-			this.match = Objects.requireNonNull(match);
+			this.tests = List.copyOf(tests);
+			fields = Iters.from(this.tests).flatMap(Test::reportFields).toList();
 		}
 		
 		@Override
-		protected void addFields(QueryFields queryFields){ queryFields.add(field); }
+		protected void addFields(QueryFields queryFields){
+			queryFields.add(fields);
+		}
+		
 		@Override
 		protected boolean test(T fe){
-			var val = field.get(null, fe);
-			return match.test(val);
-		}
-		
-		@Override
-		public <V> Query<T> byField(Struct.FieldRef<T, V> ref, Predicate<V> match){
-			//noinspection unchecked
-			var field = (IOField<T, V>)QuerySupport.asIOField(ref);
-			return new ByFields<>(
-				parent,
-				List.of(
-					new ByFields.Pair<>(this.field, this.match),
-					new ByFields.Pair<>(field, match)
-				),
-				List.of(), List.of()
-			);
-		}
-		
-		@Override
-		@SuppressWarnings({"unchecked", "rawtypes"})
-		public Query<T> byFields(List<Struct.FieldRef<T, ?>> refs, Predicate<T> match){
-			var fields = new ArrayList<IOField>(refs.size() + 1);
-			for(Struct.FieldRef<T, ?> ref : refs){
-				fields.add(QuerySupport.asIOField((Struct.FieldRef)ref));
-			}
-			
-			return new Queries.ByFields(
-				parent,
-				List.of(new ByFields.Pair<>(this.field, this.match)),
-				fields, List.of(match)
-			);
-		}
-	}
-	
-	public static class ByFields<T extends IOInstance<T>> extends FieldTested<T>{
-		
-		public record Pair<T extends IOInstance<T>, VT>(IOField<T, VT> field, Predicate<VT> fieldTest){
-			boolean test(T el){
-				var val = field.get(null, el);
-				return fieldTest.test(val);
-			}
-		}
-		
-		private final List<Pair<T, ?>> fieldPairs;
-		
-		private final FieldSet<T>        fields;
-		private final List<Predicate<T>> elementTests;
-		
-		public ByFields(Query<T> parent, List<Pair<T, ?>> fieldPairs, Collection<IOField<T, ?>> fields, List<Predicate<T>> elementTests){
-			super(parent);
-			this.fieldPairs = List.copyOf(fieldPairs);
-			this.elementTests = List.copyOf(elementTests);
-			this.fields = FieldSet.of(Iters.concat(fields, Iters.from(fieldPairs).map(Pair::field)));
-		}
-		
-		@Override
-		protected void addFields(QueryFields queryFields){ queryFields.add(fields); }
-		@Override
-		protected boolean test(T fe){
-			for(var pair : fieldPairs){
-				if(!pair.test(fe)){
-					return false;
-				}
-			}
-			for(var elT : elementTests){
-				if(!elT.test(fe)){
+			for(var test : tests){
+				if(!test.test(fe)){
 					return false;
 				}
 			}
@@ -177,30 +112,27 @@ public final class Queries{
 		}
 		
 		@Override
-		public <V> Query<T> byField(Struct.FieldRef<T, V> ref, Predicate<V> match){
-			//noinspection unchecked
-			var field = (IOField<T, V>)QuerySupport.asIOField(ref);
-			return new ByFields<>(
-				parent,
-				Iters.concatN1(fieldPairs, new ByFields.Pair<>(field, match)).toList(),
-				fields, elementTests
-			);
+		public Query<T> where(List<Test<T>> tests){
+			return new Filtered<>(parent, Iters.concat(this.tests, tests).toList());
+		}
+	}
+	
+	public static class FilterGeneric<T> extends TestedQuery<T>{
+		
+		private final Predicate<T> match;
+		
+		public FilterGeneric(Query<T> parent, Predicate<T> match){
+			super(parent);
+			this.match = Objects.requireNonNull(match);
 		}
 		
 		@Override
-		@SuppressWarnings({"unchecked", "rawtypes"})
-		public Query<T> byFields(List<Struct.FieldRef<T, ?>> refs, Predicate<T> match){
-			var fields = new ArrayList<IOField>(refs.size() + this.fields.size());
-			fields.addAll(this.fields);
-			for(Struct.FieldRef<T, ?> ref : refs){
-				fields.add(QuerySupport.asIOField((Struct.FieldRef)ref));
-			}
-			
-			return new Queries.ByFields(
-				parent,
-				fieldPairs,
-				fields, Iters.concatN1(elementTests, match).toList()
-			);
+		protected void addFields(QueryFields queryFields){
+			queryFields.markUnknown();
+		}
+		@Override
+		protected boolean test(T fe){
+			return match.test(fe);
 		}
 	}
 	
@@ -216,8 +148,9 @@ public final class Queries{
 		
 		@Override
 		public QueryableData.QuerySource<R> open(QueryFields queryFields) throws IOException{
-			queryFields.add(mapper);
-			var parent = this.parent.open(queryFields);
+			var parentFields = new QueryFields();
+			parentFields.add(mapper);
+			var parent = this.parent.open(parentFields);
 			return new QueryableData.QuerySource<>(){
 				@Override
 				public void close() throws IOException{
@@ -251,7 +184,8 @@ public final class Queries{
 		
 		@Override
 		public QueryableData.QuerySource<R> open(QueryFields queryFields) throws IOException{
-			var parent = this.parent.open(new QueryFields());
+			queryFields.markUnknown();
+			var parent = this.parent.open(queryFields);
 			return new QueryableData.QuerySource<>(){
 				@Override
 				public void close() throws IOException{
