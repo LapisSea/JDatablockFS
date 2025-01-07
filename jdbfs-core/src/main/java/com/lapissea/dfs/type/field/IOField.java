@@ -31,7 +31,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -59,7 +58,7 @@ import java.util.function.Supplier;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
+public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType, FieldNames.Named
 	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive, IOFieldFusedString{
 	
 	public interface FieldUsage{
@@ -421,7 +420,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 	}
 	
-	@Nullable
 	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();

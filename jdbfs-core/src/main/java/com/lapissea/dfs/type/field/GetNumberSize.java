@@ -189,8 +189,13 @@ abstract sealed class GetNumberSize<T extends IOInstance<T>> implements VirtualF
 		return size;
 	}
 	private NumberSize calcMax(VarPool<T> ioPool, T inst){
-		var len = unsigned? calcMaxVal(ioPool, inst) : calcMinMaxVal(ioPool, inst);
-		return NumberSize.bySize(len, unsigned);
+		if(unsigned){
+			var len = calcMaxVal(ioPool, inst);
+			return NumberSize.bySize(Math.max(0, len));
+		}else{
+			var len = calcMinMaxVal(ioPool, inst);
+			return NumberSize.bySizeSigned(len);
+		}
 	}
 	
 	protected abstract long calcMaxVal(VarPool<T> ioPool, T instance);

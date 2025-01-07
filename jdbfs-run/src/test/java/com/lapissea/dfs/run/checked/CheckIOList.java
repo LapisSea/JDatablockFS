@@ -348,4 +348,8 @@ public class CheckIOList<T> implements IOList<T>{
 		testData.free(index);
 		dataEquality();
 	}
+	@Override
+	public String toString(){
+		return testData.toString();
+	}
 }

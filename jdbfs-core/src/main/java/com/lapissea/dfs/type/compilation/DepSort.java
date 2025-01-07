@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * A topological dependency sort algorithm
+ */
 public class DepSort<T>{
 	
 	public static final class CycleException extends RuntimeException{

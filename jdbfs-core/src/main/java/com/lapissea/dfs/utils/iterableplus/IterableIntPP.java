@@ -810,4 +810,8 @@ public interface IterableIntPP{
 			}
 		};
 	}
+	
+	default IterableIntPP positive(){
+		return filter(i -> i>=0);
+	}
 }

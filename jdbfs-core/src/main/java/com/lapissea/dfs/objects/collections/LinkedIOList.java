@@ -214,13 +214,15 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	public void add(T value) throws IOException{
 		IONode<T> newNode = allocNode(value, null);
 		
-		if(isEmpty()){
-			setHead(newNode);
-		}else{
-			getLastNode().setNext(newNode);
+		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+			if(isEmpty()){
+				setHead(newNode);
+			}else{
+				getLastNode().setNext(newNode);
+			}
+			
+			deltaSize(1);
 		}
-		
-		deltaSize(1);
 	}
 	
 	@Override

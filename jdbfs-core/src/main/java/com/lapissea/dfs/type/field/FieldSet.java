@@ -255,6 +255,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return b.make();
 	}
 	
+	public static <T extends IOInstance<T>> FieldSet<T> of(IOField<T, ?> field){
+		Objects.requireNonNull(field);
+		return new FieldSet<>(new IOField[]{field});
+	}
 	@SafeVarargs
 	public static <T extends IOInstance<T>> FieldSet<T> of(IOField<T, ?>... data){
 		return of(Arrays.asList(data));
@@ -265,7 +269,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		var size = data.size();
 		if(size == 1 && data instanceof SequencedCollection<IOField<T, ?>> l){
-			return new FieldSet<>(new IOField[]{l.getFirst()});
+			return of(l.getFirst());
 		}
 		
 		var safeData = new SetBuilder<T>(size);
