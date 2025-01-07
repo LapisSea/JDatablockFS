@@ -55,6 +55,7 @@ public final class Plan<TState, TAction>{
 	}
 	
 	public static <S, a> Plan<S, a> start(FuzzingRunner<S, a, ?> runner, long seed, long totalIterations, int sequenceLength){ return start(runner, null, seed, totalIterations, sequenceLength); }
+	public static <S, a> Plan<S, a> start(FuzzingRunner<S, a, ?> runner, FuzzSequenceSource source)                          { return start(runner, null, source); }
 	public static <S, A> Plan<S, A> start(FuzzingRunner<S, A, ?> runner, FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		return start(runner, config, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
