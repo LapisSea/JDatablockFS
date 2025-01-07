@@ -747,6 +747,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return mapped;
 	}
 	
+	public final T readNewSelective(DataProvider provider, RandomIO.Creator src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext) throws IOException{
+		try(var io = src.io()){
+			return readNewSelective(provider, io, depTicket, genericContext, false);
+		}
+	}
 	public final T readNewSelective(DataProvider provider, ContentReader src, Set<String> names, GenericContext genericContext) throws IOException{
 		return readNewSelective(provider, src, getFieldDependency().getDeps(names), genericContext, false);
 	}
@@ -1023,10 +1028,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var gen = deps.generators();
 		if(gen != null) generateAll(gen, ioPool, provider, instance, true);
 		
-		var atomicIO = fields.size()>1? dest.localTransactionBuffer(false) : dest;
-		
-		int checkIndex = 0;
+		var     atomicIO = fields.size()>1? dest.localTransactionBuffer(false) : dest;
+		boolean close    = atomicIO != dest;
 		try{
+			int checkIndex = 0;
 			for(IOField<T, ?> field : getSpecificFields()){
 				if(fields.get(checkIndex) == field){
 					checkIndex++;
@@ -1042,14 +1047,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					
 					continue;
 				}
-				
-				atomicIO.skipExact(field.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE));
+				var toSkip = field.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+				try{
+					atomicIO.skipExact(toSkip);
+				}catch(IOException e){
+					skipFail(provider, dest, field, e);
+				}
 			}
+		}catch(Throwable e){
+			close = false;
+			throw e;
 		}finally{
-			if(atomicIO != dest){
+			if(close){
 				atomicIO.close();
 			}
 		}
+	}
+	
+	private void skipFail(DataProvider provider, RandomIO dest, IOField<T, ?> field, IOException cause) throws IOException{
+		var oldPos = dest.getPos();
+		try{
+			readNew(provider, dest, null);
+		}catch(Throwable readE){
+			var e = new IOException("Failed to skip field: " + field + " A valid existing object should already exist!", cause);
+			e.addSuppressed(readE);
+			throw e;
+		}finally{
+			dest.setPos(oldPos);
+		}
+		throw new IOException("Failed to skip field: " + field, cause);
 	}
 	
 	protected void readIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
