@@ -148,10 +148,11 @@ public final class Iters{
 		}
 	}
 	
-	private record CollectionIterable<T>(Collection<T> data) implements IterablePP.SizedPP<T>{
+	private record CollectionIterable<T>(Collection<? extends T> data) implements IterablePP.SizedPP<T>{
 		@Override
 		public Iterator<T> iterator(){
-			return data.iterator();
+			//noinspection unchecked
+			return (Iterator<T>)data.iterator();
 		}
 		@Override
 		public OptionalInt getSize(){
@@ -169,7 +170,7 @@ public final class Iters{
 		public <T1> T1[] toArray(IntFunction<T1[]> ctor){ return data.toArray(ctor); }
 		@Override
 		public SizedPP<T> reverse(){
-			if(data instanceof SequencedCollection<T> sequenced){
+			if(data instanceof SequencedCollection<? extends T> sequenced){
 				return new CollectionIterable<>(sequenced.reversed());
 			}
 			return SizedPP.super.reverse();
@@ -619,12 +620,12 @@ public final class Iters{
 		};
 	}
 	
-	public static <T> IterablePP.SizedPP<T> concat(Collection<T> a, Collection<T> b){
+	public static <T> IterablePP.SizedPP<T> concat(Collection<? extends T> a, Collection<? extends T> b){
 		var aEmpty = a.isEmpty();
 		if(aEmpty || b.isEmpty()){
 			var col = aEmpty? b : a;
 			//noinspection unchecked
-			return col instanceof IterablePP.SizedPP<?> i? (IterablePP.SizedPP<T>)i : from(col);
+			return col instanceof IterablePP.SizedPP<?> i? (IterablePP.SizedPP<T>)i : new CollectionIterable<>(col);
 		}
 		return new IterablePP.SizedPP.Default<>(){
 			@Override
@@ -635,10 +636,10 @@ public final class Iters{
 			@Override
 			public Iterator<T> iterator(){
 				return new Iterator<>(){
-					private Iterator<T> iter = a.iterator();
-					private boolean     aDone;
+					private Iterator<? extends T> iter = a.iterator();
+					private boolean               aDone;
 					
-					private Iterator<T> nextIter(){
+					private Iterator<? extends T> nextIter(){
 						if(aDone) return null;
 						aDone = true;
 						var it = iter = b.iterator();
