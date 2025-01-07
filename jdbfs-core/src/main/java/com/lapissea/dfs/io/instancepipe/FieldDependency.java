@@ -6,7 +6,9 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.ShouldNeverHappenError;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -14,6 +16,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class FieldDependency<T extends IOInstance<T>>{
 	
@@ -92,76 +96,90 @@ public class FieldDependency<T extends IOInstance<T>>{
 		return makeTicket(new HashSet<>(writeFields), new HashSet<>(readFields));
 	}
 	
-	private Ticket<T> generateFieldDependency(IOField<T, ?> selectedField){
-		checkExistenceOfField(selectedField);
+	private void writeDependencies(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
 		
-		Set<IOField<T, ?>> selectedWriteFieldsSet = new HashSet<>();
-		selectedWriteFieldsSet.add(selectedField);
-		Set<IOField<T, ?>> selectedReadFieldsSet = new HashSet<>();
-		selectedReadFieldsSet.add(selectedField);
+		if(field.hasDependencies()){
+			// add fields that are a dependency or contain any dependencies
+			allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).forEach(deps);
+		}
 		
-		boolean shouldRun = true;
-		while(shouldRun){
-			shouldRun = false;
+		//If a field generates another one, then that one may be changed as well and must be written to preserve consistancy
+		Iters.from(field.getGenerators()).map(IOField.ValueGeneratorInfo::field).filter(allFields::contains).forEach(deps);
+		
+		// must write all fields after this one as it may change size and shift around fields after it
+		if(!field.getSizeDescriptor().hasFixed()){
+			var index = allFields.indexOf(field);
+			if(index == -1) throw new ShouldNeverHappenError();
 			
-			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
-				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).asCollection())){
-						shouldRun = true;
-					}
-				}
-				for(var gen : field.getGenerators()){
-					if(allFields.contains(gen.field()) && selectedWriteFieldsSet.add(gen.field())){
-						shouldRun = true;
-					}
-				}
-			}
-			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
-				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).asCollection())){
-						shouldRun = true;
-					}
-				}
-			}
+			allFields.subList(index + 1, allFields.size()).forEach(deps);
+		}
+	}
+	private void readDependencies(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
+		
+		if(field.hasDependencies()){
+			// add fields that are a dependency or contain any dependencies
+			allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).forEach(deps);
+		}
+		
+		//Find field and add to read fields when the field is skipped but is a dependency of another
+		// skipped field that may need the dependency to correctly skip
+		var index = allFields.indexOf(field);
+		if(index>0){
+			var skipped = Iters.from(allFields.subList(0, index)).filterNot(isListed).bake();
 			
-			//Find field and add to read fields when the field is skipped but is a dependency of another
-			// skipped field that may need the dependency to correctly skip
-			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
-				var index = allFields.indexOf(field);
-				if(index<=0) continue;
-				
-				var before = new ArrayList<>(allFields.subList(0, index));
-				
-				before.removeIf(selectedReadFieldsSet::contains);
-				
-				for(IOField<T, ?> skipped : before){
+			var dependenciesOfSkipped = skipped.filter(e -> !e.getSizeDescriptor().hasFixed())
+			                                   .flatMap(IOField::getDependencies).bake();
+			
+			if(dependenciesOfSkipped.hasAny()){
+				for(IOField<T, ?> skippedField : skipped){
 					//is skipped field dependency of another skipped field who's size may depend on it.
-					if(Iters.from(before).filter(e -> !e.getSizeDescriptor().hasFixed())
-					        .flatMap(IOField::getDependencies)
-					        .anyMatch(e -> skipped.iterUnpackedFields().anyIs(e))){
-						selectedReadFieldsSet.add(skipped);
-						shouldRun = true;
-					}
-				}
-				
-			}
-			
-			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
-				if(field.getSizeDescriptor().hasFixed()){
-					continue;
-				}
-				
-				var index = allFields.indexOf(field);
-				if(index == -1) throw new AssertionError();//TODO handle fields in fields
-				for(int i = index + 1; i<allFields.size(); i++){
-					if(selectedWriteFieldsSet.add(allFields.get(i))){
-						shouldRun = true;
+					if(dependenciesOfSkipped.anyMatch(e -> skippedField.iterUnpackedFields().anyIs(e))){
+						deps.accept(skippedField);
 					}
 				}
 			}
 		}
+	}
+	
+	private Ticket<T> generateFieldDependency(IOField<T, ?> selectedField){
+		checkExistenceOfField(selectedField);
 		
-		return makeTicket(selectedWriteFieldsSet, selectedReadFieldsSet);
+		var writeFields = fieldBFSResolve(selectedField, this::writeDependencies);
+		var readFields  = fieldBFSResolve(selectedField, this::readDependencies);
+		
+		return makeTicket(writeFields, readFields);
+	}
+	
+	private interface BFSResolve<T extends IOInstance<T>, F extends IOField<T, ?>>{
+		void accept(F field, Predicate<F> existing, Consumer<F> add);
+	}
+	private Set<IOField<T, ?>> fieldBFSResolve(IOField<T, ?> selectedField, BFSResolve<T, IOField<T, ?>> resolve){
+		return fieldBFSResolve(List.of(selectedField), resolve);
+	}
+	private Set<IOField<T, ?>> fieldBFSResolve(Iterable<IOField<T, ?>> selectedFields, BFSResolve<T, IOField<T, ?>> resolve){
+		var fields = new HashSet<IOField<T, ?>>(allFields.size());
+		var queue  = new ArrayDeque<IOField<T, ?>>();
+		
+		Consumer<IOField<T, ?>> add = f -> {
+			if(fields.add(f)){
+				queue.add(f);
+			}
+		};
+		selectedFields.forEach(add);
+		
+		while(!queue.isEmpty()){
+			IOField<T, ?> field;
+			while((field = queue.poll()) != null){
+				
+				resolve.accept(field, fields::contains, add);
+				
+				if(fields.size() == allFields.size() && fields.containsAll(allFields)){
+					return fields;
+				}
+			}
+		}
+		
+		return fields;
 	}
 	
 	private static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> collectGenerators(Collection<IOField<T, ?>> writeFields){
@@ -187,10 +205,10 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	private Ticket<T> makeTicket(Set<IOField<T, ?>> writeFields, Set<IOField<T, ?>> readFields){
-		var w = fieldSetToOrderedList(allFields, writeFields);
-		var r = fieldSetToOrderedList(allFields, readFields);
-		var g = collectGenerators(writeFields);
-		return new Ticket<>(w.equals(allFields), r.equals(allFields), w, r, g, w.hashCode()^r.hashCode());
+		var writes     = fieldSetToOrderedList(allFields, writeFields);
+		var reads      = fieldSetToOrderedList(allFields, readFields);
+		var generators = collectGenerators(writes);
+		return new Ticket<>(writes.equals(allFields), reads.equals(allFields), writes, reads, generators, writes.hashCode()^reads.hashCode());
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){
