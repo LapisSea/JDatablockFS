@@ -22,9 +22,13 @@ import com.lapissea.dfs.type.NewUnmanaged;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.FieldSet;
+import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
@@ -160,7 +164,7 @@ public final class TestUtils{
 			if(useCluster){
 				var c = Cluster.init(mem);
 				try{
-					((UnsafeConsumer<Cluster, IOException>)ses::accept).accept(c);
+					ses.accept(c);
 				}catch(Throwable e){
 					throw new RuntimeException("Failed cluster session", e);
 				}
@@ -332,15 +336,24 @@ public final class TestUtils{
 	public static <T extends IOInstance<T>> void checkPipeInOutEquality(StructPipe<T> pipe, T value) throws IOException{
 		var ch     = DataProvider.newVerySimpleProvider();
 		var memory = AllocateTicket.bytes(128).submit(ch);
-		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value);
+		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value, null);
 	}
 	
 	public static <Prov extends DataProvider.Holder & RandomIO.Creator, T extends IOInstance<T>>
 	void checkPipeInOutEquality(Prov memory, StructPipe<T> pipe, T value) throws IOException{
-		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value);
+		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value, null);
+	}
+	public static <Prov extends DataProvider.Holder & RandomIO.Creator, T extends IOInstance<T>>
+	void checkPipeInOutEquality(Prov memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
+		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value, fields);
 	}
 	public static <T extends IOInstance<T>>
-	void checkPipeInOutEquality(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value) throws IOException{
+	void checkPipeInOutEquality(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
+		if(fields != null && !fields.isEmpty()){
+			checkPipeInOutEqualityPartial(provider, memory, pipe, value, fields);
+			return;
+		}
+		
 		try{
 			try(var io = memory.io()){
 				pipe.write(provider, io, value);
@@ -358,6 +371,45 @@ public final class TestUtils{
 		Assertions.assertThat(read)
 		          .as("read value not the same").isEqualTo(value)
 		          .as("values should not of same identity").isNotSameAs(value);
+	}
+	
+	private static <T extends IOInstance<T>>
+	void checkPipeInOutEqualityPartial(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
+		if(fields.filtered(f -> f.isVirtual(StoragePool.IO))
+		         .joinAsOptionalStrM(", ", "Can not check IO fields [", "]", IOField::getName) instanceof Some(var msg)){
+			throw new IllegalArgumentException(msg);
+		}
+		
+		var ticket = pipe.getFieldDependency().getDeps(fields);
+		try{
+			try(var io = memory.io()){
+				pipe.write(provider, io, value);
+				io.trim();
+			}
+			var expected = memory.readAll();
+			try(var io = memory.io()){
+				pipe.writeDeps(provider, io, ticket, value);
+			}
+			var actual = memory.readAll();
+			Assertions.assertThat(actual).containsExactly(expected);
+		}catch(Throwable e){
+			throw new IOException("Failed to write " + value + " for comparison. Fields: " + fields, e);
+		}
+		T read;
+		try{
+			read = pipe.readNewSelective(provider, memory, ticket, null);
+		}catch(IOException e){
+			throw new IOException("Failed to read data for comparison. Fields: " + fields, e);
+		}
+		for(IOField<T, ?> field : fields){
+			if(!field.instancesEqual(null, value, null, read)){
+				throw new AssertionError(
+					"Field " + field.getName() + " not equal!\n" +
+					"  Expected: " + field.get(null, value) +
+					"  Actual:   " + field.get(null, read)
+				);
+			}
+		}
 	}
 	
 	public static <T extends IOInstance<T>> void checkRootsInOutEquality(T value) throws IOException{
