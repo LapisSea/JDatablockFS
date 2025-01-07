@@ -31,7 +31,7 @@ import java.util.OptionalLong;
 import static com.lapissea.dfs.objects.text.AutoText.Info.PIPE;
 import static com.lapissea.dfs.objects.text.AutoText.Info.STRUCT;
 
-@StructPipe.Special
+@StructPipe.Special(registerClass = AutoText.RegisterPipe.class)
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
 	public static final class Info{
@@ -39,6 +39,13 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		public static final StructPipe<AutoText> PIPE   = StandardStructPipe.of(STRUCT);
 	}
 	
+	static final class RegisterPipe{
+		static{
+			if(ConfigDefs.OPTIMIZED_PIPE.resolveVal()){
+				StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new);
+			}
+		}
+	}
 	
 	private static final class AutoTextPipe extends StandardStructPipe<AutoText>{
 		public AutoTextPipe(){
@@ -114,11 +121,6 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 		}
 	}
 	
-	static{
-		if(ConfigDefs.OPTIMIZED_PIPE.resolveVal()){
-			StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new);
-		}
-	}
 	
 	public static final ObjectPipe.NoPool<String> STR_PIPE = new ObjectPipe.NoPool<>(){
 		private BasicSizeDescriptor<String, Void> sizeDescriptor;

@@ -99,7 +99,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
-	public @interface Special{ }
+	public @interface Special{
+		/**
+		 * Rarely, a thread deadlock can be caused by this class.
+		 * This can be mitigated by using a dummy class to register the optimized pipe
+		 */
+		Class<?> registerClass() default void.class;
+	}
 	
 	private static final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
@@ -174,7 +180,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var typ = struct.getType();
 				//Special types must be statically initialized as they may add new special implementations.
 				if(typ.isAnnotationPresent(Special.class)){
-					Utils.ensureClassLoaded(typ);
+					var ann = typ.getAnnotation(Special.class);
+					if(ann.registerClass() == void.class){
+						Utils.ensureClassLoaded(typ);
+					}else{
+						Utils.ensureClassLoaded(ann.registerClass());
+					}
 				}
 				
 				var special = specials.get(struct);
