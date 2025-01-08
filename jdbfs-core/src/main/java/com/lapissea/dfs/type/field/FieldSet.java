@@ -249,6 +249,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
+	@Deprecated(forRemoval = true)
+	public static <T extends IOInstance<T>> FieldSet<T> of(FieldSet<T> data){
+		return Objects.requireNonNull(data);
+	}
+	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Iterable<IOField<T, ?>> iterable){
 		var b = new SetBuilder<T>(IterablePP.SizedPP.tryGetUnknown(iterable).orElse(-1));
 		iterable.forEach(b);

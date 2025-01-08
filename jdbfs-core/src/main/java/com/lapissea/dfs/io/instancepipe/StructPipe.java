@@ -92,6 +92,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected static void allowFullAccess(MethodHandles.Lookup lookup){
 		Access.addLookup(lookup);
 	}
+	static{ allowFullAccess(MethodHandles.lookup()); }
 	
 	/**
 	 * This annotation specifies that the defined type contains critical information within the static initializer.<br>

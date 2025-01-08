@@ -345,7 +345,12 @@ public final class TestUtils{
 	}
 	public static <Prov extends DataProvider.Holder & RandomIO.Creator, T extends IOInstance<T>>
 	void checkPipeInOutEquality(Prov memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
-		checkPipeInOutEquality(memory.getDataProvider(), memory, pipe, value, fields);
+		var provider = memory.getDataProvider();
+		if(fields != null && !fields.isEmpty()){
+			checkPipeInOutEqualityPartial(provider, memory, pipe, value, fields);
+			return;
+		}
+		checkPipeInOutEquality(provider, memory, pipe, value, fields);
 	}
 	public static <T extends IOInstance<T>>
 	void checkPipeInOutEquality(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
