@@ -10,22 +10,24 @@ import com.lapissea.dfs.run.TempClassGen.VisiblityGen;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RunMark;
+import com.lapissea.util.LogUtil;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -39,6 +41,7 @@ import java.util.random.RandomGenerator;
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
 public final class StructFuzzTest{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	private static final List<BiFunction<String, RandomGenerator, TempClassGen.FieldGen>> fieldTypes = List.of(
 		StructFuzzTest::signedInt,
@@ -67,7 +70,7 @@ public final class StructFuzzTest{
 	
 	private static TempClassGen.FieldGen signedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(rand), isFinal(rand), int.class, anns(IOVal, opt(rand, vns)),
+			name + "_int", getVisibility(rand), isFinal(rand), int.class, anns(IOVal, opt(rand, vns)),
 			RandomGenerator::nextInt
 		);
 	}
@@ -82,21 +85,23 @@ public final class StructFuzzTest{
 	
 	private static TempClassGen.FieldGen unsignedInt(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(rand), isFinal(rand), int.class, anns(IOVal, Unsigned, opt(rand, vns)),
+			name + "_uint", getVisibility(rand), isFinal(rand), int.class, anns(IOVal, Unsigned, opt(rand, vns)),
 			r -> r.nextInt(Integer.MAX_VALUE)
 		);
 	}
 	
 	private static TempClassGen.FieldGen string(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(rand), isFinal(rand), String.class, anns(IOVal, opt(rand, Nullable)),
-			r -> Iters.rand(r, r.nextInt(100), 0, 255)
-			          .mapToObj(i -> Character.toString((char)i)).joinAsStr()
+			name + "_str", getVisibility(rand), isFinal(rand), String.class, anns(IOVal, opt(rand, Nullable)), StructFuzzTest::randStr
 		);
+	}
+	private static String randStr(RandomGenerator r){
+		return Iters.rand(r, r.nextInt(50), 'a', 255)
+		            .mapToObj(i -> Character.toString((char)i)).joinAsStr();
 	}
 	private static TempClassGen.FieldGen generic(String name, RandomGenerator rand){
 		return new TempClassGen.FieldGen(
-			name, getVisibility(rand), isFinal(rand), Object.class, anns(IOVal, Gen, opt(rand, Nullable)),
+			name + "_gen", getVisibility(rand), isFinal(rand), Object.class, anns(IOVal, Gen, opt(rand, Nullable)),
 			r -> switch(rand.nextInt(3)){
 				case 0 -> rand.nextInt();
 				case 1 -> "hello world";
@@ -115,7 +120,7 @@ public final class StructFuzzTest{
 	
 	private final Set<TempClassGen.ClassGen> simpleEncounter = new HashSet<>();
 	
-	@Test(dataProvider = "yn")
+	@Test(groups = "earlyCheck", dataProvider = "yn")
 	void simpleGenClass(boolean isFinal, VisiblityGen visiblity) throws ReflectiveOperationException, IOException{
 		var gen = new TempClassGen.ClassGen(
 			"testBefore",
@@ -128,8 +133,26 @@ public final class StructFuzzTest{
 		simpleEncounter.add(gen);
 	}
 	
-	@Test(dependsOnMethods = "simpleGenClass")
+	@Test(groups = "earlyCheck")
+	void twoStringsSNullable() throws ReflectiveOperationException, IOException{
+		
+		var gen = new TempClassGen.ClassGen(
+			"TwoStrings",
+			List.of(
+				new TempClassGen.FieldGen("s1", VisiblityGen.PUBLIC, false, String.class, anns(IOVal), r -> "A"),
+				new TempClassGen.FieldGen("s2", VisiblityGen.PUBLIC, false, String.class, anns(IOVal, Nullable), r -> "š")
+			),
+			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
+			IOInstance.Managed.class,
+			List.of(Annotations.make(IOInstance.Order.class, Map.of("value", new String[]{"s1", "s2"})))
+		);
+		testType(gen);
+		simpleEncounter.add(gen);
+	}
+	
+	@Test(dependsOnGroups = "earlyCheck")
 	public void fuzzGen() throws LockedFlagSet{
+		
 		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){
 			private final Set<TempClassGen.ClassGen> encountered = Collections.newSetFromMap(new ConcurrentHashMap<>());
 			
@@ -137,12 +160,24 @@ public final class StructFuzzTest{
 			
 			@Override
 			public void applyAction(TempClassGen.ClassGen state, long actionIndex, Object action, RunMark mark) throws IOException{
-				if(!encountered.add(state.withName("_"))) return;
+				var stateDash = state.withName("_");
+				if(encountered.contains(stateDash)) return;
+				
+				if(mark.hasSequence()){
+					System.gc();
+					try{
+						ConfigDefs.PRINT_COMPILATION.set(ConfigDefs.CompLogLevel.FULL);
+					}catch(LockedFlagSet e){ }
+					LogUtil.println(state);
+					int i = 0;
+				}
+				
 				try{
 					testType(state);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
+				encountered.add(stateDash);
 			}
 			
 			@Override
@@ -156,7 +191,8 @@ public final class StructFuzzTest{
 				return tryCreate(rand, sequenceIndex, mark);
 			}
 			private TempClassGen.ClassGen tryCreate(RandomGenerator rand, long sequenceIndex, RunMark mark){
-				var fieldCount = rand.nextInt(6);
+				var fieldCount = 1 + rand.nextInt((int)(sequenceIndex/1000 + 1));
+				if(sequenceIndex == 1) fieldCount = 0;
 				
 				var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()
 				                  .toList(e -> fieldTypes.get(e.val()).apply("field" + e.index(), rand));
@@ -186,11 +222,11 @@ public final class StructFuzzTest{
 		}, FuzzingRunner::noopAction);
 		
 		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
-			Plan.start(
-				runner, new FuzzConfig().withName("fuzzChainResize"),
+			FuzzingUtils.stableRun(Plan.start(
+				runner,
 				new FuzzSequenceSource.LenSeed(69420, 10_000, 1)
 //				() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
-			).runAll().assertFail();
+			), "fuzzChainResize");
 		}
 	}
 	
@@ -211,9 +247,14 @@ public final class StructFuzzTest{
 		var mem = Cluster.emptyMem();
 		var ch  = AllocateTicket.bytes(64).submit(mem);
 		
+		var sets = struct.getRealFields().mapped(FieldSet::of).toList();
 		for(int i = 0; i<50; i++){
 			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
 			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
+			
+			for(var fs1 : sets){
+				TestUtils.checkPipeInOutEquality(ch, pipe, inst, fs1);
+			}
 		}
 	}
 	

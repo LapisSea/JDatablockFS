@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -47,11 +48,13 @@ public class FieldDependency<T extends IOInstance<T>>{
 		return getDeps(FieldSet.of(Iters.from(names).map(allFields::requireByName)));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
-		if(selectedFields.isEmpty()) return emptyTicket();
-		if(selectedFields.size() == 1){
-			return getDeps(selectedFields.getFirst());
-		}
-		
+		return switch(selectedFields.size()){
+			case 0 -> emptyTicket();
+			case 1 -> getDeps(selectedFields.getFirst());
+			default -> getMultiDeps(selectedFields);
+		};
+	}
+	private Ticket<T> getMultiDeps(FieldSet<T> selectedFields){
 		var cached = multiDependencyCache.get(selectedFields);
 		if(cached != null) return cached;
 		
@@ -79,21 +82,20 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	private Ticket<T> generateFieldsDependency(FieldSet<T> selectedFields){
-		if(selectedFields.isEmpty()){
-			return emptyTicket();
-		}
 		selectedFields.forEach(this::checkExistenceOfField);
 		if(selectedFields.size() == allFields.size()){
 			return new Ticket<>(true, true, allFields, allFields, collectGenerators(allFields), allFields.hashCode());
 		}
-		var writeFields = new ArrayList<IOField<T, ?>>();
-		var readFields  = new ArrayList<IOField<T, ?>>();
+		
+		var writeFields = new HashSet<IOField<T, ?>>();
+		var readFields  = new HashSet<IOField<T, ?>>();
+		
 		for(IOField<T, ?> selectedField : selectedFields){
-			var part = getDeps(selectedField);
-			part.writeFields.filtered(f -> Iters.from(writeFields).flatMap(IOField::iterUnpackedFields).noneIs(f)).forEach(writeFields::add);
-			part.readFields.filtered(f -> Iters.from(readFields).flatMap(IOField::iterUnpackedFields).noneIs(f)).forEach(readFields::add);
+			writeFields.addAll(fieldBFSResolve(selectedField, this::writeDependencies));
+			readFields.addAll(fieldBFSResolve(selectedField, this::readDependencies));
 		}
-		return makeTicket(new HashSet<>(writeFields), new HashSet<>(readFields));
+		
+		return makeTicket(writeFields, readFields);
 	}
 	
 	private void writeDependencies(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
@@ -160,33 +162,50 @@ public class FieldDependency<T extends IOInstance<T>>{
 		var fields = new HashSet<IOField<T, ?>>(allFields.size());
 		var queue  = new ArrayDeque<IOField<T, ?>>();
 		
+		Predicate<IOField<T, ?>> isListed = fields::contains;
 		Consumer<IOField<T, ?>> add = f -> {
 			if(fields.add(f)){
 				queue.add(f);
 			}
 		};
+		
 		selectedFields.forEach(add);
 		
-		while(!queue.isEmpty()){
-			IOField<T, ?> field;
-			while((field = queue.poll()) != null){
-				
-				resolve.accept(field, fields::contains, add);
-				
-				if(fields.size() == allFields.size() && fields.containsAll(allFields)){
-					return fields;
-				}
+		while(queue.poll() instanceof IOField<T, ?> field){
+			resolve.accept(field, isListed, add);
+			
+			if(fields.size() == allFields.size() && fields.containsAll(allFields)){
+				return fields;
 			}
 		}
 		
 		return fields;
 	}
 	
-	private static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> collectGenerators(Collection<IOField<T, ?>> writeFields){
-		return Utils.nullIfEmpty(IOFieldTools.fieldsToGenerators(List.copyOf(writeFields)));
+	private void ioAffectorResolve(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
+		
+		var affectFields = allFields.filtered(
+			f -> Iters.from(f.getGenerators())
+			          .map(IOField.ValueGeneratorInfo::field)
+			          .anyMatch(gf -> gf == field)
+		);
+		var sizeLook = allFields.iterDependentOn(field);
+		
+		Iters.concat(affectFields, sizeLook).filter(f -> f.isVirtual(StoragePool.IO)).forEach(deps);
+	}
+	
+	private List<IOField.ValueGeneratorInfo<T, ?>> collectGenerators(Collection<IOField<T, ?>> writeFields){
+		var toGenerateFields = fieldBFSResolve(Iters.from(writeFields).flatMap(IOField::iterUnpackedFields), this::ioAffectorResolve);
+		
+		return Utils.nullIfEmpty(
+			Iters.from(IOFieldTools.fieldsToGenerators(allFields))
+			     .filter(g -> toGenerateFields.contains(g.field()))
+			     .toList()
+		);
 	}
 	
 	private FieldSet<T> fieldSetToOrderedList(FieldSet<T> source, Set<IOField<T, ?>> fieldsSet){
+		fieldsSet = new HashSet<>(fieldsSet);
 		List<IOField<T, ?>> result = new ArrayList<>(fieldsSet.size());
 		for(IOField<T, ?> f : source){
 			var anyRemoved = false;
