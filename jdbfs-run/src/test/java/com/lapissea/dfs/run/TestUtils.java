@@ -380,16 +380,23 @@ public final class TestUtils{
 	
 	private static <T extends IOInstance<T>>
 	void checkPipeInOutEqualityPartial(DataProvider provider, RandomIO.Creator memory, StructPipe<T> pipe, T value, FieldSet<T> fields) throws IOException{
-		if(fields.filtered(f -> f.isVirtual(StoragePool.IO))
-		         .joinAsOptionalStrM(", ", "Can not check IO fields [", "]", IOField::getName) instanceof Some(var msg)){
-			throw new IllegalArgumentException(msg);
-		}
+		checkFields(fields);
 		
 		var ticket = pipe.getFieldDependency().getDeps(fields);
 		try{
 			try(var io = memory.io()){
 				pipe.write(provider, io, value);
 				io.trim();
+			}
+			try{
+				pipe.readNewSelective(provider, memory, ticket, null);
+			}catch(IOException e){
+				try{
+					pipe.readNew(provider, memory, null);
+				}catch(IOException e2){
+					throw new IOException("Failed full and partial read: " + fields, e2);
+				}
+				throw new IOException("Failed to read partial: " + fields, e);
 			}
 			var expected = memory.readAll();
 			try(var io = memory.io()){
@@ -414,6 +421,12 @@ public final class TestUtils{
 					"  Actual:   " + field.get(null, read)
 				);
 			}
+		}
+	}
+	private static <T extends IOInstance<T>> void checkFields(FieldSet<T> fields){
+		if(fields.filtered(f -> f.isVirtual(StoragePool.IO))
+		         .joinAsOptionalStrM(", ", "Can not check IO fields [", "]", IOField::getName) instanceof Some(var msg)){
+			throw new IllegalArgumentException(msg);
 		}
 	}
 	
