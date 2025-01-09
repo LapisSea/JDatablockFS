@@ -416,7 +416,7 @@ public final class DefInstanceCompiler{
 					try{
 						compileNode(node);
 					}catch(IllegalAccessException e){
-						throw new RuntimeException("Failed to bind generated class", e);
+						throw new RuntimeException("Failed to bind generated class: " + interf, e);
 					}
 					yield node;
 				}

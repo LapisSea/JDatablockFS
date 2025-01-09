@@ -99,9 +99,10 @@ public interface AccessProvider{
 		
 		protected abstract MethodHandles.Lookup getLookup() throws Defunct;
 		
-		protected MethodHandles.Lookup getLookup(Class<?> clazz, Mode... modes) throws Defunct, IllegalAccessException{
+		protected MethodHandles.Lookup getLookup(Class<?> clazz, boolean strip, Mode... modes) throws Defunct, IllegalAccessException{
 			var lookup       = getLookup();
 			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz, modes);
+			if(strip) targetLookup = AccessUtils.stripModes(targetLookup, modes);
 			AccessUtils.requireModes(targetLookup, modes);
 			return targetLookup;
 		}
@@ -110,44 +111,44 @@ public interface AccessProvider{
 		public VarHandle unreflect(Field field) throws IllegalAccessException, Defunct{
 			var requiredMode = AccessUtils.modeFromModifiers(field.getModifiers());
 			
-			var lookup = getLookup(field.getDeclaringClass(), requiredMode);
+			var lookup = getLookup(field.getDeclaringClass(), false, requiredMode);
 			return lookup.unreflectVarHandle(field);
 		}
 		
 		@Override
 		public MethodHandle unreflect(Method method) throws IllegalAccessException, Defunct{
 			var mode   = AccessUtils.modeFromModifiers(method.getModifiers());
-			var lookup = getLookup(method.getDeclaringClass(), mode);
+			var lookup = getLookup(method.getDeclaringClass(), false, mode);
 			return lookup.unreflect(method);
 		}
 		@Override
 		public MethodHandle unreflect(Constructor<?> constructor) throws IllegalAccessException, Defunct{
 			var mode   = AccessUtils.modeFromModifiers(constructor.getModifiers());
-			var lookup = getLookup(constructor.getDeclaringClass(), mode);
+			var lookup = getLookup(constructor.getDeclaringClass(), false, mode);
 			return lookup.unreflectConstructor(constructor);
 		}
 		
 		@Override
 		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface)
 			throws IllegalAccessException, Defunct{
-			var lookup = getLookup(method.getDeclaringClass(), Mode.PRIVATE, Mode.MODULE);
+			var lookup = getLookup(method.getDeclaringClass(), false, Mode.PRIVATE, Mode.MODULE);
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}
 		@Override
 		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface)
 			throws IllegalAccessException, Defunct{
-			var lookup = getLookup(constructor.getDeclaringClass(), Mode.PRIVATE, Mode.MODULE);
+			var lookup = getLookup(constructor.getDeclaringClass(), false, Mode.PRIVATE, Mode.MODULE);
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}
 		@Override
 		public Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct{
-			var lookup = getLookup(target, Mode.PACKAGE);
+			var lookup = getLookup(target, true, Mode.PACKAGE);
 			return lookup.defineClass(bytecode);
 		}
 		
 		@Override
 		public AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException, Defunct{
-			var lookup = getLookup(target, modes);
+			var lookup = getLookup(target, true, modes);
 			AccessUtils.requireModes(lookup, modes);
 			return new DirectLookup(lookup);
 		}

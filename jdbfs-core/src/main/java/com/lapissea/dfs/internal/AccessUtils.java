@@ -75,7 +75,7 @@ public final class AccessUtils{
 			}
 		}
 		
-		return AccessUtils.stripModes(actualLookup, modes);
+		return actualLookup;
 	}
 	private static IllegalAccessException fail(Class<?> clazz, MethodHandles.Lookup lookup, IllegalAccessException e){
 		return new IllegalAccessException(Log.fmt("{}#red is not accessible from {}#yellow: {}", clazz, lookup, e.getMessage()));
