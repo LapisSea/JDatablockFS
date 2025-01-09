@@ -235,8 +235,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	protected final List<BitField<T, ?>> group;
 	
-	private final List<ValueGeneratorInfo<T, ?>> generators;
-	
 	protected final Optional<BitLayout> safetyBits;
 	
 	private BitFieldMerger(List<BitField<T, ?>> group){
@@ -257,7 +255,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			));
 		}
 		initLateData(FieldSet.of(Iters.from(group).flatMap(IOField::getDependencies)));
-		generators = IOFieldTools.fieldsToGenerators(group);
 	}
 	
 	@Override
@@ -309,7 +306,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return generators;
+		return Iters.from(group).flatMap(IOField::getGenerators).toModList();
 	}
 	
 }

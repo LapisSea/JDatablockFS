@@ -451,9 +451,12 @@ public final class IOFieldTools{
 		for(var f : fields.reversed()){
 			for(var g : f.getGenerators()){
 				buff[pos++] = g;
+				if(buff.length == pos){
+					return List.of(buff);
+				}
 			}
 		}
-		return List.of(buff);
+		throw new IllegalStateException();
 	}
 	
 	public static final String UNINITIALIZED_FIELD_SIGN = "<Uninitialized>";

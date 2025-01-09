@@ -1114,7 +1114,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			return;
 		}
 		var ioFields = this.ioFields;
-		if(fields.size() == ioFields.size()){
+		if(deps.fullRead()){
 			readIOFields(ioFields, ioPool, provider, src, instance, genericContext);
 			return;
 		}

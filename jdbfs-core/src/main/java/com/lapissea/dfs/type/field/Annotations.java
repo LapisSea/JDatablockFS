@@ -126,7 +126,7 @@ public abstract class Annotations{
 			
 			@Override
 			public String toString(){
-				return '@' + annotationType.getName() + TextUtil.toString(safeValues);
+				return '@' + annotationType.getSimpleName() + TextUtil.toString(safeValues);
 			}
 		}
 		
