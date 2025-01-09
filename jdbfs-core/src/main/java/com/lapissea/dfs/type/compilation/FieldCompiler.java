@@ -47,7 +47,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -56,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -480,7 +480,7 @@ public final class FieldCompiler{
 		Preload.preloadFn(Annotations.class, "make", IOValue.class);
 	}
 	
-	public static Collection<Class<?>> getWrapperTypes(){
+	public static SequencedSet<Class<?>> getWrapperTypes(){
 		return FieldRegistry.getWrappers();
 	}
 }

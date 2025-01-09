@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.SequencedCollection;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
@@ -33,7 +34,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePPSource<IOField<T, ?>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements Set<IOField<T, ?>>, IterablePPSource<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
 		

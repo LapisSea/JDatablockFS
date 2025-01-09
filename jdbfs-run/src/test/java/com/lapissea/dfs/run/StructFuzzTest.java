@@ -28,6 +28,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -145,6 +146,21 @@ public final class StructFuzzTest{
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of(Annotations.make(IOInstance.Order.class, Map.of("value", new String[]{"s1", "s2"})))
+		);
+		testType(gen);
+		simpleEncounter.add(gen);
+	}
+	@Test(groups = "earlyCheck")
+	void instant() throws ReflectiveOperationException, IOException{
+		
+		var gen = new TempClassGen.ClassGen(
+			"InstantTyp",
+			List.of(
+				new TempClassGen.FieldGen("i1", VisiblityGen.PUBLIC, false, Instant.class, anns(IOVal, Nullable), r -> Instant.ofEpochSecond(r.nextInt(1000)))
+			),
+			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
+			IOInstance.Managed.class,
+			List.of()
 		);
 		testType(gen);
 		simpleEncounter.add(gen);

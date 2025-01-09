@@ -31,8 +31,8 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	
-	protected NullFlagCompanyField(FieldAccessor<T> field){
-		super(field);
+	protected NullFlagCompanyField(FieldAccessor<T> accessor){
+		super(accessor);
 	}
 	
 	@Override

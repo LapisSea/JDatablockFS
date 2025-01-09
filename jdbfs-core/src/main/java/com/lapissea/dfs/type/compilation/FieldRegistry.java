@@ -30,7 +30,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -39,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
@@ -196,13 +196,13 @@ final class FieldRegistry{
 		return Cache.VAL;
 	}
 	
-	static Collection<Class<?>> getWrappers(){
+	static SequencedSet<Class<?>> getWrappers(){
 		class Cache{
-			private static final Collection<Class<?>> VAL;
+			private static final SequencedSet<Class<?>> VAL;
 			
 			static{
 				var uni = getSealedUniverse(NullFlagCompanyField.class, true).orElseThrow();
-				VAL = Collections.unmodifiableSet(new LinkedHashSet<>(
+				VAL = Collections.unmodifiableSequencedSet(new LinkedHashSet<>(
 					Iters.from(uni.universe())
 					     .flatOptionals((Class<NullFlagCompanyField> fieldType) -> {
 						     if(fieldType.isAnnotationPresent(IOUnsafeValue.Mark.class)){

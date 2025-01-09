@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.SequencedCollection;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
@@ -428,7 +429,7 @@ public final class IOFieldTools{
 		};
 	}
 	
-	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(List<? extends IOField<T, ?>> fields){
+	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(SequencedCollection<? extends IOField<T, ?>> fields){
 		
 		int count = 0;
 		for(var f : fields){
