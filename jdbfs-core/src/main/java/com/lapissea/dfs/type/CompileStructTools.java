@@ -5,12 +5,12 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.GcDelayer;
 import com.lapissea.dfs.utils.KeyCounter;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.ref.WeakReference;
@@ -227,7 +227,7 @@ final class CompileStructTools{
 			struct.runOnStateDone(
 				() -> {
 					if(printLogLevel == ConfigDefs.CompLogLevel.FULL){
-						Log.log(GREEN_BRIGHT + TextUtil.toTable("Struct compiled: " + struct.cleanFullName(), struct.getFields()) + RESET);
+						Log.log(GREEN_BRIGHT + IOFieldTools.toTableString("Struct compiled: " + struct.cleanFullName(), struct.getFields()) + RESET);
 						return;
 					}
 					var fullName  = struct.getFullName();

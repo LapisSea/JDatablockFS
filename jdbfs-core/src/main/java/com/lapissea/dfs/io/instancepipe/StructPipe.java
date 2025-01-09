@@ -236,7 +236,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					var sFields = created.getSpecificFields();
 					
 					if(!sFields.equals(struct.getFields())){
-						s += "\n" + TextUtil.toTable(created.getSpecificFields());
+						s += "\n" + IOFieldTools.toTableString(created.toString(), created.getSpecificFields());
 					}
 					
 					Log.log(CYAN_BRIGHT + s + RESET);

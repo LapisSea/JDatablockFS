@@ -29,6 +29,7 @@ import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -489,5 +491,34 @@ public final class IOFieldTools{
 	}
 	public static IOInstance.Order orderFromNames(IterablePP<String> names){
 		return Annotations.make(IOInstance.Order.class, Map.of("value", names.toArray(String[]::new)));
+	}
+	
+	public static <T extends IOInstance<T>> String toTableString(String title, Iterable<IOField<T, ?>> fields){
+		return TextUtil.toTable(
+			title,
+			Iters.from(fields).map(f -> Iters.entries(
+				"fieldType", typeName(f),
+				"name", f.getName(),
+				"type", f.getGenericType(null) == null? "/" : f.getGenericType(null).getTypeName(),
+				"sizeDescriptor", f.getSizeDescriptor(),
+				"nullability", f.getNullability(),
+				"readOnly", f.isReadOnly(),
+				"generators", f.getGenerators(),
+				"dependencies", f.getDependencies()
+			).filter(e -> {
+				var v = e.getValue();
+				if(v instanceof Collection<?> c){
+					return !c.isEmpty();
+				}
+				return true;
+			}).toModMap(new LinkedHashMap<>(), Map.Entry::getKey, Map.Entry::getValue)).toModList()
+		);
+	}
+	private static <T extends IOInstance<T>> String typeName(IOField<T, ?> f){
+		var typ = f.getClass();
+		if(UtilL.instanceOf(typ, BitFieldMerger.class)) typ = BitFieldMerger.class;
+		var name = typ.getTypeName();
+		name = name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
+		return name;
 	}
 }

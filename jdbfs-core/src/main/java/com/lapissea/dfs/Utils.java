@@ -213,7 +213,8 @@ public final class Utils{
 	}
 	public static String typeToHuman(Type type){
 		return switch(type){
-			case Class<?> c -> classNameToHuman(c.getName());
+			case null -> "null";
+			case Class<?> c -> c.getTypeName();
 			case ParameterizedType p -> typeToHuman(p.getRawType()) +
 			                            Iters.from(p.getActualTypeArguments()).joinAsStr(", ", "<", ">", Utils::typeToHuman);
 			case WildcardType w -> {

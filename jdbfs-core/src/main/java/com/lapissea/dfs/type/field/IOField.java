@@ -463,7 +463,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public String getName(){ return getAccessor().getName(); }
 	@SuppressWarnings("unchecked")
 	@Override
-	public final Class<? extends ValueType> getType(){ return (Class<? extends ValueType>)getAccessor().getType(); }
+	public final Class<? extends ValueType> getType(){
+		var acc = getAccessor();
+		if(acc == null) return null;
+		return (Class<? extends ValueType>)acc.getType();
+	}
 	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
 		var acc = getAccessor();
@@ -598,7 +602,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	@Override
 	public final Type getGenericType(GenericContext genericContext){
-		return getAccessor().getGenericType(genericContext);
+		var acc = getAccessor();
+		if(acc == null) return null;
+		return acc.getGenericType(genericContext);
 	}
 	
 	@Override
