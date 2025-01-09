@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -41,6 +42,10 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 		}
 	}
 	
+	static{ Preload.preloadFn(IOLocalDateTime.class, "of", LocalDateTime.of(LocalDate.EPOCH, LocalTime.MIDNIGHT)); }
+	
+	private static MethodHandle CONSTR;
+	
 	@IOInstance.Order({"date", "time"})
 	private interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
 		
@@ -53,10 +58,15 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 		
 		Struct<IOLocalDateTime> STRUCT = Struct.of(IOLocalDateTime.class);
 		
-		MethodHandle CONSTR = Def.constrRef(IOLocalDateTime.class, LocalDate.class, LocalTime.class);
+		private static MethodHandle init(){
+			return CONSTR = Def.constrRef(IOLocalDateTime.class, LocalDate.class, LocalTime.class);
+		}
+		
 		static IOLocalDateTime of(LocalDateTime val){
+			var c = CONSTR;
+			if(c == null) c = init();
 			try{
-				return (IOLocalDateTime)CONSTR.invoke(val.toLocalDate(), val.toLocalTime());
+				return (IOLocalDateTime)c.invoke(val.toLocalDate(), val.toLocalTime());
 			}catch(Throwable e){
 				throw new RuntimeException(e);
 			}

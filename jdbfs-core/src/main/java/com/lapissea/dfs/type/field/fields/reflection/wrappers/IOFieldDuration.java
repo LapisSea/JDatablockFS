@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -41,6 +42,10 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends IOFiel
 		}
 	}
 	
+	static{ Preload.preloadFn(IODuration.class, "of", Duration.ZERO); }
+	
+	private static MethodHandle CONSTR;
+	
 	@IOInstance.Order({"seconds", "nanos"})
 	private interface IODuration extends IOInstance.Def<IODuration>{
 		
@@ -56,10 +61,14 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends IOFiel
 		
 		Struct<IODuration> STRUCT = Struct.of(IODuration.class);
 		
-		MethodHandle CONSTR = IOInstance.Def.constrRef(IODuration.class, long.class, int.class);
+		private static MethodHandle init(){
+			return CONSTR = Def.constrRef(IODuration.class, long.class, int.class);
+		}
 		static IODuration of(Duration val){
+			var c = CONSTR;
+			if(c == null) c = init();
 			try{
-				return (IODuration)CONSTR.invoke(val.getSeconds(), val.getNano());
+				return (IODuration)c.invoke(val.getSeconds(), val.getNano());
 			}catch(Throwable e){
 				throw new RuntimeException(e);
 			}
