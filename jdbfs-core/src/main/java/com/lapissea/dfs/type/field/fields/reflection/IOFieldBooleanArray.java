@@ -95,6 +95,6 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = arraySize.getValue(ioPool, instance);
-		src.skipExact(size);
+		src.skipExact(BitUtils.bitsToBytes(size));
 	}
 }
