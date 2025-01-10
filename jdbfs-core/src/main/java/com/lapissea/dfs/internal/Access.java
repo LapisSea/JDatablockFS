@@ -90,7 +90,10 @@ public final class Access{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface) throws IllegalAccessException{
-		return access(AccessProvider::makeLambda, method, functionalInterface, "failed to create lambda\n  Method: {}#red", true);
+		return makeLambda(method, functionalInterface, true);
+	}
+	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface, boolean optimized) throws IllegalAccessException{
+		return access(AccessProvider::makeLambda, method, functionalInterface, "failed to create lambda\n  Method: {}#red", optimized);
 	}
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface) throws IllegalAccessException{
 		return makeLambda(constructor, functionalInterface, true);
@@ -151,24 +154,22 @@ public final class Access{
 	T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, boolean optimized, Class<?>... parameterTypes) throws IllegalAccessException{
 		try{
 			Constructor<?> lconst;
-			if(Modifier.isPrivate(clazz.getModifiers())){
+			try{
 				lconst = clazz.getDeclaredConstructor(parameterTypes);
-			}else{
+			}catch(ReflectiveOperationException e){
 				lconst = clazz.getConstructor(parameterTypes);
 			}
-			
 			return makeLambda(lconst, functionalInterface, optimized);
 		}catch(IllegalAccessException e){
 			throw e;
 		}catch(ReflectiveOperationException ce){
 			
 			try{
-				Method of = clazz.getMethod("of", parameterTypes);
+				Method of = clazz.getDeclaredMethod("of", parameterTypes);
 				if(!Modifier.isStatic(of.getModifiers())) throw new ReflectiveOperationException(of + " not static");
-				if(!Modifier.isPublic(of.getModifiers())) throw new ReflectiveOperationException(of + " not public");
 				if(!of.getReturnType().equals(clazz)) throw new ReflectiveOperationException(of + " does not return " + clazz);
 				
-				return makeLambda(of, functionalInterface);
+				return makeLambda(of, functionalInterface, optimized);
 			}catch(ReflectiveOperationException ofe){
 				var argStr = switch(parameterTypes.length){
 					case 0 -> "empty arguments";

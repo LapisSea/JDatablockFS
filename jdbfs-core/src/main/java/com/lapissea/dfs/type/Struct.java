@@ -896,11 +896,36 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 		}catch(MissingConstructor e){
 			if(needsBuilderObj()){
-				throw new UnsupportedOperationException("Final field types may not have a default constructor: " + this, e);
+				throw new UnsupportedOperationException(Log.fmt("Final field types may not have a default constructor: {}#red", this), e);
 			}
 			throw e;
 		}
 		Objects.requireNonNull(ctor);
+		
+		if(!optimized){
+			var ctorBase = ctor;
+			ctor = new NewObj.Instance<>(){
+				private boolean checked;
+				@Override
+				public T make(){
+					var a = ctorBase.make();
+					if(!checked) check(a);
+					return a;
+				}
+				private void check(T a){
+					if(getRealFields().allMatches(IOField::isReadOnly)){
+						checked = true;
+						return;
+					}
+					var b = ctorBase.make();
+					if(a == b){
+						throw new IllegalStateException(Log.fmt("Constructor should never return the same object: {}#red", cleanFullName()));
+					}
+					checked = true;
+				}
+			};
+		}
+		
 		return emptyConstructor = ctor;
 	}
 	public boolean canHaveDefaultConstructor(){
