@@ -58,10 +58,14 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 		this.file = file;
 		
 		fileData = new RandomAccessFile(file, mode.str);
-		try{
-			fileLock = fileData.getChannel().lock();
-		}catch(IOException|OverlappingFileLockException e){
-			throw new IOException("Unable to acquire exclusive access to: " + file, e);
+		if(mode != Mode.READ_ONLY){
+			try{
+				fileLock = fileData.getChannel().lock();
+			}catch(IOException|OverlappingFileLockException e){
+				throw new IOException("Unable to acquire exclusive access to: " + file, e);
+			}
+		}else{
+			fileLock = null;
 		}
 		
 		this.used = getLength();
@@ -143,7 +147,7 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	
 	@Override
 	public void close() throws IOException{
-		fileLock.close();
+		if(fileLock != null) fileLock.close();
 		fileData.close();
 	}
 }
