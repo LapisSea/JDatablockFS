@@ -2,7 +2,7 @@ package com.lapissea.dfs.run.world;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.CursorIOData;
-import com.lapissea.dfs.io.impl.FileMemoryMapped;
+import com.lapissea.dfs.io.impl.FileMemoryMappedData;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
@@ -136,7 +136,7 @@ public final class RandomLists{
 		synchronized(RandomLists.class){
 			file = new File(path, "l" + (fileIndex++));
 		}
-		try(var memD = new FileMemoryMapped(file)){
+		try(var memD = new FileMemoryMappedData(file)){
 			runRandomLists(listCount, null, false, memD, iters);
 		}catch(IOException e){
 			throw new RuntimeException(e);

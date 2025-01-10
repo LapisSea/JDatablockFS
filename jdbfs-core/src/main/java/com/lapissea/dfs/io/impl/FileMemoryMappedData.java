@@ -12,13 +12,14 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 
-public final class FileMemoryMapped extends CursorIOData implements Closeable{
+public final class FileMemoryMappedData extends CursorIOData implements Closeable{
 	
 	private final File         file;
 	private final FileMappings mappedFileData;
 	
-	public FileMemoryMapped(File file) throws IOException{ this(file, false); }
-	public FileMemoryMapped(File file, boolean readOnly) throws IOException{
+	public FileMemoryMappedData(String fileName) throws IOException{ this(new File(fileName), false); }
+	public FileMemoryMappedData(File file) throws IOException      { this(file, false); }
+	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{
 		super(null, readOnly);
 		this.file = file;
 		
@@ -133,11 +134,11 @@ public final class FileMemoryMapped extends CursorIOData implements Closeable{
 	}
 	
 	@Override
-	public FileMemoryMapped asReadOnly(){
+	public FileMemoryMappedData asReadOnly(){
 		if(isReadOnly()) return this;
 		try{
 			close();
-			return new FileMemoryMapped(file, true);
+			return new FileMemoryMappedData(file, true);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}

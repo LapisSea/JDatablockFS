@@ -15,7 +15,7 @@ import java.nio.channels.OverlappingFileLockException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-public final class FileRandomAccess extends CursorIOData implements Closeable{
+public final class FileRandomAccessData extends CursorIOData implements Closeable{
 	
 	public enum Mode{
 		READ_ONLY("r"),
@@ -44,15 +44,16 @@ public final class FileRandomAccess extends CursorIOData implements Closeable{
 	private final RandomAccessFile fileData;
 	private final FileLock         fileLock;
 	
-	public FileRandomAccess(File file) throws IOException{ this(file, false); }
-	public FileRandomAccess(File file, boolean readOnly) throws IOException{
+	public FileRandomAccessData(String fileName) throws IOException{ this(new File(fileName), false); }
+	public FileRandomAccessData(File file) throws IOException      { this(file, false); }
+	public FileRandomAccessData(File file, boolean readOnly) throws IOException{
 		this(file,
 		     readOnly?
 		     Mode.READ_ONLY :
 		     ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE
 		);
 	}
-	public FileRandomAccess(File file, Mode mode) throws IOException{
+	public FileRandomAccessData(File file, Mode mode) throws IOException{
 		super(null, mode == Mode.READ_ONLY);
 		this.file = file;
 		
@@ -74,7 +75,7 @@ public final class FileRandomAccess extends CursorIOData implements Closeable{
 	@Override
 	public boolean equals(Object o){
 		return this == o ||
-		       o instanceof FileRandomAccess that &&
+		       o instanceof FileRandomAccessData that &&
 		       fileData.equals(that.fileData);
 	}
 	
@@ -130,11 +131,11 @@ public final class FileRandomAccess extends CursorIOData implements Closeable{
 	}
 	
 	@Override
-	public FileRandomAccess asReadOnly(){
+	public FileRandomAccessData asReadOnly(){
 		if(isReadOnly()) return this;
 		try{
 			close();
-			return new FileRandomAccess(file, true);
+			return new FileRandomAccessData(file, true);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
