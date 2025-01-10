@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 
@@ -33,7 +34,16 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 				ioOptions.add(StandardOpenOption.SYNC);
 			}
 		}
-		var fileChannel = (FileChannel)Files.newByteChannel(file.toPath(), ioOptions);
+		FileChannel fileChannel;
+		
+		try{
+			fileChannel = (FileChannel)Files.newByteChannel(file.toPath(), ioOptions);
+		}catch(NoSuchFileException e){
+			if(readOnly){
+				throw new NoSuchFileException("File must exist if in read only mode: " + e.getMessage());
+			}
+			throw e;
+		}
 		if(!readOnly){
 			try{
 				//noinspection ResultOfMethodCallIgnored

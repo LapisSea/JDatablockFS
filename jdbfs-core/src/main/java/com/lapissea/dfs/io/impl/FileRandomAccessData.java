@@ -8,6 +8,7 @@ import com.lapissea.util.MathUtil;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
@@ -56,8 +57,14 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	public FileRandomAccessData(File file, Mode mode) throws IOException{
 		super(null, mode == Mode.READ_ONLY);
 		this.file = file;
-		
-		fileData = new RandomAccessFile(file, mode.str);
+		try{
+			fileData = new RandomAccessFile(file, mode.str);
+		}catch(FileNotFoundException e){
+			if(mode == Mode.READ_ONLY){
+				throw new FileNotFoundException("File must exist if in read only mode: " + e.getMessage());
+			}
+			throw e;
+		}
 		if(mode != Mode.READ_ONLY){
 			try{
 				fileLock = fileData.getChannel().lock();
