@@ -9,6 +9,7 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -479,6 +480,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public OptionalPP<IOField<T, ?>> byName(String name){
 		var idx = indexByName(name);
 		return idx == -1? OptionalPP.empty() : OptionalPP.of(data[idx]);
+	}
+	public Match<IOField<T, ?>> byNameM(String name){
+		var idx = indexByName(name);
+		return idx == -1? Match.empty() : Match.of(data[idx]);
 	}
 	
 	public IOField<T, ?> requireByName(String name){

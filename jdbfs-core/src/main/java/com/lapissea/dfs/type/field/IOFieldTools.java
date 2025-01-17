@@ -388,7 +388,7 @@ public final class IOFieldTools{
 		return f.getDeclaringClass().isAnnotationPresent(IOValue.class);
 	}
 	
-	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
+	public static String getNumSizeName(FieldNames.Named field, IODependency.VirtualNumSize size){
 		var nam = size.name();
 		if(nam.isEmpty()){
 			return FieldNames.numberSize(field);

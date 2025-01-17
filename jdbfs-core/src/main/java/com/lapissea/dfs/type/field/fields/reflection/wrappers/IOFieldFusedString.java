@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.LimitedContentReader;
+import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.text.Encoding;
@@ -169,6 +170,10 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 		Encoding enc   = encodingField.get(ioPool, instance);
 		int      cc    = charCountField.getValue(ioPool, instance);
 		var      bytes = bytesField.getValue(ioPool, instance);
+		
+		if(bytes<0 || bytes>(src instanceof RandomIO rio? rio.remaining() : provider.getSource().getIOSize())){
+			throw new IOException("Illegal size: " + cc);
+		}
 		
 		var buff = CharBuffer.allocate(cc);
 		enc.read(new LimitedContentReader(src, bytes), buff);
