@@ -26,8 +26,10 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	private sealed interface CacheLayer<T>{
 		final class Array<T> implements CacheLayer<T>{
 			
-			private final ArrayList<T> cache = new ArrayList<>();
+			private final ArrayList<T> cache         = new ArrayList<>();
 			private       int          size;
+			private       int          toRemoveIndex = -1;
+			
 			@Override
 			public Iterable<Ldx<T>> entrySet(){
 				return Iters.from(cache).enumerateL().nonNullProps(Ldx::val);
@@ -51,18 +53,26 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 				var delta = val != null? 1 : 0;
 				if(old != null) delta--;
 				size += delta;
+				if(val != null && toRemoveIndex == 1) toRemoveIndex = i;
 			}
 			@Override
 			public void remove(long index){
 				int i = (int)index;
 				if(cache.size()<=i) return;
-				if(cache.set((int)index, null) != null){
+				if(cache.set(i, null) != null){
+					if(i == toRemoveIndex) toRemoveIndex = -1;
 					size--;
 				}
 			}
 			@Override
 			public long yeet(){
 				if(size == 0) return -1;
+				int tri = toRemoveIndex;
+				if(tri != -1){
+					cache.set(tri, null);
+					toRemoveIndex = -1;
+					return tri;
+				}
 				var rr = new RawRandom(size);
 				while(true){
 					var i = rr.nextInt(cache.size());
@@ -75,6 +85,10 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 			@Override
 			public void shiftIds(long greaterThanL, int offset){
 				int greaterThan = (int)greaterThanL;
+				
+				if(toRemoveIndex>greaterThan){
+					toRemoveIndex += offset;
+				}
 				
 				if(offset == -1){
 					cache.remove(greaterThan);
@@ -286,15 +300,18 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 	}
 	
 	private T getC(long index){
-		if(cache.size()>=maxCacheSize) cache.yeet();
+		limitCacheSize();
 		return cache.get(index);
+	}
+	private void limitCacheSize(){
+		if(cache.size()>=maxCacheSize) cache.yeet();
 	}
 	private void setC(Long index, T value){
 		if(value == null) cache.remove(index);
 		else{
-			if(cache.size()>=maxCacheSize) cache.yeet();
+			limitCacheSize();
 			cache.put(index, value);
-			if(cache.size()>maxLinearCache && cache instanceof CacheLayer.Array){
+			if(data.size()>maxLinearCache && cache instanceof CacheLayer.Array){
 				var c = new CacheLayer.Sparse<T>();
 				for(var e : cache.entrySet()){
 					c.put(e.getKey(), e.getValue());
