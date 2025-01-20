@@ -285,6 +285,9 @@ public final class TemplateClassLoader extends ClassLoader{
 					case FieldDef.IOAnnotation.AnDependencies ann -> {
 						stringsAnnotation(writer, IODependency.class, ann.names());
 					}
+					case FieldDef.IOAnnotation.AnNumberSize ann -> {
+						writer.write("@{} start value '{!}' end", IODependency.NumSize.class, ann.fieldName);
+					}
 					case FieldDef.IOAnnotation.AnGeneric ignore -> {
 						writer.write("@{}", IOValue.Generic.class);
 					}
