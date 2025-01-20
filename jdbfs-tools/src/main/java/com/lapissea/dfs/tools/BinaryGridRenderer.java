@@ -11,7 +11,6 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
-import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -1444,13 +1443,18 @@ public class BinaryGridRenderer implements DataRenderer{
 						pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));
 					}
 				}catch(Throwable e){
-					var size = 1L;
-					try{
-						size = pipe.calcUnknownSize(ctx.provider, instance, WordSpace.BYTE);
-					}catch(Throwable ignored){ }
-					drawByteRangesForced(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
+					for(var gen : instance.getThisStruct().getFields().flatMapped(IOField::getGenerators)){
+						gen.generate(ioPool, ctx.provider, instance, false);
+					}
 					
-					throw new TypeIOFail("Failed to recover virtual fields", instance.getClass(), e);
+					//TODO: Re-enable this and never generate fields. Reading was causing issues with some lists. Find out why
+//					var size = 1L;
+//					try{
+//						size = pipe.calcUnknownSize(ctx.provider, instance, WordSpace.BYTE);
+//					}catch(Throwable ignored){ }
+//					drawByteRangesForced(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
+//
+//					throw new TypeIOFail("Failed to recover virtual fields", instance.getClass(), e);
 				}
 			}
 			while(true){
