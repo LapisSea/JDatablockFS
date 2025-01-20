@@ -35,6 +35,7 @@
 		<module>/jdbfs-tools</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
+		<module>demos/Photos</module>
 	</modules>
 	
 	<dependencyManagement>

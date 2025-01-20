@@ -11,6 +11,7 @@
 !/jdbfs-run/
 !/Jorth/
 !/Fuzzer/
+!/demos
 !pom.xml
 
 !/.idea/
