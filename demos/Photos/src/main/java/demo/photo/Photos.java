@@ -25,7 +25,7 @@ public final class Photos{
 	
 	public static void main(String[] args) throws IOException{
 //		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.ALL);
-		PUtils.loggedRAMMemory(Photos::run);
+		PUtils.fileMemory(Photos::run);
 	}
 	
 	private static void run(IOInterface data) throws IOException{
@@ -61,7 +61,7 @@ public final class Photos{
 				timer.start();
 				var res = photos.where(Query.Test.field(Photo::name, n -> n.contains(trim)))
 				                .limit(30)
-				                .mapFull(p -> {
+				                .stream(s -> s.map(p -> {
 					                BufferedImage img = null;
 					                try{
 						                img = ImageIO.read(new ByteArrayInputStream(p.data));
@@ -70,8 +70,7 @@ public final class Photos{
 					                }
 					                if(img == null) img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
 					                return new GUI.NamedImage(p.name.substring(p.name.lastIndexOf('\\')), img);
-				                })
-				                .allToList();
+				                }).toList());
 				timer.end();
 				
 				gui.updateImages(res);
@@ -81,6 +80,7 @@ public final class Photos{
 			}
 			LogUtil.println("Search done in " + timer.ms() + "ms");
 		};
+		
 		gui.fileDrop = file -> {
 			if(file.isDirectory()){
 				addFolder(photos, file);
@@ -151,7 +151,7 @@ public final class Photos{
 		var last  = new AtomicLong();
 		
 		PUtils.threadedFolderScan(folder, file -> {
-			if(isValidImage(file)){
+			if(!isValidImage(file)){
 				return;
 			}
 //			LogUtil.println("Adding " + file.getPath());
@@ -171,7 +171,7 @@ public final class Photos{
 	}
 	
 	private static boolean isValidImage(File file){
-		return Iters.of(".jpeg", ".jpg", ".png").noneMatch(file.getPath()::endsWith);
+		return Iters.of(".jpeg", ".jpg", ".png").anyMatch(file.getPath()::endsWith);
 	}
 	
 	private static void dummyData(IOList<Photo> photos) throws IOException{

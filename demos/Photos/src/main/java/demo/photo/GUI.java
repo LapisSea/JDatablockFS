@@ -58,6 +58,7 @@ public class GUI extends JFrame{
 					dtde.acceptDrop(DnDConstants.ACTION_COPY);
 					Transferable transferable = dtde.getTransferable();
 					if(transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)){
+						//noinspection unchecked
 						List<File> files = (List<File>)transferable.getTransferData(DataFlavor.javaFileListFlavor);
 						for(File file : files){
 							fileDrop.accept(file);
@@ -95,6 +96,7 @@ public class GUI extends JFrame{
 		imagePanel = new JPanel();
 		imagePanel.setLayout(new GridLayout(0, 3, 10, 10)); // Adjust grid layout as needed
 		JScrollPane scrollPane = new JScrollPane(imagePanel);
+		scrollPane.getVerticalScrollBar().setUnitIncrement(50);
 		add(scrollPane, BorderLayout.CENTER);
 		
 		// Set the frame size and make it visible
