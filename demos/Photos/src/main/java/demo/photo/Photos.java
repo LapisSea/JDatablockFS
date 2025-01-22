@@ -7,18 +7,22 @@ import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NanoTimer;
+import com.lapissea.util.UtilL;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 public final class Photos{
 	static{ Thread.startVirtualThread(Cluster::emptyMem); }
@@ -48,6 +52,7 @@ public final class Photos{
 		var gui = guif.join();
 		gui.setTotalCount(photos.size());
 		
+		Object[] token = {null};
 		gui.searchChange = str -> {
 			if(str.isBlank()){
 				gui.updateImages(List.of());
@@ -60,20 +65,42 @@ public final class Photos{
 			try{
 				timer.start();
 				var res = photos.where(Query.Test.field(Photo::name, n -> n.contains(trim)))
-				                .limit(30)
-				                .stream(s -> s.map(p -> {
-					                BufferedImage img = null;
-					                try{
-						                img = ImageIO.read(new ByteArrayInputStream(p.data));
-					                }catch(IOException e){
-						                //probably a placeholder
-					                }
-					                if(img == null) img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
-					                return new GUI.NamedImage(p.name.substring(p.name.lastIndexOf('\\')), img);
-				                }).toList());
+				                .limit(60)
+				                .allToList();
 				timer.end();
 				
-				gui.updateImages(res);
+				if(res.isEmpty()){
+					gui.updateImages(List.of());
+					return;
+				}
+				
+				var unique = new Object();
+				token[0] = unique;
+				
+				var tasks = Iters.from(res).enumerate((i, p) -> CompletableFuture.supplyAsync(() -> {
+					if(unique != token[0]) return null;
+					BufferedImage img = null;
+					try{
+						img = ImageIO.read(new ByteArrayInputStream(p.data));
+					}catch(IOException e){
+						//probably a placeholder
+					}
+					if(img == null) img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+					return Map.entry(i, new GUI.NamedImage(p.name.substring(p.name.lastIndexOf('\\')), img));
+				})).collect(Collectors.toList());
+				
+				List<Map.Entry<Integer, GUI.NamedImage>> images = new ArrayList<>();
+				while(!tasks.isEmpty()){
+					UtilL.sleep(30);
+					tasks.removeIf(task -> {
+						if(task.isDone()){
+							images.add(task.join());
+							return true;
+						}
+						return false;
+					});
+					gui.updateImages(images.stream().sorted(Map.Entry.comparingByKey()).map(Map.Entry::getValue).toList());
+				}
 				
 			}catch(IOException e){
 				e.printStackTrace();
@@ -83,7 +110,7 @@ public final class Photos{
 		
 		gui.fileDrop = file -> {
 			if(file.isDirectory()){
-				addFolder(photos, file);
+				addFolder(photos, file, gui);
 			}else if(isValidImage(file)){
 				try{
 					add(photos, file);
@@ -109,7 +136,7 @@ public final class Photos{
 					}
 					case "add" -> add(photos, arg1F(cmd));
 					case "names" -> names(photos, arg1(cmd));
-					case "addFolder" -> addFolder(photos, arg1F(cmd));
+					case "addFolder" -> addFolder(photos, arg1F(cmd), gui);
 					case "dummyData" -> dummyData(photos);
 					case "size" -> size(data);
 					case "count" -> LogUtil.println("There are " + photos.size() + " photos.");
@@ -145,7 +172,7 @@ public final class Photos{
 		LogUtil.println(Iters.from(matchPhotoNames).enumerate((i, s) -> i + "\t" + s).joinAsStr("\n"));
 	}
 	
-	private static void addFolder(IOList<Photo> photos, File folder){
+	private static void addFolder(IOList<Photo> photos, File folder, GUI gui){
 		var lock  = new ReentrantLock();
 		var count = new AtomicInteger();
 		var last  = new AtomicLong();
@@ -167,6 +194,7 @@ public final class Photos{
 				var old = count.getAndSet(0);
 				LogUtil.println("Added", old + "files in 100ms");
 			}
+			gui.setTotalCount(photos.size());
 		});
 	}
 	

@@ -60,9 +60,11 @@ public class GUI extends JFrame{
 					if(transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)){
 						//noinspection unchecked
 						List<File> files = (List<File>)transferable.getTransferData(DataFlavor.javaFileListFlavor);
-						for(File file : files){
-							fileDrop.accept(file);
-						}
+						Thread.startVirtualThread(() -> {
+							for(File file : files){
+								fileDrop.accept(file);
+							}
+						});
 					}
 				}catch(Exception e){
 					e.printStackTrace();
