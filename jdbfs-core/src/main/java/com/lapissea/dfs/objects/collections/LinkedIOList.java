@@ -360,6 +360,8 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		private final IOIterator<IONode<T>> iter;
 		private       IONode<T>             node;
 		
+		private boolean closed;
+		
 		public QSource(QueryFields queryFields) throws IOException{
 			if(!queryFields.isEmpty() && valueStorage instanceof ValueStorage.InstanceBased<?> i){
 				var t = i.depTicket(queryFields.set());
@@ -371,18 +373,25 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 			else iter = head.iterator();
 		}
 		
+		private void checkClosed(){
+			if(closed) throw new IllegalStateException("Query closed");
+		}
+		
 		@Override
 		public boolean step() throws IOException{
+			checkClosed();
 			if(!iter.hasNext()) return false;
 			node = iter.ioNext();
 			return true;
 		}
 		@Override
 		public T fullEntry() throws IOException{
+			checkClosed();
 			return node.getValue();
 		}
 		@Override
 		public T fieldEntry() throws IOException{
+			checkClosed();
 			if(depTicket == null){
 				return node.getValue();
 			}
@@ -390,8 +399,9 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 			return (T)t.val();
 		}
 		@Override
-		public void close() throws IOException{
+		public void close(){
 			node = null;
+			closed = true;
 		}
 	}
 	

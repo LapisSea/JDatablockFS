@@ -877,6 +877,8 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		private int readState;
 		private T   val;
 		
+		private boolean closed;
+		
 		public QSource(QueryFields queryFields){
 			if(!queryFields.isEmpty() && storage instanceof ValueStorage.InstanceBased<?> i){
 				var t = i.depTicket(queryFields.set());
@@ -886,8 +888,13 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			}
 		}
 		
+		private void checkClosed(){
+			if(closed) throw new IllegalStateException("Query closed");
+		}
+		
 		@Override
 		public boolean step(){
+			checkClosed();
 			var ni = index + 1;
 			if(ni>=size()) return false;
 			index = ni;
@@ -897,6 +904,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		@Override
 		public T fullEntry() throws IOException{
+			checkClosed();
 			if(readState == FULL) return val;
 			val = get(index);
 			readState = FULL;
@@ -905,6 +913,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		@Override
 		public T fieldEntry() throws IOException{
+			checkClosed();
 			if(readState == NONE){
 				if(depTicket == null){
 					val = get(index);
@@ -927,7 +936,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			}
 		}
 		@Override
-		public void close(){ }
+		public void close(){
+			closed = true;
+		}
 	}
 	
 	public Query<T> query(){ return new Queries.All<>(QSource::new); }

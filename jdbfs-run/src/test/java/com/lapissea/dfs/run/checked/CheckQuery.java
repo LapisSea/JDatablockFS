@@ -23,14 +23,21 @@ public class CheckQuery<T> implements Query<T>{
 		var a = data.open(queryFields);
 		var b = reference.iterator();
 		return new QueryableData.QuerySource<>(){
-			private T toCheck;
+			private T       toCheck;
+			private boolean closed;
 			
 			@Override
 			public void close() throws IOException{
+				checkClosed();
 				a.close();
+				closed = true;
+			}
+			private void checkClosed(){
+				if(closed) throw new IllegalStateException("Query closed");
 			}
 			@Override
 			public boolean step() throws IOException{
+				checkClosed();
 				var hasNext = a.step();
 				var hnRef   = b.hasNext();
 				assertThat(hasNext).as("Step has data").isEqualTo(hnRef);
@@ -41,12 +48,14 @@ public class CheckQuery<T> implements Query<T>{
 			}
 			@Override
 			public T fullEntry() throws IOException{
+				checkClosed();
 				var val = a.fullEntry();
 				assertThat(val).as("Full entry equality").isEqualTo(toCheck);
 				return val;
 			}
 			@Override
 			public T fieldEntry() throws IOException{
+				checkClosed();
 				var val = a.fieldEntry();
 				assertThat(val).as("Field entry equality").isEqualTo(toCheck);
 				return val;

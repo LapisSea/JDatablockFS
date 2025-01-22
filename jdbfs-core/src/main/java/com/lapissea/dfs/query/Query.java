@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.iterableplus.Match;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -14,6 +15,7 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 public interface Query<T>{
 	
@@ -27,6 +29,23 @@ public interface Query<T>{
 		default Query<T> where(List<Query.Test<T>> tests)                                    { return query().where(tests); }
 		default Query<T> query(){
 			return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
+		}
+	}
+	
+	default <V> V stream(Function<Stream<T>, V> fn) throws IOException{
+		try(var data = open(new QueryFields())){
+			record Val<T>(T value){ }
+			var stream = Stream.generate(() -> {
+				try{
+					if(!data.step()) return null;
+					return new Val<>(data.fullEntry());
+				}catch(IOException e){
+					throw new UncheckedIOException("Failed to retrieve query element", e);
+				}
+			}).takeWhile(Objects::nonNull).map(Val::value);
+			var res = fn.apply(stream);
+			if(res == stream) throw new IllegalStateException("Stream must be executed within the lambda scope");
+			return res;
 		}
 	}
 	

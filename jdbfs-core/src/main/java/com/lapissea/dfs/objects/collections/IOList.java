@@ -37,7 +37,7 @@ public interface IOList<T> extends IterablePPSource<T>, Query.BaseSource<T>{
 		var iter = data.iterator();
 		
 		var push = new Consumer<String>(){
-			private String repeatBuff  = null;
+			private String repeatBuff;
 			private int    repeatCount = 0;
 			private long   repeatIndexStart;
 			private long   count       = 0;

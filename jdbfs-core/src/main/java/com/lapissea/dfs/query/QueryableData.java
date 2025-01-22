@@ -13,27 +13,35 @@ public interface QueryableData<T>{
 		static <T> QuerySource<T> fromIter(IOIterator<T> iter){
 			return new QuerySource<>(){
 				
-				private T val;
+				private T       val;
+				private boolean closed;
+				
+				private void checkClosed(){
+					if(closed) throw new IllegalStateException("Query closed");
+				}
 				
 				@Override
 				public boolean step() throws IOException{
+					checkClosed();
 					if(!iter.hasNext()) return false;
 					val = iter.ioNext();
 					return true;
 				}
 				@Override
 				public T fullEntry(){
+					checkClosed();
 					return val;
 				}
 				@Override
 				public T fieldEntry(){
+					checkClosed();
 					if(val != null && !(val instanceof IOInstance<?>)){
 						throw new UnsupportedOperationException();
 					}
 					return val;
 				}
 				@Override
-				public void close(){ }
+				public void close(){ closed = true; }
 			};
 		}
 		
