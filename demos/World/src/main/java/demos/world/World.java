@@ -1,4 +1,4 @@
-package com.lapissea.dfs.run.world;
+package demos.world;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;

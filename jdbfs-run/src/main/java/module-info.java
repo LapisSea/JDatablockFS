@@ -9,7 +9,6 @@ module JDatablockFS.run {
 	
 	opens com.lapissea.dfs.run;
 	opens com.lapissea.dfs.run.sparseimage;
-	opens com.lapissea.dfs.run.world;
 	opens com.lapissea.dfs.run.examples;
 	opens com.lapissea.dfs.benchmark;
 	

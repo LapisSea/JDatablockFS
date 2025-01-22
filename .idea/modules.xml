@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/JDatablockFS.iml" filepath="$PROJECT_DIR$/JDatablockFS.iml" />
-      <module fileurl="file://$PROJECT_DIR$/jdbfs-run/jdbfs-run.iml" filepath="$PROJECT_DIR$/jdbfs-run/jdbfs-run.iml" />
     </modules>
   </component>
 </project>

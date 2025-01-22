@@ -18,7 +18,7 @@
 !/runDir/
 !/.github/
 
-/*/target/
+target/
 
 *.iml
 

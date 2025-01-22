@@ -1,4 +1,4 @@
-package com.lapissea.dfs.run.world;
+package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.CursorIOData;
@@ -7,10 +7,10 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.run.Configuration;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -144,6 +146,16 @@ public final class RandomLists{
 			file.delete();
 		}
 	}
+	@IOValue
+	public static class Item extends IOInstance.Managed<Item>{
+		int id, count;
+	}
+	
+	@IOValue
+	public static class Entity extends IOInstance.Managed<Entity>{
+		public float      pos;
+		public List<Item> inventory = new ArrayList<>();
+	}
 	
 	private static void runRandomLists(int listCount, LateInit.Safe<DataLogger> logger, boolean close, CursorIOData mem, int iters){
 		Log.info("{#purpleStarting: {} lists#}", listCount);
@@ -155,7 +167,7 @@ public final class RandomLists{
 				for(int i = 0; i<iters; i++){
 					IOList<Entity> m = p.request("list" + rand.nextInt(listCount), ContiguousIOList.class, Entity.class);
 					m.addNew(e -> {
-						e.inventory.add(new InventorySlot());
+						e.inventory.add(new Item());
 					});
 				}
 				cl.defragment();

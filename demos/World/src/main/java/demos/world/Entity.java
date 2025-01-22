@@ -1,4 +1,4 @@
-package com.lapissea.dfs.run.world;
+package demos.world;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;

@@ -36,6 +36,7 @@
 		<module>Jorth</module>
 		<module>Fuzzer</module>
 		<module>demos/Photos</module>
+		<module>demos/World</module>
 	</modules>
 	
 	<dependencyManagement>
