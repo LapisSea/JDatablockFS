@@ -184,7 +184,6 @@ public final class Queries{
 		
 		@Override
 		public QueryableData.QuerySource<R> open(QueryFields queryFields) throws IOException{
-			queryFields.markUnknown();
 			var parent = this.parent.open(queryFields);
 			return new QueryableData.QuerySource<>(){
 				@Override
@@ -202,6 +201,44 @@ public final class Queries{
 				@Override
 				public R fieldEntry() throws IOException{
 					return mapper.apply(parent.fullEntry());
+				}
+			};
+		}
+	}
+	
+	public static class Limited<T> implements Query<T>{
+		
+		private final Query<T> parent;
+		private final long     maxCount;
+		
+		public Limited(Query<T> parent, long maxCount){
+			this.parent = Objects.requireNonNull(parent);
+			this.maxCount = maxCount;
+			if(maxCount<0) throw new IllegalArgumentException("maxCount cannot be negative");
+		}
+		
+		@Override
+		public QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException{
+			var parent = this.parent.open(queryFields);
+			return new QueryableData.QuerySource<>(){
+				private long count = 0;
+				@Override
+				public void close() throws IOException{
+					parent.close();
+				}
+				@Override
+				public boolean step() throws IOException{
+					if(count == maxCount) return false;
+					count++;
+					return parent.step();
+				}
+				@Override
+				public T fullEntry() throws IOException{
+					return parent.fullEntry();
+				}
+				@Override
+				public T fieldEntry() throws IOException{
+					return parent.fieldEntry();
 				}
 			};
 		}

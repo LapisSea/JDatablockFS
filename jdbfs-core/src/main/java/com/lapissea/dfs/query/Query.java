@@ -202,5 +202,9 @@ public interface Query<T>{
 		return new Queries.Mapped<>(this, mapper);
 	}
 	
+	default Query<T> limit(long count){
+		return new Queries.Limited<>(this, count);
+	}
+	
 	QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException;
 }
