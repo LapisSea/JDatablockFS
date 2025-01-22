@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run.checked;
 
+import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeFunction;
@@ -7,7 +8,6 @@ import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,11 +53,11 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 		return a;
 	}
 	@Override
-	public Iterator<IOEntry<K, V>> iterator(){
+	public IOIterator.Iter<IOEntry<K, V>> iterator(){
 		var ia        = data.iterator();
 		var remaining = new HashMap<>(reference);
 		
-		return new Iterator<>(){
+		return new IOIterator.Iter<>(){
 			K lastRet;
 			@Override
 			public boolean hasNext(){
@@ -67,7 +67,7 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 				return a;
 			}
 			@Override
-			public IOEntry<K, V> next(){
+			public IOEntry<K, V> ioNext(){
 				var a    = ia.next();
 				var bVal = remaining.remove(a.getKey());
 				var b    = IOEntry.of(a.getKey(), bVal);

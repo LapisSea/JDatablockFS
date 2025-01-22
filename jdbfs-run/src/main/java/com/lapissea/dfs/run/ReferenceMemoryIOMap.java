@@ -1,9 +1,9 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOMap;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
@@ -37,15 +37,15 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
-	public Iterator<IOEntry<K, V>> iterator(){
+	public IOIterator.Iter<IOEntry<K, V>> iterator(){
 		var src = data.entrySet().iterator();
-		return new Iterator<>(){
+		return new IOIterator.Iter<>(){
 			@Override
 			public boolean hasNext(){
 				return src.hasNext();
 			}
 			@Override
-			public IOEntry<K, V> next(){
+			public IOEntry<K, V> ioNext(){
 				return IOEntry.viewOf(src.next());
 			}
 		};

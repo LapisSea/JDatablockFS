@@ -29,6 +29,7 @@ import com.lapissea.util.UtilL;
 import org.roaringbitmap.RoaringBitSet;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -519,7 +520,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	}
 	
 	@Override
-	public Iterator<IOEntry<K, V>> iterator(){
+	public IOIterator.Iter<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
 			private       IOIterator<IONode<BucketEntry<K, V>>> nodeIter;
 			private final IOIterator<Bucket<K, V>>              bucketsIter = buckets.iterator();
@@ -543,7 +544,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					if(ni != null && ni.hasNext()) return true;
 					return tryFindNext() != null;
 				}catch(IOException e){
-					throw new RuntimeException(e);
+					throw new UncheckedIOException(e);
 				}
 			}
 			
