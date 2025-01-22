@@ -2,6 +2,7 @@ package com.lapissea.dfs.run.checked;
 
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.query.Query;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -351,5 +352,9 @@ public class CheckIOList<T> implements IOList<T>{
 	@Override
 	public String toString(){
 		return testData.toString();
+	}
+	@Override
+	public Query<T> query(){
+		return new CheckQuery<>(testData.query(), reference);
 	}
 }

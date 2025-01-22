@@ -1,5 +1,6 @@
 package com.lapissea.dfs.query;
 
+import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
@@ -15,6 +16,19 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 public interface Query<T>{
+	
+	interface BaseSource<T>{
+		
+		IOIterator<T> iterator();
+		
+		default Query<T> where(Query.Test<T> test)                                           { return query().where(test); }
+		default Query<T> where(Query.Test<T> test1, Query.Test<T> test2)                     { return query().where(test1, test2); }
+		default Query<T> where(Query.Test<T> test1, Query.Test<T> test2, Query.Test<T> test3){ return query().where(test1, test2, test3); }
+		default Query<T> where(List<Query.Test<T>> tests)                                    { return query().where(tests); }
+		default Query<T> query(){
+			return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
+		}
+	}
 	
 	default List<T> allToList() throws IOException{
 		var res = new ArrayList<T>();

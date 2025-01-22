@@ -2,10 +2,7 @@ package com.lapissea.dfs.objects.collections;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
-import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.Query.Test;
-import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
@@ -13,13 +10,12 @@ import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
 
 @IOValue.OverrideType.DefaultImpl(HashIOMap.class)
-public interface IOMap<K, V> extends IterablePPSource<IOMap.IOEntry<K, V>>{
+public interface IOMap<K, V> extends IterablePPSource<IOMap.IOEntry<K, V>>, Query.BaseSource<IOMap.IOEntry<K, V>>{
 	
 	interface IOEntry<K, V>{
 		
@@ -235,11 +231,4 @@ public interface IOMap<K, V> extends IterablePPSource<IOMap.IOEntry<K, V>>{
 	@Override
 	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
 	
-	default Query<IOEntry<K, V>> where(Test<IOEntry<K, V>> test)                                                       { return query().where(test); }
-	default Query<IOEntry<K, V>> where(Test<IOEntry<K, V>> test1, Test<IOEntry<K, V>> test2)                           { return query().where(test1, test2); }
-	default Query<IOEntry<K, V>> where(Test<IOEntry<K, V>> test1, Test<IOEntry<K, V>> test2, Test<IOEntry<K, V>> test3){ return query().where(test1, test2, test3); }
-	default Query<IOEntry<K, V>> where(List<Test<IOEntry<K, V>>> tests)                                                { return query().where(tests); }
-	default Query<IOEntry<K, V>> query(){
-		return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
-	}
 }

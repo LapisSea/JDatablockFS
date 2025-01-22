@@ -5,9 +5,7 @@ import com.lapissea.dfs.objects.collections.listtools.IOListCached;
 import com.lapissea.dfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.dfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.dfs.objects.collections.listtools.MemoryWrappedIOList;
-import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
@@ -33,7 +31,7 @@ import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
-public interface IOList<T> extends IterablePPSource<T>{
+public interface IOList<T> extends IterablePPSource<T>, Query.BaseSource<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -651,12 +649,4 @@ public interface IOList<T> extends IterablePPSource<T>{
 	
 	@Override
 	default OptionalInt tryGetSize(){ return Utils.longToOptInt(size()); }
-	
-	default Query<T> where(Query.Test<T> test)                                           { return query().where(test); }
-	default Query<T> where(Query.Test<T> test1, Query.Test<T> test2)                     { return query().where(test1, test2); }
-	default Query<T> where(Query.Test<T> test1, Query.Test<T> test2, Query.Test<T> test3){ return query().where(test1, test2, test3); }
-	default Query<T> where(List<Query.Test<T>> tests)                                    { return query().where(tests); }
-	default Query<T> query(){
-		return new Queries.All<>(ignore -> QueryableData.QuerySource.fromIter(iterator()));
-	}
 }

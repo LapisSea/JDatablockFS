@@ -2,6 +2,7 @@ package com.lapissea.dfs.run.checked;
 
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOSet;
+import com.lapissea.dfs.query.Query;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -127,5 +128,10 @@ public class CheckSet<T> implements IOSet<T>{
 	@Override
 	public String toString(){
 		return testData.toString();
+	}
+	
+	@Override
+	public Query<T> query(){
+		return new CheckQuery<>(testData.query(), reference);
 	}
 }

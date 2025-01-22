@@ -1,13 +1,14 @@
 package com.lapissea.dfs.objects.collections;
 
 
+import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.util.Objects;
 
 @IOValue.OverrideType.DefaultImpl(IOHashSet.class)
-public interface IOSet<T>{
+public interface IOSet<T> extends Query.BaseSource<T>{
 	
 	boolean add(T value) throws IOException;
 	
