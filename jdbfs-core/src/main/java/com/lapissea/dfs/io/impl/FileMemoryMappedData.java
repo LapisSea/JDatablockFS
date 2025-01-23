@@ -18,6 +18,8 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 	private final File         file;
 	private final FileMappings mappedFileData;
 	
+	private final Thread shutdownThread;
+	
 	public FileMemoryMappedData(String fileName) throws IOException{ this(new File(fileName), false); }
 	public FileMemoryMappedData(File file) throws IOException      { this(file, false); }
 	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{
@@ -57,6 +59,15 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 		mappedFileData = new FileMappings(fileChannel, readOnly);
 		
 		this.used = getLength();
+		
+		shutdownThread = Thread.ofPlatform().name(file + " memory flusher").unstarted(() -> {
+			try{
+				close();
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+		});
+		Runtime.getRuntime().addShutdownHook(shutdownThread);
 	}
 	
 	@Override
@@ -156,6 +167,10 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 	
 	@Override
 	public void close() throws IOException{
+		resize(getIOSize());
 		mappedFileData.close();
+		try{
+			Runtime.getRuntime().removeShutdownHook(shutdownThread);
+		}catch(IllegalStateException ignore){ }
 	}
 }

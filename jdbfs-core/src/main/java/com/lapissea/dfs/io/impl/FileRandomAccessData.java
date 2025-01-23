@@ -45,6 +45,8 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	private final RandomAccessFile fileData;
 	private final FileLock         fileLock;
 	
+	private final Thread shutdownThread;
+	
 	public FileRandomAccessData(String fileName) throws IOException{ this(new File(fileName), false); }
 	public FileRandomAccessData(File file) throws IOException      { this(file, false); }
 	public FileRandomAccessData(File file, boolean readOnly) throws IOException{
@@ -76,6 +78,15 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 		}
 		
 		this.used = getLength();
+		
+		shutdownThread = Thread.ofPlatform().name(file + " memory flusher").unstarted(() -> {
+			try{
+				close();
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+		});
+		Runtime.getRuntime().addShutdownHook(shutdownThread);
 	}
 	
 	@Override
@@ -154,6 +165,10 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	
 	@Override
 	public void close() throws IOException{
+		resize(getIOSize());
+		try{
+			Runtime.getRuntime().removeShutdownHook(shutdownThread);
+		}catch(IllegalStateException ignore){ }
 		if(fileLock != null) fileLock.close();
 		fileData.close();
 	}
