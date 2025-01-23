@@ -764,8 +764,21 @@ public final class MemoryOperations{
 			chunk.writeHeader(io);
 			IOUtils.zeroFill(io, chunk.getCapacity());
 		}
+		var end = chunk.dataEnd();
+		if(src.getIOSize() != end){
+			correctIOsize(src, end);
+		}
 		context.getChunkCache().add(chunk);
 		return chunk;
+	}
+	private static void correctIOsize(IOInterface src, long end) throws IOException{
+		try{
+			src.setIOSize(end);
+		}catch(UnsupportedOperationException e){
+			try(var io = src.io()){
+				io.setCapacity(end);
+			}
+		}
 	}
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{

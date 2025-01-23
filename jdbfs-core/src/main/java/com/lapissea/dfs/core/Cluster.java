@@ -397,15 +397,20 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
-	private boolean walkedToLast;
+	private Chunk lastWalkedChunkCache;
 	
 	@Override
 	public Chunk walkToLastChunk() throws IOException{
-		if(walkedToLast) return null;
-		return doLastWalk();
-	}
-	private Chunk doLastWalk() throws IOException{
 		Chunk ch = getFirstChunk();
+		{
+			Chunk last = lastWalkedChunkCache;
+			if(last != null){
+				var cached = getChunkCached(last.getPtr());
+				if(cached == last){
+					ch = last;
+				}
+			}
+		}
 		while(true){
 			Chunk next;
 			try{
@@ -416,15 +421,16 @@ public final class Cluster implements DataProvider{
 					var ptr = ChunkPointer.of(pos);
 					if(Chunk.isChunkValidAt(this, ptr)){
 						next = getChunk(ptr);
+						if(next.dataEnd()>end) next = null;
+						else break;
 					}
 				}
 				if(next == null){
-					return ch;
+					return lastWalkedChunkCache = ch;
 				}
 			}
 			if(next == null){
-				walkedToLast = true;
-				return ch;
+				return lastWalkedChunkCache = ch;
 			}
 			ch = next;
 		}
