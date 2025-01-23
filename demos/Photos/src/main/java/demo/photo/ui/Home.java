@@ -66,7 +66,7 @@ public class Home extends JFrame{
 	
 	
 	private List<Texture> search(String query){
-		if(query.isEmpty()) return List.of();
+		if(query.isEmpty()) return textureDb.get();
 		var result = textureDb.get();
 		return Iters.from(result).filter(t -> t.match(query)).toList();
 	}

@@ -6,7 +6,7 @@ import imgui.gl3.ImGuiImplGl3;
 
 import java.util.Objects;
 
-public class ImGuiUtils{
+public final class ImGuiUtils{
 	
 	public static void load(){ }
 	static{
