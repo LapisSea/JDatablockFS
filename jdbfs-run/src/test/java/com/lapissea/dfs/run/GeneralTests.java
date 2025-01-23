@@ -12,6 +12,7 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -379,6 +380,28 @@ public class GeneralTests{
 	}
 	
 	@Test
+	void recoverFromImproperlySizedFile() throws IOException{
+		var data = TestUtils.testCluster();
+		var t    = AllocateTicket.bytes(16);
+		for(int i = 0; i<10; i++){
+			t.submit(data);
+		}
+		ChunkPointer desiredPtr;
+		{
+			var c = t.submit(data);
+			desiredPtr = c.getPtr();
+			data.getMemoryManager().free(c);
+		}
+		//add invalid blank bytes to the end of the file to simulate sudden mid-allocation shutdown
+		data.getSource().ioAt(data.getSource().getIOSize(), r -> r.write(new byte[100]));
+		
+		var c2        = t.submit(data);
+		var actualPtr = c2.getPtr();
+		
+		assertThat(actualPtr).isEqualTo(desiredPtr);
+	}
+	
+	@Test
 	void bySizeSignedInt(){
 		NumberSize.FLAG_INFO
 			.flatMapToLong(v -> Iters.ofLongs(v.signedMinValue, v.signedMaxValue, v.maxSize))
@@ -520,4 +543,6 @@ public class GeneralTests{
 	void toStringInst2(){
 		assertThat(new Custom2().toString()).isEqualTo("{123}");
 	}
+	
+	
 }

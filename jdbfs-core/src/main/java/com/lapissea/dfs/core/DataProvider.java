@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.chunk.ChunkCache;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.VerySimpleMemoryManager;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
+import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.exceptions.PointerOutsideFile;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
@@ -58,6 +59,21 @@ public interface DataProvider{
 			return getChunk(ChunkPointer.of(MagicID.size()));
 		}
 		@Override
+		public Chunk walkToLastChunk() throws IOException{
+			Chunk ch;
+			try{
+				ch = getFirstChunk();
+			}catch(MalformedPointer e){
+				return null;
+			}
+			while(true){
+				var next = ch.nextPhysical();
+				if(next == null) break;
+				ch = next;
+			}
+			return ch;
+		}
+		@Override
 		public String toString(){
 			return "Very simple provider";
 		}
@@ -86,6 +102,8 @@ public interface DataProvider{
 	ChunkCache getChunkCache();
 	
 	Chunk getFirstChunk() throws IOException;
+	
+	Chunk walkToLastChunk() throws IOException;
 	
 	default Chunk getChunkCached(ChunkPointer ptr){
 		Objects.requireNonNull(ptr);
@@ -158,6 +176,8 @@ public interface DataProvider{
 			public ChunkCache getChunkCache(){ return DataProvider.this.getChunkCache(); }
 			@Override
 			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
+			@Override
+			public Chunk walkToLastChunk() throws IOException{ return DataProvider.this.walkToLastChunk(); }
 			@Override
 			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override

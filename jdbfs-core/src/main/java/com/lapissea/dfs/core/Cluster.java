@@ -397,6 +397,39 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
+	private boolean walkedToLast;
+	
+	@Override
+	public Chunk walkToLastChunk() throws IOException{
+		if(walkedToLast) return null;
+		return doLastWalk();
+	}
+	private Chunk doLastWalk() throws IOException{
+		Chunk ch = getFirstChunk();
+		while(true){
+			Chunk next;
+			try{
+				next = ch.nextPhysical();
+			}catch(MalformedPointer e){
+				next = null;
+				for(long pos = ch.dataEnd() + 1, end = getSource().getIOSize(); pos<end; pos++){
+					var ptr = ChunkPointer.of(pos);
+					if(Chunk.isChunkValidAt(this, ptr)){
+						next = getChunk(ptr);
+					}
+				}
+				if(next == null){
+					return ch;
+				}
+			}
+			if(next == null){
+				walkedToLast = true;
+				return ch;
+			}
+			ch = next;
+		}
+	}
+	
 	@Override
 	public IOTypeDB.PersistentDB getTypeDb(){ return metadata == null? null : metadata.db; }
 	@Override

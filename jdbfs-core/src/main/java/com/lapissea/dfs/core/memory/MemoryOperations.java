@@ -752,7 +752,8 @@ public final class MemoryOperations{
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException{
 		
 		var src   = context.getSource();
-		var ioSiz = src.getIOSize();
+		var last  = context.walkToLastChunk();
+		var ioSiz = last == null? src.getIOSize() : last.dataEnd();
 		
 		var chunk = chBuilderFromTicketSafeSize(context, ChunkPointer.of(ioSiz), ticket).create();
 		if(!ticket.approve(chunk)) return null;
