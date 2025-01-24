@@ -45,8 +45,6 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	private final RandomAccessFile fileData;
 	private final FileLock         fileLock;
 	
-	private final Thread shutdownThread;
-	
 	public FileRandomAccessData(String fileName) throws IOException{ this(new File(fileName), false); }
 	public FileRandomAccessData(File file) throws IOException      { this(file, false); }
 	public FileRandomAccessData(File file, boolean readOnly) throws IOException{
@@ -71,22 +69,23 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 			try{
 				fileLock = fileData.getChannel().lock();
 			}catch(IOException|OverlappingFileLockException e){
+				fileData.close();
 				throw new IOException("Unable to acquire exclusive access to: " + file, e);
+			}catch(Throwable e){
+				fileData.close();
+				throw e;
 			}
 		}else{
 			fileLock = null;
 		}
-		
-		this.used = getLength();
-		
-		shutdownThread = Thread.ofPlatform().name(file + " memory flusher").unstarted(() -> {
-			try{
-				close();
-			}catch(Throwable e){
-				e.printStackTrace();
-			}
-		});
-		Runtime.getRuntime().addShutdownHook(shutdownThread);
+		try{
+			this.used = getLength();
+			
+			if(!isReadOnly()) bindCloseOnShutdown(this);
+		}catch(Throwable e){
+			fileData.close();
+			throw e;
+		}
 	}
 	
 	@Override
@@ -166,10 +165,8 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	@Override
 	public void close() throws IOException{
 		resize(getIOSize());
-		try{
-			Runtime.getRuntime().removeShutdownHook(shutdownThread);
-		}catch(IllegalStateException ignore){ }
 		if(fileLock != null) fileLock.close();
 		fileData.close();
+		if(!isReadOnly()) unbindCloseOnShutdown(this);
 	}
 }

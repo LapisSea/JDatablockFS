@@ -18,8 +18,6 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 	private final File         file;
 	private final FileMappings mappedFileData;
 	
-	private final Thread shutdownThread;
-	
 	public FileMemoryMappedData(String fileName) throws IOException{ this(new File(fileName), false); }
 	public FileMemoryMappedData(File file) throws IOException      { this(file, false); }
 	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{
@@ -39,35 +37,36 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 		FileChannel fileChannel;
 		
 		try{
-			fileChannel = (FileChannel)Files.newByteChannel(file.toPath(), ioOptions);
+			var bc = Files.newByteChannel(file.toPath(), ioOptions);
+			if(bc instanceof FileChannel fc) fileChannel = fc;
+			else{
+				bc.close();
+				throw new IOException(file + " is not a valid file!");
+			}
 		}catch(NoSuchFileException e){
 			if(readOnly){
 				throw new NoSuchFileException("File must exist if in read only mode: " + e.getMessage());
 			}
 			throw e;
 		}
-		if(!readOnly){
-			try{
-				//noinspection ResultOfMethodCallIgnored
-				fileChannel.lock();
-			}catch(IOException|OverlappingFileLockException e){
-				fileChannel.close();
-				throw new IOException("Unable to acquire exclusive access to: " + file, e);
+		try{
+			if(!readOnly){
+				try{
+					//noinspection ResultOfMethodCallIgnored
+					fileChannel.lock();
+				}catch(IOException|OverlappingFileLockException e){
+					throw new IOException("Unable to acquire exclusive access to: " + file, e);
+				}
 			}
+			
+			mappedFileData = new FileMappings(fileChannel, readOnly);
+			
+			this.used = getLength();
+			if(readOnly) bindCloseOnShutdown(this);
+		}catch(Throwable e){
+			fileChannel.close();
+			throw e;
 		}
-		
-		mappedFileData = new FileMappings(fileChannel, readOnly);
-		
-		this.used = getLength();
-		
-		shutdownThread = Thread.ofPlatform().name(file + " memory flusher").unstarted(() -> {
-			try{
-				close();
-			}catch(Throwable e){
-				e.printStackTrace();
-			}
-		});
-		Runtime.getRuntime().addShutdownHook(shutdownThread);
 	}
 	
 	@Override
@@ -169,8 +168,6 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 	public void close() throws IOException{
 		resize(getIOSize());
 		mappedFileData.close();
-		try{
-			Runtime.getRuntime().removeShutdownHook(shutdownThread);
-		}catch(IllegalStateException ignore){ }
+		if(!isReadOnly()) unbindCloseOnShutdown(this);
 	}
 }
