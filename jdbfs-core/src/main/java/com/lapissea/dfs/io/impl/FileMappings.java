@@ -10,6 +10,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ final class FileMappings implements Closeable{
 	public static final int MAX_SMALL_MAPPING = 32;
 	
 	private final FileChannel fileChannel;
+	private       boolean     closed;
 	
 	private final boolean readOnly;
 	private       long    size;
@@ -42,6 +44,10 @@ final class FileMappings implements Closeable{
 		size = fileChannel.size();
 	}
 	
+	private void checkClosed() throws ClosedChannelException{
+		if(closed) throw new ClosedChannelException();
+	}
+	
 	public long fileSize(){
 		return size;
 	}
@@ -51,6 +57,8 @@ final class FileMappings implements Closeable{
 		var lock = this.lock.writeLock();
 		lock.lock();
 		try{
+			checkClosed();
+			closed = true;
 			clearMappings();
 			fileChannel.close();
 		}finally{ lock.unlock(); }
@@ -62,6 +70,7 @@ final class FileMappings implements Closeable{
 		var lock = this.lock.writeLock();
 		lock.lock();
 		try{
+			checkClosed();
 			if(size == newSize) return;
 			if(size<newSize){
 				removeMapping(size/MAX_CHUNK_SIZE);
@@ -81,19 +90,15 @@ final class FileMappings implements Closeable{
 	}
 	
 	
-	public void removeMapping(long index){
+	private void removeMapping(long index){
 		var lock = this.lock.writeLock();
 		lock.lock();
 		try{
-			MappedByteBuffer mapping;
 			if(index<mappings.length){
-				mapping = unwrap(mappings[(int)index]);
+				runIfSome(mappings[(int)index], FileMappings::unmap);
 				mappings[(int)index] = null;
 			}else{
-				mapping = unwrap(largeMappings.remove(index));
-			}
-			if(mapping != null){
-				unmap(mapping);
+				runIfSome(largeMappings.remove(index), FileMappings::unmap);
 			}
 		}finally{ lock.unlock(); }
 	}
@@ -102,6 +107,7 @@ final class FileMappings implements Closeable{
 		var lock = this.lock.writeLock();
 		lock.lock();
 		try{
+			checkClosed();
 			if(index<MAX_SMALL_MAPPING){
 				var iIndex = (int)index;
 				if(mappings.length<=iIndex){
@@ -140,6 +146,7 @@ final class FileMappings implements Closeable{
 	}
 	
 	public <T> T onMapping(long index, Function<MappedByteBuffer, T> consumer) throws IOException{
+		checkClosed();
 		var mapping = getMapping(index);
 		if(mapping == null){
 			mapping = makeMapping(index);
@@ -149,7 +156,7 @@ final class FileMappings implements Closeable{
 		return res;
 	}
 	
-	////////////////////////
+	/// /////////////////////
 	
 	private MappedByteBuffer mapIdx(long index) throws IOException{
 		var chunkStart = index*MAX_CHUNK_SIZE;
@@ -197,15 +204,19 @@ final class FileMappings implements Closeable{
 	
 	private void iterateMappings(Consumer<MappedByteBuffer> consumer){
 		for(var ref : mappings){
-			var mapping = unwrap(ref);
-			if(mapping != null) consumer.accept(mapping);
+			runIfSome(ref, consumer);
 		}
 		for(var ref : largeMappings.values()){
-			var mapping = unwrap(ref);
-			if(mapping != null) consumer.accept(mapping);
+			runIfSome(ref, consumer);
 		}
 	}
 	
+	private static void runIfSome(Reference<MappedByteBuffer> wrapped, Consumer<MappedByteBuffer> consumer){
+		if(wrapped == null) return;
+		var val = wrapped.get();
+		if(val == null) return;
+		consumer.accept(val);
+	}
 	private static MappedByteBuffer unwrap(Reference<MappedByteBuffer> wrapped){
 		return wrapped == null? null : wrapped.get();
 	}
