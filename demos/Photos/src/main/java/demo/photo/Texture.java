@@ -1,5 +1,9 @@
 package demo.photo;
 
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import demo.photo.db.ThumbnailDB;
@@ -9,7 +13,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -19,7 +22,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
 
 import static com.lapissea.util.UtilL.async;
 
@@ -54,16 +56,9 @@ public abstract class Texture{
 			}
 		}
 		
-		@NotNull
 		@Override
-		public List<TextureType> types(){
-			return List.of(TextureType.COLOR);
-		}
-		
-		@NotNull
-		@Override
-		public List<File> files(){
-			return List.of(file);
+		public List<TypedTextureFile> typedFiles(){
+			return List.of(new TypedTextureFile(TextureType.COLOR, file));
 		}
 		
 		@Override
@@ -74,52 +69,42 @@ public abstract class Texture{
 	
 	public static class MultiMap extends Texture{
 		
-		private final List<TextureType> types;
-		private final List<File>        files;
+		private final List<TypedTextureFile> files;
 		
-		public MultiMap(ThumbnailDB db, List<TextureType> types, List<File> files){
+		public MultiMap(ThumbnailDB db, List<TypedTextureFile> files){
 			super(db);
-			var sorted = IntStream.range(0, files.size())
-			                      .boxed()
-			                      .sorted(Comparator.comparing(types::get).thenComparing(files::get))
-			                      .mapToInt(Integer::intValue)
-			                      .toArray();
-			
-			if(IntStream.range(0, files.size()).allMatch(i -> sorted[i] == i)){
-				this.types = List.copyOf(types);
-				this.files = List.copyOf(files);
-			}else{
-				this.types = Arrays.stream(sorted).mapToObj(types::get).toList();
-				this.files = Arrays.stream(sorted).mapToObj(files::get).toList();
-			}
-			
+			this.files = Iters.from(files)
+			                  .sorted(Comparator.comparing(TypedTextureFile::type)
+			                                    .thenComparing(TypedTextureFile::file))
+			                  .toList();
 		}
 		
 		@Override
 		public boolean match(String query){
-			return files.stream().anyMatch(file -> TextUtil.containsIgnoreCase(file.getPath(), query));
+			return Iters.from(files).anyMatch(f -> TextUtil.containsIgnoreCase(f.file().getPath(), query));
 		}
 		
 		private File getFil(){
-			return files.get(IntStream.range(0, files.size()).filter(i -> types.get(i) == TextureType.COLOR).findAny().orElse(0));
+			return byType(TextureType.COLOR).orElse(files.getFirst().file());
 		}
-		
-		private File getFileBy(TextureType type){
-			return files.get(types.indexOf(type));
+		private Match<File> byType(TextureType type){
+			return Iters.from(files).firstMatchingM(t -> t.type() == type).map(TypedTextureFile::file);
 		}
 		
 		@Override
 		protected List<ThumbnailRenderer> thumbnailRenderers(){
-			var col     = types.contains(TextureType.COLOR);
-			var mask    = types.contains(TextureType.MASK);
-			var preview = types.contains(TextureType.PREVIEW);
+			if(byType(TextureType.PREVIEW) instanceof Some(var preview)){
+				return List.of(new ThumbnailRenderer.DirectFile(preview));
+			}
 			
 			var res = new ArrayList<ThumbnailRenderer>();
-			if(preview){
-				res.add(new ThumbnailRenderer.DirectFile(getFileBy(TextureType.PREVIEW)));
-			}else{
-				if(col) res.add(new ThumbnailRenderer.DirectFile(getFileBy(TextureType.COLOR)));
-				if(col && mask) res.add(new ThumbnailRenderer.MaskedColor(getFileBy(TextureType.COLOR), getFileBy(TextureType.MASK)));
+			
+			if(byType(TextureType.COLOR) instanceof Some(var col)){
+				res.add(new ThumbnailRenderer.DirectFile(col));
+				
+				if(byType(TextureType.MASK) instanceof Some(var mask)){
+					res.add(new ThumbnailRenderer.MaskedColor(col, mask));
+				}
 			}
 			
 			return res;
@@ -130,17 +115,9 @@ public abstract class Texture{
 		public String getName(){
 			return getFil().getName();
 		}
-		
-		@NotNull
 		@Override
-		public List<File> files(){
+		public List<TypedTextureFile> typedFiles(){
 			return files;
-		}
-		
-		@NotNull
-		@Override
-		public List<TextureType> types(){
-			return types;
 		}
 		
 		@Override
@@ -154,7 +131,7 @@ public abstract class Texture{
 	}
 	
 	
-	public static final int MAX_THUMB_SIZE = 300;
+	public static final int MAX_THUMB_SIZE = 256;
 	
 	private static final ThreadPoolExecutor RENDERER_POOL;
 	private static final ForkJoinPool       THUMBNAIL_POOL = (ForkJoinPool)Executors.newWorkStealingPool(2);
@@ -228,14 +205,12 @@ public abstract class Texture{
 	
 	@Override
 	public boolean equals(Object o){
-		if(this == o) return true;
-		if(!(o instanceof Texture)) return false;
-		return files().equals(((Texture)o).files());
+		return o instanceof Texture t && typedFiles().equals(t.typedFiles());
 	}
 	
 	@Override
 	public int hashCode(){
-		return files().hashCode();
+		return typedFiles().hashCode();
 	}
 	
 	protected abstract List<ThumbnailRenderer> thumbnailRenderers();
@@ -244,10 +219,12 @@ public abstract class Texture{
 	public abstract String getName();
 	
 	@NotNull
-	public abstract List<File> files();
+	public abstract List<TypedTextureFile> typedFiles();
 	
 	@NotNull
-	public abstract List<TextureType> types();
+	public final IterablePP<File> files(){
+		return Iters.from(typedFiles()).map(TypedTextureFile::file);
+	}
 	
 	public abstract void open();
 	

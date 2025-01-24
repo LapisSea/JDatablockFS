@@ -2,9 +2,7 @@ package demo.photo;
 
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.FunctionOI;
 import demo.photo.db.ThumbnailDB;
 
@@ -30,17 +28,11 @@ import static com.lapissea.util.UtilL.async;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 
-public class TextureDB{
+public class Textures{
 	
-	private record Entry(List<File> files, ThumbnailDB db){ }
-	
-	private static final Map<Entry, Texture> OBJ_CACHE = new WeakValueHashMap<Entry, Texture>().defineStayAlivePolicy(1);
-	
-	public static Texture make(ThumbnailDB db, List<TextureType> maps, List<File> files){
-		return OBJ_CACHE.computeIfAbsent(new Entry(files, db), fs -> {
-			if(files.size() == 1) return new Texture.SingleFile(db, files.getFirst());
-			else return new Texture.MultiMap(db, maps, files);
-		});
+	public static Texture make(ThumbnailDB db, List<TypedTextureFile> files){
+		if(files.size() == 1) return new Texture.SingleFile(db, files.getFirst().file());
+		else return new Texture.MultiMap(db, files);
 	}
 	
 	private final ThumbnailDB thumbnailDB = new ThumbnailDB();
@@ -68,7 +60,7 @@ public class TextureDB{
 			}
 		});
 		
-		textures.sort((a, b) -> ListComparator.compareLists(a.files(), b.files()));
+		textures.sort((a, b) -> ListComparator.compareLists(a.typedFiles(), b.typedFiles()));
 		
 		var duplicates =
 			textures.stream()
@@ -77,7 +69,7 @@ public class TextureDB{
 			        .stream()
 			        .filter(l -> l.size()>1)
 			        .map(l -> {
-				        Function<Texture, long[]> getSiz = t -> t.files().stream().mapToLong(File::length).toArray();
+				        Function<Texture, long[]> getSiz = t -> t.files().mapToLong(File::length).toArray();
 				        
 				        var first = l.getFirst();
 				        var exra  = getSiz.apply(first);
@@ -100,7 +92,7 @@ public class TextureDB{
 			duplicatesNotification.accept(dupsLast);
 		}
 		
-		textures.sort(Comparator.comparingInt((Texture t) -> -t.files().size()).thenComparing(Texture::getName));
+		textures.sort(Comparator.comparingInt((Texture t) -> -t.typedFiles().size()).thenComparing(Texture::getName));
 		
 		
 		cache = textures;
@@ -112,8 +104,6 @@ public class TextureDB{
 	private void iterFiles(File folder, Consumer<Texture> addTexture){
 		var fs = folder.listFiles();
 		if(fs == null) return;
-		
-		LogUtil.println(folder);
 		
 		var files          = new ArrayList<File>(fs.length);
 		var subfolderTasks = new ArrayList<CompletableFuture<Void>>(fs.length);
@@ -223,7 +213,7 @@ public class TextureDB{
 			}
 		}
 		
-		//split by pre maker differences
+		//split by pre-maker differences
 		if(counter[0]>1){
 			
 			if(nums.size() == names.size()){
@@ -247,7 +237,7 @@ public class TextureDB{
 		
 		//all ok
 		if(!maps.contains(null)){
-			multiTexture(maps, files, addTexture);
+			multiTexture(TypedTextureFile.combine(maps, files), addTexture);
 			return;
 		}
 		
@@ -259,9 +249,12 @@ public class TextureDB{
 			successMaps.add(maps.remove(i));
 			names.remove(i);
 		}
+		
+		var successT = TypedTextureFile.combine(successMaps, success);
+		
 		//rescue ok
-		if(!success.isEmpty()){
-			multiTexture(successMaps, success, addTexture);
+		if(!successT.isEmpty()){
+			multiTexture(successT, addTexture);
 		}
 		
 		//split by name differences
@@ -312,17 +305,22 @@ public class TextureDB{
 		
 	}
 	
-	private void multiTexture(List<TextureType> maps, List<File> files, Consumer<Texture> addTexture){
-		if(maps.stream().allMatch(m -> m == maps.getFirst())){
-			texturePerFile(files, addTexture);
+	private void multiTexture(List<TypedTextureFile> files, Consumer<Texture> addTexture){
+		if(Iters.from(files).map(TypedTextureFile::type).distinct().count() == 1){
+			texturePerFileT(files, addTexture);
 		}else{
-			addTexture.accept(make(getThumbnailDB(), maps, files));
+			addTexture.accept(make(getThumbnailDB(), files));
 		}
 	}
 	
 	private void texturePerFile(List<File> files, Consumer<Texture> addTexture){
 		for(File file : files){
-			addTexture.accept(make(getThumbnailDB(), null, List.of(file)));
+			addTexture.accept(make(getThumbnailDB(), List.of(new TypedTextureFile(TextureType.COLOR, file))));
+		}
+	}
+	private void texturePerFileT(List<TypedTextureFile> files, Consumer<Texture> addTexture){
+		for(var file : files){
+			addTexture.accept(make(getThumbnailDB(), List.of(file)));
 		}
 	}
 	
@@ -432,7 +430,7 @@ public class TextureDB{
 			
 			if(individual){
 				progress.accept("Finishing part 1...");
-				UtilL.sleepWhile(() -> !Texture.noWork(), 50);
+				UtilL.sleepUntil(Texture::noWork, 50);
 				
 				doTexture.accept((texture, prog) -> {
 					for(File file : texture.files()){
@@ -445,7 +443,7 @@ public class TextureDB{
 			}
 			
 			progress.accept("Finishing...");
-			UtilL.sleepWhile(() -> !Texture.noWork(), 50);
+			UtilL.sleepUntil(Texture::noWork, 50);
 			
 			onDone.run();
 		});

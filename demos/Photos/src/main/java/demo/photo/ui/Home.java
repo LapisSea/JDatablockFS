@@ -4,7 +4,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import demo.photo.Options;
 import demo.photo.Texture;
-import demo.photo.TextureDB;
+import demo.photo.Textures;
 import demo.photo.ThumbnailRenderer;
 
 import javax.swing.*;
@@ -28,11 +28,11 @@ import static javax.swing.SwingUtilities.invokeLater;
 
 public class Home extends JFrame{
 	
-	private       HomeUI    ui;
-	private final TextureDB textureDb = new TextureDB();
+	private       HomeUI   ui;
+	private final Textures textures = new Textures();
 	
 	{
-		textureDb.duplicatesNotification = dups -> ui.setDuplicateCount(dups.stream().mapToInt(l -> l.size() - 1).sum());
+		textures.duplicatesNotification = dups -> ui.setDuplicateCount(dups.stream().mapToInt(l -> l.size() - 1).sum());
 	}
 	
 	public void start(){
@@ -53,21 +53,21 @@ public class Home extends JFrame{
 		initUI();
 		setContentPane(ui.root);
 		setSize(1000, 600);
-		setLocationRelativeTo(null);
+		setLocationByPlatform(true);
 		setVisible(true);
 		
 		async(() -> {
 			var oldTitle = getTitle();
 			setTitle("Indexing...");
-			textureDb.get();
+			textures.get();
 			setTitle(oldTitle);
 		});
 	}
 	
 	
 	private List<Texture> search(String query){
-		if(query.isEmpty()) return textureDb.get();
-		var result = textureDb.get();
+		if(query.isEmpty()) return textures.get();
+		var result = textures.get();
 		return Iters.from(result).filter(t -> t.match(query)).toList();
 	}
 	
@@ -121,7 +121,7 @@ public class Home extends JFrame{
 		Options.run(this, "Options",
 		            new Options.Bool("Pre render individual", () -> individual[0] = true));
 		
-		textureDb.preRenderAll(individual[0], progress, onDone, (t) -> {
+		textures.preRenderAll(individual[0], progress, onDone, (t) -> {
 			if(searched == null || searched.isEmpty()){
 				return false;
 			}
@@ -255,7 +255,7 @@ public class Home extends JFrame{
 					if(ui.renderAllThumbnailsButton.isEnabled()){
 						ui.renderAllThumbnailsButton.setVisible(true);
 						if(Texture.noWork()){
-							var t = textureDb.get();
+							var t = textures.get();
 							if(t.size()>backgroundLoader){
 								t.get(backgroundLoader++).ensureFinal();
 							}
@@ -322,19 +322,19 @@ public class Home extends JFrame{
 				List<Texture> texturesToDelete = new ArrayList<>();
 				
 				Options.run(this, "Confirm deletion",
-				            textureDb.getDups()
-				                     .stream()
-				                     .map(t -> new Options.TextureCompare(t, texturesToDelete::addAll))
-				                     .toArray(Options.Option[]::new));
+				            textures.getDups()
+				                    .stream()
+				                    .map(t -> new Options.TextureCompare(t, texturesToDelete::addAll))
+				                    .toArray(Options.Option[]::new));
 				
 				if(texturesToDelete.isEmpty()){
 					ui.removeDuplicatesButton.setEnabled(true);
 					return;
 				}
 				
-				texturesToDelete.stream()
-				                .flatMap(t -> t.files().stream())
-				                .forEach(File::delete);
+				Iters.from(texturesToDelete)
+				     .flatMap(Texture::files)
+				     .forEach(File::delete);
 				searched = null;
 			});
 			

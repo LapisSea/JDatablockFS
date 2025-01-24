@@ -70,7 +70,7 @@ public abstract class ThumbnailElementClickable extends ThumbnailElement{
 					if(!flavor.isFlavorJavaFileListType()) throw new UnsupportedFlavorException(flavor);
 //				    if(file[0]==null) file[0]=File.createTempFile(this.hashCode()+"", "mark");
 //				    return Collections.singletonList(file[0]);
-					return texture.files();
+					return texture.files().toModList();
 				}
 			};
 			

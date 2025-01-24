@@ -25,7 +25,7 @@ public final class DummyImage{
 			var mets = g.getFontMetrics();
 			h = mets.getHeight();
 			w = mets.stringWidth(node.msg);
-			if(h/2>image.getHeight() || w>image.getWidth()) break;
+			if(h/2>image.getHeight() || w*1.05>image.getWidth()) break;
 			
 			g.setFont(g.getFont().deriveFont(g.getFont().getSize() + 1F));
 		}

@@ -2,8 +2,9 @@ package demo.photo.ui;
 
 import demo.photo.ResizeType;
 import demo.photo.Texture;
-import demo.photo.TextureDB;
 import demo.photo.TextureType;
+import demo.photo.Textures;
+import demo.photo.TypedTextureFile;
 
 import javax.swing.*;
 import java.awt.BorderLayout;
@@ -141,16 +142,12 @@ public class HomeUI{
 			
 			textureView.setVisible(true);
 			
-			var fils = texture.files();
-			var typs = texture.types();
+			var fils = texture.typedFiles();
 			
-			for(int i1 = 0; i1<fils.size(); i1++){
-				var file = fils.get(i1);
-				var type = typs.get(i1);
+			for(TypedTextureFile fil : fils){
+				if(fil.type() == TextureType.PREVIEW) continue;
 				
-				if(type == TextureType.PREVIEW) continue;
-				
-				var tex = TextureDB.make(texture.getDB(), null, List.of(file));
+				var tex = Textures.make(texture.getDB(), List.of(fil));
 				tex.readThumbnail(i -> { });
 				
 				var pan = new JPanel();
@@ -164,7 +161,7 @@ public class HomeUI{
 					}
 				}, BorderLayout.WEST);
 				
-				var lab = new JLabel("Type: " + type.toString());
+				var lab = new JLabel("Type: " + fil.type().toString());
 				lab.setFont(lab.getFont().deriveFont(lab.getFont().getSize2D()*1.5F));
 				pan.add(lab, BorderLayout.NORTH);
 				
