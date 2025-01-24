@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import demo.photo.ImageUitls;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -31,7 +32,7 @@ public sealed interface IconData{
 		
 		try(var out = new MemoryCacheImageOutputStream(bb)){
 			jpgWriter.setOutput(out);
-			jpgWriter.write(null, new javax.imageio.IIOImage(image, null, null), writeParam);
+			jpgWriter.write(null, new IIOImage(image, null, null), writeParam);
 		}catch(IOException e){
 			throw new UncheckedIOException("Failed to write JPG to byte buffer", e);
 		}finally{
@@ -48,7 +49,7 @@ public sealed interface IconData{
 		private Solid(){ }
 		
 		private Solid(BufferedImage image){
-			data = IconData.toJpg(image, 0.5F);
+			data = IconData.toJpg(image, 0.6F);
 		}
 		
 		@Override
@@ -69,7 +70,7 @@ public sealed interface IconData{
 		private Transparent(){ }
 		
 		private Transparent(BufferedImage color, BufferedImage alpha){
-			this.color = IconData.toJpg(color, 0.5F);
+			this.color = IconData.toJpg(color, 0.6F);
 			this.alpha = IconData.toJpg(alpha, 0.9F);
 		}
 		
@@ -97,12 +98,12 @@ public sealed interface IconData{
 				for(int y = 0; y<img.getHeight(); y++){
 					int pixel = img.getRGB(x, y);
 					
-					var b = ((pixel>>24)&0xff);
+					var a = ((pixel>>24)&0xff);
 					
-					color.setRGB(x, y, pixel);
-					alpha.setRGB(x, y, b|(b<<8)|(b<<16));
+					color.setRGB(x, y, pixel == 255? 0xFFFFFF : pixel);
+					alpha.setRGB(x, y, a|(a<<8)|(a<<16));
 					
-					if(b<threshold){
+					if(a<threshold){
 						hasAlpha = true;
 					}
 				}
