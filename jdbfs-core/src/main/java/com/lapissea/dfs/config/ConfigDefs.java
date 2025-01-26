@@ -1,5 +1,6 @@
 package com.lapissea.dfs.config;
 
+import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.compilation.FieldCompiler.AccessType;
 import com.lapissea.dfs.type.compilation.JorthLogger.CodeLog;
@@ -65,7 +66,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	}));
 	
 	Flag.FDur              LONG_WAIT_THRESHOLD = flagDur("loading.longWaitThreshold", RELEASE_MODE.boolMap(null, Duration.ofMillis(10000/cores()))).positive();
-	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE   = flagE("tweaks.fieldAccess", () -> jVersion()<=21? UNSAFE : VAR_HANDLE);
+	Flag.FEnum<AccessType> FIELD_ACCESS_TYPE   = flagE("tweaks.fieldAccess", () -> MyUnsafe.hasNoObjectFieldOffset()? VAR_HANDLE : UNSAFE);
 	Flag.FBool             COSTLY_STACK_TRACE  = flagB("tweaks.costlyStackTrace", deb());
 	Flag.FDur              DELAY_COMP_OBJ_GC   = flagDur("tweaks.delayCompilationObjGC", RELEASE_MODE.boolMap(Duration.ZERO, Duration.ofSeconds(5))).positive();
 	

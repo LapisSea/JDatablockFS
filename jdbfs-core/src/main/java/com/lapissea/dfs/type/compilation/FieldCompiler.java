@@ -6,6 +6,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
@@ -70,7 +71,16 @@ public final class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
+	private static final AccessType FIELD_ACCESS;
+	
+	static{
+		var acc = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
+		if(acc == AccessType.UNSAFE && MyUnsafe.hasNoObjectFieldOffset()){
+			Log.info("Could not find Unsafe.objectFieldOffset method. Unsafe field access will be disabled.");
+			acc = AccessType.VAR_HANDLE;
+		}
+		FIELD_ACCESS = acc;
+	}
 	
 	/**
 	 * Scans an unmanaged struct for
