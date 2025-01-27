@@ -312,16 +312,31 @@ public final class ChunkChainIO implements RandomIO{
 	public long readWord(int len) throws IOException{
 		if(len == 0) return 0;
 		
+		long cursorOffset    = calcCursorOffset();
+		long cursorRemaining = cursor.getSize() - cursorOffset;
+		if(cursorRemaining>=len){
+			syncSourceCursor(cursorOffset);
+			var word = source.readWord(len);
+			advanceCursorBy(len);
+			return word;
+		}
+		
+		return readMultiChunkWord(len);
+	}
+	
+	public long readMultiChunkWord(int len) throws IOException{
+		if(len == 0) return 0;
+		
 		long val = 0;
 		
 		var remaining = len;
 		do{
-			long cOff            = calcCursorOffset();
-			long cursorRemaining = cursor.getSize() - cOff;
+			long cursorOffset    = calcCursorOffset();
+			long cursorRemaining = cursor.getSize() - cursorOffset;
 			if(cursorRemaining == 0) throw new EOFException();
 			
 			int toRead = (int)Math.min(remaining, cursorRemaining);
-			syncSourceCursor(cOff);
+			syncSourceCursor(cursorOffset);
 			val |= source.readWord(toRead)<<((len - remaining)*8);
 			advanceCursorBy(toRead);
 			remaining -= toRead;

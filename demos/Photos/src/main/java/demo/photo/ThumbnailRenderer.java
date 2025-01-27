@@ -9,11 +9,15 @@ import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import static com.lapissea.util.UtilL.Assert;
@@ -23,6 +27,7 @@ import static java.awt.image.BufferedImage.TYPE_INT_ARGB;
 public abstract class ThumbnailRenderer{
 	private static final WeakValueHashMap<File, BufferedImage> MEMORY_CACHE       = new WeakValueHashMap<File, BufferedImage>().defineStayAlivePolicy(10);
 	private static final ThreadLocal<Map<File, BufferedImage>> SESSION_FILE_CACHE = ThreadLocal.withInitial(HashMap::new);
+	private static final Lock                                  READ_LOCK          = new ReentrantLock();
 	
 	private static BufferedImage readImageFile(File file) throws IOException{
 		var cache = SESSION_FILE_CACHE.get();
@@ -30,7 +35,14 @@ public abstract class ThumbnailRenderer{
 		var cached = cache.get(file);
 		if(cached != null) return cached;
 		
-		var img = ImageIO.read(file);
+		byte[] data;
+		READ_LOCK.lock();
+		try{
+			data = Files.readAllBytes(file.toPath());
+		}finally{
+			READ_LOCK.unlock();
+		}
+		var img = ImageIO.read(new ByteArrayInputStream(data));
 		if(img == null) throw new IOException();
 		
 		cache.put(file, img);

@@ -62,7 +62,8 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 			mappedFileData = new FileMappings(fileChannel, readOnly);
 			
 			this.used = getLength();
-			if(readOnly) bindCloseOnShutdown(this);
+			
+			if(!isReadOnly()) bindCloseOnShutdown(this);
 		}catch(Throwable e){
 			fileChannel.close();
 			throw e;
