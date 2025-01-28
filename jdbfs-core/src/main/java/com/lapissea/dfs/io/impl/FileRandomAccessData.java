@@ -164,6 +164,7 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 	
 	@Override
 	public void close() throws IOException{
+		markClosed();
 		resize(getIOSize());
 		if(fileLock != null) fileLock.close();
 		fileData.close();

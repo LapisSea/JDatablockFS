@@ -47,9 +47,12 @@ public abstract class CursorIOData implements IOInterface{
 		
 		private long pos;
 		
-		public CursorRandomIO(){ }
+		public CursorRandomIO(){
+			if(closed) throw new IllegalStateException("closed");
+		}
 		
 		public CursorRandomIO(long pos){
+			if(closed) throw new IllegalStateException("closed");
 			if(pos<0) throw new IndexOutOfBoundsException(pos);
 			this.pos = pos;
 		}
@@ -335,6 +338,7 @@ public abstract class CursorIOData implements IOInterface{
 	protected long used;
 	
 	private final boolean readOnly;
+	private       boolean closed;
 	
 	@SuppressWarnings("unused")
 	private       boolean             transactionOpen;
@@ -344,6 +348,8 @@ public abstract class CursorIOData implements IOInterface{
 		this.readOnly = readOnly;
 		this.hook = hook;
 	}
+	
+	protected void markClosed(){ closed = true; }
 	
 	private void logWriteEvent(long single){
 		logWriteEvent(LongStream.of(single));
@@ -369,7 +375,7 @@ public abstract class CursorIOData implements IOInterface{
 		return new CursorRandomIO();
 	}
 	@Override
-	public RandomIO ioAt(long offset){
+	public RandomIO ioAt(long offset) throws IOException{
 		return new CursorRandomIO(offset);
 	}
 	

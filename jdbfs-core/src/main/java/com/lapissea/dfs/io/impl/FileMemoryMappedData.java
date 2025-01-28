@@ -167,6 +167,7 @@ public final class FileMemoryMappedData extends CursorIOData implements Closeabl
 	
 	@Override
 	public void close() throws IOException{
+		markClosed();
 		resize(getIOSize());
 		mappedFileData.close();
 		if(!isReadOnly()) unbindCloseOnShutdown(this);
