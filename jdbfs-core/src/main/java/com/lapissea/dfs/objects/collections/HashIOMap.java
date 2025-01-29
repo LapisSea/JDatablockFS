@@ -231,6 +231,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	private void reflow() throws IOException{
 		var oldBuckets   = buckets;
 		var oldBucketPO2 = bucketPO2;
+		if(oldBucketPO2>=31) throw new IOException("Too much data");//TODO: use 64 bit hash values
 		
 		bucketPO2 = (short)(oldBucketPO2 + 1);//calcNewSize(oldBuckets, oldBucketPO2);
 		datasetID++;
@@ -804,7 +805,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	}
 	
 	private static int hashToSmall(int hash, short bucketPO2){
-		return Math.abs(hash)%(1<<bucketPO2);
+		var mask = (1<<bucketPO2) - 1;
+		return Math.abs(hash)&mask;
 	}
 	
 }
