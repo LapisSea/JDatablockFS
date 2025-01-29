@@ -31,56 +31,55 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		readManagedFields();
 	}
 	
-	private record AddPlace<T>(long index, IONode<T> node){
-		private AddPlace{
-			boolean hasIndex = index != -1;
-			boolean hasNode  = node != null;
-			if(hasIndex == hasNode){
-				throw new IllegalArgumentException(index + " " + node);
+	private sealed interface BucketResult<T>{
+		record EmptyIndex<T>(long index) implements BucketResult<T>{
+			public EmptyIndex{
+				if(index<0) throw new IllegalArgumentException("index should not be negative");
 			}
+		}
+		
+		record TailNode<T>(IONode<T> node) implements BucketResult<T>{
+			public TailNode{ Objects.requireNonNull(node); }
+		}
+		
+		record EqualsNode<T>(long index, IONode<T> previous, IONode<T> node) implements BucketResult<T>{
+			public EqualsNode{ Objects.requireNonNull(node); }
 		}
 	}
 	
-	private static <T> AddPlace<T> findAddPlace(IOList<IONode<T>> data, T value) throws IOException{
+	private static <T> BucketResult<T> find(IOList<IONode<T>> data, T value) throws IOException{
 		int hash  = HashCommons.toHash(value);
 		var width = data.size();
+		var index = smallHash(hash, width);
 		
-		long      emptyIndex = -1;
-		IONode<T> strayNext  = null;
-		
-		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var index    = smallHash(hash, width);
-			var rootNode = data.get(index);
-			if(rootNode == null){
-				if(emptyIndex == -1){
-					emptyIndex = index;
-					strayNext = null;
-				}
-			}else{
-				IONode<T> last = null;
-				for(var node : rootNode){
-					var v = node.getValue();
-					if(Objects.equals(value, v)){
-						return null;
-					}
-					last = node;
-				}
-				if(emptyIndex == -1 && strayNext == null){
-					strayNext = last;
-				}
-			}
-			
-			hash = HashCommons.h2h(hash);
+		var rootNode = data.get(index);
+		if(rootNode == null){
+			return new BucketResult.EmptyIndex<>(index);
 		}
 		
-		return new AddPlace<>(emptyIndex, strayNext);
+		IONode<T> last = null;
+		for(var node : rootNode){
+			var v = node.getValue();
+			if(Objects.equals(value, v)){
+				return new BucketResult.EqualsNode<>(index, last, node);
+			}
+			last = node;
+		}
+		
+		return new BucketResult.TailNode<>(last);
 	}
 	
-	private static <T> void applyAdd(IOList<IONode<T>> data, AddPlace<T> place, IONode<T> toAdd) throws IOException{
-		if(place.index != -1){
-			data.set(place.index, toAdd);
-		}else{
-			place.node.setNext(toAdd);
+	private static <T> void applyAdd(IOList<IONode<T>> data, BucketResult<T> place, IONode<T> toAdd) throws IOException{
+		switch(place){
+			case BucketResult.EmptyIndex(var index) -> {
+				data.set(index, toAdd);
+			}
+			case BucketResult.EqualsNode<T> ignore -> {
+				throw new IllegalStateException("Can not add existing value");
+			}
+			case BucketResult.TailNode(var node) -> {
+				node.setNext(toAdd);
+			}
 		}
 	}
 	
@@ -88,8 +87,8 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	public boolean add(T value) throws IOException{
 		var width = data.size();
 		
-		var place = findAddPlace(data, value);
-		if(place == null) return false;
+		var place = find(data, value);
+		if(place instanceof BucketResult.EqualsNode) return false;
 		
 		if(size()>=width){
 			grow();
@@ -128,9 +127,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 					
 					var value = node.getValue();
 					
-					var place = findAddPlace(newData, value);
-					Objects.requireNonNull(place);
-					
+					var place = find(newData, value);
 					applyAdd(newData, place, node);
 				}
 			}
@@ -160,44 +157,20 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public boolean remove(T value) throws IOException{
-		int hash  = HashCommons.toHash(value);
-		var width = data.size();
+		var place = find(data, value);
+		if(!(place instanceof BucketResult.EqualsNode(var index, var prev, var node))) return false;
 		
-		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var index    = smallHash(hash, width);
-			var rootNode = data.get(index);
-			check:
-			if(rootNode != null){
-				var next = rootNode.getNext();
-				if(Objects.equals(value, rootNode.getValue())){
-					try(var ignored = getDataProvider().getSource().openIOTransaction()){
-						data.set(index, next);
-						deltaSize(-1);
-					}
-					rootNode.setNext(null);
-					rootNode.free();
-					return true;
-				}
-				if(next == null) break check;
-				IONode<T> last = rootNode;
-				for(var node : next){
-					if(Objects.equals(value, node.getValue())){
-						try(var ignored = getDataProvider().getSource().openIOTransaction()){
-							last.setNext(node.getNext());
-							deltaSize(-1);
-						}
-						node.setNext(null);
-						node.free();
-						return true;
-					}
-					last = node;
-				}
+		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+			if(prev != null){
+				prev.setNext(node.getNext());
+			}else{
+				data.set(index, node.getNext());
 			}
-			
-			hash = HashCommons.h2h(hash);
+			deltaSize(-1);
 		}
-		
-		return false;
+		node.setNext(null);
+		node.free();
+		return true;
 	}
 	
 	@Override
@@ -214,23 +187,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public boolean contains(T value) throws IOException{
-		int hash  = HashCommons.toHash(value);
-		var width = data.size();
-		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var node = data.get(smallHash(hash, width));
-			
-			if(node != null){
-				for(IONode<T> tioNode : node){
-					if(Objects.equals(value, tioNode.getValue())){
-						return true;
-					}
-				}
-			}
-			
-			hash = HashCommons.h2h(hash);
-		}
-		
-		return false;
+		return find(data, value) instanceof BucketResult.EqualsNode;
 	}
 	
 	@Override
