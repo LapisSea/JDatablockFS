@@ -310,6 +310,18 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 	}
 	
+	public void runAndAssert(String sequenceStick){
+		runAndAssert(FuzzSequence.fromDataStick(sequenceStick));
+	}
+	public void runAndAssert(FuzzSequence sequence){
+		var errO = runSequence(sequence);
+		if(errO.isEmpty()) return;
+		var err = errO.get();
+		System.err.println(FuzzFail.report(List.of(err)));
+		var err2 = runSequence(err.mark(), sequence, null);
+		throw new AssertionError(err2.orElse(err));
+	}
+	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
 	public void runAndAssert(FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		Plan.start(this, config, seed, totalIterations, sequenceLength)
