@@ -56,6 +56,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType, FieldNames.Named
@@ -260,19 +261,29 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	private int typeFlagsCalc(){
-		var flagsA = EnumSet.noneOf(TypeFlag.class);
-		flagsA.addAll(computeTypeFlags());
+		var flags = EnumSet.noneOf(TypeFlag.class);
+		flags.addAll(computeTypeFlags());
 		if(getAccessor() != null && IOFieldTools.isGenerated(this)){
-			flagsA.add(TypeFlag.HAS_GENERATED_NAME);
+			flags.add(TypeFlag.HAS_GENERATED_NAME);
 		}
 		
+		if(DEBUG_VALIDATION){
+			legacyFlagCheck(flags);
+		}
 		
+		int res = 0;
+		for(var flag : flags){
+			res |= flag.bit;
+		}
+		return res;
+	}
+	
+	private void legacyFlagCheck(EnumSet<TypeFlag> flagsA){
 		var fB     = FieldSupport.typeFlags(this);
 		var flagsB = EnumSet.allOf(TypeFlag.class);
 		flagsB.removeIf(t -> !UtilL.checkFlag(fB, t.bit));
 		
 		if(!flagsA.equals(flagsB)){
-			UtilL.sleep(600);
 			synchronized(IOField.class){
 				LogUtil.println("Field:     ", this, this.getGenericType(null));
 				LogUtil.println("Field type:", this.getClass());
@@ -283,12 +294,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				throw new ShouldNeverHappenError();
 			}
 		}
-		
-		int res = 0;
-		for(var flag : flagsA){
-			res |= flag.bit;
-		}
-		return res;
 	}
 	
 	protected abstract Set<TypeFlag> computeTypeFlags();

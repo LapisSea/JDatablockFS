@@ -35,6 +35,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -48,6 +49,7 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABL
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class GeneralTests{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	private static final Logger log = LoggerFactory.getLogger(GeneralTests.class);
 	@AfterMethod

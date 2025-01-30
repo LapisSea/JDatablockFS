@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields;
 
 import com.lapissea.dfs.io.IO;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -20,9 +21,12 @@ public non-sealed class NoIOField<Inst extends IOInstance<Inst>, ValueType> exte
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
+		var instance = IOInstance.isInstanceOrSealed(getType());
+		
 		return Iters.of(
 			IOFieldTools.isGeneric(this)? TypeFlag.DYNAMIC : null,
-			IOInstance.isInstanceOrSealed(getType())? TypeFlag.IO_INSTANCE : null,
+			instance? TypeFlag.IO_INSTANCE : null,
+			instance && !IOFieldTools.isGeneric(getAccessor()) && !Struct.canUnknownHavePointers(getType())? TypeFlag.HAS_NO_POINTERS : null,
 			getType().isEnum() || SupportedPrimitive.isAny(getType())? TypeFlag.PRIMITIVE_OR_ENUM : null
 		).nonNulls().toModSet();
 	}
