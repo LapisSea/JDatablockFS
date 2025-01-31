@@ -174,7 +174,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	private static final int[] INTEGRITY_DIVS = Iters.range(0, 16).mapExact(BitUtils::makeMask).toArray();
 	
 	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
-		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
+		if(!areIntegrityBitsValid(raw >>> readBits, raw, totalBits, totalBits - readBits)){
+			throw new IOException("Bit integrity failed");
+		}
 	}
 	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
 		if(!areIntegrityBitsValid(remainingBits, raw, totalBits, oneBits)){

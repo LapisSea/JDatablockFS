@@ -10,6 +10,7 @@ import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzingRunner;
@@ -148,6 +149,7 @@ public final class RandomLists{
 	}
 	@IOValue
 	public static class Item extends IOInstance.Managed<Item>{
+		@IODependency.VirtualNumSize
 		int id, count;
 	}
 	
