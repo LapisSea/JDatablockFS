@@ -13,6 +13,7 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.NotImplementedException;
@@ -277,17 +278,19 @@ public class DefragmentManager{
 	
 	private void mergeChains(Cluster cluster) throws IOException{
 		// traceCall();
-		
+		var startingChunk = cluster.getFirstChunk();
 		while(true){
 			Chunk fragmentedChunk;
 			{
-				var fragmentedChunkOpt = cluster.getFirstChunk().chunksAhead().skip(1).firstMatching(Chunk::hasNextPtr);
+				var fragmentedChunkOpt = startingChunk.chunksAhead().skip(1).firstMatching(Chunk::hasNextPtr);
 				if(fragmentedChunkOpt.isEmpty()) break;
 				fragmentedChunk = fragmentedChunkOpt.get();
 				
+				startingChunk = fragmentedChunk;
+				
 				while(true){
 					var fptr  = fragmentedChunk.getPtr();
-					var chRef = cluster.getFirstChunk().chunksAhead().skip(1).firstMatching(c -> c.getNextPtr().equals(fptr));
+					var chRef = startingChunk.chunksAhead().skip(1).firstMatching(c -> c.getNextPtr().equals(fptr));
 					if(chRef.isEmpty()) break;
 					fragmentedChunk = chRef.get();
 				}
@@ -296,6 +299,11 @@ public class DefragmentManager{
 			long requiredSize = fragmentedChunk.chainCapacity();
 			
 			reallocateAndMove(cluster, fragmentedChunk, requiredSize);
+			
+			var cached = startingChunk.getDataProvider().getChunkCached(startingChunk.getPtr());
+			if(cached != startingChunk){
+				startingChunk = cluster.getFirstChunk();
+			}
 		}
 	}
 	
@@ -319,7 +327,7 @@ public class DefragmentManager{
 		if(moved){
 			fragmentedChunk.freeChaining();
 		}else{
-			throw new RuntimeException();
+			Log.trace("Failed reallocate and move: {}#yellow", fragmentedChunk);
 		}
 	}
 	private void moveNextAndMerge(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
@@ -503,11 +511,17 @@ public class DefragmentManager{
 	
 	private boolean moveChunkExact(final Cluster cluster, ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
 		
-		var fin = cluster.rootWalker(new MemoryWalker.PointerRecord(){
+		var rec = new MemoryWalker.PointerRecord(){
+			boolean moved;
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 				if(valueReference.getPtr().equals(oldChunk)){
-					field.setReference(instance, Reference.of(newChunk, valueReference.getOffset()));
+					try{
+						field.setReference(instance, Reference.of(newChunk, valueReference.getOffset()));
+						moved = true;
+					}catch(VaryingSize.TooSmall ts){
+						return END;//TODO: create mechanism to notify parent to expand
+					}
 					return END|SAVE;
 				}
 				return CONTINUE;
@@ -519,14 +533,21 @@ public class DefragmentManager{
 						holder.value = newChunk;
 						return END|HOLDER_COPY;
 					}
-					field.set(null, instance, newChunk);
+					try{
+						field.set(null, instance, newChunk);
+						moved = true;
+					}catch(VaryingSize.TooSmall ts){
+						return END;
+					}
 					return END|SAVE;
 				}
 				return CONTINUE;
 			}
-		}, false).walk();
+		};
 		
-		return fin == END;
+		cluster.rootWalker(rec, false).walk();
+		
+		return rec.moved;
 	}
 	
 	private <T extends IOInstance.Unmanaged<T>> MoveBuffer reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
