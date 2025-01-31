@@ -37,7 +37,7 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 		
 		assertThat(allData.size()).as("Number of iterated entries does not match the reported size").isEqualTo(reference.size());
 		
-		assertThat(allData).as("Data is not the same as the reference").isEqualTo(reference);
+		assertThat(allData).as("Data is not the same as the reference").containsAllEntriesOf(reference);
 	}
 	
 	@Override
