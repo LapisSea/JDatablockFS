@@ -26,7 +26,6 @@ import com.lapissea.util.ShouldNeverHappenError;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -77,23 +76,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static final class Bucket<K, V> extends IOInstance.Managed<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
-		@IOValue
-		@IONullability(NULLABLE)
-		private IONode<BucketEntry<K, V>> node;
-		
-		@Override
-		public Iterator<BucketEntry<K, V>> iterator(){
-			if(node == null) return Collections.emptyIterator();
-			return node.valueIterator();
-		}
-		
-		@Override
-		public String toString(){
-			return "Bucket{" + node + "}";
-		}
-	}
-	
 	private sealed interface BucketResult<T>{
 		record EmptyIndex<T>(long index) implements BucketResult<T>{
 			public EmptyIndex{
@@ -112,7 +94,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private static final class BucketSet<K, V> extends IOInstance.Unmanaged<BucketSet<K, V>>{
 		@IOValue
-		private ContiguousIOList<Bucket<K, V>> data;
+		private ContiguousIOList<IONode<BucketEntry<K, V>>> data;
 		
 		@IOValue
 		@IOValue.Unsigned
@@ -149,8 +131,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			if(toMove<=0) throw new IllegalArgumentException("toMove should be positive");
 			var moveNodes = new ArrayList<IONode<BucketEntry<K, V>>>();
 			while(!data.isEmpty()){
-				var bucket = data.getLast();
-				var node   = bucket.node;
+				var node = data.getLast();
 				if(node == null){
 					data.removeLast();
 					continue;
@@ -162,13 +143,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					node = next;
 				}
 				if(node != null){
-					bucket.node = node;
-					data.set(data.size() - 1, bucket);
+					data.set(data.size() - 1, node);
 				}else{
-					data.set(data.size() - 1, new Bucket<>());
+					data.set(data.size() - 1, null);
 					do{
 						data.removeLast();
-					}while(!data.isEmpty() && data.getLast().node == null);
+					}while(!data.isEmpty() && data.getLast() == null);
 				}
 				break;
 			}
@@ -183,9 +163,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				
 				switch(destSet.find(HashCommons.toHash(key), key)){
 					case BucketResult.EmptyIndex(var index) -> {
-						var b = new Bucket<K, V>();
-						b.node = node;
-						destSet.data.set(index, b);
+						destSet.data.set(index, node);
 						inc++;
 					}
 					case BucketResult.EqualsNode<BucketEntry<K, V>> ignore2 -> {
@@ -213,11 +191,10 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		private void put(int keyHash, BucketEntry<K, V> entry) throws IOException{
 			switch(find(keyHash, entry.key())){
 				case BucketResult.EmptyIndex(var index) -> {
-					var bucket = new Bucket<K, V>();
-					bucket.node = allocNewNode(entry, data.magentPos(index));
+					var node = allocNewNode(entry, data.magentPos(index));
 					
 					try(var ignore = getDataProvider().getSource().openIOTransaction()){
-						data.set(index, bucket);
+						data.set(index, node);
 						deltaCount(1);
 					}
 				}
@@ -250,12 +227,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				return false;
 			}
 			try(var ignore = getDataProvider().getSource().openIOTransaction()){
+				var next = node.getNext();
 				if(prev == null){
-					var b = new Bucket<K, V>();
-					b.node = node.getNext();
-					data.set(index, b);
+					data.set(index, next);
 				}else{
-					prev.setNext(node.getNext());
+					prev.setNext(next);
 				}
 				deltaCount(-1);
 			}
@@ -269,12 +245,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			if(index>=data.size()) return new BucketResult.EmptyIndex<>(index);
 			
 			var root = data.get(index);
-			if(root == null || root.node == null){
+			if(root == null){
 				return new BucketResult.EmptyIndex<>(index);
 			}
 			
 			IONode<BucketEntry<K, V>> last = null;
-			for(IONode<BucketEntry<K, V>> node : root.node){
+			for(IONode<BucketEntry<K, V>> node : root){
 				KeyResult<K> keyResult = readKey(node);
 				if(!keyResult.hasValue) continue;
 				if(Objects.equals(keyResult.key, key)){
@@ -410,57 +386,30 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@Override
 	public IOIterator.Iter<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
+			private final Iterator<BucketSet<K, V>>             setsIterator = Iters.of(amortizedSet, mainSet).nonNulls().iterator();
+			private       IOIterator<IONode<BucketEntry<K, V>>> bucketSetIter;
+			private       IOIterator<BucketEntry<K, V>>         bucketIter;
 			
-			private final IOIterator<Bucket<K, V>> bucketsIter = new IOIterator<>(){
-				private final Iterator<BucketSet<K, V>> setIterator = Iters.of(amortizedSet, mainSet).nonNulls().iterator();
-				private       IOIterator<Bucket<K, V>>  iter;
-				private       Bucket<K, V>              next;
-				
-				private Bucket<K, V> doNext() throws IOException{
-					while(iter == null || !iter.hasNext()){
-						if(!setIterator.hasNext()) return null;
-						var set = setIterator.next();
-						iter = set.data.iterator();
+			private IOIterator<BucketEntry<K, V>> tryFindNextBucket() throws IOException{
+				IONode<BucketEntry<K, V>> next = null;
+				while(next == null){
+					while(bucketSetIter == null || !bucketSetIter.hasNext()){
+						if(!setsIterator.hasNext()) return null;
+						var set = setsIterator.next();
+						bucketSetIter = set.data.iterator();
 					}
-					return next = iter.ioNext();
+					next = bucketSetIter.ioNext();
 				}
-				
-				@Override
-				public boolean hasNext() throws IOException{
-					return next != null || doNext() != null;
-				}
-				@Override
-				public Bucket<K, V> ioNext() throws IOException{
-					var n = next;
-					if(n != null) next = null;
-					else{
-						n = doNext();
-						if(n == null) throw new NoSuchElementException();
-					}
-					return n;
-				}
-			};
-			
-			private IOIterator<IONode<BucketEntry<K, V>>> nodeIter;
-			
-			private IOIterator<IONode<BucketEntry<K, V>>> tryFindNext() throws IOException{
-				while(bucketsIter.hasNext()){
-					var next = bucketsIter.ioNext();
-					if(next.node == null) continue;
-					
-					var iter = next.node.iterator();
-					if(!iter.hasNext()) continue;
-					return nodeIter = iter;
-				}
-				return null;
+				var iter = next.valueIterator();
+				return bucketIter = iter;
 			}
 			
 			@Override
 			public boolean hasNext(){
 				try{
-					var ni = nodeIter;
-					if(ni != null && ni.hasNext()) return true;
-					return tryFindNext() != null;
+					var bi = bucketIter;
+					if(bi != null && bi.hasNext()) return true;
+					return tryFindNextBucket() != null;
 				}catch(IOException e){
 					throw new UncheckedIOException(e);
 				}
@@ -468,12 +417,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			
 			@Override
 			public IOEntry<K, V> ioNext() throws IOException{
-				var ni = nodeIter;
-				if(ni == null || !ni.hasNext()){
-					if((ni = tryFindNext()) == null) throw new NoSuchElementException();
+				var bi = bucketIter;
+				if(bi == null || !bi.hasNext()){
+					if((bi = tryFindNextBucket()) == null) throw new NoSuchElementException();
 				}
-				var node  = ni.ioNext();
-				var value = node.getValue();
+				var value = bi.ioNext();
 				return value.unmodifiable();
 			}
 		};
@@ -614,7 +562,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			return true;
 		}
-		return amortizedSet != null && amortizedSet.remove(hash, key);
+		if(amortizedSet == null) return false;
+		var removed = amortizedSet.remove(hash, key);
+		return removed;
 	}
 	
 	@Override
@@ -636,4 +586,3 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 	}
 }
-

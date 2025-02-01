@@ -28,8 +28,15 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 	}
 	
 	private void checkData(){
-		var allData = new HashMap<K, V>();
-		for(IOEntry<K, V> e : data){
+		var allData  = new HashMap<K, V>();
+		var iterator = data.iterator();
+		while(iterator.hasNext()){
+			IOEntry<K, V> e;
+			try{
+				e = iterator.ioNext();
+			}catch(IOException ex){
+				throw new RuntimeException("Failed to read entry", ex);
+			}
 			if(allData.put(e.getKey(), e.getValue()) != null){
 				throw new AssertionError("Duplicate key: " + e.getKey());
 			}
