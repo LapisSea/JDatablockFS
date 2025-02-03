@@ -30,7 +30,7 @@ public interface DataProvider{
 	
 	class VerySimple implements DataProvider{
 		private final IOTypeDB      typeDB        = new IOTypeDB.MemoryOnlyDB.Synchronized();
-		private final ChunkCache    cache         = ChunkCache.strong();
+		private final ChunkCache    cache         = new ChunkCache();
 		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
 		
