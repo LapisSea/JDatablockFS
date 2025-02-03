@@ -560,13 +560,19 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		var hash = HashCommons.toHash(key);
 		
 		if(mainSet.remove(hash, key)){
+			//Shrink
 			if(amortizedSet == null && mainSet.capacity>8 && mainSet.occupancy()<=0.3){
 				resizeAmortized(mainSet.capacity/2);
 			}
 			return true;
 		}
+		
 		if(amortizedSet == null) return false;
+		
 		var removed = amortizedSet.remove(hash, key);
+		if(removed){
+			reconcile(1);
+		}
 		return removed;
 	}
 	
