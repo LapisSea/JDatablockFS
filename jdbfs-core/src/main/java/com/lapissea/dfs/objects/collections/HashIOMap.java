@@ -96,6 +96,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		@IOValue
 		private ContiguousIOList<IONode<BucketEntry<K, V>>> data;
 		
+		
 		@IOValue
 		@IOValue.Unsigned
 		@IODependency.VirtualNumSize
@@ -129,7 +130,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		private int transferTo(BucketSet<K, V> destSet, int toMove) throws IOException{
 			if(toMove<=0) throw new IllegalArgumentException("toMove should be positive");
-			var moveNodes = new ArrayList<IONode<BucketEntry<K, V>>>();
+			var moveNodes = new ArrayList<IONode<BucketEntry<K, V>>>(4);
 			while(!data.isEmpty()){
 				var node = data.getLast();
 				if(node == null){
@@ -146,9 +147,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					data.set(data.size() - 1, node);
 				}else{
 					data.set(data.size() - 1, null);
-					do{
-						data.removeLast();
-					}while(!data.isEmpty() && data.getLast() == null);
+					data.removeLast();
 				}
 				break;
 			}
@@ -442,6 +441,10 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				var removed = amortizedSet.transferTo(mainSet, (int)Math.min(Integer.MAX_VALUE, remaining));
 				remaining -= removed;
 				acum += removed;
+			}
+			var data = amortizedSet.data;
+			while(!data.isEmpty() && data.getLast() == null){
+				data.removeLast();
 			}
 		}finally{
 			transaction.close();
