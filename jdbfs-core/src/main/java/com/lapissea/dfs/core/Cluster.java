@@ -288,7 +288,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	
-	private final ChunkCache chunkCache = ChunkCache.strong();
+	private final ChunkCache chunkCache = new ChunkCache();
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager;

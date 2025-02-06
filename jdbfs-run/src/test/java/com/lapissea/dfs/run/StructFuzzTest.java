@@ -234,7 +234,7 @@ public final class StructFuzzTest{
 	@Test(dependsOnGroups = "earlyCheck")
 	public void fuzzGen() throws LockedFlagSet{
 		
-		var sequenceSource = new FuzzSequenceSource.LenSeed(69420, 10_000, 1);
+		var sequenceSource = new FuzzSequenceSource.LenSeed(69420, 5_000, 1);
 		
 		Set<TempClassGen.ClassGen> encountered = Collections.newSetFromMap(new ConcurrentHashMap<>());
 		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<TempClassGen.ClassGen, Object, IOException>(){

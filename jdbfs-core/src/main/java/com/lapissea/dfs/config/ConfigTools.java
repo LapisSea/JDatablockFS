@@ -289,6 +289,7 @@ public final class ConfigTools{
 		public final String          name;
 		public final DefaultValue<T> defaultValue;
 		private      boolean         locked;
+		private      T               lockedValue;
 		private      Throwable       lockTrace;
 		
 		protected Flag(String name, DefaultValue<T> defaultValue){
@@ -301,12 +302,12 @@ public final class ConfigTools{
 		
 		public T resolveLocking(){
 			lock();
-			return resolve();
+			return lockedValue;
 		}
 		public abstract T resolve();
 		
 		public String resolveAsStr(){
-			return Objects.toString(resolve());
+			return Objects.toString(locked? lockedValue : resolve());
 		}
 		
 		public void set(T val) throws LockedFlagSet{
@@ -324,6 +325,7 @@ public final class ConfigTools{
 		
 		public synchronized void lock(){
 			if(locked) return;
+			lockedValue = resolve();
 			locked = true;
 			
 			var cname = RED + name + RESET;
