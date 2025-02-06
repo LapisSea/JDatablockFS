@@ -283,6 +283,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		private double occupancy(){
 			return entryCount/(double)capacity;
 		}
+		private boolean isFull(long delta){
+			return occupancy(delta)>=MAX_OCCUPANCY;
+		}
 		private double occupancy(long delta){
 			return (entryCount + delta)/(double)capacity;
 		}
@@ -292,6 +295,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			return "BucketSet{" + entryCount + "/" + capacity + " " + occupancy() + "}";
 		}
 	}
+	
+	private static final int    MIN_SIZE      = 4;
+	private static final double MIN_OCCUPANCY = 0.3;
+	private static final double MAX_OCCUPANCY = 0.8;
+	private static final double GROWTH_FACTOR = 1.618;
 	
 	@IOValue
 	@IONullability(NULLABLE)
@@ -304,7 +312,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		super(provider, identity, typeDef);
 		
 		if(!readOnly && isSelfDataEmpty()){
-			newMainSet(4);
 			writeManagedFields();
 		}
 		readManagedFields();
@@ -369,6 +376,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	}
 	@Override
 	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
+		if(mainSet == null) return null;
 		var hash  = HashCommons.toHash(key);
 		var entry = mainSet.get(hash, key);
 		if(entry == null && amortizedSet != null){
@@ -379,10 +387,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	@Override
 	public boolean containsKey(K key) throws IOException{
+		if(mainSet == null) return false;
 		var hash = HashCommons.toHash(key);
 		return containsKeyHashed(key, hash);
 	}
 	private boolean containsKeyHashed(K key, int hash) throws IOException{
+		if(mainSet == null) return false;
 		if(amortizedSet != null && amortizedSet.contains(hash, key)) return true;
 		return mainSet.contains(hash, key);
 	}
@@ -472,14 +482,15 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	@Override
 	public void put(K key, V value) throws IOException{
 		if(DEBUG_VALIDATION) checkValue(value);
+		if(mainSet == null) initMainSet();
 		
 		var hash = HashCommons.toHash(key);
 		
 		if(amortizedSet != null){
 			reconcile(2);
 		}
-		if(mainSet.occupancy(1)>=0.8){
-			resizeAmortized((long)(mainSet.capacity*1.618));
+		if(mainSet.isFull(1)){
+			resizeAmortized((long)(mainSet.capacity*GROWTH_FACTOR));
 		}
 		var e = BucketEntry.of(key, value);
 		if(amortizedSet != null && amortizedSet.replace(hash, e)){
@@ -490,9 +501,14 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		if(DEBUG_VALIDATION) checkOccupancy();
 	}
 	
+	private void initMainSet() throws IOException{
+		newMainSet(MIN_SIZE);
+		writeManagedFields();
+	}
+	
 	private void checkOccupancy(){
 		var occ = mainSet.occupancy();
-		if(occ>0.8){
+		if(occ>MAX_OCCUPANCY){
 			throw new AssertionError(occ);
 		}
 	}
@@ -559,12 +575,14 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		if(toAdd.isEmpty()) return;
 		
+		if(mainSet == null) initMainSet();
+		
 		if(amortizedSet != null){
 			reconcile(toAdd.size()*2L);
 		}
 		
-		if(mainSet.occupancy(newKeys)>=0.8){
-			long regularSize = (long)(mainSet.capacity*1.618);
+		if(mainSet.isFull(newKeys)){
+			long regularSize = (long)(mainSet.capacity*GROWTH_FACTOR);
 			long keySize     = (long)((mainSet.entryCount + newKeys)*1.25);
 			resizeAmortized(Math.max(regularSize, keySize) + 1);
 		}
@@ -581,13 +599,14 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	@Override
 	public boolean remove(K key) throws IOException{
+		if(mainSet == null) return false;
 		if(amortizedSet != null) reconcile(1);
 		
 		var hash = HashCommons.toHash(key);
 		
 		if(mainSet.remove(hash, key)){
 			//Shrink
-			if(amortizedSet == null && mainSet.capacity>8 && mainSet.occupancy()<=0.3){
+			if(amortizedSet == null && mainSet.capacity>MIN_SIZE*2 && mainSet.occupancy()<=MIN_OCCUPANCY){
 				resizeAmortized(mainSet.capacity/2);
 			}
 			return true;
@@ -610,7 +629,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
 			amortizedSet = null;
 			mainSet = null;
-			newMainSet(4);
 			writeManagedFields();
 		}
 		
