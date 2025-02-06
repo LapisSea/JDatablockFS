@@ -629,7 +629,8 @@ public class SlowTests{
 				return new MapState(provider, new CheckMap<>(map));
 			}
 		};
-		int range = 40;
+		
+		int range = 400;
 		
 		var runner = new FuzzingRunner<MapState, MapAction, IOException>(rnr, RNGType.<MapAction>of(List.of(
 			r -> new MapAction.Put(10 + r.nextInt(range), 10 + r.nextInt(90)),
@@ -640,10 +641,10 @@ public class SlowTests{
 			r -> new MapAction.Remove(10 + r.nextInt(range)),
 			r -> new MapAction.ContainsKey(10 + r.nextInt(range)),
 			r -> new MapAction.Clear()
-		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
+		)).chanceFor(MapAction.Clear.class, 1F/1000).chanceFor(MapAction.PutAll.class, 0.1F));
 		
 		stableRun(
-			Plan.start(runner, 69, 50000, 2000),
+			Plan.start(runner, 69, 200_000, 2000),
 			"fuzzHashMap"
 		);
 	}

@@ -280,11 +280,16 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			);
 		}
 		
-		private boolean isFull(long delta){
-			return entryCount + delta>capacity;
-		}
 		private double occupancy(){
 			return entryCount/(double)capacity;
+		}
+		private double occupancy(long delta){
+			return (entryCount + delta)/(double)capacity;
+		}
+		
+		@Override
+		public String toString(){
+			return "BucketSet{" + entryCount + "/" + capacity + " " + occupancy() + "}";
 		}
 	}
 	
@@ -427,8 +432,13 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	}
 	
 	
-	private void reconcile(long count) throws IOException{
-		var transaction = getDataProvider().getSource().openIOTransaction();
+	private long reconcileFully() throws IOException{
+		if(amortizedSet == null) return 0;
+		return reconcile(amortizedSet.entryCount);
+	}
+	private long reconcile(long count) throws IOException{
+		var  transaction  = getDataProvider().getSource().openIOTransaction();
+		long removedTotal = 0;
 		try{
 			var remaining = count;
 			int acum      = 0;
@@ -441,6 +451,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				var removed = amortizedSet.transferTo(mainSet, (int)Math.min(Integer.MAX_VALUE, remaining));
 				remaining -= removed;
 				acum += removed;
+				removedTotal += removed;
 			}
 			var data = amortizedSet.data;
 			while(!data.isEmpty() && data.getLast() == null){
@@ -455,6 +466,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			writeManagedFields();
 			s.free();
 		}
+		return removedTotal;
 	}
 	
 	@Override
@@ -463,8 +475,10 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		var hash = HashCommons.toHash(key);
 		
-		if(amortizedSet != null) reconcile(2);
-		if(mainSet.isFull(1)){
+		if(amortizedSet != null){
+			reconcile(2);
+		}
+		if(mainSet.occupancy(1)>=0.8){
 			resizeAmortized((long)(mainSet.capacity*1.618));
 		}
 		var e = BucketEntry.of(key, value);
@@ -473,12 +487,22 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 		
 		mainSet.put(hash, e);
-		assert !mainSet.isFull(0);
+		if(DEBUG_VALIDATION) checkOccupancy();
+	}
+	
+	private void checkOccupancy(){
+		var occ = mainSet.occupancy();
+		if(occ>0.8){
+			throw new AssertionError(occ);
+		}
 	}
 	
 	private void resizeAmortized(long newSize) throws IOException{
 		if(amortizedSet != null){
-			reconcile(amortizedSet.capacity);
+			var removed = reconcileFully();
+			if(removed>5){
+				Log.trace("Reconciled {}#yellow elements before HashIOMap resize", removed);
+			}
 			assert amortizedSet == null;
 		}
 		try(var ignore = getDataProvider().getSource().openIOTransaction()){
@@ -539,8 +563,10 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			reconcile(toAdd.size()*2L);
 		}
 		
-		if(mainSet.isFull(newKeys)){
-			resizeAmortized(mainSet.capacity + newKeys + (amortizedSet == null? mainSet.capacity/4 : Math.min(mainSet.capacity, amortizedSet.capacity)/2));
+		if(mainSet.occupancy(newKeys)>=0.8){
+			long regularSize = (long)(mainSet.capacity*1.618);
+			long keySize     = (long)((mainSet.entryCount + newKeys)*1.25);
+			resizeAmortized(Math.max(regularSize, keySize) + 1);
 		}
 		
 		for(var e : toAdd){
@@ -550,7 +576,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			mainSet.put(e.hash, entry);
 		}
-		assert !mainSet.isFull(0);
+		if(DEBUG_VALIDATION) checkOccupancy();
 	}
 	
 	@Override
