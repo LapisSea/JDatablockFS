@@ -527,13 +527,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			add(source.get());
 			return;
 		}
-		if(storage instanceof ValueStorage.UnmanagedInstance){//TODO is this necessary? Test and maybe remove
-			requestCapacity(size() + count);
-			for(long i = 0; i<count; i++){
-				add(source.get());
-			}
-			return;
-		}
+		
 		defragData(count);
 		
 		try(var io = selfIO()){
