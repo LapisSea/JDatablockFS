@@ -5,47 +5,32 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.internal.HashCommons;
 import com.lapissea.dfs.internal.Preload;
-import com.lapissea.dfs.io.IOTransaction;
-import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
-import org.roaringbitmap.RoaringBitSet;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -90,325 +75,245 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static class Bucket<K, V> extends IOInstance.Managed<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
+	private sealed interface BucketResult<T>{
+		record EmptyIndex<T>(long index) implements BucketResult<T>{
+			public EmptyIndex{
+				if(index<0) throw new IllegalArgumentException("index should not be negative");
+			}
+		}
+		
+		record TailNode<T>(IONode<T> node) implements BucketResult<T>{
+			public TailNode{ Objects.requireNonNull(node); }
+		}
+		
+		record EqualsNode<T>(long index, IONode<T> previous, IONode<T> node) implements BucketResult<T>{
+			public EqualsNode{ Objects.requireNonNull(node); }
+		}
+	}
+	
+	private static final class BucketSet<K, V> extends IOInstance.Managed<BucketSet<K, V>>{
 		@IOValue
-		@IONullability(NULLABLE)
-		private IONode<BucketEntry<K, V>> node;
+		private ContiguousIOList<IONode<BucketEntry<K, V>>> data;
 		
-		public BucketEntry<K, V> entry(K key) throws IOException{
-			if(node == null) return null;
-			for(IONode<BucketEntry<K, V>> n : node){
-				var entry = n.getValue();
-				if(entry != null && Objects.equals(entry.key(), key)){
-					return entry;
+		@IOValue
+		@IOValue.Unsigned
+		@IODependency.VirtualNumSize
+		private long entryCount;
+		@IOValue
+		@IOValue.Unsigned
+		@IODependency.VirtualNumSize
+		private long capacity;
+		
+		private void init(DataProvider provider, GenericContext ctx, long capacity) throws IOException{
+			allocateNulls(provider, ctx);
+			data.addMultipleNew(capacity);
+			this.capacity = capacity;
+		}
+		
+		private void deltaCount(long delta){
+			entryCount += delta;
+			if(entryCount<0) throw new ShouldNeverHappenError();
+		}
+		
+		private int transferTo(BucketSet<K, V> destSet, int toMove) throws IOException{
+			if(toMove<=0) throw new IllegalArgumentException("toMove should be positive");
+			var moveNodes = new ArrayList<IONode<BucketEntry<K, V>>>(4);
+			while(!data.isEmpty()){
+				var node = data.getLast();
+				if(node == null){
+					data.removeLast();
+					continue;
+				}
+				while(node != null && moveNodes.size()<toMove){
+					moveNodes.add(node);
+					var next = node.getNext();
+					node.setNext(null);
+					node = next;
+				}
+				if(node != null){
+					data.set(data.size() - 1, node);
+				}else{
+					data.set(data.size() - 1, null);
+					data.removeLast();
+				}
+				break;
+			}
+			var inc = 0;
+			for(var node : moveNodes){
+				K key;
+				{
+					var keyRes = readKey(node);
+					if(!keyRes.hasValue) continue;
+					key = keyRes.key;
+				}
+				
+				switch(destSet.find(HashCommons.toHash(key), key)){
+					case BucketResult.EmptyIndex(var index) -> {
+						destSet.data.set(index, node);
+						inc++;
+					}
+					case BucketResult.EqualsNode<BucketEntry<K, V>> ignore2 -> {
+						Log.warn("Found duplicate key in map! Possible corruption. Key: {}#red", key);
+					}
+					case BucketResult.TailNode(var destNode) -> {
+						destNode.setNext(node);
+						inc++;
+					}
 				}
 			}
-			
+			if(inc != 0){
+				destSet.deltaCount(inc);
+				deltaCount(-inc);
+			}
+			return moveNodes.size();
+		}
+		private boolean replace(int keyHash, BucketEntry<K, V> entry) throws IOException{
+			if(find(keyHash, entry.key()) instanceof BucketResult.EqualsNode<BucketEntry<K, V>> place){
+				place.node.setValue(entry);
+				return true;
+			}
+			return false;
+		}
+		
+		private boolean contains(int keyHash, K key) throws IOException{
+			return find(keyHash, key) instanceof BucketResult.EqualsNode;
+		}
+		
+		private BucketEntry<K, V> get(int keyHash, K key) throws IOException{
+			if(find(keyHash, key) instanceof BucketResult.EqualsNode<BucketEntry<K, V>> v){
+				return v.node.getValue();
+			}
 			return null;
 		}
 		
-		public void put(BucketEntry<K, V> entry) throws IOException{
-			for(var node : node){
-				var e = node.getValue();
-				if(e != null && Objects.equals(e.key(), entry.key())){
-					node.setValue(entry);
-					return;
-				}
-			}
-			throw new RuntimeException("bucket entry not found");
-		}
-		
-		private IterablePP<IONode<BucketEntry<K, V>>> nodeIter(){
-			if(node == null) return Iters.of();
-			return node.iter();
-		}
-		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
-			if(node == null) return null;
-			for(var entry : node){
-				var k = readKey(entry);
-				if(!k.hasValue) continue;
-				if(Objects.equals(k.key, key)){
-					return entry.getValue();
-				}
+		private BucketResult<BucketEntry<K, V>> find(int keyHash, K key) throws IOException{
+			var index = keyHash%capacity;
+			if(index>=data.size()) return new BucketResult.EmptyIndex<>(index);
+			
+			var root = data.get(index);
+			if(root == null){
+				return new BucketResult.EmptyIndex<>(index);
 			}
 			
-			return null;
+			IONode<BucketEntry<K, V>> last = null;
+			for(IONode<BucketEntry<K, V>> node : root){
+				KeyResult<K> keyResult = readKey(node);
+				if(!keyResult.hasValue) continue;
+				if(Objects.equals(keyResult.key, key)){
+					return new BucketResult.EqualsNode<>(index, last, node);
+				}
+				last = node;
+			}
+			
+			return new BucketResult.TailNode<>(last);
 		}
 		
-		@Override
-		public Iterator<BucketEntry<K, V>> iterator(){
-			if(node == null) return Collections.emptyIterator();
-			return node.valueIterator();
+		private double occupancy(){
+			return entryCount/(double)capacity;
+		}
+		private boolean isFull(long delta){
+			return occupancy(delta)>=MAX_OCCUPANCY;
+		}
+		private double occupancy(long delta){
+			return (entryCount + delta)/(double)capacity;
 		}
 		
 		@Override
 		public String toString(){
-			return "Bucket{" + node + "}";
+			return "BucketSet{" + entryCount + "/" + capacity + " " + occupancy() + "}";
 		}
 	}
 	
-	private static final class SmallHashes implements Iterable<Integer>{
-		private static final class Iter implements Iterator<Integer>{
-			
-			private final short bucketPO2;
-			private       int   hash;
-			private       int   itersLeft = HashCommons.HASH_GENERATIONS;
-			
-			private Iter(short bucketPO2, int hash){
-				this.bucketPO2 = bucketPO2;
-				this.hash = hash;
-			}
-			
-			@Override
-			public boolean hasNext(){
-				return itersLeft>0;
-			}
-			@Override
-			public Integer next(){
-				itersLeft--;
-				
-				var hash     = this.hash;
-				var hashNext = HashCommons.h2h(hash);
-				
-				var smallHash     = hashToSmall(hash, bucketPO2);
-				var smallHashNext = hashToSmall(hashNext, bucketPO2);
-				
-				if(smallHash == smallHashNext) hashNext++;
-				
-				this.hash = hashNext;
-				
-				return smallHash;
-			}
-		}
-		
-		private final short bucketPO2;
-		private final int   hash;
-		
-		private SmallHashes(short bucketPO2, Object key){
-			this(bucketPO2, HashCommons.toHash(key));
-		}
-		private SmallHashes(short bucketPO2, int hash){
-			this.bucketPO2 = bucketPO2;
-			this.hash = hash;
-		}
-		
-		@Override
-		public Iterator<Integer> iterator(){ return new Iter(bucketPO2, hash); }
-	}
+	private static final int    MIN_SIZE      = 4;
+	private static final double MIN_OCCUPANCY = 0.3;
+	private static final double MAX_OCCUPANCY = 0.8;
+	private static final double GROWTH_FACTOR = 1.618;
 	
 	@IOValue
-	@IOValue.Unsigned
-	private short bucketPO2 = 1;
-	
+	@IONullability(NULLABLE)
+	private BucketSet<K, V> amortizedSet;
 	@IOValue
-	private IOList<Bucket<K, V>> buckets;
-	
-	private int datasetID;
+	@IONullability(NULLABLE)
+	private BucketSet<K, V> mainSet;
 	
 	public HashIOMap(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, typeDef);
 		
 		if(!readOnly && isSelfDataEmpty()){
-			newBuckets();
 			writeManagedFields();
-			fillBuckets(buckets, bucketPO2);
 		}
 		readManagedFields();
 	}
 	
-	private void fillBuckets(IOList<Bucket<K, V>> buckets, short bucketPO2) throws IOException{
-		var siz = 1L<<bucketPO2;
-		buckets.addMultipleNew(siz - buckets.size());
-	}
-	
-	@SuppressWarnings("unchecked")
-	private void newBuckets() throws IOException{
-		getThisStruct().getFields()
-		               .requireExactFieldType(RefField.class, "buckets")
-		               .allocateUnmanaged(this);
-	}
-	
-	private void reflow() throws IOException{
-		var oldBuckets   = buckets;
-		var oldBucketPO2 = bucketPO2;
-		if(oldBucketPO2>=31) throw new IOException("Too much data");//TODO: use 64 bit hash values
-		
-		bucketPO2 = (short)(oldBucketPO2 + 1);//calcNewSize(oldBuckets, oldBucketPO2);
-		datasetID++;
-		
-		if(bucketPO2<0) throw new IllegalStateException();
-		
-		newBuckets();
-		fillBuckets(buckets, bucketPO2);
-		
-		if(size()<512){
-//			Log.traceCall("method: rewire, size: {}", size());
-			try(var ignored = getDataProvider().getSource().openIOTransaction()){
-				transferRewire(oldBuckets, buckets, bucketPO2);
-				writeManagedFields();
+	private void putToSet(BucketSet<K, V> dest, int keyHash, BucketEntry<K, V> entry) throws IOException{
+		switch(dest.find(keyHash, entry.key())){
+			case BucketResult.EmptyIndex(var index) -> {
+				var node = allocNewNode(entry, dest.data.magentPos(index));
+				
+				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+					dest.data.set(index, node);
+					dest.deltaCount(1);
+					writeManagedFields();
+				}
 			}
-			disownedFree(oldBuckets);
-		}else{
-//			Log.traceCall("method: reallocate and transfer, size: {}", size());
-			
-			parallelSortTransfer(oldBuckets);
-			
-			var nCount = rawNodeStreamWithValues(buckets).count();
-			if(nCount != size()){
-				reportFail(oldBuckets, nCount);
+			case BucketResult.EqualsNode<BucketEntry<K, V>> place -> {
+				place.node.setValue(entry);
 			}
-			
+			case BucketResult.TailNode(var node) -> {
+				var nextNode = allocNewNode(entry, node.getPointer().getValue());
+				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+					node.setNext(nextNode);
+					dest.deltaCount(1);
+					writeManagedFields();
+				}
+			}
+		}
+	}
+	private boolean removeFromSet(BucketSet<K, V> set, int keyHash, K key) throws IOException{
+		if(!(set.find(keyHash, key) instanceof BucketResult.EqualsNode(var index, var prev, var node))){
+			return false;
+		}
+		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+			var next = node.getNext();
+			if(prev == null){
+				set.data.set(index, next);
+			}else{
+				prev.setNext(next);
+			}
+			set.deltaCount(-1);
 			writeManagedFields();
-			((Unmanaged<?>)oldBuckets).free();
 		}
+		node.setNext(null);
+		node.free();
+		return true;
 	}
 	
-	private void syncSortTransfer(IOList<Bucket<K, V>> oldBuckets) throws IOException{
-		for(long pos = 0; pos<oldBuckets.size(); pos += 128){
-			long from   = pos;
-			long to     = Math.min(oldBuckets.size(), from + 128);
-			var  marked = new RoaringBitSet();
-			
-			var view        = oldBuckets.subListView(from, to);
-			var sortedNodes = collectNodes(view, buckets, marked, bucketPO2);
-			optimizedOrderTransfer(sortedNodes, buckets, marked);
-		}
-	}
-	private void parallelSortTransfer(IOList<Bucket<K, V>> oldBuckets) throws IOException{
-		var marked    = new RoaringBitSet();
-		var err       = Collections.synchronizedList(new LinkedList<Throwable>());
-		var reads     = new ArrayBlockingQueue<HashMap<Integer, List<IONode<BucketEntry<K, V>>>>>(4);
-		var semaphore = new Semaphore(3);
-		try(var worker = Executors.newFixedThreadPool(3)){
-			int count = 0;
-			for(long pos = 0; pos<oldBuckets.size(); pos += 128){
-				long from = pos;
-				long to   = Math.min(oldBuckets.size(), from + 128);
-				count++;
-				worker.execute(() -> {
-					try{
-						if(!err.isEmpty()) return;
-						semaphore.acquire();
-						if(!err.isEmpty()) return;
-						var view = oldBuckets.subListView(from, to);
-						reads.add(collectNodes(view, buckets, marked, bucketPO2));
-					}catch(Throwable e){ err.add(e); }
-				});
-			}
-			for(int i = 0; i<count; i++){
-				if(!err.isEmpty()){
-					worker.shutdown();
-					semaphore.drainPermits();
-					throw new RuntimeException(err.getFirst());
-				}
-				
-				var sortedNodes = reads.take();
-				optimizedOrderTransfer(sortedNodes, buckets, marked);
-				semaphore.release();
-			}
-			if(!err.isEmpty()){
-				worker.shutdown();
-				semaphore.drainPermits();
-				throw new RuntimeException(err.getFirst());
-			}
-		}catch(InterruptedException e){
-			throw new RuntimeException(e);
-		}
+	private IOType buckedNodeType(){
+		return IOType.of(
+			IONode.class,
+			((IOType.RawAndArg)getTypeDef()).withRaw(BucketEntry.class)
+		);
 	}
 	
-	private void reportFail(IOList<Bucket<K, V>> oldBuckets, int nCount){
-		var oldKeys = rawKeyStream(oldBuckets).collect(Collectors.toSet());
-		var newKeys = rawKeyStream(buckets).collect(Collectors.toSet());
-		if(oldKeys.size()>newKeys.size()){
-			oldKeys.removeAll(newKeys);
-			throw new IllegalStateException("Failed to transfer keys: " + TextUtil.toShortString(oldKeys));
-		}
-		LogUtil.println(oldKeys.size(), newKeys.size());
-		throw new IllegalStateException(nCount + " " + size());
+	@SuppressWarnings({"unchecked", "OverlyStrongTypeCast"})
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, long magnet) throws IOException{
+		return IONode.allocValNode(
+			newEntry,
+			null,
+			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
+			buckedNodeType(),
+			getDataProvider(),
+			OptionalLong.of(magnet)
+		);
 	}
 	
-	private void disownedFree(IOList<Bucket<K, V>> oldBuckets) throws IOException{
-		//TODO: properly handle memory ownership
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
-			for(long i = 0; i<oldBuckets.size(); i++){
-				oldBuckets.set(i, new Bucket<>());
-			}
-		}
-		((Unmanaged<?>)oldBuckets).free();
-	}
-	
-	private void optimizedOrderTransfer(HashMap<Integer, List<IONode<BucketEntry<K, V>>>> sortedNodes, IOList<Bucket<K, V>> newBuckets, BitSet marked) throws IOException{
+	private void newMainSet(long size) throws IOException{
+		mainSet = new BucketSet<>();
 		
-		for(var e : sortedNodes.entrySet()){
-			var noods     = e.getValue();
-			int smallHash = e.getKey();
-			
-			Bucket<K, V>              bucket      = newBuckets.get(smallHash);
-			IONode<BucketEntry<K, V>> last        = bucket.nodeIter().findLast().orElse(null);
-			IOTransaction             transaction = null;
-			
-			if(last != null || noods.size()>1){
-				transaction = getDataProvider().getSource().openIOTransaction();
-			}
-			try{
-				for(var nood : noods){
-					var node = allocNewNode(nood::getValueDataIO, (Unmanaged<?>)newBuckets);
-					
-					if(last == null){
-						bucket.node = node;
-						synchronized(marked){
-							setBucket(newBuckets, smallHash, bucket);
-							marked.clear(smallHash);
-						}
-					}else{
-						last.setNext(node);
-					}
-					last = node;
-				}
-			}finally{
-				if(transaction != null) transaction.close();
-			}
-		}
-	}
-	private static <K, V> HashMap<Integer, List<IONode<BucketEntry<K, V>>>> collectNodes(IOList<Bucket<K, V>> oldData, IOList<Bucket<K, V>> newData, BitSet marked, short newPO2) throws IOException{
-		var sortedNodes = new HashMap<Integer, List<IONode<BucketEntry<K, V>>>>();
-		
-		for(var bucket : oldData){
-			if(bucket.node == null) continue;
-			nood:
-			for(var n : bucket.node){
-				var kr = readKey(n);
-				if(!kr.hasValue) continue;
-				var key = kr.key;
-				
-				for(int smallHash : new SmallHashes(newPO2, key)){
-					if(!sortedNodes.containsKey(smallHash) && !(isMarked(marked, newData, smallHash))){
-						sortedNodes.computeIfAbsent(smallHash, k -> {
-							mark(marked, k);
-							return new ArrayList<>(1);
-						}).add(n);
-						continue nood;
-					}
-				}
-				
-				sortedNodes.computeIfAbsent(hashToSmall(HashCommons.toHash(key), newPO2), k -> {
-					mark(marked, k);
-					return new ArrayList<>(1);
-				}).add(n);
-			}
-		}
-		return sortedNodes;
-	}
-	private static void mark(BitSet marked, int index){
-		synchronized(marked){
-			marked.set(index);
-		}
-	}
-	private static <K, V> boolean isMarked(BitSet marked, IOList<Bucket<K, V>> newData, int index){
-		synchronized(marked){
-			if(marked.get(index)) return true;
-			return newData.getUnsafe(index).node != null;
-		}
+		var bType   = ((IOType.RawAndArg)getTypeDef()).withRaw(BucketSet.class);
+		var generic = bType.generic(getDataProvider().getTypeDb());
+		var ctx     = GenericContext.of(BucketSet.class, generic);
+		mainSet.init(getDataProvider(), ctx, size);
 	}
 	
 	private static IOField<BucketEntry<Object, Object>, ?> keyVar;
@@ -426,49 +331,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		keyVar = BucketEntry.STRUCT.getFields().requireByName("key");
 	}
 	
-	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
-		for(Bucket<K, V> oldBucket : oldBuckets){
-			var oldNodes = oldBucket.nodeIter().toModList();
-			for(var node : oldNodes){
-				if(node.hasNext()) node.setNext(null);
-				
-				if(!node.hasValue()){
-					node.free();
-					continue;
-				}
-				
-				var smallHash = hashToSmall(HashCommons.toHash(readKey(node).key), newPO2);
-				
-				Bucket<K, V> bucket = getBucket(newBuckets, smallHash);
-				if(bucket.node == null){
-					bucket.node = node;
-					setBucket(newBuckets, smallHash, bucket);
-					continue;
-				}
-				
-				var last = bucket.node;
-				while(true){
-					if(!last.hasValue()){
-						throw new RuntimeException();
-					}
-					var next = last.getNext();
-					if(next == null) break;
-					last = next;
-				}
-				last.setNext(node);
-			}
-			
-		}
-	}
 	
 	private class ModifiableIOEntry extends IOEntry.Modifiable.Abstract<K, V>{
 		
-		private       int               currentDatasetID = datasetID;
-		private       Bucket<K, V>      currentBucket;
 		private final BucketEntry<K, V> data;
 		
-		public ModifiableIOEntry(Bucket<K, V> bucket, BucketEntry<K, V> entry){
-			currentBucket = bucket;
+		public ModifiableIOEntry(BucketEntry<K, V> entry){
 			this.data = entry;
 		}
 		
@@ -477,10 +345,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		@Override
 		public V getValue(){ return data.value(); }
 		
-		private void fastSet(V value) throws IOException{
-			data.value(value);
-			currentBucket.put(data);
-		}
 		private void mapSet(V value) throws IOException{
 			data.value(value);
 			HashIOMap.this.put(getKey(), value);
@@ -488,62 +352,69 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		@Override
 		public void set(V value) throws IOException{
-			if(datasetID != currentDatasetID){
-				if(tryUpdateData()){
-					fastSet(value);
-				}else mapSet(value);
-			}else fastSet(value);
-		}
-		
-		private boolean tryUpdateData() throws IOException{
-			Bucket<K, V> bucket = getBucket(buckets, hashToSmall(HashCommons.toHash(getKey()), bucketPO2));
-			if(bucket == null) return false;
-			
-			currentBucket = bucket;
-			currentDatasetID = datasetID;
-			return true;
+			mapSet(value);
 		}
 	}
 	
 	@Override
+	public long size(){
+		long size = 0;
+		var  ms   = mainSet;
+		if(ms != null) size += ms.entryCount;
+		var as = amortizedSet;
+		if(as != null) size += as.entryCount;
+		return size;
+	}
+	@Override
 	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
-		for(int smallHash : new SmallHashes(bucketPO2, key)){
-			var bucket = getBucket(buckets, smallHash);
-			
-			if(bucket == null) continue;
-			
-			var entry = bucket.entry(key);
-			if(entry == null) continue;
-			
-			return new ModifiableIOEntry(bucket, entry);
+		if(mainSet == null) return null;
+		var hash  = HashCommons.toHash(key);
+		var entry = mainSet.get(hash, key);
+		if(entry == null && amortizedSet != null){
+			entry = amortizedSet.get(hash, key);
 		}
-		return null;
+		return entry == null? null : new ModifiableIOEntry(entry);
+	}
+	
+	@Override
+	public boolean containsKey(K key) throws IOException{
+		if(mainSet == null) return false;
+		var hash = HashCommons.toHash(key);
+		return containsKeyHashed(key, hash);
+	}
+	private boolean containsKeyHashed(K key, int hash) throws IOException{
+		if(mainSet == null) return false;
+		if(amortizedSet != null && amortizedSet.contains(hash, key)) return true;
+		return mainSet.contains(hash, key);
 	}
 	
 	@Override
 	public IOIterator.Iter<IOEntry<K, V>> iterator(){
 		return new IOIterator.Iter<>(){
-			private       IOIterator<IONode<BucketEntry<K, V>>> nodeIter;
-			private final IOIterator<Bucket<K, V>>              bucketsIter = buckets.iterator();
+			private final Iterator<BucketSet<K, V>>             setsIterator = Iters.of(amortizedSet, mainSet).nonNulls().iterator();
+			private       IOIterator<IONode<BucketEntry<K, V>>> bucketSetIter;
+			private       IOIterator<BucketEntry<K, V>>         bucketIter;
 			
-			private IOIterator<IONode<BucketEntry<K, V>>> tryFindNext() throws IOException{
-				while(bucketsIter.hasNext()){
-					var next = bucketsIter.ioNext();
-					if(next.node == null) continue;
-					
-					var iter = next.node.iterator();
-					if(!iter.hasNext()) continue;
-					return nodeIter = iter;
+			private IOIterator<BucketEntry<K, V>> tryFindNextBucket() throws IOException{
+				IONode<BucketEntry<K, V>> next = null;
+				while(next == null){
+					while(bucketSetIter == null || !bucketSetIter.hasNext()){
+						if(!setsIterator.hasNext()) return null;
+						var set = setsIterator.next();
+						bucketSetIter = set.data.iterator();
+					}
+					next = bucketSetIter.ioNext();
 				}
-				return null;
+				var iter = next.valueIterator();
+				return bucketIter = iter;
 			}
 			
 			@Override
 			public boolean hasNext(){
 				try{
-					var ni = nodeIter;
-					if(ni != null && ni.hasNext()) return true;
-					return tryFindNext() != null;
+					var bi = bucketIter;
+					if(bi != null && bi.hasNext()) return true;
+					return tryFindNextBucket() != null;
 				}catch(IOException e){
 					throw new UncheckedIOException(e);
 				}
@@ -551,53 +422,105 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			
 			@Override
 			public IOEntry<K, V> ioNext() throws IOException{
-				var ni = nodeIter;
-				if(ni == null || !ni.hasNext()){
-					if((ni = tryFindNext()) == null) throw new NoSuchElementException();
+				var bi = bucketIter;
+				if(bi == null || !bi.hasNext()){
+					if((bi = tryFindNextBucket()) == null) throw new NoSuchElementException();
 				}
-				var node  = ni.ioNext();
-				var value = node.getValue();
+				var value = bi.ioNext();
 				return value.unmodifiable();
 			}
 		};
 	}
 	
-	private IterablePP<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
-		return rawNodeStream(buckets)
-			       .map(e -> {
-				       try{
-					       return readKey(e);
-				       }catch(IOException ex){
-					       throw UtilL.uncheckedThrow(ex);
-				       }
-			       })
-			       .filter(KeyResult::hasValue)
-			       .map(KeyResult::key);
-	}
 	
-	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
-		return buckets.flatMapped(Bucket::nodeIter);
+	private long reconcileFully() throws IOException{
+		if(amortizedSet == null) return 0;
+		return reconcile(amortizedSet.entryCount);
 	}
-	
-	private IterablePP<IONode<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
-		return rawNodeStream(buckets).filter(e -> {
-			try{
-				return e.hasValue();
-			}catch(IOException ex){
-				throw UtilL.uncheckedThrow(ex);
+	private long reconcile(long count) throws IOException{
+		Unmanaged<?> toFree = null;
+		
+		var  transaction  = getDataProvider().getSource().openIOTransaction();
+		long removedTotal = 0;
+		try{
+			var remaining = count;
+			int acum      = 0;
+			while(remaining>0 && !amortizedSet.data.isEmpty()){
+				if(acum>64){
+					transaction.close();
+					transaction = getDataProvider().getSource().openIOTransaction();
+					acum = 0;
+				}
+				var removed = amortizedSet.transferTo(mainSet, (int)Math.min(Integer.MAX_VALUE, remaining));
+				remaining -= removed;
+				acum += removed;
+				removedTotal += removed;
 			}
-		});
+			var data = amortizedSet.data;
+			while(!data.isEmpty() && data.getLast() == null){
+				data.removeLast();
+			}
+			if(data.isEmpty()){
+				amortizedSet = null;
+				toFree = data;
+			}
+			writeManagedFields();
+			return removedTotal;
+		}finally{
+			transaction.close();
+			if(toFree != null){
+				toFree.free();
+			}
+		}
 	}
 	
 	@Override
 	public void put(K key, V value) throws IOException{
 		if(DEBUG_VALIDATION) checkValue(value);
-		var sizeFlag = putEntry(buckets, bucketPO2, key, value);
-		if(sizeFlag.inc == 0) return;
+		if(mainSet == null) initMainSet();
 		
-		deltaSize(sizeFlag.inc);
-		if(size()>=buckets.size()){
-			reflow();
+		var hash = HashCommons.toHash(key);
+		
+		if(amortizedSet != null){
+			reconcile(2);
+		}
+		if(mainSet.isFull(1)){
+			resizeAmortized((long)(mainSet.capacity*GROWTH_FACTOR));
+		}
+		var e = BucketEntry.of(key, value);
+		if(amortizedSet != null && amortizedSet.replace(hash, e)){
+			return;
+		}
+		
+		putToSet(mainSet, hash, e);
+		if(DEBUG_VALIDATION) checkOccupancy();
+	}
+	
+	private void initMainSet() throws IOException{
+		newMainSet(MIN_SIZE);
+		writeManagedFields();
+	}
+	
+	private void checkOccupancy(){
+		var occ = mainSet.occupancy();
+		if(occ>MAX_OCCUPANCY){
+			throw new AssertionError(occ);
+		}
+	}
+	
+	private void resizeAmortized(long newSize) throws IOException{
+		if(amortizedSet != null){
+			var removed = reconcileFully();
+			if(removed>5){
+				Log.trace("Reconciled {}#yellow elements before HashIOMap resize", removed);
+			}
+			assert amortizedSet == null;
+		}
+		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+			amortizedSet = mainSet;
+			newMainSet(newSize);
+			writeManagedFields();
+			reconcile((int)Math.max(2, Math.min(10, amortizedSet.capacity/8)));
 		}
 	}
 	
@@ -633,181 +556,83 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				checkValue(value);
 			}
 		}
-		
-		while(size()>=(buckets.size() + values.size())){
-			reflow();
-		}
-		
-		Map<Integer, List<Map.Entry<K, V>>> sorted = new HashMap<>();
-		
-		for(Map.Entry<K, V> kvEntry : values.entrySet()){
-			sorted.computeIfAbsent(hashToSmall(HashCommons.toHash(kvEntry.getKey()), bucketPO2), i -> new ArrayList<>()).add(kvEntry);
-		}
-		
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
-			long deltaSize = 0;
-			for(var group : sorted.values()){
-				for(Map.Entry<K, V> e : group){
-					var key   = e.getKey();
-					var value = e.getValue();
-					
-					var action = putEntry(buckets, bucketPO2, key, value);
-					deltaSize += action.inc;
-				}
+		record HashEntry<K, V>(K key, V value, int hash){ }
+		var toAdd   = new ArrayList<HashEntry<K, V>>(values.size());
+		var newKeys = 0;
+		for(var e : values.entrySet()){
+			var key  = e.getKey();
+			var hash = HashCommons.toHash(key);
+			if(!containsKeyHashed(key, hash)){
+				newKeys++;
 			}
-			
-			deltaSize(deltaSize);
+			toAdd.add(new HashEntry<>(key, e.getValue(), hash));
 		}
+		
+		if(toAdd.isEmpty()) return;
+		
+		if(mainSet == null) initMainSet();
+		
+		if(amortizedSet != null){
+			reconcile(toAdd.size()*2L);
+		}
+		
+		if(mainSet.isFull(newKeys)){
+			long regularSize = (long)(mainSet.capacity*GROWTH_FACTOR);
+			long keySize     = (long)((mainSet.entryCount + newKeys)*1.25);
+			resizeAmortized(Math.max(regularSize, keySize) + 1);
+		}
+		
+		for(var e : toAdd){
+			var entry = BucketEntry.of(e.key, e.value);
+			if(amortizedSet != null && amortizedSet.replace(e.hash, entry)){
+				continue;
+			}
+			putToSet(mainSet, e.hash, entry);
+		}
+		if(DEBUG_VALIDATION) checkOccupancy();
 	}
 	
 	@Override
 	public boolean remove(K key) throws IOException{
-		for(int smallHash : new SmallHashes(bucketPO2, key)){
-			var bucket = getBucket(buckets, smallHash);
-			if(bucket.node == null) continue;
-			
-			var prevNode = bucket.node;
-			for(var node : bucket.node){
-				var keyResult = readKey(node);
-				if(!keyResult.hasValue) continue;
-				if(Objects.equals(keyResult.key, key)){
-					if(prevNode == node){
-						bucket.node = node.getNext();
-						setBucket(buckets, smallHash, bucket);
-					}else{
-						prevNode.setNext(node.getNext());
-					}
-					node.setNext(null);
-					node.free();
-					deltaSize(-1);
-					return true;
-				}
-				prevNode = node;
+		if(mainSet == null) return false;
+		if(amortizedSet != null) reconcile(1);
+		
+		var hash = HashCommons.toHash(key);
+		
+		if(removeFromSet(mainSet, hash, key)){
+			//Shrink
+			if(amortizedSet == null && mainSet.capacity>MIN_SIZE*2 && mainSet.occupancy()<=MIN_OCCUPANCY){
+				resizeAmortized(mainSet.capacity/2);
 			}
+			return true;
 		}
-		return false;
+		
+		if(amortizedSet == null) return false;
+		
+		var removed = removeFromSet(amortizedSet, hash, key);
+		if(removed){
+			reconcile(1);
+		}
+		return removed;
 	}
 	
 	@Override
 	public void clear() throws IOException{
-		datasetID++;
+		var as = amortizedSet;
+		var ms = mainSet;
+		
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
-			size = 0;
-			bucketPO2 = 1;
-			buckets.clear();
-			fillBuckets(buckets, bucketPO2);
+			amortizedSet = null;
+			mainSet = null;
 			writeManagedFields();
 		}
-	}
-	
-	private enum PutAction{
-		OVERWRITE(0),
-		OVERWRITE_EMPTY(1),
-		BUCKET_APPEND(1);
 		
-		final int inc;
-		PutAction(int inc){ this.inc = inc; }
-	}
-	
-	private PutAction putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
-		
-		Bucket<K, V> firstBucket = null;
-		
-		var newEntry = BucketEntry.of(key, value);
-		
-		var orgHash = HashCommons.toHash(key);
-		
-		for(int smallHash : new SmallHashes(bucketPO2, orgHash)){
-			var bucket = getBucket(buckets, smallHash);
-			if(firstBucket == null) firstBucket = bucket;
-			
-			var entry = bucket.getEntryByKey(key);
-			if(entry != null){
-				entry.value(value);
-				bucket.put(entry);
-				return PutAction.OVERWRITE;
-			}
+		if(as != null){
+			as.data.free();
 		}
-		assert firstBucket != null;
-		
-		for(int smallHash : new SmallHashes(bucketPO2, orgHash)){
-			var bucket = getBucket(buckets, smallHash);
-			
-			if(bucket.node == null){
-				bucket.node = allocNewNode(newEntry, ((Unmanaged<?>)buckets).getPointer());
-				setBucket(buckets, smallHash, bucket);
-				return PutAction.OVERWRITE_EMPTY;
-			}
+		if(ms != null){
+			ms.data.free();
 		}
-		
-		IONode<BucketEntry<K, V>> last = firstBucket.node;
-		for(var node : firstBucket.node){
-			if(!node.hasValue()){
-				if(DEBUG_VALIDATION){
-					var val = node.getValue();
-					if(val != null) throw new RuntimeException(node + " hasValue is not correct");
-				}
-				
-				node.setValue(newEntry);
-				return PutAction.OVERWRITE_EMPTY;
-			}
-			
-			last = node;
-		}
-		
-		last.setNext(allocNewNode(newEntry, last.getPointer()));
-		
-		return PutAction.BUCKET_APPEND;
-	}
-	
-	private IOType buckedNodeType(){
-		return IOType.of(
-			IONode.class,
-			((IOType.RawAndArg)getTypeDef()).withRaw(BucketEntry.class)
-		);
-	}
-	
-	@SuppressWarnings("unchecked")
-	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, ChunkPointer magnet) throws IOException{
-		return IONode.allocValNode(
-			newEntry,
-			null,
-			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
-			buckedNodeType(),
-			getDataProvider(),
-			OptionalLong.of(magnet.getValue())
-		);
-	}
-	private IONode<BucketEntry<K, V>> allocNewNode(RandomIO.Creator entryBytes, IOInstance.Unmanaged<?> magnet) throws IOException{
-		try(var io = entryBytes.io()){
-			return IONode.allocValNode(
-				io,
-				null,
-				buckedNodeType(),
-				getDataProvider(),
-				OptionalLong.of(magnet.getPointer().getValue())
-			);
-		}
-	}
-	
-	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
-		return buckets.get(smallHash);
-	}
-	
-	private void setBucket(IOList<Bucket<K, V>> buckets, int smallHash, Bucket<K, V> bucket) throws IOException{
-		buckets.set(smallHash, bucket);
-		if(DEBUG_VALIDATION){
-			var read = buckets.get(smallHash);
-			if(!read.equals(bucket)){
-				throw new IllegalStateException("Bucket integrity failed:\n" + bucket + "\n" + read);
-			}
-		}
-	}
-	
-	private static int hashToSmall(int hash, short bucketPO2){
-		var mask = (1<<bucketPO2) - 1;
-		return Math.abs(hash)&mask;
 	}
 	
 }
-

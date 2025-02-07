@@ -861,6 +861,12 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		return "C";
 	}
 	
+	public long magentPos(long index) throws IOException{
+		try(var io = ioAtElement(Math.min(size, index))){
+			return io.calcGlobalPos();
+		}
+	}
+	
 	private final class QSource implements QueryableData.QuerySource<T>{
 		private static final int NONE = 0, FIELD = 1, FULL = 2;
 		
