@@ -10,6 +10,7 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
@@ -18,8 +19,6 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -92,10 +91,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static final class BucketSet<K, V> extends IOInstance.Unmanaged<BucketSet<K, V>>{
+	private static final class BucketSet<K, V> extends IOInstance.Managed<BucketSet<K, V>>{
 		@IOValue
 		private ContiguousIOList<IONode<BucketEntry<K, V>>> data;
-		
 		
 		@IOValue
 		@IOValue.Unsigned
@@ -106,26 +104,15 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		@IODependency.VirtualNumSize
 		private long capacity;
 		
-		private BucketSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
-			super(provider, identity, typeDef);
-			if(!isSelfDataEmpty()){
-				readManagedFields();
-			}
-		}
-		
-		private void init(long capacity) throws IOException{
-			allocateNulls();
+		private void init(DataProvider provider, GenericContext ctx, long capacity) throws IOException{
+			allocateNulls(provider, ctx);
 			data.addMultipleNew(capacity);
 			this.capacity = capacity;
-			writeManagedFields();
 		}
 		
-		private IOFieldPrimitive.FLong<BucketSet<K, V>> sizeField;
-		private void deltaCount(long delta) throws IOException{
-			if(sizeField == null) sizeField = getThisStruct().getFields().requireExactLong("entryCount");
+		private void deltaCount(long delta){
 			entryCount += delta;
 			if(entryCount<0) throw new ShouldNeverHappenError();
-			writeManagedField(sizeField);
 		}
 		
 		private int transferTo(BucketSet<K, V> destSet, int toMove) throws IOException{
@@ -187,28 +174,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			return false;
 		}
-		private void put(int keyHash, BucketEntry<K, V> entry) throws IOException{
-			switch(find(keyHash, entry.key())){
-				case BucketResult.EmptyIndex(var index) -> {
-					var node = allocNewNode(entry, data.magentPos(index));
-					
-					try(var ignore = getDataProvider().getSource().openIOTransaction()){
-						data.set(index, node);
-						deltaCount(1);
-					}
-				}
-				case BucketResult.EqualsNode<BucketEntry<K, V>> place -> {
-					place.node.setValue(entry);
-				}
-				case BucketResult.TailNode(var node) -> {
-					var nextNode = allocNewNode(entry, node.getPointer().getValue());
-					try(var ignore = getDataProvider().getSource().openIOTransaction()){
-						node.setNext(nextNode);
-						deltaCount(1);
-					}
-				}
-			}
-		}
 		
 		private boolean contains(int keyHash, K key) throws IOException{
 			return find(keyHash, key) instanceof BucketResult.EqualsNode;
@@ -219,24 +184,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				return v.node.getValue();
 			}
 			return null;
-		}
-		
-		private boolean remove(int keyHash, K key) throws IOException{
-			if(!(find(keyHash, key) instanceof BucketResult.EqualsNode(var index, var prev, var node))){
-				return false;
-			}
-			try(var ignore = getDataProvider().getSource().openIOTransaction()){
-				var next = node.getNext();
-				if(prev == null){
-					data.set(index, next);
-				}else{
-					prev.setNext(next);
-				}
-				deltaCount(-1);
-			}
-			node.setNext(null);
-			node.free();
-			return true;
 		}
 		
 		private BucketResult<BucketEntry<K, V>> find(int keyHash, K key) throws IOException{
@@ -259,25 +206,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			
 			return new BucketResult.TailNode<>(last);
-		}
-		
-		private IOType buckedNodeType(){
-			return IOType.of(
-				IONode.class,
-				((IOType.RawAndArg)getTypeDef()).withRaw(BucketEntry.class)
-			);
-		}
-		
-		@SuppressWarnings({"unchecked", "OverlyStrongTypeCast"})
-		private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, long magnet) throws IOException{
-			return IONode.allocValNode(
-				newEntry,
-				null,
-				(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
-				buckedNodeType(),
-				getDataProvider(),
-				OptionalLong.of(magnet)
-			);
 		}
 		
 		private double occupancy(){
@@ -317,12 +245,75 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		readManagedFields();
 	}
 	
-	@SuppressWarnings("unchecked")
+	private void putToSet(BucketSet<K, V> dest, int keyHash, BucketEntry<K, V> entry) throws IOException{
+		switch(dest.find(keyHash, entry.key())){
+			case BucketResult.EmptyIndex(var index) -> {
+				var node = allocNewNode(entry, dest.data.magentPos(index));
+				
+				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+					dest.data.set(index, node);
+					dest.deltaCount(1);
+					writeManagedFields();
+				}
+			}
+			case BucketResult.EqualsNode<BucketEntry<K, V>> place -> {
+				place.node.setValue(entry);
+			}
+			case BucketResult.TailNode(var node) -> {
+				var nextNode = allocNewNode(entry, node.getPointer().getValue());
+				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+					node.setNext(nextNode);
+					dest.deltaCount(1);
+					writeManagedFields();
+				}
+			}
+		}
+	}
+	private boolean removeFromSet(BucketSet<K, V> set, int keyHash, K key) throws IOException{
+		if(!(set.find(keyHash, key) instanceof BucketResult.EqualsNode(var index, var prev, var node))){
+			return false;
+		}
+		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+			var next = node.getNext();
+			if(prev == null){
+				set.data.set(index, next);
+			}else{
+				prev.setNext(next);
+			}
+			set.deltaCount(-1);
+			writeManagedFields();
+		}
+		node.setNext(null);
+		node.free();
+		return true;
+	}
+	
+	private IOType buckedNodeType(){
+		return IOType.of(
+			IONode.class,
+			((IOType.RawAndArg)getTypeDef()).withRaw(BucketEntry.class)
+		);
+	}
+	
+	@SuppressWarnings({"unchecked", "OverlyStrongTypeCast"})
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, long magnet) throws IOException{
+		return IONode.allocValNode(
+			newEntry,
+			null,
+			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
+			buckedNodeType(),
+			getDataProvider(),
+			OptionalLong.of(magnet)
+		);
+	}
+	
 	private void newMainSet(long size) throws IOException{
-		getThisStruct().getFields()
-		               .requireExactFieldType(RefField.class, "mainSet")
-		               .allocateUnmanaged(this);
-		mainSet.init(size);
+		mainSet = new BucketSet<>();
+		
+		var bType   = ((IOType.RawAndArg)getTypeDef()).withRaw(BucketSet.class);
+		var generic = bType.generic(getDataProvider().getTypeDb());
+		var ctx     = GenericContext.of(BucketSet.class, generic);
+		mainSet.init(getDataProvider(), ctx, size);
 	}
 	
 	private static IOField<BucketEntry<Object, Object>, ?> keyVar;
@@ -447,6 +438,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		return reconcile(amortizedSet.entryCount);
 	}
 	private long reconcile(long count) throws IOException{
+		Unmanaged<?> toFree = null;
+		
 		var  transaction  = getDataProvider().getSource().openIOTransaction();
 		long removedTotal = 0;
 		try{
@@ -467,16 +460,18 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			while(!data.isEmpty() && data.getLast() == null){
 				data.removeLast();
 			}
+			if(data.isEmpty()){
+				amortizedSet = null;
+				toFree = data;
+			}
+			writeManagedFields();
+			return removedTotal;
 		}finally{
 			transaction.close();
+			if(toFree != null){
+				toFree.free();
+			}
 		}
-		if(amortizedSet.data.isEmpty()){
-			var s = amortizedSet;
-			amortizedSet = null;
-			writeManagedFields();
-			s.free();
-		}
-		return removedTotal;
 	}
 	
 	@Override
@@ -497,7 +492,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			return;
 		}
 		
-		mainSet.put(hash, e);
+		putToSet(mainSet, hash, e);
 		if(DEBUG_VALIDATION) checkOccupancy();
 	}
 	
@@ -592,7 +587,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			if(amortizedSet != null && amortizedSet.replace(e.hash, entry)){
 				continue;
 			}
-			mainSet.put(e.hash, entry);
+			putToSet(mainSet, e.hash, entry);
 		}
 		if(DEBUG_VALIDATION) checkOccupancy();
 	}
@@ -604,7 +599,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		var hash = HashCommons.toHash(key);
 		
-		if(mainSet.remove(hash, key)){
+		if(removeFromSet(mainSet, hash, key)){
 			//Shrink
 			if(amortizedSet == null && mainSet.capacity>MIN_SIZE*2 && mainSet.occupancy()<=MIN_OCCUPANCY){
 				resizeAmortized(mainSet.capacity/2);
@@ -614,7 +609,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		
 		if(amortizedSet == null) return false;
 		
-		var removed = amortizedSet.remove(hash, key);
+		var removed = removeFromSet(amortizedSet, hash, key);
 		if(removed){
 			reconcile(1);
 		}
@@ -633,9 +628,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 		
 		if(as != null){
-			as.free();
+			as.data.free();
 		}
-		ms.free();
-		
+		if(ms != null){
+			ms.data.free();
+		}
 	}
+	
 }
