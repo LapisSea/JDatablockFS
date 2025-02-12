@@ -31,22 +31,6 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		readManagedFields();
 	}
 	
-	private sealed interface BucketResult<T>{
-		record EmptyIndex<T>(long index) implements BucketResult<T>{
-			public EmptyIndex{
-				if(index<0) throw new IllegalArgumentException("index should not be negative");
-			}
-		}
-		
-		record TailNode<T>(IONode<T> node) implements BucketResult<T>{
-			public TailNode{ Objects.requireNonNull(node); }
-		}
-		
-		record EqualsNode<T>(long index, IONode<T> previous, IONode<T> node) implements BucketResult<T>{
-			public EqualsNode{ Objects.requireNonNull(node); }
-		}
-	}
-	
 	private static <T> BucketResult<T> find(IOList<IONode<T>> data, T value) throws IOException{
 		int hash  = HashCommons.toHash(value);
 		var width = data.size();
@@ -61,7 +45,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		for(var node : rootNode){
 			var v = node.getValue();
 			if(Objects.equals(value, v)){
-				return new BucketResult.EqualsNode<>(index, last, node);
+				return new BucketResult.EqualsResult<>(index, last, node);
 			}
 			last = node;
 		}
@@ -74,7 +58,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 			case BucketResult.EmptyIndex(var index) -> {
 				data.set(index, toAdd);
 			}
-			case BucketResult.EqualsNode<T> ignore -> {
+			case BucketResult.EqualsResult<T> ignore -> {
 				throw new IllegalStateException("Can not add existing value");
 			}
 			case BucketResult.TailNode(var node) -> {
@@ -88,7 +72,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		var width = data.size();
 		
 		var place = find(data, value);
-		if(place instanceof BucketResult.EqualsNode) return false;
+		if(place instanceof BucketResult.EqualsResult) return false;
 		
 		if(size()>=width){
 			grow();
@@ -158,7 +142,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	@Override
 	public boolean remove(T value) throws IOException{
 		var place = find(data, value);
-		if(!(place instanceof BucketResult.EqualsNode(var index, var prev, var node))) return false;
+		if(!(place instanceof BucketResult.EqualsResult(var index, var prev, var node))) return false;
 		
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
 			if(prev != null){
@@ -187,7 +171,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public boolean contains(T value) throws IOException{
-		return find(data, value) instanceof BucketResult.EqualsNode;
+		return find(data, value) instanceof BucketResult.EqualsResult;
 	}
 	
 	@Override

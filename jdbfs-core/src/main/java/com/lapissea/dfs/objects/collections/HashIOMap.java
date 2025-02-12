@@ -10,6 +10,9 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.collections.BucketResult.EmptyIndex;
+import com.lapissea.dfs.objects.collections.BucketResult.EqualsResult;
+import com.lapissea.dfs.objects.collections.BucketResult.TailNode;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
@@ -75,22 +78,6 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private sealed interface BucketResult<T>{
-		record EmptyIndex<T>(long index) implements BucketResult<T>{
-			public EmptyIndex{
-				if(index<0) throw new IllegalArgumentException("index should not be negative");
-			}
-		}
-		
-		record TailNode<T>(IONode<T> node) implements BucketResult<T>{
-			public TailNode{ Objects.requireNonNull(node); }
-		}
-		
-		record EqualsNode<T>(long index, IONode<T> previous, IONode<T> node) implements BucketResult<T>{
-			public EqualsNode{ Objects.requireNonNull(node); }
-		}
-	}
-	
 	private static final class BucketSet<K, V> extends IOInstance.Managed<BucketSet<K, V>>{
 		@IOValue
 		private ContiguousIOList<IONode<BucketEntry<K, V>>> data;
@@ -148,14 +135,14 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				}
 				
 				switch(destSet.find(HashCommons.toHash(key), key)){
-					case BucketResult.EmptyIndex(var index) -> {
+					case EmptyIndex(var index) -> {
 						destSet.data.set(index, node);
 						inc++;
 					}
-					case BucketResult.EqualsNode<BucketEntry<K, V>> ignore2 -> {
+					case EqualsResult<BucketEntry<K, V>> ignore2 -> {
 						Log.warn("Found duplicate key in map! Possible corruption. Key: {}#red", key);
 					}
-					case BucketResult.TailNode(var destNode) -> {
+					case TailNode(var destNode) -> {
 						destNode.setNext(node);
 						inc++;
 					}
@@ -168,20 +155,20 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			return moveNodes.size();
 		}
 		private boolean replace(int keyHash, BucketEntry<K, V> entry) throws IOException{
-			if(find(keyHash, entry.key()) instanceof BucketResult.EqualsNode<BucketEntry<K, V>> place){
-				place.node.setValue(entry);
+			if(find(keyHash, entry.key()) instanceof EqualsResult(var i, var p, var node)){
+				node.setValue(entry);
 				return true;
 			}
 			return false;
 		}
 		
 		private boolean contains(int keyHash, K key) throws IOException{
-			return find(keyHash, key) instanceof BucketResult.EqualsNode;
+			return find(keyHash, key) instanceof EqualsResult;
 		}
 		
 		private BucketEntry<K, V> get(int keyHash, K key) throws IOException{
-			if(find(keyHash, key) instanceof BucketResult.EqualsNode<BucketEntry<K, V>> v){
-				return v.node.getValue();
+			if(find(keyHash, key) instanceof EqualsResult<BucketEntry<K, V>> v){
+				return v.node().getValue();
 			}
 			return null;
 		}
@@ -200,7 +187,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				KeyResult<K> keyResult = readKey(node);
 				if(!keyResult.hasValue) continue;
 				if(Objects.equals(keyResult.key, key)){
-					return new BucketResult.EqualsNode<>(index, last, node);
+					return new BucketResult.EqualsResult<>(index, last, node);
 				}
 				last = node;
 			}
@@ -247,7 +234,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	
 	private void putToSet(BucketSet<K, V> dest, int keyHash, BucketEntry<K, V> entry) throws IOException{
 		switch(dest.find(keyHash, entry.key())){
-			case BucketResult.EmptyIndex(var index) -> {
+			case EmptyIndex(var index) -> {
 				var node = allocNewNode(entry, dest.data.magentPos(index));
 				
 				try(var ignore = getDataProvider().getSource().openIOTransaction()){
@@ -256,10 +243,10 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 					writeManagedFields();
 				}
 			}
-			case BucketResult.EqualsNode<BucketEntry<K, V>> place -> {
-				place.node.setValue(entry);
+			case EqualsResult<BucketEntry<K, V>> place -> {
+				place.node().setValue(entry);
 			}
-			case BucketResult.TailNode(var node) -> {
+			case TailNode(var node) -> {
 				var nextNode = allocNewNode(entry, node.getPointer().getValue());
 				try(var ignore = getDataProvider().getSource().openIOTransaction()){
 					node.setNext(nextNode);
@@ -270,7 +257,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		}
 	}
 	private boolean removeFromSet(BucketSet<K, V> set, int keyHash, K key) throws IOException{
-		if(!(set.find(keyHash, key) instanceof BucketResult.EqualsNode(var index, var prev, var node))){
+		if(!(set.find(keyHash, key) instanceof EqualsResult(var index, var prev, var node))){
 			return false;
 		}
 		try(var ignore = getDataProvider().getSource().openIOTransaction()){
