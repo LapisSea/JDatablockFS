@@ -55,7 +55,7 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 					
 					var annotations = Iters.concat(
 						Iters.of(Annotations.make(IOValue.class), Annotations.makeNullability(IONullability.Mode.NULLABLE)),
-						Iters.from(anns).flatOptionals(field::getAnnotation)
+						Iters.from(anns).flatOptionalsM(field::getAnnotation)
 					).toList();
 					
 					var genType = field.getGenericType(null);
@@ -81,6 +81,10 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	public IOFieldOptional(FieldAccessor<T> accessor){
 		super(accessor);
 		initSizeDescriptor(SizeDescriptor.Fixed.empty());
+	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
 	}
 	
 	@Override

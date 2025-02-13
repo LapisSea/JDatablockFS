@@ -90,6 +90,10 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			return DynamicSupport.calcSize(prov, val);
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.DYNAMIC);
+	}
 	
 	@Override
 	public void init(FieldSet<CTyp> fields){

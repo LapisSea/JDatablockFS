@@ -2,11 +2,14 @@ package com.lapissea.dfs.run.checked;
 
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOSet;
-import org.testng.Assert;
+import com.lapissea.dfs.query.Query;
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.StringJoiner;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class CheckSet<T> implements IOSet<T>{
 	
@@ -15,19 +18,32 @@ public class CheckSet<T> implements IOSet<T>{
 	
 	public CheckSet(IOSet<T> testData) throws IOException{
 		this.testData = testData;
-		copyData(reference);
+		copyTestDataTo(reference);
 		dataEquality();
 	}
 	
 	private void dataEquality() throws IOException{
-		Assert.assertEquals(testData.size(), reference.size(), "Sizes do not match");
-		var copy = HashSet.<T>newHashSet(Math.toIntExact(testData.size()));
-		copyData(copy);
-		Assert.assertEquals(copy.size(), testData.size(), "Number of elements does not match the reported size");
-		Assert.assertEquals(copy, reference);
+		assertThat(testData.size()).as("Reported sizes do not match").isEqualTo(reference.size());
+		var tdCopy = HashSet.<T>newHashSet(Math.toIntExact(testData.size()));
+		copyTestDataTo(tdCopy);
+		assertThat(tdCopy.size()).as("Number of iterated elements does not match the reported size").isEqualTo(reference.size());
+		
+		var missing            = reference.stream().filter(ref -> !tdCopy.contains(ref)).toList();
+		var shouldNotBePresent = tdCopy.stream().filter(ref -> !reference.contains(ref)).toList();
+		
+		if(missing.isEmpty() && shouldNotBePresent.isEmpty()){
+			return;
+		}
+		
+		StringJoiner sj = new StringJoiner("\n");
+		sj.add("Element equality failed:");
+		if(!missing.isEmpty()) sj.add("\tMissing: " + missing);
+		if(!shouldNotBePresent.isEmpty()) sj.add("\tShould not be present: " + shouldNotBePresent);
+		
+		throw new AssertionError(sj.toString());
 	}
 	
-	private void copyData(Set<T> copy) throws IOException{
+	private void copyTestDataTo(Set<T> copy) throws IOException{
 		var iter = testData.iterator();
 		while(iter.hasNext()){
 			if(!copy.add(iter.ioNext())){
@@ -40,7 +56,7 @@ public class CheckSet<T> implements IOSet<T>{
 	public boolean add(T value) throws IOException{
 		var a = testData.add(value);
 		var b = reference.add(value);
-		Assert.assertEquals(a, b, "add() failed: previous values are not equal");
+		assertThat(a).as("add() failed: previous values are not equal").isEqualTo(b);
 		dataEquality();
 		return a;
 	}
@@ -48,7 +64,7 @@ public class CheckSet<T> implements IOSet<T>{
 	public boolean remove(T value) throws IOException{
 		var a = testData.remove(value);
 		var b = reference.remove(value);
-		Assert.assertEquals(a, b);
+		assertThat(a).as("remove failed: result differs from reference").isEqualTo(b);
 		dataEquality();
 		return a;
 	}
@@ -62,14 +78,14 @@ public class CheckSet<T> implements IOSet<T>{
 	public boolean contains(T value) throws IOException{
 		var a = testData.contains(value);
 		var b = reference.contains(value);
-		Assert.assertEquals(a, b, "contains failed: result differs from reference");
+		assertThat(a).as("contains failed: result differs from reference").isEqualTo(b);
 		return a;
 	}
 	@Override
 	public long size(){
 		var a = testData.size();
 		var b = reference.size();
-		Assert.assertEquals(a, b);
+		assertThat(a).as("Reported size does not match").isEqualTo(b);
 		return a;
 	}
 	@Override
@@ -82,13 +98,15 @@ public class CheckSet<T> implements IOSet<T>{
 			public boolean hasNext() throws IOException{
 				var a = iter.hasNext();
 				var b = !copy.isEmpty();
-				Assert.assertEquals(a, b);
+				assertThat(a).as("iterator() failed: hasNext results are not equal").isEqualTo(b);
 				return a;
 			}
 			@Override
 			public T ioNext() throws IOException{
 				var val = iter.ioNext();
-				Assert.assertTrue(copy.remove(val));
+				assertThat(copy.remove(val))
+					.as("iterator() failed: Next element is not contained within the reference")
+					.isTrue();
 				return val;
 			}
 		};
@@ -110,5 +128,10 @@ public class CheckSet<T> implements IOSet<T>{
 	@Override
 	public String toString(){
 		return testData.toString();
+	}
+	
+	@Override
+	public Query<T> query(){
+		return new CheckQuery<>(testData.query(), reference);
 	}
 }

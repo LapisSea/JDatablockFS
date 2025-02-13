@@ -1,6 +1,5 @@
 package com.lapissea.dfs.run;
 
-import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.logging.Log;
@@ -14,8 +13,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReadOnlyTests{
 	
@@ -36,18 +34,18 @@ public class ReadOnlyTests{
 	@Test
 	public void simpleInstanceStruct(){
 		var struct = Struct.of(Simple.class, STATE_DONE);
-		assertTrue(struct.needsBuilderObj(), "Struct needs builder obj");
+		assertThat(struct.needsBuilderObj()).as("Struct needs builder obj").isTrue();
 		Log.info("Ok: {}#green", struct);
 	}
 	
 	@Test(dependsOnMethods = "simpleInstanceStruct")
-	public void generateProxy(){
+	public void generateProxy() throws IllegalAccessException{
 		var res     = BuilderProxyCompiler.getProxy(Simple.class);
 		var bStruct = Struct.of(res, STATE_DONE);
 		var b       = bStruct.make();
 		bStruct.getFields().requireExact(int.class, "val").set(null, b, 123);
 		var simple = b.build();
-		assertEquals(simple, new Simple(123));
+		assertThat(simple).isEqualTo(new Simple(123));
 	}
 	
 	@Test(dependsOnMethods = {"simpleInstanceStruct", "generateProxy"})
@@ -56,15 +54,7 @@ public class ReadOnlyTests{
 		var pipe   = StandardStructPipe.of(struct, STATE_DONE);
 		
 		var inst = new Simple(69);
-		
-		var mem = Cluster.emptyMem();
-		var ch  = AllocateTicket.bytes(64).submit(mem);
-		
-		pipe.write(ch, inst);
-		
-		var read = pipe.readNew(ch, null);
-		
-		assertEquals(read, inst);
+		TestUtils.checkPipeInOutEquality(pipe, inst);
 	}
 	
 }

@@ -7,8 +7,10 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 
 public class Image extends IOInstance.Managed<Image>{
+	static{ allowFullAccess(MethodHandles.lookup()); }
 	
 	@IOValue
 	public static class Pixel extends IOInstance.Managed<Pixel>{

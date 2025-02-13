@@ -6,10 +6,12 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
+import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +32,7 @@ public final class FieldDef extends IOInstance.Managed<FieldDef>{
 		@IOValue
 		final class AnReferenceType extends Managed<AnReferenceType> implements IOAnnotation{
 			public final IOValue.Reference.PipeType type;
-			public AnReferenceType(IOValue.Reference.PipeType type){ this.type = type; }
+			public AnReferenceType(IOValue.Reference.PipeType type){ this.type = Objects.requireNonNull(type); }
 		}
 		
 		sealed interface AnDependencies extends IOAnnotation{
@@ -58,6 +60,15 @@ public final class FieldDef extends IOInstance.Managed<FieldDef>{
 		final class AnUnsigned extends Managed<AnUnsigned> implements IOAnnotation{ }
 		
 		final class AnUnsafe extends Managed<AnUnsafe> implements IOAnnotation{ }
+		
+		@IOValue
+		final class AnNumberSize extends Managed<AnNumberSize> implements IOAnnotation{
+			public final String fieldName;
+			
+			public AnNumberSize(String fieldName){
+				this.fieldName = Objects.requireNonNull(fieldName);
+			}
+		}
 		
 	}
 	
@@ -87,24 +98,28 @@ public final class FieldDef extends IOInstance.Managed<FieldDef>{
 		
 		var isDynamic = IOFieldTools.isGeneric(field);
 		
-		IOFieldTools.getNullabilityOpt(field)
-		            .map(IOAnnotation.AnNullability::new)
-		            .ifPresent(annotations::add);
+		if(IOFieldTools.getNullabilityOpt(field) instanceof Some(var mode)){
+			annotations.add(new IOAnnotation.AnNullability(mode));
+		}
 		
 		if(isDynamic) annotations.add(new IOAnnotation.AnGeneric());
 		
-		field.getAccessor().getAnnotation(IOValue.Reference.class)
-		     .map(IOValue.Reference::dataPipeType)
-		     .map(IOAnnotation.AnReferenceType::new)
-		     .ifPresent(annotations::add);
+		if(field.getAccessor().getAnnotation(IOValue.Reference.class) instanceof Some(var ann)){
+			annotations.add(new IOAnnotation.AnReferenceType(ann.dataPipeType()));
+		}
 		
 		var depNames = field.getDependencies().iter().toModList(IOField::getName);
-		if(field.getType().isArray()) depNames.remove(FieldNames.collectionLen(field.getAccessor()));
 		if(isDynamic) depNames.remove(FieldNames.genericID(field.getAccessor()));
 		switch(depNames.size()){
 			case 0 -> { }
 			case 1 -> annotations.add(new IOAnnotation.AnDependencies.Single(depNames.getFirst()));
 			default -> annotations.add(new IOAnnotation.AnDependencies.Multi(depNames));
+		}
+		
+		if(field.getAnnotation(IODependency.VirtualNumSize.class) instanceof Some(var ann)){
+			annotations.add(new IOAnnotation.AnNumberSize(IOFieldTools.getNumSizeName(field, ann)));
+		}else if(field.getAnnotation(IODependency.NumSize.class) instanceof Some(var ann)){
+			annotations.add(new IOAnnotation.AnNumberSize(ann.value()));
 		}
 		
 		if(field.getAccessor().hasAnnotation(IOValue.Unsigned.class)) annotations.add(new IOAnnotation.AnUnsigned());

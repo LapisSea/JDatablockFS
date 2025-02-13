@@ -8,24 +8,51 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.stream.LongStream;
 
 public abstract class CursorIOData implements IOInterface{
+	
+	private static final Map<IOInterface, Thread> TO_SHUTDOWN = new IdentityHashMap<>();
+	
+	protected static synchronized <T extends IOInterface & Closeable> void bindCloseOnShutdown(T data){
+		var shutdownThread = Thread.ofVirtual().name(data + " flusher").unstarted(() -> {
+			try{
+				data.close();
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+		});
+		Runtime.getRuntime().addShutdownHook(shutdownThread);
+		TO_SHUTDOWN.put(data, shutdownThread);
+	}
+	protected static synchronized <T extends IOInterface & Closeable> void unbindCloseOnShutdown(T data){
+		var thread = TO_SHUTDOWN.remove(data);
+		if(thread == null) return;
+		try{
+			Runtime.getRuntime().removeShutdownHook(thread);
+		}catch(IllegalStateException ignore){ }
+	}
 	
 	@SuppressWarnings("resource")
 	public final class CursorRandomIO implements RandomIO{
 		
 		private long pos;
 		
-		public CursorRandomIO(){ }
+		public CursorRandomIO(){
+			if(closed) throw new IllegalStateException("closed");
+		}
 		
 		public CursorRandomIO(long pos){
+			if(closed) throw new IllegalStateException("closed");
 			if(pos<0) throw new IndexOutOfBoundsException(pos);
 			this.pos = pos;
 		}
@@ -311,6 +338,7 @@ public abstract class CursorIOData implements IOInterface{
 	protected long used;
 	
 	private final boolean readOnly;
+	private       boolean closed;
 	
 	@SuppressWarnings("unused")
 	private       boolean             transactionOpen;
@@ -320,6 +348,8 @@ public abstract class CursorIOData implements IOInterface{
 		this.readOnly = readOnly;
 		this.hook = hook;
 	}
+	
+	protected void markClosed(){ closed = true; }
 	
 	private void logWriteEvent(long single){
 		logWriteEvent(LongStream.of(single));
@@ -345,7 +375,7 @@ public abstract class CursorIOData implements IOInterface{
 		return new CursorRandomIO();
 	}
 	@Override
-	public RandomIO ioAt(long offset){
+	public RandomIO ioAt(long offset) throws IOException{
 		return new CursorRandomIO(offset);
 	}
 	

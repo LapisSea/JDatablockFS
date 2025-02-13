@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="DisplayHost" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.tools.server.DisplayHost" />
-    <module name="run" />
-    <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Ddfs.tools.renderer.errorLogLevel=STACK -Ddfs.tools.jitWarmup=false -Ddfs.tools.drawDebug=false -DinitialData=sessions.dfs" />
+    <module name="jdbfs-tools" />
+    <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Ddfs.tools.renderer.errorLogLevel=STACK -Ddfs.tools.jitWarmup=false -Ddfs.tools.drawDebug=false" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />
     <extension name="coverage">
       <pattern>

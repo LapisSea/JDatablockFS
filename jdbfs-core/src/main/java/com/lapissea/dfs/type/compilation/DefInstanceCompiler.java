@@ -5,6 +5,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.GetAnnotation;
@@ -13,12 +14,15 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.CompilationTools.FieldStub;
 import com.lapissea.dfs.type.compilation.CompilationTools.Style;
 import com.lapissea.dfs.type.field.Annotations;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.PerKeyLock;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
@@ -59,7 +63,6 @@ import java.util.function.Function;
 import static com.lapissea.dfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
 import static com.lapissea.dfs.type.compilation.JorthUtils.writeAnnotations;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NOT_NULL;
-import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class DefInstanceCompiler{
@@ -97,16 +100,17 @@ public final class DefInstanceCompiler{
 	}
 	
 	
-	//////////////////////////////// DATA /////////////////////////////////
+	/// ///////////////////////////// DATA /////////////////////////////////
 	
 	
 	private record Specials(
-		Optional<Method> set,
-		Optional<Method> toStr,
-		Optional<Method> toShortStr
+		Match<Method> set,
+		Match<Method> toStr,
+		Match<Method> toShortStr
 	){ }
 	
-	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
+	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter,
+	                         Optional<FieldStub> setter) implements GetAnnotation{
 		IterablePP<FieldStub> stubs(){ return Iters.ofPresent(getter, setter); }
 		@Override
 		public String toString(){
@@ -116,13 +120,19 @@ public final class DefInstanceCompiler{
 			       setter.map(v -> " setter: " + v).orElse("") +
 			       "}";
 		}
+		@Override
+		public <T extends Annotation> T get(Class<T> annotationClass){
+			var res = Iters.from(annotations).firstMatching(a -> a.annotationType() == annotationClass);
+			//noinspection unchecked
+			return (T)res.orElse(null);
+		}
 	}
 	
 	record CompletionInfo<T extends IOInstance<T>>(
 		Class<T> base, Class<T> completed,
 		Set<String> completedGetters
 	){
-		record Weak<T extends IOInstance<T>>(
+		record WeakInfo<T extends IOInstance<T>>(
 			WeakReference<Class<T>> base, WeakReference<Class<T>> completed,
 			Set<String> completedGetters
 		){
@@ -133,8 +143,8 @@ public final class DefInstanceCompiler{
 				return new CompletionInfo<>(base, completed, completedGetters);
 			}
 		}
-		Weak<T> weakRef(){
-			return new Weak<>(new WeakReference<>(base), new WeakReference<>(completed), completedGetters);
+		WeakInfo<T> weakRef(){
+			return new WeakInfo<>(new WeakReference<>(base), new WeakReference<>(completed), completedGetters);
 		}
 		
 		CompletionInfo{
@@ -143,16 +153,16 @@ public final class DefInstanceCompiler{
 			Objects.requireNonNull(completedGetters);
 		}
 		
-		private static final Map<Class<?>, CompletionInfo.Weak<?>> COMPLETION_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
-		private static final PerKeyLock<Class<?>>                  COMPLETION_LOCK  = new PerKeyLock<>();
+		private static final Map<Class<?>, WeakInfo<?>> COMPLETION_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
+		private static final PerKeyLock<Class<?>>       COMPLETION_LOCK  = new PerKeyLock<>();
 		
 		@SuppressWarnings("unchecked")
-		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
+		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf) throws IllegalAccessException{
 			var c = getCached(interf);
 			if(c != null) return c;
 			
 			return COMPLETION_LOCK.syncGet(interf, () -> {
-				var cachedWeak = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
+				var cachedWeak = (WeakInfo<T>)COMPLETION_CACHE.get(interf);
 				if(cachedWeak != null){
 					var cached = cachedWeak.deref();
 					if(cached != null) return cached;
@@ -166,12 +176,13 @@ public final class DefInstanceCompiler{
 		
 		@SuppressWarnings("unchecked")
 		private static <T extends IOInstance<T>> CompletionInfo<T> getCached(Class<T> interf){
-			var cached = (CompletionInfo.Weak<T>)COMPLETION_CACHE.get(interf);
+			var cached = (WeakInfo<T>)COMPLETION_CACHE.get(interf);
 			if(cached != null) return cached.deref();
 			return null;
 		}
 		
-		private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf){
+		private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf) throws IllegalAccessException{
+			var interfAccess = Access.findAccess(interf, Access.Mode.PACKAGE);
 			
 			var getters = new ArrayList<FieldStub>();
 			var setters = new ArrayList<FieldStub>();
@@ -243,10 +254,15 @@ public final class DefInstanceCompiler{
 					BytecodeUtils.printClass(file);
 				}
 				
-				//noinspection unchecked
-				var completed = (Class<T>)Access.privateLookupIn(interf).defineClass(file);
+				Class<T> completed;
+				try{
+					//noinspection unchecked
+					completed = (Class<T>)interfAccess.defineClass(interf, file);
+				}catch(AccessProvider.Defunct|IllegalAccessException e){
+					throw new ShouldNeverHappenError(e);
+				}
 				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters));
-			}catch(IllegalAccessException|MalformedJorth e){
+			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}
 		}
@@ -265,22 +281,22 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	public record Key<T extends IOInstance<T>>(Class<T> clazz, Optional<Set<String>> includeNames){
+	public record Key<T extends IOInstance<T>>(Class<T> clazz, Match<Set<String>> includeNames){
 		public Key(Class<T> clazz){
-			this(clazz, Optional.empty());
+			this(clazz, Match.empty());
 		}
-		public Key(Class<T> clazz, Optional<Set<String>> includeNames){
+		public Key(Class<T> clazz, Match<Set<String>> includeNames){
 			this.clazz = Objects.requireNonNull(clazz);
 			this.includeNames = includeNames.map(Set::copyOf);
 		}
 		
-		private CompletionInfo<T> complete(){
+		private CompletionInfo<T> complete() throws IllegalAccessException{
 			return CompletionInfo.completeCached(clazz);
 		}
 	}
 	
-	private record Result<T extends IOInstance<T>>(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields,
-	                                               Optional<List<FieldInfo>> oPartialFields){ }
+	private record Result<T extends IOInstance<T>>(Class<T> impl, Match<List<FieldInfo>> oOrderedFields,
+	                                               Match<List<FieldInfo>> oPartialFields){ }
 	
 	private static final class ImplNode<T extends IOInstance<T>>{
 		enum State{
@@ -299,12 +315,16 @@ public final class DefInstanceCompiler{
 			this.key = key;
 		}
 		
-		private void init(Result<T> result){
+		private void init(Result<T> result) throws IllegalAccessException{
 			this.impl = result.impl;
-			dataConstructor = result.oOrderedFields.map(this::getCtor).orElse(null);
-			partialDataConstructor = result.oPartialFields.map(this::getCtor).orElse(null);
+			if(result.oOrderedFields instanceof Some(var fields)){
+				dataConstructor = getCtor(fields);
+			}
+			if(result.oPartialFields instanceof Some(var fields)){
+				partialDataConstructor = getCtor(fields);
+			}
 		}
-		private MethodHandle getCtor(List<FieldInfo> fields){
+		private MethodHandle getCtor(List<FieldInfo> fields) throws IllegalAccessException{
 			try{
 				var ctr = impl.getConstructor(Iters.from(fields).map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
 				return Access.makeMethodHandle(ctr);
@@ -331,7 +351,7 @@ public final class DefInstanceCompiler{
 	
 	private static final String GET_UNMAPPED_CLASS_FN = "$$fetchUnmappedClass";
 	
-	//////////////////////////////// API /////////////////////////////////
+	/// ///////////////////////////// API /////////////////////////////////
 	
 	
 	public static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<?> impl){
@@ -377,7 +397,7 @@ public final class DefInstanceCompiler{
 	}
 	
 	
-	//////////////////////////////// IMPLEMENTATION /////////////////////////////////
+	/// ///////////////////////////// IMPLEMENTATION /////////////////////////////////
 	
 	
 	private static <T extends IOInstance<T>> ImplNode<T> getNode(Key<T> key){
@@ -393,7 +413,11 @@ public final class DefInstanceCompiler{
 			return switch(node.state){
 				case null -> throw new ShouldNeverHappenError();
 				case NEW -> {
-					compileNode(node);
+					try{
+						compileNode(node);
+					}catch(IllegalAccessException e){
+						throw new RuntimeException("Failed to bind generated class: " + interf, e);
+					}
 					yield node;
 				}
 				case COMPILING -> throw new MalformedStruct("Type requires itself to compile");
@@ -405,7 +429,7 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void compileNode(ImplNode<T> node){
+	private static <T extends IOInstance<T>> void compileNode(ImplNode<T> node) throws IllegalAccessException{
 		node.state = ImplNode.State.COMPILING;
 		
 		Key<T> key = node.key;
@@ -433,7 +457,7 @@ public final class DefInstanceCompiler{
 		node.state = ImplNode.State.DONE;
 	}
 	
-	private static <T extends IOInstance<T>> Result<T> compile(CompletionInfo<T> completion, Optional<Set<String>> includeNames, String humanName){
+	private static <T extends IOInstance<T>> Result<T> compile(CompletionInfo<T> completion, Match<Set<String>> includeNames, String humanName){
 		Class<T> completeInter = completion.completed;
 		
 		var getters  = new ArrayList<FieldStub>();
@@ -444,13 +468,19 @@ public final class DefInstanceCompiler{
 		
 		var fieldInfo = mergeStubs(getters, setters);
 		
-		includeNames.ifPresent(strings -> checkIncludeNames(fieldInfo, strings));
+		if(includeNames instanceof Some(var names)){
+			checkIncludeNames(fieldInfo, names);
+		}
 		
-		var orderedFields = getOrder(completeInter, fieldInfo)
-			                    .map(names -> Iters.from(names)
-			                                       .map(name -> Iters.from(fieldInfo).firstMatching(f -> f.name.equals(name)))
-			                                       .toList(Optional::orElseThrow))
-			                    .or(() -> fieldInfo.size()>1? Optional.empty() : Optional.of(fieldInfo));
+		Match<List<FieldInfo>> orderedFields = switch(getOrder(completeInter, fieldInfo)){
+			case Match.Some(List<String> names) -> {
+				var fields = Iters.from(names).toList(name -> {
+					return Iters.from(fieldInfo).filter(f -> f.name.equals(name)).getFirst();
+				});
+				yield Match.of(fields);
+			}
+			case Match.None<?> ignore -> fieldInfo.size()>1? Match.empty() : Match.of(fieldInfo);
+		};
 		
 		checkClass(completeInter, specials, orderedFields);
 		
@@ -461,10 +491,19 @@ public final class DefInstanceCompiler{
 		try{
 			for(int i = 0; ; i++){
 				try{
-					var cls = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName, i);
+					var generatedClass = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName, i);
 					
-					var ordered = orderedFields.flatMap(oFields -> includeNames.map(inc -> Iters.from(oFields).filter(f -> inc.contains(f.name)).toList()));
-					return new Result<>(cls, orderedFields, ordered);
+					Match<List<FieldInfo>> ordered = Match.empty();
+					
+					if(orderedFields instanceof Some(List<FieldInfo> fields) && includeNames instanceof Some(Set<String> included)){
+						ordered = Match.of(
+							Iters.from(fields)
+							     .filter(f -> included.contains(f.name))
+							     .toList()
+						);
+					}
+					
+					return new Result<>(generatedClass, orderedFields, ordered);
 				}catch(LinkageError e){
 					if(!e.getMessage().contains("duplicate class definition")){
 						throw new RuntimeException(e);
@@ -481,8 +520,8 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static void checkIncludeNames(List<FieldInfo> fieldInfo, Set<String> includeNames){
+		var infoNames = Iters.from(fieldInfo).map(FieldInfo::name);
 		for(String includeName : includeNames){
-			var infoNames = Iters.from(fieldInfo).map(FieldInfo::name);
 			if(infoNames.noneMatch(includeName::equals)){
 				throw new IllegalArgumentException(includeName + " is not a valid field name. \n" +
 				                                   "Field names: " + infoNames.joinAsStr(", "));
@@ -490,44 +529,46 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, Optional<List<FieldInfo>> oOrderedFields){
+	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, Match<List<FieldInfo>> oOrderedFields){
+		if(!(specials.set instanceof Some(var set))) return;
 		
-		if(specials.set.isPresent()){
-			var set = specials.set.get();
+		if(!(oOrderedFields instanceof Some(var orderedFields))){
+			throw new MalformedTemplateStruct(interf.getName() + " has a full setter but no argument order. Please add " + IOInstance.Order.class.getName() + " to the type");
+		}
+		
+		if(set.getParameterCount() != orderedFields.size()){
+			throw new MalformedTemplateStruct(set + " has " + set.getParameterCount() + " parameters but has " + orderedFields.size() + " fields");
+		}
+		
+		var parms = set.getGenericParameterTypes();
+		for(int i = 0; i<orderedFields.size(); i++){
+			var field    = orderedFields.get(i);
+			var parmType = parms[i];
 			
-			if(oOrderedFields.isEmpty()){
-				throw new MalformedTemplateStruct(interf.getName() + " has a full setter but no argument order. Please add " + IOInstance.Order.class.getName() + " to the type");
-			}
+			if(field.type.equals(parmType)) continue;
 			
-			var orderedFields = oOrderedFields.get();
-			
-			if(set.getParameterCount() != orderedFields.size()){
-				throw new MalformedTemplateStruct(set + " has " + set.getParameterCount() + " parameters but has " + orderedFields.size() + " fields");
-			}
-			
-			var parms = set.getGenericParameterTypes();
-			for(int i = 0; i<orderedFields.size(); i++){
-				var field    = orderedFields.get(i);
-				var parmType = parms[i];
-				
-				if(field.type.equals(parmType)) continue;
-				
-				//TODO: implement fits type instead of exact match
-				throw new MalformedTemplateStruct(field.name + " has the type of " + field.type.getTypeName() + " but set argument is " + parmType);
-			}
+			//TODO: implement fits type instead of exact match
+			throw new MalformedTemplateStruct(field.name + " has the type of " + field.type.getTypeName() + " but set argument is " + parmType);
 		}
 	}
 	
 	private static <T extends IOInstance<T>> Class<T> generateImpl(
-		CompletionInfo<T> completion, Optional<Set<String>> includeNames, Specials specials,
-		List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields,
+		CompletionInfo<T> completion, Match<Set<String>> includeNames, Specials specials,
+		List<FieldInfo> fieldInfo, Match<List<FieldInfo>> orderedFields,
 		String humanName, int numAddon
 	){
 		var interf = completion.completed;
 		
+		AccessProvider interfAccess;
+		try{
+			interfAccess = Access.findAccess(interf, Access.Mode.PACKAGE);
+		}catch(IllegalAccessException e){
+			throw new RuntimeException("Could not find access to generate implementation", e);
+		}
+		
 		var implName = interf.getName() +
 		               IOInstance.Def.IMPL_NAME_POSTFIX + (numAddon != 0? "~" + numAddon : "") +
-		               includeNames.map(n -> Iters.from(n).joinAsStr("_", "€€fields~", "")).orElse("");
+		               includeNames.map(n -> Iters.from(n).joinAsStr("_", IOInstance.Def.IMPL_FIELDS_MARK, "")).orElse("");
 		
 		var log = JorthLogger.make();
 		try{
@@ -581,13 +622,12 @@ public final class DefInstanceCompiler{
 				
 				if(Iters.from(fieldInfo).allMatch(
 					f -> f.setter.isPresent() ||
-					     Iters.from(f.annotations).anyMatch(a -> a instanceof IONullability n && n.value() == NULLABLE) ||
+					     IOFieldTools.isNullable(f) ||
 					     List.of(ChunkPointer.class, Optional.class).contains(Utils.typeToRaw(f.type))
 				)){
 					generateDefaultConstructor(writer, includedFields);
-				}else{
-					int a000 = 0;
 				}
+				
 				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
 				if(includeNames.isPresent()){
 					generateDataConstructor(writer, includedOrdered, includeNames, humanName);//Included only fields constructor
@@ -600,26 +640,24 @@ public final class DefInstanceCompiler{
 					var setterNames = Iters.from(setters).toModSet(FieldStub::varName);
 					
 					var dataFields = Iters.from(includedFields).filter(
-						f -> !setterNames.contains(f.name) && (includeNames.isEmpty() || includeNames.get().contains(f.name))
+						f -> !setterNames.contains(f.name) && isFieldIncluded(includeNames, f.name)
 					).toList();
 					if(dataFields.isEmpty()) break readOnlyConstructor;
 					if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
 					
 					var dfSet = Set.copyOf(dataFields);
 					
-					for(Optional<List<FieldInfo>> op : List.of(orderedFields, includedOrdered)){
-						if(op.isEmpty()) continue;
-						var fieldSet = Set.copyOf(op.get());
-						if(dfSet.equals(fieldSet)){
+					for(Match<List<FieldInfo>> op : List.of(orderedFields, includedOrdered)){
+						if(!(op instanceof Some(var fields))) continue;
+						if(dfSet.equals(Set.copyOf(fields))){
 							break readOnlyConstructor;
 						}
 					}
 					
-					generateDataConstructor(writer, Optional.of(dataFields), Optional.empty(), humanName);
+					generateDataConstructor(writer, Match.of(dataFields), Match.empty(), humanName);
 				}
 				
-				if(specials.set.isPresent()){
-					var set = specials.set.get();
+				if(specials.set instanceof Some(var setFn)){
 					
 					for(FieldInfo info : orderedFields.orElseThrow()){
 						writer.write(
@@ -628,11 +666,7 @@ public final class DefInstanceCompiler{
 							info.type);
 					}
 					
-					writer.write(
-						"""
-							public function {} start
-							""",
-						set.getName());
+					writer.write("public function {} start", setFn.getName());
 					
 					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("get #arg {!}", info.name);
@@ -656,9 +690,13 @@ public final class DefInstanceCompiler{
 				BytecodeUtils.printClass(file);
 			}
 			
-			//noinspection unchecked
-			return (Class<T>)Access.privateLookupIn(interf).defineClass(file);
-		}catch(IllegalAccessException|MalformedJorth e){
+			try{
+				//noinspection unchecked
+				return (Class<T>)interfAccess.defineClass(interf, file);
+			}catch(IllegalAccessException|AccessProvider.Defunct e){
+				throw new ShouldNeverHappenError(e);
+			}
+		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate implementation for: " + interf.getName(), e);
 		}
 	}
@@ -676,16 +714,19 @@ public final class DefInstanceCompiler{
 		);
 	}
 	
-	private static Boolean isFieldIncluded(Optional<Set<String>> includeNames, String name){
-		return includeNames.map(ns -> ns.contains(name)).orElse(true);
+	private static boolean isFieldIncluded(Match<Set<String>> includeNames, String name){
+		return switch(includeNames){
+			case Match.None<?> ignored -> true;
+			case Match.Some(var names) -> names.contains(name);
+		};
 	}
 	
 	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorth{
-		if(specials.toStr.isPresent()){
-			generateSpecialToString(interf, writer, specials.toStr.get());
+		if(specials.toStr instanceof Some(var toStr)){
+			generateSpecialToString(interf, writer, toStr);
 		}
-		if(specials.toShortStr.isPresent()){
-			generateSpecialToString(interf, writer, specials.toShortStr.get());
+		if(specials.toShortStr instanceof Some(var toShortStr)){
+			generateSpecialToString(interf, writer, toShortStr);
 		}
 	}
 	
@@ -710,7 +751,7 @@ public final class DefInstanceCompiler{
 				public function <init>
 				start
 					super start
-						get #typ.impl $STRUCT
+						static call #typ.impl $STRUCT
 					end
 				""");
 		
@@ -726,11 +767,10 @@ public final class DefInstanceCompiler{
 		writer.wEnd();
 	}
 	
-	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
-		if(oOrderedFields.filter(d -> !d.isEmpty()).isEmpty()){
+	private static void generateDataConstructor(CodeStream writer, Match<List<FieldInfo>> oOrderedFields, Match<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
+		if(!(oOrderedFields instanceof Some(var orderedFields)) || orderedFields.isEmpty()){
 			return;
 		}
-		var orderedFields = oOrderedFields.get();
 		
 		writer.write(
 			"""
@@ -740,7 +780,7 @@ public final class DefInstanceCompiler{
 					end
 				start
 					super start
-						get #typ.impl $STRUCT
+						static call #typ.impl $STRUCT
 					end
 				""",
 			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
@@ -748,7 +788,7 @@ public final class DefInstanceCompiler{
 		
 		for(int i = 0; i<orderedFields.size(); i++){
 			FieldInfo info     = orderedFields.get(i);
-			boolean   included = includeNames.map(in -> in.contains(info.name)).orElse(true);
+			boolean   included = isFieldIncluded(includeNames, info.name);
 			
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
@@ -782,25 +822,27 @@ public final class DefInstanceCompiler{
 		return Iters.concat(getters, setters).toModSet(FieldStub::varName);
 	}
 	
-	private static Optional<Class<?>> upperSame(Class<?> interf){
+	private static Match<Class<?>> upperSame(Class<?> interf){
 		var its = Iters.from(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toModList();
-		if(its.size() != 1) return Optional.empty();
+		if(its.size() != 1) return Match.empty();
 		
 		Set<String> parentNames = collectNames(its.getFirst());
 		Set<String> thisNames   = collectNames(interf);
 		if(parentNames.equals(thisNames)){
-			return Optional.of(its.getFirst());
+			return Match.of(its.getFirst());
 		}
-		return Optional.empty();
+		return Match.empty();
 	}
-	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
+	private static Match<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order = interf.getAnnotation(IOInstance.Order.class);
 		if(order == null){
 			var its = Iters.from(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toModList();
-			if(its.size() != 1) return Optional.empty();
+			if(its.size() != 1) return Match.empty();
 			
-			var upper = upperSame(interf);
-			return upper.flatMap(u -> getOrder(u, fieldInfo));
+			if(upperSame(interf) instanceof Some(Class<?> upper)){
+				return getOrder(upper, fieldInfo);
+			}
+			return Match.empty();
 		}
 		
 		var check   = Iters.from(fieldInfo).toModSet(FieldInfo::name);
@@ -818,21 +860,31 @@ public final class DefInstanceCompiler{
 			throw new MalformedTemplateStruct(check + " are not listed in the order annotation");
 		}
 		
-		return Optional.of(ordered);
+		return Match.of(ordered);
 	}
 	
 	private static void defineStatics(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
-				private static final field $STRUCT #Struct
+				private static field $V_STRUCT #Struct
 				
-				function <clinit> start
-					static call #Struct of start
-						class #typ.impl
+				private static function $STRUCT
+					returns #Struct
+				start
+					static call {} isNull start
+						get #typ.impl $V_STRUCT
 					end
-					set #typ.impl $STRUCT
+					if start
+						static call #Struct of start
+							class #typ.impl
+						end
+						set #typ.impl $V_STRUCT
+					end
+					get #typ.impl $V_STRUCT
 				end
-				""");
+				
+				""",
+			Objects.class);
 		
 		unmappedClassFn(writer, baseClazz);
 	}
@@ -946,9 +998,9 @@ public final class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, Collection<FieldStub> getters, Collection<FieldStub> setters){
-		var set        = Optional.<Method>empty();
-		var toStr      = Optional.<Method>empty();
-		var toShortStr = Optional.<Method>empty();
+		var set        = Match.<Method>empty();
+		var toStr      = Match.<Method>empty();
+		var toShortStr = Match.<Method>empty();
 		
 		var q = new ArrayDeque<Class<?>>(2);
 		q.addLast(interf);
@@ -957,15 +1009,18 @@ public final class DefInstanceCompiler{
 			var clazz = q.removeFirst();
 			last.add(clazz);
 			
-			toStr = toStr.or(() -> {
-				for(Method m : clazz.getDeclaredMethods()){
-					if(isToString(clazz, m, "toString")){
-						return Optional.of(m);
-					}
-				}
-				return Optional.empty();
-			});
-			toShortStr = toShortStr.or(() -> Iters.from(clazz.getMethods()).firstMatching(m -> isToString(clazz, m, "toShortString")));
+			if(toStr.isEmpty()){
+				toStr = Iters.from(clazz.getDeclaredMethods())
+				             .filter(m -> isToString(clazz, m, "toString"))
+				             .matchFirst();
+			}
+			
+			if(toShortStr.isEmpty()){
+				toShortStr = Iters.from(clazz.getDeclaredMethods())
+				                  .filter(m -> isToString(clazz, m, "toShortString"))
+				                  .matchFirst();
+			}
+			
 			if(toStr.isPresent() && toShortStr.isPresent()) break;
 			
 			if(q.isEmpty()){
@@ -988,14 +1043,14 @@ public final class DefInstanceCompiler{
 			if(List.of("set", "setAll").contains(method.getName())){
 				if(method.getReturnType() != void.class) throw new MalformedTemplateStruct("set can not have a return type");
 				if(set.isPresent()) throw new MalformedTemplateStruct("duplicate set method");
-				set = Optional.of(method);
+				set = Match.of(method);
 				continue;
 			}
-			
-			CompilationTools.asStub(method).ifPresentOrElse(
-				st -> (st.isGetter()? getters : setters).add(st),
-				() -> { throw new MalformedTemplateStruct(method + " is not a setter or a getter!"); }
-			);
+			if(CompilationTools.asStub(method) instanceof Some(var stub)){
+				(stub.isGetter()? getters : setters).add(stub);
+			}else{
+				throw new MalformedTemplateStruct(method + " is not a setter or a getter!");
+			}
 		}
 		
 		return new Specials(set, toStr, toShortStr);

@@ -11,13 +11,14 @@
 !/jdbfs-run/
 !/Jorth/
 !/Fuzzer/
+!/demos
 !pom.xml
 
 !/.idea/
 !/runDir/
 !/.github/
 
-/*/target/
+target/
 
 *.iml
 

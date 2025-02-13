@@ -142,7 +142,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				throw new UseFixed();
 			}
 			return new PipeFieldCompiler.Result<>(result, state.ruleReply);
-		}, true);
+		}, STATE_DONE);
 		if(type instanceof Struct.Unmanaged){
 			throw new IllegalArgumentException("Unmanaged types are not supported");
 		}

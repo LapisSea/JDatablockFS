@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -30,6 +31,11 @@ public abstract sealed class BitField<T extends IOInstance<T>, Type> extends IOF
 		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
 			super(accessor, sizeDescriptor);
+		}
+		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			throw NotImplementedException.infer();//TODO: implement NoIO.computeTypeFlags()
 		}
 		
 		@Override

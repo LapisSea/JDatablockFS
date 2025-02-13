@@ -6,6 +6,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.IllegalAnnotation;
 import com.lapissea.dfs.exceptions.IllegalField;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.internal.MyUnsafe;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GetAnnotation;
@@ -21,6 +22,7 @@ import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.access.FunctionalReflectionAccessor;
+import com.lapissea.dfs.type.field.access.FunctionalVarHandleAccessor;
 import com.lapissea.dfs.type.field.access.ReflectionAccessor;
 import com.lapissea.dfs.type.field.access.UnsafeAccessor;
 import com.lapissea.dfs.type.field.access.VarHandleAccessor;
@@ -33,6 +35,8 @@ import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -44,7 +48,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -53,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -67,7 +71,16 @@ public final class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
+	private static final AccessType FIELD_ACCESS;
+	
+	static{
+		var acc = ConfigDefs.FIELD_ACCESS_TYPE.resolveLocking();
+		if(acc == AccessType.UNSAFE && MyUnsafe.hasNoObjectFieldOffset()){
+			Log.info("Could not find Unsafe.objectFieldOffset method. Unsafe field access will be disabled.");
+			acc = AccessType.VAR_HANDLE;
+		}
+		FIELD_ACCESS = acc;
+	}
 	
 	/**
 	 * Scans an unmanaged struct for
@@ -272,13 +285,13 @@ public final class FieldCompiler{
 		var functionFields = new HashMap<String, GetSet>();
 		
 		hangingMethods.removeIf(hangingMethod -> {
-			var stub = CompilationTools.asStub(hangingMethod);
-			stub.ifPresent(st -> {
-				var p = functionFields.computeIfAbsent(st.varName(), n -> new GetSet());
-				if(st.isGetter()) p.getter = hangingMethod;
+			if(CompilationTools.asStub(hangingMethod) instanceof Some(var stub)){
+				var p = functionFields.computeIfAbsent(stub.varName(), n -> new GetSet());
+				if(stub.isGetter()) p.getter = hangingMethod;
 				else p.setter = hangingMethod;
-			});
-			return stub.isPresent();
+				return true;
+			}
+			return false;
 		});
 		
 		checkInvalidFunctionOnlyFields(functionFields, cl);
@@ -314,7 +327,19 @@ public final class FieldCompiler{
 				}
 			}
 			
-			fields.add(FunctionalReflectionAccessor.make(struct, name, getter, Optional.ofNullable(setter), annotations, type));
+			fields.add(switch(FIELD_ACCESS){
+				case UNSAFE, VAR_HANDLE -> {
+					try{
+						yield new FunctionalVarHandleAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+					}catch(IllegalAccessException ex){
+						throw new IllegalField(
+							"fmt", "Could not make VarHandle accessor for field {#red{}.{}#}! Cause:\n{}",
+							struct.getType().getName(), name, ex
+						);
+					}
+				}
+				case REFLECTION -> new FunctionalReflectionAccessor<>(struct, annotations, getter, Match.ofNullable(setter), name, type);
+			});
 		}
 		return fields;
 	}
@@ -352,8 +377,8 @@ public final class FieldCompiler{
 				var getter = pickGSMethod(ioMethods, field, true);
 				var setter = pickGSMethod(ioMethods, field, false);
 				
-				getter.ifPresent(reportField);
-				setter.ifPresent(reportField);
+				if(getter != null) reportField.accept(getter);
+				if(setter != null) reportField.accept(setter);
 				
 				Type   type      = getType(field);
 				String fieldName = getFieldName(field);
@@ -365,17 +390,17 @@ public final class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("fmt", e, "Failed to scan field {#red #{}} on {}#yellow", field.getName(), struct.cleanName());
+				throw new MalformedStruct("fmt", e, "Failed to scan field {}#red on {}#yellow", field.getName(), struct.cleanName());
 			}
 		}
 		return fields;
 	}
-	private static Optional<Method> pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean getter){
+	private static Method pickGSMethod(IterablePP<Method> ioMethods, Field field, boolean getter){
 		return ioMethods.firstMatching(m -> {
-			if(!IOFieldTools.isIOField(m)) return false;
-			var name = CompilationTools.asStub(m).filter(s -> s.isGetter() == getter).map(CompilationTools.FieldStub::varName);
-			return name.filter(n -> n.equals(getFieldName(field))).isPresent();
-		});
+			return IOFieldTools.isIOField(m) &&
+			       (getter? CompilationTools.asGetterStub(m) : CompilationTools.asSetterStub(m)) instanceof Some(var stub) &&
+			       stub.varName().equals(getFieldName(field));
+		}).orElse(null);
 	}
 	
 	private static <T extends IOInstance<T>> void checkInvalidFunctionOnlyFields(Map<String, GetSet> functionFields, Class<T> cl){
@@ -465,7 +490,7 @@ public final class FieldCompiler{
 		Preload.preloadFn(Annotations.class, "make", IOValue.class);
 	}
 	
-	public static Collection<Class<?>> getWrapperTypes(){
+	public static SequencedSet<Class<?>> getWrapperTypes(){
 		return FieldRegistry.getWrappers();
 	}
 }

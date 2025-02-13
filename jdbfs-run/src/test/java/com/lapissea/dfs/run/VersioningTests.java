@@ -8,17 +8,18 @@ import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LateInit;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class VersioningTests{
 	
@@ -30,12 +31,12 @@ public class VersioningTests{
 			"""
 				extends #IOInstance.Managed<{0}>
 				public class {0} start
-					
+				
 					template-for #val in {1} start
 						@ #IOValue
 						public field #val.name #val.type
 					end
-					
+				
 					public function <init> start
 						super start end
 						template-for #val in {1} start
@@ -114,11 +115,13 @@ public class VersioningTests{
 		T obj = (T)cl.roots()
 		             .require(1, IOInstance.class);
 		
-		var type  = obj.getThisStruct();
+		var type = obj.getThisStruct();
+		
 		var names = type.getFields().mapped(IOField::getName).toModSet();
-		Assert.assertEquals(names, Set.of("a"));
+		assertThat(names).containsExactlyInAnyOrder("a");
+		
 		var aField = type.getFields().requireExact(int.class, "a");
-		Assert.assertEquals(aField.get(null, obj), 1);
+		assertThat(aField.get(null, obj)).as("field has a wrong value").isEqualTo(1);
 	}
 	
 	public enum TestNames{
@@ -140,8 +143,8 @@ public class VersioningTests{
 		var obj = (List<Enum<?>>)cl.roots()
 		                           .require("names", GenericContainer.class).value;
 		
-		var names = obj.stream().map(Enum::name).toList();
-		Assert.assertEquals(names, List.of("FOO", "BAR"));
+		var names = Iters.from(obj).toList(Enum::name);
+		assertThat(names).containsExactly("FOO", "BAR");
 	}
 	
 }

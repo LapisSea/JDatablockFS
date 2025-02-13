@@ -9,6 +9,7 @@ import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
 import com.lapissea.dfs.objects.collections.IOTreeSet;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeRunnable;
 
@@ -252,7 +253,7 @@ public final class RandomActions{
 		var th    = Runtime.getRuntime().availableProcessors() + 1;
 		var iter  = 500_000_000;
 		var total = iter*(long)th;
-		IntStream.range(0, th).mapToObj(ti -> Thread.ofPlatform().start(() -> {
+		Iters.range(0, th).mapToObj(ti -> Thread.ofPlatform().start(() -> {
 			var r = new RawRandom(69L*ti);
 			try(var io = MemoryData.builder().withCapacity(8).withUsedLength(8).build().io()){
 				for(int i = 0; i<iter; i++){

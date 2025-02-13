@@ -53,11 +53,15 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 			return arr == null? 0 : BitUtils.bitsToBytes(arr.length);
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	private static final boolean[] DEFAULT_VAL = new boolean[0];
 	@Override
 	public boolean[] get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
 	@Override
@@ -91,6 +95,6 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = arraySize.getValue(ioPool, instance);
-		src.skipExact(size);
+		src.skipExact(BitUtils.bitsToBytes(size));
 	}
 }

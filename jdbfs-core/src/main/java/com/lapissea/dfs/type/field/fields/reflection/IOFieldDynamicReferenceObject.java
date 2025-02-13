@@ -55,7 +55,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		@Override
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			return List.of(
-				Behaviour.of(IONullability.class, BehaviourSupport::ioNullability),
+				Behaviour.noop(IONullability.class),
 				Behaviour.of(IOValue.Generic.class, BehaviourSupport::genericID),
 				Behaviour.of(IOValue.Reference.class, BehaviourSupport::referenceCompanion)
 			);
@@ -90,6 +90,10 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		if(getNullability() == IONullability.Mode.DEFAULT_IF_NULL){
 			throw new MalformedStruct("DEFAULT_IF_NULL is not supported on dynamic fields!");
 		}
+	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.DYNAMIC);
 	}
 	
 	@Override

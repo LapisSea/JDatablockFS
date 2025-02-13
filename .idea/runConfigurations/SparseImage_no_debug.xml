@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="SparseImage no debug" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.dfs.run.sparseimage.SparseImage" />
-    <module name="run" />
+    <module name="jdbfs-run" />
     <option name="PROGRAM_PARAMETERS" value="-iterations 10" />
     <option name="VM_PARAMETERS" value="--finalization=disabled -Ddfs.printCompilation=false" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/runDir/main" />

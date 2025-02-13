@@ -32,12 +32,14 @@ import com.lapissea.dfs.type.string.ToStringFormat;
 import com.lapissea.dfs.type.string.ToStringFragment;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -54,6 +56,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -78,6 +81,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		//Preload for faster first start
 		Preload.preload(DefInstanceCompiler.class);
 		Preload.preload(FieldCompiler.class);
+	}
+	
+	public interface FieldRef<T, V> extends Function<T, V>, Serializable{
+	
 	}
 	
 	/**
@@ -143,17 +150,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				throw new ClassCastException(instanceClass.getName() + " is not unmanaged!");
 			}
 			
-			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, false);
+			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, StagedInit.STATE_NOT_STARTED);
 		}
 		
-		private final NewUnmanaged<T> unmanagedConstructor;
+		private       NewUnmanaged<T> unmanagedConstructor;
 		private final boolean         hasDynamicFields;
 		private       FieldSet<T>     unmanagedStaticFields;
 		
-		private Unmanaged(Class<T> type, boolean runNow){
-			super(type, runNow);
+		private Unmanaged(Class<T> type, int syncStage){
+			super(type, syncStage);
 			hasDynamicFields = UtilL.instanceOf(getType(), IOInstance.Unmanaged.DynamicFields.class);
-			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
 		}
 		
 		public boolean hasDynamicFields(){
@@ -161,7 +167,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
-			return unmanagedConstructor.make(provider, identity, type);
+			var ctor = unmanagedConstructor;
+			if(ctor == null) ctor = initConstructor();
+			return ctor.make(provider, identity, type);
+		}
+		private NewUnmanaged<T> initConstructor(){
+			try{
+				return unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, true);
+			}catch(IllegalAccessException e){
+				throw new RuntimeException("Could not create constructor for " + cleanFullName(), e);
+			}
 		}
 		
 		@Deprecated
@@ -181,7 +196,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				fields = generatedFields();
 			}catch(Throwable e){
-				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 			}
 			return instanceToString0(
 				ioPool, instance, settings,
@@ -219,7 +234,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
 		validateStructType(instanceClass);
-		var s = structOfType((Class<? extends IOInstance>)instanceClass, minRequestedStage == STATE_DONE);
+		var s = structOfType((Class<? extends IOInstance>)instanceClass, minRequestedStage);
+		//Still wait because class may be cached but initialized at a lower stage
 		s.waitForState(minRequestedStage);
 		return s;
 	}
@@ -245,7 +261,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return Optional.empty();
 		}
 		
-		var s = structOfType((Class<? extends IOInstance>)instanceClass, false);
+		var s = structOfType((Class<? extends IOInstance>)instanceClass, STATE_NOT_STARTED);
 		return Optional.of(s);
 	}
 	
@@ -277,7 +293,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 */
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
 		try{
-			var s = structOfType(instanceClass, minRequestedStage == STATE_DONE);
+			var s = structOfType(instanceClass, minRequestedStage);
+			//Still wait because class may be cached but initialized at a lower stage
 			s.waitForState(minRequestedStage);
 			return s;
 		}catch(Throwable e){
@@ -305,14 +322,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	 */
 	public static <T extends IOInstance<T>> Struct<T> of(@NotNull Class<T> instanceClass){
 		try{
-			return structOfType(instanceClass, false);
+			return structOfType(instanceClass, STATE_NOT_STARTED);
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);
 		}
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct<T> structOfType(Class<T> instanceClass, boolean runNow){
+	private static <T extends IOInstance<T>> Struct<T> structOfType(Class<T> instanceClass, int syncStage){
 		Objects.requireNonNull(instanceClass);
 		
 		var cached = getCached(instanceClass);
@@ -324,7 +341,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
 		
-		return compile(instanceClass, (MakeStruct<T, Struct<T>>)Struct::new, runNow);
+		return compile(instanceClass, (MakeStruct<T, Struct<T>>)Struct::new, syncStage);
 	}
 	
 	public record FieldStruct<T extends IOInstance<T>>
@@ -367,43 +384,46 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public static final int STATE_CONCRETE_TYPE = 1, STATE_FIELD_MAKE = 2, STATE_INIT_FIELDS = 3;
 	
-	private Struct(Class<T> type, boolean runNow){
+	private Struct(Class<T> type, int syncStage){
 		this.type = Objects.requireNonNull(type);
-		init(runNow, () -> {
-			calcHash();
-			
-			var idef = isDefinition = IOInstance.Def.isDefinition(type);
-			if(idef){
-				concreteType = DefInstanceCompiler.getImpl(type);
-			}else concreteType = type;
-			
-			setInitState(STATE_CONCRETE_TYPE);
-			
-			fields = FieldCompiler.compile(this);
-			needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
-			
-			setInitState(STATE_FIELD_MAKE);
-			
-			for(var field : fields){
-				try{
-					field.init(fields);
-					Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
-				}catch(Throwable e){
-					throw new RuntimeException("Failed to init " + field, e);
+		init(syncStage, runStage -> {
+			switch(runStage){
+				case STATE_CONCRETE_TYPE -> {
+					calcHash();
+					
+					var idef = isDefinition = IOInstance.Def.isDefinition(type);
+					if(idef){
+						concreteType = DefInstanceCompiler.getImpl(type);
+					}else concreteType = type;
 				}
+				case STATE_FIELD_MAKE -> {
+					fields = FieldCompiler.compile(this);
+					needsBuilderObj = fields.anyMatches(IOField::isReadOnly);
+				}
+				case STATE_INIT_FIELDS -> {
+					for(var field : fields){
+						try{
+							field.init(fields);
+							Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
+						}catch(Throwable e){
+							throw new RuntimeException("Failed to init " + field, e);
+						}
+					}
+					
+				}
+				case STATE_DONE -> {
+					poolObjectsSize = calcPoolObjectsSize();
+					poolPrimitivesSize = calcPoolPrimitivesSize();
+					hasPools = calcHasPools();
+					canHavePointers = calcCanHavePointers();
+					
+					if(canHaveDefaultConstructor()){
+						findEmptyConstructor(false);
+					}
+				}
+				default -> throw new NotImplementedException();
 			}
-			
-			setInitState(STATE_INIT_FIELDS);
-			
-			poolObjectsSize = calcPoolObjectsSize();
-			poolPrimitivesSize = calcPoolPrimitivesSize();
-			hasPools = calcHasPools();
-			canHavePointers = calcCanHavePointers();
-			
-			if(canHaveDefaultConstructor()){
-				findEmptyConstructor(false);
-			}
-		});
+		}, null);
 	}
 	
 	
@@ -511,10 +531,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private String stripDef(String name){
 		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
 			var index = name.indexOf(IOInstance.Def.IMPL_COMPLETION_POSTFIX);
-			index = Math.min(index, name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX, index == -1? 0 : index));
 			if(index != -1){
 				name = name.substring(0, index);
 			}
+			name = IOInstance.Def.IMPL_PATTERN_CHECK.matcher(name).replaceFirst("");
 		}
 		return name;
 	}
@@ -717,7 +737,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		try{
 			fields = generatedFields();
 		}catch(Throwable e){
-			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 		}
 		return instanceToString0(ioPool, instance, settings, fields);
 	}
@@ -729,7 +749,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return c;
 	}
 	private IterablePP<IOField<T, ?>> generatedFieldsCompute(){
-		var fs = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME));
+		var fs = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 		return generatedFieldsCache = tryOrderFields(fs).bake();
 	}
 	
@@ -768,7 +788,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					valStr = field.instanceToString(ioPool, instance, set);
 				}
 			}catch(Throwable e){
-				valStr = Optional.of(IOFieldTools.corruptedGet(e));
+				//Tried to get excluded field
+				if(IOInstance.Def.isDefinitionImplementation(getType()) && e instanceof UnsupportedOperationException){
+					valStr = Optional.empty();
+				}else{
+					valStr = Optional.of(IOFieldTools.corruptedGet(e));
+				}
 			}
 			if(!settings.showFieldNames()) return valStr;
 			return valStr.map(value -> field.getName() + settings.fieldValueSeparator() + value);
@@ -858,13 +883,49 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		NewObj.Instance<T> ctor;
 		try{
 			ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, optimized, NEW_OBJ_INST_ARGS);
+		}catch(IllegalAccessException e){
+			if(emptyConstructor != null){
+				if(optimized) Log.warn("Warning! Could not create optimized constructor for: {}#red! Cause:\n{}", cleanFullName(), e);
+				return emptyConstructor;
+			}
+			if(!optimized) throw new RuntimeException("Constructor could not be created!", e);
+			try{
+				ctor = Access.findConstructorArgs(getConcreteType(), NewObj.Instance.class, false, NEW_OBJ_INST_ARGS);
+			}catch(IllegalAccessException ex){
+				throw new RuntimeException("Constructor could not be created!", ex);
+			}
 		}catch(MissingConstructor e){
 			if(needsBuilderObj()){
-				throw new UnsupportedOperationException("Final field types may not have a default constructor: " + this, e);
+				throw new UnsupportedOperationException(Log.fmt("Final field types may not have a default constructor: {}#red", this), e);
 			}
 			throw e;
 		}
 		Objects.requireNonNull(ctor);
+		
+		if(!optimized){
+			var ctorBase = ctor;
+			ctor = new NewObj.Instance<>(){
+				private boolean checked;
+				@Override
+				public T make(){
+					var a = ctorBase.make();
+					if(!checked) check(a);
+					return a;
+				}
+				private void check(T a){
+					if(getRealFields().allMatches(IOField::isReadOnly)){
+						checked = true;
+						return;
+					}
+					var b = ctorBase.make();
+					if(a == b){
+						throw new IllegalStateException(Log.fmt("Constructor should never return the same object: {}#red", cleanFullName()));
+					}
+					checked = true;
+				}
+			};
+		}
+		
 		return emptyConstructor = ctor;
 	}
 	public boolean canHaveDefaultConstructor(){
@@ -952,7 +1013,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
 		if(!needsBuilderObj()) throw new UnsupportedOperationException();
-		var cls = BuilderProxyCompiler.getProxy(this);
+		Class<ProxyBuilder<T>> cls;
+		try{
+			cls = BuilderProxyCompiler.getProxy(this);
+		}catch(IllegalAccessException e){
+			throw new RuntimeException("Could not create proxy for: " + this, e);
+		}
 		var typ = now? Struct.of(cls, STATE_DONE) : Struct.of(cls);
 		
 		if(DEBUG_VALIDATION){

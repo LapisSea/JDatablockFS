@@ -27,6 +27,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -173,7 +174,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	private static final int[] INTEGRITY_DIVS = Iters.range(0, 16).mapExact(BitUtils::makeMask).toArray();
 	
 	public static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
-		readIntegrityBits(raw >>> readBits, raw, totalBits, totalBits - readBits);
+		if(!areIntegrityBitsValid(raw >>> readBits, raw, totalBits, totalBits - readBits)){
+			throw new IOException("Bit integrity failed");
+		}
 	}
 	public static void readIntegrityBits(long remainingBits, long raw, int totalBits, int oneBits) throws IOException{
 		if(!areIntegrityBitsValid(remainingBits, raw, totalBits, oneBits)){
@@ -234,8 +237,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	protected final List<BitField<T, ?>> group;
 	
-	private final List<ValueGeneratorInfo<T, ?>> generators;
-	
 	protected final Optional<BitLayout> safetyBits;
 	
 	private BitFieldMerger(List<BitField<T, ?>> group){
@@ -256,7 +257,11 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			));
 		}
 		initLateData(FieldSet.of(Iters.from(group).flatMap(IOField::getDependencies)));
-		generators = IOFieldTools.fieldsToGenerators(group);
+	}
+	
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of();
 	}
 	
 	@Override
@@ -303,7 +308,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return generators;
+		return Iters.from(group).flatMap(IOField::getGenerators).toModList();
 	}
 	
 }

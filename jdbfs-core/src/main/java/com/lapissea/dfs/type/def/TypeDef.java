@@ -101,7 +101,7 @@ public sealed interface TypeDef{
 	}
 	
 	@IOValue
-	final class DInstance extends IOInstance.Managed<DJustInterface> implements TypeDef{
+	final class DInstance extends IOInstance.Managed<DInstance> implements TypeDef{
 		public final List<FieldDef> fields;
 		public final List<Integer>  fieldOrder;
 		public final Relations      relations;

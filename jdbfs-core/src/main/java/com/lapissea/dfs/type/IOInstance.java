@@ -1,11 +1,13 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -18,6 +20,7 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -31,6 +34,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +45,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.LongFunction;
+import java.util.regex.Pattern;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.INSTANCE;
@@ -85,6 +90,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		String IMPL_NAME_POSTFIX       = "€Impl";
 		String IMPL_COMPLETION_POSTFIX = "€Full";
+		String IMPL_FIELDS_MARK        = "€€fields~";
+		
+		Pattern IMPL_PATTERN_CHECK = Pattern.compile(IMPL_NAME_POSTFIX + "\\d*(" + IMPL_FIELDS_MARK + "\\w+)?$");
 		
 		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
@@ -191,7 +199,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		static <T extends Def<T>> T of(Class<T> clazz){
-			return Struct.of(clazz).make();
+			return Struct.of(clazz, Struct.STATE_CONCRETE_TYPE).make();
 		}
 		
 		static <T extends Def<T>> T of(Class<T> clazz, int arg1){
@@ -250,19 +258,33 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static boolean isDefinition(Class<?> c){
 			return c.isInterface() && UtilL.instanceOf(c, IOInstance.Def.class);
 		}
+		static boolean isDefinitionImplementation(Class<?> c){
+			return !c.isInterface() && UtilL.instanceOf(c, IOInstance.Def.class) && IMPL_PATTERN_CHECK.matcher(c.getName()).find();
+		}
 		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
 			return DefInstanceCompiler.dataConstructor(type);
 		}
 		static <T extends Def<T>, A1> MethodHandle partialDataConstructor(Class<T> type, Set<String> names, boolean fullCtor){
-			return DefInstanceCompiler.dataConstructor(new DefInstanceCompiler.Key<>(type, Optional.of(names)), fullCtor);
+			return DefInstanceCompiler.dataConstructor(new DefInstanceCompiler.Key<>(type, Match.of(names)), fullCtor);
 		}
 		
 		static <T extends Def<T>> Class<T> partialImplementation(Class<T> type, Set<String> includedFieldNames){
-			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Optional.of(includedFieldNames)));
+			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Match.of(includedFieldNames)));
 		}
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
+		static{ allowFullAccess(MethodHandles.lookup()); }
+		
+		protected static void registerAccess(Class<?> lookupProvider){
+			registerAccess0(lookupProvider, true);
+		}
+		protected static void registerAccess(Class<?> lookupProvider, boolean selfCheck){
+			registerAccess0(lookupProvider, selfCheck);
+		}
+		protected static void allowFullAccess(MethodHandles.Lookup lookup){
+			Access.addLookup(lookup);
+		}
 		
 		private Struct<SELF>  thisStruct;
 		private VarPool<SELF> virtualFields;
@@ -457,6 +479,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public interface DynamicFields<SELF extends Unmanaged<SELF>>{
 			@NotNull
 			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
+		}
+		
+		protected static void allowFullAccess(MethodHandles.Lookup lookup){
+			Access.addLookup(lookup);
 		}
 		
 		private final DataProvider   provider;
@@ -716,7 +742,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 	}
 	
-	
 	Struct<SELF> getThisStruct();
 	
 	void allocateNulls(DataProvider provider, GenericContext genericContext) throws IOException;
@@ -745,6 +770,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);
 	}
+	static boolean isInstanceOrSealed(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.class) ||
+		       SealedUtil.getSealedUniverse(type, false).filter(IOInstance::isInstance).isPresent();
+	}
 	
 	static boolean isUnmanaged(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
@@ -753,5 +782,30 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		var isInstance  = isInstance(type);
 		var isUnmanaged = UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance && !isUnmanaged;
+	}
+	
+	
+	static Void allowFullAccessI(MethodHandles.Lookup lookup){
+		Access.addLookup(lookup);
+		return null;
+	}
+	static Void registerAccessI(Class<?> lookupProvider){
+		registerAccess0(lookupProvider, true);
+		return null;
+	}
+	static Void registerAccessI(Class<?> lookupProvider, boolean selfCheck){
+		registerAccess0(lookupProvider, selfCheck);
+		return null;
+	}
+	
+	private static void registerAccess0(Class<?> lookupProvider, boolean selfCheck){
+		AccessProvider provider;
+		if(selfCheck){
+			var callee = Utils.getCallee(2);
+			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider, callee);
+		}else{
+			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider);
+		}
+		Access.registerProvider(provider);
 	}
 }

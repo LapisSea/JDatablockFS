@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.InternalDataOrder;
@@ -23,6 +24,8 @@ import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -42,10 +45,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.SequencedCollection;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
@@ -179,18 +184,21 @@ public final class IOFieldTools{
 		return res;
 	}
 	
-	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
-		Optional<String> dynSiz = Iters.ofPresent(
-			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
-			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> getNumSizeName(field, e)),
+	public static <T extends IOInstance<T>> Match<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
+		String sizeName;
+		if(field.getAnnotation(IODependency.NumSize.class) instanceof Some(var ann)){
+			sizeName = ann.value();
+		}else if(field.getAnnotation(IODependency.VirtualNumSize.class) instanceof Some(var ann)){
+			sizeName = getNumSizeName(field, ann);
+		}else if(field.getAnnotation(IODependency.class) instanceof Some(var ann) && Iters.from(ann.value()).anyEquals(FieldNames.numberSize(field))){
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			Iters.from(field.getAnnotation(IODependency.class)).flatMapArray(IODependency::value).firstMatching(name -> name.equals(FieldNames.numberSize(field)))
-		).findFirst();
-		
-		if(dynSiz.isEmpty()) return Optional.empty();
-		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
+			sizeName = FieldNames.numberSize(field);
+		}else{
+			return Match.empty();
+		}
+		var opt = field.getDeclaringStruct().getFields().exact(NumberSize.class, sizeName);
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("Missing or invalid field should have been checked in annotation logic");
-		return opt;
+		return Match.of(opt.get());
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
@@ -221,6 +229,17 @@ public final class IOFieldTools{
 		return acc;
 	}
 	
+	public static boolean isNullable(GetAnnotation holder){
+		return isNullable(new AnnotatedType(){
+			@Override
+			public Map<Class<? extends Annotation>, ? extends Annotation> getAnnotations(){
+				var ann = holder.get(IONullability.class);
+				return ann == null? Map.of() : Map.of(IONullability.class, ann);
+			}
+			@Override
+			public Type getGenericType(GenericContext genericContext){ return null; }
+		});
+	}
 	public static boolean isNullable(AnnotatedType holder){
 		return getNullability(holder) == NULLABLE;
 	}
@@ -230,7 +249,7 @@ public final class IOFieldTools{
 	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
 		return getNullabilityOpt(holder).orElse(defaultMode);
 	}
-	public static Optional<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
+	public static Match<IONullability.Mode> getNullabilityOpt(AnnotatedType holder){
 		return holder.getAnnotation(IONullability.class).map(IONullability::value);
 	}
 	
@@ -369,17 +388,7 @@ public final class IOFieldTools{
 		return f.getDeclaringClass().isAnnotationPresent(IOValue.class);
 	}
 	
-	public static boolean canHaveNullAnnotation(AnnotatedType field){
-		var typ = field.getType();
-		if(typ.isPrimitive()) return false;
-		return isGeneric(field) || typ.isArray() || UtilL.instanceOf(typ, Collection.class) ||
-		       Iters.concat(
-			       Iters.of(IOInstance.class, Enum.class, Type.class),
-			       FieldCompiler.getWrapperTypes(),
-			       Iters.from(SupportedPrimitive.values()).map(p -> p.wrapper)
-		       ).anyMatch(c -> UtilL.instanceOf(typ, c));
-	}
-	public static String getNumSizeName(FieldAccessor<?> field, IODependency.VirtualNumSize size){
+	public static String getNumSizeName(FieldNames.Named field, IODependency.VirtualNumSize size){
 		var nam = size.name();
 		if(nam.isEmpty()){
 			return FieldNames.numberSize(field);
@@ -422,7 +431,7 @@ public final class IOFieldTools{
 		};
 	}
 	
-	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(List<? extends IOField<T, ?>> fields){
+	public static <T extends IOInstance<T>> List<IOField.ValueGeneratorInfo<T, ?>> fieldsToGenerators(SequencedCollection<? extends IOField<T, ?>> fields){
 		
 		int count = 0;
 		for(var f : fields){
@@ -442,9 +451,12 @@ public final class IOFieldTools{
 		for(var f : fields.reversed()){
 			for(var g : f.getGenerators()){
 				buff[pos++] = g;
+				if(buff.length == pos){
+					return List.of(buff);
+				}
 			}
 		}
-		return List.of(buff);
+		throw new IllegalStateException();
 	}
 	
 	public static final String UNINITIALIZED_FIELD_SIGN = "<Uninitialized>";
@@ -482,5 +494,34 @@ public final class IOFieldTools{
 	}
 	public static IOInstance.Order orderFromNames(IterablePP<String> names){
 		return Annotations.make(IOInstance.Order.class, Map.of("value", names.toArray(String[]::new)));
+	}
+	
+	public static <T extends IOInstance<T>> String toTableString(String title, Iterable<IOField<T, ?>> fields){
+		return TextUtil.toTable(
+			title,
+			Iters.from(fields).map(f -> Iters.entries(
+				"fieldType", typeName(f),
+				"name", f.getName(),
+				"type", f.getGenericType(null) == null? "/" : f.getGenericType(null).getTypeName(),
+				"sizeDescriptor", f.getSizeDescriptor(),
+				"nullability", f.getNullability(),
+				"readOnly", f.isReadOnly(),
+				"generators", f.getGenerators(),
+				"dependencies", f.getDependencies()
+			).filter(e -> {
+				var v = e.getValue();
+				if(v instanceof Collection<?> c){
+					return !c.isEmpty();
+				}
+				return true;
+			}).toModMap(new LinkedHashMap<>(), Map.Entry::getKey, Map.Entry::getValue)).toModList()
+		);
+	}
+	private static <T extends IOInstance<T>> String typeName(IOField<T, ?> f){
+		var typ = f.getClass();
+		if(UtilL.instanceOf(typ, BitFieldMerger.class)) typ = BitFieldMerger.class;
+		var name = typ.getTypeName();
+		name = name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
+		return name;
 	}
 }

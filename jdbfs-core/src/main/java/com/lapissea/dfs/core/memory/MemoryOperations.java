@@ -752,7 +752,8 @@ public final class MemoryOperations{
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException{
 		
 		var src   = context.getSource();
-		var ioSiz = src.getIOSize();
+		var last  = context.walkToLastChunk();
+		var ioSiz = last == null? src.getIOSize() : last.dataEnd();
 		
 		var chunk = chBuilderFromTicketSafeSize(context, ChunkPointer.of(ioSiz), ticket).create();
 		if(!ticket.approve(chunk)) return null;
@@ -763,15 +764,24 @@ public final class MemoryOperations{
 			chunk.writeHeader(io);
 			IOUtils.zeroFill(io, chunk.getCapacity());
 		}
+		var end = chunk.dataEnd();
+		if(src.getIOSize() != end){
+			correctIOsize(src, end);
+		}
 		context.getChunkCache().add(chunk);
 		return chunk;
 	}
+	private static void correctIOsize(IOInterface src, long end) throws IOException{
+		try{
+			src.setIOSize(end);
+		}catch(UnsupportedOperationException e){
+			try(var io = src.io()){
+				io.setCapacity(end);
+			}
+		}
+	}
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
-		//TODO: re-enable this once DataProvider.withRouter is replaced with proper router
-//		assert firstChunk.getDataProvider()==context;
-//		assert target.getDataProvider()==context;
-		
 		var ptr = firstChunk.getPtr();
 		
 		var prev = new PhysicalChunkWalker(context.getFirstChunk())

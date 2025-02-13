@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form xmlns="http://www.intellij.com/uidesigner/form/" version="1" bind-to-class="demo.photo.ui.HomeUI">
+  <grid id="27dc6" binding="root" layout-manager="BorderLayout" hgap="0" vgap="0">
+    <constraints>
+      <xy x="20" y="20" width="790" height="444"/>
+    </constraints>
+    <properties/>
+    <border type="none">
+      <size top="0" left="0" bottom="0" right="0"/>
+    </border>
+    <children>
+      <grid id="ac276" layout-manager="BorderLayout" hgap="0" vgap="0">
+        <constraints border-constraint="North"/>
+        <properties>
+          <background color="-1"/>
+        </properties>
+        <border type="empty">
+          <size top="10" left="10" bottom="15" right="10"/>
+        </border>
+        <children>
+          <grid id="305f9" layout-manager="BorderLayout" hgap="0" vgap="0">
+            <constraints border-constraint="Center"/>
+            <properties>
+              <background color="-1"/>
+            </properties>
+            <border type="empty">
+              <size top="0" left="0" bottom="0" right="20"/>
+            </border>
+            <children>
+              <component id="d2186" class="javax.swing.JTextField" binding="searchField">
+                <constraints border-constraint="Center"/>
+                <properties/>
+              </component>
+              <component id="bc63f" class="javax.swing.JButton" binding="searchButton">
+                <constraints border-constraint="East"/>
+                <properties>
+                  <text value="Search"/>
+                </properties>
+              </component>
+            </children>
+          </grid>
+          <grid id="bb51f" layout-manager="FlowLayout" hgap="5" vgap="0" flow-align="1">
+            <constraints border-constraint="East"/>
+            <properties>
+              <background color="-1"/>
+            </properties>
+            <border type="none"/>
+            <children>
+              <component id="8e5c6" class="javax.swing.JButton" binding="renderAllThumbnailsButton" default-binding="true">
+                <constraints/>
+                <properties>
+                  <text value="Pre-bake all thumbnails"/>
+                </properties>
+              </component>
+              <component id="5a3da" class="javax.swing.JButton" binding="removeDuplicatesButton">
+                <constraints/>
+                <properties>
+                  <hideActionText value="false"/>
+                  <text value="dups"/>
+                </properties>
+              </component>
+            </children>
+          </grid>
+        </children>
+      </grid>
+      <grid id="22ab6" layout-manager="BorderLayout" hgap="0" vgap="0">
+        <constraints border-constraint="Center"/>
+        <properties/>
+        <border type="none"/>
+        <children>
+          <scrollpane id="b9684" binding="resultScroll">
+            <constraints border-constraint="Center"/>
+            <properties>
+              <doubleBuffered value="false"/>
+              <horizontalScrollBarPolicy value="30"/>
+              <verticalScrollBarPolicy value="20"/>
+            </properties>
+            <border type="empty">
+              <size top="0" left="0" bottom="0" right="0"/>
+              <color color="-3866621"/>
+            </border>
+            <children>
+              <grid id="538a1" binding="searchResults" layout-manager="FlowLayout" hgap="5" vgap="5" flow-align="1">
+                <constraints/>
+                <properties/>
+                <border type="none">
+                  <size top="10" left="10" bottom="10" right="10"/>
+                  <color color="-16543035"/>
+                </border>
+                <children/>
+              </grid>
+            </children>
+          </scrollpane>
+          <grid id="31e52" binding="textureView" layout-manager="BorderLayout" hgap="0" vgap="0">
+            <constraints border-constraint="East"/>
+            <properties>
+              <background color="-1"/>
+            </properties>
+            <border type="none"/>
+            <children>
+              <grid id="6e334" layout-manager="GridBagLayout">
+                <constraints border-constraint="North"/>
+                <properties>
+                  <background color="-1"/>
+                </properties>
+                <border type="none"/>
+                <children>
+                  <component id="e3464" class="javax.swing.JButton" binding="dragNDropButton" default-binding="true">
+                    <constraints>
+                      <grid row="1" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                      <gridbag top="5" left="5" bottom="5" right="5" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <text value="Drag-n-drop"/>
+                    </properties>
+                  </component>
+                  <component id="4696b" class="javax.swing.JSpinner" binding="resizeNumWidth">
+                    <constraints>
+                      <grid row="3" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
+                      <gridbag top="5" left="5" bottom="2" right="5" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <maximumSize width="78" height="30"/>
+                      <minimumSize width="78" height="30"/>
+                      <nextFocusableComponent value="7f732"/>
+                      <preferredSize width="78" height="30"/>
+                    </properties>
+                  </component>
+                  <component id="837c7" class="javax.swing.JComboBox" binding="resizeType">
+                    <constraints>
+                      <grid row="3" column="2" row-span="2" col-span="1" vsize-policy="0" hsize-policy="2" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                      <gridbag weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <preferredSize width="60" height="38"/>
+                    </properties>
+                  </component>
+                  <component id="7f732" class="javax.swing.JSpinner" binding="resizeNumHeight">
+                    <constraints>
+                      <grid row="4" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
+                      <gridbag top="2" left="5" bottom="5" right="5" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <maximumSize width="78" height="30"/>
+                      <minimumSize width="78" height="30"/>
+                      <nextFocusableComponent value="837c7"/>
+                      <preferredSize width="78" height="30"/>
+                    </properties>
+                  </component>
+                  <component id="13704" class="javax.swing.JButton" binding="closeTexture">
+                    <constraints>
+                      <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+                      <gridbag top="0" left="5" bottom="5" right="5" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <text value="Close"/>
+                    </properties>
+                  </component>
+                  <component id="7d00e" class="javax.swing.JLabel">
+                    <constraints>
+                      <grid row="2" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+                      <gridbag top="10" left="5" bottom="0" right="5" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                    <properties>
+                      <font name="Consolas" size="18"/>
+                      <text value="Resize settings"/>
+                    </properties>
+                  </component>
+                  <hspacer id="44a61">
+                    <constraints>
+                      <grid row="2" column="1" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                      <gridbag top="0" left="50" bottom="0" right="0" weightx="0.0" weighty="0.0"/>
+                    </constraints>
+                  </hspacer>
+                </children>
+              </grid>
+              <scrollpane id="1de40" binding="textureViewScroll">
+                <constraints border-constraint="Center"/>
+                <properties>
+                  <horizontalScrollBarPolicy value="30"/>
+                  <verticalScrollBarPolicy value="22"/>
+                </properties>
+                <border type="empty">
+                  <size top="0" left="0" bottom="0" right="0"/>
+                </border>
+                <children>
+                  <grid id="45cdc" binding="textureFiles" layout-manager="FlowLayout" hgap="5" vgap="5" flow-align="1">
+                    <constraints/>
+                    <properties/>
+                    <border type="none"/>
+                    <children/>
+                  </grid>
+                </children>
+              </scrollpane>
+            </children>
+          </grid>
+        </children>
+      </grid>
+    </children>
+  </grid>
+</form>

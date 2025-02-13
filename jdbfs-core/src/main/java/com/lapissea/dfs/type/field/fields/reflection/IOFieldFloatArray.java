@@ -52,6 +52,10 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 		}));
 	}
 	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
+	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		arraySize = fields.requireExactInt(FieldNames.collectionLen(getAccessor()));
@@ -60,7 +64,7 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 	private static final float[] DEFAULT_VAL = new float[0];
 	@Override
 	public float[] get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> DEFAULT_VAL);
+		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
 	@Override

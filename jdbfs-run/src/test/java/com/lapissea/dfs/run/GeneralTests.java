@@ -12,7 +12,7 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.collections.ContiguousIOList;
 import com.lapissea.dfs.objects.collections.HashIOMap;
@@ -35,10 +35,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -46,10 +46,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class GeneralTests{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	private static final Logger log = LoggerFactory.getLogger(GeneralTests.class);
 	@AfterMethod
@@ -62,7 +62,7 @@ public class GeneralTests{
 			signedIO(numberSize, numberSize.signedMaxValue);
 			signedIO(numberSize, numberSize.signedMinValue);
 			if(numberSize != NumberSize.VOID){
-				var iter = new Random(10).longs(numberSize.signedMinValue, numberSize.signedMaxValue).limit(1000).iterator();
+				var iter = new RawRandom(10).longs(numberSize.signedMinValue, numberSize.signedMaxValue).limit(1000).iterator();
 				while(iter.hasNext()){
 					signedIO(numberSize, iter.nextLong());
 				}
@@ -75,7 +75,7 @@ public class GeneralTests{
 		numberSize.writeSigned(new ContentOutputStream.BA(buf), value);
 		var read = numberSize.readSigned(new ContentInputStream.BA(buf));
 		
-		assertEquals(read, value, value + " was not read or written correctly with " + numberSize);
+		assertThat(read).describedAs(() -> value + " was not read or written correctly with " + numberSize).isEqualTo(value);
 	}
 	
 	@org.testng.annotations.DataProvider(name = "chunkSizeNumbers")
@@ -90,7 +90,7 @@ public class GeneralTests{
 		var providerRead = DataProvider.newVerySimpleProvider(provider.getSource());
 		var readChunk    = providerRead.getChunk(chunk.getPtr());
 		
-		assertEquals(readChunk, chunk);
+		assertThat(readChunk).isEqualTo(chunk);
 	}
 	
 	@Test(dataProvider = "chunkSizeNumbers")
@@ -108,7 +108,7 @@ public class GeneralTests{
 		chunk.write(true, bodyData);
 		
 		var readBody = chunk.readAll();
-		assertEquals(readBody, bodyData);
+		assertThat(readBody).containsExactly(bodyData);
 	}
 	
 	@Test(dataProvider = "chunkSizeNumbers")
@@ -126,7 +126,7 @@ public class GeneralTests{
 		chunk.write(true, bodyData);
 		
 		var readBody = chunk.readAll();
-		assertEquals(readBody, bodyData);
+		assertThat(readBody).containsExactly(bodyData);
 	}
 	
 	@Test
@@ -239,7 +239,7 @@ public class GeneralTests{
 		var cl = Cluster.init(MemoryData.empty());
 		cl.roots().provide(1, -123);
 		int val = cl.roots().require(1, int.class);
-		assertEquals(val, -123);
+		assertThat(val).isEqualTo(-123);
 	}
 	
 	@Test(groups = {"rootProvider"})
@@ -247,14 +247,14 @@ public class GeneralTests{
 		var cl = Cluster.init(MemoryData.empty());
 		cl.roots().provide(1, -123);
 		Integer val = cl.roots().require(1, Integer.class);
-		assertEquals(val, -123);
+		assertThat(val).isEqualTo(-123);
 	}
 	
 	@Test(groups = {"rootProvider"})
 	void rootIntRequest() throws IOException{
 		var cl  = Cluster.init(MemoryData.empty());
 		var val = cl.roots().request(1, int.class);
-		assertEquals(val, 0);
+		assertThat(val).isEqualTo(0);
 	}
 	
 	@Test
@@ -262,16 +262,11 @@ public class GeneralTests{
 		var    provider = TestUtils.testChunkProvider();
 		String data     = "this is a test!";
 		
-		StructPipe<StringContainer> pipe = StandardStructPipe.of(StringContainer.class);
-		
+		var pipe  = StandardStructPipe.of(StringContainer.class);
 		var chunk = AllocateTicket.bytes(64).submit(provider);
 		
 		var text = new StringContainer(data);
-		
-		pipe.write(provider, chunk, text);
-		var read = pipe.readNew(chunk, null);
-		
-		assertEquals(text, read);
+		TestUtils.checkPipeInOutEquality(chunk, pipe, text);
 	}
 	
 	
@@ -304,12 +299,11 @@ public class GeneralTests{
 		
 		var text = new AutoText(data);
 		
-		AutoText.PIPE.write(chunk, text);
-		var read = AutoText.PIPE.readNew(chunk, null);
+		AutoText.Info.PIPE.write(chunk, text);
+		var read = AutoText.Info.PIPE.readNew(chunk, null);
 		
-		if(Objects.equals(text, read)) return;
-		assertEquals(text, read, "Text bytes: " + data.chars().mapToObj(Integer::toString)
-		                                              .collect(Collectors.joining(", ", "[", "]")));
+		assertThat(read).as(() -> "Text should match. Bytes: " + Iters.rangeMap(0, data.length(), i -> (int)data.charAt(i)))
+		                .isEqualTo(text);
 	}
 	
 	@Test(dataProvider = "strings")
@@ -317,16 +311,7 @@ public class GeneralTests{
 		var mem = MemoryData.empty();
 		mem.writeUTF(true, text);
 		var read = mem.readUTF(0);
-		assertEquals(text, read);
-	}
-	
-	@SuppressWarnings("unchecked")
-	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
-		listEqualityTest(info, LinkedIOList.class, typ, session, useCluster);
-	}
-	@SuppressWarnings("unchecked")
-	static <T extends IOInstance<T>> void contiguousListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
-		listEqualityTest(info, ContiguousIOList.class, typ, session, useCluster);
+		assertThat(read).isEqualTo(text);
 	}
 	
 	static <T, L extends IOInstance.Unmanaged<L> & IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
@@ -351,17 +336,24 @@ public class GeneralTests{
 		                    AllocateTicket.bytes(1).submit(cluster),
 		                    AllocateTicket.bytes(1).submit(cluster));
 		AllocateTicket.bytes(1).submit(cluster);
-		var c1 = AllocateTicket.bytes(40).submit(cluster);
+		var padBlock = AllocateTicket.bytes(40).submit(cluster);
+		
 		var mm = cluster.getMemoryManager();
-		assertEquals(mm.getFreeChunks().size(), 0);
+		assertThat(mm.getFreeChunks().size()).as("Exact free count required").isEqualTo(0);
+		
 		mm.free(List.of(frees.get(0), frees.get(2), frees.get(4)));
-		assertEquals(mm.getFreeChunks().size(), 3);
+		assertThat(mm.getFreeChunks().size()).as("Exact free count required").isEqualTo(3);
+		
 		mm.free(List.of(frees.get(1), frees.get(3)));
-		assertEquals(mm.getFreeChunks().size(), 1);
-		assertTrue(cluster.getSource().getIOSize()>c1.getPtr().getValue());
-		c1.freeChaining();
-		assertEquals(mm.getFreeChunks().size(), 1);
-		assertEquals(cluster.getSource().getIOSize(), c1.getPtr().getValue());
+		assertThat(mm.getFreeChunks().size()).as("Exact free count required").isEqualTo(1);
+		
+		assertThat(cluster.getSource().getIOSize()).isGreaterThan(padBlock.getPtr().getValue());
+		
+		padBlock.freeChaining();
+		assertThat(mm.getFreeChunks().size()).as("Exact free count required").isEqualTo(1);
+		
+		assertThat(cluster.getSource().getIOSize()).as("Data should free the padBlock and end there exactly")
+		                                           .isEqualTo(padBlock.getPtr().getValue());
 	}
 	
 	@Test
@@ -385,8 +377,30 @@ public class GeneralTests{
 			io.write(bb);
 		}
 		
-		assertEquals(first.chainLength(), 2);
-		assertEquals(first.readAll(), bb);
+		assertThat(first.chainLength()).as("Chain length should have allocated. Chain length is:").isEqualTo(2);
+		assertThat(first.readAll()).containsExactly(bb);
+	}
+	
+	@Test
+	void recoverFromImproperlySizedFile() throws IOException{
+		var data = TestUtils.testCluster();
+		var t    = AllocateTicket.bytes(16);
+		for(int i = 0; i<10; i++){
+			t.submit(data);
+		}
+		ChunkPointer desiredPtr;
+		{
+			var c = t.submit(data);
+			desiredPtr = c.getPtr();
+			data.getMemoryManager().free(c);
+		}
+		//add invalid blank bytes to the end of the file to simulate sudden mid-allocation shutdown
+		data.getSource().ioAt(data.getSource().getIOSize(), r -> r.write(new byte[100]));
+		
+		var c2        = t.submit(data);
+		var actualPtr = c2.getPtr();
+		
+		assertThat(actualPtr).isEqualTo(desiredPtr);
 	}
 	
 	@Test
@@ -436,16 +450,16 @@ public class GeneralTests{
 		
 		var c   = TestUtils.testCluster();
 		Foo def = c.roots().request("default", Foo.class);
-		assertEquals(def, Foo.of(Optional.empty()));
+		assertThat(def).isEqualTo(Foo.of(Optional.empty()));
 		
 		var helloWorld = Optional.of("Hello world! :)");
 		c.roots().provide("some", Foo.of(helloWorld));
 		var read = c.roots().request("some", Foo.class);
-		assertEquals(read, Foo.of(helloWorld));
+		assertThat(read).isEqualTo(Foo.of(helloWorld));
 		
 		c.roots().provide("none", Foo.of(Optional.empty()));
 		Foo none = c.roots().request("none", Foo.class);
-		assertEquals(none, Foo.of(Optional.empty()));
+		assertThat(none).isEqualTo(Foo.of(Optional.empty()));
 	}
 	
 	@Test(expectedExceptions = IllegalField.class)
@@ -471,16 +485,16 @@ public class GeneralTests{
 		
 		var c   = TestUtils.testCluster();
 		Foo def = c.roots().request("default", Foo.class);
-		assertEquals(def, Foo.of(null));
+		assertThat(def).isEqualTo(Foo.of(null));
 		
 		var helloWorld = String.class;
 		c.roots().provide("some", Foo.of(helloWorld));
 		var read = c.roots().request("some", Foo.class);
-		assertEquals(read, Foo.of(helloWorld));
+		assertThat(read).isEqualTo(Foo.of(helloWorld));
 		
 		c.roots().provide("none", Foo.of(null));
 		Foo none = c.roots().request("none", Foo.class);
-		assertEquals(none, Foo.of(null));
+		assertThat(none).isEqualTo(Foo.of(null));
 	}
 	
 	@Test
@@ -496,16 +510,16 @@ public class GeneralTests{
 		
 		var c   = TestUtils.testCluster();
 		Foo def = c.roots().request("default", Foo.class);
-		assertEquals(def, Foo.of(null));
+		assertThat(def).isEqualTo(Foo.of(null));
 		
 		var helloWorld = SyntheticParameterizedType.of(List.class, List.of(Integer.class));
 		c.roots().provide("some", Foo.of(helloWorld));
 		var read = c.roots().request("some", Foo.class);
-		assertEquals(read, Foo.of(helloWorld));
+		assertThat(read).isEqualTo(Foo.of(helloWorld));
 		
 		c.roots().provide("none", Foo.of(null));
 		Foo none = c.roots().request("none", Foo.class);
-		assertEquals(none, Foo.of(null));
+		assertThat(none).isEqualTo(Foo.of(null));
 	}
 	
 	@IOValue
@@ -525,10 +539,12 @@ public class GeneralTests{
 	
 	@Test
 	void toStringInst1(){
-		assertEquals(new Custom1().toString(), "<123>");
+		assertThat(new Custom1().toString()).isEqualTo("<123>");
 	}
 	@Test
 	void toStringInst2(){
-		assertEquals(new Custom2().toString(), "{123}");
+		assertThat(new Custom2().toString()).isEqualTo("{123}");
 	}
+	
+	
 }

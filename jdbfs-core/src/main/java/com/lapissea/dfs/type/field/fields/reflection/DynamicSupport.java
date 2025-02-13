@@ -32,7 +32,7 @@ public abstract class DynamicSupport{
 	public static long calcSize(DataProvider prov, Object val){
 		return switch(val){
 			case null -> 0;
-			case String str -> AutoText.PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
+			case String str -> AutoText.Info.PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
 					yield ChunkPointer.DYN_SIZE_DESCRIPTOR.calcUnknown(null, prov, u.getPointer(), WordSpace.BYTE);
@@ -181,7 +181,7 @@ public abstract class DynamicSupport{
 		}
 		
 		if(typ == String.class){
-			AutoText.PIPE.skip(provider, src, genericContext);
+			AutoText.Info.PIPE.skip(provider, src, genericContext);
 			return;
 		}
 		if(IOInstance.isInstance(typ)){

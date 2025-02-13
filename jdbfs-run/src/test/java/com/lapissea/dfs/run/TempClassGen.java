@@ -8,12 +8,14 @@ import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 
 public final class TempClassGen{
@@ -32,17 +34,27 @@ public final class TempClassGen{
 		record All() implements CtorType{ }
 	}
 	
-	public record FieldGen(String name, Type type, Iterable<Annotation> annotations, boolean isFinal, Function<RandomGenerator, Object> generator){
+	public enum VisiblityGen{
+		PRIVATE,
+		PROTECTED,
+		PUBLIC
+	}
+	
+	public record FieldGen(
+		String name, VisiblityGen visibility, boolean isFinal, Type type,
+		Iterable<Annotation> annotations, Function<RandomGenerator, Object> generator
+	){
 		@Override
 		public String toString(){
 			return Iters.from(annotations).joinAsOptionalStr("\n", "", "\n", a -> "@" + a.annotationType().getSimpleName()).orElse("") +
-			       "public " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
+			       visibility.toString().toLowerCase() + " " + (isFinal? "final " : "") + type.getTypeName() + " " + name + ";";
 		}
 		@Override
 		public boolean equals(Object o){
 			return this == o ||
 			       o instanceof FieldGen that &&
 			       this.isFinal == that.isFinal &&
+			       this.visibility == that.visibility &&
 			       this.type.equals(that.type) &&
 			       this.name.equals(that.name) &&
 			       this.annotations.equals(that.annotations) &&
@@ -86,14 +98,21 @@ public final class TempClassGen{
 	
 	public static Class<IOInstance<?>> gen(ClassGen classGen){
 		try{
-			var cl = new ClassLoader(){
+			var cl = new ClassLoader(TempClassGen.class.getClassLoader()){
 				static{ ClassLoader.registerAsParallelCapable(); }
 				
 				@Override
 				protected Class<?> findClass(String name) throws ClassNotFoundException{
-					if(!classGen.name.equals(name)) throw new ClassNotFoundException(name);
-					var bytecode = makeClass(this, classGen);
-					return defineClass(name, bytecode, 0, bytecode.length);
+					var baseName = classGen.name;
+					if(name.equals(baseName)){
+						var bytecode = makeClass(this, classGen);
+						return defineClass(name, bytecode, 0, bytecode.length);
+					}
+					if(name.equals(providerName(baseName))){
+						var bytecode = makeAccessClass(this, providerName(baseName));
+						return defineClass(name, bytecode, 0, bytecode.length);
+					}
+					throw new ClassNotFoundException(name);
 				}
 			};
 			//noinspection unchecked
@@ -110,11 +129,19 @@ public final class TempClassGen{
 					code.write("extends {}", classGen.parent);
 				}
 				code.write("public class {!} start", classGen.name);
+				code.write(
+					"""
+						function <clinit> start
+							static call {} registerAccess start
+								class {}
+							end
+						end
+						""", IOInstance.Managed.class, providerName(classGen.name));
 				
 				for(FieldGen field : classGen.fields){
 					JorthUtils.writeAnnotations(code, field.annotations);
 					if(field.isFinal) code.write("final");
-					code.write("public field {!} {}", field.name, field.type);
+					code.write("{} field {!} {}", field.visibility, field.name, field.type);
 				}
 				
 				for(var ctor : classGen.constructors){
@@ -160,6 +187,29 @@ public final class TempClassGen{
 				}
 				
 				code.wEnd();
+			});
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to generate class", e);
+		}
+	}
+	private static String providerName(String name){
+		return name + "€LookupProvider";
+	}
+	private static byte[] makeAccessClass(ClassLoader cl, String name){
+		try{
+			return Jorth.generateClass(cl, name, code -> {
+				code.addImports(Supplier.class, MethodHandles.class);
+				code.write(
+					"""
+						implements #Supplier
+						public class {!} start
+							public function get
+								returns #Object
+							start
+								static call #MethodHandles lookup
+							end
+						end
+						""", name);
 			});
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class", e);

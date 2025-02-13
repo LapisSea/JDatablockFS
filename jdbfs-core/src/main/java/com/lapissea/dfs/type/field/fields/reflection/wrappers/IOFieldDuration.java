@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -10,7 +11,6 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
@@ -19,17 +19,15 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
-public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Duration>{
+public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, Duration>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<Duration>{
@@ -43,6 +41,10 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFl
 			return List.of(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
 		}
 	}
+	
+	static{ Preload.preloadFn(IODuration.class, "of", Duration.ZERO); }
+	
+	private static MethodHandle CONSTR;
 	
 	@IOInstance.Order({"seconds", "nanos"})
 	private interface IODuration extends IOInstance.Def<IODuration>{
@@ -59,10 +61,14 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFl
 		
 		Struct<IODuration> STRUCT = Struct.of(IODuration.class);
 		
-		MethodHandle CONSTR = IOInstance.Def.constrRef(IODuration.class, long.class, int.class);
+		private static MethodHandle init(){
+			return CONSTR = Def.constrRef(IODuration.class, long.class, int.class);
+		}
 		static IODuration of(Duration val){
+			var c = CONSTR;
+			if(c == null) c = init();
 			try{
-				return (IODuration)CONSTR.invoke(val.getSeconds(), val.getNano());
+				return (IODuration)c.invoke(val.getSeconds(), val.getNano());
 			}catch(Throwable e){
 				throw new RuntimeException(e);
 			}
@@ -113,74 +119,23 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends NullFl
 	}
 	
 	@Override
-	public Duration get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, () -> Duration.ZERO);
-	}
-	@Override
-	public boolean isNull(VarPool<CTyp> ioPool, CTyp instance){
-		return isNullRawNullable(ioPool, instance);
-	}
+	protected Duration defaultValue(){ return Duration.ZERO; }
 	
-	@Override
-	public void set(VarPool<CTyp> ioPool, CTyp instance, Duration value){
-		super.set(ioPool, instance, switch(getNullability()){
-			case DEFAULT_IF_NULL, NULLABLE -> value;
-			case NOT_NULL -> Objects.requireNonNull(value);
-		});
-	}
 	@Override
 	protected IOField<CTyp, Duration> maxAsFixedSize(VaryingSize.Provider varProvider){
 		return new IOFieldDuration<>(getAccessor(), varProvider);
 	}
 	
 	@Override
-	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val = getWrapped(ioPool, instance);
-		if(nullable()){
-			if(val == null){
-				if(fixed){
-					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return;
-			}
-		}
-		instancePipe.write(provider, dest, val);
+	protected void writeValue(DataProvider provider, ContentWriter dest, Duration value) throws IOException{
+		instancePipe.write(provider, dest, IODuration.of(value));
 	}
-	
-	private Duration readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		if(nullable()){
-			boolean isNull = getIsNull(ioPool, instance);
-			if(isNull){
-				if(fixed){
-					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return null;
-			}
-		}
-		
+	@Override
+	protected Duration readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		return instancePipe.readNew(provider, src, genericContext).getData();
 	}
-	
 	@Override
-	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		set(ioPool, instance, readNew(ioPool, provider, src, instance, genericContext));
-	}
-	
-	@Override
-	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
-			return;
-		}
-		
-		if(nullable()){
-			boolean isNull = getIsNull(ioPool, instance);
-			if(isNull){
-				if(fixed){
-					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return;
-			}
-		}
+	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		instancePipe.skip(provider, src, genericContext);
 	}
 }

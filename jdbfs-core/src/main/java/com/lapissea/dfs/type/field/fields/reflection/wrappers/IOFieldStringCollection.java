@@ -19,8 +19,8 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
-import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 
-public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends NullFlagCompanyField<T, CollectionType>{
+public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOFieldWrapper<T, CollectionType>{
 	
 	@SuppressWarnings("unused")
 	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
@@ -83,7 +83,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		@Override
 		public long calcByteSize(DataProvider provider, String element){
-			return AutoText.PIPE.calcUnknownSize(provider, new AutoText(element), WordSpace.BYTE);
+			return AutoText.Info.PIPE.calcUnknownSize(provider, new AutoText(element), WordSpace.BYTE);
 		}
 		@Override
 		public OptionalLong getFixedByteSize(){
@@ -91,15 +91,15 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}
 		@Override
 		public void write(DataProvider provider, ContentWriter dest, String element) throws IOException{
-			AutoText.PIPE.write(provider, dest, new AutoText(element));
+			AutoText.Info.PIPE.write(provider, dest, new AutoText(element));
 		}
 		@Override
 		public String read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			return AutoText.PIPE.readNew(provider, src, genericContext).getData();
+			return AutoText.Info.PIPE.readNew(provider, src, genericContext).getData();
 		}
 		@Override
 		public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-			AutoText.PIPE.skip(provider, src, genericContext);
+			AutoText.Info.PIPE.skip(provider, src, genericContext);
 		}
 	}
 	
@@ -121,6 +121,9 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 		}));
 	}
 	
+	@Override
+	protected CollectionType defaultValue(){ return adapter.makeNew(0); }
+	
 	@SuppressWarnings({"rawtypes"})
 	private static <C> CollectionAdapter<String, C> makeAdapter(FieldAccessor<?> accessor, Class<? extends CollectionAdapter> adapterType){
 		var collectionType = accessor.getGenericType(null);
@@ -137,25 +140,16 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	}
 	
 	@Override
-	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		if(nullable() && getIsNull(ioPool, instance)) return;
-		adapter.write(get(ioPool, instance), provider, dest);
+	protected void writeValue(DataProvider provider, ContentWriter dest, CollectionType value) throws IOException{
+		adapter.write(value, provider, dest);
 	}
 	@Override
-	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		if(nullable()){
-			if(getIsNull(ioPool, instance)){
-				set(ioPool, instance, null);
-				return;
-			}
-		}
-		
+	protected CollectionType readValue(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = collectionSize.getValue(ioPool, instance);
-		set(ioPool, instance, adapter.read(size, provider, src, genericContext));
+		return adapter.read(size, provider, src, genericContext);
 	}
-	
 	@Override
-	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected void skipValue(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size = collectionSize.getValue(ioPool, instance);
 		adapter.skipData(size, provider, src, genericContext);
 	}

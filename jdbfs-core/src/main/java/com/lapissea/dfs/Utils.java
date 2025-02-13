@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -212,7 +213,8 @@ public final class Utils{
 	}
 	public static String typeToHuman(Type type){
 		return switch(type){
-			case Class<?> c -> classNameToHuman(c.getName());
+			case null -> "null";
+			case Class<?> c -> c.getTypeName();
 			case ParameterizedType p -> typeToHuman(p.getRawType()) +
 			                            Iters.from(p.getActualTypeArguments()).joinAsStr(", ", "<", ">", Utils::typeToHuman);
 			case WildcardType w -> {
@@ -285,9 +287,15 @@ public final class Utils{
 		return Optional.ofNullable(clazz.getAnnotation(type));
 	}
 	
-	public static void ensureClassLoaded(Class<?> typ){
+	public static void ensureClassLoaded(Class<?> clazz){
 		try{
-			Class.forName(typ.getName(), true, typ.getClassLoader());
+			var lookup = MethodHandles.publicLookup();
+			lookup.ensureInitialized(clazz);
+			return;
+		}catch(IllegalAccessException ignore){ }
+		
+		try{
+			Class.forName(clazz.getName(), true, clazz.getClassLoader());
 		}catch(ClassNotFoundException e){
 			throw new ShouldNeverHappenError(e);
 		}

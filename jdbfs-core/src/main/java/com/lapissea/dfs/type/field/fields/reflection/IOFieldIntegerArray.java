@@ -151,6 +151,10 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 			return addapters.get(nSiz).getSize(col)*(long)nSiz.bytes;
 		}));
 	}
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.HAS_NO_POINTERS);
+	}
 	
 	private NumberSize getNumSize(VarPool<T> pool, T inst){
 		return numSize.get(pool, inst);

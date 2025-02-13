@@ -11,7 +11,6 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.chunk.ChunkSet;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
-import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
@@ -35,11 +34,18 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.access.BasicFieldAccessor;
+import com.lapissea.dfs.type.field.access.TypeFlag;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.type.field.fields.CollectionAdapter;
+import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
+import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -56,6 +62,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
@@ -1436,13 +1443,18 @@ public class BinaryGridRenderer implements DataRenderer{
 						pipe.readDeps(ioPool, ctx.provider, io, deps, instance, generics(instance, parentGenerics));
 					}
 				}catch(Throwable e){
-					var size = 1L;
-					try{
-						size = pipe.calcUnknownSize(ctx.provider, instance, WordSpace.BYTE);
-					}catch(Throwable ignored){ }
-					drawByteRangesForced(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
+					for(var gen : instance.getThisStruct().getFields().flatMapped(IOField::getGenerators)){
+						gen.generate(ioPool, ctx.provider, instance, false);
+					}
 					
-					throw new TypeIOFail("Failed to recover virtual fields", instance.getClass(), e);
+					//TODO: Re-enable this and never generate fields. Reading was causing issues with some lists. Find out why
+//					var size = 1L;
+//					try{
+//						size = pipe.calcUnknownSize(ctx.provider, instance, WordSpace.BYTE);
+//					}catch(Throwable ignored){ }
+//					drawByteRangesForced(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(reference.calcGlobalOffset(ctx.provider), size)), Color.RED, false);
+//
+//					throw new TypeIOFail("Failed to recover virtual fields", instance.getClass(), e);
 				}
 			}
 			while(true){
@@ -1601,6 +1613,85 @@ public class BinaryGridRenderer implements DataRenderer{
 							}
 							continue;
 						}
+						if(field instanceof CollectionAdapter.CollectionContainer<?, ?> container){
+							var addapter  = container.getCollectionAddapter();
+							var colletion = field.get(ioPool, instance);
+							switch(addapter.getElementIO()){
+								case CollectionAdapter.ElementIOImpl.PipeImpl pipeImpl -> {
+									long arrOffset = 0;
+									var  gen       = generics(instance, parentGenerics);
+									for(var el : ((CollectionAdapter<IOInstance, Object>)addapter).asListView(colletion)){
+										if(el == null) continue;
+										var elSize = pipeImpl.calcByteSize(ctx.provider, el);
+										
+										StructPipe elementPipe = StandardStructPipe.of(el.getThisStruct());
+										annotateStruct(ctx, el, reference.addOffset(fieldOffset + arrOffset), elementPipe, gen, annotate, noPtr);
+										arrOffset += elSize;
+									}
+									continue;
+								}
+								case CollectionAdapter.ElementIOImpl.SealedTypeImpl pipeImpl -> {
+									long arrOffset = 0;
+									var  gen       = generics(instance, parentGenerics);
+									int  arrPow    = -1;
+									for(var el : ((CollectionAdapter<IOInstance, Object>)addapter).asListView(colletion)){
+										arrPow++;
+										if(el == null) continue;
+										var type = el.getClass();
+										int id;
+										try{
+											id = ctx.provider.getTypeDb().toID(pipeImpl.getRoot(), type, false);
+										}catch(IOException e){
+											throw new RuntimeException("Failed to compute ID", e);
+										}
+										var idBytes = 1 + NumberSize.bySize(id).bytes;
+										annotateByteField(
+											ctx,
+											ioPool,
+											instance,
+											new NoIOField<>(
+												new BasicFieldAccessor<T>(null, field.getName() + "[" + arrPow + "]:type", List.of()){
+													@Override
+													public int getTypeID(){ return TypeFlag.ID_OBJECT; }
+													@Override
+													public boolean genericTypeHasArgs(){
+														return false;
+													}
+													@Override
+													public Object get(VarPool<T> ioPool, T instance){ return type; }
+													@Override
+													public void set(VarPool<T> ioPool, T instance, Object value){ throw new UnsupportedOperationException(); }
+													@Override
+													public boolean isReadOnly(){ return true; }
+													@Override
+													public Type getGenericType(GenericContext genericContext){
+														return Class.class;
+													}
+												},
+												SizeDescriptor.Fixed.of(idBytes)
+											){
+												@Override
+												public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+													return Optional.of(settings.doShort()? type.getSimpleName() : type.getTypeName());
+												}
+											},
+											col,
+											reference.addOffset(fieldOffset + arrOffset),
+											DrawUtils.Range.fromSize(arrOffset, idBytes)
+										);
+										arrOffset += idBytes;
+										
+										var elSize = pipeImpl.calcByteSize(ctx.provider, el);
+										
+										StructPipe elementPipe = StandardStructPipe.of(el.getThisStruct());
+										annotateStruct(ctx, el, reference.addOffset(fieldOffset + arrOffset), elementPipe, gen, annotate, noPtr);
+										arrOffset += elSize;
+									}
+									continue;
+								}
+								default -> { }
+							}
+						}
 						if(acc == null){
 							throw new RuntimeException("unknown field " + field);
 						}
@@ -1663,6 +1754,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 								continue;
 							}
+							
 							boolean isList = typ == List.class || typ == ArrayList.class;
 							if(typ.isArray() || isList){
 								
@@ -1725,7 +1817,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									
 									long arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
-										var siz = AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst.get(i)), WordSpace.BYTE);
+										var siz = AutoText.Info.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst.get(i)), WordSpace.BYTE);
 										annotateByteField(
 											ctx, ioPool, instance, BGRUtils.stringArrayElement(instance, i, inst),
 											col,
@@ -1768,11 +1860,15 @@ public class BinaryGridRenderer implements DataRenderer{
 									continue;
 								}
 							}
-							
+							if(field instanceof IOFieldFusedString){
+								if(!annotate) continue;
+								annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+								return;
+							}
 							if(typ == String.class){
 								if(!annotate) continue;
 								try{
-									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true, noPtr);
+									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.Info.PIPE, null, true, noPtr);
 								}catch(Throwable e){
 									annotateByteField(ctx, ioPool, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
 								}

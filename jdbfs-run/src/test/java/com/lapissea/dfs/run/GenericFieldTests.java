@@ -14,7 +14,6 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiFunction;
-import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -41,7 +40,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.util.UtilL.async;
-import static org.testng.AssertJUnit.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class GenericFieldTests{
 	
@@ -51,7 +50,7 @@ public class GenericFieldTests{
 	@Test
 	void simpleGenericTest() throws IOException{
 		//noinspection unchecked
-		var pipe = StandardStructPipe.of(GenericContainer.class, STATE_DONE);
+		var pipe = StandardStructPipe.of((Class<GenericContainer<Object>>)(Class<?>)GenericContainer.class, STATE_DONE);
 		
 		var provider = TestUtils.testChunkProvider();
 		var chunk    = AllocateTicket.bytes(64).submit(provider);
@@ -59,19 +58,10 @@ public class GenericFieldTests{
 		var container = new GenericContainer<>();
 		
 		container.value = new Dummy(123);
-		
-		pipe.write(chunk, container);
-		var read = pipe.readNew(chunk, null);
-		
-		assertEquals(container, read);
-		
+		TestUtils.checkPipeInOutEquality(chunk, pipe, container);
 		
 		container.value = "This is a test.";
-		
-		pipe.write(chunk, container);
-		read = pipe.readNew(chunk, null);
-		
-		assertEquals(container, read);
+		TestUtils.checkPipeInOutEquality(chunk, pipe, container);
 	}
 	
 	record Gen<T>(UnsafeBiFunction<RandomGenerator, DataProvider, T, IOException> gen, Class<T> type, String name){
@@ -248,10 +238,7 @@ public class GenericFieldTests{
 				}
 				var wrapVal = new GenericContainer<>(value);
 				try(var chD = AllocateTicket.bytes(64).submitAsTempMem(d)){
-					var ch = chD.chunk();
-					pip.write(ch, wrapVal);
-					var read = pip.readNew(ch, null);
-					Assert.assertEquals(read, wrapVal);
+					TestUtils.checkPipeInOutEquality(chD.chunk(), pip, wrapVal);
 					return null;
 				}catch(Throwable e){
 					long siz = -1;
@@ -302,10 +289,7 @@ public class GenericFieldTests{
 							}
 						}
 						try(var chD = AllocateTicket.bytes(64).submitAsTempMem(cl)){
-							var ch = chD.chunk();
-							pip.write(ch, val);
-							var generic = pip.readNew(ch, null);
-							Assert.assertEquals(generic, val);
+							TestUtils.checkPipeInOutEquality(chD.chunk(), pip, val);
 						}catch(Throwable e1){
 							var strSiz = TextUtil.toString(arr).length();
 							synchronized(res){
@@ -333,9 +317,9 @@ public class GenericFieldTests{
 			var c  = new GenericContainer<>(value);
 			pip.write(ch, c);
 			var generic = pip.readNew(ch, null);
-			Assert.assertEquals(generic.value, value);
+			assertThat(generic.value).isEqualTo(value);
 			
-			Assert.fail("Expected to fail");
+			throw new AssertionError("Expected to fail");
 		}
 	}
 	

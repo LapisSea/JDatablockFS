@@ -62,7 +62,7 @@ public final class Sampling{
 						return v == null? 1 : v + 1;
 					});
 				}
-				UtilL.sleep(1);
+				UtilL.sleep(Math.random()*10);
 			}
 			
 			if(print){

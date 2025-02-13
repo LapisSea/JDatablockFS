@@ -1,7 +1,8 @@
 package com.lapissea.dfs.type.field.access;
 
+import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessUtils;
 import com.lapissea.dfs.internal.MyUnsafe;
-import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
@@ -11,7 +12,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -19,19 +19,19 @@ import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 
 public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
 	
-	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
+	public static final class Funct<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
 		
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
 		
-		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		public Funct(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
 			super(struct, field, name, genericType);
 			
-			getter.ifPresent(get -> validateGetter(genericType, get));
-			setter.ifPresent(set -> validateSetter(genericType, set));
+			if(getter != null) validateGetter(genericType, getter);
+			if(setter != null) validateSetter(genericType, setter);
 			
-			this.getter = getter.map(ExactFieldAccessor::findParent).map(this::makeGetter).orElse(null);
-			this.setter = setter.map(ExactFieldAccessor::findParent).map(this::makeSetter).orElse(null);
+			this.getter = getter != null? makeGetter(findParent(getter)) : null;
+			this.setter = setter != null? makeSetter(findParent(setter)) : null;
 		}
 		
 		@Override
@@ -134,66 +134,20 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		}
 	}
 	
-	public static final class PtrFunc<CTyp extends IOInstance<CTyp>> extends Funct<CTyp>{
-		
-		public PtrFunc(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
-			super(struct, field, getter, setter, name, ChunkPointer.class);
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
+		if(getter == null && setter == null){
+			return new UnsafeAccessor<>(struct, field, name, genericType);
 		}
-		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null) fail();
-			return num.getValue();
-		}
-		private void fail(){
-			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-		}
-		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, ChunkPointer.of(value));
-		}
-	}
-	
-	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
-		
-		public Ptr(Struct<CTyp> struct, Field field, String name){
-			super(struct, field, name, ChunkPointer.class);
-		}
-		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (ChunkPointer)get(ioPool, instance);
-			if(num == null) fail();
-			return num.getValue();
-		}
-		private void fail(){
-			throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
-		}
-		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, ChunkPointer.of(value));
-		}
-	}
-	
-	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		if(genericType == ChunkPointer.class){
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new Ptr<>(struct, field, name);
-			}
-			return new PtrFunc<>(struct, field, getter, setter, name);
-		}else{
-			if(getter.isEmpty() && setter.isEmpty()){
-				return new UnsafeAccessor<>(struct, field, name, genericType);
-			}
-			return new UnsafeAccessor.Funct<>(struct, field, getter, setter, name, genericType);
-		}
+		return new UnsafeAccessor.Funct<>(struct, field, getter, setter, name, genericType);
 	}
 	
 	private final Class<?> declaringClass;
 	private final long     fieldOffset;
 	
-	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
+	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		declaringClass = field.getDeclaringClass();
+		Access.findAccess(field.getDeclaringClass(), AccessUtils.modeFromModifiers(field.getModifiers()));
 		fieldOffset = MyUnsafe.objectFieldOffset(field);
 	}
 	

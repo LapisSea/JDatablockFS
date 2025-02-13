@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,8 +29,8 @@ import static java.util.function.Predicate.not;
 
 public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public <E extends Exception> BaseFixedStructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
-		super(type, compiler, initNow);
+	public <E extends Exception> BaseFixedStructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, int syncStage) throws E{
+		super(type, compiler, syncStage);
 	}
 	
 	
@@ -50,9 +51,9 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStr(", ").ifPresent(badFields -> {
+		if(sizeFieldStream(structFields).filter(IOField::hasDependencies).joinAsOptionalStrM(", ") instanceof Some(var badFields)){
 			throw new IllegalField("fmt", "{}#red should not have dependencies", badFields);
-		});
+		}
 		
 		return sizeFieldStream(structFields)
 			       .distinct()
@@ -72,7 +73,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	protected static <T extends IOInstance<T>> IterablePP<IOField<T, NumberSize>> sizeFieldStream(FieldSet<T> structFields){
-		return structFields.flatOptionals(f -> IOFieldTools.getDynamicSize(f.getAccessor()));
+		return structFields.flatOptionalsM(f -> IOFieldTools.getDynamicSize(f.getAccessor()));
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
@@ -81,6 +82,6 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		src.skipExact(getFixedDescriptor().get());
+		src.skipExact(getFixedDescriptor().get(WordSpace.BYTE));
 	}
 }

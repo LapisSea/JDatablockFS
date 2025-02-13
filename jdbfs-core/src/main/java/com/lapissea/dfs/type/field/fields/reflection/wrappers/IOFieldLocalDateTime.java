@@ -1,6 +1,7 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.FixedVaryingStructPipe;
@@ -10,15 +11,13 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
-import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
@@ -26,10 +25,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
-public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, LocalDateTime>{
+public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, LocalDateTime>{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<LocalDateTime>{
@@ -44,6 +42,10 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 		}
 	}
 	
+	static{ Preload.preloadFn(IOLocalDateTime.class, "of", LocalDateTime.of(LocalDate.EPOCH, LocalTime.MIDNIGHT)); }
+	
+	private static MethodHandle CONSTR;
+	
 	@IOInstance.Order({"date", "time"})
 	private interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
 		
@@ -56,10 +58,15 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 		
 		Struct<IOLocalDateTime> STRUCT = Struct.of(IOLocalDateTime.class);
 		
-		MethodHandle CONSTR = Def.constrRef(IOLocalDateTime.class, LocalDate.class, LocalTime.class);
+		private static MethodHandle init(){
+			return CONSTR = Def.constrRef(IOLocalDateTime.class, LocalDate.class, LocalTime.class);
+		}
+		
 		static IOLocalDateTime of(LocalDateTime val){
+			var c = CONSTR;
+			if(c == null) c = init();
 			try{
-				return (IOLocalDateTime)CONSTR.invoke(val.toLocalDate(), val.toLocalTime());
+				return (IOLocalDateTime)c.invoke(val.toLocalDate(), val.toLocalTime());
 			}catch(Throwable e){
 				throw new RuntimeException(e);
 			}
@@ -70,14 +77,12 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 	}
 	
 	private final StructPipe<IOLocalDateTime> instancePipe;
-	private final boolean                     fixed;
 	
 	public IOFieldLocalDateTime(FieldAccessor<CTyp> accessor){ this(accessor, null); }
 	public IOFieldLocalDateTime(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.fixed = varProvider != null;
 		
-		if(fixed){
+		if(varProvider != null){
 			instancePipe = FixedVaryingStructPipe.tryVarying(IOLocalDateTime.STRUCT, varProvider);
 		}else instancePipe = StandardStructPipe.of(IOLocalDateTime.STRUCT);
 		
@@ -109,75 +114,26 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends N
 		return IOLocalDateTime.of(raw);
 	}
 	
-	@Override
-	public LocalDateTime get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, () -> LocalDateTime.of(LocalDate.EPOCH, LocalTime.MIDNIGHT));
-	}
-	@Override
-	public boolean isNull(VarPool<CTyp> ioPool, CTyp instance){
-		return isNullRawNullable(ioPool, instance);
-	}
+	private static final LocalDateTime DEFAULT = LocalDateTime.of(LocalDate.EPOCH, LocalTime.MIDNIGHT);
 	
 	@Override
-	public void set(VarPool<CTyp> ioPool, CTyp instance, LocalDateTime value){
-		super.set(ioPool, instance, switch(getNullability()){
-			case DEFAULT_IF_NULL, NULLABLE -> value;
-			case NOT_NULL -> Objects.requireNonNull(value);
-		});
-	}
+	protected LocalDateTime defaultValue(){ return DEFAULT; }
+	
 	@Override
 	protected IOField<CTyp, LocalDateTime> maxAsFixedSize(VaryingSize.Provider varProvider){
 		return new IOFieldLocalDateTime<>(getAccessor(), varProvider);
 	}
 	
 	@Override
-	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val = getWrapped(ioPool, instance);
-		if(nullable()){
-			if(val == null){
-				if(fixed){
-					IOUtils.zeroFill(dest, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return;
-			}
-		}
-		instancePipe.write(provider, dest, val);
+	protected void writeValue(DataProvider provider, ContentWriter dest, LocalDateTime value) throws IOException{
+		instancePipe.write(provider, dest, IOLocalDateTime.of(value));
 	}
-	
-	private LocalDateTime readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		if(nullable()){
-			boolean isNull = getIsNull(ioPool, instance);
-			if(isNull){
-				if(fixed){
-					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return null;
-			}
-		}
-		
+	@Override
+	protected LocalDateTime readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		return instancePipe.readNew(provider, src, genericContext).getData();
 	}
-	
 	@Override
-	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		set(ioPool, instance, readNew(ioPool, provider, src, instance, genericContext));
-	}
-	
-	@Override
-	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
-			return;
-		}
-		
-		if(nullable()){
-			boolean isNull = getIsNull(ioPool, instance);
-			if(isNull){
-				if(fixed){
-					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
-				}
-				return;
-			}
-		}
+	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		instancePipe.skip(provider, src, genericContext);
 	}
 }

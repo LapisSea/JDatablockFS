@@ -95,6 +95,15 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		);
 	}
 	
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Iters.of(
+			TypeFlag.DYNAMIC,
+			IOInstance.isInstanceOrSealed(rootType)? TypeFlag.IO_INSTANCE : null,
+			Iters.values(typeToPipe).anyMatch(p -> p.getType().getCanHavePointers())? null : TypeFlag.HAS_NO_POINTERS
+		).nonNulls().toModSet();
+	}
+	
 	public Collection<StructPipe<ValueType>> getTypePipes(){
 		return typeToPipe.values();
 	}

@@ -27,6 +27,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -41,6 +42,12 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
 		this(accessor, null);
 	}
+	
+	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of(TypeFlag.IO_INSTANCE);
+	}
+	
 	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
 		if(getNullability() == DEFAULT_IF_NULL){

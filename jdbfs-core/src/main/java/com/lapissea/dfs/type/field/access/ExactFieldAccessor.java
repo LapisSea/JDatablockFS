@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -41,7 +42,7 @@ import static com.lapissea.dfs.type.field.access.TypeFlag.*;
  * types. For example, if an {@link Integer} type is passed to the {@link FieldAccessor#set} function of a {@code long} accessor, then this class will unbox the
  * {@link Integer} in to an int and widen it to a long. This value will then be passed on to the {@link ExactFieldAccessor#setExactLong} function
  */
-public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor.ReadOnly<CTyp>{
+public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
 	
 	protected static Method findParent(Method method){
 		var cl = method.getDeclaringClass();
@@ -65,9 +66,11 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	private final Class<?> rawType;
 	private final int      typeID;
 	private final boolean  genericTypeHasArgs;
+	private final boolean  readOnlyField;
 	
 	public ExactFieldAccessor(Struct<CTyp> struct, String name, Type genericType, Map<Class<? extends Annotation>, ? extends Annotation> annotations, boolean readOnlyField){
-		super(struct, name, annotations, readOnlyField);
+		super(struct, name, annotations);
+		this.readOnlyField = readOnlyField;
 		
 		Class<?> type = Utils.typeToRaw(genericType);
 		
@@ -78,13 +81,24 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 	}
 	
+	protected final void checkReadOnlyField(){
+		if(readOnlyField){
+			failReadOnly();
+		}
+	}
+	private void failReadOnly(){
+		throw new UnsupportedOperationException(Log.fmt("Field {}#red is final, can not set it!", this));
+	}
+	@Override
+	public final boolean isReadOnly(){ return readOnlyField; }
+	
 	@Override
 	public boolean genericTypeHasArgs(){
 		return genericTypeHasArgs;
 	}
 	
 	@SuppressWarnings("unchecked")
-	protected final Function<CTyp, Object> makeGetter(Method m){
+	protected final Function<CTyp, Object> makeGetter(Method m) throws IllegalAccessException{
 		var typ = m.getReturnType();
 		if(typ == short.class) return Access.makeLambda(m, FunctionOS.class);
 		if(typ == char.class) return Access.makeLambda(m, FunctionOC.class);
@@ -97,7 +111,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return Access.makeLambda(m, Function.class);
 	}
 	@SuppressWarnings("unchecked")
-	protected final BiConsumer<CTyp, Object> makeSetter(Method m){
+	protected final BiConsumer<CTyp, Object> makeSetter(Method m) throws IllegalAccessException{
 		var typ = m.getParameterTypes()[0];
 		if(typ == short.class) return Access.makeLambda(m, ConsumerOS.class);
 		if(typ == char.class) return Access.makeLambda(m, ConsumerOC.class);
@@ -115,7 +129,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return rawType;
 	}
 	@Override
-	public int getTypeID(){
+	public final int getTypeID(){
 		return typeID;
 	}
 	
@@ -160,7 +174,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	
 	
 	@Override
-	public Object get(VarPool<CTyp> ioPool, CTyp instance){
+	public final Object get(VarPool<CTyp> ioPool, CTyp instance){
 		if(typeID == ID_OBJECT){
 			return getExactObject(ioPool, instance);
 		}else{
@@ -182,7 +196,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
+	public final void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		if(typeID == ID_OBJECT){
 			setExactObject(ioPool, instance, value);
 		}else{
@@ -228,7 +242,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
+	public final double getDouble(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_DOUBLE -> getExactDouble(ioPool, instance);
 			case ID_FLOAT -> getExactFloat(ioPool, instance);
@@ -244,7 +258,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		};
 	}
 	@Override
-	public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
+	public final void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		switch(typeID){
 			case ID_DOUBLE -> setExactDouble(ioPool, instance, value);
 			case ID_OBJECT -> setExactObject(ioPool, instance, value);
@@ -253,7 +267,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
+	public final float getFloat(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_FLOAT -> getExactFloat(ioPool, instance);
 			case ID_OBJECT -> getObjAsFloat(ioPool, instance);
@@ -264,7 +278,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return (Float)getExactObject(ioPool, instance);
 	}
 	@Override
-	public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
+	public final void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		switch(typeID){
 			case ID_FLOAT -> setExactFloat(ioPool, instance, value);
 			case ID_DOUBLE -> setExactDouble(ioPool, instance, value);
@@ -274,7 +288,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
+	public final byte getByte(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_BYTE -> getExactByte(ioPool, instance);
 			case ID_OBJECT -> getObjAsByte(ioPool, instance);
@@ -285,7 +299,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return (Byte)getExactObject(ioPool, instance);
 	}
 	@Override
-	public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
+	public final void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		switch(typeID){
 			case ID_BYTE -> setExactByte(ioPool, instance, value);
 			case ID_INT -> setExactInt(ioPool, instance, value);
@@ -297,7 +311,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
+	public final boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_BOOLEAN -> getExactBoolean(ioPool, instance);
 			case ID_OBJECT -> getObjAsBoolean(ioPool, instance);
@@ -308,7 +322,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		return (Boolean)getExactObject(ioPool, instance);
 	}
 	@Override
-	public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+	public final void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 		switch(typeID){
 			case ID_BOOLEAN -> setExactBoolean(ioPool, instance, value);
 			case ID_OBJECT -> setExactObject(ioPool, instance, value);
@@ -346,7 +360,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public int getInt(VarPool<CTyp> ioPool, CTyp instance){
+	public final int getInt(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_INT -> getExactInt(ioPool, instance);
 			case ID_SHORT -> getExactShort(ioPool, instance);
@@ -364,7 +378,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		};
 	}
 	@Override
-	public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
+	public final void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		switch(typeID){
 			case ID_INT -> setExactInt(ioPool, instance, value);
 			case ID_LONG -> setExactLong(ioPool, instance, value);
@@ -374,7 +388,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 	}
 	
 	@Override
-	public short getShort(VarPool<CTyp> ioPool, CTyp instance){
+	public final short getShort(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_SHORT -> getExactShort(ioPool, instance);
 			case ID_BYTE -> getExactByte(ioPool, instance);
@@ -390,7 +404,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		};
 	}
 	@Override
-	public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
+	public final void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		switch(typeID){
 			case ID_SHORT -> setExactShort(ioPool, instance, value);
 			case ID_INT -> setExactInt(ioPool, instance, value);
@@ -400,7 +414,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		}
 	}
 	@Override
-	public char getChar(VarPool<CTyp> ioPool, CTyp instance){
+	public final char getChar(VarPool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
 			case ID_CHAR -> getExactChar(ioPool, instance);
 			case ID_OBJECT -> getObjAsChar(ioPool, instance);
@@ -414,7 +428,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 		};
 	}
 	@Override
-	public void setChar(VarPool<CTyp> ioPool, CTyp instance, char value){
+	public final void setChar(VarPool<CTyp> ioPool, CTyp instance, char value){
 		switch(typeID){
 			case ID_CHAR -> setExactChar(ioPool, instance, value);
 			case ID_INT -> setExactInt(ioPool, instance, value);

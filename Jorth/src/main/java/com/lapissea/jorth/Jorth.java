@@ -538,6 +538,10 @@ public final class Jorth extends CodeDestination{
 					currentFunction.setStaticOp(owner, member);
 				}
 			}
+			case CAST -> {
+				var clazz = getReadClassName(source);
+				currentFunction.castOp(new GenericType(clazz));
+			}
 			case IF -> {
 				source.requireKeyword(Keyword.START);
 				currentFunction.pushIfBool();

@@ -15,6 +15,7 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.BasicSizeDescriptor;
@@ -30,10 +31,12 @@ import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -107,7 +110,8 @@ public class InstanceCollection{
 	}
 	
 	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends NullFlagCompanyField<T, CollectionType>{
+		extends NullFlagCompanyField<T, CollectionType>
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -136,6 +140,18 @@ public class InstanceCollection{
 				}
 				return sum;
 			}));
+		}
+		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			var     typ = dataAdapter.getElementIO().componentType();
+			boolean noPtr;
+			if((Modifier.isFinal(typ.getModifiers()) || IOInstance.Def.isDefinition(typ)) && !Struct.of(typ).getCanHavePointers()){
+				noPtr = true;
+			}else{
+				noPtr = !Struct.canUnknownHavePointers(typ);
+			}
+			return Iters.of(TypeFlag.IO_INSTANCE, noPtr? TypeFlag.HAS_NO_POINTERS : null).nonNulls().toModSet();//TODO: Add TypeFlag.HAS_NO_POINTERS if it is known that types are only no pointer instances
 		}
 		
 		@Override
@@ -192,10 +208,13 @@ public class InstanceCollection{
 				TextUtil.toString(val)
 			);
 		}
+		@Override
+		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}
 	
 	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends RefField.ReferenceCompanion<T, CollectionType>{
+		extends RefField.ReferenceCompanion<T, CollectionType>
+		implements CollectionAdapter.CollectionContainer<ElementType, CollectionType>{
 		
 		private final CollectionAdapter<ElementType, CollectionType> dataAdapter;
 		
@@ -275,6 +294,11 @@ public class InstanceCollection{
 		}
 		
 		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of();
+		}
+		
+		@Override
 		protected CollectionType newDefault(){
 			return dataAdapter.makeNew(0);
 		}
@@ -343,6 +367,7 @@ public class InstanceCollection{
 			return refPipe;
 		}
 		
+		
 		@Override
 		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
 			var val = get(ioPool, instance);
@@ -355,6 +380,8 @@ public class InstanceCollection{
 				TextUtil.toString(val)
 			);
 		}
+		@Override
+		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

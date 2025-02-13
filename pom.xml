@@ -12,11 +12,11 @@
 		
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		
-		<maven-compiler-plugin-version>3.11.0</maven-compiler-plugin-version>
-		<maven-surefire-plugin-version>3.1.2</maven-surefire-plugin-version>
-		<maven-assembly-plugin-version>3.6.0</maven-assembly-plugin-version>
-		<maven-gpg-plugin-version>3.0.1</maven-gpg-plugin-version>
-		<maven-source-plugin-version>3.2.1</maven-source-plugin-version>
+		<maven-compiler-plugin-version>3.13.0</maven-compiler-plugin-version>
+		<maven-surefire-plugin-version>3.5.2</maven-surefire-plugin-version>
+		<maven-assembly-plugin-version>3.7.1</maven-assembly-plugin-version>
+		<maven-gpg-plugin-version>3.2.7</maven-gpg-plugin-version>
+		<maven-source-plugin-version>3.3.1</maven-source-plugin-version>
 		
 		<jmh.version>1.37</jmh.version>
 		
@@ -35,6 +35,8 @@
 		<module>/jdbfs-tools</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
+		<module>demos/Photos</module>
+		<module>demos/World</module>
 	</modules>
 	
 	<dependencyManagement>
@@ -47,7 +49,7 @@
 			<dependency>
 				<groupId>org.testng</groupId>
 				<artifactId>testng</artifactId>
-				<version>7.9.0</version>
+				<version>7.10.2</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>
@@ -62,14 +64,17 @@
 				<version>${jmh.version}</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>org.assertj</groupId>
+				<artifactId>assertj-core</artifactId>
+				<version>3.27.2</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>com.google.code.gson</groupId>
+				<artifactId>gson</artifactId>
+				<version>2.11.0</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
-	
-	<!--	<repositories>-->
-	<!--		<repository>-->
-	<!--			<name>git snap</name>-->
-	<!--			<id>gitsnap</id>-->
-	<!--			<url>https://github.com/LapisSea/maven-snaps/tree/master/repo/</url>-->
-	<!--		</repository>-->
-	<!--	</repositories>-->
 </project>

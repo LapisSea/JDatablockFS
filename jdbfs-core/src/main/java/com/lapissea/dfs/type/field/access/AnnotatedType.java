@@ -3,13 +3,13 @@ package com.lapissea.dfs.type.field.access;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.function.Function.identity;
 
@@ -41,9 +41,9 @@ public interface AnnotatedType{
 	}
 	
 	@NotNull
-	default <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+	default <T extends Annotation> Match<T> getAnnotation(Class<T> annotationClass){
 		//noinspection unchecked
-		return Optional.ofNullable((T)getAnnotations().get(annotationClass));
+		return Match.ofNullable((T)getAnnotations().get(annotationClass));
 	}
 	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
 		return getAnnotations().containsKey(annotationClass);

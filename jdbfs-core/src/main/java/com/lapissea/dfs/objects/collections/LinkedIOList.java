@@ -5,8 +5,10 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
+import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.QuerySupport;
+import com.lapissea.dfs.query.QueryFields;
+import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.Struct;
@@ -16,13 +18,13 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.util.LateInit;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE_MANAGED;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
@@ -100,7 +102,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
-	private static final LateInit.Safe<IOField<?, ?>> HEAD_FIELD = Runner.async(
+	private static final CompletableFuture<IOField<?, ?>> HEAD_FIELD = Runner.async(
 		() -> Struct.Unmanaged.of(LinkedIOList.class).getFields().requireByName("head")
 	);
 	
@@ -214,13 +216,15 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	public void add(T value) throws IOException{
 		IONode<T> newNode = allocNode(value, null);
 		
-		if(isEmpty()){
-			setHead(newNode);
-		}else{
-			getLastNode().setNext(newNode);
+		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+			if(isEmpty()){
+				setHead(newNode);
+			}else{
+				getLastNode().setNext(newNode);
+			}
+			
+			deltaSize(1);
 		}
-		
-		deltaSize(1);
 	}
 	
 	@Override
@@ -265,14 +269,14 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	
 	private IONode<T> getHead() throws IOException{
 		if(!readOnly || head == null){
-			readManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.get());
+			readManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.join());
 		}
 		return head;
 	}
 	private void setHead(IONode<T> head) throws IOException{
 		this.head = head;
 		getDataProvider().getSource().openIOTransaction(() -> {
-			writeManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.get());
+			writeManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.join());
 		});
 	}
 	
@@ -344,56 +348,65 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		return "L";
 	}
 	
-	
-	@Override
-	public Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields -> {
-			var                       size = size();
-			FieldDependency.Ticket<?> depTicket;
-			if(valueStorage instanceof ValueStorage.InstanceBased<?> i){
-				var t = i.depTicket(readFields);
-				depTicket = t.fullRead()? null : t;
-			}else depTicket = null;
-			
-			return new QuerySupport.AccessIterator<T>(){
-				long cursor;
-				
-				IOIterator.Iter<IONode<T>> iter;
-				long                       iterCursor;
-				
-				@SuppressWarnings("rawtypes")
-				@Override
-				public QuerySupport.Accessor<T> next(){
-					if(cursor>=size) return null;
-					var index = cursor++;
-					return full -> {
-						checkSize(index);
-						
-						if(iter == null || iterCursor>=index + 1){
-							var head = getHead();
-							if(head == null) iter = IOIterator.Iter.emptyIter();
-							else iter = head.iterator();
-							iterCursor = 0;
-						}
-						
-						IONode<T> node;
-						do{
-							node = iter.ioNext();
-							iterCursor++;
-						}while(iterCursor != index + 1);
-						
-						if(!full && depTicket != null){
-							var t = node.readValueSelective(depTicket, true);
-							return (T)t.val();
-						}
-						return node.getValue();
-					};
-				}
-			};
-		}));
-	}
 	@Override
 	public void free(long index){
 		throw NotImplementedException.infer();//TODO: implement LinkedIOList.free()
+	}
+	
+	private final class QSource implements QueryableData.QuerySource<T>{
+		
+		private final FieldDependency.Ticket<?> depTicket;
+		
+		private final IOIterator<IONode<T>> iter;
+		private       IONode<T>             node;
+		
+		private boolean closed;
+		
+		public QSource(QueryFields queryFields) throws IOException{
+			if(!queryFields.isEmpty() && valueStorage instanceof ValueStorage.InstanceBased<?> i){
+				var t = i.depTicket(queryFields.set());
+				depTicket = t.fullRead()? null : t;
+			}else depTicket = null;
+			
+			var head = getHead();
+			if(head == null) iter = IOIterator.Iter.emptyIter();
+			else iter = head.iterator();
+		}
+		
+		private void checkClosed(){
+			if(closed) throw new IllegalStateException("Query closed");
+		}
+		
+		@Override
+		public boolean step() throws IOException{
+			checkClosed();
+			if(!iter.hasNext()) return false;
+			node = iter.ioNext();
+			return true;
+		}
+		@Override
+		public T fullEntry() throws IOException{
+			checkClosed();
+			return node.getValue();
+		}
+		@Override
+		public T fieldEntry() throws IOException{
+			checkClosed();
+			if(depTicket == null){
+				return node.getValue();
+			}
+			var t = node.readValueSelective(depTicket, true);
+			return (T)t.val();
+		}
+		@Override
+		public void close(){
+			node = null;
+			closed = true;
+		}
+	}
+	
+	@Override
+	public Query<T> query(){
+		return new Queries.All<>(QSource::new);
 	}
 }

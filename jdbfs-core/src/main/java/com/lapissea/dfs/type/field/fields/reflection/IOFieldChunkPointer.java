@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.util.List;
@@ -58,15 +59,20 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	}
 	
 	@Override
+	protected Set<TypeFlag> computeTypeFlags(){
+		return Set.of();
+	}
+	
+	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
 		
-		Optional<IOField<T, NumberSize>> fieldOps = forceFixed? Optional.empty() : IOFieldTools.getDynamicSize(getAccessor());
-		
-		fieldOps.ifPresent(f -> dynamicSize = f::get);
-		
-		initSizeDescriptor(fieldOps.map(field -> SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
-		                           .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes)));
+		if(!forceFixed && IOFieldTools.getDynamicSize(getAccessor()) instanceof Some(var field)){
+			dynamicSize = field::get;
+			initSizeDescriptor(SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()));
+		}else{
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+		}
 	}
 	@Override
 	public IOField<T, ChunkPointer> maxAsFixedSize(VaryingSize.Provider varProvider){

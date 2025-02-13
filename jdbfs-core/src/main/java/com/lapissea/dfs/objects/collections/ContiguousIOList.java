@@ -8,6 +8,7 @@ import com.lapissea.dfs.core.chunk.ChunkBuilder;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.exceptions.OutOfBitDepth;
 import com.lapissea.dfs.io.RandomIO;
+import com.lapissea.dfs.io.RangeIO;
 import com.lapissea.dfs.io.ValueStorage;
 import com.lapissea.dfs.io.ValueStorage.StorageRule;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -17,8 +18,10 @@ import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.query.Queries;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.QuerySupport;
+import com.lapissea.dfs.query.QueryFields;
+import com.lapissea.dfs.query.QueryableData;
 import com.lapissea.dfs.type.CommandSet;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -57,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.RandomAccess;
+import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
@@ -245,6 +249,10 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				throw new RuntimeException(e);
 			}
 		}
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of(TypeFlag.IO_INSTANCE);
+		}
 	}
 	
 	private static String elementName(long index){
@@ -413,7 +421,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			varyingBuffer = newVarying;
 			writeManagedFields();
 			
-			try(var io = getPointer().makeReference().addOffset(headSiz).io(getDataProvider())){
+			try(var io = RangeIO.of(getPointer().dereference(getDataProvider()), headSiz, Long.MAX_VALUE)){
 				
 				for(long i = 0; i<size(); i++){
 					var newDataStart = i*newElemenSize;
@@ -519,13 +527,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			add(source.get());
 			return;
 		}
-		if(storage instanceof ValueStorage.UnmanagedInstance){//TODO is this necessary? Test and maybe remove
-			requestCapacity(size() + count);
-			for(long i = 0; i<count; i++){
-				add(source.get());
-			}
-			return;
-		}
+		
 		defragData(count);
 		
 		try(var io = selfIO()){
@@ -839,37 +841,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	
 	@Override
-	public Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields -> {
-			var                       size = size();
-			FieldDependency.Ticket<?> depTicket;
-			if(storage instanceof ValueStorage.InstanceBased<?> i){
-				depTicket = i.depTicket(readFields);
-			}else depTicket = null;
-			
-			return new QuerySupport.AccessIterator<T>(){
-				long cursor;
-				
-				@SuppressWarnings("rawtypes")
-				@Override
-				public QuerySupport.Accessor<T> next(){
-					if(cursor>=size) return null;
-					var index = cursor++;
-					return full -> {
-						checkSize(index);
-						try(var io = ioAtElement(index)){
-							if(!full && depTicket != null && storage instanceof ValueStorage.InstanceBased i){
-								return (T)i.readNewSelective(io, depTicket, true);
-							}
-							return storage.readNew(io);
-						}
-					};
-				}
-			};
-		}));
-	}
-	
-	@Override
 	public void free(long index) throws IOException{
 		checkSize(index);
 		if(!storage.needsRemoval()) return;
@@ -889,4 +860,86 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	protected String getStringPrefix(){
 		return "C";
 	}
+	
+	public long magentPos(long index) throws IOException{
+		try(var io = ioAtElement(Math.min(size, index))){
+			return io.calcGlobalPos();
+		}
+	}
+	
+	private final class QSource implements QueryableData.QuerySource<T>{
+		private static final int NONE = 0, FIELD = 1, FULL = 2;
+		
+		private final FieldDependency.Ticket<?> depTicket;
+		
+		private long index = -1;
+		
+		private int readState;
+		private T   val;
+		
+		private boolean closed;
+		
+		public QSource(QueryFields queryFields){
+			if(!queryFields.isEmpty() && storage instanceof ValueStorage.InstanceBased<?> i){
+				var t = i.depTicket(queryFields.set());
+				depTicket = t.fullRead()? null : t;
+			}else{
+				depTicket = null;
+			}
+		}
+		
+		private void checkClosed(){
+			if(closed) throw new IllegalStateException("Query closed");
+		}
+		
+		@Override
+		public boolean step(){
+			checkClosed();
+			var ni = index + 1;
+			if(ni>=size()) return false;
+			index = ni;
+			readState = NONE;
+			return true;
+		}
+		
+		@Override
+		public T fullEntry() throws IOException{
+			checkClosed();
+			if(readState == FULL) return val;
+			val = get(index);
+			readState = FULL;
+			return val;
+		}
+		
+		@Override
+		public T fieldEntry() throws IOException{
+			checkClosed();
+			if(readState == NONE){
+				if(depTicket == null){
+					val = get(index);
+					readState = FULL;
+				}else{
+					val = readPartial();
+					readState = FIELD;
+				}
+			}
+			return val;
+		}
+		
+		private T readPartial() throws IOException{
+			try(var io = ioAtElement(index)){
+				//noinspection rawtypes
+				if(storage instanceof ValueStorage.InstanceBased i){
+					return (T)i.readNewSelective(io, depTicket, true);
+				}
+				return storage.readNew(io);
+			}
+		}
+		@Override
+		public void close(){
+			closed = true;
+		}
+	}
+	
+	public Query<T> query(){ return new Queries.All<>(QSource::new); }
 }

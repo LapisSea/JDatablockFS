@@ -9,6 +9,7 @@ import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -25,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.SequencedCollection;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
@@ -33,7 +35,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePPSource<IOField<T, ?>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements Set<IOField<T, ?>>, IterablePPSource<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
 		
@@ -249,12 +251,21 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
+	@Deprecated(forRemoval = true)
+	public static <T extends IOInstance<T>> FieldSet<T> of(FieldSet<T> data){
+		return Objects.requireNonNull(data);
+	}
+	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Iterable<IOField<T, ?>> iterable){
 		var b = new SetBuilder<T>(IterablePP.SizedPP.tryGetUnknown(iterable).orElse(-1));
 		iterable.forEach(b);
 		return b.make();
 	}
 	
+	public static <T extends IOInstance<T>> FieldSet<T> of(IOField<T, ?> field){
+		Objects.requireNonNull(field);
+		return new FieldSet<>(new IOField[]{field});
+	}
 	@SafeVarargs
 	public static <T extends IOInstance<T>> FieldSet<T> of(IOField<T, ?>... data){
 		return of(Arrays.asList(data));
@@ -265,7 +276,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		var size = data.size();
 		if(size == 1 && data instanceof SequencedCollection<IOField<T, ?>> l){
-			return new FieldSet<>(new IOField[]{l.getFirst()});
+			return of(l.getFirst());
 		}
 		
 		var safeData = new SetBuilder<T>(size);
@@ -469,6 +480,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public OptionalPP<IOField<T, ?>> byName(String name){
 		var idx = indexByName(name);
 		return idx == -1? OptionalPP.empty() : OptionalPP.of(data[idx]);
+	}
+	public Match<IOField<T, ?>> byNameM(String name){
+		var idx = indexByName(name);
+		return idx == -1? Match.empty() : Match.of(data[idx]);
 	}
 	
 	public IOField<T, ?> requireByName(String name){

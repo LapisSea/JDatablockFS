@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * A topological dependency sort algorithm
+ */
 public class DepSort<T>{
 	
 	public static final class CycleException extends RuntimeException{
@@ -32,7 +35,7 @@ public class DepSort<T>{
 			this.data = new int[2];
 		}
 		void add(int i){
-			if(data.length == cursor) data = Arrays.copyOf(data, data.length*3/2);
+			if(data.length == cursor) data = Arrays.copyOf(data, data.length*2);
 			data[cursor] = i;
 			cursor++;
 		}

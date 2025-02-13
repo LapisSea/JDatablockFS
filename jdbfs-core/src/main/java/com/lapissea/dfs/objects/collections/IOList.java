@@ -6,8 +6,6 @@ import com.lapissea.dfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.dfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.dfs.objects.collections.listtools.MemoryWrappedIOList;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.query.QueryCheck;
-import com.lapissea.dfs.query.QuerySupport;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
@@ -24,25 +22,22 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalInt;
-import java.util.OptionalLong;
 import java.util.RandomAccess;
-import java.util.Set;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
-public interface IOList<T> extends IterablePPSource<T>{
+public interface IOList<T> extends IterablePPSource<T>, Query.BaseSource<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
 		
 		var push = new Consumer<String>(){
-			private String repeatBuff  = null;
+			private String repeatBuff;
 			private int    repeatCount = 0;
 			private long   repeatIndexStart;
 			private long   count       = 0;
@@ -644,54 +639,6 @@ public interface IOList<T> extends IterablePPSource<T>{
 			@Override
 			protected T unmap(To v){ return unmap.apply(v); }
 		};
-	}
-	
-	
-	default Query<T> query(String expression, Object... args){
-		return query().filter(expression, args);
-	}
-	
-	default Query<T> query(Set<String> readFields, Predicate<T> filter){
-		return query().filter(new QueryCheck.Lambda((Predicate<Object>)filter, readFields));
-	}
-	
-	abstract class ListData<T> implements QuerySupport.Data<T>{
-		
-		public static <T> QuerySupport.Data<T> of(IOList<T> list, Function<Set<String>, QuerySupport.AccessIterator<T>> elements){
-			return new ListData<>(list){
-				@Override
-				public QuerySupport.AccessIterator<T> elements(Set<String> readFields){
-					return elements.apply(readFields);
-				}
-			};
-		}
-		
-		private final IOList<T> l;
-		protected ListData(IOList<T> l){ this.l = l; }
-		
-		@Override
-		public Class<T> elementType(){
-			return l.elementType();
-		}
-		@Override
-		public OptionalLong count(){
-			return OptionalLong.of(l.size());
-		}
-	}
-	
-	default Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields -> {
-			var size = size();
-			return new QuerySupport.AccessIterator<T>(){
-				long cursor;
-				@Override
-				public QuerySupport.Accessor<T> next(){
-					if(cursor>=size) return null;
-					var i = cursor++;
-					return full -> IOList.this.get(i);
-				}
-			};
-		}));
 	}
 	
 	void free(long index) throws IOException;

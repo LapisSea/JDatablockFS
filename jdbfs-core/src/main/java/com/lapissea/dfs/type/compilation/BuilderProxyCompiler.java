@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.type.IOInstance;
@@ -19,6 +20,10 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+
+import java.lang.invoke.MethodHandles;
+import java.util.Objects;
 
 public final class BuilderProxyCompiler{
 	
@@ -27,8 +32,8 @@ public final class BuilderProxyCompiler{
 	private static final WeakKeyValueMap<Class<?>, Class<? extends ProxyBuilder<?>>> CACHE      = new WeakKeyValueMap.Sync<>();
 	private static final PerKeyLock<Class<?>>                                        CACHE_LOCK = new PerKeyLock<>();
 	
-	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Class<T> type){ return getProxy(Struct.of(type)); }
-	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Struct<T> type){
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Class<T> type) throws IllegalAccessException{ return getProxy(Struct.of(type)); }
+	public static <T extends IOInstance<T>> Class<ProxyBuilder<T>> getProxy(Struct<T> type) throws IllegalAccessException{
 		return CACHE_LOCK.syncGet(type.getType(), () -> {
 			var cls = type.getType();
 			//noinspection unchecked
@@ -41,13 +46,16 @@ public final class BuilderProxyCompiler{
 		});
 	}
 	
-	private static <T extends IOInstance<T>> Class<ProxyBuilder<T>> compileProxy(Struct<T> type){
+	private static <T extends IOInstance<T>> Class<ProxyBuilder<T>> compileProxy(Struct<T> type) throws IllegalAccessException{
 		if(!type.needsBuilderObj()){
 			throw new IllegalArgumentException();
 		}
 		
 		var baseClass     = type.getType();
 		var concreteClass = type.getConcreteType();
+		
+		
+		AccessProvider concreteClassAccess = Access.findAccess(concreteClass, Access.Mode.PACKAGE);
 		
 		ConfigDefs.CompLogLevel.SMALL.log("Generating builder for: {}#yellow{}#yellowBright", Utils.classPathHeadless(baseClass), baseClass.getSimpleName());
 		
@@ -81,16 +89,25 @@ public final class BuilderProxyCompiler{
 				
 				writer.write(
 					"""
-						private static final field $STRUCT #Struct
+						private static field $V_STRUCT #Struct<{0}>
 						
-						function <clinit> start
-							static call #Struct of start
-								class {0}
+						private static function $STRUCT
+							returns #Struct<{0}>
+						start
+							static call {1} isNull start
+								get {0} $V_STRUCT
 							end
-							set {0} $STRUCT
+							if start
+								static call #Struct of start
+									class {0}
+								end
+								set {0} $V_STRUCT
+							end
+							get {0} $V_STRUCT
 						end
+						
 						""",
-					proxyName);
+					proxyName, Objects.class, IOInstance.Managed.class, MethodHandles.class);
 				
 				for(IOField<T, ?> field : fields){
 					writeField(writer, field.getAccessor());
@@ -100,7 +117,7 @@ public final class BuilderProxyCompiler{
 						public function <init>
 						start
 							super start
-								get {0} $STRUCT
+								static call {0} $STRUCT
 							end
 							template-for #fName in {1} start
 								get #ChunkPointer NULL
@@ -133,13 +150,14 @@ public final class BuilderProxyCompiler{
 				BytecodeUtils.printClass(clazzBytes);
 			}
 			
-			//noinspection unchecked
-			return (Class<ProxyBuilder<T>>)Access.privateLookupIn(concreteClass)
-			                                     .defineClass(clazzBytes);
+			try{
+				//noinspection unchecked
+				return (Class<ProxyBuilder<T>>)concreteClassAccess.defineClass(concreteClass, clazzBytes);
+			}catch(IllegalAccessException|AccessProvider.Defunct e){
+				throw new ShouldNeverHappenError(e);
+			}
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate proxy for " + baseClass.getTypeName(), e);
-		}catch(IllegalAccessException e){
-			throw new RuntimeException(e);
 		}
 	}
 	

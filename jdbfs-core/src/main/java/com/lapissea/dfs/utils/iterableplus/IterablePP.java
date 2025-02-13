@@ -6,6 +6,7 @@ import com.lapissea.dfs.utils.function.FunctionOI;
 import com.lapissea.dfs.utils.function.FunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -108,6 +109,14 @@ public interface IterablePP<T> extends Iterable<T>{
 		throw new NoSuchElementException();
 	}
 	
+	default Match<T> matchFirst(){
+		for(T element : this){
+			if(element == null) continue;
+			return Match.of(element);
+		}
+		return Match.empty();
+	}
+	
 	default Optional<T> findFirst(){
 		for(T element : this){
 			if(element == null) continue;
@@ -134,6 +143,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return Optional.empty();
 	}
+	default <E extends Throwable> Match<T> firstNotMatchingM(UnsafePredicate<T, E> predicate) throws E{
+		return Match.from(firstNotMatching(predicate));
+	}
 	default <E extends Throwable> Optional<T> firstNotMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
 			if(element == null) continue;
@@ -142,6 +154,9 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		}
 		return Optional.empty();
+	}
+	default <E extends Throwable> Match<T> firstMatchingM(UnsafePredicate<T, E> predicate) throws E{
+		return Match.from(firstMatching(predicate));
 	}
 	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		for(var element : this){
@@ -298,6 +313,19 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		return List.copyOf(res);
 	}
+	@SuppressWarnings("unchecked")
+	default <T1> T1[] toArray(Class<T1> type){
+		var size = tryGetSize().orElse(8);
+		var res  = (T1[])Array.newInstance(type, size);
+		if(size == 0) return res;
+		int siz = 0;
+		for(var t : this){
+			if(res.length == siz) res = Utils.growArr(res);
+			res[siz++] = (T1)t;
+		}
+		if(res.length == siz) return res;
+		return Arrays.copyOf(res, siz);
+	}
 	
 	default <T1> T1[] toArray(IntFunction<T1[]> ctor){
 		var  size = tryGetSize().orElse(8);
@@ -408,13 +436,21 @@ public interface IterablePP<T> extends Iterable<T>{
 		return res;
 	}
 	
+	default <L extends Collection<T>> L asCollection(IntFunction<L> constructor){
+		var siz    = tryGetSize().orElse(0);
+		L   result = constructor.apply(siz);
+		for(T t : this){
+			result.add(t);
+		}
+		return result;
+	}
 	
 	default PPCollection<T> asCollection(){
 		return new PPCollection<>(this, tryGetSize());
 	}
 	default PPBakedSequence<T> bake(){
 		//noinspection unchecked
-		return new PPBakedSequence<>((T[])toArray(Object[]::new));
+		return new PPBakedSequence<>((T[])toArray(Object.class));
 	}
 	
 	default String joinAsStr()                                              { return joinAsStr("", "", "", null); }
@@ -427,6 +463,24 @@ public interface IterablePP<T> extends Iterable<T>{
 		var iter = iterator();
 		if(!iter.hasNext()) return prefix.isEmpty() && suffix.isEmpty()? "" : prefix + suffix;
 		return strLoop(delimiter, prefix, suffix, toString, iter);
+	}
+	
+	default Match<String> joinAsOptionalStrM()                                              { return joinAsOptionalStrM("", "", "", null); }
+	default Match<String> joinAsOptionalStrM(String delimiter)                              { return joinAsOptionalStrM(delimiter, "", "", null); }
+	default Match<String> joinAsOptionalStrM(Function<T, String> toString)                  { return joinAsOptionalStrM("", "", "", toString); }
+	default Match<String> joinAsOptionalStrM(String delimiter, Function<T, String> toString){ return joinAsOptionalStrM(delimiter, "", "", toString); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Match<String> joinAsOptionalStrM(String delimiter, String prefix, String suffix){ return joinAsOptionalStrM(delimiter, prefix, suffix, null); }
+	/**
+	 * NOTE: The prefix and suffix will only be included if there is any element!
+	 */
+	default Match<String> joinAsOptionalStrM(String delimiter, String prefix, String suffix, Function<T, String> toString){
+		var iter = iterator();
+		if(!iter.hasNext()) return Match.empty();
+		var res = strLoop(delimiter, prefix, suffix, toString, iter);
+		return Match.of(res);
 	}
 	
 	default Optional<String> joinAsOptionalStr()                                              { return joinAsOptionalStr("", "", "", null); }
@@ -563,6 +617,9 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default IterablePP<T> filterNot(Predicate<T> filter){
+		return filter(filter.negate());
+	}
 	default IterablePP<T> filter(Predicate<T> filter){
 		return new Iters.DefaultIterable<>(){
 			@Override
@@ -624,6 +681,10 @@ public interface IterablePP<T> extends Iterable<T>{
 						return (T)result[index++];
 					}
 				};
+			}
+			@Override
+			public SizedPP<T> reverse(){
+				return IterablePP.this.sorted(comparator.reversed());
 			}
 		};
 	}
@@ -801,6 +862,10 @@ public interface IterablePP<T> extends Iterable<T>{
 				};
 			}
 		};
+	}
+	
+	default <L> IterablePP<L> flatOptionalsM(Function<T, Match<L>> map){
+		return flatOptionals(e -> map.apply(e).opt());
 	}
 	default <L> IterablePP<L> flatOptionals(Function<T, Optional<L>> map){
 		return new Iters.DefaultIterable<>(){
@@ -1266,6 +1331,38 @@ public interface IterablePP<T> extends Iterable<T>{
 			preIncrementInt(i);
 			i++;
 		}
+	}
+	
+	default SizedPP<T> reverse(){
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){ return SizedPP.tryGet(IterablePP.this); }
+			@Override
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private Object[] data;
+					private int      i = -2;
+					
+					private void init(){
+						data = IterablePP.this.toArray(Object.class);
+						i = data.length - 1;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						if(i == -2) init();
+						return i>=0;
+					}
+					@Override
+					public T next(){
+						if(i == -2) init();
+						if(i == -1) throw new NoSuchElementException();
+						//noinspection unchecked
+						return (T)data[i--];
+					}
+				};
+			}
+		};
 	}
 	
 	private static void preIncrementLong(long index){

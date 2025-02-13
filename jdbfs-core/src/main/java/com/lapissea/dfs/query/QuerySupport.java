@@ -1,208 +1,99 @@
 package com.lapissea.dfs.query;
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.objects.collections.IOIterator;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.utils.WeakKeyValueMap;
+import com.lapissea.dfs.utils.iterableplus.Match;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.NoSuchElementException;
+import java.io.Serializable;
+import java.lang.invoke.MethodHandleInfo;
+import java.lang.invoke.SerializedLambda;
 import java.util.Objects;
-import java.util.OptionalLong;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-public enum QuerySupport{
-	;
+public final class QuerySupport{
 	
-	public interface Accessor<T>{
-		T get(boolean full) throws IOException;
+	private static final WeakKeyValueMap<Struct.FieldRef<?, ?>, IOField<?, ?>> IOF_CACHE = new WeakKeyValueMap.Sync<>();
+	
+	static <T extends IOInstance<T>, V> IOField<T, V> asIOField(Struct.FieldRef<T, V> ref){
+		var cached = IOF_CACHE.get(ref);
+		if(cached != null){
+			//noinspection unchecked
+			return (IOField<T, V>)cached;
+		}
+		
+		var val = asIOFieldPure(ref);
+		IOF_CACHE.put(ref, val);
+		return val;
 	}
 	
-	public interface AccessIterator<T>{
-		Accessor<T> next() throws IOException;
+	static <T extends IOInstance<T>, V> IOField<T, V> asIOFieldPure(Struct.FieldRef<T, V> ref){
+		if(!ref.getClass().isHidden()){
+			throw new IllegalArgumentException(ref.getClass() + " must be a JVM produced lambda");
+		}
+		
+		var lambda = asSerializedLambda(ref);
+		
+		var implClassName = lambda.getImplClass();
+		if(implClassName == null) throw new IllegalStateException("implClassName is null");
+		implClassName = implClassName.replace('/', '.');
+		var memberName = lambda.getImplMethodName();
+		
+		var errName = switch(lambda.getImplMethodKind()){
+			case MethodHandleInfo.REF_getField -> "getField";
+			case MethodHandleInfo.REF_getStatic -> "getStatic";
+			case MethodHandleInfo.REF_putField -> "putField";
+			case MethodHandleInfo.REF_putStatic -> "putStatic";
+			case MethodHandleInfo.REF_invokeVirtual -> null; //For classes
+			case MethodHandleInfo.REF_invokeStatic -> "invokeStatic";
+			case MethodHandleInfo.REF_invokeSpecial -> "invokeSpecial";
+			case MethodHandleInfo.REF_newInvokeSpecial -> "newInvokeSpecial";
+			case MethodHandleInfo.REF_invokeInterface -> null; //For interfaces (duh)
+			default -> "UNKNOWN: " + lambda.getImplMethodKind();
+		};
+		
+		
+		if(errName != null){
+			throw new IllegalArgumentException(
+				"ref must be a method reference! Eg: Foobar::foo but is" + implClassName + "::" + memberName + " (" + errName + ")"
+			);
+		}
+		
+		Class<?> implClass;
+		try{
+			implClass = Class.forName(implClassName);
+		}catch(ClassNotFoundException e){
+			throw new RuntimeException("Could not find " + implClassName, e);
+		}
+		
+		//noinspection unchecked
+		var struct = (Struct<T>)Struct.ofUnknown(implClass, Struct.STATE_FIELD_MAKE);
+		
+		if(struct.getFields().byName(memberName).match() instanceof Match.Some<IOField<T, ?>>(var field)){
+			//noinspection unchecked
+			return (IOField<T, V>)field;
+		}
+		
+		throw new IllegalArgumentException("No matching fields from " + implClassName + "::" + memberName);
 	}
 	
-	public interface Data<T>{
+	private static SerializedLambda asSerializedLambda(Serializable object){
+		Objects.requireNonNull(object);
+		Object replacement;
+		try{
+			var writeReplace = object.getClass().getDeclaredMethod("writeReplace");
+			writeReplace.setAccessible(true);
+			replacement = writeReplace.invoke(object);
+		}catch(Throwable ex){
+			throw new RuntimeException("Error serializing lambda", ex);
+		}
 		
-		Class<T> elementType();
+		if(replacement instanceof SerializedLambda res){
+			return res;
+		}
 		
-		OptionalLong count();
-		
-		AccessIterator<T> elements(Set<String> readFields);
+		throw new IllegalStateException(
+			"writeReplace must return a SerializedLambda: " + (replacement == null? "NULL" : replacement.getClass().getTypeName())
+		);
 	}
-	
-	private static final class StagedQuery<T> implements Query<T>{
-		
-		private final Data<T> data;
-		private StagedQuery(Data<T> data){
-			this.data = data;
-		}
-		
-		@Override
-		public Class<T> elementType(){
-			return data.elementType();
-		}
-		@Override
-		public long count() throws IOException{
-			var c = data.count();
-			if(c.isPresent()) return c.getAsLong();
-			long count = 0;
-			var  es    = data.elements(Set.of());
-			while(es.next() != null){
-				count++;
-			}
-			return count;
-		}
-		@Override
-		public boolean anyMatch() throws IOException{
-			var c = data.count();
-			if(c.isPresent()) return c.getAsLong()>0;
-			return data.elements(Set.of()).next() != null;
-		}
-		@Override
-		public OptionalPP<T> any() throws IOException{
-			var es    = data.elements(Set.of());
-			var match = es.next();
-			if(match != null){
-				return OptionalPP.of(match.get(true));
-			}
-			return OptionalPP.empty();
-		}
-		
-		@Override
-		public IOIterator<T> all(){
-			var elements = data.elements(Set.of());
-			return new IOIterator<>(){
-				private Accessor<T> acc;
-				private boolean     run = true;
-				
-				private void run() throws IOException{
-					if(run){
-						run = false;
-						acc = elements.next();
-					}
-				}
-				
-				@Override
-				public boolean hasNext() throws IOException{
-					run();
-					return acc != null;
-				}
-				@Override
-				public T ioNext() throws IOException{
-					run();
-					if(acc == null){
-						throw new NoSuchElementException();
-					}
-					var t = acc.get(true);
-					run = true;
-					return t;
-				}
-			};
-		}
-		@Override
-		public long deleteAll() throws IOException{
-			throw NotImplementedException.infer();//TODO: implement StagedQuery.deleteAll()
-		}
-		
-		
-		private static final class MappedData<T> implements Data<T>{
-			private final Data<?>          base;
-			private final Class<T>         elementType;
-			private final QueryValueSource source;
-			private final Object[]         args;
-			private final Set<String>      fieldNames;
-			
-			private MappedData(Data<?> base, QueryValueSource source, Object[] args){
-				this.base = base;
-				this.elementType = Objects.requireNonNull((Class<T>)source.type());
-				this.source = source;
-				this.args = args;
-				fieldNames = source.deep()
-				                   .filter(QueryValueSource.Field.class::isInstance)
-				                   .map(QueryValueSource.Field.class::cast)
-				                   .map(QueryValueSource.Field::name)
-				                   .collect(Collectors.toSet());
-			}
-			
-			@Override
-			public Class<T> elementType(){ return elementType; }
-			@Override
-			public OptionalLong count(){ return OptionalLong.empty(); }
-			
-			@Override
-			public AccessIterator<T> elements(Set<String> readFields){
-				var fields = Utils.join(readFields, fieldNames);
-				var src    = base.elements(fields);
-				return () -> {
-					var acc = src.next();
-					if(acc == null) return null;
-					return full -> {
-						var val = acc.get(full);
-						return (T)QueryExecutor.getValueDef(new QueryContext(args, val), source);
-					};
-				};
-			}
-		}
-		
-		@Override
-		public <R> Query<R> map(QueryValueSource field, Object... args){
-			return new StagedQuery<>(new MappedData<>(data, field, args));
-		}
-		
-		private static final class FilteredData<T> implements Data<T>{
-			private final Data<T>    base;
-			private final Class<T>   elementType;
-			private final QueryCheck check;
-			private final Object[]   args;
-			
-			private FilteredData(Data<T> base, QueryCheck check, Object[] args){
-				this.base = base;
-				this.elementType = base.elementType();
-				this.check = check;
-				this.args = args;
-			}
-			
-			@Override
-			public Class<T> elementType(){ return elementType; }
-			@Override
-			public OptionalLong count(){ return OptionalLong.empty(); }
-			
-			@Override
-			public AccessIterator<T> elements(Set<String> readFields){
-				var chFields = check.fieldNames();
-				var fields   = Utils.join(chFields, readFields);
-				var src      = base.elements(fields);
-				return () -> {
-					while(true){
-						var acc = src.next();
-						if(acc == null) return null;
-						var partial = acc.get(false);
-						if(QueryExecutor.executeCheckDef(new QueryContext(args, partial), check)){
-							return acc;
-						}
-					}
-				};
-			}
-		}
-		
-		@Override
-		public Query<T> filter(QueryCheck check, Object... args){
-			if(data instanceof StagedQuery.FilteredData<T> dat &&
-			   Arrays.equals(args, dat.args)){
-				var l   = QueryCheck.uncache(dat.check);
-				var r   = QueryCheck.uncache(check);
-				var and = QueryCheck.cached(new QueryCheck.And(l, r));
-				return new StagedQuery<>(new FilteredData<>(data, and, args));
-			}
-			return new StagedQuery<>(new FilteredData<>(data, check, args));
-		}
-	}
-	
-	public static <T> Query<T> of(Data<T> data){
-		return new StagedQuery<>(data);
-	}
-	
 }

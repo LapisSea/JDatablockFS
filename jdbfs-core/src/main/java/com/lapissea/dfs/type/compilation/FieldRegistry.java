@@ -18,8 +18,9 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LateInit;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
@@ -29,7 +30,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -38,8 +38,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 
@@ -50,7 +52,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 final class FieldRegistry{
 	
-	private static final LateInit.Safe<List<FieldUsage>> USAGES = Runner.async(new Supplier<>(){
+	private static final CompletableFuture<List<FieldUsage>> USAGES = Runner.async(new Supplier<>(){
 		@Override
 		public List<FieldUsage> get(){
 			Log.trace("{#yellowBrightDiscovering IOFields#}");
@@ -58,15 +60,15 @@ final class FieldRegistry{
 			var log = Log.TRACE && !ConfigUtils.configBoolean(FieldRegistry.class.getName() + "#printed", false);
 			if(log) System.setProperty(FieldRegistry.class.getName() + "#printed", "true");
 			
-			var tasks = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
+			var tasks = new ConcurrentLinkedDeque<CompletableFuture<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>>();
 			var lines = log? new ConcurrentLinkedDeque<String>() : null;
 			scan(IOField.class, tasks, lines);
 			
 			var scanned = new HashMap<Class<?>, List<FieldUsage>>();
 			while(!tasks.isEmpty()){
 				var any = tasks.removeIf(c -> {
-					if(!c.isInitialized()) return false;
-					c.get().ifPresent(
+					if(!c.isDone()) return false;
+					c.join().ifPresent(
 						e -> scanned.put(e.getKey(), e.getValue())
 					);
 					return true;
@@ -90,7 +92,7 @@ final class FieldRegistry{
 			if(lines != null) lines.add(Log.fmt(str, typ));
 		}
 		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
+		private static void scan(Class<?> type, Deque<CompletableFuture<Optional<Map.Entry<Class<?>, List<FieldUsage>>>>> tasks, Deque<String> lines){
 			if(type.getSimpleName().contains("NoIO")){
 				log("Ignoring \"NoIO\" {#blackBright{}~#}", type, lines);
 				return;
@@ -99,7 +101,7 @@ final class FieldRegistry{
 				var usage = getFieldUsage(type);
 				if(usage.isPresent()){
 					log("Sealed {#blackBright{}~#} has usage, ignoring children", type, lines);
-					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
+					tasks.add(CompletableFuture.completedFuture(usage));
 					return;
 				}
 				log("Scanning sealed {#blackBright{}~#} children", type, lines);
@@ -174,7 +176,7 @@ final class FieldRegistry{
 		}
 	});
 	
-	private static List<FieldUsage> getData(){ return USAGES.isInitialized() || !Log.TRACE? USAGES.get() : getDataLogged(); }
+	private static List<FieldUsage> getData(){ return USAGES.isDone() || !Log.TRACE? USAGES.join() : getDataLogged(); }
 	
 	private static Map<Class<?>, Set<FieldUsage>> getProducers(){
 		class Cache{
@@ -194,20 +196,20 @@ final class FieldRegistry{
 		return Cache.VAL;
 	}
 	
-	static Collection<Class<?>> getWrappers(){
+	static SequencedSet<Class<?>> getWrappers(){
 		class Cache{
-			private static final Collection<Class<?>> VAL;
+			private static final SequencedSet<Class<?>> VAL;
 			
 			static{
 				var uni = getSealedUniverse(NullFlagCompanyField.class, true).orElseThrow();
-				VAL = Collections.unmodifiableSet(new LinkedHashSet<>(
+				VAL = Collections.unmodifiableSequencedSet(new LinkedHashSet<>(
 					Iters.from(uni.universe())
 					     .flatOptionals((Class<NullFlagCompanyField> fieldType) -> {
 						     if(fieldType.isAnnotationPresent(IOUnsafeValue.Mark.class)){
 							     return Optional.empty();
 						     }
 						     var superC = (ParameterizedType)fieldType.getGenericSuperclass();
-						     if(Utils.typeToRaw(superC) != NullFlagCompanyField.class){
+						     if(!List.of(NullFlagCompanyField.class, IOFieldWrapper.class).contains(Utils.typeToRaw(superC))){
 							     return Optional.empty();
 						     }
 						     var args = superC.getActualTypeArguments();
@@ -228,7 +230,7 @@ final class FieldRegistry{
 	private static List<FieldUsage> getDataLogged(){
 		Log.trace("Waiting for FieldRegistry...");
 		var start = System.nanoTime();
-		var data  = USAGES.get();
+		var data  = USAGES.join();
 		var end   = System.nanoTime();
 		Log.trace("Waited {}ms for FieldRegistry", (end - start)/1000_000D);
 		return data;
@@ -331,11 +333,11 @@ final class FieldRegistry{
 		Set<Class<? extends Annotation>>  activeAnns = Iters.from(CONSUMABLE_ANNOTATIONS).filter(acc::hasAnnotation).toModSet();
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
-				behaviour.generateFields(acc).ifPresent(res -> {
+				if(behaviour.generateFields(acc) instanceof Some(var res)){
 					result.addAll(res.fields());
 					activeAnns.remove(behaviour.annotationType());
 					activeAnns.removeAll(res.touchedAnnotations());
-				});
+				}
 			}
 		}
 		
@@ -362,11 +364,14 @@ final class FieldRegistry{
 		var acc  = field.getAccessor();
 		
 		var deps = new HashSet<String>();
-		acc.getAnnotation(IODependency.class).ifPresent(ann -> deps.addAll(Arrays.asList(ann.value())));
+		if(acc.getAnnotation(IODependency.class) instanceof Some(var ann)){
+			deps.addAll(Arrays.asList(ann.value()));
+		}
 		
 		for(FieldUsage u : usages){
 			for(var behaviour : u.annotationBehaviour(type)){
-				behaviour.getDependencyNames(acc).ifPresent(deps::addAll);
+				if(!(behaviour.getDependencyNames(acc) instanceof Some(var names))) continue;
+				deps.addAll(names);
 			}
 		}
 		return deps;

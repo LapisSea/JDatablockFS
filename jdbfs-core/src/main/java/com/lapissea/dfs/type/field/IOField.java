@@ -24,11 +24,14 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -40,6 +43,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,23 +51,40 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
-	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive{
+public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType, FieldNames.Named
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger, IOFieldChunkPointer, IOFieldOptional, IOFieldPrimitive, IOFieldFusedString{
 	
 	public interface FieldUsage{
 		abstract class InstanceOf<Typ> implements FieldUsage{
 			private final Class<Typ>                    type;
 			@SuppressWarnings("rawtypes")
 			private final Set<Class<? extends IOField>> fieldTypes;
+			
+			private final BiPredicate<Type, GetAnnotation> extraFilter;
+			
 			@SuppressWarnings("rawtypes")
 			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes){
+				this(type, fieldTypes, (type0, annotations) -> true);
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, Predicate<GetAnnotation> annotationFilter){
+				this(type, fieldTypes, (type0, annotations) -> annotationFilter.test(annotations));
+			}
+			
+			@SuppressWarnings("rawtypes")
+			public InstanceOf(Class<Typ> type, Set<Class<? extends IOField>> fieldTypes, BiPredicate<Type, GetAnnotation> extraFilter){
 				this.type = type;
 				this.fieldTypes = Set.copyOf(fieldTypes);
+				this.extraFilter = Objects.requireNonNull(extraFilter);
 			}
 			
 			public final Class<Typ> getType(){
@@ -72,7 +93,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			@Override
 			public final boolean isCompatible(Type type, GetAnnotation annotations){
-				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
+				return UtilL.instanceOf(Utils.typeToRaw(type), getType()) && extraFilter.test(type, annotations);
 			}
 			@Override
 			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field);
@@ -130,11 +151,30 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			public Behaviour<A, T> withDeps(BiFunction<FieldAccessor<T>, A, Set<String>> dependencyNames){
 				return new Behaviour<>(annotationType, generateFields, Optional.of(dependencyNames));
 			}
-			
-			public Optional<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){
-				return accessor.getAnnotation(annotationType).map(a -> generateFields.apply(accessor, a));
+			public Behaviour<A, T> disableIf(BiPredicate<FieldAccessor<T>, A> filter){
+				return new Behaviour<>(
+					annotationType,
+					(fieldAccessor, annotation) -> {
+						if(filter.test(fieldAccessor, annotation)) return BehaviourRes.non();
+						return generateFields.apply(fieldAccessor, annotation);
+					},
+					dependencyNames.map(names -> {
+						return (fieldAccessor, annotation) -> {
+							if(filter.test(fieldAccessor, annotation)) return Set.of();
+							return names.apply(fieldAccessor, annotation);
+						};
+					})
+				);
 			}
-			public Optional<Set<String>> getDependencyNames(FieldAccessor<T> accessor){
+			
+			public Match<BehaviourRes<T>> generateFields(FieldAccessor<T> accessor){
+				if(accessor.getAnnotation(annotationType) instanceof Match.Some<A>(var ann)){
+					return Match.of(generateFields.apply(accessor, ann));
+				}else{
+					return Match.empty();
+				}
+			}
+			public Match<Set<String>> getDependencyNames(FieldAccessor<T> accessor){
 				return accessor.getAnnotation(annotationType).map(ann -> {
 					if(dependencyNames.isPresent()){
 						return dependencyNames.get().apply(accessor, ann);
@@ -163,11 +203,22 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	private SizeDescriptor<T> descriptor;
 	
-	public static final int DYNAMIC_FLAG           = 1<<0;
-	public static final int IOINSTANCE_FLAG        = 1<<1;
-	public static final int PRIMITIVE_OR_ENUM_FLAG = 1<<2;
-	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
-	public static final int HAS_GENERATED_NAME     = 1<<4;
+	public static final int DYNAMIC_FLAG            = 1<<0;
+	public static final int IO_INSTANCE_FLAG        = 1<<1;
+	public static final int PRIMITIVE_OR_ENUM_FLAG  = 1<<2;
+	public static final int HAS_NO_POINTERS_FLAG    = 1<<3;
+	public static final int HAS_GENERATED_NAME_FLAG = 1<<4;
+	
+	public enum TypeFlag{
+		DYNAMIC(DYNAMIC_FLAG),
+		IO_INSTANCE(IO_INSTANCE_FLAG),
+		PRIMITIVE_OR_ENUM(PRIMITIVE_OR_ENUM_FLAG),
+		HAS_NO_POINTERS(HAS_NO_POINTERS_FLAG),
+		HAS_GENERATED_NAME(HAS_GENERATED_NAME_FLAG);
+		
+		public final int bit;
+		TypeFlag(int flag){ this.bit = flag; }
+	}
 	
 	private int  typeFlags   = -1;
 	private byte needsIOPool = 2;
@@ -196,15 +247,57 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		lateDataInitialized = true;
 	}
 	
+	public final boolean typeFlag(TypeFlag flag){
+		return typeFlag(flag.bit);
+	}
 	public final boolean typeFlag(int flag){
 		return (typeFlags()&flag) == flag;
 	}
 	
 	public final int typeFlags(){
 		var f = typeFlags;
-		if(f == -1) f = typeFlags = FieldSupport.typeFlags(this);
+		if(f == -1) f = typeFlags = typeFlagsCalc();
 		return f;
 	}
+	
+	private int typeFlagsCalc(){
+		var flags = EnumSet.noneOf(TypeFlag.class);
+		flags.addAll(computeTypeFlags());
+		if(getAccessor() != null && IOFieldTools.isGenerated(this)){
+			flags.add(TypeFlag.HAS_GENERATED_NAME);
+		}
+		
+		if(DEBUG_VALIDATION){
+			legacyFlagCheck(flags);
+		}
+		
+		int res = 0;
+		for(var flag : flags){
+			res |= flag.bit;
+		}
+		return res;
+	}
+	
+	private void legacyFlagCheck(EnumSet<TypeFlag> flagsA){
+		var fB     = FieldSupport.typeFlags(this);
+		var flagsB = EnumSet.allOf(TypeFlag.class);
+		flagsB.removeIf(t -> !UtilL.checkFlag(fB, t.bit));
+		
+		if(!flagsA.equals(flagsB)){
+			synchronized(IOField.class){
+				LogUtil.println("Field:     ", this, this.getGenericType(null));
+				LogUtil.println("Field type:", this.getClass());
+				LogUtil.println("Expected:", flagsB);
+				LogUtil.println("Actual:  ", flagsA);
+				FieldSupport.typeFlags(this);
+				computeTypeFlags();
+				throw new ShouldNeverHappenError();
+			}
+		}
+	}
+	
+	protected abstract Set<TypeFlag> computeTypeFlags();
+	
 	
 	public boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
@@ -224,6 +317,19 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		return switch(getNullability()){
 			case NOT_NULL, NULLABLE -> rawGet(ioPool, instance) == null;
 			case DEFAULT_IF_NULL -> false;
+		};
+	}
+	
+	protected final ValueType getNullable(VarPool<T> ioPool, T instance, ValueType defaultValue){
+		var value = rawGet(ioPool, instance);
+		if(value != null) return value;
+		return switch(getNullability()){
+			case NOT_NULL -> throw new FieldIsNull(this);
+			case NULLABLE -> null;
+			case DEFAULT_IF_NULL -> {
+				set(ioPool, instance, defaultValue);
+				yield defaultValue;
+			}
 		};
 	}
 	
@@ -319,7 +425,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 	}
 	
-	@Nullable
 	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of();
@@ -363,7 +468,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public String getName(){ return getAccessor().getName(); }
 	@SuppressWarnings("unchecked")
 	@Override
-	public final Class<? extends ValueType> getType(){ return (Class<? extends ValueType>)getAccessor().getType(); }
+	public final Class<? extends ValueType> getType(){
+		var acc = getAccessor();
+		if(acc == null) return null;
+		return (Class<? extends ValueType>)acc.getType();
+	}
 	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
 		var acc = getAccessor();
@@ -498,7 +607,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	@Override
 	public final Type getGenericType(GenericContext genericContext){
-		return getAccessor().getGenericType(genericContext);
+		var acc = getAccessor();
+		if(acc == null) return null;
+		return acc.getGenericType(genericContext);
 	}
 	
 	@Override

@@ -10,10 +10,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Spliterator;
 import java.util.concurrent.CompletableFuture;
@@ -118,6 +119,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		var fails = run(
 			new FuzzConfig().withName("establishStableFail")
 			                .withErrorDelay(Duration.ofMillis(Long.MAX_VALUE))
+			                .withErrorTracking(new FuzzConfig.ErrorTracking(OptionalInt.empty(), false))
 			                .dontLog(),
 			RunMark.NONE, () -> IntStream.range(0, reruns).mapToObj(i -> sequence)
 		);
@@ -308,6 +310,18 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 	}
 	
+	public void runAndAssert(String sequenceStick){
+		runAndAssert(FuzzSequence.fromDataStick(sequenceStick));
+	}
+	public void runAndAssert(FuzzSequence sequence){
+		var errO = runSequence(sequence);
+		if(errO.isEmpty()) return;
+		var err = errO.get();
+		System.err.println(FuzzFail.report(List.of(err)));
+		var err2 = runSequence(err.mark(), sequence, null);
+		throw new AssertionError(err2.orElse(err));
+	}
+	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){ runAndAssert(null, seed, totalIterations, sequenceLength); }
 	public void runAndAssert(FuzzConfig config, long seed, long totalIterations, int sequenceLength){
 		Plan.start(this, config, seed, totalIterations, sequenceLength)
@@ -346,13 +360,36 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 					case ManyData.Async d -> new FuzzProgress(conf, d.totalIterations);
 					case ManyData.Instant d -> new FuzzProgress(conf, CompletableFuture.completedFuture(d.totalIterations));
 				};
-				
-				var fails = Collections.synchronizedList(new ArrayList<FuzzFail<State, Action>>(){
-					@Override
-					public boolean add(FuzzFail<State, Action> f){
-						return (conf.maxErrorsTracked().isEmpty() || conf.maxErrorsTracked().getAsInt()>this.size()) && super.add(f);
+				var fails = new ArrayList<FuzzFail<State, Action>>(conf.errorTracking().maxErrorsTracked().orElse(16)){
+					synchronized void deduplicateStacktrace(){
+						var errC = conf.errorTracking();
+						if(!errC.deduplicateByStacktrace()) return;
+						var res = FuzzFail.sortFails(this, conf.failOrder().orElse(null));
+						clear();
+						addAll(res);
+						
+						var errs = new HashSet<String>();
+						removeIf(err -> {
+							var sw = new StringBuilder(err.e().getClass().getName());
+							for(var e : err.e().getStackTrace()){
+								sw.append(e);
+							}
+							return !errs.add(sw.toString());
+						});
 					}
-				});
+					@Override
+					public synchronized boolean add(FuzzFail<State, Action> f){
+						var errC = conf.errorTracking();
+						var errs = errC.maxErrorsTracked();
+						if(errs.isEmpty()){
+							return super.add(f);
+						}
+						if(this.size()>=errs.getAsInt()){
+							deduplicateStacktrace();
+						}
+						return errs.getAsInt()>this.size() && super.add(f);
+					}
+				};
 				
 				ScheduledExecutorService          delayExec;
 				Consumer<FuzzFail<State, Action>> reportFail;
@@ -378,6 +415,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				
 				Supplier<List<FuzzFail<State, Action>>> finalize = () -> {
 					progress.reportDone();
+					fails.deduplicateStacktrace();
 					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
 					Thread.startVirtualThread(System::gc);
 					return res;

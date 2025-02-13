@@ -1,5 +1,5 @@
 {
-	"port": 1234,
+	"port": 12345,
 	"loggerType": "server",
 	"loggerFallback": "none",
 	"threadedOutput": false

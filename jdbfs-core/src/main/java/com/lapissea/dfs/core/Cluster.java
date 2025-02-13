@@ -288,7 +288,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	
-	private final ChunkCache chunkCache = ChunkCache.strong();
+	private final ChunkCache chunkCache = new ChunkCache();
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager;
@@ -394,6 +394,45 @@ public final class Cluster implements DataProvider{
 			return getChunk(firstChunkPtr());
 		}catch(MalformedPointer e){
 			throw new IOException("First chunk does not exist", e);
+		}
+	}
+	
+	private Chunk lastWalkedChunkCache;
+	
+	@Override
+	public Chunk walkToLastChunk() throws IOException{
+		Chunk ch = getFirstChunk();
+		{
+			Chunk last = lastWalkedChunkCache;
+			if(last != null){
+				var cached = getChunkCached(last.getPtr());
+				if(cached == last){
+					ch = last;
+				}
+			}
+		}
+		while(true){
+			Chunk next;
+			try{
+				next = ch.nextPhysical();
+			}catch(MalformedPointer e){
+				next = null;
+				for(long pos = ch.dataEnd() + 1, end = getSource().getIOSize(); pos<end; pos++){
+					var ptr = ChunkPointer.of(pos);
+					if(Chunk.isChunkValidAt(this, ptr)){
+						next = getChunk(ptr);
+						if(next.dataEnd()>end) next = null;
+						else break;
+					}
+				}
+				if(next == null){
+					return lastWalkedChunkCache = ch;
+				}
+			}
+			if(next == null){
+				return lastWalkedChunkCache = ch;
+			}
+			ch = next;
 		}
 	}
 	

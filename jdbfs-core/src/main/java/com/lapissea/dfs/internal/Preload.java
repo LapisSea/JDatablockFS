@@ -7,6 +7,7 @@ import com.lapissea.dfs.type.Struct;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class Preload{
@@ -26,7 +27,7 @@ public final class Preload{
 		task(c, null, null, null, lookup);
 	}
 	private static void task(Class<?> c, Class<? extends StructPipe> pipeClass, String functionName, Object[] args, MethodHandles.Lookup cLookup){
-		Thread.startVirtualThread(() -> {
+		CompletableFuture.runAsync(() -> {
 			try{
 				if(pipeClass != null){
 					StructPipe.of((Class)pipeClass, (Struct)Struct.ofUnknown(c, StagedInit.STATE_DONE), StagedInit.STATE_DONE);
@@ -53,7 +54,7 @@ public final class Preload{
 			}catch(Throwable e){
 				e.printStackTrace();
 			}
-		});
+		}, Thread::startVirtualThread);
 	}
 	
 }

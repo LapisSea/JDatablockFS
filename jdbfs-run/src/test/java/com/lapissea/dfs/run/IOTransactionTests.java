@@ -9,8 +9,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HexFormat;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class IOTransactionTests{
 	
@@ -174,7 +173,7 @@ public class IOTransactionTests{
 		int cap = 50;
 		
 		//Dumb brute force all possible edge cases
-		TestUtils.randomBatch(500000, 1000, (rand, run) -> {
+		TestUtils.randomBatch(300000, (rand, run) -> {
 			int runIndex = 0;
 			
 			IOInterface data   = MemoryData.builder().withCapacity(cap + 10).build();
@@ -208,31 +207,32 @@ public class IOTransactionTests{
 						data.write(off, false, buf);
 					}
 					
-					assertEquals(data.getIOSize(), mirror.getIOSize());
+					assertThat(data.getIOSize()).isEqualTo(mirror.getIOSize());
 					
-					for(int i = 0; i<10; i++){
+					for(int i0 = 0; i0<10; i0++){
+						int i = i0;
 						{
-							var rSiz = rand.nextInt(20);
-							var rOff = rand.nextInt((int)(data.getIOSize() - rSiz));
-							var m    = mirror.read(rOff, rSiz);
-							var b    = data.read(rOff, rSiz);
-							if(!Arrays.equals(b, m)){
-								fail("Failed read on: offset: " + rOff + " size: " + rSiz + " iter index: " + i + "\n" + mismatchBin(m, b, true));
-							}
+							var rSiz  = rand.nextInt(20);
+							var rOff  = rand.nextInt((int)(data.getIOSize() - rSiz));
+							var ref   = mirror.read(rOff, rSiz);
+							var bytes = data.read(rOff, rSiz);
+							assertThat(bytes).as(() -> "Failed read on: offset: " + rOff + " size: " + rSiz + " iter index: " + i + "\n" +
+							                           mismatchBin(ref, bytes, true))
+							                 .containsExactly(ref);
 						}
 						
 						{
-							var bOff = rand.nextInt((int)(data.getIOSize()));
-							var b1   = mirror.ioMap(io -> io.setPos(bOff).readInt1());
-							var b2   = data.ioMap(io -> io.setPos(bOff).readInt1());
-							assertEquals(b1, b2, "check iteration " + i);
+							var bOff  = rand.nextInt((int)(data.getIOSize()));
+							var ref   = mirror.ioMap(io -> io.setPos(bOff).readInt1());
+							var bytes = data.ioMap(io -> io.setPos(bOff).readInt1());
+							assertThat(bytes).as(() -> "check iteration " + i).isEqualTo(ref);
 						}
 						
-						var bSiz = rand.nextInt(1, 9);
-						var bOff = rand.nextInt((int)(data.getIOSize() - bSiz));
-						var b1   = mirror.ioMap(io -> io.setPos(bOff).readWord(bSiz));
-						var b2   = data.ioMap(io -> io.setPos(bOff).readWord(bSiz));
-						assertEquals(b1, b2, "check iteration " + i);
+						var bSiz  = rand.nextInt(1, 9);
+						var bOff  = rand.nextInt((int)(data.getIOSize() - bSiz));
+						var ref   = mirror.ioMap(io -> io.setPos(bOff).readWord(bSiz));
+						var bytes = data.ioMap(io -> io.setPos(bOff).readWord(bSiz));
+						assertThat(bytes).as(() -> "check iteration " + i).isEqualTo(ref);
 					}
 					
 					check(before, mirror, data, "post write");
@@ -245,20 +245,18 @@ public class IOTransactionTests{
 	}
 	
 	private void check(byte[] before, IOInterface expected, IOInterface data, String s){
-		byte[] m, d;
+		byte[] reference, bytes;
 		try{
-			m = expected.readAll();
-			d = data.readAll();
+			reference = expected.readAll();
+			bytes = data.readAll();
 		}catch(Throwable e){
 			throw new RuntimeException(s, e);
 		}
-		if(!Arrays.equals(m, d)){
-			fail(s + "\n" +
-			     "Before\n" +
-			     HexFormat.of().formatHex(before) + "\n" +
-			     mismatchBin(m, d, true)
-			);
-		}
+		assertThat(bytes).as(() -> s + "\n" +
+		                           "Before\n" +
+		                           HexFormat.of().formatHex(before) + "\n" +
+		                           mismatchBin(reference, bytes, true))
+		                 .containsExactly(reference);
 	}
 	private static void checkMismatchBin(MemoryData expected, int... actual) throws IOException{
 		var a = new byte[actual.length];

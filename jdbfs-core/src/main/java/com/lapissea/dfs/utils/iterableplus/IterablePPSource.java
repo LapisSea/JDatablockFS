@@ -46,6 +46,9 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default <L> IterablePP<L> flatOptionals(Function<T, Optional<L>> map){
 		return iter().flatOptionals(map);
 	}
+	default <L> IterablePP<L> flatOptionalsM(Function<T, Match<L>> map){
+		return iter().flatOptionalsM(map);
+	}
 	
 	default <L> IterablePP<L> mapped(Function<T, L> mapper){
 		return iter().map(mapper);
@@ -72,4 +75,8 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default boolean anyIs(T value)     { return iter().anyIs(value); }
 	default boolean noneEquals(T value){ return iter().noneEquals(value); }
 	default boolean anyEquals(T value) { return iter().anyEquals(value); }
+	
+	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
+		return iter().firstMatching(predicate);
+	}
 }

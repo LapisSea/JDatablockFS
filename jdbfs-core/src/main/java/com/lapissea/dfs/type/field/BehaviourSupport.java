@@ -14,6 +14,8 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -69,14 +71,17 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> ioNullability(FieldAccessor<T> field, IONullability ann){
-		if(!IOFieldTools.canHaveNullAnnotation(field)){
-			throw new MalformedStruct("fmt", "{}#red is not a supported field", field);
-		}
 		if(SupportedPrimitive.get(field.getType()).isPresent() && ann.value() == DEFAULT_IF_NULL){
 			throw new MalformedStruct("fmt", "Wrapper type on {}#yellow does not support {}#red mode", field, DEFAULT_IF_NULL);
 		}
 		
-		if(!IOFieldTools.isNullable(field) || !canHaveNullabilityField(field)) return BehaviourRes.non();
+		if(!IOFieldTools.isNullable(field)){
+			return BehaviourRes.non();
+		}
+		
+		if(!canHaveNullabilityField(field)){
+			throw new ShouldNeverHappenError();//TODO: remove this when fully tested
+		}
 		
 		return new BehaviourRes<>(new VirtualFieldDefinition<T, Boolean>(
 			StoragePool.IO,
@@ -86,76 +91,15 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> virtualNumSize(FieldAccessor<T> field, IODependency.VirtualNumSize ann){
-		var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
-		
-		var min = ann.min();
-		var max = ann.max();
-		
-		var vf = new VirtualFieldDefinition<>(
+		return new BehaviourRes<>(new VirtualFieldDefinition<>(
 			IO,
 			IOFieldTools.getNumSizeName(field, ann),
 			NumberSize.class,
-			new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
-				private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					var len = unsigned? calcMaxVal(ioPool, inst, deps) : calcMinMaxVal(ioPool, inst, deps);
-					return NumberSize.bySize(len, unsigned);
-				}
-				private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					return switch(deps.size()){
-						case 1 -> deps.get(0).getLong(ioPool, inst);
-						case 2 -> {
-							long a = deps.get(0).getLong(ioPool, inst);
-							long b = deps.get(1).getLong(ioPool, inst);
-							yield Math.max(a, b);
-						}
-						default -> {
-							long best = 0;
-							for(var d : deps){
-								long newVal = d.getLong(ioPool, inst);
-								if(newVal>best){
-									best = newVal;
-								}
-							}
-							yield best;
-						}
-					};
-				}
-				private long calcMinMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-					return switch(deps.size()){
-						case 1 -> deps.get(0).getLong(ioPool, inst);
-						case 2 -> {
-							long a   = deps.get(0).getLong(ioPool, inst);
-							long b   = deps.get(1).getLong(ioPool, inst);
-							var  min = Math.min(a, b);
-							var  max = Math.max(a, b);
-							yield Math.abs(min)>Math.abs(max)? min : max;
-						}
-						default -> {
-							long min = Long.MAX_VALUE;
-							long max = Long.MIN_VALUE;
-							for(var d : deps){
-								long newVal = d.getLong(ioPool, inst);
-								min = Math.min(min, newVal);
-								max = Math.max(max, newVal);
-							}
-							yield Math.abs(min)>Math.abs(max)? min : max;
-						}
-					};
-				}
-				
-				@Override
-				public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-					var raw  = val == null? calcMax(ioPool, inst, deps) : val;
-					var size = raw.max(min);
-					
-					if(size.greaterThan(max)){
-						throw new RuntimeException(size + " can't fit in to " + max);
-					}
-					return size;
-				}
-			});
-		
-		return new BehaviourRes<>(vf);
+			new GetNumberSize.Uninitialized<T>(
+				ann.min(), ann.max(),
+				field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class
+			)
+		));
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> reference(FieldAccessor<T> field){
@@ -169,7 +113,6 @@ public final class BehaviourSupport{
 	}
 	
 	public static <T extends IOInstance<T>> BehaviourRes<T> collectionLength(FieldAccessor<T> field){
-		if(field.hasAnnotation(IOValue.Reference.class)) return BehaviourRes.non();
 		var type   = field.getType();
 		var isList = type == List.class || type == ArrayList.class;
 		if(!type.isArray() && !isList){
@@ -177,24 +120,32 @@ public final class BehaviourSupport{
 		}
 		Set<Class<? extends Annotation>> annotationTouch = new HashSet<>();
 		
-		var arrayLenSize = field.getAnnotation(IODependency.ArrayLenSize.class);
-		arrayLenSize.map(Annotation::annotationType).ifPresent(annotationTouch::add);
-		
-		var arrayLengthSizeName = arrayLenSize.map(IODependency.ArrayLenSize::name)
-		                                      .orElseGet(() -> FieldNames.numberSize(FieldNames.name(FieldNames.collectionLen(field))));
+		var    arrayLenSize = field.getAnnotation(IODependency.ArrayLenSize.class);
+		String arrayLengthSizeName;
+		if(arrayLenSize instanceof Some(var ann)){
+			annotationTouch.add(ann.annotationType());
+			arrayLengthSizeName = ann.name();
+		}else{
+			arrayLengthSizeName = FieldNames.numberSize(FieldNames.name(FieldNames.collectionLen(field)));
+		}
 		
 		boolean needsNumSize = type == int[].class;
 		
 		var lenField = new VirtualFieldDefinition<>(
 			IO, FieldNames.collectionLen(field), int.class,
-			(VirtualFieldDefinition.GetterFilter<T, Integer>)(ioPool, instance, dependencies, value) -> {
-				if(value>0) return value;
-				var collection = instance == null? null : field.get(ioPool, instance);
-				if(collection != null){
-					if(isList) return ((List<?>)collection).size();
-					return Array.getLength(collection);
+			new VirtualFieldDefinition.GetterFilter<T, Integer>(){
+				@Override
+				public Integer filter(VarPool<T> ioPool, T instance, Integer value){
+					if(value>0) return value;
+					var collection = instance == null? null : field.get(ioPool, instance);
+					if(collection != null){
+						if(isList) return ((List<?>)collection).size();
+						return Array.getLength(collection);
+					}
+					return 0;
 				}
-				return 0;
+				@Override
+				public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
 			},
 			List.of(
 				Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
