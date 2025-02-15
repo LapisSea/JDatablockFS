@@ -288,9 +288,12 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		throw new UnsupportedOperationException();
 	}
 	
+	private String name;
 	@Override
 	public String getName(){
-		return Iters.from(group).joinAsStr(" + ", IOField::getName);
+		var n = name;
+		if(n == null) n = name = Iters.from(group).joinAsStr(" + ", IOField::getName);
+		return n;
 	}
 	
 	@Override
