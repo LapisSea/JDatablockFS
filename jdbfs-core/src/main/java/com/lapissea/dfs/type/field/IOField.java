@@ -397,8 +397,32 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
 		enum Strictness{
-			NOT_REALLY, ON_EXTERNAL_ALWAYS, ALWAYS
+			/**
+			 * Signifies that the generator may or may not have a correct {@link ValueGenerator#shouldGenerate}.
+			 * This is used when the cost of checking if something should be generated is very similar to the cost of actual generation
+			 * */
+			NOT_REALLY,
+			/**
+			 * Signifies that the generator will always have correct {@link ValueGenerator#shouldGenerate} when modification is enabled.
+			 */
+			ON_EXTERNAL_ALWAYS,
+			/**
+			 * The generator always, regardless of the context returns a correct {@link ValueGenerator#shouldGenerate}
+			 */
+			ALWAYS
 		}
+		
+		abstract class NoCheck<T extends IOInstance<T>, ValType> implements ValueGenerator<T, ValType>{
+			@Override
+			public final Strictness strictDetermineLevel(){
+				return Strictness.NOT_REALLY;
+			}
+			@Override
+			public final boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException{
+				return true;
+			}
+		}
+		
 		default Strictness strictDetermineLevel(){ return Strictness.ALWAYS; }
 		
 		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
