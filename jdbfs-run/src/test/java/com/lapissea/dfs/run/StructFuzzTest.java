@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -149,6 +150,13 @@ public final class StructFuzzTest{
 				if(type == float[].class){
 					var bb = new float[r.nextInt(10)];
 					for(int i = 0; i<bb.length; i++) bb[i] = r.nextFloat();
+					return bb;
+				}
+				if(type == ByteBuffer.class){
+					var data = new byte[r.nextInt(10)];
+					r.nextBytes(data);
+					var bb = ByteBuffer.wrap(data);
+					if(rand.nextBoolean()) bb = bb.asReadOnlyBuffer();
 					return bb;
 				}
 				if(UNKNOWNS.add(type)){

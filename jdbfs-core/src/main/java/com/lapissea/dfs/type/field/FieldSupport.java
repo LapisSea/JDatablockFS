@@ -17,6 +17,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -251,7 +252,9 @@ final class FieldSupport{
 		
 		var typeGen = accessor.getGenericType(null);
 		var type    = accessor.getType();
-		
+		if(type == ByteBuffer.class){
+			return HAS_NO_POINTERS_FLAG;
+		}
 		if(type == Optional.class){
 			typeGen = IOFieldTools.unwrapOptionalTypeRequired(typeGen);
 			type = Utils.typeToRaw(typeGen);

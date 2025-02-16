@@ -29,4 +29,5 @@ public abstract class FieldNames{
 	public static String companionValueFlag(Named field){ return make(field, "value"); }
 	public static String ref(Named field)               { return make(field, "ref"); }
 	public static String pack(Named field)              { return make(field, "pack"); }
+	public static String modifiable(Named field)        { return make(field, "isMod"); }
 }

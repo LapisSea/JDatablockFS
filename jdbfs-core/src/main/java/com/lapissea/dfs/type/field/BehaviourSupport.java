@@ -21,7 +21,8 @@ import com.lapissea.util.UtilL;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -112,12 +113,66 @@ public final class BehaviourSupport{
 		));
 	}
 	
+	private static <T extends IOInstance<T>> VirtualFieldDefinition.GetterFilter<T, Integer> arryFilter(FieldAccessor<T> field){
+		return new VirtualFieldDefinition.GetterFilter<>(){
+			@Override
+			public Integer filter(VarPool<T> ioPool, T instance, Integer value){
+				if(value>0) return value;
+				if(instance == null) return 0;
+				var data = field.get(ioPool, instance);
+				if(data == null) return 0;
+				return Array.getLength(data);
+			}
+			@Override
+			public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
+		};
+	}
+	private static <T extends IOInstance<T>> VirtualFieldDefinition.GetterFilter<T, Integer> collectionFilter(FieldAccessor<T> field){
+		return new VirtualFieldDefinition.GetterFilter<>(){
+			@Override
+			public Integer filter(VarPool<T> ioPool, T instance, Integer value){
+				if(value>0) return value;
+				if(instance == null) return 0;
+				var data = field.get(ioPool, instance);
+				if(data == null) return 0;
+				return ((Collection<?>)data).size();
+			}
+			@Override
+			public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
+		};
+	}
+	private static <T extends IOInstance<T>> VirtualFieldDefinition.GetterFilter<T, Integer> bufferFilter(FieldAccessor<T> field){
+		return new VirtualFieldDefinition.GetterFilter<>(){
+			@Override
+			public Integer filter(VarPool<T> ioPool, T instance, Integer value){
+				if(value>0) return value;
+				if(instance == null) return 0;
+				var data = field.get(ioPool, instance);
+				if(data == null) return 0;
+				return ((Buffer)data).capacity();
+			}
+			@Override
+			public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
+		};
+	}
+	
 	public static <T extends IOInstance<T>> BehaviourRes<T> collectionLength(FieldAccessor<T> field){
-		var type   = field.getType();
-		var isList = type == List.class || type == ArrayList.class;
-		if(!type.isArray() && !isList){
+		
+		enum FType{
+			ARRAY,
+			COLLECTION,
+			BB
+		}
+		
+		var   type = field.getType();
+		FType fType;
+		if(type.isArray()) fType = FType.ARRAY;
+		else if(UtilL.instanceOf(type, Collection.class)) fType = FType.COLLECTION;
+		else if(type == ByteBuffer.class) fType = FType.BB;
+		else{
 			throw new AssertionError(type.getTypeName());
 		}
+		
 		Set<Class<? extends Annotation>> annotationTouch = new HashSet<>();
 		
 		var    arrayLenSize = field.getAnnotation(IODependency.ArrayLenSize.class);
@@ -133,19 +188,10 @@ public final class BehaviourSupport{
 		
 		var lenField = new VirtualFieldDefinition<>(
 			IO, FieldNames.collectionLen(field), int.class,
-			new VirtualFieldDefinition.GetterFilter<T, Integer>(){
-				@Override
-				public Integer filter(VarPool<T> ioPool, T instance, Integer value){
-					if(value>0) return value;
-					var collection = instance == null? null : field.get(ioPool, instance);
-					if(collection != null){
-						if(isList) return ((List<?>)collection).size();
-						return Array.getLength(collection);
-					}
-					return 0;
-				}
-				@Override
-				public VirtualFieldDefinition.GetterFilter<T, Integer> withUsers(List<FieldAccessor<T>> users){ return this; }
+			switch(fType){
+				case ARRAY -> arryFilter(field);
+				case COLLECTION -> collectionFilter(field);
+				case BB -> bufferFilter(field);
 			},
 			List.of(
 				Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
