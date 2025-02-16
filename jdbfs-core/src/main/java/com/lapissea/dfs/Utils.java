@@ -318,16 +318,10 @@ public final class Utils{
 	}
 	
 	public static <T> List<T> concat(List<T> a, List<T> b){
-		var l = new ArrayList<T>(a.size() + b.size());
-		l.addAll(a);
-		l.addAll(b);
-		return List.copyOf(l);
+		return Iters.concat(a, b).toList();
 	}
 	public static <T> List<T> concat(List<T> a, T b){
-		var l = new ArrayList<T>(a.size() + 1);
-		l.addAll(a);
-		l.add(b);
-		return List.copyOf(l);
+		return Iters.concatN1(a, b).toList();
 	}
 	public static boolean isInnerClass(Class<?> clazz){
 		return clazz.isMemberClass() && !Modifier.isStatic(clazz.getModifiers());

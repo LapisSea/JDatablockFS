@@ -10,6 +10,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteArray;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteBuffer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldDirectType;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldEnumCollection;
@@ -27,7 +28,7 @@ import java.util.List;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
-	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldDirectType, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, IOFieldIntegerArray, IOFieldWrapper, InstanceCollection.InlineField{
+	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldByteBuffer, IOFieldDirectType, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, IOFieldIntegerArray, IOFieldWrapper, InstanceCollection.InlineField{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	

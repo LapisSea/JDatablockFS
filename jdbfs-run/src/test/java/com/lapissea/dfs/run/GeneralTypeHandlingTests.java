@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -381,11 +382,11 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void wrapperListing(){
-		var actual = Set.copyOf(FieldCompiler.getWrapperTypes());
+		var actual = FieldCompiler.getWrapperTypes();
 		assertThat(actual).containsExactlyInAnyOrder(
 			byte[].class, int[].class, float[].class, boolean[].class,
 			String.class, Duration.class, Instant.class,
-			LocalDate.class, LocalTime.class, LocalDateTime.class
+			LocalDate.class, LocalTime.class, LocalDateTime.class, ByteBuffer.class
 		);
 	}
 	

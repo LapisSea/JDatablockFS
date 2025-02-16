@@ -515,7 +515,9 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 			var perfect = buildNameLookupPerfect(data);
 			if(perfect != null) return nameLookup = perfect;
 		}
-		return nameLookup = name -> data.getOrDefault(name, -1);
+		return nameLookup = name -> {
+			return data.getOrDefault(name, -1);
+		};
 	}
 	
 	private final class PerfectLookup implements ToIntFunction<String>{

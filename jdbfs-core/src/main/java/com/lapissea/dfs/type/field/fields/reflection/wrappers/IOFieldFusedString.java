@@ -105,32 +105,20 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 	@Override
 	public List<ValueGeneratorInfo<CTyp, ?>> getGenerators(){
 		return List.of(
-			new ValueGeneratorInfo<>(encodingField, new ValueGenerator<CTyp, Encoding>(){
-				@Override
-				public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance){ return true; }
-				@Override
-				public Strictness strictDetermineLevel(){ return Strictness.NOT_REALLY; }
+			new ValueGeneratorInfo<>(encodingField, new ValueGenerator.NoCheck<CTyp, Encoding>(){
 				@Override
 				public Encoding generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
 					var str = get(ioPool, instance);
 					return Encoding.findBest(str);
 				}
 			}),
-			new ValueGeneratorInfo<>(charCountField, new ValueGenerator<CTyp, Integer>(){
-				@Override
-				public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance){ return true; }
-				@Override
-				public Strictness strictDetermineLevel(){ return Strictness.NOT_REALLY; }
+			new ValueGeneratorInfo<>(charCountField, new ValueGenerator.NoCheck<CTyp, Integer>(){
 				@Override
 				public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
 					return get(ioPool, instance).length();
 				}
 			}),
-			new ValueGeneratorInfo<>(bytesField, new ValueGenerator<CTyp, Integer>(){
-				@Override
-				public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance){ return true; }
-				@Override
-				public Strictness strictDetermineLevel(){ return Strictness.NOT_REALLY; }
+			new ValueGeneratorInfo<>(bytesField, new ValueGenerator.NoCheck<CTyp, Integer>(){
 				@Override
 				public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
 					String   data = get(ioPool, instance);
