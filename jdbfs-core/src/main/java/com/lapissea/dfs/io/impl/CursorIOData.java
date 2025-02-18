@@ -182,9 +182,9 @@ public abstract class CursorIOData implements IOInterface{
 			long remaining = cap - getPos();
 			if(remaining<=0) setCapacity0(Math.max(4, Math.max(cap + 1, cap + 1 - remaining)), false);
 			write1(pos, (byte)b);
-			if(hook != null) logWriteEvent(pos);
 			pos++;
 			used = Math.max(used, pos);
+			if(hook != null) logWriteEvent(pos);
 		}
 		
 		@Override
