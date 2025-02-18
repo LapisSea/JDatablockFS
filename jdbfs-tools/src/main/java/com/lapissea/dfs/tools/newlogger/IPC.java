@@ -1,0 +1,246 @@
+package com.lapissea.dfs.tools.newlogger;
+
+import com.lapissea.dfs.io.bit.EnumUniverse;
+import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.iterableplus.Iters;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Arrays;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+final class IPC{
+	
+	public static final int TIMEOUT      = 500;
+	public static final int DEFAULT_PORT = 56786;//No meaning, just a random number in the private port space
+	
+	public enum MSGInit{
+		NACK, ACK, REQ
+	}
+	
+	public enum MSGSession{
+		NACK, ACK, REQ, END
+	}
+	
+	public enum MSGSessionMessage{
+		NACK, ACK, FRAME_FULL, FRAME_DIFF, CLEAR, END, READ_FULL, READ_STATS
+	}
+	
+	record HandshakeRes(int sessionManagementPort){ }
+	
+	public static HandshakeRes clientHandshake(InetSocketAddress serverAddress) throws IOException{
+		try(var socket = new Socket()){
+			socket.connect(serverAddress, TIMEOUT);
+			Log.trace("CLIENT: Connected to {}#yellow", serverAddress);
+			
+			var output = new DataOutputStream(socket.getOutputStream());
+			writeEnum(output, MSGInit.REQ, true);
+			
+			var input    = new DataInputStream(socket.getInputStream());
+			var response = readEnum(input, MSGInit.class);
+			if(response != MSGInit.ACK){
+				throw new IOException("Unexpected handshake response from server: " + response);
+			}
+			var newPort = readPortNum(input);
+			Log.trace("CLIENT: Recieved session management port on {}#green", newPort);
+			return new HandshakeRes(newPort);
+		}
+	}
+	
+	public static ServerSocket recieveHandshake(ServerSocket ss) throws IOException{
+		Log.trace("SERVER: Waiting for handshake...");
+		try(var socket = ss.accept()){
+			var output = new DataOutputStream(socket.getOutputStream());
+			var input  = new DataInputStream(socket.getInputStream());
+			
+			Log.trace("SERVER: Waiting on init message on {}#yellow", socket);
+			var response = readEnum(input, MSGInit.class);
+			if(response != MSGInit.REQ){
+				writeEnum(output, MSGInit.NACK, true);
+				Log.warn("SERVER: Unexpected handshake init message: {}#red", response);
+				
+				return null;
+			}
+			Log.trace("SERVER: Acknowledging connection on {}#yellow", socket);
+			writeEnum(output, MSGInit.ACK, true);
+			
+			var connectionSocket = new ServerSocket(0);
+			writePortNum(output, connectionSocket.getLocalPort());
+			
+			Log.trace("SERVER: Opened session management port on {}#green", connectionSocket.getLocalPort());
+			return connectionSocket;
+		}
+	}
+	
+	public static Socket requestSession(Socket commSocket, String name) throws IOException{
+		var out = new DataOutputStream(commSocket.getOutputStream());
+		
+		writeEnum(out, MSGSession.REQ, false);
+		writeString(out, name, true);
+		
+		var in  = new DataInputStream(commSocket.getInputStream());
+		var res = readEnum(in, MSGSession.class);
+		if(res != MSGSession.ACK){
+			throw new IOException("Server did not acknowledge the session but sent: " + res);
+		}
+		var port = IPC.readPortNum(in);
+		
+		var socket = new Socket();
+		socket.connect(new InetSocketAddress(commSocket.getInetAddress(), port));
+		return socket;
+	}
+	
+	sealed interface SendFrame{ }
+	
+	record FullFrame(long uid, byte[] data, long[] ids) implements SendFrame{
+		@Override
+		public String toString(){
+			return "FullFrame{" +
+			       "uid=" + uid +
+			       ", data=" + Arrays.toString(data) +
+			       ", ids=" + Arrays.toString(ids) +
+			       '}';
+		}
+	}
+	
+	record DiffPart(int offset, byte[] data){
+		@Override
+		public String toString(){
+			return "DiffPart{" +
+			       "offset=" + offset +
+			       ", data=" + Arrays.toString(data) +
+			       '}';
+		}
+	}
+	
+	record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, long[] ids) implements SendFrame{
+		@Override
+		public String toString(){
+			return "DiffFrame{" +
+			       "uid=" + uid +
+			       ", prevUid=" + prevUid +
+			       (newSize == -1? "" : ", newSize=" + newSize) +
+			       ", parts=" + Iters.of(parts).joinAsStr(", ", "[", "]", p -> "{" + p.offset + " -> " + Arrays.toString(p.data) + "}") +
+			       ", ids=" + Arrays.toString(ids) +
+			       '}';
+		}
+	}
+	
+	public static void writeDiffFrame(DataOutputStream dest, DiffFrame frame) throws IOException{
+		dest.writeLong(frame.uid);
+		dest.writeLong(frame.prevUid);
+		dest.writeInt(frame.newSize);
+		dest.writeInt(frame.parts.length);
+		for(DiffPart part : frame.parts){
+			dest.writeInt(part.offset);
+			writeBytes(dest, part.data, false);
+		}
+		writeIds(dest, frame.ids);
+	}
+	
+	public static DiffFrame readDiffFrame(DataInputStream src) throws IOException{
+		var uid      = src.readLong();
+		var prevUid  = src.readLong();
+		var newSize  = src.readInt();
+		var partsLen = src.readInt();
+		var parts    = new DiffPart[partsLen];
+		for(int i = 0; i<partsLen; i++){
+			var offset = src.readInt();
+			var bytes  = readBytes(src);
+			parts[i] = new DiffPart(offset, bytes);
+		}
+		long[] ids = readIds(src);
+		return new DiffFrame(uid, prevUid, newSize, parts, ids);
+	}
+	
+	public static void writeStats(DataOutputStream dest, DBLogConnection.Session.SessionStats stats) throws IOException{
+		dest.writeLong(stats.frameCount());
+		dest.writeLong(stats.lastFrameUid());
+	}
+	
+	public static DBLogConnection.Session.SessionStats readStats(DataInputStream src) throws IOException{
+		var frameCount   = src.readLong();
+		var lastFrameUid = src.readLong();
+		return new DBLogConnection.Session.SessionStats(frameCount, lastFrameUid);
+	}
+	
+	public static void writeFullFrame(DataOutputStream dest, FullFrame frame) throws IOException{
+		dest.writeLong(frame.uid);
+		writeBytes(dest, frame.data, false);
+		writeIds(dest, frame.ids);
+	}
+	private static void writeIds(DataOutputStream dest, long[] ids) throws IOException{
+		dest.writeInt(ids.length);
+		for(long id : ids){
+			dest.writeLong(id);
+		}
+	}
+	
+	public static FullFrame readFullFrame(DataInputStream src) throws IOException{
+		var    uid  = src.readLong();
+		var    data = readBytes(src);
+		long[] ids  = readIds(src);
+		return new FullFrame(uid, data, ids);
+	}
+	private static long[] readIds(DataInputStream src) throws IOException{
+		var    idLen = src.readInt();
+		long[] ids   = new long[idLen];
+		for(int i = 0; i<idLen; i++){
+			ids[i] = src.readLong();
+		}
+		return ids;
+	}
+	
+	public static int readPortNum(DataInputStream input) throws IOException{
+		var newPort = input.readInt();
+		if(newPort<=0 || newPort>65535){
+			throw new IOException("Invalid port number: " + newPort);
+		}
+		return newPort;
+	}
+	public static void writePortNum(DataOutputStream output, int port) throws IOException{
+		if(port<=0 || port>65535){
+			throw new IOException("Invalid port number: " + port);
+		}
+		output.writeInt(port);
+		output.flush();
+	}
+	
+	public static <E extends Enum<E>> E readEnum(DataInputStream src, Class<E> type) throws IOException{
+		var ordinal  = src.readShort();
+		var universe = EnumUniverse.of(type);
+		if(ordinal<0 || ordinal>=universe.size()){
+			throw new IOException("Invalid enum ordinal: " + ordinal);
+		}
+		return universe.get(ordinal);
+	}
+	public static <E extends Enum<E>> void writeEnum(DataOutputStream dest, E val, boolean flush) throws IOException{
+		dest.writeShort(val.ordinal());
+		if(flush) dest.flush();
+	}
+	
+	public static String readString(DataInputStream input) throws IOException{
+		byte[] buff = readBytes(input);
+		return new String(buff, UTF_8);
+	}
+	public static byte[] readBytes(DataInputStream input) throws IOException{
+		int    length = input.readInt();
+		byte[] buff   = new byte[length];
+		input.readFully(buff);
+		return buff;
+	}
+	
+	public static void writeString(DataOutputStream output, String message, boolean flush) throws IOException{
+		writeBytes(output, message.getBytes(UTF_8), flush);
+	}
+	public static void writeBytes(DataOutputStream output, byte[] messageBytes, boolean flush) throws IOException{
+		output.writeInt(messageBytes.length);
+		output.write(messageBytes);
+		if(flush) output.flush();
+	}
+}

@@ -18,6 +18,7 @@ module JDatablockFS.tools {
 	exports com.lapissea.dfs.tools.logging;
 	exports com.lapissea.dfs.tools.server;
 	exports com.lapissea.dfs.tools.utils;
+	exports com.lapissea.dfs.tools.newlogger;
 	
 	opens com.lapissea.dfs.tools;
 }
