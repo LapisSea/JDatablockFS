@@ -14,14 +14,12 @@ import java.io.IOException;
 
 public class SessionTests{
 	
-	static{
-		Log.trace("Starting SessionTests");
-	}
-	
-	DBLogServer server;
+	private DBLogServer server;
 	
 	@BeforeTest
 	public void startServer(){
+		Log.info("Starting SessionTests");
+		
 		server = new DBLogServer();
 		Thread.ofVirtual().start(() -> {
 			try{
@@ -69,6 +67,14 @@ public class SessionTests{
 				io.setPos(2).write(13);
 			}
 		}
+	}
+	
+	@Test(expectedExceptions = IllegalStateException.class)
+	public void sessionAfterClose() throws IOException{
+		var remote = new DBLogConnection.OfRemote();
+		remote.openSession("test");
+		remote.close();
+		remote.openSession("test2");
 	}
 	
 	
