@@ -168,13 +168,13 @@ public interface DBLogConnection extends Closeable{
 			}
 			
 			@Override
-			public void writeEvent(IOInterface data, LongStream changeIds) throws IOException{
+			public void writeEvent(IOInterface data, LongStream writeIds) throws IOException{
 				if(socket.isClosed()){
 					return;
 				}
 				
-				var bytes = data.readAll();
-				var ids   = changeIds.toArray();
+				var bytes    = data.readAll();
+				var writeSet = IPC.RangeSet.from(writeIds);
 				
 				ioLock.lock();
 				try{
@@ -184,9 +184,9 @@ public interface DBLogConnection extends Closeable{
 					
 					var uid = ++this.uid;
 					
-					var full = new IPC.FullFrame(uid, bytes, ids);
+					var full = new IPC.FullFrame(uid, bytes, writeSet);
 					if(last != null){
-						var diff = makeDiff(last.data(), bytes, last.uid(), uid, ids);
+						var diff = makeDiff(last.data(), bytes, last.uid(), uid, writeSet);
 						IPC.writeEnum(socketOut, IPC.MSGSessionMessage.FRAME_DIFF, false);
 						IPC.writeDiffFrame(socketOut, diff);
 					}else{
@@ -215,7 +215,7 @@ public interface DBLogConnection extends Closeable{
 			}
 		}
 		
-		private static IPC.DiffFrame makeDiff(byte[] last, byte[] current, long lastUid, long uid, long[] ids){
+		private static IPC.DiffFrame makeDiff(byte[] last, byte[] current, long lastUid, long uid, IPC.RangeSet writes){
 			
 			final class Range{
 				private int from, to;
@@ -248,7 +248,7 @@ public interface DBLogConnection extends Closeable{
 			}
 			
 			
-			return new IPC.DiffFrame(uid, lastUid, last.length != current.length? current.length : -1, parts, ids);
+			return new IPC.DiffFrame(uid, lastUid, last.length != current.length? current.length : -1, parts, writes);
 		}
 		
 		@Override

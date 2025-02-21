@@ -1,20 +1,22 @@
 package com.lapissea.dfs.tools.newlogger;
 
-import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.objects.Blob;
-import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.util.function.UnsafeLongFunction;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
 
 public sealed interface IOFrame{
 	
+	@IOInstance.Order({"start", "size"})
 	final class Range extends IOInstance.Managed<Range>{
+		static{ allowFullAccess(MethodHandles.lookup()); }
+		
 		@IOValue
 		@IODependency.VirtualNumSize
 		@IOValue.Unsigned
@@ -30,25 +32,36 @@ public sealed interface IOFrame{
 	
 	@IOValue
 	final class Full extends IOInstance.Managed<Full> implements IOFrame{
-		private final Blob data;
+		static{ allowFullAccess(MethodHandles.lookup()); }
 		
+		@IOValue.Unsigned
+		@IODependency.VirtualNumSize
+		private final long        uid;
+		private final Blob        data;
 		private final List<Range> writes;
 		
-		public Full(Blob data, List<Range> writes){
+		public Full(long uid, Blob data, List<Range> writes){
+			this.uid = uid;
 			this.data = data;
 			this.writes = List.copyOf(writes);
 		}
 		@Override
-		public byte[] resolve(IOList<IOFrame> frames) throws IOException{
+		public byte[] resolve(UnsafeLongFunction<IOFrame, IOException> frames) throws IOException{
 			return data.readAll();
 		}
+		
 		@Override
 		public List<Range> writes(){ return writes; }
+		@Override
+		public long uid(){ return uid; }
 	}
 	
 	@IOValue
+	@IOInstance.Order({"parts", "partsBuff", "uid", "previousID", "newSize", "writes"})
 	final class Diff extends IOInstance.Managed<Diff> implements IOFrame{
+		static{ allowFullAccess(MethodHandles.lookup()); }
 		
+		@IOValue
 		public static final class Part extends IOInstance.Managed<Part>{
 			@IODependency.VirtualNumSize
 			@IOValue.Unsigned
@@ -61,54 +74,29 @@ public sealed interface IOFrame{
 			}
 		}
 		
-		public static Diff of(IOInterface last, IOInterface src, long srcID, List<Range> writes) throws IOException{
-			
-			record MakePart(long fileOffset, ByteArrayOutputStream data){ }
-			
-			long newSize = -1;
-			
-			try(var lastIO = last.io(); var srcIO = src.io()){
-				byte[] chunkA = new byte[1024];
-				byte[] chunkB = new byte[1024];
-				while(true){
-					var readA = lastIO.read(chunkA);
-					var readB = 0;
-					while(readB<readA){
-						var r = srcIO.read(chunkB, readB, readA - readB);
-						if(r == -1) break;
-						readB += r;
-					}
-					
-					if(readA>readB){
-					
-					}
-					
-				}
-			}
-			
-		}
-		
 		public final  List<Part> parts;
 		private final Blob       partsBuff;
-		
-		public final long previousID;
-		public final int  newSize;
+		public final  long       uid;
+		@IOValue.Unsigned
+		public final  long       previousID;
+		public final  int        newSize;
 		
 		private final List<Range> writes;
 		
-		public Diff(List<Part> parts, Blob partsBuff, long previousID, int newSize, List<Range> writes){
+		public Diff(List<Part> parts, Blob partsBuff, long uid, long previousID, int newSize, List<Range> writes){
 			this.parts = List.copyOf(parts);
 			this.partsBuff = partsBuff;
+			this.uid = uid;
 			this.previousID = previousID;
 			this.newSize = newSize;
 			this.writes = writes;
 		}
 		
 		@Override
-		public byte[] resolve(IOList<IOFrame> frames) throws IOException{
-			var prev = frames.get(previousID);
+		public byte[] resolve(UnsafeLongFunction<IOFrame, IOException> frameGet) throws IOException{
+			var prev = frameGet.apply(previousID);
 			
-			var bb = prev.resolve(frames);
+			var bb = prev.resolve(frameGet);
 			if(newSize != -1) bb = Arrays.copyOf(bb, newSize);
 			
 			try(var io = partsBuff.io()){
@@ -120,11 +108,15 @@ public sealed interface IOFrame{
 			
 			return bb;
 		}
+		
 		@Override
 		public List<Range> writes(){ return writes; }
+		@Override
+		public long uid(){ return uid; }
 	}
 	
-	byte[] resolve(IOList<IOFrame> frames) throws IOException;
+	byte[] resolve(UnsafeLongFunction<IOFrame, IOException> frames) throws IOException;
 	
 	List<Range> writes();
+	long uid();
 }

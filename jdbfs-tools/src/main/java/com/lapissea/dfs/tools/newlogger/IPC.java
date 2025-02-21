@@ -1,7 +1,10 @@
 package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.io.bit.EnumUniverse;
+import com.lapissea.dfs.io.content.ContentInputStream;
+import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.DataInputStream;
@@ -10,7 +13,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.StringJoiner;
+import java.util.function.LongConsumer;
+import java.util.stream.LongStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -95,15 +102,86 @@ final class IPC{
 		return socket;
 	}
 	
-	sealed interface SendFrame{ }
+	record RangeSet(long[] startsSizes){
+		
+		public static RangeSet from(LongStream stream){
+			final class Range{
+				private long from, to;
+				Range(long from, long to){
+					this.from = from;
+					this.to = to;
+				}
+			}
+			var writes = new ArrayList<Range>();
+			stream.sequential().forEach(new LongConsumer(){
+				Range lastRange;
+				@Override
+				public void accept(long i){
+					if(lastRange == null){
+						lastRange = new Range(i, i + 1);
+						writes.add(lastRange);
+						return;
+					}
+					if(lastRange.to == i){
+						lastRange.to++;
+					}else{
+						var im1 = i - 1;
+						for(Range range : writes){
+							if(range.to == i){
+								lastRange = range;
+								range.to++;
+								return;
+							}
+							if(range.from == im1){
+								lastRange = range;
+								range.from--;
+								return;
+							}
+						}
+						
+						lastRange = new Range(i, i + 1);
+						writes.add(lastRange);
+					}
+				}
+			});
+			
+			long[] startsSizes = new long[writes.size()*2];
+			for(int i = 0; i<writes.size(); i++){
+				var write = writes.get(i);
+				startsSizes[i*2] = write.from;
+				startsSizes[i*2 + 1] = write.to - write.from;
+			}
+			return new RangeSet(startsSizes);
+		}
+		
+		RangeSet{
+			if(startsSizes.length%2 != 0){
+				throw new IllegalArgumentException("Array length should be even");
+			}
+		}
+		@Override
+		public String toString(){
+			var joiner = new StringJoiner(", ", "[", "]");
+			for(int i = 0; i<startsSizes.length; i += 2){
+				var start = startsSizes[i];
+				var size  = startsSizes[i + 1];
+				joiner.add(start + " -> " + (start + size));
+			}
+			return joiner.toString();
+		}
+	}
 	
-	record FullFrame(long uid, byte[] data, long[] ids) implements SendFrame{
+	sealed interface SendFrame{
+		long uid();
+	}
+	
+	record FullFrame(long uid, byte[] data, RangeSet writes) implements SendFrame{
 		@Override
 		public String toString(){
 			return "FullFrame{" +
 			       "uid=" + uid +
 			       ", data=" + Arrays.toString(data) +
-			       ", ids=" + Arrays.toString(ids) +
+			       ", writes=" + writes +
 			       '}';
 		}
 	}
@@ -118,7 +196,7 @@ final class IPC{
 		}
 	}
 	
-	record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, long[] ids) implements SendFrame{
+	record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, RangeSet writes) implements SendFrame{
 		@Override
 		public String toString(){
 			return "DiffFrame{" +
@@ -126,7 +204,7 @@ final class IPC{
 			       ", prevUid=" + prevUid +
 			       (newSize == -1? "" : ", newSize=" + newSize) +
 			       ", parts=" + Iters.of(parts).joinAsStr(", ", "[", "]", p -> "{" + p.offset + " -> " + Arrays.toString(p.data) + "}") +
-			       ", ids=" + Arrays.toString(ids) +
+			       ", writes=" + writes +
 			       '}';
 		}
 	}
@@ -140,7 +218,7 @@ final class IPC{
 			dest.writeInt(part.offset);
 			writeBytes(dest, part.data, false);
 		}
-		writeIds(dest, frame.ids);
+		writeLongs(dest, frame.writes.startsSizes);
 	}
 	
 	public static DiffFrame readDiffFrame(DataInputStream src) throws IOException{
@@ -154,8 +232,8 @@ final class IPC{
 			var bytes  = readBytes(src);
 			parts[i] = new DiffPart(offset, bytes);
 		}
-		long[] ids = readIds(src);
-		return new DiffFrame(uid, prevUid, newSize, parts, ids);
+		long[] ids = readLongs(src);
+		return new DiffFrame(uid, prevUid, newSize, parts, new RangeSet(ids));
 	}
 	
 	public static void writeStats(DataOutputStream dest, DBLogConnection.Session.SessionStats stats) throws IOException{
@@ -172,26 +250,43 @@ final class IPC{
 	public static void writeFullFrame(DataOutputStream dest, FullFrame frame) throws IOException{
 		dest.writeLong(frame.uid);
 		writeBytes(dest, frame.data, false);
-		writeIds(dest, frame.ids);
-	}
-	private static void writeIds(DataOutputStream dest, long[] ids) throws IOException{
-		dest.writeInt(ids.length);
-		for(long id : ids){
-			dest.writeLong(id);
-		}
+		writeLongs(dest, frame.writes.startsSizes);
 	}
 	
 	public static FullFrame readFullFrame(DataInputStream src) throws IOException{
-		var    uid  = src.readLong();
-		var    data = readBytes(src);
-		long[] ids  = readIds(src);
-		return new FullFrame(uid, data, ids);
+		var uid    = src.readLong();
+		var data   = readBytes(src);
+		var writes = readLongs(src);
+		return new FullFrame(uid, data, new RangeSet(writes));
 	}
-	private static long[] readIds(DataInputStream src) throws IOException{
-		var    idLen = src.readInt();
-		long[] ids   = new long[idLen];
+	
+	private static void writeLongs(DataOutputStream dest, long[] ids) throws IOException{
+		long min = Long.MAX_VALUE, max = Long.MIN_VALUE;
+		for(long id : ids){
+			max = Math.max(max, id);
+			min = Math.min(min, id);
+		}
+		var maxS = NumberSize.bySizeSigned(max);
+		var minS = NumberSize.bySizeSigned(min);
+		var size = maxS.max(minS);
+		
+		dest.writeInt(ids.length);
+		writeEnum(dest, size, false);
+		
+		var d = new ContentOutputStream.Wrapp(dest);
+		for(long id : ids){
+			size.write(d, id);
+		}
+	}
+	
+	private static long[] readLongs(DataInputStream src) throws IOException{
+		var idLen = src.readInt();
+		var size  = readEnum(src, NumberSize.class);
+		
+		long[] ids = new long[idLen];
+		var    s   = new ContentInputStream.Wrapp(src);
 		for(int i = 0; i<idLen; i++){
-			ids[i] = src.readLong();
+			ids[i] = size.readSigned(s);
 		}
 		return ids;
 	}

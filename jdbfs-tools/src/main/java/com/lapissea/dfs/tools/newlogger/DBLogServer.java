@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger;
 
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.util.UtilL;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -8,12 +10,11 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.SequencedMap;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -57,8 +58,8 @@ public class DBLogServer{
 						sessions.put(name, session);
 						sessionReceiver.setSoTimeout(5000);
 						
-						Thread.ofVirtual().name("Session: " + name).start(() -> {
-							try(sessionReceiver; var socket = sessionReceiver.accept()){
+						CompletableFuture.runAsync(() -> {
+							try(var socket = sessionReceiver.accept()){
 								Log.info("SERVER: Session {}#green fully connected! Ready for commands.", name);
 								var sin  = new DataInputStream(socket.getInputStream());
 								var sout = new DataOutputStream(socket.getOutputStream());
@@ -66,9 +67,10 @@ public class DBLogServer{
 									var close = session.run(sin, sout);
 									if(close) break;
 								}
-							}catch(IOException e){
+							}catch(Throwable e){
 								e.printStackTrace();
 							}finally{
+								UtilL.closeSilently(sessionReceiver);
 								lock.lock();
 								try{
 									sessions.remove(name);
@@ -77,7 +79,7 @@ public class DBLogServer{
 								}
 								Log.info("SERVER: Session {}#yellow ended", name);
 							}
-						});
+						}, Thread.ofVirtual().name("Session: " + name)::start);
 					}finally{
 						lock.unlock();
 					}
@@ -86,13 +88,17 @@ public class DBLogServer{
 			
 			return false;
 		}
+		
+		public Set<String> sessionNames(){
+			return sessions.keySet();
+		}
 	}
 	
 	private static final class Session{
 		
-		public final String                            name;
-		public final SequencedMap<Long, IPC.SendFrame> frames = new LinkedHashMap<>();
-		private Session(String name){ this.name = name; }
+		public final String  name;
+		public final FrameDB frameDB = new FrameDB(MemoryData.empty());
+		private Session(String name) throws IOException{ this.name = name; }
 		
 		private boolean run(DataInputStream in, DataOutputStream out) throws IOException{
 			
@@ -108,13 +114,19 @@ public class DBLogServer{
 				case FRAME_FULL -> {
 					var frame = IPC.readFullFrame(in);
 					Log.trace("SERVER: Frame received: {}#green", frame);
-					frames.put(frame.uid(), frame);
+					frameDB.store(name, frame);
 					ackNow(out);
 				}
 				case FRAME_DIFF -> {
 					var frame = IPC.readDiffFrame(in);
-					Log.trace("SERVER: Frame received: {}#green\n  as: {}#blue", frame, (Supplier<Object>)() -> resolve(frame));
-					frames.put(frame.uid(), frame);
+					Log.trace("SERVER: Frame received: {}#green\n  as: {}#blue", frame, (Supplier<Object>)() -> {
+						try{
+							return frameDB.resolve(name, frame.uid());
+						}catch(IOException e){
+							throw new RuntimeException(e);
+						}
+					});
+					frameDB.store(name, frame);
 					ackNow(out);
 				}
 				case END -> {
@@ -123,25 +135,25 @@ public class DBLogServer{
 				}
 				case CLEAR -> {
 					Log.trace("SERVER: Clearing session {}#yellow", name);
-					frames.clear();
+					frameDB.clear(name);
 					ackNow(out);
 				}
 				case READ_FULL -> {
 					long uid = in.readLong();
-					var  sf  = frames.get(uid);
+					var  sf  = frameDB.resolve(name, uid);
 					if(sf == null){
 						IPC.writeEnum(out, IPC.MSGSessionMessage.NACK, true);
 						return true;
 					}
 					
 					IPC.writeEnum(out, IPC.MSGSessionMessage.FRAME_FULL, false);
-					IPC.writeFullFrame(out, resolve(sf));
+					IPC.writeFullFrame(out, sf);
 					out.flush();
 				}
 				case READ_STATS -> {
 					ackNow(out);
-					var last = frames.lastEntry();
-					IPC.writeStats(out, new DBLogConnection.Session.SessionStats(frames.size(), last == null? -1 : last.getKey()));
+					var info = frameDB.sequenceInfo(name);
+					IPC.writeStats(out, info);
 					out.flush();
 				}
 				default -> {
@@ -155,29 +167,6 @@ public class DBLogServer{
 		private static void ackNow(DataOutputStream out) throws IOException{
 			IPC.writeEnum(out, IPC.MSGSessionMessage.ACK, true);
 		}
-		private IPC.FullFrame resolve(IPC.SendFrame frame){
-			return switch(frame){
-				case IPC.DiffFrame f -> resolve(f);
-				case IPC.FullFrame f -> f;
-			};
-		}
-		private IPC.FullFrame resolve(IPC.DiffFrame frame){
-			var full = switch(frames.get(frame.prevUid())){
-				case IPC.DiffFrame prev -> resolve(prev);
-				case IPC.FullFrame prev -> prev;
-			};
-			byte[] buff;
-			if(frame.newSize() != -1){
-				buff = Arrays.copyOf(full.data(), frame.newSize());
-			}else{
-				buff = full.data().clone();
-			}
-			for(var part : frame.parts()){
-				System.arraycopy(part.data(), 0, buff, part.offset(), part.data().length);
-			}
-			return new IPC.FullFrame(frame.uid(), buff, frame.ids());
-		}
-		
 	}
 	
 	public        boolean                  run         = true;
@@ -189,7 +178,7 @@ public class DBLogServer{
 		runThread.interrupt();
 	}
 	
-	public void run() throws IOException{
+	public void start() throws IOException{
 		runThread = Thread.currentThread();
 		try(var soc = new ServerSocket(IPC.DEFAULT_PORT)){
 			while(run){

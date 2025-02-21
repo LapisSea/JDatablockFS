@@ -11,6 +11,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.net.BindException;
 
 public class SessionTests{
 	
@@ -23,7 +24,9 @@ public class SessionTests{
 		server = new DBLogServer();
 		Thread.ofVirtual().start(() -> {
 			try{
-				server.run();
+				server.start();
+			}catch(BindException e){
+				Log.warn("Server failed to start: {}#red", e);
 			}catch(IOException e){
 				if(e.getMessage().equals("Closed by interrupt")){
 					return;
