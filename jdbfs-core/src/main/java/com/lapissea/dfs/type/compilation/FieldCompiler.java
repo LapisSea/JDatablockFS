@@ -382,7 +382,6 @@ public final class FieldCompiler{
 				
 				Type   type      = getType(field);
 				String fieldName = getFieldName(field);
-				field.setAccessible(true);
 				
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
@@ -390,7 +389,7 @@ public final class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("fmt", e, "Failed to scan field {}#red on {}#yellow", field.getName(), struct.cleanName());
+				throw new MalformedStruct("fmt", e, "Failed to scan field {}#red on {}#yellow", field.getName(), struct.cleanFullName());
 			}
 		}
 		return fields;
