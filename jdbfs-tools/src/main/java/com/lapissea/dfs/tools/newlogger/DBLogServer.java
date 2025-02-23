@@ -26,10 +26,17 @@ public class DBLogServer{
 		private final Map<String, Session> sessions = new HashMap<>();
 		private final Lock                 lock     = new ReentrantLock();
 		private final Thread               thread   = Thread.currentThread();
+		private final Socket               managementSocket;
+		private final DataInputStream      in;
+		private final DataOutputStream     out;
 		
-		private boolean manageSessions(Socket managementSocket) throws IOException{
-			var in  = new DataInputStream(managementSocket.getInputStream());
-			var out = new DataOutputStream(managementSocket.getOutputStream());
+		private Connection(Socket managementSocket) throws IOException{
+			this.managementSocket = managementSocket;
+			in = new DataInputStream(managementSocket.getInputStream());
+			out = new DataOutputStream(managementSocket.getOutputStream());
+		}
+		
+		private boolean processConnection() throws IOException{
 			
 			IPC.MSGSession command;
 			try{
@@ -47,39 +54,7 @@ public class DBLogServer{
 				case REQ -> {
 					lock.lock();
 					try{
-						var name = IPC.readString(in);
-						Log.info("SERVER: Session named {}#green requested", name);
-						IPC.writeEnum(out, IPC.MSGSession.ACK, true);
-						
-						var session         = new Session(name);
-						var sessionReceiver = new ServerSocket(0);
-						IPC.writePortNum(out, sessionReceiver.getLocalPort());
-						
-						sessions.put(name, session);
-						sessionReceiver.setSoTimeout(5000);
-						
-						CompletableFuture.runAsync(() -> {
-							try(var socket = sessionReceiver.accept()){
-								Log.info("SERVER: Session {}#green fully connected! Ready for commands.", name);
-								var sin  = new DataInputStream(socket.getInputStream());
-								var sout = new DataOutputStream(socket.getOutputStream());
-								while(true){
-									var close = session.run(sin, sout);
-									if(close) break;
-								}
-							}catch(Throwable e){
-								e.printStackTrace();
-							}finally{
-								UtilL.closeSilently(sessionReceiver);
-								lock.lock();
-								try{
-									sessions.remove(name);
-								}finally{
-									lock.unlock();
-								}
-								Log.info("SERVER: Session {}#yellow ended", name);
-							}
-						}, Thread.ofVirtual().name("Session: " + name)::start);
+						handleRequest();
 					}finally{
 						lock.unlock();
 					}
@@ -87,6 +62,44 @@ public class DBLogServer{
 			}
 			
 			return false;
+		}
+		
+		private void handleRequest() throws IOException{
+			var name = IPC.readString(in);
+			Log.info("SERVER: Session named {}#green requested", name);
+			IPC.writeEnum(out, IPC.MSGSession.ACK, true);
+			
+			var sessionReceiver = new ServerSocket(0);
+			IPC.writePortNum(out, sessionReceiver.getLocalPort());
+			
+			sessionReceiver.setSoTimeout(5000);
+			
+			CompletableFuture.runAsync(() -> {
+				try(var socket = sessionReceiver.accept()){
+					
+					var session = new Session(name, socket);
+					sessions.put(name, session);
+					
+					Log.info("SERVER: Session {}#green connected! Ready for commands.", name);
+					
+					while(true){
+						var close = session.process();
+						if(close) break;
+					}
+					
+				}catch(Throwable e){
+					e.printStackTrace();
+				}finally{
+					UtilL.closeSilently(sessionReceiver);
+					lock.lock();
+					try{
+						sessions.remove(name);
+					}finally{
+						lock.unlock();
+					}
+					Log.info("SERVER: [{}#yellow] Session ended", name);
+				}
+			}, Thread.ofVirtual().name("Session: " + name)::start);
 		}
 		
 		public Set<String> sessionNames(){
@@ -98,28 +111,38 @@ public class DBLogServer{
 		
 		public final String  name;
 		public final FrameDB frameDB = new FrameDB(MemoryData.empty());
-		private Session(String name) throws IOException{ this.name = name; }
 		
-		private boolean run(DataInputStream in, DataOutputStream out) throws IOException{
+		private final Socket           socket;
+		private final DataInputStream  in;
+		private final DataOutputStream out;
+		
+		private Session(String name, Socket socket) throws IOException{
+			this.name = name;
+			this.socket = socket;
+			in = new DataInputStream(socket.getInputStream());
+			out = new DataOutputStream(socket.getOutputStream());
+		}
+		
+		private boolean process() throws IOException{
 			
 			IPC.MSGSessionMessage cmd;
 			try{
 				cmd = IPC.readEnum(in, IPC.MSGSessionMessage.class);
 			}catch(EOFException e){
-				Log.info("SERVER: Ending session {}#yellow because the stream ended", name);
+				Log.info("SERVER: [{}#red] Ending session because the stream ended", name);
 				return true;
 			}
 			
 			switch(cmd){
 				case FRAME_FULL -> {
 					var frame = IPC.readFullFrame(in);
-					Log.trace("SERVER: Frame received: {}#green", frame);
+					Log.trace("SERVER: [{}#green] Frame received: {}#green", name, frame);
 					frameDB.store(name, frame);
 					ackNow(out);
 				}
 				case FRAME_DIFF -> {
 					var frame = IPC.readDiffFrame(in);
-					Log.trace("SERVER: Frame received: {}#green\n  as: {}#blue", frame, (Supplier<Object>)() -> {
+					Log.trace("SERVER: [{}#green] Frame received: {}#green\n  as: {}#blue", name, frame, (Supplier<Object>)() -> {
 						try{
 							return frameDB.resolve(name, frame.uid());
 						}catch(IOException e){
@@ -130,11 +153,11 @@ public class DBLogServer{
 					ackNow(out);
 				}
 				case END -> {
-					Log.info("SERVER: Ending session {}#yellow as requested", name);
+					Log.info("SERVER: [{}#green] Ending session as requested", name);
 					return true;
 				}
 				case CLEAR -> {
-					Log.trace("SERVER: Clearing session {}#yellow", name);
+					Log.trace("SERVER: [{}#green] Clearing session", name);
 					frameDB.clear(name);
 					ackNow(out);
 				}
@@ -157,7 +180,7 @@ public class DBLogServer{
 					out.flush();
 				}
 				default -> {
-					Log.warn("SERVER: Unrecognized frame type: {}", cmd);
+					Log.warn("SERVER: [{}#green] Unrecognized frame type: {}", name, cmd);
 					IPC.writeEnum(out, IPC.MSGSessionMessage.NACK, true);
 					return true;
 				}
@@ -182,28 +205,36 @@ public class DBLogServer{
 		runThread = Thread.currentThread();
 		try(var soc = new ServerSocket(IPC.DEFAULT_PORT)){
 			while(run){
-				var ss = IPC.recieveHandshake(soc);
-				if(ss == null) continue;
-				
-				CompletableFuture.runAsync(() -> {
-					try(ss; var managementSocket = ss.accept()){
-						Connection con = new Connection();
-						connections.put(ss.getLocalPort(), con);
-						while(true){
-							var toClose = con.manageSessions(managementSocket);
-							if(toClose) break;
-						}
-					}catch(Throwable e){
-						e.printStackTrace();
-					}finally{
-						connections.remove(ss.getLocalPort());
-					}
-				}, Thread.ofVirtual()::start);
+				listenForConnection(soc);
 			}
 			for(Connection value : connections.values()){
 				value.thread.interrupt();
 			}
 		}
+	}
+	
+	private void listenForConnection(ServerSocket soc) throws IOException{
+		ServerSocket ss = IPC.recieveHandshake(soc);
+		if(ss == null) return;
+		
+		CompletableFuture.runAsync(() -> {
+			try(ss; var managementSocket = ss.accept()){
+				
+				var con = new Connection(managementSocket);
+				connections.put(ss.getLocalPort(), con);
+				
+				while(true){
+					var toClose = con.processConnection();
+					if(toClose) break;
+				}
+				
+			}catch(Throwable e){
+				e.printStackTrace();
+			}finally{
+				connections.remove(ss.getLocalPort());
+				UtilL.closeSilently(ss);
+			}
+		}, Thread.ofVirtual()::start);
 	}
 	
 }

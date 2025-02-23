@@ -165,7 +165,8 @@ final class IPC{
 			for(int i = 0; i<startsSizes.length; i += 2){
 				var start = startsSizes[i];
 				var size  = startsSizes[i + 1];
-				joiner.add(start + " -> " + (start + size));
+				if(size == 1) joiner.add(start + "");
+				else joiner.add(start + "..." + (start + size));
 			}
 			return joiner.toString();
 		}

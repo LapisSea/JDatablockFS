@@ -68,6 +68,8 @@ public interface DBLogConnection extends Closeable{
 		public void close() throws IOException{
 			sessionLock.lock();
 			try{
+				if(sessionManagementSocket.isClosed()) return;
+				Log.info("CLIENT: Closing log connection on {}#yellow", sessionManagementSocket);
 				
 				for(Session value : sessions.values()){
 					value.close();
@@ -154,6 +156,7 @@ public interface DBLogConnection extends Closeable{
 				ioLock.lock();
 				try{
 					if(socket.isClosed()) return;
+					Log.trace("CLIENT: Closing log session {}#yellow", name);
 					sessionLock.lock();
 					try{
 						var removed = sessions.remove(name);
@@ -161,6 +164,7 @@ public interface DBLogConnection extends Closeable{
 					}finally{
 						sessionLock.unlock();
 					}
+					writeEnum(socketOut, IPC.MSGSessionMessage.END, true);
 					socket.close();
 				}finally{
 					ioLock.unlock();
