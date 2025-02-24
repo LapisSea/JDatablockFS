@@ -181,10 +181,11 @@ public abstract class CursorIOData implements IOInterface{
 			var  cap       = getCapacity();
 			long remaining = cap - getPos();
 			if(remaining<=0) setCapacity0(Math.max(4, Math.max(cap + 1, cap + 1 - remaining)), false);
+			var oldPos = pos;
 			write1(pos, (byte)b);
 			pos++;
 			used = Math.max(used, pos);
-			if(hook != null) logWriteEvent(pos);
+			if(hook != null) logWriteEvent(oldPos);
 		}
 		
 		@Override
