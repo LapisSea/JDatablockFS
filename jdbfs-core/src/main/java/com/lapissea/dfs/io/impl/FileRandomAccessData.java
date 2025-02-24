@@ -5,7 +5,6 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.util.MathUtil;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -16,7 +15,7 @@ import java.nio.channels.OverlappingFileLockException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-public final class FileRandomAccessData extends CursorIOData implements Closeable{
+public final class FileRandomAccessData extends ClosableIOData{
 	
 	public enum Mode{
 		READ_ONLY("r"),
@@ -27,9 +26,6 @@ public final class FileRandomAccessData extends CursorIOData implements Closeabl
 		Mode(String str){ this.str = str; }
 	}
 	
-	public static void readInto(String path, IOInterface dest) throws IOException{
-		readInto(new File(path), dest);
-	}
 	public static void readInto(File file, IOInterface dest) throws IOException{
 		try(var in = new FileInputStream(file); var out = dest.io()){
 			var buff = new byte[MathUtil.snap((int)file.length(), 16, BATCH_BYTES)];
