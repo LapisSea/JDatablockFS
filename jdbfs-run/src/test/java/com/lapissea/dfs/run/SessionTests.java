@@ -1,9 +1,11 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.io.IOInterfaces;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.DBLogConnection;
-import com.lapissea.dfs.tools.newlogger.DBLogServer;
+import com.lapissea.dfs.tools.newlogger.DBLogIngestServer;
+import com.lapissea.dfs.tools.newlogger.FrameDB;
 import com.lapissea.util.UtilL;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
@@ -15,13 +17,13 @@ import java.net.BindException;
 
 public class SessionTests{
 	
-	private DBLogServer server;
+	private DBLogIngestServer server;
 	
 	@BeforeTest
 	public void startServer(){
 		Log.info("Starting SessionTests");
 		
-		server = new DBLogServer();
+		server = new DBLogIngestServer(() -> new FrameDB(IOInterfaces.ofMemory()));
 		Thread.ofVirtual().start(() -> {
 			try{
 				server.start();

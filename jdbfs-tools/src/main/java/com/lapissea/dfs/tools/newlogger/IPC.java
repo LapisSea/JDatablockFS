@@ -26,16 +26,15 @@ final class IPC{
 	public static final int TIMEOUT      = 500;
 	public static final int DEFAULT_PORT = 56786;//No meaning, just a random number in the private port space
 	
-	public enum MSGInit{
-		NACK, ACK, REQ
+	public enum MSGConnection{
+		NACK, ACK, END,
+		CONNECT, REQUEST_SESSION
 	}
 	
 	public enum MSGSession{
-		NACK, ACK, REQ, END
-	}
-	
-	public enum MSGSessionMessage{
-		NACK, ACK, FRAME_FULL, FRAME_DIFF, CLEAR, END, READ_FULL, READ_STATS
+		NACK, ACK, END,
+		FRAME_FULL, FRAME_DIFF, CLEAR,
+		READ_FULL, READ_STATS
 	}
 	
 	record HandshakeRes(int sessionManagementPort){ }
@@ -46,16 +45,19 @@ final class IPC{
 			Log.trace("CLIENT: Connected to {}#yellow", serverAddress);
 			
 			var output = new DataOutputStream(socket.getOutputStream());
-			writeEnum(output, MSGInit.REQ, true);
+			writeEnum(output, MSGConnection.CONNECT, true);
 			
 			var input    = new DataInputStream(socket.getInputStream());
-			var response = readEnum(input, MSGInit.class);
-			if(response != MSGInit.ACK){
-				throw new IOException("Unexpected handshake response from server: " + response);
+			var response = readEnum(input, MSGConnection.class);
+			switch(response){
+				case ACK -> {
+					var newPort = readPortNum(input);
+					Log.trace("CLIENT: Received session management port on {}#green", newPort);
+					return new HandshakeRes(newPort);
+				}
+				case NACK -> throw new IOException("Handshake NACK!");
+				default -> throw new IOException("Unexpected handshake response from server: " + response);
 			}
-			var newPort = readPortNum(input);
-			Log.trace("CLIENT: Recieved session management port on {}#green", newPort);
-			return new HandshakeRes(newPort);
 		}
 	}
 	
@@ -66,15 +68,15 @@ final class IPC{
 			var input  = new DataInputStream(socket.getInputStream());
 			
 			Log.trace("SERVER: Waiting on init message on {}#yellow", socket);
-			var response = readEnum(input, MSGInit.class);
-			if(response != MSGInit.REQ){
-				writeEnum(output, MSGInit.NACK, true);
+			var response = readEnum(input, MSGConnection.class);
+			if(response != MSGConnection.CONNECT){
+				writeEnum(output, MSGConnection.NACK, true);
 				Log.warn("SERVER: Unexpected handshake init message: {}#red", response);
 				
 				return null;
 			}
 			Log.trace("SERVER: Acknowledging connection on {}#yellow", socket);
-			writeEnum(output, MSGInit.ACK, true);
+			writeEnum(output, MSGConnection.ACK, true);
 			
 			var connectionSocket = new ServerSocket(0);
 			writePortNum(output, connectionSocket.getLocalPort());
@@ -87,12 +89,12 @@ final class IPC{
 	public static Socket requestSession(Socket commSocket, String name) throws IOException{
 		var out = new DataOutputStream(commSocket.getOutputStream());
 		
-		writeEnum(out, MSGSession.REQ, false);
+		writeEnum(out, MSGConnection.REQUEST_SESSION, false);
 		writeString(out, name, true);
 		
 		var in  = new DataInputStream(commSocket.getInputStream());
-		var res = readEnum(in, MSGSession.class);
-		if(res != MSGSession.ACK){
+		var res = readEnum(in, MSGConnection.class);
+		if(res != MSGConnection.ACK){
 			throw new IOException("Server did not acknowledge the session but sent: " + res);
 		}
 		var port = IPC.readPortNum(in);

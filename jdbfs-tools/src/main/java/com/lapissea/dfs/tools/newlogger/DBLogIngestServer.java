@@ -1,8 +1,8 @@
 package com.lapissea.dfs.tools.newlogger;
 
-import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -14,15 +14,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-public class DBLogServer{
+public final class DBLogIngestServer{
 	
-	private static final class Connection{
+	private final class Connection{
 		private final Map<String, Session> sessions = new HashMap<>();
 		private final Lock                 lock     = new ReentrantLock();
 		private final Thread               thread   = Thread.currentThread();
@@ -38,9 +39,9 @@ public class DBLogServer{
 		
 		private boolean processConnection() throws IOException{
 			
-			IPC.MSGSession command;
+			IPC.MSGConnection command;
 			try{
-				command = IPC.readEnum(in, IPC.MSGSession.class);
+				command = IPC.readEnum(in, IPC.MSGConnection.class);
 			}catch(EOFException e){
 				Log.info("SERVER: Ending connection with port {}#yellow because the stream ended", managementSocket.getPort());
 				return true;
@@ -51,7 +52,7 @@ public class DBLogServer{
 					Log.info("SERVER: Ending connection with port {}#green as requested", managementSocket.getPort());
 					return true;
 				}
-				case REQ -> {
+				case REQUEST_SESSION -> {
 					lock.lock();
 					try{
 						handleRequest();
@@ -67,8 +68,9 @@ public class DBLogServer{
 		private void handleRequest() throws IOException{
 			var name = IPC.readString(in);
 			Log.info("SERVER: Session named {}#green requested", name);
-			IPC.writeEnum(out, IPC.MSGSession.ACK, true);
+			IPC.writeEnum(out, IPC.MSGConnection.ACK, true);
 			
+			//noinspection resource
 			var sessionReceiver = new ServerSocket(0);
 			IPC.writePortNum(out, sessionReceiver.getLocalPort());
 			
@@ -77,7 +79,7 @@ public class DBLogServer{
 			CompletableFuture.runAsync(() -> {
 				try(var socket = sessionReceiver.accept()){
 					
-					var session = new Session(name, socket);
+					var session = new Session(name, getDB(), socket);
 					sessions.put(name, session);
 					
 					Log.info("SERVER: Session {}#green connected! Ready for commands.", name);
@@ -110,14 +112,15 @@ public class DBLogServer{
 	private static final class Session{
 		
 		public final String  name;
-		public final FrameDB frameDB = new FrameDB(MemoryData.empty());
+		public final FrameDB frameDB;
 		
 		private final Socket           socket;
 		private final DataInputStream  in;
 		private final DataOutputStream out;
 		
-		private Session(String name, Socket socket) throws IOException{
+		private Session(String name, FrameDB frameDB, Socket socket) throws IOException{
 			this.name = name;
+			this.frameDB = frameDB;
 			this.socket = socket;
 			in = new DataInputStream(socket.getInputStream());
 			out = new DataOutputStream(socket.getOutputStream());
@@ -125,9 +128,9 @@ public class DBLogServer{
 		
 		private boolean process() throws IOException{
 			
-			IPC.MSGSessionMessage cmd;
+			IPC.MSGSession cmd;
 			try{
-				cmd = IPC.readEnum(in, IPC.MSGSessionMessage.class);
+				cmd = IPC.readEnum(in, IPC.MSGSession.class);
 			}catch(EOFException e){
 				Log.info("SERVER: [{}#red] Ending session because the stream ended", name);
 				return true;
@@ -165,11 +168,11 @@ public class DBLogServer{
 					long uid = in.readLong();
 					var  sf  = frameDB.resolve(name, uid);
 					if(sf == null){
-						IPC.writeEnum(out, IPC.MSGSessionMessage.NACK, true);
+						IPC.writeEnum(out, IPC.MSGSession.NACK, true);
 						return true;
 					}
 					
-					IPC.writeEnum(out, IPC.MSGSessionMessage.FRAME_FULL, false);
+					IPC.writeEnum(out, IPC.MSGSession.FRAME_FULL, false);
 					IPC.writeFullFrame(out, sf);
 					out.flush();
 				}
@@ -181,20 +184,41 @@ public class DBLogServer{
 				}
 				default -> {
 					Log.warn("SERVER: [{}#green] Unrecognized frame type: {}", name, cmd);
-					IPC.writeEnum(out, IPC.MSGSessionMessage.NACK, true);
+					IPC.writeEnum(out, IPC.MSGSession.NACK, true);
 					return true;
 				}
 			}
 			return false;
 		}
 		private static void ackNow(DataOutputStream out) throws IOException{
-			IPC.writeEnum(out, IPC.MSGSessionMessage.ACK, true);
+			IPC.writeEnum(out, IPC.MSGSession.ACK, true);
 		}
 	}
 	
-	public        boolean                  run         = true;
+	private       boolean                  run         = true;
 	private final Map<Integer, Connection> connections = Collections.synchronizedMap(new LinkedHashMap<>());
 	private       Thread                   runThread;
+	
+	private final    UnsafeSupplier<FrameDB, IOException> frameDBInit;
+	private volatile FrameDB                              db;
+	
+	public DBLogIngestServer(UnsafeSupplier<FrameDB, IOException> frameDBInit){
+		this.frameDBInit = frameDBInit;
+	}
+	
+	private FrameDB getDB() throws IOException{
+		if(db == null) loadDB();
+		return db;
+	}
+	private void loadDB() throws IOException{
+		synchronized(this){
+			if(db == null){
+				var db = frameDBInit.get();
+				Objects.requireNonNull(db);
+				this.db = db;
+			}
+		}
+	}
 	
 	public void stop(){
 		run = false;

@@ -77,7 +77,7 @@ public interface DBLogConnection extends Closeable{
 				sessions.clear();
 				
 				var out = new DataOutputStream(sessionManagementSocket.getOutputStream());
-				IPC.writeEnum(out, IPC.MSGSession.END, true);
+				IPC.writeEnum(out, IPC.MSGConnection.END, true);
 				sessionManagementSocket.close();
 			}finally{
 				sessionLock.unlock();
@@ -116,11 +116,11 @@ public interface DBLogConnection extends Closeable{
 						throw new IllegalStateException("Session closed");
 					}
 					
-					writeEnum(socketOut, IPC.MSGSessionMessage.READ_FULL, false);
+					writeEnum(socketOut, IPC.MSGSession.READ_FULL, false);
 					socketOut.writeLong(uid);
 					socketOut.flush();
 					
-					var msg = IPC.readEnum(socketIn, IPC.MSGSessionMessage.class);
+					var msg = IPC.readEnum(socketIn, IPC.MSGSession.class);
 					switch(msg){
 						case FRAME_FULL -> {
 							var frame = IPC.readFullFrame(socketIn);
@@ -138,8 +138,8 @@ public interface DBLogConnection extends Closeable{
 			public SessionStats readStats() throws IOException{
 				ioLock.lock();
 				try{
-					writeEnum(socketOut, IPC.MSGSessionMessage.READ_STATS, true);
-					var msg = IPC.readEnum(socketIn, IPC.MSGSessionMessage.class);
+					writeEnum(socketOut, IPC.MSGSession.READ_STATS, true);
+					var msg = IPC.readEnum(socketIn, IPC.MSGSession.class);
 					switch(msg){
 						case ACK -> {
 							return IPC.readStats(socketIn);
@@ -164,7 +164,7 @@ public interface DBLogConnection extends Closeable{
 					}finally{
 						sessionLock.unlock();
 					}
-					writeEnum(socketOut, IPC.MSGSessionMessage.END, true);
+					writeEnum(socketOut, IPC.MSGSession.END, true);
 					socket.close();
 				}finally{
 					ioLock.unlock();
@@ -191,17 +191,17 @@ public interface DBLogConnection extends Closeable{
 					var full = new IPC.FullFrame(uid, bytes, writeSet);
 					if(last != null){
 						var diff = makeDiff(last.data(), bytes, last.uid(), uid, writeSet);
-						IPC.writeEnum(socketOut, IPC.MSGSessionMessage.FRAME_DIFF, false);
+						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_DIFF, false);
 						IPC.writeDiffFrame(socketOut, diff);
 					}else{
-						IPC.writeEnum(socketOut, IPC.MSGSessionMessage.FRAME_FULL, false);
+						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_FULL, false);
 						IPC.writeFullFrame(socketOut, full);
 					}
 					last = full;
 					
 					socketOut.flush();
 					
-					var b = IPC.readEnum(socketIn, IPC.MSGSessionMessage.class);
+					var b = IPC.readEnum(socketIn, IPC.MSGSession.class);
 					switch(b){
 						case ACK -> Log.trace("CLIENT: frame {} acknowledged", uid);
 						case NACK -> throw new IOException("FRAME_NACK");
