@@ -3,7 +3,6 @@ package com.lapissea.dfs.io.impl;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.io.content.WordIO;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -13,7 +12,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 
-public final class FileMemoryMappedData extends CursorIOData implements Closeable{
+public final class FileMemoryMappedData extends ClosableIOData{
 	
 	private final File         file;
 	private final FileMappings mappedFileData;
