@@ -83,5 +83,20 @@ public class SessionTests{
 		remote.openSession("test2");
 	}
 	
+	@Test
+	public void clearSession() throws IOException{
+		try(var remote = new DBLogConnection.OfRemote();
+		    var ses = remote.openSession("clearSession")){
+			var mem = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
+			try(var io = mem.io()){
+				io.write(new byte[]{1, 2, 3, 4});
+				io.setPos(0).write(11);
+				assertThat(ses.readStats()).extracting("frameCount").isEqualTo(2L);
+				ses.clear();
+				assertThat(ses.readStats()).extracting("frameCount").isEqualTo(0L);
+			}
+		}
+	}
+	
 	
 }

@@ -4,6 +4,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -23,13 +24,15 @@ import java.util.function.Supplier;
 
 public final class DBLogIngestServer{
 	
-	private final class Connection{
+	private final class Connection implements Closeable{
 		private final Map<String, Session> sessions = new HashMap<>();
 		private final Lock                 lock     = new ReentrantLock();
-		private final Thread               thread   = Thread.currentThread();
-		private final Socket               managementSocket;
-		private final DataInputStream      in;
-		private final DataOutputStream     out;
+		
+		private Thread thread;
+		
+		private final Socket           managementSocket;
+		private final DataInputStream  in;
+		private final DataOutputStream out;
 		
 		private Connection(Socket managementSocket) throws IOException{
 			this.managementSocket = managementSocket;
@@ -38,6 +41,7 @@ public final class DBLogIngestServer{
 		}
 		
 		private boolean processConnection() throws IOException{
+			thread = Thread.currentThread();
 			
 			IPC.MSGConnection command;
 			try{
@@ -77,9 +81,9 @@ public final class DBLogIngestServer{
 			sessionReceiver.setSoTimeout(5000);
 			
 			CompletableFuture.runAsync(() -> {
-				try(var socket = sessionReceiver.accept()){
+				try(var socket = sessionReceiver.accept();
+				    var session = new Session(name, getDB(), socket)){
 					
-					var session = new Session(name, getDB(), socket);
 					sessions.put(name, session);
 					
 					Log.info("SERVER: Session {}#green connected! Ready for commands.", name);
@@ -107,9 +111,25 @@ public final class DBLogIngestServer{
 		public Set<String> sessionNames(){
 			return sessions.keySet();
 		}
+		
+		@Override
+		public void close(){
+			thread.interrupt();
+			lock.lock();
+			try{
+				for(Session value : sessions.values()){
+					value.close();
+				}
+				sessions.clear();
+			}finally{
+				lock.unlock();
+			}
+			UtilL.closeSilently(managementSocket);
+			
+		}
 	}
 	
-	private static final class Session{
+	private static final class Session implements Closeable{
 		
 		public final String  name;
 		public final FrameDB frameDB;
@@ -117,6 +137,8 @@ public final class DBLogIngestServer{
 		private final Socket           socket;
 		private final DataInputStream  in;
 		private final DataOutputStream out;
+		
+		private Thread processThread;
 		
 		private Session(String name, FrameDB frameDB, Socket socket) throws IOException{
 			this.name = name;
@@ -127,6 +149,10 @@ public final class DBLogIngestServer{
 		}
 		
 		private boolean process() throws IOException{
+			processThread = Thread.currentThread();
+			if(processThread.isInterrupted()){
+				return true;
+			}
 			
 			IPC.MSGSession cmd;
 			try{
@@ -168,9 +194,11 @@ public final class DBLogIngestServer{
 					long uid = in.readLong();
 					var  sf  = frameDB.resolve(name, uid);
 					if(sf == null){
+						Log.info("SERVER: [{}#green] Requested to read frame of ID: {}#red", name, uid);
 						IPC.writeEnum(out, IPC.MSGSession.NACK, true);
 						return true;
 					}
+					Log.trace("SERVER: [{}#green] Sending full frame of ID: {}#green", name, uid);
 					
 					IPC.writeEnum(out, IPC.MSGSession.FRAME_FULL, false);
 					IPC.writeFullFrame(out, sf);
@@ -193,6 +221,11 @@ public final class DBLogIngestServer{
 		private static void ackNow(DataOutputStream out) throws IOException{
 			IPC.writeEnum(out, IPC.MSGSession.ACK, true);
 		}
+		
+		public void close(){
+			processThread.interrupt();
+			UtilL.closeSilently(socket);
+		}
 	}
 	
 	private       boolean                  run         = true;
@@ -204,6 +237,16 @@ public final class DBLogIngestServer{
 	
 	public DBLogIngestServer(UnsafeSupplier<FrameDB, IOException> frameDBInit){
 		this.frameDBInit = frameDBInit;
+		
+		//lazy init db
+		Thread.ofVirtual().start(() -> {
+			UtilL.sleep(100);
+			try{
+				getDB();
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		});
 	}
 	
 	private FrameDB getDB() throws IOException{
@@ -222,7 +265,9 @@ public final class DBLogIngestServer{
 	
 	public void stop(){
 		run = false;
-		runThread.interrupt();
+		if(runThread != null){
+			runThread.interrupt();
+		}
 	}
 	
 	public void start() throws IOException{
@@ -232,7 +277,7 @@ public final class DBLogIngestServer{
 				listenForConnection(soc);
 			}
 			for(Connection value : connections.values()){
-				value.thread.interrupt();
+				value.close();
 			}
 		}
 	}

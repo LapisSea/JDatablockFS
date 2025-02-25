@@ -32,6 +32,7 @@ public interface DBLogConnection extends Closeable{
 		IOHook getIOHook();
 		byte[] readFrame(long uid) throws IOException;
 		SessionStats readStats() throws IOException;
+		void clear() throws IOException;
 		
 		default byte[] readLastFrame() throws IOException{
 			var stats = readStats();
@@ -126,8 +127,8 @@ public interface DBLogConnection extends Closeable{
 							var frame = IPC.readFullFrame(socketIn);
 							return frame.data();
 						}
-						case NACK -> throw new IOException("NACK");
-						default -> throw new IOException("Unexpected response: " + msg);
+						case NACK -> throw new IOException("NACK on readFrame");
+						default -> throw new IOException("Unexpected readFrame response: " + msg);
 					}
 				}finally{
 					ioLock.unlock();
@@ -139,13 +140,19 @@ public interface DBLogConnection extends Closeable{
 				ioLock.lock();
 				try{
 					writeEnum(socketOut, IPC.MSGSession.READ_STATS, true);
-					var msg = IPC.readEnum(socketIn, IPC.MSGSession.class);
-					switch(msg){
-						case ACK -> {
-							return IPC.readStats(socketIn);
-						}
-						default -> throw new IOException("Unexpected response: " + msg);
-					}
+					requireAckResponse("readStats");
+					return IPC.readStats(socketIn);
+				}finally{
+					ioLock.unlock();
+				}
+			}
+			
+			@Override
+			public void clear() throws IOException{
+				ioLock.lock();
+				try{
+					writeEnum(socketOut, IPC.MSGSession.CLEAR, true);
+					requireAckResponse("clear");
 				}finally{
 					ioLock.unlock();
 				}
@@ -201,15 +208,19 @@ public interface DBLogConnection extends Closeable{
 					
 					socketOut.flush();
 					
-					var b = IPC.readEnum(socketIn, IPC.MSGSession.class);
-					switch(b){
-						case ACK -> Log.trace("CLIENT: frame {} acknowledged", uid);
-						case NACK -> throw new IOException("FRAME_NACK");
-						default -> throw new IOException("Unexpected response: " + b);
-					}
-					
+					requireAckResponse("writeEvent");
+					Log.trace("CLIENT: frame {} acknowledged", uid);
 				}finally{
 					ioLock.unlock();
+				}
+			}
+			
+			private void requireAckResponse(String actionName) throws IOException{
+				var response = IPC.readEnum(socketIn, IPC.MSGSession.class);
+				switch(response){
+					case ACK -> { }//ok
+					case NACK -> throw new IOException("Got NACK on " + actionName);
+					default -> throw new IOException("Unexpected " + actionName + " response: " + response);
 				}
 			}
 			

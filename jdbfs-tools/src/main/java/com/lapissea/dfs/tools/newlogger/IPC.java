@@ -62,7 +62,7 @@ final class IPC{
 	}
 	
 	public static ServerSocket recieveHandshake(ServerSocket ss) throws IOException{
-		Log.trace("SERVER: Waiting for handshake...");
+		Log.log("SERVER: Waiting for handshake...");
 		try(var socket = ss.accept()){
 			var output = new DataOutputStream(socket.getOutputStream());
 			var input  = new DataInputStream(socket.getInputStream());
