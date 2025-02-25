@@ -7,13 +7,14 @@ import com.lapissea.dfs.tools.newlogger.DBLogConnection;
 import com.lapissea.dfs.tools.newlogger.DBLogIngestServer;
 import com.lapissea.dfs.tools.newlogger.FrameDB;
 import com.lapissea.util.UtilL;
-import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.net.BindException;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class SessionTests{
 	
@@ -50,13 +51,13 @@ public class SessionTests{
 			var mem = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
 			try(var io = mem.io()){
 				io.write(new byte[]{1, 2, 3, 4});
-				Assert.assertEquals(ses.readLastFrame(), mem.readAll());
+				assertThat(ses.readLastFrame()).isEqualTo(mem.readAll());
 				io.setPos(0).write(11);
-				Assert.assertEquals(ses.readLastFrame(), mem.readAll());
+				assertThat(ses.readLastFrame()).isEqualTo(mem.readAll());
 				io.setPos(2).write(13);
-				Assert.assertEquals(ses.readLastFrame(), mem.readAll());
+				assertThat(ses.readLastFrame()).isEqualTo(mem.readAll());
 				io.write(new byte[]{21, 22, 23, 24});
-				Assert.assertEquals(ses.readLastFrame(), mem.readAll());
+				assertThat(ses.readLastFrame()).isEqualTo(mem.readAll());
 			}
 		}
 	}
