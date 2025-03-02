@@ -1,6 +1,7 @@
 package com.lapissea.dfs.exceptions;
 
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
@@ -27,11 +28,24 @@ public class CacheOutOfSync extends IOException{
 		if(cached.getClass() == actual.getClass() && cached instanceof IOInstance<?> i){
 			return instScan((IOInstance)cached, (IOInstance)actual);
 		}
-		return "\n" + TextUtil.toTable("cached/actual", cached, actual);
+		String cachedStr;
+		try{
+			cachedStr = Objects.toString(cached);
+		}catch(Throwable e){
+			cachedStr = IOFieldTools.corruptedGet(e);
+		}
+		return cachedStr + "\n" + TextUtil.toTable("cached/actual", cached, actual);
 	}
 	private static <T extends IOInstance<T>> String instScan(T cached, T actual){
-		var struct = cached.getThisStruct();
-		var sb     = new StringBuilder(32).append('\n');
+		var    struct = cached.getThisStruct();
+		var    sb     = new StringBuilder(32);
+		String cachedStr;
+		try{
+			cachedStr = Objects.toString(cached);
+		}catch(Throwable e){
+			cachedStr = IOFieldTools.corruptedGet(e);
+		}
+		sb.append(cachedStr).append('\n');
 		
 		List<Map<String, String>> bad = new ArrayList<>();
 		for(var field : struct.getRealFields()){

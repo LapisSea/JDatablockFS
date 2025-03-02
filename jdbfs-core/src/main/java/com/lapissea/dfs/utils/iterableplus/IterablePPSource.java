@@ -79,4 +79,10 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default <E extends Throwable> Optional<T> firstMatching(UnsafePredicate<T, E> predicate) throws E{
 		return iter().firstMatching(predicate);
 	}
+	default IterablePP.SizedPP<IterablePP.Idx<T>> enumerated(){
+		return iter().enumerate();
+	}
+	default <R> IterablePP.SizedPP<R> enumerated(IterablePP.Enumerator<T, R> enumerator){
+		return iter().enumerate(enumerator);
+	}
 }
