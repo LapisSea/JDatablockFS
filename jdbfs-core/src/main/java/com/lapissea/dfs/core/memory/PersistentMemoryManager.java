@@ -1,6 +1,8 @@
 package com.lapissea.dfs.core.memory;
 
+import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.DefragmentManager;
 import com.lapissea.dfs.core.MemoryManager;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -14,6 +16,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -31,7 +34,21 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
+public final class PersistentMemoryManager
+	extends MemoryManager.StrategyImpl<PersistentMemoryManager.AllocStrategy, PersistentMemoryManager.AllocToStrategy>{
+	
+	protected enum AllocStrategy{
+		REUSE_FREE_CHUNKS,
+		APPEND_TO_FILE
+	}
+	
+	protected enum AllocToStrategy{
+		GROW_FILE_ALLOC,
+		GROW_FREE_ALLOC,
+		SIMPLE_NEXT_ASSIGN,
+		CHAIN_WALK_UP_DEFRAGMENT,
+		GROWING_HEADER_NEXT_ASSIGN,
+	}
 	
 	private final List<ChunkPointer>   queuedFreeChunks   = new ArrayList<>();
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
@@ -131,9 +148,8 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			throw new IllegalStateException("There is nothing that should have ended!");
 		}
 		
-		var found = stack.iter().enumerate().firstMatching(e -> e.val() == chain);
-		if(found.isPresent()){
-			var count = stack.size() - found.get().index();
+		if(stack.enumerated().firstMatchingM(e -> e.val() == chain) instanceof Match.Some(var found)){
+			var count = stack.size() - found.index();
 			stack.add(popped);
 			throw new IllegalStateException("Chain is closed in wrong order! There is " + count + " open chains ahead!");
 		}
@@ -148,30 +164,57 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	}
 	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
-		super(context);
+		super(context, AllocStrategy.class.getEnumConstants(), AllocToStrategy.class.getEnumConstants());
 		this.freeChunks = freeChunks;
 	}
 	
-	@Override
-	protected List<AllocStrategy> createAllocs(){
-		return List.of(
-			(ctx, ticket, dryRun) -> {
-				if(defragmentMode) return null;
-				return MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
-			},
-			MemoryOperations::allocateAppendToFile
-		);
-	}
+	private final Lock fileSizeLock = new ReentrantLock();
 	
 	@Override
-	protected List<AllocToStrategy> createAllocTos(){
-		return List.of(
-			(first, target, toAllocate) -> MemoryOperations.growFileAlloc(target, toAllocate),
-			(first, target, toAllocate) -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove),
-			(first, target, toAllocate) -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
-			(first, target, toAllocate) -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate),
-			(first, target, toAllocate) -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
-		);
+	protected Chunk alloc(AllocStrategy strategy, DataProvider ctx, AllocateTicket ticket, boolean dryRun) throws IOException{
+		return switch(strategy){
+			case REUSE_FREE_CHUNKS -> {
+				if(defragmentMode) yield null;
+				freeChunksLock.lock();
+				try{
+					yield MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
+				}finally{
+					freeChunksLock.unlock();
+				}
+			}
+			case APPEND_TO_FILE -> {
+				fileSizeLock.lock();
+				try{
+					yield MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
+				}finally{
+					fileSizeLock.unlock();
+				}
+			}
+		};
+	}
+	@Override
+	protected long allocTo(AllocToStrategy strategy, Chunk first, Chunk target, long toAllocate) throws IOException{
+		return switch(strategy){
+			case GROW_FILE_ALLOC -> {
+				fileSizeLock.lock();
+				try{
+					yield MemoryOperations.growFileAlloc(target, toAllocate);
+				}finally{
+					fileSizeLock.unlock();
+				}
+			}
+			case GROW_FREE_ALLOC -> {
+				freeChunksLock.lock();
+				try{
+					yield MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
+				}finally{
+					freeChunksLock.unlock();
+				}
+			}
+			case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
+			case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
+			case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
+		};
 	}
 	
 	@Override
@@ -231,7 +274,13 @@ public final class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			}
 		}
 		
-		var popped = popFile(toFree);
+		Collection<Chunk> popped;
+		fileSizeLock.lock();
+		try{
+			popped = popFile(toFree);
+		}finally{
+			fileSizeLock.unlock();
+		}
 		if(popped.isEmpty()){
 			return;
 		}

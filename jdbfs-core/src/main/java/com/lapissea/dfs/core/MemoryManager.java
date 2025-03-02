@@ -35,50 +35,42 @@ public interface MemoryManager extends DataProvider.Holder{
 	/**
 	 * Partial implementation of {@link MemoryManager} that reduces boilerplate for allocation and bookkeeping
 	 */
-	abstract class StrategyImpl implements MemoryManager{
+	abstract class StrategyImpl<AS extends Enum<AS>, ATS extends Enum<ATS>> implements MemoryManager{
 		
-		public interface AllocStrategy{
-			/**
-			 * @return a chunk that has been newly allocated from context. Returned chunk should always have a size of 0,
-			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine) If
-			 * null, the strategy signals that it has failed.
-			 */
-			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket, boolean dryRun) throws IOException;
-		}
+		protected final DataProvider context;
+		private final   AS[]         allocs;
+		private final   ATS[]        allocTos;
 		
-		public interface AllocToStrategy{
-			/**
-			 * @param firstChunk is the chunk that is at the start of the chain.
-			 * @param target     is the last chunk in the chain. It is the chunk that will be modified to achieve extra capacity in the chain.
-			 * @param toAllocate is the number of bytes that would need to be allocated. (should be greater than 0)
-			 *                   This is only a suggestion but should be taken seriously.
-			 * @return the number of bytes that have been newly allocated to target (directly or indirectly). Returning 0 indicates a failure
-			 * of the strategy. Returning any other positive number signifies a success. The amount of bytes allocates should try to be as close
-			 * as possible to toAllocate. If it is less than, another pass of strategy executing will be done. If greater or equal, then the
-			 * allocation sequence will end.
-			 */
-			long allocTo(@NotNull Chunk firstChunk, @NotNull Chunk target, long toAllocate) throws IOException;
-		}
-		
-		protected final DataProvider          context;
-		private         List<AllocStrategy>   allocs;
-		private         List<AllocToStrategy> allocTos;
-		
-		public StrategyImpl(DataProvider context){
+		public StrategyImpl(DataProvider context, AS[] allocs, ATS[] allocTos){
+			if(allocs.length == 0){
+				throw new IllegalStateException("allocs cannot be empty");
+			}
+			if(allocTos.length == 0){
+				throw new IllegalStateException("allocTos cannot be empty");
+			}
 			this.context = context;
+			this.allocs = allocs.clone();
+			this.allocTos = allocTos.clone();
 		}
 		
-		protected abstract List<AllocStrategy> createAllocs();
-		protected abstract List<AllocToStrategy> createAllocTos();
+		/**
+		 * @return a chunk that has been newly allocated from context. Returned chunk should always have a size of 0,
+		 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine) If
+		 * null, the strategy signals that it has failed.
+		 */
+		protected abstract Chunk alloc(AS strategy, DataProvider context, AllocateTicket ticket, boolean dryRun) throws IOException;
 		
-		private List<AllocStrategy> getAllocs(){
-			var v = allocs;
-			return v != null? v : (allocs = List.copyOf(createAllocs()));
-		}
-		private List<AllocToStrategy> getAllocTos(){
-			var v = allocTos;
-			return v != null? v : (allocTos = List.copyOf(createAllocTos()));
-		}
+		/**
+		 * @param firstChunk is the chunk at the start of the chain.
+		 * @param target     is the last chunk in the chain. It is the chunk that will be modified to achieve extra capacity in the chain.
+		 * @param toAllocate is the number of bytes that would need to be allocated. (should be greater than 0)
+		 *                   This is only a suggestion but should be taken seriously.
+		 * @return the number of bytes that have been newly allocated to target (directly or indirectly). Returning 0 indicates a failure
+		 * of the strategy. Returning any other positive number signifies a success. The amount of bytes allocates should try to be as close
+		 * as possible to toAllocate. If it is less than, another pass of strategy executing will be done. If greater or equal, then the
+		 * allocation sequence will end.
+		 */
+		protected abstract long allocTo(ATS strategy, @NotNull Chunk firstChunk, @NotNull Chunk target, long toAllocate) throws IOException;
 		
 		@Override
 		public DataProvider getDataProvider(){
@@ -86,7 +78,7 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 		
 		@Override
-		public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
+		public final void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
 			Objects.requireNonNull(firstChunk);
 			Objects.requireNonNull(target);
 			if(toAllocate<0){
@@ -97,8 +89,6 @@ public interface MemoryManager extends DataProvider.Holder{
 				MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			}
 			
-			var allocTos = getAllocTos();
-			
 			var last = target;
 			
 			long remaining = toAllocate;
@@ -106,8 +96,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			while(remaining>0){
 				last = last.last();
 				
-				for(AllocToStrategy allocTo : allocTos){
-					long allocated = allocTo.allocTo(firstChunk, last, remaining);
+				for(var strategy : allocTos){
+					long allocated = allocTo(strategy, firstChunk, last, remaining);
 					
 					if(DEBUG_VALIDATION) validateAlloc(firstChunk, last, allocated);
 					if(allocated == 0) continue;
@@ -159,13 +149,13 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 		
 		@Override
-		public Chunk alloc(AllocateTicket ticket) throws IOException{
+		public final Chunk alloc(AllocateTicket ticket) throws IOException{
 			Chunk chunk;
 			
 			tryStrategies:
 			{
-				for(var alloc : getAllocs()){
-					chunk = alloc.alloc(context, ticket, false);
+				for(var strategy : allocs){
+					chunk = alloc(strategy, context, ticket, false);
 					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
@@ -185,8 +175,8 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public boolean canAlloc(AllocateTicket ticket) throws IOException{
-			for(var alloc : getAllocs()){
-				var chunk = alloc.alloc(context, ticket, true);
+			for(var strategy : allocs){
+				var chunk = alloc(strategy, context, ticket, true);
 				if(chunk != null){
 					return true;
 				}
