@@ -169,6 +169,7 @@ public final class Cluster implements DataProvider{
 		
 		@Override
 		public void drop(ObjectID id) throws IOException{
+			if(cache != null) cache.remove(id);
 			metadata.rootObjects.remove(id);
 		}
 	}
