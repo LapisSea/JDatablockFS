@@ -21,7 +21,7 @@ import java.util.stream.LongStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-final class IPC{
+public final class IPC{
 	
 	public static final int TIMEOUT      = 500;
 	public static final int DEFAULT_PORT = 56786;//No meaning, just a random number in the private port space
@@ -37,7 +37,7 @@ final class IPC{
 		READ_FULL, READ_STATS
 	}
 	
-	record HandshakeRes(int sessionManagementPort){ }
+	public record HandshakeRes(int sessionManagementPort){ }
 	
 	public static HandshakeRes clientHandshake(InetSocketAddress serverAddress) throws IOException{
 		try(var socket = new Socket()){
@@ -174,11 +174,11 @@ final class IPC{
 		}
 	}
 	
-	sealed interface SendFrame{
+	public sealed interface SendFrame{
 		long uid();
 	}
 	
-	record FullFrame(long uid, byte[] data, RangeSet writes) implements SendFrame{
+	public record FullFrame(long uid, byte[] data, RangeSet writes) implements SendFrame{
 		@Override
 		public String toString(){
 			return "FullFrame{" +
@@ -189,7 +189,7 @@ final class IPC{
 		}
 	}
 	
-	record DiffPart(int offset, byte[] data){
+	public record DiffPart(int offset, byte[] data){
 		@Override
 		public String toString(){
 			return "DiffPart{" +
@@ -199,7 +199,7 @@ final class IPC{
 		}
 	}
 	
-	record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, RangeSet writes) implements SendFrame{
+	public record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, RangeSet writes) implements SendFrame{
 		@Override
 		public String toString(){
 			return "DiffFrame{" +

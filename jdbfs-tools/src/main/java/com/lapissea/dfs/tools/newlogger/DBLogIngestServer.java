@@ -78,8 +78,6 @@ public final class DBLogIngestServer{
 			var sessionReceiver = new ServerSocket(0);
 			IPC.writePortNum(out, sessionReceiver.getLocalPort());
 			
-			sessionReceiver.setSoTimeout(5000);
-			
 			CompletableFuture.runAsync(() -> {
 				try(var socket = sessionReceiver.accept();
 				    var session = new Session(name, getDB(), socket)){

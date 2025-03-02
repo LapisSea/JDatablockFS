@@ -23,6 +23,22 @@ public final class FrameDB{
 			Cluster.init(storage);
 		}
 		cluster = new Cluster(storage);
+		
+		Thread.ofVirtual().start(() -> {
+			lock.lock();
+			try{
+				if(cluster.roots().listAll().hasAny()){
+					return;
+				}
+				store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0])));
+				store("\0", new IPC.DiffFrame(1, 0, -1, new IPC.DiffPart[0], new IPC.RangeSet(new long[0])));
+				clear("\0");
+			}catch(IOException e){
+				e.printStackTrace();
+			}finally{
+				lock.unlock();
+			}
+		});
 	}
 	
 	void store(String name, IPC.SendFrame frame) throws IOException{
@@ -50,11 +66,15 @@ public final class FrameDB{
 				yield new IOFrame.Full(f.uid(), blob, rangeSetToIO(f.writes()));
 			}
 		};
-		
+		store(name, ioFrame);
+	}
+	
+	private void store(String name, IOFrame ioFrame) throws IOException{
 		lock.lock();
 		try{
 			IOMap<Long, IOFrame> frames   = getFrames(name);
-			var                  sequence = getFrameSequence(name);
+			IOList<Long>         sequence = getFrameSequence(name);
+			
 			frames.put(ioFrame.uid(), ioFrame);
 			sequence.add(ioFrame.uid());
 		}finally{
@@ -80,7 +100,7 @@ public final class FrameDB{
 		}
 	}
 	
-	IPC.FullFrame resolve(String name, long uid) throws IOException{
+	public IPC.FullFrame resolve(String name, long uid) throws IOException{
 		lock.lock();
 		try{
 			IOMap<Long, IOFrame> frames = getFrames(name);
