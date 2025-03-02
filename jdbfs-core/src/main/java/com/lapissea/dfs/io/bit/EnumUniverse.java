@@ -15,12 +15,13 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.SequencedSet;
 import java.util.Spliterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
-public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP.SizedPP<T>{
+public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> implements IterablePP.SizedPP<T>, SequencedSet<T>{
 	
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
 	
@@ -264,5 +265,21 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	@Override
 	public OptionalInt getSize(){
 		return OptionalInt.of(size());
+	}
+	
+	public final class Revered extends AbstractList<T> implements SequencedSet<T>{
+		@Override
+		public T get(int index){ return universe[universe.length - 1 - index]; }
+		@Override
+		public Spliterator<T> spliterator(){ return super.spliterator(); }
+		@Override
+		public EnumUniverse<T> reversed(){ return EnumUniverse.this; }
+		@Override
+		public int size(){ return EnumUniverse.this.size(); }
+	}
+	
+	@Override
+	public Revered reversed(){
+		return new Revered();
 	}
 }
