@@ -79,7 +79,7 @@ public final class IPC{
 			writeEnum(output, MSGConnection.ACK, true);
 			
 			var connectionSocket = new ServerSocket(0);
-			writePortNum(output, connectionSocket.getLocalPort());
+			writePortNum(output, connectionSocket.getLocalPort(), true);
 			
 			Log.trace("SERVER: Opened session management port on {}#green", connectionSocket.getLocalPort());
 			return connectionSocket;
@@ -104,7 +104,7 @@ public final class IPC{
 		return socket;
 	}
 	
-	record RangeSet(long[] startsSizes){
+	public record RangeSet(long[] startsSizes){
 		
 		public static RangeSet from(LongStream stream){
 			final class Range{
@@ -156,7 +156,7 @@ public final class IPC{
 			return new RangeSet(startsSizes);
 		}
 		
-		RangeSet{
+		public RangeSet{
 			if(startsSizes.length%2 != 0){
 				throw new IllegalArgumentException("Array length should be even");
 			}
@@ -301,12 +301,12 @@ public final class IPC{
 		}
 		return newPort;
 	}
-	public static void writePortNum(DataOutputStream output, int port) throws IOException{
+	public static void writePortNum(DataOutputStream output, int port, boolean flush) throws IOException{
 		if(port<=0 || port>65535){
 			throw new IOException("Invalid port number: " + port);
 		}
 		output.writeInt(port);
-		output.flush();
+		if(flush) output.flush();
 	}
 	
 	public static <E extends Enum<E>> E readEnum(DataInputStream src, Class<E> type) throws IOException{

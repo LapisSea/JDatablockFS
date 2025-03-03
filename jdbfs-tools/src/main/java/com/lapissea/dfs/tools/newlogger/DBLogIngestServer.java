@@ -11,6 +11,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -46,7 +47,7 @@ public final class DBLogIngestServer{
 			IPC.MSGConnection command;
 			try{
 				command = IPC.readEnum(in, IPC.MSGConnection.class);
-			}catch(EOFException e){
+			}catch(EOFException|SocketException e){
 				Log.info("SERVER: Ending connection with port {}#yellow because the stream ended", managementSocket.getPort());
 				return true;
 			}
@@ -76,7 +77,7 @@ public final class DBLogIngestServer{
 			
 			//noinspection resource
 			var sessionReceiver = new ServerSocket(0);
-			IPC.writePortNum(out, sessionReceiver.getLocalPort());
+			IPC.writePortNum(out, sessionReceiver.getLocalPort(), true);
 			
 			CompletableFuture.runAsync(() -> {
 				try(var socket = sessionReceiver.accept();
@@ -155,7 +156,7 @@ public final class DBLogIngestServer{
 			IPC.MSGSession cmd;
 			try{
 				cmd = IPC.readEnum(in, IPC.MSGSession.class);
-			}catch(EOFException e){
+			}catch(EOFException|SocketException e){
 				Log.info("SERVER: [{}#red] Ending session because the stream ended", name);
 				return true;
 			}

@@ -166,8 +166,7 @@ public interface DBLogConnection extends Closeable{
 					Log.trace("CLIENT: Closing log session {}#yellow", name);
 					sessionLock.lock();
 					try{
-						var removed = sessions.remove(name);
-						assert removed == this;
+						sessions.remove(name, this);
 					}finally{
 						sessionLock.unlock();
 					}
@@ -209,7 +208,7 @@ public interface DBLogConnection extends Closeable{
 					socketOut.flush();
 					
 					requireAckResponse("writeEvent");
-					Log.trace("CLIENT: frame {} acknowledged", uid);
+					Log.trace("CLIENT: [{}#green] frame {}#green acknowledged", name, uid);
 				}finally{
 					ioLock.unlock();
 				}
