@@ -41,11 +41,11 @@ public final class FrameDB{
 		});
 	}
 	
-	void store(String name, IPC.SendFrame frame) throws IOException{
+	public void store(String name, IPC.SendFrame frame) throws IOException{
 		var ioFrame = switch(frame){
 			case IPC.DiffFrame f -> {
 				var capacity = Iters.from(f.parts()).mapToLong(p -> p.data().length).sum();
-				var blob     = Blob.request(cluster, capacity);
+				var blob     = newSyncBlob(capacity);
 				
 				var parts = new ArrayList<IOFrame.Diff.Part>(f.parts().length);
 				try(var io = blob.io()){
@@ -57,16 +57,28 @@ public final class FrameDB{
 						var size  = part.data().length;
 						parts.add(new IOFrame.Diff.Part(offset, new IOFrame.Range(start, size)));
 					}
+					assert io.getPos() == capacity;
 				}
 				yield new IOFrame.Diff(parts, blob, f.uid(), f.prevUid(), f.newSize(), rangeSetToIO(f.writes()));
 			}
 			case IPC.FullFrame f -> {
-				var blob = Blob.request(cluster, f.data().length);
+				var blob = newSyncBlob(f.data().length);
 				blob.set(f.data());
 				yield new IOFrame.Full(f.uid(), blob, rangeSetToIO(f.writes()));
 			}
 		};
 		store(name, ioFrame);
+	}
+	private Blob newSyncBlob(long capacity) throws IOException{
+		Blob blob;
+		lock.lock();
+		try{
+			blob = Blob.request(cluster, capacity);
+			blob.io(io -> io.setSize(capacity));
+		}finally{
+			lock.unlock();
+		}
+		return blob;
 	}
 	
 	private void store(String name, IOFrame ioFrame) throws IOException{
