@@ -402,15 +402,17 @@ public final class Cluster implements DataProvider{
 	
 	@Override
 	public Chunk walkToLastChunk() throws IOException{
-		Chunk ch = getFirstChunk();
+		Chunk ch = null;
 		{
 			Chunk last = lastWalkedChunkCache;
 			if(last != null){
-				var cached = getChunkCached(last.getPtr());
-				if(cached == last){
+				if(getChunkCached(last.getPtr()) == last){
 					ch = last;
 				}
 			}
+		}
+		if(ch == null){
+			ch = getFirstChunk();
 		}
 		while(true){
 			Chunk next;
