@@ -12,7 +12,10 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.BindException;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,6 +74,25 @@ public class SessionTests{
 				io.write(new byte[]{1, 2, 3, 4});
 				ses.close();
 				io.setPos(2).write(13);
+			}
+		}
+	}
+	
+	@Test
+	public void manySessions() throws IOException{
+		try(var remote = new DBLogConnection.OfRemote()){
+			var t = IntStream.range(0, 100).mapToObj(i -> CompletableFuture.runAsync(() -> {
+				try(var ses = remote.openSession("ses" + i)){
+					var mem = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
+					try(var io = mem.io()){
+						for(int j = 0; j<10; j++){
+							io.write(new byte[]{1, 2, 3, 4});
+						}
+					}
+				}catch(IOException e){ throw new UncheckedIOException(e); }
+			}, Thread.ofVirtual().name(i + " iter")::start)).toList();
+			for(var f : t){
+				f.join();
 			}
 		}
 	}
