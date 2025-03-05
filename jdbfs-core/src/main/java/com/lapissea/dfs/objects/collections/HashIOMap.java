@@ -92,6 +92,9 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		private long capacity;
 		
 		private void init(DataProvider provider, GenericContext ctx, long capacity) throws IOException{
+			if(capacity<=0){
+				throw new IOException("Capacity must be greater than 0 but is " + capacity);
+			}
 			allocateNulls(provider, ctx);
 			data.addMultipleNew(capacity);
 			this.capacity = capacity;

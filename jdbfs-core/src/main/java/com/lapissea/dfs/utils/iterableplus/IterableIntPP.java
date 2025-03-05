@@ -15,6 +15,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.IntBinaryOperator;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
@@ -195,6 +196,28 @@ public interface IterableIntPP{
 			}
 		}
 		return false;
+	}
+	
+	default OptionalInt reduce(IntBinaryOperator op){
+		var iter = this.iterator();
+		if(!iter.hasNext()){
+			return OptionalInt.empty();
+		}
+		int result = iter.nextInt();
+		while(iter.hasNext()){
+			var e = iter.nextInt();
+			result = op.applyAsInt(result, e);
+		}
+		return OptionalInt.of(result);
+	}
+	default int reduce(int seed, IntBinaryOperator op){
+		var iter   = this.iterator();
+		int result = seed;
+		while(iter.hasNext()){
+			var e = iter.nextInt();
+			result = op.applyAsInt(result, e);
+		}
+		return result;
 	}
 	
 	IntIterator iterator();
