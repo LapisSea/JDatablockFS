@@ -4,8 +4,6 @@ import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.TextUtil;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
 import org.lwjgl.vulkan.KHRSwapchain;
@@ -60,13 +58,13 @@ public class PhysicalDevice{
 			memoryHeaps = Iters.from(mem.memoryHeaps()).map(e -> new MemoryHeap(e.flags(), e.size())).toList();
 			
 		}
-		
-		LogUtil.println(TextUtil.toTable(name, families));
-		LogUtil.println(TextUtil.toTable(name, formats));
-		LogUtil.println(TextUtil.toNamedPrettyJson(surfaceCapabilities));
-		LogUtil.println("presentModes", presentModes);
-		LogUtil.println(TextUtil.toTable(memoryTypes));
-		LogUtil.println(TextUtil.toTable(memoryHeaps));
+
+//		LogUtil.println(TextUtil.toTable(name, families));
+//		LogUtil.println(TextUtil.toTable(name, formats));
+//		LogUtil.println(TextUtil.toNamedPrettyJson(surfaceCapabilities));
+//		LogUtil.println("presentModes", presentModes);
+//		LogUtil.println(TextUtil.toTable(memoryTypes));
+//		LogUtil.println(TextUtil.toTable(memoryHeaps));
 	}
 	
 	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface, MemoryStack stack){

@@ -2,10 +2,12 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.vulkan.EXTDebugReport;
 import org.lwjgl.vulkan.EXTFullScreenExclusive;
@@ -39,6 +41,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -70,7 +73,10 @@ public final class VUtils{
 	}
 	
 	public static void check(int errorCode, String action){
-		if(errorCode == VK10.VK_SUCCESS) return;
+		if(errorCode == VK10.VK_SUCCESS){
+			LogUtil.println(action, "ok");
+			return;
+		}
 		fail(errorCode, action);
 	}
 	private static void fail(int errorCode, String action){
@@ -140,6 +146,11 @@ public final class VUtils{
 		}
 		ptrs.flip();
 		return ptrs;
+	}
+	
+	public static List<String> UTF8ArrayToJava(PointerBuffer strings){
+		if(strings == null) return null;
+		return Iters.rangeMap(0, strings.capacity(), i -> MemoryUtil.memUTF8(strings.get(i))).toList();
 	}
 	
 	private static final ThreadLocal<Set<Object>> STR_STACK = ThreadLocal.withInitial(HashSet::new);

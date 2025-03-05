@@ -1,8 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.Configuration;
 
 import java.io.File;
@@ -13,6 +16,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	static{
 		Configuration.DEBUG.set(true);
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
 	private GlfwWindow window;
@@ -22,6 +26,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public void init(){
 		window = createWindow();
+		window.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
 		vkCore = new VulkanCore("DFS debugger", window);
 	}
 	

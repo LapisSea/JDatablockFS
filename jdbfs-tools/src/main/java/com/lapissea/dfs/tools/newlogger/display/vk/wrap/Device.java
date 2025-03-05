@@ -8,6 +8,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
@@ -64,6 +65,24 @@ public class Device implements VulkanResource{
 		var ptr = new long[1];
 		check(VK10.vkCreateImageView(value, info, null, ptr), "createImageView");
 		return new ImageView(ptr[0], this);
+	}
+	
+	public CommandPool createCommandPool(QueueFamilyProps queue, CommandPool.Type commandPoolType){
+		try(var mem = MemoryStack.stackPush()){
+			int flags = 0;
+			if(commandPoolType == CommandPool.Type.SHORT_LIVED) flags |= VK10.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			if(commandPoolType != CommandPool.Type.WRITE_ONCE) flags |= VK10.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			
+			var info = VkCommandPoolCreateInfo.calloc(mem)
+			                                  .sType$Default()
+			                                  .flags(flags)
+			                                  .queueFamilyIndex(queue.index);
+			
+			var ptr = mem.mallocLong(1);
+			check(VK10.vkCreateCommandPool(value, info, null, ptr), "createCommandPool");
+			
+			return new CommandPool(ptr.get(0), this, commandPoolType);
+		}
 	}
 	
 	@Override

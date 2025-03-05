@@ -3,16 +3,18 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.TextUtil;
+import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
@@ -37,6 +39,12 @@ import static org.lwjgl.vulkan.VK10.vkCreateInstance;
 
 public class VulkanCore implements AutoCloseable{
 	
+	private static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
+	
+	public static void preload(){
+		validateExtensionsLayers(List.of(), List.of());
+	}
+	
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(VkExtent2D.class, e -> e.width() + "x" + e.height());
 		TextUtil.CUSTOM_TO_STRINGS.register(VkExtent3D.class, e -> e.width() + "x" + e.height() + "x" + e.depth());
@@ -47,18 +55,20 @@ public class VulkanCore implements AutoCloseable{
 	public static final int API_VERSION_MINOR = 1;
 	
 	
-	private final String     name;
-	private final VkInstance instance;
-	private final Surface    surface;
-	private final Device     device;
-	private final Swapchain  swapchain;
+	private final String        name;
+	private final VkInstance    instance;
+	private final Surface       surface;
+	private final Device        device;
+	private final Swapchain     swapchain;
+	private final CommandPool   cmdPool;
+	private final CommandBuffer graphicsBuff;
 	
 	private final DebugLoggerEXT debugLog;
 	
 	public VulkanCore(String name, GlfwWindow window){
 		this.name = name;
 		instance = createInstance();
-		debugLog = new DebugLoggerEXT(instance, this::debugLogCallback);
+		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
 		
 		surface = Surface.create(instance, window.getHandle());
 		
@@ -71,7 +81,11 @@ public class VulkanCore implements AutoCloseable{
 		device = physicalDevice.createDevice(queueGraphicsInfo);
 		swapchain = device.createSwapchain(surface);
 		
+		cmdPool = device.createCommandPool(queueGraphicsInfo, CommandPool.Type.NORMAL);
+		graphicsBuff = cmdPool.createCommandBuffer(1).getFirst();
+		
 	}
+	
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
 		var severityS = Optional.ofNullable(severity).map(e -> e.color + e.name()).orElse(ConsoleColors.RED_BRIGHT + "UNKNOWN") + ConsoleColors.RESET;
@@ -92,46 +106,28 @@ public class VulkanCore implements AutoCloseable{
 	private VkInstance createInstance(){
 		try(var stack = MemoryStack.stackPush()){
 			
-			var availableExtensions = getAvailableExtensionNames(null);
-			var availableLayers     = getAvailableLayerNames();
-
-//			LogUtil.println(Iters.from(availableLayers).joinAsStr("\n  ", "LAYERS\n  ", ""));
-//			LogUtil.println(Iters.from(availableExtensions).joinAsStr("\n  ", "EXTENSIONS\n  ", ""));
+			List<String> layerNames          = new ArrayList<>();
+			List<String> extraExtensionNames = new ArrayList<>();
 			
-			List<String> layerNames = new ArrayList<>();
-			if(availableLayers.contains("VK_LAYER_KHRONOS_validation")){
-				layerNames.add("VK_LAYER_KHRONOS_validation");
-			}else{
-				Log.warn("Could not find VK_LAYER_KHRONOS_validation layer! Make sure SDK is installed");
+			if(VK_DEBUG){
+				if(getAvailableLayerNames().contains("VK_LAYER_KHRONOS_validation")){
+					layerNames.add("VK_LAYER_KHRONOS_validation");
+				}else{
+					Log.warn("Could not find VK_LAYER_KHRONOS_validation layer! Make sure SDK is installed");
+				}
+				extraExtensionNames.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 			}
 			
-			List<String> extraExtension = List.of(
-				VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-			);
-			
-			var requiredExtensions = glfwGetRequiredInstanceExtensions();
+			var requiredExtensions = VUtils.UTF8ArrayToJava(glfwGetRequiredInstanceExtensions());
 			if(requiredExtensions == null){
 				throw new IllegalStateException("glfwGetRequiredInstanceExtensions failed to find the platform surface extensions.");
 			}
 			
+			var extensionNames = Iters.concat(requiredExtensions, extraExtensionNames).distinct().toList();
 			
-			var extensions = stack.mallocPointer(requiredExtensions.capacity() + extraExtension.size());
-			extensions.put(requiredExtensions);
-			for(var ext : extraExtension){
-				extensions.put(stack.ASCII(ext));
+			if(VK_DEBUG){
+				validateExtensionsLayers(extensionNames, layerNames);
 			}
-			extensions.flip();
-			
-			Iters.range(0, extensions.capacity()).mapToLong(extensions::get).mapToObj(MemoryUtil::memUTF8)
-			     .filterNot(availableExtensions::contains).joinAsOptionalStr("\n")
-			     .ifPresent(missing -> {
-				     throw new IllegalStateException("Missing required extension: " + missing);
-			     });
-			
-			Iters.from(layerNames).filterNot(availableLayers::contains).joinAsOptionalStr("\n")
-			     .ifPresent(missing -> {
-				     throw new IllegalStateException("Missing required layers: " + missing);
-			     });
 			
 			var appInfo = VkApplicationInfo.calloc(stack).sType$Default()
 			                               .apiVersion(VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0))
@@ -140,12 +136,30 @@ public class VulkanCore implements AutoCloseable{
 			var info = VkInstanceCreateInfo.calloc(stack).sType$Default()
 			                               .pApplicationInfo(appInfo)
 			                               .ppEnabledLayerNames(VUtils.UTF8ArrayOnStack(stack, layerNames))
-			                               .ppEnabledExtensionNames(extensions);
+			                               .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames));
 			
 			var pp = stack.mallocPointer(1);
 			check(vkCreateInstance(info, null, pp), "createInstance");
 			return new VkInstance(pp.get(0), info);
 		}
+	}
+	
+	private static void validateExtensionsLayers(List<String> extensions, List<String> layerNames){
+		
+		var availableExtensions = getAvailableExtensionNames(null);
+		
+		if(Iters.from(extensions).filterNot(availableExtensions::contains).joinAsOptionalStrM("\n") instanceof Match.Some(var missing)){
+			throw new IllegalStateException("Missing required extension: " + missing + "\n" +
+			                                "  Available extensions: " + availableExtensions);
+		}
+		
+		var availableLayers = getAvailableLayerNames();
+		
+		if(Iters.from(layerNames).filterNot(availableLayers::contains).joinAsOptionalStrM("\n") instanceof Match.Some(var missing)){
+			throw new IllegalStateException("Missing required layers: " + missing + "\n" +
+			                                "  Available layers: " + availableLayers);
+		}
+		
 	}
 	
 	private static Set<String> getAvailableExtensionNames(String layerName){
@@ -180,10 +194,12 @@ public class VulkanCore implements AutoCloseable{
 	
 	@Override
 	public void close(){
+		graphicsBuff.destroy();
+		cmdPool.destroy();
 		swapchain.destroy();
 		device.destroy();
 		surface.destroy();
-		debugLog.destroy();
+		if(debugLog != null) debugLog.destroy();
 		VK10.vkDestroyInstance(instance, null);
 	}
 }
