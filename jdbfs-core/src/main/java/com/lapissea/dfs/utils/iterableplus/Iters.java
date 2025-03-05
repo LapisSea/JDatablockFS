@@ -533,7 +533,12 @@ public final class Iters{
 		return switch(data){
 			case Collection<T> col -> new CollectionIterable<>(col);
 			case IterablePP<T> iter -> iter;
-			default -> data::iterator;
+			default -> new DefaultIterable<>(){
+				@Override
+				public Iterator<T> iterator(){
+					return data.iterator();
+				}
+			};
 		};
 	}
 	@Deprecated
