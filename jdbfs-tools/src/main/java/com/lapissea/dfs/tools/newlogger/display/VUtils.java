@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.PointerBuffer;
@@ -74,7 +73,7 @@ public final class VUtils{
 	
 	public static void check(int errorCode, String action){
 		if(errorCode == VK10.VK_SUCCESS){
-			LogUtil.println(action, "ok");
+//			LogUtil.println(action, "ok");
 			return;
 		}
 		fail(errorCode, action);

@@ -3,11 +3,13 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
@@ -55,13 +57,15 @@ public class VulkanCore implements AutoCloseable{
 	public static final int API_VERSION_MINOR = 1;
 	
 	
-	private final String        name;
-	private final VkInstance    instance;
-	private final Surface       surface;
-	private final Device        device;
-	private final Swapchain     swapchain;
-	private final CommandPool   cmdPool;
-	private final CommandBuffer graphicsBuff;
+	private final String         name;
+	private final VkInstance     instance;
+	private final Surface        surface;
+	private final PhysicalDevice physicalDevice;
+	public final  Device         device;
+	public final  Swapchain      swapchain;
+	
+	public final VulkanQueue      renderQueue;
+	public final QueueFamilyProps renderQueueFamily;
 	
 	private final DebugLoggerEXT debugLog;
 	
@@ -73,33 +77,41 @@ public class VulkanCore implements AutoCloseable{
 		surface = Surface.create(instance, window.getHandle());
 		
 		var physicalDevices = new PhysicalDevices(instance, surface);
-		var physicalDevice  = physicalDevices.selectDevice(VkQueueCapability.GRAPHICS, true);
+		physicalDevice = physicalDevices.selectDevice(VkQueueCapability.GRAPHICS, true);
 		
-		var queueGraphicsInfo = Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(VkQueueCapability.GRAPHICS)).orElseThrow();
+		renderQueueFamily = findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
+		
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
-		device = physicalDevice.createDevice(queueGraphicsInfo);
+		device = physicalDevice.createDevice(renderQueueFamily);
 		swapchain = device.createSwapchain(surface);
 		
-		cmdPool = device.createCommandPool(queueGraphicsInfo, CommandPool.Type.NORMAL);
-		graphicsBuff = cmdPool.createCommandBuffer(1).getFirst();
-		
+		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
 	}
 	
+	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueCapability capability){
+		return Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(capability));
+	}
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
 		var severityS = Optional.ofNullable(severity).map(e -> e.color + e.name()).orElse(ConsoleColors.RED_BRIGHT + "UNKNOWN") + ConsoleColors.RESET;
 		var type      = Iters.from(messageTypes).joinAsOptionalStr(", ").orElse("UNKNOWN");
 		
-		var log = Iters.from(message.split("\n"))
-		               .joinAsStr("\n", line -> Log.fmt("[{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, line));
+		var msgFinal = message.replace("] Object ", "]\n  Object ")
+		                      .replace("; Object ", ";\n  Object ")
+		                      .replace("; | MessageID", ";\n| MessageID");
+		if(msgFinal.contains("\n")){
+			msgFinal = "\n" + msgFinal;
+		}
+		msgFinal = Log.fmt("[{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, msgFinal);
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
-			new RuntimeException("\n" + log).printStackTrace();
+			new RuntimeException(msgFinal).printStackTrace();
 			System.exit(1);
 			return true;
+		}else{
+			Log.log(msgFinal);
 		}
-		Log.log(log);
 		return false;
 	}
 	
@@ -194,8 +206,7 @@ public class VulkanCore implements AutoCloseable{
 	
 	@Override
 	public void close(){
-		graphicsBuff.destroy();
-		cmdPool.destroy();
+		renderQueue.destroy();
 		swapchain.destroy();
 		device.destroy();
 		surface.destroy();

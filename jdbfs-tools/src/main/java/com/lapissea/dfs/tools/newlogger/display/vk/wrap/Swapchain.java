@@ -22,10 +22,10 @@ public class Swapchain implements VulkanResource{
 		return new Swapchain(ptr[0], device, createInfo);
 	}
 	
-	private final long            handle;
-	public final  Device          device;
-	public final  List<Image>     images;
-	public final  List<ImageView> imageViews;
+	public final long            handle;
+	public final Device          device;
+	public final List<Image>     images;
+	public final List<ImageView> imageViews;
 	
 	public Swapchain(long handle, Device device, VkSwapchainCreateInfoKHR createInfo){
 		this.handle = handle;

@@ -11,6 +11,8 @@ import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
+import org.lwjgl.vulkan.VkQueue;
+import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
@@ -82,6 +84,27 @@ public class Device implements VulkanResource{
 			check(VK10.vkCreateCommandPool(value, info, null, ptr), "createCommandPool");
 			
 			return new CommandPool(ptr.get(0), this, commandPoolType);
+		}
+	}
+	
+	public VkQueue getQueue(QueueFamilyProps family, int queueIndex){
+		try(var stack = MemoryStack.stackPush()){
+			var ptr = stack.mallocPointer(1);
+			VK10.vkGetDeviceQueue(value, family.index, queueIndex, ptr);
+			return new VkQueue(ptr.get(0), value);
+		}
+	}
+	
+	public VulkanSemaphore createSemaphore(){
+		try(var stack = MemoryStack.stackPush()){
+			
+			var info = VkSemaphoreCreateInfo.calloc(stack)
+			                                .sType$Default();
+			
+			var ptr = stack.mallocLong(1);
+			check(VK10.vkCreateSemaphore(value, info, null, ptr), "createSemaphore");
+			
+			return new VulkanSemaphore(ptr.get(0), this);
 		}
 	}
 	

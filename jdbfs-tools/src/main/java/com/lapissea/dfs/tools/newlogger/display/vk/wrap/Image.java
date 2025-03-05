@@ -15,7 +15,7 @@ import java.util.Set;
 
 public class Image implements VulkanResource{
 	
-	private final long   handle;
+	public final  long   handle;
 	private final Device device;
 	
 	public Image(long handle, Device device){

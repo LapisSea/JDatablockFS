@@ -12,16 +12,16 @@ public final class LogServerStart{
 	static{
 		//Eager init to reduce startup time
 		Thread.ofVirtual().start(VulkanCore::preload);
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
 	public static void main(String[] args) throws IOException, LockedFlagSet{
 //		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
 		
+		var t = System.currentTimeMillis();
 		try(var display = new VulkanDisplay()){
-			var t = System.currentTimeMillis();
-			display.init();
 			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
-//			display.run();
+			display.run();
 		}
 		System.exit(0);
 		
