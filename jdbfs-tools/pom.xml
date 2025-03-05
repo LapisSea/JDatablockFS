@@ -6,7 +6,7 @@
 	
 	<properties>
 		<github.spair.version>1.86.11</github.spair.version>
-		<lwjgl.version>3.3.3</lwjgl.version>
+		<lwjgl.version>3.3.6</lwjgl.version>
 		<joml.version>1.10.5</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 	</properties>

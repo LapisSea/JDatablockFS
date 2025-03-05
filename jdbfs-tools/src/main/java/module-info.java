@@ -13,6 +13,7 @@ module JDatablockFS.tools {
 	
 	requires imgui.lwjgl3;
 	requires imgui.binding;
+	requires org.lwjgl.vulkan;
 	
 	exports com.lapissea.dfs.tools;
 	exports com.lapissea.dfs.tools.logging;
@@ -21,4 +22,7 @@ module JDatablockFS.tools {
 	exports com.lapissea.dfs.tools.newlogger;
 	
 	opens com.lapissea.dfs.tools;
+	exports com.lapissea.dfs.tools.newlogger.display.vk to jlapisutil;
+	exports com.lapissea.dfs.tools.newlogger.display.vk.enums to jlapisutil;
+	exports com.lapissea.dfs.tools.newlogger.display.vk.wrap to jlapisutil;
 }
