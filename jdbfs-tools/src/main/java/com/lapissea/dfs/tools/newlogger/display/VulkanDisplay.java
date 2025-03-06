@@ -13,12 +13,12 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 
 import java.io.File;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -33,6 +33,7 @@ public class VulkanDisplay implements AutoCloseable{
 	private       List<CommandBuffer> graphicsBuffs;
 	
 	private boolean resizing;
+	private Instant nextResizeWaitAttempt = Instant.now();
 	
 	public VulkanDisplay(){
 		window = createWindow();
@@ -46,16 +47,7 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		recordCommandBuffers();
 		
-		window.size.register(() -> {
-			if(!resizing){
-				for(int i = 0; i<32; i++){
-					if(!resizing) UtilL.sleep(1);
-				}
-			}
-			for(int i = 0; i<100; i++){
-				if(resizing) UtilL.sleep(1);
-			}
-		});
+		window.size.register(this::onResizeEvent);
 	}
 	
 	private void render(){
@@ -63,7 +55,7 @@ public class VulkanDisplay implements AutoCloseable{
 			renderQueue();
 		}catch(VulkanCodeException e){
 			switch(e.code){
-				case KHRSwapchain.VK_SUBOPTIMAL_KHR, KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR -> {
+				case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
 					handleResize();
 				}
 				default -> throw e;
@@ -93,7 +85,7 @@ public class VulkanDisplay implements AutoCloseable{
 				renderQueue();
 			}catch(VulkanCodeException e2){
 				switch(e2.code){
-					case KHRSwapchain.VK_SUBOPTIMAL_KHR, KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR -> { }
+					case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> { }
 					default -> throw e2;
 				}
 			}
@@ -102,6 +94,30 @@ public class VulkanDisplay implements AutoCloseable{
 			resizing = false;
 		}
 		
+	}
+	private void onResizeEvent(){
+		var now = Instant.now();
+		if(now.isBefore(nextResizeWaitAttempt)){
+			return;
+		}
+		var end = now.plusMillis(50);
+		if(!resizing){
+			for(int i = 0; i<50; i++){
+				if(resizing || Instant.now().isAfter(end)){
+					break;
+				}
+				UtilL.sleep(0.5);
+			}
+		}
+		for(int i = 0; i<100; i++){
+			if(!resizing || Instant.now().isAfter(end)){
+				break;
+			}
+			UtilL.sleep(0.5);
+		}
+		if(resizing){
+			nextResizeWaitAttempt = Instant.now().plusMillis(1000);
+		}
 	}
 	
 	private void recordCommandBuffers(){
@@ -211,5 +227,4 @@ public class VulkanDisplay implements AutoCloseable{
 		vkCore.close();
 		window.destroy();
 	}
-	
 }
