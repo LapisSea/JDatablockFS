@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
@@ -8,8 +10,6 @@ import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
 
 import java.util.List;
-
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
 
 public class CommandPool implements VulkanResource{
 	
@@ -32,7 +32,7 @@ public class CommandPool implements VulkanResource{
 		this.type = type;
 	}
 	
-	public List<CommandBuffer> createCommandBuffer(int count){
+	public List<CommandBuffer> createCommandBuffer(int count) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			var info = VkCommandBufferAllocateInfo.calloc(mem)
 			                                      .sType$Default()
@@ -41,9 +41,9 @@ public class CommandPool implements VulkanResource{
 			                                      .commandBufferCount(count);
 			
 			var bufferRefs = mem.mallocPointer(count);
-			check(VK10.vkAllocateCommandBuffers(device.value, info, bufferRefs), "allocateCommandBuffers");
+			VKCalls.vkAllocateCommandBuffers(device, info, bufferRefs);
 			
-			return Iters.rangeMap(0, bufferRefs.capacity(), i -> new CommandBuffer(bufferRefs.get(i), this, device)).toList();
+			return Iters.rangeMap(0, bufferRefs.capacity(), i -> new CommandBuffer(bufferRefs.get(i), this)).toList();
 		}
 	}
 	

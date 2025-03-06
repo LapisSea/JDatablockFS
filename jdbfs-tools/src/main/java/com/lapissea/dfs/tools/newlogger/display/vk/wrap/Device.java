@@ -1,5 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
@@ -15,8 +17,6 @@ import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
-
 public class Device implements VulkanResource{
 	
 	public final VkDevice value;
@@ -31,13 +31,13 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public Swapchain createSwapchain(Surface surface, VKPresentMode preferredPresentMode){
+	public Swapchain createSwapchain(Surface surface, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			var format = Iters.from(physicalDevice.formats)
 			                  .firstMatching(e -> e.format == VkFormat.R8G8B8A8_UNORM && e.colorSpace == VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
 			                  .orElse(physicalDevice.formats.getFirst());
 			
-			SurfaceCapabilities surfaceCapabilities = physicalDevice.getSurfaceCapabilities(surface);
+			SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
 			
 			var presentMode = physicalDevice.presentModes.contains(preferredPresentMode)?
 			                  preferredPresentMode :
@@ -62,17 +62,15 @@ public class Device implements VulkanResource{
 			    .clipped(true)
 			;
 			
-			return Swapchain.create(this, info);
+			return VKCalls.vkCreateSwapchainKHR(this, info);
 		}
 	}
 	
-	public ImageView createImageView(VkImageViewCreateInfo info){
-		var ptr = new long[1];
-		check(VK10.vkCreateImageView(value, info, null, ptr), "createImageView");
-		return new ImageView(ptr[0], this);
+	public ImageView createImageView(VkImageViewCreateInfo info) throws VulkanCodeException{
+		return VKCalls.vkCreateImageView(this, info);
 	}
 	
-	public CommandPool createCommandPool(QueueFamilyProps queue, CommandPool.Type commandPoolType){
+	public CommandPool createCommandPool(QueueFamilyProps queue, CommandPool.Type commandPoolType) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			int flags = 0;
 			if(commandPoolType == CommandPool.Type.SHORT_LIVED) flags |= VK10.VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
@@ -83,10 +81,8 @@ public class Device implements VulkanResource{
 			                                  .flags(flags)
 			                                  .queueFamilyIndex(queue.index);
 			
-			var ptr = mem.mallocLong(1);
-			check(VK10.vkCreateCommandPool(value, info, null, ptr), "createCommandPool");
-			
-			return new CommandPool(ptr.get(0), this, commandPoolType);
+			var res = VKCalls.vkCreateCommandPool(this, info);
+			return new CommandPool(res, this, commandPoolType);
 		}
 	}
 	
@@ -98,16 +94,13 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public VulkanSemaphore createSemaphore(){
+	public VulkanSemaphore createSemaphore() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkSemaphoreCreateInfo.calloc(stack)
 			                                .sType$Default();
 			
-			var ptr = stack.mallocLong(1);
-			check(VK10.vkCreateSemaphore(value, info, null, ptr), "createSemaphore");
-			
-			return new VulkanSemaphore(ptr.get(0), this);
+			return VKCalls.vkCreateSemaphore(this, info);
 		}
 	}
 	

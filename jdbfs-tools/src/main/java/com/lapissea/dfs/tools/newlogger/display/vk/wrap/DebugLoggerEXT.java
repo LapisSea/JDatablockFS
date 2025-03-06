@@ -1,5 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.util.ConsoleColors;
 import org.lwjgl.system.MemoryStack;
@@ -13,7 +15,6 @@ import org.lwjgl.vulkan.VkInstance;
 import java.util.EnumSet;
 import java.util.Set;
 
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 
 public class DebugLoggerEXT implements VulkanResource{
@@ -70,7 +71,7 @@ public class DebugLoggerEXT implements VulkanResource{
 		};
 	}
 	
-	public DebugLoggerEXT(VkInstance instance, Callback callback){
+	public DebugLoggerEXT(VkInstance instance, Callback callback) throws VulkanCodeException{
 		this.instance = instance;
 		
 		dbgFunc = VkDebugUtilsMessengerCallbackEXT.create((messageSeverity, messageTypes, pCallbackData, pUserData) -> {
@@ -95,7 +96,7 @@ public class DebugLoggerEXT implements VulkanResource{
 			throw e;
 		}
 	}
-	private long initDebugCallback(){
+	private long initDebugCallback() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var cInfo = VkDebugUtilsMessengerCreateInfoEXT.calloc(stack).sType$Default()
 			                                              .messageSeverity(VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT|
@@ -107,9 +108,7 @@ public class DebugLoggerEXT implements VulkanResource{
 			                                                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
 			                                              .pfnUserCallback(dbgFunc);
 			
-			var callbackB = new long[1];
-			check(EXTDebugUtils.vkCreateDebugUtilsMessengerEXT(instance, cInfo, null, callbackB), "createDebugUtilsMessenger");
-			return callbackB[0];
+			return VKCalls.vkCreateDebugUtilsMessengerEXT(instance, cInfo);
 		}
 	}
 	

@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -8,7 +10,6 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
-import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
 import org.lwjgl.vulkan.VkPhysicalDevice;
@@ -17,11 +18,10 @@ import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
 
 public class PhysicalDevice{
 	
@@ -34,7 +34,7 @@ public class PhysicalDevice{
 	public final List<MemoryType>       memoryTypes;
 	public final List<MemoryHeap>       memoryHeaps;
 	
-	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface){
+	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
 		this.pDevice = pDevice;
 		try(var stack = MemoryStack.stackPush()){
 			var properties = VkPhysicalDeviceProperties.malloc(stack);
@@ -64,23 +64,21 @@ public class PhysicalDevice{
 //		LogUtil.println(TextUtil.toTable(memoryHeaps));
 	}
 	
-	public SurfaceCapabilities getSurfaceCapabilities(Surface surface){
-		return surface.getCapabilities(pDevice);
-	}
-	
-	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface, MemoryStack stack){
-		final List<QueueFamilyProps> families;
-		var                          ib = stack.mallocInt(1);
+	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface, MemoryStack stack) throws VulkanCodeException{
+		var ib = stack.mallocInt(1);
 		VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, null);
 		var familyProps = VkQueueFamilyProperties.malloc(ib.get(0), stack);
 		VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, familyProps);
 		
-		families = Iters.from(familyProps).enumerate((i, p) -> new QueueFamilyProps(pDevice, surface, p, i)).toList();
-		return families;
+		var families = new ArrayList<QueueFamilyProps>();
+		for(VkQueueFamilyProperties familyProp : familyProps){
+			families.add(new QueueFamilyProps(pDevice, surface, familyProp, families.size()));
+		}
+		return List.copyOf(families);
 	}
 	
 	
-	public Device createDevice(QueueFamilyProps family){
+	public Device createDevice(QueueFamilyProps family) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var queueInfo = VkDeviceQueueCreateInfo.calloc(1, stack);
@@ -102,9 +100,7 @@ public class PhysicalDevice{
 			                             ))
 			                             .pEnabledFeatures(features);
 			
-			var ptr = stack.mallocPointer(1);
-			check(VK10.vkCreateDevice(pDevice, info, null, ptr), "createDevice");
-			var vkd = new VkDevice(ptr.get(0), pDevice, info);
+			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
 			return new Device(vkd, this);
 		}

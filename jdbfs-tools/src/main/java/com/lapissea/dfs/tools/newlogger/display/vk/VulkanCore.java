@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
@@ -34,18 +35,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import static org.lwjgl.vulkan.VK10.VK_MAKE_API_VERSION;
-import static org.lwjgl.vulkan.VK10.vkCreateInstance;
 
 public class VulkanCore implements AutoCloseable{
 	
 	private static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
 	
 	public static void preload(){
-		validateExtensionsLayers(List.of(), List.of());
+		try{
+			validateExtensionsLayers(List.of(), List.of());
+		}catch(VulkanCodeException e){
+			e.printStackTrace();
+		}
 	}
 	
 	static{
@@ -71,12 +74,12 @@ public class VulkanCore implements AutoCloseable{
 	
 	private final DebugLoggerEXT debugLog;
 	
-	public VulkanCore(String name, GlfwWindow window){
+	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
 		instance = createInstance();
 		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
 		
-		surface = Surface.create(instance, window.getHandle());
+		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
 		
 		var physicalDevices = new PhysicalDevices(instance, surface);
 		physicalDevice = physicalDevices.selectDevice(VkQueueCapability.GRAPHICS, true);
@@ -89,17 +92,19 @@ public class VulkanCore implements AutoCloseable{
 		createSwapchain();
 	}
 	
-	public void recreateSwapchain(){
+	public void recreateSwapchain() throws VulkanCodeException{
 		destroySwapchain();
 		createSwapchain();
 	}
 	
 	private void destroySwapchain(){
-		renderQueue.waitIdle();
+		try{
+			renderQueue.waitIdle();
+		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		renderQueue.destroy();
 		swapchain.destroy();
 	}
-	private void createSwapchain(){
+	private void createSwapchain() throws VulkanCodeException{
 		swapchain = device.createSwapchain(surface, VKPresentMode.IMMEDIATE);
 		
 		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
@@ -131,7 +136,7 @@ public class VulkanCore implements AutoCloseable{
 		return false;
 	}
 	
-	private VkInstance createInstance(){
+	private VkInstance createInstance() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			List<String> layerNames          = new ArrayList<>();
@@ -166,13 +171,11 @@ public class VulkanCore implements AutoCloseable{
 			                               .ppEnabledLayerNames(VUtils.UTF8ArrayOnStack(stack, layerNames))
 			                               .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames));
 			
-			var pp = stack.mallocPointer(1);
-			check(vkCreateInstance(info, null, pp), "createInstance");
-			return new VkInstance(pp.get(0), info);
+			return VKCalls.vkCreateInstance(stack, info);
 		}
 	}
 	
-	private static void validateExtensionsLayers(List<String> extensions, List<String> layerNames){
+	private static void validateExtensionsLayers(List<String> extensions, List<String> layerNames) throws VulkanCodeException{
 		
 		var availableExtensions = getAvailableExtensionNames(null);
 		
@@ -190,33 +193,33 @@ public class VulkanCore implements AutoCloseable{
 		
 	}
 	
-	private static Set<String> getAvailableExtensionNames(String layerName){
+	private static Set<String> getAvailableExtensionNames(String layerName) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var instance_extensions = getAvailableExtensions(stack, layerName);
 			return Iters.from(instance_extensions).map(VkExtensionProperties::extensionNameString).toSet();
 		}
 	}
-	private static VkExtensionProperties.Buffer getAvailableExtensions(MemoryStack stack, String layerName){
+	private static VkExtensionProperties.Buffer getAvailableExtensions(MemoryStack stack, String layerName) throws VulkanCodeException{
 		var countB = stack.mallocInt(1);
-		check(VK10.vkEnumerateInstanceExtensionProperties(layerName, countB, null), "enumerateInstanceExtensionProperties");
+		VKCalls.vkEnumerateInstanceExtensionProperties(layerName, countB, null);
 		
 		var instance_extensions = VkExtensionProperties.malloc(countB.get(0), stack);
-		check(VK10.vkEnumerateInstanceExtensionProperties(layerName, countB, instance_extensions), "enumerateInstanceExtensionProperties");
+		VKCalls.vkEnumerateInstanceExtensionProperties(layerName, countB, instance_extensions);
 		return instance_extensions;
 	}
 	
-	private static Set<String> getAvailableLayerNames(){
+	private static Set<String> getAvailableLayerNames() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var res = getAvailableLayers(stack);
 			return Iters.from(res).map(VkLayerProperties::layerNameString).toSet();
 		}
 	}
-	private static VkLayerProperties.Buffer getAvailableLayers(MemoryStack stack){
+	private static VkLayerProperties.Buffer getAvailableLayers(MemoryStack stack) throws VulkanCodeException{
 		var countB = stack.mallocInt(1);
-		check(VK10.vkEnumerateInstanceLayerProperties(countB, null), "enumerateInstanceLayerProperties");
+		VKCalls.vkEnumerateInstanceLayerProperties(countB, null);
 		
 		var res = VkLayerProperties.malloc(countB.get(0), stack);
-		check(VK10.vkEnumerateInstanceLayerProperties(countB, res), "enumerateInstanceLayerProperties");
+		VKCalls.vkEnumerateInstanceLayerProperties(countB, res);
 		return res;
 	}
 	

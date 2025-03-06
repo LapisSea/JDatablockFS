@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
@@ -9,27 +10,29 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 
+import java.util.ArrayList;
 import java.util.List;
-
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
-import static org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices;
 
 public class PhysicalDevices{
 	
 	private final List<PhysicalDevice> devices;
 	
-	public PhysicalDevices(VkInstance instance, Surface surface){
+	public PhysicalDevices(VkInstance instance, Surface surface) throws VulkanCodeException{
 		List<VkPhysicalDevice> handles;
 		try(var mem = MemoryStack.stackPush()){
 			var count = mem.mallocInt(1);
-			check(vkEnumeratePhysicalDevices(instance, count, null), "enumeratePhysicalDevices");
+			VKCalls.vkEnumeratePhysicalDevices(instance, count, null);
 			
 			var ptrs = mem.mallocPointer(count.get(0));
-			check(vkEnumeratePhysicalDevices(instance, count, ptrs), "enumeratePhysicalDevices");
+			VKCalls.vkEnumeratePhysicalDevices(instance, count, ptrs);
 			
 			handles = Iters.rangeMap(0, ptrs.capacity(), i -> new VkPhysicalDevice(ptrs.get(i), instance)).toList();
 		}
-		devices = Iters.from(handles).toList(h -> new PhysicalDevice(h, surface));
+		var devices = new ArrayList<PhysicalDevice>(handles.size());
+		for(var handle : handles){
+			devices.add(new PhysicalDevice(handle, surface));
+		}
+		this.devices = List.copyOf(devices);
 	}
 	
 	public PhysicalDevice selectDevice(VkQueueCapability requiredCapability, boolean supportsPresent){

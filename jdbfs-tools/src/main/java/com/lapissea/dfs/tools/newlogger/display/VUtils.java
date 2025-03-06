@@ -6,7 +6,6 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
-import org.lwjgl.vulkan.VK10;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
@@ -50,17 +49,6 @@ public final class VUtils{
 		
 		g2d.dispose();
 		return image;
-	}
-	
-	public static void check(int errorCode, String action){
-		if(errorCode == VK10.VK_SUCCESS){
-//			LogUtil.println(action, "ok");
-			return;
-		}
-		fail(errorCode, action);
-	}
-	private static void fail(int errorCode, String action){
-		throw VulkanCodeException.from(errorCode, action);
 	}
 	
 	public static PointerBuffer UTF8ArrayOnStack(MemoryStack stack, String... strings){

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlagBits;
@@ -23,10 +24,10 @@ public class Image implements VulkanResource{
 		this.device = device;
 	}
 	
-	public ImageView createImageView(VkImageViewType type, VkFormat format, Set<VkImageAspectFlagBits> aspectFlags){
-		return createImageView(type, format, aspectFlags);
+	public ImageView createImageView(VkImageViewType type, VkFormat format, Set<VkImageAspectFlagBits> aspectFlags) throws VulkanCodeException{
+		return createImageView(type, format, aspectFlags, 1, 1);
 	}
-	public ImageView createImageView(VkImageViewType type, VkFormat format, Set<VkImageAspectFlagBits> aspectFlags, int mipLevelCount, int layerCount){
+	public ImageView createImageView(VkImageViewType type, VkFormat format, Set<VkImageAspectFlagBits> aspectFlags, int mipLevelCount, int layerCount) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkImageViewCreateInfo.calloc(stack);
 			info.sType$Default()

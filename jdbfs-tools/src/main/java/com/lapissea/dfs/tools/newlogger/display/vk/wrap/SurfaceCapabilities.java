@@ -1,39 +1,26 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSurfaceTransformFlagKHR;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VkExtent2D;
-import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
-
+/**
+ *
+ * <pre><code>
+ * struct VkSurfaceCapabilitiesKHR {
+ *     uint32_t {@link #minImageCount};
+ *     uint32_t {@link #maxImageCount};
+ *     {@link VkExtent2D VkExtent2D} {@link #currentExtent};
+ *     {@link VkExtent2D VkExtent2D} {@link #minImageExtent};
+ *     {@link VkExtent2D VkExtent2D} {@link #maxImageExtent};
+ *     uint32_t {@link #maxImageArrayLayers};
+ *     VkSurfaceTransformFlagsKHR {@link #supportedTransforms};
+ *     VkSurfaceTransformFlagBitsKHR {@link #currentTransform};
+ *     VkCompositeAlphaFlagsKHR {@link #supportedCompositeAlpha};
+ *     VkImageUsageFlags {@link #supportedUsageFlags};
+ * }</code></pre>
+ */
 public class SurfaceCapabilities{
-	/**
-	 *
-	 * <pre><code>
-	 * struct VkSurfaceCapabilitiesKHR {
-	 *     uint32_t {@link #minImageCount};
-	 *     uint32_t {@link #maxImageCount};
-	 *     {@link VkExtent2D VkExtent2D} {@link #currentExtent};
-	 *     {@link VkExtent2D VkExtent2D} {@link #minImageExtent};
-	 *     {@link VkExtent2D VkExtent2D} {@link #maxImageExtent};
-	 *     uint32_t {@link #maxImageArrayLayers};
-	 *     VkSurfaceTransformFlagsKHR {@link #supportedTransforms};
-	 *     VkSurfaceTransformFlagBitsKHR {@link #currentTransform};
-	 *     VkCompositeAlphaFlagsKHR {@link #supportedCompositeAlpha};
-	 *     VkImageUsageFlags {@link #supportedUsageFlags};
-	 * }</code></pre>
-	 */
-	
-	public static SurfaceCapabilities from(VkPhysicalDevice physicalDevice, long surfaceHandle){
-		try(var mem = MemoryStack.stackPush()){
-			var caps = VkSurfaceCapabilitiesKHR.malloc(mem);
-			check(KHRSurface.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surfaceHandle, caps), "getPhysicalDeviceSurfaceCapabilities");
-			return new SurfaceCapabilities(caps);
-		}
-	}
 	
 	public final int      minImageCount;
 	public final int      maxImageCount;

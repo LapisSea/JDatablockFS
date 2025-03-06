@@ -1,15 +1,14 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkSubmitInfo;
-
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
 
 public class VulkanQueue implements VulkanResource{
 	
@@ -19,37 +18,39 @@ public class VulkanQueue implements VulkanResource{
 	private final VulkanSemaphore presentCompleteSemaphore;
 	private final VulkanSemaphore renderCompleteSemaphore;
 	
-	public VulkanQueue(Device device, Swapchain swapchain, QueueFamilyProps queue, int queueIndex){
+	public VulkanQueue(Device device, Swapchain swapchain, QueueFamilyProps queue, int queueIndex) throws VulkanCodeException{
 		this.value = device.getQueue(queue, queueIndex);
 		this.swapchain = swapchain;
 		
 		presentCompleteSemaphore = device.createSemaphore();
-		renderCompleteSemaphore = device.createSemaphore();
+		try{
+			renderCompleteSemaphore = device.createSemaphore();
+		}catch(VulkanCodeException e){
+			presentCompleteSemaphore.destroy();
+			throw e;
+		}
 	}
 	
 	
-	public int acquireNextImage(){
+	public int acquireNextImage() throws VulkanCodeException{
 		waitIdle();//TODO: BLOCKS EVERYTHING!!! FIX THIS PLEASE
 		
-		var index = new int[1];
-		
-		check(KHRSwapchain.vkAcquireNextImageKHR(
-			value.getDevice(), swapchain.handle, Long.MAX_VALUE, presentCompleteSemaphore.handle, //Wait for presentation to complete
-			0, index
-		), "acquireNextImage");
-		return index[0];
+		return VKCalls.vkAcquireNextImageKHR(
+			value.getDevice(), swapchain, Long.MAX_VALUE, presentCompleteSemaphore, //Wait for presentation to complete
+			0
+		);
 	}
 	
-	public void submitNow(CommandBuffer commandBuffer){
+	public void submitNow(CommandBuffer commandBuffer) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkSubmitInfo.calloc(stack).sType$Default()
 			                       .pCommandBuffers(stack.pointers(commandBuffer.handle()));
-			
-			check(VK10.vkQueueSubmit(value, info, 0), "queueSubmit");
+			VKCalls.vkQueueSubmit(value, info, 0);
 		}
 	}
-	public void submitAsync(CommandBuffer commandBuffer){
+	
+	public void submitAsync(CommandBuffer commandBuffer) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkSubmitInfo.malloc(stack)
@@ -61,11 +62,11 @@ public class VulkanQueue implements VulkanResource{
 			                       .pCommandBuffers(stack.pointers(commandBuffer.handle()))
 			                       .pSignalSemaphores(stack.longs(renderCompleteSemaphore.handle));//Signal render complete when done
 			
-			check(VK10.vkQueueSubmit(value, info, 0), "queueSubmit");
+			VKCalls.vkQueueSubmit(value, info, 0);
 		}
 	}
 	
-	public void present(int index){
+	public void present(int index) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkPresentInfoKHR.calloc(stack).sType$Default()
 			                           .pWaitSemaphores(stack.longs(renderCompleteSemaphore.handle))
@@ -73,12 +74,12 @@ public class VulkanQueue implements VulkanResource{
 			                           .pSwapchains(stack.longs(swapchain.handle))
 			                           .pImageIndices(stack.ints(index));
 			
-			check(KHRSwapchain.vkQueuePresentKHR(value, info), "queuePresent");
+			VKCalls.vkQueuePresentKHR(value, info);
 		}
 	}
 	
-	public void waitIdle(){
-		VK10.vkQueueWaitIdle(value);
+	public void waitIdle() throws VulkanCodeException{
+		VKCalls.vkQueueWaitIdle(value);
 	}
 	
 	@Override

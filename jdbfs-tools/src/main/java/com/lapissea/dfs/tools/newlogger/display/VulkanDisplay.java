@@ -38,19 +38,24 @@ public class VulkanDisplay implements AutoCloseable{
 	public VulkanDisplay(){
 		window = createWindow();
 		window.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
-		vkCore = new VulkanCore("DFS debugger", window);
-		
-		var family = vkCore.findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
-		
-		cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
-		graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
-		
-		recordCommandBuffers();
-		
 		window.size.register(this::onResizeEvent);
+		
+		try{
+			vkCore = new VulkanCore("DFS debugger", window);
+			
+			var family = vkCore.findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
+			
+			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
+			graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
+			
+			recordCommandBuffers();
+		}catch(VulkanCodeException e){
+			throw new RuntimeException("Failed to init vulkan display", e);
+		}
+		
 	}
 	
-	private void render(){
+	private void render() throws VulkanCodeException{
 		try{
 			renderQueue();
 		}catch(VulkanCodeException e){
@@ -58,11 +63,11 @@ public class VulkanDisplay implements AutoCloseable{
 				case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
 					handleResize();
 				}
-				default -> throw e;
+				default -> throw new RuntimeException("Failed to render frame", e);
 			}
 		}
 	}
-	private void renderQueue(){
+	private void renderQueue() throws VulkanCodeException{
 		vkCore.renderQueue.waitIdle();
 		recordCommandBuffers();
 		var bufferQueue = vkCore.renderQueue;
@@ -71,7 +76,7 @@ public class VulkanDisplay implements AutoCloseable{
 		bufferQueue.present(index);
 	}
 	
-	private void handleResize(){
+	private void handleResize() throws VulkanCodeException{
 		resizing = true;
 		try{
 			vkCore.recreateSwapchain();
@@ -86,7 +91,7 @@ public class VulkanDisplay implements AutoCloseable{
 			}catch(VulkanCodeException e2){
 				switch(e2.code){
 					case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> { }
-					default -> throw e2;
+					default -> throw new RuntimeException("Failed to render frame", e2);
 				}
 			}
 			vkCore.renderQueue.waitIdle();
@@ -120,7 +125,7 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	
-	private void recordCommandBuffers(){
+	private void recordCommandBuffers() throws VulkanCodeException{
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
@@ -217,7 +222,9 @@ public class VulkanDisplay implements AutoCloseable{
 	public void close(){
 		window.hide();
 		
-		vkCore.renderQueue.waitIdle();
+		try{
+			vkCore.renderQueue.waitIdle();
+		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		for(var buf : graphicsBuffs){
 			buf.destroy();

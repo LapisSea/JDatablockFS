@@ -1,11 +1,12 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
-import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
@@ -13,16 +14,7 @@ import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.lapissea.dfs.tools.newlogger.display.VUtils.check;
-import static org.lwjgl.glfw.GLFWVulkan.glfwCreateWindowSurface;
-
 public class Surface implements VulkanResource{
-	
-	public static Surface create(VkInstance instance, long windowHandle){
-		var surfaceRef = new long[1];
-		check(glfwCreateWindowSurface(instance, windowHandle, null, surfaceRef), "createWindowSurface");
-		return new Surface(instance, surfaceRef[0]);
-	}
 	
 	public final  long       handle;
 	private final VkInstance instance;
@@ -32,40 +24,40 @@ public class Surface implements VulkanResource{
 		this.handle = handle;
 	}
 	
-	public boolean supportsPresent(VkPhysicalDevice device, int familyIndex){
-		var res = new int[1];
-		check(KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, handle, res), "getPhysicalDeviceSurfaceSupport");
-		return res[0] == VK10.VK_TRUE;
+	public boolean supportsPresent(VkPhysicalDevice device, int familyIndex) throws VulkanCodeException{
+		return VKCalls.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, this);
 	}
 	
-	public List<SurfaceFormat> getFormats(VkPhysicalDevice pDevice){
+	public List<SurfaceFormat> getFormats(VkPhysicalDevice pDevice) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			
-			var count = new int[1];
-			check(KHRSurface.vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, handle, count, null), "getPhysicalDeviceSurfaceFormats");
-			var formats = VkSurfaceFormatKHR.malloc(count[0], mem);
-			check(KHRSurface.vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, handle, count, formats), "getPhysicalDeviceSurfaceFormats");
+			var count = mem.mallocInt(1);
+			VKCalls.vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, this, count, null);
+			var formats = VkSurfaceFormatKHR.malloc(count.get(0), mem);
+			VKCalls.vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, this, count, formats);
 			
 			return Iters.from(formats).toList(f -> new SurfaceFormat(f.format(), f.colorSpace()));
 		}
 	}
 	
-	public SurfaceCapabilities getCapabilities(VkPhysicalDevice pDevice){
-		return SurfaceCapabilities.from(pDevice, handle);
+	public SurfaceCapabilities getCapabilities(PhysicalDevice physicalDevice) throws VulkanCodeException{
+		return VKCalls.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice.pDevice, handle);
 	}
 	
-	public EnumSet<VKPresentMode> getPresentModes(VkPhysicalDevice pDevice){
+	public EnumSet<VKPresentMode> getPresentModes(VkPhysicalDevice physicalDevice) throws VulkanCodeException{
+		var surface = this;
+		
 		try(var mem = MemoryStack.stackPush()){
-			var count = mem.mallocInt(1);
-			check(KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(pDevice, handle, count, null), "getPhysicalDeviceSurfacePresentModes");
-			var modes = mem.mallocInt(count.get(0));
-			check(KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(pDevice, handle, count, modes), "getPhysicalDeviceSurfacePresentModes");
+			var pPresentModeCount = mem.mallocInt(1);
+			VKCalls.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, pPresentModeCount, null);
+			var pPresentModes = mem.mallocInt(pPresentModeCount.get(0));
+			VKCalls.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, pPresentModeCount, pPresentModes);
 			
 			var res = EnumSet.noneOf(VKPresentMode.class);
-			for(int i = 0; i<modes.capacity(); i++){
-				res.add(VKPresentMode.from(modes.get(i)));
+			for(int i = 0; i<pPresentModes.capacity(); i++){
+				res.add(VKPresentMode.from(pPresentModes.get(i)));
 			}
-			if(res.size() != modes.capacity()) throw new AssertionError();
+			if(res.size() != pPresentModes.capacity()) throw new AssertionError();
 			return res;
 		}
 	}
