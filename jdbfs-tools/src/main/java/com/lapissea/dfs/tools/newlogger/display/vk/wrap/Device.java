@@ -31,16 +31,19 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public Swapchain createSwapchain(Surface surface){
-		Device device = this;
+	public Swapchain createSwapchain(Surface surface, VKPresentMode preferredPresentMode){
 		try(var mem = MemoryStack.stackPush()){
-			var pDevice = device.physicalDevice;
-			var format = Iters.from(pDevice.formats)
+			var format = Iters.from(physicalDevice.formats)
 			                  .firstMatching(e -> e.format == VkFormat.R8G8B8A8_UNORM && e.colorSpace == VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
-			                  .orElse(pDevice.formats.getFirst());
+			                  .orElse(physicalDevice.formats.getFirst());
 			
-			var presentMode = pDevice.presentModes.contains(VKPresentMode.FIFO)? VKPresentMode.FIFO : pDevice.presentModes.iterator().next();
-			int numOfImages = Math.min(pDevice.surfaceCapabilities.minImageCount + 1, pDevice.surfaceCapabilities.maxImageCount);
+			SurfaceCapabilities surfaceCapabilities = physicalDevice.getSurfaceCapabilities(surface);
+			
+			var presentMode = physicalDevice.presentModes.contains(preferredPresentMode)?
+			                  preferredPresentMode :
+			                  physicalDevice.presentModes.iterator().next();
+			
+			int numOfImages = Math.min(surfaceCapabilities.minImageCount + 1, surfaceCapabilities.maxImageCount);
 			
 			var usage = VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 			
@@ -49,17 +52,17 @@ public class Device implements VulkanResource{
 			    .minImageCount(numOfImages)
 			    .imageFormat(format.format.id)
 			    .imageColorSpace(format.colorSpace.id)
-			    .imageExtent(pDevice.surfaceCapabilities.currentExtent.toStack(mem))
+			    .imageExtent(surfaceCapabilities.currentExtent.toStack(mem))
 			    .imageArrayLayers(1)
 			    .imageUsage(usage)
 			    .imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
-			    .preTransform(pDevice.surfaceCapabilities.currentTransform.bit)
+			    .preTransform(surfaceCapabilities.currentTransform.bit)
 			    .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
 			    .presentMode(presentMode.id)
 			    .clipped(true)
 			;
 			
-			return Swapchain.create(device, info);
+			return Swapchain.create(this, info);
 		}
 	}
 	

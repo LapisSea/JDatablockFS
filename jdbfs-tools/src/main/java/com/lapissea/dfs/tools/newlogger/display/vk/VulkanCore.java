@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
@@ -62,10 +63,11 @@ public class VulkanCore implements AutoCloseable{
 	private final Surface        surface;
 	private final PhysicalDevice physicalDevice;
 	public final  Device         device;
-	public final  Swapchain      swapchain;
 	
-	public final VulkanQueue      renderQueue;
 	public final QueueFamilyProps renderQueueFamily;
+	
+	public Swapchain   swapchain;
+	public VulkanQueue renderQueue;
 	
 	private final DebugLoggerEXT debugLog;
 	
@@ -84,7 +86,21 @@ public class VulkanCore implements AutoCloseable{
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
-		swapchain = device.createSwapchain(surface);
+		createSwapchain();
+	}
+	
+	public void recreateSwapchain(){
+		destroySwapchain();
+		createSwapchain();
+	}
+	
+	private void destroySwapchain(){
+		renderQueue.waitIdle();
+		renderQueue.destroy();
+		swapchain.destroy();
+	}
+	private void createSwapchain(){
+		swapchain = device.createSwapchain(surface, VKPresentMode.IMMEDIATE);
 		
 		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
 	}
@@ -206,8 +222,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	@Override
 	public void close(){
-		renderQueue.destroy();
-		swapchain.destroy();
+		destroySwapchain();
+		
 		device.destroy();
 		surface.destroy();
 		if(debugLog != null) debugLog.destroy();

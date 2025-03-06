@@ -10,8 +10,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
@@ -28,8 +30,9 @@ public class VulkanDisplay implements AutoCloseable{
 	private final VulkanCore vkCore;
 	
 	private final CommandPool         cmdPool;
-	private final List<CommandBuffer> graphicsBuffs;
+	private       List<CommandBuffer> graphicsBuffs;
 	
+	private boolean resizing;
 	
 	public VulkanDisplay(){
 		window = createWindow();
@@ -41,22 +44,71 @@ public class VulkanDisplay implements AutoCloseable{
 		cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
 		
-		recordCommandBuffer();
+		recordCommandBuffers();
 		
+		window.size.register(() -> {
+			if(!resizing){
+				for(int i = 0; i<32; i++){
+					if(!resizing) UtilL.sleep(1);
+				}
+			}
+			for(int i = 0; i<100; i++){
+				if(resizing) UtilL.sleep(1);
+			}
+		});
 	}
 	
 	private void render(){
+		try{
+			renderQueue();
+		}catch(VulkanCodeException e){
+			switch(e.code){
+				case KHRSwapchain.VK_SUBOPTIMAL_KHR, KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR -> {
+					handleResize();
+				}
+				default -> throw e;
+			}
+		}
+	}
+	private void renderQueue(){
+		vkCore.renderQueue.waitIdle();
+		recordCommandBuffers();
 		var bufferQueue = vkCore.renderQueue;
 		var index       = bufferQueue.acquireNextImage();
 		bufferQueue.submitAsync(graphicsBuffs.get(index));
 		bufferQueue.present(index);
 	}
 	
-	private void recordCommandBuffer(){
+	private void handleResize(){
+		resizing = true;
+		try{
+			vkCore.recreateSwapchain();
+			if(vkCore.swapchain.images.size() != graphicsBuffs.size()){
+				graphicsBuffs.forEach(CommandBuffer::destroy);
+				graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
+			}
+			
+			recordCommandBuffers();
+			try{
+				renderQueue();
+			}catch(VulkanCodeException e2){
+				switch(e2.code){
+					case KHRSwapchain.VK_SUBOPTIMAL_KHR, KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR -> { }
+					default -> throw e2;
+				}
+			}
+			vkCore.renderQueue.waitIdle();
+		}finally{
+			resizing = false;
+		}
+		
+	}
+	
+	private void recordCommandBuffers(){
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
-			clearColor.float32().put(0, new float[]{0, 0, 0, 1});
+			clearColor.float32().put(0, new float[]{0, 0, (float)Math.abs(Math.sin(System.currentTimeMillis()/1000D))*0.5F, 1});
 			
 			var imageRange = VkImageSubresourceRange.calloc(stack);
 			imageRange.aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
@@ -109,7 +161,7 @@ public class VulkanDisplay implements AutoCloseable{
 		win.loadState(winFile);
 		win.autoHandleStateSaving(winFile);
 		
-		win.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).resizeable(false));
+		win.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).resizeable(true));
 		Thread.ofVirtual().start(() -> win.setIcon(createVulkanIcon(128, 128)));
 		return win;
 	}
@@ -119,11 +171,21 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var t = Thread.ofPlatform().name("render").start(() -> {
 			while(!window.shouldClose()){
-				render();
+				try{
+					render();
+				}catch(Throwable e){
+					e.printStackTrace();
+					window.requestClose();
+				}
 			}
 		});
 		while(!window.shouldClose()){
-			window.pollEvents();
+			try{
+				window.pollEvents();
+			}catch(Throwable e){
+				e.printStackTrace();
+				window.requestClose();
+			}
 			try{
 				Thread.sleep(5);
 			}catch(InterruptedException e){ window.requestClose(); }

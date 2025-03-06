@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -79,8 +78,13 @@ public final class VUtils{
 		fail(errorCode, action);
 	}
 	private static void fail(int errorCode, String action){
-		var name = switch(errorCode){
-			case VK10.VK_SUCCESS -> throw new ShouldNeverHappenError();
+		var name = vkCodeToName(errorCode);
+		throw new VulkanCodeException(Log.fmt("Failed to call {}#red: {}#red", action, name), errorCode);
+	}
+	
+	public static String vkCodeToName(int errorCode){
+		return switch(errorCode){
+			case VK10.VK_SUCCESS -> "VK_SUCCESS";
 			case VK10.VK_NOT_READY -> "VK_NOT_READY";
 			case VK10.VK_TIMEOUT -> "VK_TIMEOUT";
 			case VK10.VK_EVENT_SET -> "VK_EVENT_SET";
@@ -130,9 +134,8 @@ public final class VUtils{
 			case EXTShaderObject.VK_INCOMPATIBLE_SHADER_BINARY_EXT -> "VK_INCOMPATIBLE_SHADER_BINARY_EXT";
 			case KHRPipelineBinary.VK_PIPELINE_BINARY_MISSING_KHR -> "VK_PIPELINE_BINARY_MISSING_KHR";
 			case KHRPipelineBinary.VK_ERROR_NOT_ENOUGH_SPACE_KHR -> "VK_ERROR_NOT_ENOUGH_SPACE_KHR";
-			default -> "<CODE " + errorCode + ">";
+			default -> null;
 		};
-		throw new IllegalStateException(Log.fmt("Failed to call {}#red: {}#red", action, name));
 	}
 	
 	public static PointerBuffer UTF8ArrayOnStack(MemoryStack stack, String... strings){

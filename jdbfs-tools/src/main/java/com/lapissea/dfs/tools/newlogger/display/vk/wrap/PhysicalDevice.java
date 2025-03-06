@@ -30,7 +30,6 @@ public class PhysicalDevice{
 	public final VkPhysicalDeviceType   type;
 	public final List<QueueFamilyProps> families;
 	public final List<SurfaceFormat>    formats;
-	public final SurfaceCapabilities    surfaceCapabilities;
 	public final Set<VKPresentMode>     presentModes;
 	public final List<MemoryType>       memoryTypes;
 	public final List<MemoryHeap>       memoryHeaps;
@@ -47,7 +46,6 @@ public class PhysicalDevice{
 			families = getQueueFamilies(pDevice, surface, stack);
 		}
 		formats = surface.getFormats(pDevice);
-		surfaceCapabilities = surface.getCapabilities(pDevice);
 		presentModes = Collections.unmodifiableSet(surface.getPresentModes(pDevice));
 		
 		try(var stack = MemoryStack.stackPush()){
@@ -56,7 +54,6 @@ public class PhysicalDevice{
 			
 			memoryTypes = Iters.from(mem.memoryTypes()).map(e -> new MemoryType(e.heapIndex(), e.propertyFlags())).toList();
 			memoryHeaps = Iters.from(mem.memoryHeaps()).map(e -> new MemoryHeap(e.flags(), e.size())).toList();
-			
 		}
 
 //		LogUtil.println(TextUtil.toTable(name, families));
@@ -65,6 +62,10 @@ public class PhysicalDevice{
 //		LogUtil.println("presentModes", presentModes);
 //		LogUtil.println(TextUtil.toTable(memoryTypes));
 //		LogUtil.println(TextUtil.toTable(memoryHeaps));
+	}
+	
+	public SurfaceCapabilities getSurfaceCapabilities(Surface surface){
+		return surface.getCapabilities(pDevice);
 	}
 	
 	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface, MemoryStack stack){
