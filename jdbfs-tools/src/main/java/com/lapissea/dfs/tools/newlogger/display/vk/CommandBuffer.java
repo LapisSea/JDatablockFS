@@ -11,7 +11,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.function.UnsafeRunnable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferMemoryBarrier;
@@ -30,26 +29,8 @@ import java.util.Set;
 
 public class CommandBuffer implements VulkanResource{
 	
-	public enum State{
-		INITIAL,
-		RECORDING,
-		EXECUTABLE,
-		PENDING,
-		INVALID;
-		
-		public boolean canTransitionTo(State state){
-			return switch(this){
-				case INITIAL -> state == RECORDING;
-				case RECORDING, PENDING -> state == EXECUTABLE || state == INVALID;
-				case EXECUTABLE -> state == PENDING || state == INVALID;
-				case INVALID -> state == INITIAL;
-			};
-		}
-	}
-	
 	private final VkCommandBuffer val;
 	private final CommandPool     pool;
-	private       State           state = State.INITIAL;
 	
 	public CommandBuffer(long handle, CommandPool pool){
 		this.val = new VkCommandBuffer(handle, pool.device.value);
@@ -57,26 +38,14 @@ public class CommandBuffer implements VulkanResource{
 	}
 	
 	public void begin(Set<VkCommandBufferUsageFlag> usage) throws VulkanCodeException{
-		transitionTo(State.RECORDING, () -> {
-			try(var stack = MemoryStack.stackPush()){
-				var info = VkCommandBufferBeginInfo.calloc(stack).sType$Default()
-				                                   .flags(Iters.from(usage).mapToInt(e -> e.bit).reduce(0, (a, b) -> a|b));
-				VKCalls.vkBeginCommandBuffer(val, info);
-			}
-		});
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkCommandBufferBeginInfo.calloc(stack).sType$Default()
+			                                   .flags(Iters.from(usage).mapToInt(e -> e.bit).reduce(0, (a, b) -> a|b));
+			VKCalls.vkBeginCommandBuffer(val, info);
+		}
 	}
 	public void end() throws VulkanCodeException{
-		transitionTo(State.EXECUTABLE, () -> {
-			VKCalls.vkEndCommandBuffer(val);
-		});
-	}
-	
-	private <E extends Throwable> void transitionTo(State state, UnsafeRunnable<E> action) throws E{
-//		if(!this.state.canTransitionTo(state)){
-//			throw new IllegalStateException("Cannot transition from " + this.state + " to " + state + "!");
-//		}
-		action.run();
-		this.state = state;
+		VKCalls.vkEndCommandBuffer(val);
 	}
 	
 	public long handle(){
@@ -86,11 +55,6 @@ public class CommandBuffer implements VulkanResource{
 	@Override
 	public void destroy(){
 		VKCalls.vkFreeCommandBuffers(pool, val);
-	}
-	
-	@Override
-	public String toString(){
-		return "CommandBuffer{" + state + '}';
 	}
 	
 	public void clearColorImage(Image image, VkImageLayout layout, VkClearColorValue color, VkImageSubresourceRange range){
