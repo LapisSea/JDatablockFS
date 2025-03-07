@@ -43,27 +43,27 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
-public final class VKCalls{
+public interface VKCalls{
 	
-	public static void check(int errorCode, String action) throws VulkanCodeException{
+	static void check(int errorCode, String action) throws VulkanCodeException{
 		if(errorCode == VK10.VK_SUCCESS){
 			return;
 		}
 		throw VulkanCodeException.from(errorCode, action);
 	}
 	
-	public static int vkAcquireNextImageKHR(VkDevice device, Swapchain swapchain, long timeout, VulkanSemaphore semaphore, long fence) throws VulkanCodeException{
+	static int vkAcquireNextImageKHR(VkDevice device, Swapchain swapchain, long timeout, VulkanSemaphore semaphore, long fence) throws VulkanCodeException{
 		var index = new int[1];
 		check(KHRSwapchain.vkAcquireNextImageKHR(device, swapchain.handle, timeout, semaphore.handle, fence, index), "vkAcquireNextImageKHR");
 		return index[0];
 	}
-	public static void vkQueueSubmit(VkQueue queue, VkSubmitInfo info, int fence) throws VulkanCodeException{
+	static void vkQueueSubmit(VkQueue queue, VkSubmitInfo info, int fence) throws VulkanCodeException{
 		check(VK10.vkQueueSubmit(queue, info, fence), "vkQueueSubmit");
 	}
-	public static void vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR info) throws VulkanCodeException{
+	static void vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR info) throws VulkanCodeException{
 		check(KHRSwapchain.vkQueuePresentKHR(queue, info), "vkQueuePresentKHR");
 	}
-	public static void vkQueueWaitIdle(VkQueue queue) throws VulkanCodeException{
+	static void vkQueueWaitIdle(VkQueue queue) throws VulkanCodeException{
 		check(VK10.vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 	}
 	static VkInstance vkCreateInstance(MemoryStack stack, VkInstanceCreateInfo info) throws VulkanCodeException{
@@ -74,26 +74,26 @@ public final class VKCalls{
 	static void vkEnumerateInstanceExtensionProperties(CharSequence pLayerName, IntBuffer pPropertyCount, VkExtensionProperties.Buffer pProperties) throws VulkanCodeException{
 		check(VK10.vkEnumerateInstanceExtensionProperties(pLayerName, pPropertyCount, pProperties), "vkEnumerateInstanceExtensionProperties");
 	}
-	public static Swapchain vkCreateSwapchainKHR(Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
+	static Swapchain vkCreateSwapchainKHR(Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(KHRSwapchain.vkCreateSwapchainKHR(device.value, createInfo, null, ptr), "vkCreateSwapchainKHR");
 		return new Swapchain(ptr[0], device, createInfo);
 	}
-	public static void vkGetSwapchainImagesKHR(Device device, Swapchain swapchain, IntBuffer pSwapchainImageCount, LongBuffer pSwapchainImages) throws VulkanCodeException{
+	static void vkGetSwapchainImagesKHR(Device device, Swapchain swapchain, IntBuffer pSwapchainImageCount, LongBuffer pSwapchainImages) throws VulkanCodeException{
 		check(KHRSwapchain.vkGetSwapchainImagesKHR(device.value, swapchain.handle, pSwapchainImageCount, pSwapchainImages), "vkGetSwapchainImagesKHR");
 	}
-	public static ImageView vkCreateImageView(Device device, VkImageViewCreateInfo info) throws VulkanCodeException{
+	static ImageView vkCreateImageView(Device device, VkImageViewCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateImageView(device.value, info, null, ptr), "vkCreateImageView");
 		return new ImageView(ptr[0], device);
 	}
-	public static long vkCreateCommandPool(Device device, VkCommandPoolCreateInfo info) throws VulkanCodeException{
+	static long vkCreateCommandPool(Device device, VkCommandPoolCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateCommandPool(device.value, info, null, ptr), "vkCreateCommandPool");
 		var res = ptr[0];
 		return res;
 	}
-	public static VulkanSemaphore vkCreateSemaphore(Device device, VkSemaphoreCreateInfo info) throws VulkanCodeException{
+	static VulkanSemaphore vkCreateSemaphore(Device device, VkSemaphoreCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateSemaphore(device.value, info, null, ptr), "vkCreateSemaphore");
 		return new VulkanSemaphore(ptr[0], device);
@@ -104,34 +104,34 @@ public final class VKCalls{
 	static void vkEndCommandBuffer(VkCommandBuffer commandBuffer) throws VulkanCodeException{
 		check(VK10.vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
 	}
-	public static void vkAllocateCommandBuffers(Device device, VkCommandBufferAllocateInfo pAllocateInfo, PointerBuffer pCommandBuffers) throws VulkanCodeException{
+	static void vkAllocateCommandBuffers(Device device, VkCommandBufferAllocateInfo pAllocateInfo, PointerBuffer pCommandBuffers) throws VulkanCodeException{
 		check(VK10.vkAllocateCommandBuffers(device.value, pAllocateInfo, pCommandBuffers), "vkAllocateCommandBuffers");
 	}
-	public static Surface glfwCreateWindowSurface(VkInstance instance, long windowHandle) throws VulkanCodeException{
+	static Surface glfwCreateWindowSurface(VkInstance instance, long windowHandle) throws VulkanCodeException{
 		var surfaceRef = new long[1];
 		check(GLFWVulkan.glfwCreateWindowSurface(instance, windowHandle, null, surfaceRef), "glfwCreateWindowSurface");
 		return new Surface(instance, surfaceRef[0]);
 	}
-	public static boolean vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice device, int familyIndex, Surface surface) throws VulkanCodeException{
+	static boolean vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice device, int familyIndex, Surface surface) throws VulkanCodeException{
 		var res = new int[1];
 		check(KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, surface.handle, res), "vkGetPhysicalDeviceSurfaceSupportKHR");
 		return res[0] == VK10.VK_TRUE;
 	}
-	public static void vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, Surface surface, IntBuffer pSurfaceFormatCount, VkSurfaceFormatKHR.Buffer pSurfaceFormats) throws VulkanCodeException{
+	static void vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, Surface surface, IntBuffer pSurfaceFormatCount, VkSurfaceFormatKHR.Buffer pSurfaceFormats) throws VulkanCodeException{
 		check(KHRSurface.vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface.handle, pSurfaceFormatCount, pSurfaceFormats), "vkGetPhysicalDeviceSurfaceFormatsKHR");
 	}
-	public static void vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, Surface surface, IntBuffer pPresentModeCount, IntBuffer pPresentModes) throws VulkanCodeException{
+	static void vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, Surface surface, IntBuffer pPresentModeCount, IntBuffer pPresentModes) throws VulkanCodeException{
 		check(KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface.handle, pPresentModeCount, pPresentModes), "vkGetPhysicalDeviceSurfacePresentModesKHR");
 	}
 	
-	public static SurfaceCapabilities vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, long surfaceHandle) throws VulkanCodeException{
+	static SurfaceCapabilities vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, long surfaceHandle) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			var caps = VkSurfaceCapabilitiesKHR.malloc(mem);
 			check(KHRSurface.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surfaceHandle, caps), "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
 			return new SurfaceCapabilities(caps);
 		}
 	}
-	public static VkDevice vkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo info) throws VulkanCodeException{
+	static VkDevice vkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo info) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			var ptr = mem.mallocPointer(1);
 			check(VK10.vkCreateDevice(physicalDevice, info, null, ptr), "vkCreateDevice");
@@ -141,7 +141,7 @@ public final class VKCalls{
 	static void vkEnumerateInstanceLayerProperties(IntBuffer pPropertyCount, VkLayerProperties.Buffer pProperties) throws VulkanCodeException{
 		check(VK10.vkEnumerateInstanceLayerProperties(pPropertyCount, pProperties), "vkEnumerateInstanceLayerProperties");
 	}
-	public static long vkCreateDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerCreateInfoEXT cInfo) throws VulkanCodeException{
+	static long vkCreateDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerCreateInfoEXT cInfo) throws VulkanCodeException{
 		var callbackB = new long[1];
 		check(EXTDebugUtils.vkCreateDebugUtilsMessengerEXT(instance, cInfo, null, callbackB), "createDebugUtilsMessenger");
 		return callbackB[0];
@@ -152,12 +152,12 @@ public final class VKCalls{
 	static void vkFreeCommandBuffers(CommandPool pool, VkCommandBuffer commandBuffer){
 		VK10.vkFreeCommandBuffers(pool.device.value, pool.handle, commandBuffer);
 	}
-	public static RenderPass vkCreateRenderPass(Device device, VkRenderPassCreateInfo pCreateInfo) throws VulkanCodeException{
+	static RenderPass vkCreateRenderPass(Device device, VkRenderPassCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateRenderPass(device.value, pCreateInfo, null, res), "vkCreateRenderPass");
 		return new RenderPass(res[0], device);
 	}
-	public static FrameBuffer vkCreateFramebuffer(Device device, VkFramebufferCreateInfo info) throws VulkanCodeException{
+	static FrameBuffer vkCreateFramebuffer(Device device, VkFramebufferCreateInfo info) throws VulkanCodeException{
 		var ref = new long[1];
 		check(VK10.vkCreateFramebuffer(device.value, info, null, ref), "vkCreateFramebuffer");
 		return new FrameBuffer(ref[0], device);
