@@ -104,6 +104,10 @@ public class Device implements VulkanResource{
 		}
 	}
 	
+	public RenderPass.Builder buildRenderPass(){
+		return new RenderPass.Builder(this);
+	}
+	
 	@Override
 	public void destroy(){
 		VK10.vkDestroyDevice(value, null);

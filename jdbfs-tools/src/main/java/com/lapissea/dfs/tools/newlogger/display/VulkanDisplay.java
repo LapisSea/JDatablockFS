@@ -2,20 +2,15 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAccessFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkClearColorValue;
-import org.lwjgl.vulkan.VkImageSubresourceRange;
 
 import java.io.File;
 import java.time.Instant;
@@ -31,9 +26,6 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
-	
-	private boolean resizing;
-	private Instant nextResizeWaitAttempt = Instant.now();
 	
 	public VulkanDisplay(){
 		window = createWindow();
@@ -76,10 +68,12 @@ public class VulkanDisplay implements AutoCloseable{
 		bufferQueue.present(index);
 	}
 	
+	private boolean resizing;
+	private Instant nextResizeWaitAttempt = Instant.now();
 	private void handleResize() throws VulkanCodeException{
 		resizing = true;
 		try{
-			vkCore.recreateSwapchain();
+			vkCore.recreateSwapchainContext();
 			if(vkCore.swapchain.images.size() != graphicsBuffs.size()){
 				graphicsBuffs.forEach(CommandBuffer::destroy);
 				graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
@@ -131,38 +125,15 @@ public class VulkanDisplay implements AutoCloseable{
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
 			clearColor.float32().put(0, new float[]{0, 0, (float)Math.abs(Math.sin(System.currentTimeMillis()/1000D))*0.5F, 1});
 			
-			var imageRange = VkImageSubresourceRange.calloc(stack);
-			imageRange.aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
-			          .baseMipLevel(0)
-			          .levelCount(1)
-			          .baseArrayLayer(0)
-			          .layerCount(1);
+			var renderArea = new Rect2D(vkCore.swapchain.extent);
 			
 			for(int i = 0; i<graphicsBuffs.size(); i++){
-				var buf    = graphicsBuffs.get(i);
-				var target = vkCore.swapchain.images.get(i);
-				
-				var presentToClear = new MemoryBarrier.BarImage(
-					VkAccessFlag.MEMORY_READ,
-					VkAccessFlag.TRANSFER_WRITE,
-					VkImageLayout.UNDEFINED,
-					VkImageLayout.TRANSFER_DST_OPTIMAL,
-					target,
-					imageRange
-				);
-				var clearToPresent = new MemoryBarrier.BarImage(
-					presentToClear,
-					VkAccessFlag.MEMORY_READ,
-					VkImageLayout.PRESENT_SRC_KHR
-				);
+				var buf         = graphicsBuffs.get(i);
+				var frameBuffer = vkCore.frameBuffers.get(i);
 				
 				buf.begin(Set.of());
-				{
-					buf.pipelineBarrier(VkPipelineStageFlag.TRANSFER, VkPipelineStageFlag.TRANSFER, 0, List.of(presentToClear));
+				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
-					buf.clearColorImage(target, presentToClear.newLayout(), clearColor, imageRange);
-					
-					buf.pipelineBarrier(VkPipelineStageFlag.TRANSFER, VkPipelineStageFlag.BOTTOM_OF_PIPE, 0, List.of(clearToPresent));
 				}
 				buf.end();
 			}

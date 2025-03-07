@@ -16,11 +16,13 @@ import java.util.Set;
 
 public class Image implements VulkanResource{
 	
-	public final  long   handle;
-	private final Device device;
+	public final  long     handle;
+	public final  Extent2D extent;
+	private final Device   device;
 	
-	public Image(long handle, Device device){
+	public Image(long handle, Extent2D extent, Device device){
 		this.handle = handle;
+		this.extent = extent;
 		this.device = device;
 	}
 	

@@ -5,19 +5,25 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCommandBufferUsageFla
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Image;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.function.UnsafeRunnable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkClearColorValue;
+import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkMemoryBarrier;
+import org.lwjgl.vulkan.VkRect2D;
+import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 
 import java.util.List;
 import java.util.Set;
@@ -136,6 +142,27 @@ public class CommandBuffer implements VulkanResource{
 			}
 			
 			VK10.vkCmdPipelineBarrier(val, srcStageMask.bit, dstStageMask.bit, dependencyFlags, globals, memories, images);
+		}
+	}
+	
+	public interface RenderPassScope extends AutoCloseable{
+		@Override
+		void close();
+	}
+	
+	public RenderPassScope beginRenderPass(RenderPass renderPass, FrameBuffer frameBuffer, Rect2D renderArea, VkClearColorValue color){
+		try(var stack = MemoryStack.stackPush()){
+			
+			var info = VkRenderPassBeginInfo.malloc(stack)
+			                                .sType$Default().pNext(0)
+			                                .renderPass(renderPass.handle)
+			                                .framebuffer(frameBuffer.handle)
+			                                .renderArea(renderArea.set(VkRect2D.malloc(stack)))
+			                                .pClearValues(VkClearValue.malloc(1, stack).color(color));
+			
+			VK10.vkCmdBeginRenderPass(val, info, VK10.VK_SUBPASS_CONTENTS_INLINE);
+			
+			return () -> VK10.vkCmdEndRenderPass(val);
 		}
 	}
 }

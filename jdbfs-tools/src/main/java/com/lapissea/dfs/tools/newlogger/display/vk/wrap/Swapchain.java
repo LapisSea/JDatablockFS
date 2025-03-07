@@ -18,6 +18,8 @@ import java.util.Set;
 public class Swapchain implements VulkanResource{
 	
 	public final long            handle;
+	public final VkFormat        format;
+	public final Extent2D        extent;
 	public final Device          device;
 	public final List<Image>     images;
 	public final List<ImageView> imageViews;
@@ -25,6 +27,8 @@ public class Swapchain implements VulkanResource{
 	public Swapchain(long handle, Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
 		this.handle = handle;
 		this.device = device;
+		format = VkFormat.from(createInfo.imageFormat());
+		extent = new Extent2D(createInfo.imageExtent());
 		
 		var format = VkFormat.from(createInfo.imageFormat());
 		
@@ -39,14 +43,12 @@ public class Swapchain implements VulkanResource{
 	
 	private List<Image> getSwapchainImages() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
-			var count     = stack.mallocInt(1);
-			var device    = this.device;
-			var swapchain = this;
-			VKCalls.vkGetSwapchainImagesKHR(device, swapchain, count, null);
+			var count = stack.mallocInt(1);
+			VKCalls.vkGetSwapchainImagesKHR(device, this, count, null);
 			var imageRefs = stack.mallocLong(count.get(0));
-			VKCalls.vkGetSwapchainImagesKHR(device, swapchain, count, imageRefs);
+			VKCalls.vkGetSwapchainImagesKHR(device, this, count, imageRefs);
 			
-			return Iters.rangeMap(0, imageRefs.capacity(), i -> new Image(imageRefs.get(i), device)).toList();
+			return Iters.rangeMap(0, imageRefs.capacity(), i -> new Image(imageRefs.get(i), extent, device)).toList();
 		}
 	}
 	

@@ -4,11 +4,18 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
@@ -25,6 +32,7 @@ import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
+import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
@@ -62,6 +70,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	
 	private final String         name;
+	private final DebugLoggerEXT debugLog;
+	
 	private final VkInstance     instance;
 	private final Surface        surface;
 	private final PhysicalDevice physicalDevice;
@@ -69,10 +79,10 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final QueueFamilyProps renderQueueFamily;
 	
-	public Swapchain   swapchain;
-	public VulkanQueue renderQueue;
-	
-	private final DebugLoggerEXT debugLog;
+	public Swapchain         swapchain;
+	public VulkanQueue       renderQueue;
+	public RenderPass        renderPass;
+	public List<FrameBuffer> frameBuffers;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
@@ -89,30 +99,82 @@ public class VulkanCore implements AutoCloseable{
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
-		createSwapchain();
+		createSwapchainContext();
 	}
 	
-	public void recreateSwapchain() throws VulkanCodeException{
-		destroySwapchain();
-		createSwapchain();
+	public void recreateSwapchainContext() throws VulkanCodeException{
+		destroySwapchainContext();
+		createSwapchainContext();
 	}
 	
-	private void destroySwapchain(){
+	private void destroySwapchainContext(){
 		try{
 			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		for(FrameBuffer frameBuffer : frameBuffers){
+			frameBuffer.destroy();
+		}
+		renderPass.close();
 		renderQueue.destroy();
 		swapchain.destroy();
 	}
-	private void createSwapchain() throws VulkanCodeException{
+	private void createSwapchainContext() throws VulkanCodeException{
 		swapchain = device.createSwapchain(surface, VKPresentMode.IMMEDIATE);
 		
 		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
+		
+		renderPass = createRenderPass();
+		frameBuffers = createFrameBuffers();
+	}
+	
+	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var viewRef = stack.mallocLong(1);
+			var info = VkFramebufferCreateInfo.calloc(stack)
+			                                  .sType$Default()
+			                                  .renderPass(renderPass.handle)
+			                                  .pAttachments(viewRef)
+			                                  .width(swapchain.extent.width)
+			                                  .height(swapchain.extent.height)
+			                                  .layers(1);
+			
+			var views = swapchain.imageViews;
+			var fbs   = new ArrayList<FrameBuffer>(views.size());
+			for(var view : views){
+				viewRef.put(0, view.handle);
+				fbs.add(VKCalls.vkCreateFramebuffer(device, info));
+			}
+			return List.copyOf(fbs);
+		}
+	}
+	
+	private RenderPass createRenderPass() throws VulkanCodeException{
+		
+		var attachment = new RenderPass.AttachmentInfo(
+			swapchain.format,
+			VkSampleCountFlag.N1,
+			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+			VkImageLayout.UNDEFINED, VkImageLayout.PRESENT_SRC_KHR
+		);
+		
+		var subpass = new RenderPass.SubpassInfo(
+			VkPipelineBindPoint.GRAPHICS,
+			List.of(),
+			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.PRESENT_SRC_KHR)),
+			List.of(),
+			null,
+			new int[0]
+		);
+		
+		return device.buildRenderPass().attachment(attachment).subpass(subpass).build();
 	}
 	
 	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueCapability capability){
 		return Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(capability));
 	}
+	
+	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of("VUID-VkAttachmentReference-layout-03077");
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
 		var severityS = Optional.ofNullable(severity).map(e -> e.color + e.name()).orElse(ConsoleColors.RED_BRIGHT + "UNKNOWN") + ConsoleColors.RESET;
@@ -128,8 +190,10 @@ public class VulkanCore implements AutoCloseable{
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
 			new RuntimeException(msgFinal).printStackTrace();
-			System.exit(1);
-			return true;
+			if(!WHITELISTED_ERROR_IDS.contains(messageIDName)){
+				System.exit(1);
+				return true;
+			}
 		}else{
 			Log.log(msgFinal);
 		}
@@ -225,7 +289,7 @@ public class VulkanCore implements AutoCloseable{
 	
 	@Override
 	public void close(){
-		destroySwapchain();
+		destroySwapchainContext();
 		
 		device.destroy();
 		surface.destroy();

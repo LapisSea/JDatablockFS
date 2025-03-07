@@ -3,7 +3,9 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ImageView;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
@@ -23,6 +25,7 @@ import org.lwjgl.vulkan.VkDebugUtilsMessengerCreateInfoEXT;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
+import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
@@ -30,6 +33,7 @@ import org.lwjgl.vulkan.VkLayerProperties;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
+import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
@@ -147,5 +151,15 @@ public final class VKCalls{
 	}
 	static void vkFreeCommandBuffers(CommandPool pool, VkCommandBuffer commandBuffer){
 		VK10.vkFreeCommandBuffers(pool.device.value, pool.handle, commandBuffer);
+	}
+	public static RenderPass vkCreateRenderPass(Device device, VkRenderPassCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreateRenderPass(device.value, pCreateInfo, null, res), "vkCreateRenderPass");
+		return new RenderPass(res[0], device);
+	}
+	public static FrameBuffer vkCreateFramebuffer(Device device, VkFramebufferCreateInfo info) throws VulkanCodeException{
+		var ref = new long[1];
+		check(VK10.vkCreateFramebuffer(device.value, info, null, ref), "vkCreateFramebuffer");
+		return new FrameBuffer(ref[0], device);
 	}
 }
