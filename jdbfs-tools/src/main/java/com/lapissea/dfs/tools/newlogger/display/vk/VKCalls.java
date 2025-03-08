@@ -1,16 +1,19 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ImageView;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanSemaphore;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
@@ -27,11 +30,13 @@ import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
+import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
 import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
@@ -44,6 +49,7 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.List;
 
 public interface VKCalls{
 	
@@ -164,9 +170,22 @@ public interface VKCalls{
 		check(VK10.vkCreateFramebuffer(device.value, info, null, ref), "vkCreateFramebuffer");
 		return new FrameBuffer(ref[0], device);
 	}
-	static ShaderModule vkCreateShaderModule(Device device, VkShaderModuleCreateInfo pCreateInfo) throws VulkanCodeException{
+	static ShaderModule vkCreateShaderModule(Device device, VkShaderStageFlag stage, VkShaderModuleCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateShaderModule(device.value, pCreateInfo, null, res), "vkCreateShaderModule");
-		return new ShaderModule(res[0], device);
+		return new ShaderModule(res[0], stage, device);
+	}
+	static List<Pipeline> vkCreateGraphicsPipelines(Device device, long pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
+		long[] result = new long[pCreateInfos.capacity()];
+		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
+		return Iters.rangeMap(0, result.length, i -> {
+			var layout = new Pipeline.Layout(pCreateInfos.get(i).layout(), device);
+			return new Pipeline(result[i], layout, device);
+		}).toList();
+	}
+	static Pipeline.Layout vkCreatePipelineLayout(Device device, VkPipelineLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
+		long[] res = new long[1];
+		check(VK10.vkCreatePipelineLayout(device.value, pCreateInfo, null, res), "vkCreatePipelineLayout");
+		return new Pipeline.Layout(res[0], device);
 	}
 }

@@ -134,6 +134,10 @@ public class VulkanDisplay implements AutoCloseable{
 				buf.begin(Set.of());
 				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
+					buf.bindPipeline(vkCore.pipeline, true);
+					
+					buf.draw(3, 1, 0, 0);
+					
 				}
 				buf.end();
 			}

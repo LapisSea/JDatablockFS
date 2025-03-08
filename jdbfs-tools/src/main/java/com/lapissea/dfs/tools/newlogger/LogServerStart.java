@@ -12,11 +12,14 @@ public final class LogServerStart{
 	static{
 		//Eager init to reduce startup time
 		Thread.ofVirtual().start(VulkanCore::preload);
-		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
+//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
 	public static void main(String[] args) throws IOException, LockedFlagSet{
 //		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
+
+//		LogUtil.println(ProcessHandle.current().pid());
+//		UtilL.sleep(5000);
 		
 		var t = System.currentTimeMillis();
 		try(var display = new VulkanDisplay()){

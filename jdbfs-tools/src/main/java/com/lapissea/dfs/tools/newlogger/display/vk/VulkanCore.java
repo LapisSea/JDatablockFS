@@ -8,15 +8,20 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
@@ -88,10 +93,14 @@ public class VulkanCore implements AutoCloseable{
 	public VulkanQueue       renderQueue;
 	public RenderPass        renderPass;
 	public List<FrameBuffer> frameBuffers;
+	public Pipeline          pipeline;
+	
+	private final ShaderModuleSet testShaderModules;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
 		instance = createInstance();
+		testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
 		
 		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
@@ -104,13 +113,20 @@ public class VulkanCore implements AutoCloseable{
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
-		createSwapchainContext();
 		
-		var vert = createShaderModule("test", ShaderType.VERTEX);
-		var frag = createShaderModule("test", ShaderType.FRAGMENT);
+		createSwapchainContext();
 	}
 	
-	private ShaderModule createShaderModule(String name, ShaderType type) throws VulkanCodeException{
+	public ShaderModule createShaderModule(ByteBuffer spirv, ShaderType type) throws VulkanCodeException{
+		var device = this.device;
+		try(var stack = MemoryStack.stackPush()){
+			
+			var pCreateInfo = VkShaderModuleCreateInfo.calloc(stack).sType$Default().pCode(spirv);
+			
+			return VKCalls.vkCreateShaderModule(device, type.vkFlag, pCreateInfo);
+		}
+	}
+	public static ByteBuffer sourceToSpirv(String name, ShaderType type){
 		var path = "/shaders/" + name + "." + type.extension;
 		
 		ByteBuffer spirv;
@@ -119,13 +135,7 @@ public class VulkanCore implements AutoCloseable{
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to compile shader: " + name + " - " + type, e);
 		}
-		var device = this.device;
-		try(var stack = MemoryStack.stackPush()){
-			
-			var pCreateInfo = VkShaderModuleCreateInfo.calloc(stack).sType$Default().pCode(spirv);
-			
-			return VKCalls.vkCreateShaderModule(device, pCreateInfo);
-		}
+		return spirv;
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
@@ -133,10 +143,22 @@ public class VulkanCore implements AutoCloseable{
 		createSwapchainContext();
 	}
 	
+	private void createSwapchainContext() throws VulkanCodeException{
+		swapchain = device.createSwapchain(surface, VKPresentMode.IMMEDIATE);
+		
+		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
+		
+		renderPass = createRenderPass();
+		frameBuffers = createFrameBuffers();
+		
+		pipeline = createPipeline();
+	}
 	private void destroySwapchainContext(){
 		try{
 			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		pipeline.destroy();
 		
 		for(FrameBuffer frameBuffer : frameBuffers){
 			frameBuffer.destroy();
@@ -145,13 +167,13 @@ public class VulkanCore implements AutoCloseable{
 		renderQueue.destroy();
 		swapchain.destroy();
 	}
-	private void createSwapchainContext() throws VulkanCodeException{
-		swapchain = device.createSwapchain(surface, VKPresentMode.IMMEDIATE);
-		
-		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
-		
-		renderPass = createRenderPass();
-		frameBuffers = createFrameBuffers();
+	
+	private Pipeline createPipeline() throws VulkanCodeException{
+		var area = new Rect2D(swapchain.extent);
+		return device.createPipeline(
+			renderPass, 0, testShaderModules, area, area,
+			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, VkSampleCountFlag.N1
+		);
 	}
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
@@ -187,7 +209,7 @@ public class VulkanCore implements AutoCloseable{
 		var subpass = new RenderPass.SubpassInfo(
 			VkPipelineBindPoint.GRAPHICS,
 			List.of(),
-			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.PRESENT_SRC_KHR)),
+			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
 			List.of(),
 			null,
 			new int[0]
@@ -208,7 +230,8 @@ public class VulkanCore implements AutoCloseable{
 		
 		var msgFinal = message.replace("] Object ", "]\n  Object ")
 		                      .replace("; Object ", ";\n  Object ")
-		                      .replace("; | MessageID", ";\n| MessageID");
+		                      .replace("; | MessageID", ";\n| MessageID")
+		                      .replace("] | MessageID", "]\n| MessageID");
 		if(msgFinal.contains("\n")){
 			msgFinal = "\n" + msgFinal;
 		}
@@ -317,6 +340,7 @@ public class VulkanCore implements AutoCloseable{
 	public void close(){
 		destroySwapchainContext();
 		
+		testShaderModules.destroy();
 		device.destroy();
 		surface.destroy();
 		if(debugLog != null) debugLog.destroy();

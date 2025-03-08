@@ -75,6 +75,7 @@ public class RenderPass implements VulkanResource{
 				   .attachment(attachment.attachment)
 				   .layout(attachment.layout.id);
 			}
+			res.position(0);
 			return res;
 		}
 		

@@ -8,6 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Image;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -81,6 +82,7 @@ public class CommandBuffer implements VulkanResource{
 					}
 					bar.set(globals.position(i++));
 				}
+				globals.position(0);
 			}
 			VkBufferMemoryBarrier.Buffer memories = null;
 			if(mc>0){
@@ -92,6 +94,7 @@ public class CommandBuffer implements VulkanResource{
 					}
 					bar.set(memories.position(i++));
 				}
+				memories.position(0);
 			}
 			VkImageMemoryBarrier.Buffer images = null;
 			if(ic>0){
@@ -103,6 +106,7 @@ public class CommandBuffer implements VulkanResource{
 					}
 					bar.set(images.position(i++));
 				}
+				images.position(0);
 			}
 			
 			VK10.vkCmdPipelineBarrier(val, srcStageMask.bit, dstStageMask.bit, dependencyFlags, globals, memories, images);
@@ -128,5 +132,12 @@ public class CommandBuffer implements VulkanResource{
 			
 			return () -> VK10.vkCmdEndRenderPass(val);
 		}
+	}
+	
+	public void bindPipeline(Pipeline pipeline, boolean graphics){
+		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
+	}
+	public void draw(int vertexCount, int instanceCount, int firstVertex, int firstInstance){
+		VK10.vkCmdDraw(val, vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 }
