@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.tools.newlogger.display.ShaderCompiler;
+import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
@@ -16,6 +18,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
@@ -36,7 +39,9 @@ import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
+import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -100,6 +105,27 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
 		createSwapchainContext();
+		
+		var vert = createShaderModule("test", ShaderType.VERTEX);
+		var frag = createShaderModule("test", ShaderType.FRAGMENT);
+	}
+	
+	private ShaderModule createShaderModule(String name, ShaderType type) throws VulkanCodeException{
+		var path = "/shaders/" + name + "." + type.extension;
+		
+		ByteBuffer spirv;
+		try{
+			spirv = ShaderCompiler.glslToSpirv(path, type.vkFlag, VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0));
+		}catch(Throwable e){
+			throw new RuntimeException("Failed to compile shader: " + name + " - " + type, e);
+		}
+		var device = this.device;
+		try(var stack = MemoryStack.stackPush()){
+			
+			var pCreateInfo = VkShaderModuleCreateInfo.calloc(stack).sType$Default().pCode(spirv);
+			
+			return VKCalls.vkCreateShaderModule(device, pCreateInfo);
+		}
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{

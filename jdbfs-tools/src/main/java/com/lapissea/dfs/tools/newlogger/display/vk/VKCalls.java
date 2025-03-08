@@ -6,6 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
@@ -35,6 +36,7 @@ import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
+import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
@@ -161,5 +163,10 @@ public interface VKCalls{
 		var ref = new long[1];
 		check(VK10.vkCreateFramebuffer(device.value, info, null, ref), "vkCreateFramebuffer");
 		return new FrameBuffer(ref[0], device);
+	}
+	static ShaderModule vkCreateShaderModule(Device device, VkShaderModuleCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreateShaderModule(device.value, pCreateInfo, null, res), "vkCreateShaderModule");
+		return new ShaderModule(res[0], device);
 	}
 }

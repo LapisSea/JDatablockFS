@@ -21,4 +21,13 @@ public class Extent2D{
 	public VkExtent2D toStack(MemoryStack mem){
 		return VkExtent2D.malloc(mem).set(width, height);
 	}
+	
+	@Override
+	public final boolean equals(Object o){
+		return o instanceof Extent2D that && width == that.width && height == that.height;
+	}
+	@Override
+	public int hashCode(){
+		return 31*width + height;
+	}
 }

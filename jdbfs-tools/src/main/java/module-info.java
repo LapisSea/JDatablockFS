@@ -14,6 +14,7 @@ module JDatablockFS.tools {
 	requires imgui.lwjgl3;
 	requires imgui.binding;
 	requires org.lwjgl.vulkan;
+	requires org.lwjgl.shaderc;
 	
 	exports com.lapissea.dfs.tools;
 	exports com.lapissea.dfs.tools.logging;
