@@ -216,4 +216,9 @@ public class Device implements VulkanResource{
 	public void destroy(){
 		VK10.vkDestroyDevice(value, null);
 	}
+	
+	@Override
+	public String toString(){
+		return "Device{" + physicalDevice.name + "}";
+	}
 }

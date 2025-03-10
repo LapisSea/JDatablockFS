@@ -25,14 +25,15 @@ import java.util.Set;
 
 public class PhysicalDevice{
 	
+	public record MemoryProperties(List<MemoryType> memoryTypes, List<MemoryHeap> memoryHeaps){ }
+	
 	public final VkPhysicalDevice       pDevice;
 	public final String                 name;
 	public final VkPhysicalDeviceType   type;
 	public final List<QueueFamilyProps> families;
 	public final List<SurfaceFormat>    formats;
 	public final Set<VKPresentMode>     presentModes;
-	public final List<MemoryType>       memoryTypes;
-	public final List<MemoryHeap>       memoryHeaps;
+	public final MemoryProperties       memoryProperties;
 	
 	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
 		this.pDevice = pDevice;
@@ -52,8 +53,9 @@ public class PhysicalDevice{
 			var mem = VkPhysicalDeviceMemoryProperties.malloc(stack);
 			VK10.vkGetPhysicalDeviceMemoryProperties(pDevice, mem);
 			
-			memoryTypes = Iters.from(mem.memoryTypes()).map(e -> new MemoryType(e.heapIndex(), e.propertyFlags())).toList();
-			memoryHeaps = Iters.from(mem.memoryHeaps()).map(e -> new MemoryHeap(e.flags(), e.size())).toList();
+			var memoryTypes = Iters.from(mem.memoryTypes()).map(e -> new MemoryType(e.heapIndex(), e.propertyFlags())).toList();
+			var memoryHeaps = Iters.from(mem.memoryHeaps()).map(e -> new MemoryHeap(e.flags(), e.size())).toList();
+			memoryProperties = new MemoryProperties(memoryTypes, memoryHeaps);
 		}
 
 //		LogUtil.println(TextUtil.toTable(name, families));

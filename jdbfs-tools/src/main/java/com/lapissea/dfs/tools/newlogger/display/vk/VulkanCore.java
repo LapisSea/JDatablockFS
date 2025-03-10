@@ -8,15 +8,19 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -26,17 +30,21 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
+import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
@@ -44,6 +52,7 @@ import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
+import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
 import java.nio.ByteBuffer;
@@ -95,12 +104,17 @@ public class VulkanCore implements AutoCloseable{
 	public List<FrameBuffer> frameBuffers;
 	public Pipeline          pipeline;
 	
-	private final ShaderModuleSet testShaderModules;
+	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
+	
+	private final CommandPool   transferPool;
+	private final CommandBuffer transferBuffer;
+	private final VulkanQueue   transferQueue;
+	
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
+		
 		instance = createInstance();
-		testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
 		
 		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
@@ -114,7 +128,79 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
 		
+		
+		var transferFamily = findQueueFamilyBy(VkQueueCapability.TRANSFER).orElseThrow();
+		transferPool = device.createCommandPool(transferFamily, CommandPool.Type.NORMAL);
+		transferBuffer = transferPool.createCommandBuffer();
+		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
 		createSwapchainContext();
+	}
+	
+	public BufferAndMemory createBuffer(long size, Set<VkBufferUsageFlag> usageFlags, Set<VkMemoryPropertyFlags> memoryFlags) throws VulkanCodeException{
+		VkBuffer     buffer = null;
+		DeviceMemory memory = null;
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkBufferCreateInfo.calloc(stack)
+			                             .sType$Default()
+			                             .size(size)
+			                             .usage(Iters.from(usageFlags).mapToInt(b -> b.bit).reduce(0, (a, b) -> a|b))
+			                             .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
+			
+			buffer = VKCalls.vkCreateBuffer(device, info);
+			
+			var requirement = buffer.getRequirements();
+			
+			int memoryTypeIndex = getMemoryTypeIndex(requirement.memoryTypeBits(), memoryFlags);
+			
+			var pAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
+			                                        .sType$Default()
+			                                        .allocationSize(requirement.size())
+			                                        .memoryTypeIndex(memoryTypeIndex);
+			
+			memory = VKCalls.vkAllocateMemory(device, pAllocateInfo);
+			
+			VKCalls.vkBindBufferMemory(buffer, memory, 0);
+			
+			return new BufferAndMemory(buffer, memory, requirement.size());
+		}catch(Throwable e){
+			if(buffer != null) buffer.destroy();
+			if(memory != null) memory.destroy();
+			throw e;
+		}
+	}
+	
+	private int getMemoryTypeIndex(int typeBits, Set<VkMemoryPropertyFlags> requiredProperties){
+		return Iters.from(physicalDevice.memoryProperties.memoryTypes())
+		            .enumerate()
+		            .filter(e -> {
+			            var typeSupported = UtilL.checkFlag(typeBits, 1<<e.index());
+			            var hasMemProps   = e.val().propertyFlags.containsAll(requiredProperties);
+			            return typeSupported && hasMemProps;
+		            }).map(IterablePP.Idx::index)
+		            .findFirst()
+		            .orElseThrow(() -> new IllegalStateException("Could not find memory type for: " + typeBits + " & " + requiredProperties));
+	}
+	
+	public BufferAndMemory createVertexBuffer(ByteBuffer data) throws VulkanCodeException{
+		var size = data.remaining();
+		
+		try(var stagingVb = createBuffer(
+			size,
+			EnumSet.of(VkBufferUsageFlag.TRANSFER_SRC),
+			EnumSet.of(VkMemoryPropertyFlags.HOST_VISIBLE, VkMemoryPropertyFlags.HOST_COHERENT)
+		)){
+			try(var mem = VKCalls.vkMapMemory(stagingVb.memory, 0, stagingVb.allocationSize, 0)){
+				mem.put(data);
+			}
+			
+			var vb = createBuffer(
+				size,
+				EnumSet.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
+				EnumSet.of(VkMemoryPropertyFlags.DEVICE_LOCAL)
+			);
+			stagingVb.copyTo(transferBuffer, transferQueue, vb);
+			return vb;
+		}
 	}
 	
 	public ShaderModule createShaderModule(ByteBuffer spirv, ShaderType type) throws VulkanCodeException{
@@ -339,6 +425,13 @@ public class VulkanCore implements AutoCloseable{
 	@Override
 	public void close(){
 		destroySwapchainContext();
+		
+		try{
+			transferQueue.waitIdle();
+		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		transferQueue.destroy();
+		transferBuffer.destroy();
+		transferPool.destroy();
 		
 		testShaderModules.destroy();
 		device.destroy();

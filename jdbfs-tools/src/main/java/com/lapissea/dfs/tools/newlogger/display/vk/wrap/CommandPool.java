@@ -32,7 +32,10 @@ public class CommandPool implements VulkanResource{
 		this.type = type;
 	}
 	
-	public List<CommandBuffer> createCommandBuffer(int count) throws VulkanCodeException{
+	public CommandBuffer createCommandBuffer() throws VulkanCodeException{
+		return createCommandBuffers(1).getFirst();
+	}
+	public List<CommandBuffer> createCommandBuffers(int count) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			var info = VkCommandBufferAllocateInfo.calloc(mem)
 			                                      .sType$Default()

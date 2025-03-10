@@ -11,9 +11,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkBufferCopy;
 import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkClearValue;
@@ -139,5 +141,23 @@ public class CommandBuffer implements VulkanResource{
 	}
 	public void draw(int vertexCount, int instanceCount, int firstVertex, int firstInstance){
 		VK10.vkCmdDraw(val, vertexCount, instanceCount, firstVertex, firstInstance);
+	}
+	
+	public void copyBuffer(VkBuffer srcBuff, VkBuffer dstBuff, long size){
+		copyBuffer(srcBuff, 0, dstBuff, 0, size);
+	}
+	public void copyBuffer(VkBuffer srcBuff, long srcOffset, VkBuffer dstBuff, long dstOffset, long size){
+		try(var stack = MemoryStack.stackPush()){
+			
+			var copyInfo = VkBufferCopy.malloc(1, stack);
+			copyInfo.srcOffset(srcOffset)
+			        .dstOffset(dstOffset)
+			        .size(size);
+			
+			copyBuffer(srcBuff, dstBuff, copyInfo);
+		}
+	}
+	public void copyBuffer(VkBuffer srcBuff, VkBuffer dstBuff, VkBufferCopy.Buffer regions){
+		VK10.vkCmdCopyBuffer(val, srcBuff.handle, dstBuff.handle, regions);
 	}
 }

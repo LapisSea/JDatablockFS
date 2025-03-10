@@ -27,8 +27,6 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 						return core.createShaderModule(spirv, type);
 					}catch(VulkanCodeException e){
 						throw UtilL.uncheckedThrow(e);
-					}finally{
-						LogUtil.println("Created shader module: ", name, type);
 					}
 				}));
 			}

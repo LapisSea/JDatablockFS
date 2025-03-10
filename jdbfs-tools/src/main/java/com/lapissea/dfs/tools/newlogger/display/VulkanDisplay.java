@@ -10,9 +10,11 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VkClearColorValue;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +29,38 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
+	static class Vert{
+		private static final int  SIZE = 8;
+		private final        long ptr;
+		
+		Vert(ByteBuffer data, float x, float y){
+			this(data);
+			x(x).y(y);
+		}
+		Vert(ByteBuffer data){
+			ptr = MemoryUtil.memAddress(data);
+			assert data.remaining()>=SIZE;
+		}
+		
+		public Vert x(float x){
+			MemoryUtil.memPutFloat(ptr, x);
+			return this;
+		}
+		public Vert y(float y){
+			MemoryUtil.memPutFloat(ptr + 4, y);
+			return this;
+		}
+		public float x(){ return MemoryUtil.memGetFloat(ptr); }
+		public float y(){ return MemoryUtil.memGetFloat(ptr + 4); }
+		
+		public static void put(ByteBuffer data, float x, float y){
+			var ptr = MemoryUtil.memAddress(data);
+			data.position(data.position() + 8);
+			MemoryUtil.memPutFloat(ptr, x);
+			MemoryUtil.memPutFloat(ptr + 4, y);
+		}
+	}
+	
 	public VulkanDisplay(){
 		window = createWindow();
 		window.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
@@ -38,7 +72,18 @@ public class VulkanDisplay implements AutoCloseable{
 			var family = vkCore.findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
 			
 			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
-			graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
+			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
+			
+			var bb = MemoryUtil.memAlloc(3*Vert.SIZE);
+			Vert.put(bb, -0.7F, 0.7F);
+			Vert.put(bb, 0.7F, 0.7F);
+			Vert.put(bb, 0, -0.7F);
+			bb.flip();
+			
+			var buff = vkCore.createVertexBuffer(bb);
+			MemoryUtil.memFree(bb);
+			
+			buff.destroy();
 			
 			recordCommandBuffers();
 		}catch(VulkanCodeException e){
@@ -60,8 +105,8 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	private void renderQueue() throws VulkanCodeException{
-		vkCore.renderQueue.waitIdle();
-		recordCommandBuffers();
+//		vkCore.renderQueue.waitIdle();
+//		recordCommandBuffers();
 		var bufferQueue = vkCore.renderQueue;
 		var index       = bufferQueue.acquireNextImage();
 		bufferQueue.submitAsync(graphicsBuffs.get(index));
@@ -76,7 +121,7 @@ public class VulkanDisplay implements AutoCloseable{
 			vkCore.recreateSwapchainContext();
 			if(vkCore.swapchain.images.size() != graphicsBuffs.size()){
 				graphicsBuffs.forEach(CommandBuffer::destroy);
-				graphicsBuffs = cmdPool.createCommandBuffer(vkCore.swapchain.images.size());
+				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			}
 			
 			recordCommandBuffers();
@@ -123,7 +168,9 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
-			clearColor.float32().put(0, new float[]{0, 0, (float)Math.abs(Math.sin(System.currentTimeMillis()/1000D))*0.5F, 1});
+			
+			var f = (float)Math.abs(Math.sin(System.currentTimeMillis()/1000D))*0.5F;
+			clearColor.float32().put(0, new float[]{0, 0, 0, 1});
 			
 			var renderArea = new Rect2D(vkCore.swapchain.extent);
 			
