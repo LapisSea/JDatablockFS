@@ -1,11 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
@@ -15,6 +17,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
+import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
@@ -132,7 +135,8 @@ public class Device implements VulkanResource{
 		List<ShaderModule> modules,
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
-		VkSampleCountFlag sampleCount
+		VkSampleCountFlag sampleCount,
+		DescriptorSetLayout descriptorSetLayout
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -165,7 +169,7 @@ public class Device implements VulkanResource{
 			                                                     .pScissors(pScissors);
 			
 			var rasterState = VkPipelineRasterizationStateCreateInfo.calloc(stack).sType$Default()
-			                                                        .polygonMode(polygonMode.bit)
+			                                                        .polygonMode(polygonMode.id)
 			                                                        .cullMode(cullMode.bit)
 			                                                        .frontFace(frontFace.bit)
 			                                                        .depthClampEnable(false)
@@ -188,10 +192,10 @@ public class Device implements VulkanResource{
 			                                                         .pAttachments(blendAttachState)
 			                                                         .blendConstants(stack.floats(1, 1, 1, 1));
 			
-			var pCreateInfo = VkPipelineLayoutCreateInfo.calloc(stack).sType$Default()
-			                                            .pSetLayouts(null);
+			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack).sType$Default()
+			                                             .pSetLayouts(stack.longs(descriptorSetLayout.handle));
 			
-			var layout = VKCalls.vkCreatePipelineLayout(this, pCreateInfo);
+			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
 			
 			
 			var pCreateInfos = VkGraphicsPipelineCreateInfo.calloc(1, stack).sType$Default()
@@ -209,6 +213,19 @@ public class Device implements VulkanResource{
 			                                               .basePipelineIndex(-1);
 			
 			return VKCalls.vkCreateGraphicsPipelines(this, 0, pCreateInfos).getFirst();
+		}
+	}
+	
+	
+	public DescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			
+			var pCreateInfo = VkDescriptorPoolCreateInfo.calloc(stack)
+			                                            .sType$Default()
+			                                            .flags(flags.value)
+			                                            .maxSets(maxSets);
+			
+			return VKCalls.vkCreateDescriptorPool(this, pCreateInfo);
 		}
 	}
 	

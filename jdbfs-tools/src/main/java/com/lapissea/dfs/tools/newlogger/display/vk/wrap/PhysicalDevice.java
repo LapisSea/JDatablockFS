@@ -53,8 +53,8 @@ public class PhysicalDevice{
 			var mem = VkPhysicalDeviceMemoryProperties.malloc(stack);
 			VK10.vkGetPhysicalDeviceMemoryProperties(pDevice, mem);
 			
-			var memoryTypes = Iters.from(mem.memoryTypes()).map(e -> new MemoryType(e.heapIndex(), e.propertyFlags())).toList();
-			var memoryHeaps = Iters.from(mem.memoryHeaps()).map(e -> new MemoryHeap(e.flags(), e.size())).toList();
+			var memoryTypes = Iters.from(mem.memoryTypes()).map(MemoryType::new).toList();
+			var memoryHeaps = Iters.from(mem.memoryHeaps()).map(MemoryHeap::new).toList();
 			memoryProperties = new MemoryProperties(memoryTypes, memoryHeaps);
 		}
 

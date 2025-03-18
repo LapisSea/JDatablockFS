@@ -1,9 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.UtilL;
-
-import java.util.List;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 
 import static org.lwjgl.vulkan.EXTConditionalRendering.VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT;
 import static org.lwjgl.vulkan.EXTFragmentDensityMap.VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT;
@@ -17,7 +15,7 @@ import static org.lwjgl.vulkan.NVDeviceGeneratedCommands.VK_PIPELINE_STAGE_COMMA
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK13.VK_PIPELINE_STAGE_NONE;
 
-public enum VkPipelineStageFlag{
+public enum VkPipelineStageFlag implements VUtils.FlagSetValue{
 	TOP_OF_PIPE(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
 	DRAW_INDIRECT(VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT),
 	VERTEX_INPUT(VK_PIPELINE_STAGE_VERTEX_INPUT_BIT),
@@ -50,7 +48,8 @@ public enum VkPipelineStageFlag{
 	public final int bit;
 	VkPipelineStageFlag(int bit){ this.bit = bit; }
 	
-	public static List<VkPipelineStageFlag> from(int props){
-		return Iters.from(VkPipelineStageFlag.class).filter(cap -> UtilL.checkFlag(props, cap.bit)).toList();
-	}
+	@Override
+	public int bit(){ return bit; }
+	
+	public static Flags<VkPipelineStageFlag> from(int props){ return new Flags<>(VkPipelineStageFlag.class, props); }
 }

@@ -1,12 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public enum VkPhysicalDeviceType{
+public enum VkPhysicalDeviceType implements VUtils.IDValue{
 	
 	OTHER(VK_PHYSICAL_DEVICE_TYPE_OTHER),
 	INTEGRATED_GPU(VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU),
@@ -17,15 +15,9 @@ public enum VkPhysicalDeviceType{
 	
 	public final int id;
 	VkPhysicalDeviceType(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkPhysicalDeviceType> BY_ID = Iters.from(VkPhysicalDeviceType.class).toMap(e -> e.id, e -> e);
-	
-	public static VkPhysicalDeviceType from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
+	public static VkPhysicalDeviceType from(int id){ return VUtils.fromID(VkPhysicalDeviceType.class, id); }
 	
 }

@@ -6,8 +6,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 
-import java.util.Set;
-
 public class BufferAndMemory implements VulkanResource{
 	
 	public final VkBuffer     buffer;
@@ -29,7 +27,7 @@ public class BufferAndMemory implements VulkanResource{
 	}
 	
 	public void copyTo(CommandBuffer copyBuffer, VulkanQueue queue, BufferAndMemory vb) throws VulkanCodeException{
-		copyBuffer.begin(Set.of(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT));
+		copyBuffer.begin(Flags.of(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT));
 		copyBuffer.copyBuffer(buffer, vb.buffer, buffer.size);
 		copyBuffer.end();
 		

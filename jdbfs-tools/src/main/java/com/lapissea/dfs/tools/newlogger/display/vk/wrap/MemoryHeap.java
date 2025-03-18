@@ -1,21 +1,19 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryHeapFlag;
-
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
+import org.lwjgl.vulkan.VkMemoryHeap;
 
 public class MemoryHeap{
 	
-	public final Set<VkMemoryHeapFlag> flags;
-	public final long                  size;
+	public final Flags<VkMemoryHeapFlag> flags;
+	public final long                    size;
 	
-	public MemoryHeap(int flags, long size){
-		this(VkMemoryHeapFlag.from(flags), size);
+	public MemoryHeap(VkMemoryHeap val){
+		this(new Flags<>(VkMemoryHeapFlag.class, val.flags()), val.size());
 	}
-	public MemoryHeap(EnumSet<VkMemoryHeapFlag> flags, long size){
-		this.flags = Collections.unmodifiableSet(flags);
+	public MemoryHeap(Flags<VkMemoryHeapFlag> flags, long size){
+		this.flags = flags;
 		this.size = size;
 	}
 }

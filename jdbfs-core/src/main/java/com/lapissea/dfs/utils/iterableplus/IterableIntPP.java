@@ -837,4 +837,22 @@ public interface IterableIntPP{
 	default IterableIntPP positive(){
 		return filter(i -> i>=0);
 	}
+	
+	default <V> Map<Integer, V> toMap(IntFunction<V> value){
+		return toMap(i -> i, value);
+	}
+	default <K, V> Map<K, V> toMap(IntFunction<K> key, IntFunction<V> value){
+		//noinspection unchecked
+		Map.Entry<K, V>[] arr  = new Map.Entry[8];
+		var               iter = iterator();
+		int               siz  = 0;
+		while(iter.hasNext()){
+			if(arr.length == siz) arr = Utils.growArr(arr);
+			var e = iter.nextInt();
+			arr[siz++] = Map.entry(key.apply(e), value.apply(e));
+		}
+		
+		if(arr.length != siz) arr = Arrays.copyOf(arr, siz);
+		return Map.ofEntries(arr);
+	}
 }

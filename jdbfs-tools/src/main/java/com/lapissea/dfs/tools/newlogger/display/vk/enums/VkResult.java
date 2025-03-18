@@ -1,6 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import org.lwjgl.vulkan.EXTDebugReport;
 import org.lwjgl.vulkan.EXTFullScreenExclusive;
 import org.lwjgl.vulkan.EXTImageCompressionControl;
@@ -20,9 +20,7 @@ import org.lwjgl.vulkan.VK12;
 import org.lwjgl.vulkan.VK13;
 import org.lwjgl.vulkan.VK14;
 
-import java.util.Map;
-
-public enum VkResult{
+public enum VkResult implements VUtils.IDValue{
 	SUCCESS(VK10.VK_SUCCESS),
 	NOT_READY(VK10.VK_NOT_READY),
 	TIMEOUT(VK10.VK_TIMEOUT),
@@ -76,15 +74,8 @@ public enum VkResult{
 	
 	public final int id;
 	VkResult(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkResult> BY_ID = Iters.from(VkResult.class).toMap(e -> e.id, e -> e);
-	
-	public static VkResult from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
-	
+	public static VkResult from(int id){ return VUtils.fromID(VkResult.class, id); }
 }

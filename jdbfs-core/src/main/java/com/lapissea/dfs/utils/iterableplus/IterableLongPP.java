@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
+import java.util.function.LongBinaryOperator;
 import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
@@ -172,6 +174,40 @@ public interface IterableLongPP{
 			count++;
 		}
 		return count;
+	}
+	
+	default boolean hasDuplicates(){
+		var res  = new HashSet<Long>();
+		var iter = this.iterator();
+		while(iter.hasNext()){
+			var e = iter.nextLong();
+			if(!res.add(e)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	default OptionalLong reduce(LongBinaryOperator op){
+		var iter = this.iterator();
+		if(!iter.hasNext()){
+			return OptionalLong.empty();
+		}
+		long result = iter.nextLong();
+		while(iter.hasNext()){
+			var e = iter.nextLong();
+			result = op.applyAsLong(result, e);
+		}
+		return OptionalLong.of(result);
+	}
+	default long reduce(int seed, LongBinaryOperator op){
+		var  iter   = this.iterator();
+		long result = seed;
+		while(iter.hasNext()){
+			var e = iter.nextLong();
+			result = op.applyAsLong(result, e);
+		}
+		return result;
 	}
 	
 	LongIterator iterator();
@@ -517,5 +553,23 @@ public interface IterableLongPP{
 				};
 			}
 		};
+	}
+	
+	default <V> Map<Long, V> toMap(LongFunction<V> value){
+		return toMap(i -> i, value);
+	}
+	default <K, V> Map<K, V> toMap(LongFunction<K> key, LongFunction<V> value){
+		//noinspection unchecked
+		Map.Entry<K, V>[] arr  = new Map.Entry[8];
+		var               iter = iterator();
+		int               siz  = 0;
+		while(iter.hasNext()){
+			if(arr.length == siz) arr = Utils.growArr(arr);
+			var e = iter.nextLong();
+			arr[siz++] = Map.entry(key.apply(e), value.apply(e));
+		}
+		
+		if(arr.length != siz) arr = Arrays.copyOf(arr, siz);
+		return Map.ofEntries(arr);
 	}
 }

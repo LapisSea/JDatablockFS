@@ -1,13 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.UtilL;
-
-import java.util.List;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public enum VkSampleCountFlag{
+public enum VkSampleCountFlag implements VUtils.FlagSetValue{
 	
 	N1(VK_SAMPLE_COUNT_1_BIT),
 	N2(VK_SAMPLE_COUNT_2_BIT),
@@ -21,7 +19,8 @@ public enum VkSampleCountFlag{
 	public final int bit;
 	VkSampleCountFlag(int bit){ this.bit = bit; }
 	
-	public static List<VkSampleCountFlag> from(int props){
-		return Iters.from(VkSampleCountFlag.class).filter(cap -> UtilL.checkFlag(props, cap.bit)).toList();
-	}
+	@Override
+	public int bit(){ return bit; }
+	
+	public static Flags<VkSampleCountFlag> from(int props){ return new Flags<>(VkSampleCountFlag.class, props); }
 }

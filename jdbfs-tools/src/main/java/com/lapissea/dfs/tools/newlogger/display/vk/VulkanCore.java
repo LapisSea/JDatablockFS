@@ -15,7 +15,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
@@ -120,30 +120,30 @@ public class VulkanCore implements AutoCloseable{
 		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
 		
 		var physicalDevices = new PhysicalDevices(instance, surface);
-		physicalDevice = physicalDevices.selectDevice(VkQueueCapability.GRAPHICS, true);
+		physicalDevice = physicalDevices.selectDevice(VkQueueFlag.GRAPHICS, true);
 		
-		renderQueueFamily = findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
+		renderQueueFamily = findQueueFamilyBy(VkQueueFlag.GRAPHICS).orElseThrow();
 		
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
 		device = physicalDevice.createDevice(renderQueueFamily);
 		
 		
-		var transferFamily = findQueueFamilyBy(VkQueueCapability.TRANSFER).orElseThrow();
+		var transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
 		transferPool = device.createCommandPool(transferFamily, CommandPool.Type.NORMAL);
 		transferBuffer = transferPool.createCommandBuffer();
 		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
 		createSwapchainContext();
 	}
 	
-	public BufferAndMemory createBuffer(long size, Set<VkBufferUsageFlag> usageFlags, Set<VkMemoryPropertyFlags> memoryFlags) throws VulkanCodeException{
+	public BufferAndMemory createBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlags> memoryFlags) throws VulkanCodeException{
 		VkBuffer     buffer = null;
 		DeviceMemory memory = null;
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkBufferCreateInfo.calloc(stack)
 			                             .sType$Default()
 			                             .size(size)
-			                             .usage(Iters.from(usageFlags).mapToInt(b -> b.bit).reduce(0, (a, b) -> a|b))
+			                             .usage(usageFlags.value)
 			                             .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
 			
 			buffer = VKCalls.vkCreateBuffer(device, info);
@@ -169,7 +169,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	private int getMemoryTypeIndex(int typeBits, Set<VkMemoryPropertyFlags> requiredProperties){
+	private int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlags> requiredProperties){
 		return Iters.from(physicalDevice.memoryProperties.memoryTypes())
 		            .enumerate()
 		            .filter(e -> {
@@ -186,8 +186,8 @@ public class VulkanCore implements AutoCloseable{
 		
 		try(var stagingVb = createBuffer(
 			size,
-			EnumSet.of(VkBufferUsageFlag.TRANSFER_SRC),
-			EnumSet.of(VkMemoryPropertyFlags.HOST_VISIBLE, VkMemoryPropertyFlags.HOST_COHERENT)
+			Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
+			Flags.of(VkMemoryPropertyFlags.HOST_VISIBLE, VkMemoryPropertyFlags.HOST_COHERENT)
 		)){
 			try(var mem = VKCalls.vkMapMemory(stagingVb.memory, 0, stagingVb.allocationSize, 0)){
 				mem.put(data);
@@ -195,8 +195,8 @@ public class VulkanCore implements AutoCloseable{
 			
 			var vb = createBuffer(
 				size,
-				EnumSet.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
-				EnumSet.of(VkMemoryPropertyFlags.DEVICE_LOCAL)
+				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
+				Flags.of(VkMemoryPropertyFlags.DEVICE_LOCAL)
 			);
 			stagingVb.copyTo(transferBuffer, transferQueue, vb);
 			return vb;
@@ -258,7 +258,8 @@ public class VulkanCore implements AutoCloseable{
 		var area = new Rect2D(swapchain.extent);
 		return device.createPipeline(
 			renderPass, 0, testShaderModules, area, area,
-			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, VkSampleCountFlag.N1
+			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, VkSampleCountFlag.N1,
+			null
 		);
 	}
 	
@@ -304,7 +305,7 @@ public class VulkanCore implements AutoCloseable{
 		return device.buildRenderPass().attachment(attachment).subpass(subpass).build();
 	}
 	
-	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueCapability capability){
+	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueFlag capability){
 		return Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(capability));
 	}
 	

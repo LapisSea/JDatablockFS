@@ -1,8 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
 import static org.lwjgl.vulkan.EXTFragmentDensityMap.VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
@@ -37,7 +35,7 @@ import static org.lwjgl.vulkan.VK13.VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 import static org.lwjgl.vulkan.VK13.VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 import static org.lwjgl.vulkan.VK14.VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
 
-public enum VkImageLayout{
+public enum VkImageLayout implements VUtils.IDValue{
 	UNDEFINED(VK_IMAGE_LAYOUT_UNDEFINED),
 	GENERAL(VK_IMAGE_LAYOUT_GENERAL),
 	COLOR_ATTACHMENT_OPTIMAL(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
@@ -81,21 +79,9 @@ public enum VkImageLayout{
 	;
 	
 	public final int id;
-	
 	VkImageLayout(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkImageLayout> BY_ID =
-		Iters.from(VkImageLayout.class).map(e -> e.id).distinct()
-		     .toMap(
-			     id -> id,
-			     id -> Iters.from(VkImageLayout.class).firstMatching(e -> e.id == id).orElseThrow()
-		     );
-	
-	public static VkImageLayout from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
+	public static VkImageLayout from(int id){ return VUtils.fromID(VkImageLayout.class, id); }
 }

@@ -1,15 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.AMDDisplayNativeHdr.VK_COLOR_SPACE_DISPLAY_NATIVE_AMD;
 import static org.lwjgl.vulkan.EXTSwapchainColorspace.*;
 import static org.lwjgl.vulkan.KHRSurface.VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 import static org.lwjgl.vulkan.KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
-public enum VkColorSpaceKHR{
+public enum VkColorSpaceKHR implements VUtils.IDValue{
 	SRGB_NONLINEAR_KHR(VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
 	DISPLAY_P3_NONLINEAR_EXT(VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT),
 	EXTENDED_SRGB_LINEAR_EXT(VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT),
@@ -30,21 +28,9 @@ public enum VkColorSpaceKHR{
 	DCI_P3_LINEAR_EXT(VK_COLOR_SPACE_DCI_P3_LINEAR_EXT);
 	
 	public final int id;
-	
 	VkColorSpaceKHR(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkColorSpaceKHR> BY_ID =
-		Iters.from(VkColorSpaceKHR.class).map(e -> e.id).distinct()
-		     .toMap(
-			     id -> id,
-			     id -> Iters.from(VkColorSpaceKHR.class).firstMatching(e -> e.id == id).orElseThrow()
-		     );
-	
-	public static VkColorSpaceKHR from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
+	public static VkColorSpaceKHR from(int id){ return VUtils.fromID(VkColorSpaceKHR.class, id); }
 }

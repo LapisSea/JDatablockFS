@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
@@ -35,7 +35,7 @@ public class PhysicalDevices{
 		this.devices = List.copyOf(devices);
 	}
 	
-	public PhysicalDevice selectDevice(VkQueueCapability requiredCapability, boolean supportsPresent){
+	public PhysicalDevice selectDevice(VkQueueFlag requiredCapability, boolean supportsPresent){
 		for(PhysicalDevice device : devices){
 			for(QueueFamilyProps family : device.families){
 				if(supportsPresent && !family.supportsPresent){

@@ -1,15 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.KHRSurface.VK_PRESENT_MODE_FIFO_KHR;
 import static org.lwjgl.vulkan.KHRSurface.VK_PRESENT_MODE_FIFO_RELAXED_KHR;
 import static org.lwjgl.vulkan.KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR;
 import static org.lwjgl.vulkan.KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR;
 
-public enum VKPresentMode{
+public enum VKPresentMode implements VUtils.IDValue{
 	
 	IMMEDIATE(VK_PRESENT_MODE_IMMEDIATE_KHR),
 	MAILBOX(VK_PRESENT_MODE_MAILBOX_KHR),
@@ -18,14 +16,8 @@ public enum VKPresentMode{
 	
 	public final int id;
 	VKPresentMode(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VKPresentMode> BY_ID = Iters.from(VKPresentMode.class).toMap(e -> e.id, e -> e);
-	
-	public static VKPresentMode from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
+	public static VKPresentMode from(int id){ return VUtils.fromID(VKPresentMode.class, id); }
 }

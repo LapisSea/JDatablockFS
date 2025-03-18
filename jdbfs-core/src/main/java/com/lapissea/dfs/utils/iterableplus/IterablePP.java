@@ -364,39 +364,78 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default <K, V> Map<K, V> toMap(Function<T, K> key, Function<T, V> value){
-		int size = tryGetSize().orElse(8);
-		var iter = size>0? iterator() : null;
-		T   e;
+		var sizeO = tryGetSize();
+		if(sizeO.isEmpty()){
+			return unknownN(key, value, iterator());
+		}
+		int size = sizeO.orElseThrow();
+		if(size == 0) return Map.of();
+		
+		var iter = iterator();
 		return switch(size){
-			case 0 -> Map.of();
-			case 1 -> Map.of(key.apply((e = iter.next())), value.apply(e));
-			case 2 -> Map.of(
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e)
-			);
-			case 3 -> Map.of(
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e)
-			);
-			case 4 -> Map.of(
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e),
-				key.apply((e = iter.next())), value.apply(e)
-			);
-			default -> {
-				var arr = new Map.Entry[size];
-				int siz = 0;
-				while(iter.hasNext()){
-					if(arr.length == siz) arr = Utils.growArr(arr);
-					arr[siz++] = Map.entry(key.apply((e = iter.next())), value.apply(e));
-				}
-				if(arr.length != siz) arr = Arrays.copyOf(arr, siz);
-				yield Map.ofEntries(arr);
-			}
+			case 1 -> known1(key, value, iter);
+			case 2 -> known2(key, value, iter);
+			case 3 -> known3(key, value, iter);
+			case 4 -> known4(key, value, iter);
+			default -> knownN(key, value, iter, size);
 		};
 	}
+	
+	private <K, V> Map<K, V> knownN(Function<T, K> key, Function<T, V> value, Iterator<T> iter, int size){
+		//noinspection unchecked
+		Map.Entry<K, V>[] arr = new Map.Entry[size];
+		for(int i = 0; i<size; i++){
+			T e = iter.next();
+			arr[i] = Map.entry(key.apply(e), value.apply(e));
+		}
+		if(iter.hasNext()){
+			throw new IllegalStateException("Iterator has more elements but declares " + size);
+		}
+		return Map.ofEntries(arr);
+	}
+	private <K, V> Map<K, V> unknownN(Function<T, K> key, Function<T, V> value, Iterator<T> iter){
+		//noinspection unchecked
+		Map.Entry<K, V>[] arr = new Map.Entry[8];
+		
+		int siz = 0;
+		while(iter.hasNext()){
+			if(arr.length == siz) arr = Utils.growArr(arr);
+			T e = iter.next();
+			arr[siz++] = Map.entry(key.apply(e), value.apply(e));
+		}
+		
+		if(arr.length != siz) arr = Arrays.copyOf(arr, siz);
+		return Map.ofEntries(arr);
+	}
+	private <K, V> Map<K, V> known4(Function<T, K> key, Function<T, V> value, Iterator<T> iter){
+		T e;
+		return Map.of(
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e)
+		);
+	}
+	private <K, V> Map<K, V> known3(Function<T, K> key, Function<T, V> value, Iterator<T> iter){
+		T e;
+		return Map.of(
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e)
+		);
+	}
+	private <K, V> Map<K, V> known2(Function<T, K> key, Function<T, V> value, Iterator<T> iter){
+		T e;
+		return Map.of(
+			key.apply((e = iter.next())), value.apply(e),
+			key.apply((e = iter.next())), value.apply(e)
+		);
+	}
+	private <K, V> Map<K, V> known1(Function<T, K> key, Function<T, V> value, Iterator<T> iter){
+		T e = iter.next();
+		return Map.of(key.apply(e), value.apply(e));
+	}
+	
 	default <K, V> Map<K, V> toModMap(Function<T, Map.Entry<K, V>> entry){
 		return map(entry).toModMap(Map.Entry::getKey, Map.Entry::getValue);
 	}

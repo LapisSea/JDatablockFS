@@ -12,7 +12,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCopy;
@@ -28,7 +27,6 @@ import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 
 import java.util.List;
-import java.util.Set;
 
 public class CommandBuffer implements VulkanResource{
 	
@@ -40,10 +38,10 @@ public class CommandBuffer implements VulkanResource{
 		this.pool = pool;
 	}
 	
-	public void begin(Set<VkCommandBufferUsageFlag> usage) throws VulkanCodeException{
+	public void begin(Flags<VkCommandBufferUsageFlag> usage) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkCommandBufferBeginInfo.calloc(stack).sType$Default()
-			                                   .flags(Iters.from(usage).mapToInt(e -> e.bit).reduce(0, (a, b) -> a|b));
+			                                   .flags(usage.value);
 			VKCalls.vkBeginCommandBuffer(val, info);
 		}
 	}

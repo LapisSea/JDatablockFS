@@ -1,15 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.HUAWEISubpassShading.VK_PIPELINE_BIND_POINT_SUBPASS_SHADING_HUAWEI;
 import static org.lwjgl.vulkan.KHRRayTracingPipeline.VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 import static org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_COMPUTE;
 import static org.lwjgl.vulkan.VK10.VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-public enum VkPipelineBindPoint{
+public enum VkPipelineBindPoint implements VUtils.IDValue{
 	
 	GRAPHICS(VK_PIPELINE_BIND_POINT_GRAPHICS),
 	COMPUTE(VK_PIPELINE_BIND_POINT_COMPUTE),
@@ -19,15 +17,8 @@ public enum VkPipelineBindPoint{
 	
 	public final int id;
 	VkPipelineBindPoint(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkPipelineBindPoint> BY_ID = Iters.from(VkPipelineBindPoint.class).toMap(e -> e.id, e -> e);
-	
-	public static VkPipelineBindPoint from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
-	
+	public static VkPipelineBindPoint from(int id){ return VUtils.fromID(VkPipelineBindPoint.class, id); }
 }

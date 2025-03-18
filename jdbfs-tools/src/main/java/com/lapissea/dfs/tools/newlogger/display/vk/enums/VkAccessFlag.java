@@ -1,13 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.UtilL;
-
-import java.util.List;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public enum VkAccessFlag{
+public enum VkAccessFlag implements VUtils.FlagSetValue{
 	INDIRECT_COMMAND_READ(VK_ACCESS_INDIRECT_COMMAND_READ_BIT),
 	INDEX_READ(VK_ACCESS_INDEX_READ_BIT),
 	VERTEX_ATTRIBUTE_READ(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT),
@@ -30,7 +28,8 @@ public enum VkAccessFlag{
 	public final int bit;
 	VkAccessFlag(int bit){ this.bit = bit; }
 	
-	public static List<VkAccessFlag> from(int props){
-		return Iters.from(VkAccessFlag.class).filter(cap -> UtilL.checkFlag(props, cap.bit)).toList();
-	}
+	@Override
+	public int bit(){ return bit; }
+	
+	public static Flags<VkAccessFlag> from(int props){ return new Flags<>(VkAccessFlag.class, props); }
 }

@@ -1,15 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 import static org.lwjgl.vulkan.VK10.VK_ATTACHMENT_LOAD_OP_LOAD;
 import static org.lwjgl.vulkan.VK14.VK_ATTACHMENT_LOAD_OP_NONE;
 
-public enum VkAttachmentLoadOp{
+public enum VkAttachmentLoadOp implements VUtils.IDValue{
 	
 	LOAD(VK_ATTACHMENT_LOAD_OP_LOAD),
 	CLEAR(VK_ATTACHMENT_LOAD_OP_CLEAR),
@@ -19,15 +17,8 @@ public enum VkAttachmentLoadOp{
 	
 	public final int id;
 	VkAttachmentLoadOp(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkAttachmentLoadOp> BY_ID = Iters.from(VkAttachmentLoadOp.class).toMap(e -> e.id, e -> e);
-	
-	public static VkAttachmentLoadOp from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
-	
+	public static VkAttachmentLoadOp from(int id){ return VUtils.fromID(VkAttachmentLoadOp.class, id); }
 }

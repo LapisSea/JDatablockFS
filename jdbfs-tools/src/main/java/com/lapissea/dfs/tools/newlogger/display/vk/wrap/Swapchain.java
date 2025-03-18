@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
@@ -13,7 +14,6 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public class Swapchain implements VulkanResource{
 	
@@ -36,7 +36,7 @@ public class Swapchain implements VulkanResource{
 		
 		var views = new ArrayList<ImageView>(images.size());
 		for(Image image : images){
-			views.add(image.createImageView(VkImageViewType.TYPE_2D, format, Set.of(VkImageAspectFlagBits.COLOR_BIT)));
+			views.add(image.createImageView(VkImageViewType.TYPE_2D, format, Flags.of(VkImageAspectFlagBits.COLOR_BIT)));
 		}
 		imageViews = List.copyOf(views);
 	}

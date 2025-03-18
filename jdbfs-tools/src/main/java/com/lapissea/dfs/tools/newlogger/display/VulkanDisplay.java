@@ -1,8 +1,9 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueCapability;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
@@ -17,7 +18,6 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
 
@@ -69,7 +69,7 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			vkCore = new VulkanCore("DFS debugger", window);
 			
-			var family = vkCore.findQueueFamilyBy(VkQueueCapability.GRAPHICS).orElseThrow();
+			var family = vkCore.findQueueFamilyBy(VkQueueFlag.GRAPHICS).orElseThrow();
 			
 			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
@@ -178,7 +178,7 @@ public class VulkanDisplay implements AutoCloseable{
 				var buf         = graphicsBuffs.get(i);
 				var frameBuffer = vkCore.frameBuffers.get(i);
 				
-				buf.begin(Set.of());
+				buf.begin(Flags.of());
 				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
 					buf.bindPipeline(vkCore.pipeline, true);

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.PointerBuffer;
@@ -21,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -99,5 +101,33 @@ public final class VUtils{
 				return fn.getName() + ": <ERROR: " + e + ">";
 			}
 		}).filter(Objects::nonNull).joinAsStr(", ", cls.getSimpleName() + "{", "}");
+	}
+	
+	public interface IDValue{
+		int id();
+	}
+	
+	public interface FlagSetValue{
+		int bit();
+	}
+	
+	private static final WeakKeyValueMap<Class<?>, Map<Integer, ?>> ID_CACHE = new WeakKeyValueMap.Sync<>();
+	
+	public static <E extends Enum<E> & IDValue> E fromID(Class<E> type, int id){
+		//noinspection unchecked
+		Map<Integer, E> idCache = (Map<Integer, E>)ID_CACHE.get(type);
+		if(idCache == null){
+			ID_CACHE.put(type, idCache = enumToIDs(type));
+		}
+		var res = idCache.get(id);
+		if(res == null){
+			throw new IllegalArgumentException("Unknown ID " + id + " for type " + type);
+		}
+		return res;
+	}
+	public static <E extends Enum<E> & IDValue> Map<Integer, E> enumToIDs(Class<E> type){
+		var uni = Iters.from(type);
+		return uni.mapToInt(IDValue::id).distinct()
+		          .toMap(id -> id, id -> uni.firstMatching(e -> e.id() == id).orElseThrow());
 	}
 }

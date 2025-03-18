@@ -1,12 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.util.UtilL;
-
-import java.util.EnumSet;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public enum VkMemoryPropertyFlags{
+public enum VkMemoryPropertyFlags implements VUtils.FlagSetValue{
 	DEVICE_LOCAL(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
 	HOST_VISIBLE(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
 	HOST_COHERENT(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
@@ -16,10 +15,9 @@ public enum VkMemoryPropertyFlags{
 	public final int bit;
 	VkMemoryPropertyFlags(int bit){ this.bit = bit; }
 	
-	public static EnumSet<VkMemoryPropertyFlags> from(int props){
-		var flags = EnumSet.allOf(VkMemoryPropertyFlags.class);
-		flags.removeIf(flag -> !UtilL.checkFlag(props, flag.bit));
-		return flags;
-	}
+	@Override
+	public int bit(){ return bit; }
+	
+	public static Flags<VkMemoryPropertyFlags> from(int props){ return new Flags<>(VkMemoryPropertyFlags.class, props); }
 	
 }

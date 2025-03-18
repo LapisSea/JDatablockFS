@@ -1,12 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
-
-import java.util.Map;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import static org.lwjgl.vulkan.VK10.*;
 
-public enum VkFormat{
+public enum VkFormat implements VUtils.IDValue{
 	UNDEFINED(VK_FORMAT_UNDEFINED),
 	R4G4_UNORM_PACK8(VK_FORMAT_R4G4_UNORM_PACK8),
 	R4G4B4A4_UNORM_PACK16(VK_FORMAT_R4G4B4A4_UNORM_PACK16),
@@ -193,17 +191,12 @@ public enum VkFormat{
 	ASTC_12x12_UNORM_BLOCK(VK_FORMAT_ASTC_12x12_UNORM_BLOCK),
 	ASTC_12x12_SRGB_BLOCK(VK_FORMAT_ASTC_12x12_SRGB_BLOCK);
 	
+	
 	public final int id;
 	
 	VkFormat(int id){ this.id = id; }
+	@Override
+	public int id(){ return id; }
 	
-	private static final Map<Integer, VkFormat> BY_ID = Iters.from(VkFormat.class).toMap(e -> e.id, e -> e);
-	
-	public static VkFormat from(int id){
-		var value = BY_ID.get(id);
-		if(value == null){
-			throw new IllegalArgumentException("Unknown id: " + id);
-		}
-		return value;
-	}
+	public static VkFormat from(int id){ return VUtils.fromID(VkFormat.class, id); }
 }
