@@ -1,7 +1,9 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
@@ -9,6 +11,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
@@ -27,6 +31,11 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
+	
+	public BufferAndMemory  verts;
+	public GraphicsPipeline gPipeline;
+	
+	private List<BufferAndMemory> uniformBuffs;
 	
 	public static class Vert{
 		public static final int SIZE = 4*(2 + 3);
@@ -71,11 +80,61 @@ public class VulkanDisplay implements AutoCloseable{
 			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
+			verts = vkCore.createVertexBuffer(6*Vert.SIZE, bb -> {
+				Vert.put(bb, 0, 1F, 1, 0, 0);
+				Vert.put(bb, 1F, 1F, 0, 1, 0);
+				Vert.put(bb, 0, 0, 0, 0, 1);
+				
+				Vert.put(bb, 0, 0, 0, 0, 1);
+				Vert.put(bb, 1F, 1F, 0, 1, 0);
+				Vert.put(bb, 1, 0F, 1, 1, 0);
+			});
+			
+			createPipeline();
+			
 			recordCommandBuffers();
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
 		
+	}
+	
+	private void updateUniforms(int index) throws VulkanCodeException{
+		var buf = uniformBuffs.get(index);
+		buf.update(b -> {
+			var f = b.asFloatBuffer();
+			
+			var t   = System.currentTimeMillis()%100000;
+			var mat = new Matrix4f();
+			mat.translate(120, 155, 0);
+			mat.rotate((float)(t/1000D%(Math.PI*2)), new Vector3f(0, 0, 1));
+			mat.scale((float)(Math.sin(t/800D)/3 + 0.5));
+			
+			mat.scale(400);
+			mat.translate(-0.5F, -0.5F, 0);
+			
+			var s = vkCore.swapchain.extent;
+			mat.get(f);
+			mat.identity();
+			mat.ortho(0, s.width, 0, s.height, -10, 10, true);
+			mat.get(f.position(16));
+		});
+	}
+	
+	private void createPipeline() throws VulkanCodeException{
+		assert uniformBuffs == null;
+		
+		var matSize = 4*4;
+		var size    = matSize*2;
+		var fSize   = size*Float.SIZE;
+		
+		uniformBuffs = vkCore.createUniformBuffers(fSize);
+		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs);
+	}
+	private void destroyPipeline(){
+		gPipeline.destroy();
+		uniformBuffs.forEach(BufferAndMemory::destroy);
+		uniformBuffs = null;
 	}
 	
 	private void render() throws VulkanCodeException{
@@ -91,10 +150,11 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	private void renderQueue() throws VulkanCodeException{
-//		vkCore.renderQueue.waitIdle();
+		vkCore.renderQueue.waitIdle();
 //		recordCommandBuffers();
 		var bufferQueue = vkCore.renderQueue;
 		var index       = bufferQueue.acquireNextImage();
+		updateUniforms(index);
 		bufferQueue.submitAsync(graphicsBuffs.get(index));
 		bufferQueue.present(index);
 	}
@@ -109,6 +169,9 @@ public class VulkanDisplay implements AutoCloseable{
 				graphicsBuffs.forEach(CommandBuffer::destroy);
 				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			}
+			
+			destroyPipeline();
+			createPipeline();
 			
 			recordCommandBuffers();
 			try{
@@ -167,9 +230,9 @@ public class VulkanDisplay implements AutoCloseable{
 				buf.begin(Flags.of());
 				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
-					buf.bindPipeline(vkCore.gPipeline, i);
+					buf.bindPipeline(gPipeline, i);
 					
-					buf.draw(3, 1, 0, 0);
+					buf.draw(6, 1, 0, 0);
 					
 				}
 				buf.end();
@@ -233,6 +296,9 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			vkCore.renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		destroyPipeline();
+		verts.destroy();
 		
 		for(var buf : graphicsBuffs){
 			buf.destroy();

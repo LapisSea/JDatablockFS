@@ -5,14 +5,13 @@ import com.lapissea.dfs.tools.newlogger.display.ShaderCompiler;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlags;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
@@ -103,15 +102,12 @@ public class VulkanCore implements AutoCloseable{
 	public VulkanQueue       renderQueue;
 	public RenderPass        renderPass;
 	public List<FrameBuffer> frameBuffers;
-	public GraphicsPipeline  gPipeline;
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
 	private final CommandPool   transferPool;
 	private final CommandBuffer transferBuffer;
 	private final VulkanQueue   transferQueue;
-	
-	public BufferAndMemory verts;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
@@ -136,17 +132,24 @@ public class VulkanCore implements AutoCloseable{
 		transferBuffer = transferPool.createCommandBuffer();
 		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
 		
-		
-		verts = createVertexBuffer(3*VulkanDisplay.Vert.SIZE, bb -> {
-			VulkanDisplay.Vert.put(bb, -0.7F, 0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
-			VulkanDisplay.Vert.put(bb, 0.7F, 0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
-			VulkanDisplay.Vert.put(bb, 0, -0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
-		});
-		
 		createSwapchainContext();
 	}
+	public List<BufferAndMemory> createUniformBuffers(int size) throws VulkanCodeException{
+		var res = new BufferAndMemory[swapchain.images.size()];
+		for(int i = 0; i<res.length; i++){
+			res[i] = createUniformBuffer(size);
+		}
+		return List.of(res);
+	}
+	public BufferAndMemory createUniformBuffer(int size) throws VulkanCodeException{
+		return createBuffer(
+			size,
+			Flags.of(VkBufferUsageFlag.UNIFORM_BUFFER),
+			Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
+		);
+	}
 	
-	public BufferAndMemory createBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlags> memoryFlags) throws VulkanCodeException{
+	public BufferAndMemory createBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
 		VkBuffer     buffer = null;
 		DeviceMemory memory = null;
 		try(var stack = MemoryStack.stackPush()){
@@ -179,7 +182,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	private int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlags> requiredProperties){
+	private int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlag> requiredProperties){
 		return Iters.from(physicalDevice.memoryProperties.memoryTypes())
 		            .enumerate()
 		            .filter(e -> {
@@ -199,16 +202,13 @@ public class VulkanCore implements AutoCloseable{
 		try(var stagingVb = createBuffer(
 			size,
 			Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
-			Flags.of(VkMemoryPropertyFlags.HOST_VISIBLE, VkMemoryPropertyFlags.HOST_COHERENT)
+			Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
 		)){
-			try(var mem = VKCalls.vkMapMemory(stagingVb.memory, 0, stagingVb.allocationSize, 0)){
-				mem.populate(populator);
-			}
-			
+			stagingVb.update(populator);
 			var vb = createBuffer(
 				size,
 				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
-				Flags.of(VkMemoryPropertyFlags.DEVICE_LOCAL)
+				Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL)
 			);
 			stagingVb.copyTo(transferBuffer, transferQueue, vb);
 			return vb;
@@ -248,15 +248,11 @@ public class VulkanCore implements AutoCloseable{
 		
 		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
-		
-		gPipeline = createPipeline(verts.buffer);
 	}
 	private void destroySwapchainContext(){
 		try{
 			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
-		
-		gPipeline.destroy();
 		
 		for(FrameBuffer frameBuffer : frameBuffers){
 			frameBuffer.destroy();
@@ -266,7 +262,7 @@ public class VulkanCore implements AutoCloseable{
 		swapchain.destroy();
 	}
 	
-	private GraphicsPipeline createPipeline(VkBuffer vb) throws VulkanCodeException{
+	public GraphicsPipeline createPipeline(VkBuffer vb, List<BufferAndMemory> uniforms) throws VulkanCodeException{
 		var area = new Rect2D(swapchain.extent);
 		var p    = new GraphicsPipeline(device);
 		
@@ -276,8 +272,14 @@ public class VulkanCore implements AutoCloseable{
 				VkDescriptorType.STORAGE_BUFFER,
 				1,
 				Flags.of(VkShaderStageFlag.VERTEX)
+			),
+			new DescriptorSetLayoutBinding(
+				1,
+				VkDescriptorType.UNIFORM_BUFFER,
+				1,
+				Flags.of(VkShaderStageFlag.VERTEX)
 			)
-		), vb);
+		), vb, uniforms);
 		p.initPipeline(renderPass, 0, testShaderModules, area, area);
 		return p;
 	}
@@ -329,8 +331,13 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of("VUID-VkAttachmentReference-layout-03077");
+	private static final Set<String> IGNORE_IDS            = Set.of("Loader Message");
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
+		if(severity == DebugLoggerEXT.Severity.INFO && IGNORE_IDS.contains(messageIDName)){
+			return false;
+		}
+		
 		var severityS = Optional.ofNullable(severity).map(e -> e.color + e.name()).orElse(ConsoleColors.RED_BRIGHT + "UNKNOWN") + ConsoleColors.RESET;
 		var type      = Iters.from(messageTypes).joinAsOptionalStr(", ").orElse("UNKNOWN");
 		
@@ -341,7 +348,7 @@ public class VulkanCore implements AutoCloseable{
 		if(msgFinal.contains("\n")){
 			msgFinal = "\n" + msgFinal;
 		}
-		msgFinal = Log.fmt("[{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, msgFinal);
+		msgFinal = Log.fmt("[{#purpleVK-Callback#}] [{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, msgFinal);
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
 			new RuntimeException(msgFinal).printStackTrace();
@@ -449,8 +456,6 @@ public class VulkanCore implements AutoCloseable{
 		try{
 			transferQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
-		
-		verts.destroy();
 		
 		transferQueue.destroy();
 		transferBuffer.destroy();

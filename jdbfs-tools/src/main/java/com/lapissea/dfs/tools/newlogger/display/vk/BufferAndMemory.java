@@ -6,6 +6,9 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 
+import java.nio.ByteBuffer;
+import java.util.function.Consumer;
+
 public class BufferAndMemory implements VulkanResource{
 	
 	public final VkBuffer     buffer;
@@ -33,5 +36,11 @@ public class BufferAndMemory implements VulkanResource{
 		
 		queue.submitNow(copyBuffer);
 		queue.waitIdle();
+	}
+	
+	public void update(Consumer<ByteBuffer> populator) throws VulkanCodeException{
+		try(var mem = VKCalls.vkMapMemory(memory, 0, allocationSize, 0)){
+			mem.populate(populator);
+		}
 	}
 }
