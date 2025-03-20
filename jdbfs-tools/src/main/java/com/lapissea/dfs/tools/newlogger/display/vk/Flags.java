@@ -1,16 +1,23 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.PPBakedSequence;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.SequencedCollection;
 
-public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E>{
+public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E> implements SequencedCollection<E>, Stringify{
+	
+	static{
+		TextUtil.CUSTOM_TO_STRINGS.register(Flags.class, Flags::toString);
+	}
 	
 	private static final Flags<?> EMPTY = new Flags<>(null, 0);
 	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(){
@@ -34,20 +41,27 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 		return new Flags<>(ec, v);
 	}
 	
-	public final Class<E> enumClass;
-	public final int      value;
+	public final  Class<E> enumClass;
+	public final  int      value;
+	private final boolean  reversed;
 	
 	private PPBakedSequence<E> set;
 	
 	public Flags(Class<E> enumClass, int value){
+		this(enumClass, value, false);
+	}
+	private Flags(Class<E> enumClass, int value, boolean reversed){
 		this.enumClass = enumClass;
 		this.value = value;
+		this.reversed = reversed;
 	}
 	
 	private PPBakedSequence<E> values(){
 		if(set != null) return set;
 		if(enumClass == null || value == 0) return set = Iters.<E>of().bake();
-		return set = Iters.from(enumClass).filter(e -> UtilL.checkFlag(value, e.bit())).bake();
+		var raw = Iters.from(enumClass).filter(e -> UtilL.checkFlag(value, e.bit()));
+		if(reversed) raw = raw.reverse();
+		return set = raw.bake();
 	}
 	
 	@Override
@@ -63,6 +77,14 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 		}
 		if(enumClass == null) return "Flags(" + value + ")";
 		return values().joinAsStr(", ", enumClass.getSimpleName() + ":{", "}");
+	}
+	@Override
+	public String toShortString(){
+		if(value == 0){
+			return "(EMPTY)";
+		}
+		if(enumClass == null) return "(" + value + ")";
+		return values().joinAsStr(", ", "{", "}");
 	}
 	
 	@Override
@@ -82,5 +104,18 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 			       that.value == this.value;
 		}
 		return super.equals(o);
+	}
+	
+	@Override
+	public Flags<E> reversed(){
+		return new Flags<>(enumClass, value, !reversed);
+	}
+	@Override
+	public E getLast(){
+		return values().getLast();
+	}
+	@Override
+	public E getFirst(){
+		return values().getFirst();
 	}
 }
