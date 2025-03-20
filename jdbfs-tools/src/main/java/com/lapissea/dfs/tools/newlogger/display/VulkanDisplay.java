@@ -11,7 +11,6 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VkClearColorValue;
 
 import java.io.File;
@@ -29,35 +28,33 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
-	static class Vert{
-		private static final int  SIZE = 8;
-		private final        long ptr;
+	public static class Vert{
+		public static final int SIZE = 4*(2 + 3);
+//		private final       long ptr;
+//
+//		Vert(ByteBuffer data, float x, float y){
+//			this(data);
+//			x(x).y(y);
+//		}
+//		Vert(ByteBuffer data){
+//			ptr = MemoryUtil.memAddress(data);
+//			assert data.remaining()>=SIZE;
+//		}
+//
+//		public Vert x(float x){
+//			MemoryUtil.memPutFloat(ptr, x);
+//			return this;
+//		}
+//		public Vert y(float y){
+//			MemoryUtil.memPutFloat(ptr + 4, y);
+//			return this;
+//		}
+//		public float x(){ return MemoryUtil.memGetFloat(ptr); }
+//		public float y(){ return MemoryUtil.memGetFloat(ptr + 4); }
 		
-		Vert(ByteBuffer data, float x, float y){
-			this(data);
-			x(x).y(y);
-		}
-		Vert(ByteBuffer data){
-			ptr = MemoryUtil.memAddress(data);
-			assert data.remaining()>=SIZE;
-		}
-		
-		public Vert x(float x){
-			MemoryUtil.memPutFloat(ptr, x);
-			return this;
-		}
-		public Vert y(float y){
-			MemoryUtil.memPutFloat(ptr + 4, y);
-			return this;
-		}
-		public float x(){ return MemoryUtil.memGetFloat(ptr); }
-		public float y(){ return MemoryUtil.memGetFloat(ptr + 4); }
-		
-		public static void put(ByteBuffer data, float x, float y){
-			var ptr = MemoryUtil.memAddress(data);
-			data.position(data.position() + 8);
-			MemoryUtil.memPutFloat(ptr, x);
-			MemoryUtil.memPutFloat(ptr + 4, y);
+		public static void put(ByteBuffer data, float x, float y, float r, float g, float b){
+			data.putFloat(x).putFloat(y)
+			    .putFloat(r).putFloat(g).putFloat(b);
 		}
 	}
 	
@@ -73,17 +70,6 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
-			
-			var bb = MemoryUtil.memAlloc(3*Vert.SIZE);
-			Vert.put(bb, -0.7F, 0.7F);
-			Vert.put(bb, 0.7F, 0.7F);
-			Vert.put(bb, 0, -0.7F);
-			bb.flip();
-			
-			var buff = vkCore.createVertexBuffer(bb);
-			MemoryUtil.memFree(bb);
-			
-			buff.destroy();
 			
 			recordCommandBuffers();
 		}catch(VulkanCodeException e){
@@ -181,7 +167,7 @@ public class VulkanDisplay implements AutoCloseable{
 				buf.begin(Flags.of());
 				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
-					buf.bindPipeline(vkCore.pipeline, true);
+					buf.bindPipeline(vkCore.gPipeline, i);
 					
 					buf.draw(3, 1, 0, 0);
 					

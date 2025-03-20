@@ -5,25 +5,25 @@ import com.lapissea.dfs.tools.newlogger.display.ShaderCompiler;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayoutBinding;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
@@ -61,6 +61,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
@@ -102,7 +103,7 @@ public class VulkanCore implements AutoCloseable{
 	public VulkanQueue       renderQueue;
 	public RenderPass        renderPass;
 	public List<FrameBuffer> frameBuffers;
-	public Pipeline          pipeline;
+	public GraphicsPipeline  gPipeline;
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
@@ -110,6 +111,7 @@ public class VulkanCore implements AutoCloseable{
 	private final CommandBuffer transferBuffer;
 	private final VulkanQueue   transferQueue;
 	
+	public BufferAndMemory verts;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
@@ -133,6 +135,14 @@ public class VulkanCore implements AutoCloseable{
 		transferPool = device.createCommandPool(transferFamily, CommandPool.Type.NORMAL);
 		transferBuffer = transferPool.createCommandBuffer();
 		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
+		
+		
+		verts = createVertexBuffer(3*VulkanDisplay.Vert.SIZE, bb -> {
+			VulkanDisplay.Vert.put(bb, -0.7F, 0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
+			VulkanDisplay.Vert.put(bb, 0.7F, 0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
+			VulkanDisplay.Vert.put(bb, 0, -0.7F, (float)Math.random(), (float)Math.random(), (float)Math.random());
+		});
+		
 		createSwapchainContext();
 	}
 	
@@ -182,7 +192,9 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public BufferAndMemory createVertexBuffer(ByteBuffer data) throws VulkanCodeException{
-		var size = data.remaining();
+		return createVertexBuffer(data.remaining(), dst -> dst.put(data));
+	}
+	public BufferAndMemory createVertexBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
 		
 		try(var stagingVb = createBuffer(
 			size,
@@ -190,7 +202,7 @@ public class VulkanCore implements AutoCloseable{
 			Flags.of(VkMemoryPropertyFlags.HOST_VISIBLE, VkMemoryPropertyFlags.HOST_COHERENT)
 		)){
 			try(var mem = VKCalls.vkMapMemory(stagingVb.memory, 0, stagingVb.allocationSize, 0)){
-				mem.put(data);
+				mem.populate(populator);
 			}
 			
 			var vb = createBuffer(
@@ -237,14 +249,14 @@ public class VulkanCore implements AutoCloseable{
 		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
 		
-		pipeline = createPipeline();
+		gPipeline = createPipeline(verts.buffer);
 	}
 	private void destroySwapchainContext(){
 		try{
 			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
-		pipeline.destroy();
+		gPipeline.destroy();
 		
 		for(FrameBuffer frameBuffer : frameBuffers){
 			frameBuffer.destroy();
@@ -254,13 +266,20 @@ public class VulkanCore implements AutoCloseable{
 		swapchain.destroy();
 	}
 	
-	private Pipeline createPipeline() throws VulkanCodeException{
+	private GraphicsPipeline createPipeline(VkBuffer vb) throws VulkanCodeException{
 		var area = new Rect2D(swapchain.extent);
-		return device.createPipeline(
-			renderPass, 0, testShaderModules, area, area,
-			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, VkSampleCountFlag.N1,
-			null
-		);
+		var p    = new GraphicsPipeline(device);
+		
+		p.initDescriptor(swapchain.imageViews.size(), List.of(
+			new DescriptorSetLayoutBinding(
+				0,
+				VkDescriptorType.STORAGE_BUFFER,
+				1,
+				Flags.of(VkShaderStageFlag.VERTEX)
+			)
+		), vb);
+		p.initPipeline(renderPass, 0, testShaderModules, area, area);
+		return p;
 	}
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
@@ -430,6 +449,9 @@ public class VulkanCore implements AutoCloseable{
 		try{
 			transferQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		verts.destroy();
+		
 		transferQueue.destroy();
 		transferBuffer.destroy();
 		transferPool.destroy();

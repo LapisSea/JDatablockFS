@@ -2,18 +2,20 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.PPBakedSequence;
 import com.lapissea.util.UtilL;
 
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 
 public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E>{
 	
+	private static final Flags<?> EMPTY = new Flags<>(null, 0);
 	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(){
-		return new Flags<>(null, 0);
+		//noinspection unchecked
+		return (Flags<E>)EMPTY;
 	}
 	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(E value){
 		return new Flags<>(value.getDeclaringClass(), value.bit());
@@ -35,17 +37,17 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 	public final Class<E> enumClass;
 	public final int      value;
 	
-	private List<E> set;
+	private PPBakedSequence<E> set;
 	
 	public Flags(Class<E> enumClass, int value){
 		this.enumClass = enumClass;
 		this.value = value;
 	}
 	
-	private List<E> values(){
+	private PPBakedSequence<E> values(){
 		if(set != null) return set;
-		if(enumClass == null || value == 0) return set = List.of();
-		return set = Iters.from(enumClass).filter(e -> UtilL.checkFlag(value, e.bit())).toList();
+		if(enumClass == null || value == 0) return set = Iters.<E>of().bake();
+		return set = Iters.from(enumClass).filter(e -> UtilL.checkFlag(value, e.bit())).bake();
 	}
 	
 	@Override
@@ -57,10 +59,28 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 	@Override
 	public String toString(){
 		if(value == 0){
-			if(enumClass == null) return "EMPTY";
-			return enumClass.getSimpleName() + "/EMPTY";
+			return (enumClass == null? "Flags" : enumClass.getSimpleName()) + "(EMPTY)";
 		}
-		if(enumClass == null) return "Flags{" + value + "}";
-		return values().toString();
+		if(enumClass == null) return "Flags(" + value + ")";
+		return values().joinAsStr(", ", enumClass.getSimpleName() + ":{", "}");
+	}
+	
+	@Override
+	public boolean contains(Object o){
+		return o instanceof VUtils.FlagSetValue e &&
+		       UtilL.checkFlag(value, e.bit()) &&
+		       (enumClass == null || enumClass.isInstance(o));
+	}
+	@Override
+	public int hashCode(){
+		return enumClass.hashCode() + value*31;
+	}
+	@Override
+	public boolean equals(Object o){
+		if(o instanceof Flags<?> that){
+			return that.enumClass == this.enumClass &&
+			       that.value == this.value;
+		}
+		return super.equals(o);
 	}
 }

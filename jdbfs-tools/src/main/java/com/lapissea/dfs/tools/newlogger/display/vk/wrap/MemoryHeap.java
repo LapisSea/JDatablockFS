@@ -10,7 +10,7 @@ public class MemoryHeap{
 	public final long                    size;
 	
 	public MemoryHeap(VkMemoryHeap val){
-		this(new Flags<>(VkMemoryHeapFlag.class, val.flags()), val.size());
+		this(VkMemoryHeapFlag.from(val.flags()), val.size());
 	}
 	public MemoryHeap(Flags<VkMemoryHeapFlag> flags, long size){
 		this.flags = flags;

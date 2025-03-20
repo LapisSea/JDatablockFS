@@ -10,7 +10,7 @@ public class MemoryType{
 	public final Flags<VkMemoryPropertyFlags> propertyFlags;
 	
 	public MemoryType(VkMemoryType val){
-		this(val.heapIndex(), new Flags<>(VkMemoryPropertyFlags.class, val.propertyFlags()));
+		this(val.heapIndex(), VkMemoryPropertyFlags.from(val.propertyFlags()));
 	}
 	public MemoryType(int heapIndex, Flags<VkMemoryPropertyFlags> propertyFlags){
 		this.heapIndex = heapIndex;

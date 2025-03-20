@@ -1,11 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkDescriptorSetLayoutBinding;
@@ -23,16 +20,7 @@ public class DescriptorPool implements VulkanResource{
 		this.device = device;
 	}
 	
-	public DescriptorSetLayout createDescriptorSetLayout() throws VulkanCodeException{
-		
-		var bindings = List.of(
-			new DescriptorSetLayoutBinding(
-				0,
-				VkDescriptorType.STORAGE_BUFFER,
-				1,
-				Flags.of(VkShaderStageFlag.VERTEX)
-			)
-		);
+	public DescriptorSetLayout createDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings) throws VulkanCodeException{
 		
 		try(var stack = MemoryStack.stackPush()){
 			var descriptorBindings = VkDescriptorSetLayoutBinding.malloc(bindings.size(), stack);

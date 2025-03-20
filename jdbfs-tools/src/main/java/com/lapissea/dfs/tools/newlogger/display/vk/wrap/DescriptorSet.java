@@ -17,15 +17,17 @@ public class DescriptorSet implements VulkanResource{
 		this.device = device;
 	}
 	
-	public void update(){
+	public void update(VkBuffer buffer){
 		
 		try(MemoryStack stack = MemoryStack.stackPush()){
-			var pBufferInfo = VkDescriptorBufferInfo.calloc(1, stack);
+			var pBufferInfo = VkDescriptorBufferInfo.malloc(1, stack);
+			pBufferInfo.buffer(buffer.handle)
+			           .offset(0)
+			           .range(buffer.size);
 			
 			var pDescriptorWrites = VkWriteDescriptorSet.calloc(1, stack);
 			
-			pDescriptorWrites.get(0)
-			                 .sType$Default()
+			pDescriptorWrites.sType$Default()
 			                 .dstSet(handle)
 			                 .dstBinding(0)
 			                 .dstArrayElement(0)

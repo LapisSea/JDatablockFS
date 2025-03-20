@@ -5,6 +5,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 
 public class MappedVkMemory implements VulkanResource{
 	
@@ -30,6 +31,11 @@ public class MappedVkMemory implements VulkanResource{
 		
 		MemoryUtil.memCopy(MemoryUtil.memAddress(src), offPtr, toCopy);
 		src.position(src.position() + toCopy);
+	}
+	
+	public void populate(Consumer<ByteBuffer> populator){
+		var bb = MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
+		populator.accept(bb);
 	}
 	
 	@Override
