@@ -14,10 +14,15 @@ import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -129,5 +134,22 @@ public final class VUtils{
 		var uni = Iters.from(type);
 		return uni.mapToInt(IDValue::id).distinct()
 		          .toMap(id -> id, id -> uni.firstMatching(e -> e.id() == id).orElseThrow());
+	}
+	public static ByteBuffer readResource(String resource) throws IOException{
+		URL url = VUtils.class.getResource(resource);
+		if(url == null){
+			throw new IOException("Resource not found: " + resource);
+		}
+		var buffer = new ByteArrayOutputStream(){
+			byte[] buf(){ return this.buf; }
+		};
+		try(var source = url.openStream()){
+			if(source == null){
+				throw new FileNotFoundException(resource);
+			}
+			source.transferTo(buffer);
+		}
+		
+		return ByteBuffer.wrap(buffer.buf()).order(ByteOrder.nativeOrder()).limit(buffer.size());
 	}
 }

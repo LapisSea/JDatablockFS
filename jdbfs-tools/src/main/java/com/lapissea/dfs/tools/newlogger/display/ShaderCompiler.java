@@ -3,19 +3,15 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.shaderc.ShadercIncludeResolve;
 import org.lwjgl.util.shaderc.ShadercIncludeResult;
 import org.lwjgl.util.shaderc.ShadercIncludeResultRelease;
 import org.lwjgl.vulkan.VK10;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.ByteBuffer;
 
-import static org.lwjgl.system.MemoryUtil.memFree;
-import static org.lwjgl.system.MemoryUtil.memUTF8;
 import static org.lwjgl.util.shaderc.Shaderc.*;
 
 public final class ShaderCompiler{
@@ -51,7 +47,7 @@ public final class ShaderCompiler{
 			case COMPUTE -> shaderc_compute_shader;
 		};
 		
-		ByteBuffer src = readResource(classPath);
+		var src = VUtils.readResource(classPath);
 		
 		long compiler = shaderc_compiler_initialize();
 		long options  = shaderc_compile_options_initialize();
@@ -59,22 +55,28 @@ public final class ShaderCompiler{
 		var resolver = new ShadercIncludeResolve(){
 			public long invoke(long user_data, long requested_source, int type, long requesting_source, long include_depth){
 				var res = ShadercIncludeResult.calloc();
-				var src = classPath.substring(0, classPath.lastIndexOf('/')) + "/" + memUTF8(requested_source);
+				var src = classPath.substring(0, classPath.lastIndexOf('/')) + "/" + MemoryUtil.memUTF8(requested_source);
 				try{
-					res.content(readResource(src));
-					res.source_name(memUTF8(src));
-					return res.address();
+					var data = VUtils.readResource(src);
+					var mem  = MemoryUtil.memAlloc(data.remaining()).put(data).flip();
+					res.content(mem);
 				}catch(IOException e){
-					throw new AssertionError("Failed to resolve include: " + src);
+					new IOException("Failed to resolve include: " + src, e).printStackTrace();
+					res.content(MemoryUtil.memAlloc(1));
 				}
+				
+				res.source_name(MemoryUtil.memUTF8(src));
+				return res.address();
 			}
 		};
 		
 		var releaser = new ShadercIncludeResultRelease(){
 			public void invoke(long user_data, long include_result){
 				ShadercIncludeResult result = ShadercIncludeResult.create(include_result);
-				memFree(result.source_name());
+				MemoryUtil.memFree(result.source_name());
+				MemoryUtil.memFree(result.content());
 				result.free();
+				System.gc();
 			}
 		};
 		
@@ -85,7 +87,12 @@ public final class ShaderCompiler{
 		
 		long res;
 		try(MemoryStack stack = MemoryStack.stackPush()){
-			res = shaderc_compile_into_spv(compiler, src, shaderc_kind, stack.UTF8(classPath), stack.UTF8("main"), options);
+			var srcN = MemoryUtil.memAlloc(src.remaining()).put(src).flip();
+			try{
+				res = shaderc_compile_into_spv(compiler, srcN, shaderc_kind, stack.UTF8(classPath), stack.UTF8("main"), options);
+			}finally{
+				MemoryUtil.memFree(srcN);
+			}
 			if(res == 0){
 				throw new RuntimeException("Internal error during compilation!");
 			}
@@ -105,24 +112,4 @@ public final class ShaderCompiler{
 		resolver.free();
 		return spirv;
 	}
-	
-	private static ByteBuffer readResource(String resource) throws IOException{
-		URL url = ShaderCompiler.class.getResource(resource);
-		if(url == null){
-			throw new IOException("Resource not found: " + resource);
-		}
-		var buffer = new ByteArrayOutputStream(){
-			byte[] buf(){ return this.buf; }
-		};
-		try(var source = url.openStream()){
-			if(source == null){
-				throw new FileNotFoundException(resource);
-			}
-			source.transferTo(buffer);
-		}
-		var res = BufferUtils.createByteBuffer(buffer.size());
-		res.put(buffer.buf(), 0, res.capacity());
-		return res.flip();
-	}
-	
 }
