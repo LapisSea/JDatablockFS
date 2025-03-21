@@ -54,13 +54,13 @@ public sealed interface MemoryBarrier{
 		VkImageLayout newLayout,
 		int srcQueueFamilyIndex,
 		int dstQueueFamilyIndex,
-		Image image,
+		VkImage image,
 		VkImageSubresourceRange subresourceRange
 	) implements MemoryBarrier{
 		public BarImage(BarImage previous, VkAccessFlag dstAccessMask, VkImageLayout newLayout){
 			this(previous.dstAccessMask, dstAccessMask, previous.newLayout, newLayout, VK10.VK_QUEUE_FAMILY_IGNORED, VK10.VK_QUEUE_FAMILY_IGNORED, previous.image, previous.subresourceRange);
 		}
-		public BarImage(VkAccessFlag srcAccessMask, VkAccessFlag dstAccessMask, VkImageLayout oldLayout, VkImageLayout newLayout, Image image, VkImageSubresourceRange subresourceRange){
+		public BarImage(VkAccessFlag srcAccessMask, VkAccessFlag dstAccessMask, VkImageLayout oldLayout, VkImageLayout newLayout, VkImage image, VkImageSubresourceRange subresourceRange){
 			this(srcAccessMask, dstAccessMask, oldLayout, newLayout, VK10.VK_QUEUE_FAMILY_IGNORED, VK10.VK_QUEUE_FAMILY_IGNORED, image, subresourceRange);
 		}
 		public void set(VkImageMemoryBarrier.Buffer dest){

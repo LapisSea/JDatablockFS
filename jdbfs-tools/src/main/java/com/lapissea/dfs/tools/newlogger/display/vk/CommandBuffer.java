@@ -6,12 +6,12 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Image;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCopy;
@@ -58,7 +58,7 @@ public class CommandBuffer implements VulkanResource{
 		VKCalls.vkFreeCommandBuffers(pool, val);
 	}
 	
-	public void clearColorImage(Image image, VkImageLayout layout, VkClearColorValue color, VkImageSubresourceRange range){
+	public void clearColorImage(VkImage image, VkImageLayout layout, VkClearColorValue color, VkImageSubresourceRange range){
 		VK10.vkCmdClearColorImage(val, image.handle, layout.id, color, range);
 	}
 	public void pipelineBarrier(VkPipelineStageFlag srcStageMask, VkPipelineStageFlag dstStageMask, int dependencyFlags, List<MemoryBarrier> barriers){

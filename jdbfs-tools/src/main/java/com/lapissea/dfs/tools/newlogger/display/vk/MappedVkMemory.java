@@ -1,6 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VK10;
 
@@ -9,10 +9,10 @@ import java.util.function.Consumer;
 
 public class MappedVkMemory implements VulkanResource{
 	
-	private final DeviceMemory memory;
-	private final long         ptr, size;
+	private final VkDeviceMemory memory;
+	private final long           ptr, size;
 	
-	public MappedVkMemory(DeviceMemory memory, long ptr, long size){
+	public MappedVkMemory(VkDeviceMemory memory, long ptr, long size){
 		this.memory = memory;
 		this.ptr = ptr;
 		this.size = size;

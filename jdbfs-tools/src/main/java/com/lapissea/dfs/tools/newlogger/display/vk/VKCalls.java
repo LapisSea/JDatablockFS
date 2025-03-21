@@ -7,9 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
@@ -17,6 +15,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanSemaphore;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.PointerBuffer;
@@ -100,10 +100,10 @@ public interface VKCalls{
 	static void vkGetSwapchainImagesKHR(Device device, Swapchain swapchain, IntBuffer pSwapchainImageCount, LongBuffer pSwapchainImages) throws VulkanCodeException{
 		check(KHRSwapchain.vkGetSwapchainImagesKHR(device.value, swapchain.handle, pSwapchainImageCount, pSwapchainImages), "vkGetSwapchainImagesKHR");
 	}
-	static ImageView vkCreateImageView(Device device, VkImageViewCreateInfo info) throws VulkanCodeException{
+	static VkImageView vkCreateImageView(Device device, VkImageViewCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateImageView(device.value, info, null, ptr), "vkCreateImageView");
-		return new ImageView(ptr[0], device);
+		return new VkImageView(ptr[0], device);
 	}
 	static long vkCreateCommandPool(Device device, VkCommandPoolCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
@@ -198,7 +198,7 @@ public interface VKCalls{
 		check(VK10.vkCreatePipelineLayout(device.value, pCreateInfo, null, res), "vkCreatePipelineLayout");
 		return new Pipeline.Layout(res[0], device);
 	}
-	static MappedVkMemory vkMapMemory(DeviceMemory memory, long offset, long size, int flags) throws VulkanCodeException{
+	static MappedVkMemory vkMapMemory(VkDeviceMemory memory, long offset, long size, int flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var res = stack.mallocPointer(1);
 			check(VK10.vkMapMemory(memory.device.value, memory.handle, offset, size, flags, res), "vkMapMemory");
@@ -210,12 +210,12 @@ public interface VKCalls{
 		check(VK10.vkCreateBuffer(device.value, info, null, res), "vkCreateBuffer");
 		return new VkBuffer(res[0], info.size(), device);
 	}
-	static DeviceMemory vkAllocateMemory(Device device, VkMemoryAllocateInfo pAllocateInfo) throws VulkanCodeException{
+	static VkDeviceMemory vkAllocateMemory(Device device, VkMemoryAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkAllocateMemory(device.value, pAllocateInfo, null, res), "vkAllocateMemory");
-		return new DeviceMemory(res[0], device);
+		return new VkDeviceMemory(res[0], device);
 	}
-	static void vkBindBufferMemory(VkBuffer buffer, DeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
+	static void vkBindBufferMemory(VkBuffer buffer, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindBufferMemory(buffer.device.value, buffer.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
 	}
 	static DescriptorSetLayout vkCreateDescriptorSetLayout(DescriptorPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{

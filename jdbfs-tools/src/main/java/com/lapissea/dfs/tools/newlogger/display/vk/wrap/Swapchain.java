@@ -21,8 +21,8 @@ public class Swapchain implements VulkanResource{
 	public final VkFormat        format;
 	public final Extent2D        extent;
 	public final Device          device;
-	public final List<Image>     images;
-	public final List<ImageView> imageViews;
+	public final List<VkImage>     images;
+	public final List<VkImageView> imageViews;
 	
 	public Swapchain(long handle, Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
 		this.handle = handle;
@@ -34,27 +34,27 @@ public class Swapchain implements VulkanResource{
 		
 		images = getSwapchainImages();
 		
-		var views = new ArrayList<ImageView>(images.size());
-		for(Image image : images){
+		var views = new ArrayList<VkImageView>(images.size());
+		for(VkImage image : images){
 			views.add(image.createImageView(VkImageViewType.TYPE_2D, format, Flags.of(VkImageAspectFlagBits.COLOR_BIT)));
 		}
 		imageViews = List.copyOf(views);
 	}
 	
-	private List<Image> getSwapchainImages() throws VulkanCodeException{
+	private List<VkImage> getSwapchainImages() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var count = stack.mallocInt(1);
 			VKCalls.vkGetSwapchainImagesKHR(device, this, count, null);
 			var imageRefs = stack.mallocLong(count.get(0));
 			VKCalls.vkGetSwapchainImagesKHR(device, this, count, imageRefs);
 			
-			return Iters.rangeMap(0, imageRefs.capacity(), i -> new Image(imageRefs.get(i), extent, device)).toList();
+			return Iters.rangeMap(0, imageRefs.capacity(), i -> new VkImage(imageRefs.get(i), extent, device)).toList();
 		}
 	}
 	
 	@Override
 	public void destroy(){
-		for(ImageView imageView : imageViews){
+		for(VkImageView imageView : imageViews){
 			imageView.destroy();
 		}
 		KHRSwapchain.vkDestroySwapchainKHR(device.value, handle, null);

@@ -12,22 +12,22 @@ import org.lwjgl.vulkan.VkComponentMapping;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 
-public class Image implements VulkanResource{
+public class VkImage implements VulkanResource{
 	
 	public final  long     handle;
 	public final  Extent2D extent;
 	private final Device   device;
 	
-	public Image(long handle, Extent2D extent, Device device){
+	public VkImage(long handle, Extent2D extent, Device device){
 		this.handle = handle;
 		this.extent = extent;
 		this.device = device;
 	}
 	
-	public ImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlagBits> aspectFlags) throws VulkanCodeException{
+	public VkImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlagBits> aspectFlags) throws VulkanCodeException{
 		return createImageView(type, format, aspectFlags, 1, 1);
 	}
-	public ImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlagBits> aspectFlags, int mipLevelCount, int layerCount) throws VulkanCodeException{
+	public VkImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlagBits> aspectFlags, int mipLevelCount, int layerCount) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkImageViewCreateInfo.calloc(stack);
 			info.sType$Default()

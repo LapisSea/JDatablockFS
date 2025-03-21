@@ -3,12 +3,12 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
-public class DeviceMemory implements VulkanResource{
+public class VkDeviceMemory implements VulkanResource{
 	
 	public final long   handle;
 	public final Device device;
 	
-	public DeviceMemory(long handle, Device device){
+	public VkDeviceMemory(long handle, Device device){
 		this.handle = handle;
 		this.device = device;
 	}

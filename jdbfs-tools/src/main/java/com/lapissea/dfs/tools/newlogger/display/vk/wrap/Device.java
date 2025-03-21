@@ -87,7 +87,7 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public ImageView createImageView(VkImageViewCreateInfo info) throws VulkanCodeException{
+	public VkImageView createImageView(VkImageViewCreateInfo info) throws VulkanCodeException{
 		return VKCalls.vkCreateImageView(this, info);
 	}
 	
