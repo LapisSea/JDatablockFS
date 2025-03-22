@@ -138,7 +138,7 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	private void renderQueue() throws VulkanCodeException{
-		vkCore.renderQueue.waitIdle();
+//		vkCore.renderQueue.waitIdle();
 //		recordCommandBuffers();
 		var bufferQueue = vkCore.renderQueue;
 		var index       = bufferQueue.acquireNextImage();

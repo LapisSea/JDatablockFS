@@ -2,11 +2,15 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
 import org.lwjgl.vulkan.KHRSwapchain;
@@ -94,6 +98,18 @@ public class PhysicalDevice{
 			memoryProperties = new MemoryProperties(memoryTypes, memoryHeaps);
 		}
 		return memoryProperties;
+	}
+	
+	public int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlag> requiredProperties){
+		return Iters.from(memoryProperties.memoryTypes())
+		            .enumerate()
+		            .filter(e -> {
+			            var typeSupported = UtilL.checkFlag(typeBits, 1<<e.index());
+			            var hasMemProps   = e.val().propertyFlags.containsAll(requiredProperties);
+			            return typeSupported && hasMemProps;
+		            }).map(IterablePP.Idx::index)
+		            .findFirst()
+		            .orElseThrow(() -> new IllegalStateException("Could not find memory type for: " + typeBits + " & " + requiredProperties));
 	}
 	
 	

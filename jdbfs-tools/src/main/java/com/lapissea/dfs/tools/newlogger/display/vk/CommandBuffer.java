@@ -137,7 +137,7 @@ public class CommandBuffer implements VulkanResource{
 			                                .renderPass(renderPass.handle)
 			                                .framebuffer(frameBuffer.handle)
 			                                .renderArea(renderArea.set(VkRect2D.malloc(stack)))
-			                                .pClearValues(VkClearValue.malloc(1, stack).color(color));
+			                                .pClearValues(VkClearValue.malloc(2, stack).color(color).position(1).color(color).position(0));
 			
 			VK10.vkCmdBeginRenderPass(val, info, VK10.VK_SUBPASS_CONTENTS_INLINE);
 			

@@ -1,6 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkMemoryRequirements;
@@ -15,6 +19,20 @@ public class VkBuffer implements VulkanResource{
 		this.handle = handle;
 		this.size = size;
 		this.device = device;
+	}
+	
+	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
+		var requirement     = getRequirements();
+		int memoryTypeIndex = physicalDevice.getMemoryTypeIndex(requirement.memoryTypeBits(), memoryFlags);
+		var memory          = device.allocateMemory(requirement.size(), memoryTypeIndex);
+		
+		try{
+			VKCalls.vkBindBufferMemory(this, memory, 0);
+		}catch(Throwable e){
+			memory.destroy();
+			throw e;
+		}
+		return memory;
 	}
 	
 	public MemoryRequirements getRequirements(){

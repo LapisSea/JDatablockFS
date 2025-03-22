@@ -11,13 +11,10 @@ public class BufferAndMemory implements VulkanResource{
 	
 	public final VkBuffer       buffer;
 	public final VkDeviceMemory memory;
-	public final long           allocationSize;
 	
-	
-	public BufferAndMemory(VkBuffer buffer, VkDeviceMemory memory, long allocationSize){
+	public BufferAndMemory(VkBuffer buffer, VkDeviceMemory memory){
 		this.buffer = buffer;
 		this.memory = memory;
-		this.allocationSize = allocationSize;
 	}
 	
 	
@@ -34,7 +31,7 @@ public class BufferAndMemory implements VulkanResource{
 	}
 	
 	public void update(Consumer<ByteBuffer> populator) throws VulkanCodeException{
-		try(var mem = VKCalls.vkMapMemory(memory, 0, allocationSize, 0)){
+		try(var mem = memory.map()){
 			mem.populate(populator);
 		}
 	}

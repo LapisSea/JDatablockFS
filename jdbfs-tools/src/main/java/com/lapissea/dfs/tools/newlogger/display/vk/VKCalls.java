@@ -220,7 +220,7 @@ public interface VKCalls{
 	static VkDeviceMemory vkAllocateMemory(Device device, VkMemoryAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkAllocateMemory(device.value, pAllocateInfo, null, res), "vkAllocateMemory");
-		return new VkDeviceMemory(res[0], device);
+		return new VkDeviceMemory(res[0], device, pAllocateInfo.allocationSize());
 	}
 	static void vkBindBufferMemory(VkBuffer buffer, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindBufferMemory(buffer.device.value, buffer.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");

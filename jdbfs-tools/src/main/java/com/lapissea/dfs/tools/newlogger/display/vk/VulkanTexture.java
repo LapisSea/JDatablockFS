@@ -64,9 +64,9 @@ public class VulkanTexture implements VulkanResource{
 	
 	@Override
 	public void destroy(){
-		memory.destroy();
+		if(sampler != null) sampler.destroy();
 		view.destroy();
-		sampler.destroy();
+		memory.destroy();
 		image.destroy();
 	}
 }

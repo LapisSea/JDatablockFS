@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import org.lwjgl.system.MemoryStack;
@@ -44,6 +45,20 @@ public class VkImage implements VulkanResource{
 		this.extent = extent;
 		this.format = format;
 		this.samples = samples;
+	}
+	
+	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> requiredProperties) throws VulkanCodeException{
+		var requirements    = getRequirements();
+		var memoryTypeIndex = physicalDevice.getMemoryTypeIndex(requirements.memoryTypeBits(), requiredProperties);
+		
+		var mem = device.allocateMemory(requirements.size(), memoryTypeIndex);
+		try{
+			VKCalls.vkBindImageMemory(this, mem, 0);
+		}catch(Throwable e){
+			mem.destroy();
+			throw e;
+		}
+		return mem;
 	}
 	
 	public MemoryRequirements getRequirements(){

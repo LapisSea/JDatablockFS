@@ -47,10 +47,12 @@ public class GraphicsPipeline implements VulkanResource{
 		}
 	}
 	
-	public void initPipeline(RenderPass renderPass, int subpass, List<ShaderModule> modules, Rect2D viewport, Rect2D scissors) throws VulkanCodeException{
+	public void initPipeline(RenderPass renderPass, int subpass, List<ShaderModule> modules,
+	                         Rect2D viewport, Rect2D scissors,
+	                         VkSampleCountFlag samples) throws VulkanCodeException{
 		pipeline = device.createPipeline(
 			renderPass, subpass, modules, viewport, scissors,
-			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, VkSampleCountFlag.N1,
+			VkPolygonMode.FILL, VkCullModeFlag.FRONT, VkFrontFace.CLOCKWISE, samples,
 			descriptorSetLayout
 		);
 	}

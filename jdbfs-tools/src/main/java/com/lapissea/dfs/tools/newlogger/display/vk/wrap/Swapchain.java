@@ -4,7 +4,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
@@ -21,7 +20,6 @@ public class Swapchain implements VulkanResource{
 	public final long              handle;
 	public final FormatColor       formatColor;
 	public final Extent2D          extent;
-	public final VkFormat          format;
 	public final Device            device;
 	public final List<VkImage>     images;
 	public final List<VkImageView> imageViews;
@@ -31,15 +29,12 @@ public class Swapchain implements VulkanResource{
 		this.device = device;
 		formatColor = new FormatColor(createInfo.imageFormat(), createInfo.imageColorSpace());
 		extent = new Extent2D(createInfo.imageExtent());
-		format = VkFormat.from(createInfo.imageFormat());
-		
-		var format = VkFormat.from(createInfo.imageFormat());
 		
 		images = getSwapchainImages();
 		
 		var views = new ArrayList<VkImageView>(images.size());
 		for(VkImage image : images){
-			views.add(image.createImageView(VkImageViewType.TYPE_2D, format, Flags.of(VkImageAspectFlag.COLOR)));
+			views.add(image.createImageView(VkImageViewType.TYPE_2D, formatColor.format, Flags.of(VkImageAspectFlag.COLOR)));
 		}
 		imageViews = List.copyOf(views);
 	}
@@ -53,7 +48,7 @@ public class Swapchain implements VulkanResource{
 			
 			return Iters.rangeMap(
 				0, imageRefs.capacity(),
-				i -> new VkImage(imageRefs.get(i), device, extent.as3d(), format, VkSampleCountFlag.N1)
+				i -> new VkImage(imageRefs.get(i), device, extent.as3d(), formatColor.format, VkSampleCountFlag.N1)
 			).toList();
 		}
 	}

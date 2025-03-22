@@ -40,13 +40,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
@@ -65,6 +63,7 @@ import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,10 +123,11 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final QueueFamilyProps renderQueueFamily;
 	
-	public Swapchain         swapchain;
-	public VulkanQueue       renderQueue;
-	public RenderPass        renderPass;
-	public List<FrameBuffer> frameBuffers;
+	public Swapchain           swapchain;
+	public List<VulkanTexture> mssaImages;
+	public VulkanQueue         renderQueue;
+	public RenderPass          renderPass;
+	public List<FrameBuffer>   frameBuffers;
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
@@ -166,12 +166,7 @@ public class VulkanCore implements AutoCloseable{
 			VkSampleCountFlag.N1
 		);
 		
-		var requirements    = image.getRequirements();
-		var memoryTypeIndex = getMemoryTypeIndex(requirements.memoryTypeBits(), Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
-		
-		var memory = device.allocateMemory(requirements.size(), memoryTypeIndex);
-		
-		VKCalls.vkBindImageMemory(image, memory, 0);
+		var memory = image.allocateAndBindRequiredMemory(physicalDevice, Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
 		
 		imageUpdate(image, pixels);
 		
@@ -217,30 +212,14 @@ public class VulkanCore implements AutoCloseable{
 		try{
 			buffer = device.createBuffer(size, usageFlags, VkSharingMode.EXCLUSIVE);
 			
-			var requirement     = buffer.getRequirements();
-			int memoryTypeIndex = getMemoryTypeIndex(requirement.memoryTypeBits(), memoryFlags);
-			memory = device.allocateMemory(requirement.size(), memoryTypeIndex);
+			memory = buffer.allocateAndBindRequiredMemory(physicalDevice, memoryFlags);
 			
-			VKCalls.vkBindBufferMemory(buffer, memory, 0);
-			
-			return new BufferAndMemory(buffer, memory, requirement.size());
+			return new BufferAndMemory(buffer, memory);
 		}catch(Throwable e){
 			if(memory != null) memory.destroy();
 			if(buffer != null) buffer.destroy();
 			throw e;
 		}
-	}
-	
-	private int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlag> requiredProperties){
-		return Iters.from(physicalDevice.memoryProperties.memoryTypes())
-		            .enumerate()
-		            .filter(e -> {
-			            var typeSupported = UtilL.checkFlag(typeBits, 1<<e.index());
-			            var hasMemProps   = e.val().propertyFlags.containsAll(requiredProperties);
-			            return typeSupported && hasMemProps;
-		            }).map(IterablePP.Idx::index)
-		            .findFirst()
-		            .orElseThrow(() -> new IllegalStateException("Could not find memory type for: " + typeBits + " & " + requiredProperties));
 	}
 	
 	public BufferAndMemory createVertexBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
@@ -287,11 +266,24 @@ public class VulkanCore implements AutoCloseable{
 		swapchain = device.createSwapchain(
 			oldSwapchain, surface, VKPresentMode.IMMEDIATE,
 			List.of(
-//				new FormatColor(VkFormat.B8G8R8A8_SRGB, VkColorSpaceKHR.SRGB_NONLINEAR_KHR),
 				new FormatColor(VkFormat.R8G8B8A8_UNORM, VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
 			)
 		);
 		if(oldSwapchain != null) oldSwapchain.destroy();
+		
+		var images = new ArrayList<VulkanTexture>(swapchain.images.size());
+		for(int i = 0; i<swapchain.images.size(); i++){
+			var image = device.createImage(swapchain.extent.width, swapchain.extent.height, swapchain.formatColor.format,
+			                               Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT),
+			                               physicalDevice.samples);
+			
+			var memory = image.allocateAndBindRequiredMemory(physicalDevice, Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
+			
+			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, Flags.of(VkImageAspectFlag.COLOR));
+			
+			images.add(new VulkanTexture(image, memory, view, null));
+		}
+		mssaImages = images;
 		
 		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
 		
@@ -309,6 +301,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 		renderPass.close();
 		renderQueue.destroy();
+		mssaImages.forEach(VulkanTexture::destroy);
 		if(destroySwapchain) swapchain.destroy();
 	}
 	
@@ -336,13 +329,13 @@ public class VulkanCore implements AutoCloseable{
 				Flags.of(VkShaderStageFlag.FRAGMENT)
 			)
 		), vb, uniforms, texture);
-		p.initPipeline(renderPass, 0, testShaderModules, area, area);
+		p.initPipeline(renderPass, 0, testShaderModules, area, area, physicalDevice.samples);
 		return p;
 	}
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
-			var viewRef = stack.mallocLong(1);
+			var viewRef = stack.mallocLong(2);
 			var info = VkFramebufferCreateInfo.calloc(stack)
 			                                  .sType$Default()
 			                                  .renderPass(renderPass.handle)
@@ -353,8 +346,10 @@ public class VulkanCore implements AutoCloseable{
 			
 			var views = swapchain.imageViews;
 			var fbs   = new ArrayList<FrameBuffer>(views.size());
-			for(var view : views){
-				viewRef.put(0, view.handle);
+			for(int i = 0; i<views.size(); i++){
+				var mssaView      = mssaImages.get(i).view;
+				var swapchainView = views.get(i);
+				viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
 				fbs.add(VKCalls.vkCreateFramebuffer(device, info));
 			}
 			return List.copyOf(fbs);
@@ -363,10 +358,16 @@ public class VulkanCore implements AutoCloseable{
 	
 	private RenderPass createRenderPass() throws VulkanCodeException{
 		
-		var attachment = new RenderPass.AttachmentInfo(
+		var mssaAttachment = new RenderPass.AttachmentInfo(
+			swapchain.formatColor.format,
+			physicalDevice.samples,
+			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
+		);
+		var presentAttachment = new RenderPass.AttachmentInfo(
 			swapchain.formatColor.format,
 			VkSampleCountFlag.N1,
-			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, VkImageLayout.PRESENT_SRC_KHR
 		);
 		
@@ -374,20 +375,20 @@ public class VulkanCore implements AutoCloseable{
 			VkPipelineBindPoint.GRAPHICS,
 			List.of(),
 			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
-			List.of(),
+			List.of(new RenderPass.AttachmentReference(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
 			null,
 			new int[0]
 		);
 		
-		return device.buildRenderPass().attachment(attachment).subpass(subpass).build();
+		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
 	}
 	
 	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueFlag capability){
 		return Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(capability));
 	}
 	
-	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of("VUID-VkAttachmentReference-layout-03077");
-	private static final Set<String> IGNORE_IDS            = Set.of("Loader Message");
+	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of();
+	private static final Set<String> IGNORE_IDS            = new HashSet<>(Set.of("Loader Message"));
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
 		if(severity == DebugLoggerEXT.Severity.INFO && IGNORE_IDS.contains(messageIDName)){
