@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import org.lwjgl.system.MemoryStack;
@@ -8,15 +9,9 @@ import org.lwjgl.vulkan.VkDescriptorBufferInfo;
 import org.lwjgl.vulkan.VkDescriptorImageInfo;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 
-public class DescriptorSet{
+public class DescriptorSet extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
-	
-	public DescriptorSet(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public DescriptorSet(Device device, long handle){ super(device, handle); }
 	
 	public void update(VkBuffer buffer, VkBuffer uniformBuffer, VulkanTexture texture){
 		
@@ -72,4 +67,7 @@ public class DescriptorSet{
 		}
 		
 	}
+	
+	@Override
+	public void destroy(){ }
 }

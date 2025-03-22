@@ -16,18 +16,15 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Swapchain implements VulkanResource{
+public class Swapchain extends VulkanResource.DeviceHandleObj{
 	
-	public final long              handle;
 	public final FormatColor       formatColor;
 	public final Extent2D          extent;
-	public final Device            device;
 	public final List<VkImage>     images;
 	public final List<VkImageView> imageViews;
 	
-	public Swapchain(long handle, Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
-		this.handle = handle;
-		this.device = device;
+	public Swapchain(Device device, long handle, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
+		super(device, handle);
 		formatColor = new FormatColor(createInfo.imageFormat(), createInfo.imageColorSpace());
 		extent = new Extent2D(createInfo.imageExtent());
 		
@@ -49,7 +46,7 @@ public class Swapchain implements VulkanResource{
 			
 			return Iters.rangeMap(
 				0, imageRefs.capacity(),
-				i -> new VkImage(imageRefs.get(i), device, extent.as3d(), formatColor.format, VkSampleCountFlag.N1, VKImageType.IMG_2D)
+				i -> new VkImage(device, imageRefs.get(i), extent.as3d(), formatColor.format, VkSampleCountFlag.N1, VKImageType.IMG_2D)
 			).toList();
 		}
 	}

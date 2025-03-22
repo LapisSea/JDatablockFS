@@ -6,15 +6,9 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkResult;
 import org.lwjgl.vulkan.VK10;
 
-public class VkFence implements VulkanResource{
+public class VkFence extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
-	
-	public VkFence(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public VkFence(Device device, long handle){ super(device, handle); }
 	
 	public void waitFor() throws VulkanCodeException{
 		VKCalls.vkWaitForFence(device.value, this, Long.MAX_VALUE);

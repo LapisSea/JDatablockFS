@@ -146,7 +146,7 @@ public class Device implements VulkanResource{
 			                                  .queueFamilyIndex(queue.index);
 			
 			var res = VKCalls.vkCreateCommandPool(this, info);
-			return new CommandPool(res, this, commandPoolType);
+			return new CommandPool(this, res, commandPoolType);
 		}
 	}
 	

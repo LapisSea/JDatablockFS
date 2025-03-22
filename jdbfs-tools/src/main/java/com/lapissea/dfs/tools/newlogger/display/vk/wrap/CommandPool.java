@@ -11,7 +11,7 @@ import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
 
 import java.util.List;
 
-public class CommandPool implements VulkanResource{
+public class CommandPool extends VulkanResource.DeviceHandleObj{
 	
 	public enum Type{
 		/**For general use*/
@@ -22,13 +22,10 @@ public class CommandPool implements VulkanResource{
 		WRITE_ONCE
 	}
 	
-	public final long   handle;
-	public final Device device;
-	public final Type   type;
+	public final Type type;
 	
-	public CommandPool(long handle, Device device, Type type){
-		this.handle = handle;
-		this.device = device;
+	public CommandPool(Device device, long handle, Type type){
+		super(device, handle);
 		this.type = type;
 	}
 	

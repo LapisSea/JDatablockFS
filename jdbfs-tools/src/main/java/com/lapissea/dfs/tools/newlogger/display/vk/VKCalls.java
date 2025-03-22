@@ -103,7 +103,7 @@ public interface VKCalls{
 	static Swapchain vkCreateSwapchainKHR(Device device, VkSwapchainCreateInfoKHR createInfo) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(KHRSwapchain.vkCreateSwapchainKHR(device.value, createInfo, null, ptr), "vkCreateSwapchainKHR");
-		return new Swapchain(ptr[0], device, createInfo);
+		return new Swapchain(device, ptr[0], createInfo);
 	}
 	static void vkGetSwapchainImagesKHR(Device device, Swapchain swapchain, IntBuffer pSwapchainImageCount, LongBuffer pSwapchainImages) throws VulkanCodeException{
 		check(KHRSwapchain.vkGetSwapchainImagesKHR(device.value, swapchain.handle, pSwapchainImageCount, pSwapchainImages), "vkGetSwapchainImagesKHR");
@@ -111,7 +111,7 @@ public interface VKCalls{
 	static VkImageView vkCreateImageView(Device device, VkImageViewCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateImageView(device.value, info, null, ptr), "vkCreateImageView");
-		return new VkImageView(ptr[0], device);
+		return new VkImageView(device, ptr[0]);
 	}
 	static long vkCreateCommandPool(Device device, VkCommandPoolCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
@@ -122,7 +122,7 @@ public interface VKCalls{
 	static VkSemaphore vkCreateSemaphore(Device device, VkSemaphoreCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateSemaphore(device.value, info, null, ptr), "vkCreateSemaphore");
-		return new VkSemaphore(ptr[0], device);
+		return new VkSemaphore(device, ptr[0]);
 	}
 	static void vkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo info) throws VulkanCodeException{
 		check(VK10.vkBeginCommandBuffer(commandBuffer, info), "vkBeginCommandBuffer");
@@ -184,30 +184,30 @@ public interface VKCalls{
 	static RenderPass vkCreateRenderPass(Device device, VkRenderPassCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateRenderPass(device.value, pCreateInfo, null, res), "vkCreateRenderPass");
-		return new RenderPass(res[0], device);
+		return new RenderPass(device, res[0]);
 	}
 	static FrameBuffer vkCreateFramebuffer(Device device, VkFramebufferCreateInfo info) throws VulkanCodeException{
 		var ref = new long[1];
 		check(VK10.vkCreateFramebuffer(device.value, info, null, ref), "vkCreateFramebuffer");
-		return new FrameBuffer(ref[0], device);
+		return new FrameBuffer(device, ref[0]);
 	}
 	static ShaderModule vkCreateShaderModule(Device device, VkShaderStageFlag stage, VkShaderModuleCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateShaderModule(device.value, pCreateInfo, null, res), "vkCreateShaderModule");
-		return new ShaderModule(res[0], stage, device);
+		return new ShaderModule(device, res[0], stage);
 	}
 	static List<Pipeline> vkCreateGraphicsPipelines(Device device, long pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
 		long[] result = new long[pCreateInfos.capacity()];
 		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
 		return Iters.rangeMap(0, result.length, i -> {
-			var layout = new Pipeline.Layout(pCreateInfos.get(i).layout(), device);
-			return new Pipeline(result[i], layout, device);
+			var layout = new Pipeline.Layout(device, pCreateInfos.get(i).layout());
+			return new Pipeline(device, result[i], layout);
 		}).toList();
 	}
 	static Pipeline.Layout vkCreatePipelineLayout(Device device, VkPipelineLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		long[] res = new long[1];
 		check(VK10.vkCreatePipelineLayout(device.value, pCreateInfo, null, res), "vkCreatePipelineLayout");
-		return new Pipeline.Layout(res[0], device);
+		return new Pipeline.Layout(device, res[0]);
 	}
 	static MappedVkMemory vkMapMemory(VkDeviceMemory memory, long offset, long size, int flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
@@ -219,12 +219,12 @@ public interface VKCalls{
 	static VkBuffer vkCreateBuffer(Device device, VkBufferCreateInfo info) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateBuffer(device.value, info, null, res), "vkCreateBuffer");
-		return new VkBuffer(res[0], info.size(), device);
+		return new VkBuffer(device, res[0], info.size());
 	}
 	static VkDeviceMemory vkAllocateMemory(Device device, VkMemoryAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkAllocateMemory(device.value, pAllocateInfo, null, res), "vkAllocateMemory");
-		return new VkDeviceMemory(res[0], device, pAllocateInfo.allocationSize());
+		return new VkDeviceMemory(device, res[0], pAllocateInfo.allocationSize());
 	}
 	static void vkBindBufferMemory(VkBuffer buffer, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindBufferMemory(buffer.device.value, buffer.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
@@ -235,36 +235,36 @@ public interface VKCalls{
 	static DescriptorSetLayout vkCreateDescriptorSetLayout(DescriptorPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorSetLayout(pool.device.value, pCreateInfo, null, res), "vkCreateDescriptorSetLayout");
-		return new DescriptorSetLayout(res[0], pool);
+		return new DescriptorSetLayout(pool, res[0]);
 	}
 	static DescriptorPool vkCreateDescriptorPool(Device device, VkDescriptorPoolCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorPool(device.value, pCreateInfo, null, res), "vkCreateDescriptorPool");
-		return new DescriptorPool(res[0], device);
+		return new DescriptorPool(device, res[0]);
 	}
 	static List<DescriptorSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		long[] arr = new long[pAllocateInfo.descriptorSetCount()];
 		check(VK10.vkAllocateDescriptorSets(device.value, pAllocateInfo, arr), "vkAllocateDescriptorSets");
 		var res = new DescriptorSet[arr.length];
 		for(int i = 0; i<arr.length; i++){
-			res[i] = new DescriptorSet(arr[i], device);
+			res[i] = new DescriptorSet(device, arr[i]);
 		}
 		return List.of(res);
 	}
 	static VkImage vkCreateImage(Device device, VkImageCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateImage(device.value, pCreateInfo, null, res), "vkCreateImage");
-		return new VkImage(res[0], device, pCreateInfo);
+		return new VkImage(device, res[0], pCreateInfo);
 	}
 	static VkSampler vkCreateSampler(Device device, VkSamplerCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateSampler(device.value, pCreateInfo, null, res), "vkCreateSampler");
-		return new VkSampler(res[0], device);
+		return new VkSampler(device, res[0]);
 	}
 	static VkFence vkCreateFence(Device device, VkFenceCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateFence(device.value, pCreateInfo, null, res), "vkCreateFence");
-		return new VkFence(res[0], device);
+		return new VkFence(device, res[0]);
 	}
 	static void vkWaitForFence(VkDevice device, VkFence fence, long timeout) throws VulkanCodeException{
 		check(VK10.vkWaitForFences(device, fence.handle, true, timeout), "vkWaitForFences");

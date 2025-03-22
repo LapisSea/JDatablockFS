@@ -24,7 +24,7 @@ import org.lwjgl.vulkan.VkSubpassDescription;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RenderPass implements VulkanResource{
+public class RenderPass extends VulkanResource.DeviceHandleObj{
 	
 	public record AttachmentInfo(
 		VkFormat format,
@@ -174,13 +174,8 @@ public class RenderPass implements VulkanResource{
 		}
 	}
 	
-	public final long   handle;
-	public final Device device;
 	
-	public RenderPass(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public RenderPass(Device device, long handle){ super(device, handle); }
 	
 	@Override
 	public void destroy(){

@@ -3,15 +3,9 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
-public class FrameBuffer implements VulkanResource{
+public class FrameBuffer extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
-	
-	public FrameBuffer(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public FrameBuffer(Device device, long handle){ super(device, handle); }
 	
 	@Override
 	public void destroy(){

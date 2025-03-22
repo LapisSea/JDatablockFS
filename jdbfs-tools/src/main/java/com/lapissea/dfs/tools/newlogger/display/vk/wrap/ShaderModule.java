@@ -4,16 +4,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import org.lwjgl.vulkan.VK10;
 
-public class ShaderModule implements VulkanResource{
+public class ShaderModule extends VulkanResource.DeviceHandleObj{
 	
-	public final long              handle;
 	public final VkShaderStageFlag stage;
-	public final Device            device;
 	
-	public ShaderModule(long handle, VkShaderStageFlag stage, Device device){
-		this.handle = handle;
+	public ShaderModule(Device device, long handle, VkShaderStageFlag stage){
+		super(device, handle);
 		this.stage = stage;
-		this.device = device;
 	}
 	@Override
 	public void destroy(){

@@ -3,15 +3,9 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
-public class VkSampler implements VulkanResource{
+public class VkSampler extends VulkanResource.DeviceHandleObj{
 	
-	public final  long   handle;
-	private final Device device;
-	
-	public VkSampler(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public VkSampler(Device device, long handle){ super(device, handle); }
 	
 	@Override
 	public void destroy(){

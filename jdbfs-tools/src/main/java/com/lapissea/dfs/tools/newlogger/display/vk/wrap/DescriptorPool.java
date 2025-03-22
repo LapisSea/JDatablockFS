@@ -10,15 +10,9 @@ import org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo;
 
 import java.util.List;
 
-public class DescriptorPool implements VulkanResource{
+public class DescriptorPool extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
-	
-	public DescriptorPool(long handle, Device device){
-		this.handle = handle;
-		this.device = device;
-	}
+	public DescriptorPool(Device device, long handle){ super(device, handle); }
 	
 	public DescriptorSetLayout createDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings) throws VulkanCodeException{
 		

@@ -9,16 +9,13 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 
-public class VkBuffer implements VulkanResource{
+public class VkBuffer extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final long   size;
-	public final Device device;
+	public final long size;
 	
-	public VkBuffer(long handle, long size, Device device){
-		this.handle = handle;
+	public VkBuffer(Device device, long handle, long size){
+		super(device, handle);
 		this.size = size;
-		this.device = device;
 	}
 	
 	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{

@@ -6,15 +6,12 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
-public class VkDeviceMemory implements VulkanResource{
+public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
-	public final long   allocationSize;
+	public final long allocationSize;
 	
-	public VkDeviceMemory(long handle, Device device, long allocationSize){
-		this.handle = handle;
-		this.device = device;
+	public VkDeviceMemory(Device device, long handle, long allocationSize){
+		super(device, handle);
 		this.allocationSize = allocationSize;
 	}
 	

@@ -3,17 +3,11 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
-public class Pipeline implements VulkanResource{
+public class Pipeline extends VulkanResource.DeviceHandleObj{
 	
-	public static class Layout implements VulkanResource{
+	public static class Layout extends VulkanResource.DeviceHandleObj{
 		
-		public final long   handle;
-		public final Device device;
-		
-		public Layout(long handle, Device device){
-			this.handle = handle;
-			this.device = device;
-		}
+		public Layout(Device device, long handle){ super(device, handle); }
 		
 		@Override
 		public void destroy(){
@@ -21,14 +15,11 @@ public class Pipeline implements VulkanResource{
 		}
 	}
 	
-	public final long   handle;
-	public final Device device;
 	public final Layout layout;
 	
-	public Pipeline(long handle, Layout layout, Device device){
-		this.handle = handle;
+	public Pipeline(Device device, long handle, Layout layout){
+		super(device, handle);
 		this.layout = layout;
-		this.device = device;
 	}
 	
 	@Override

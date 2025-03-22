@@ -9,13 +9,12 @@ import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
 
 import java.util.List;
 
-public class DescriptorSetLayout implements VulkanResource{
+public class DescriptorSetLayout extends VulkanResource.DeviceHandleObj{
 	
-	public final long           handle;
 	public final DescriptorPool pool;
 	
-	public DescriptorSetLayout(long handle, DescriptorPool pool){
-		this.handle = handle;
+	public DescriptorSetLayout(DescriptorPool pool, long handle){
+		super(pool.device, handle);
 		this.pool = pool;
 	}
 	
@@ -30,12 +29,12 @@ public class DescriptorSetLayout implements VulkanResource{
 			                                               .descriptorPool(pool.handle)
 			                                               .pSetLayouts(layouts);
 			
-			return VKCalls.vkAllocateDescriptorSets(pool.device, pAllocateInfo);
+			return VKCalls.vkAllocateDescriptorSets(device, pAllocateInfo);
 		}
 	}
 	
 	@Override
 	public void destroy(){
-		VK10.vkDestroyDescriptorSetLayout(pool.device.value, handle, null);
+		VK10.vkDestroyDescriptorSetLayout(device.value, handle, null);
 	}
 }

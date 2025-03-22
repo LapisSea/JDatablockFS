@@ -26,27 +26,24 @@ import org.lwjgl.vulkan.VkSamplerCreateInfo;
 
 import static org.lwjgl.vulkan.VK10.VK_LOD_CLAMP_NONE;
 
-public class VkImage implements VulkanResource{
+public class VkImage extends VulkanResource.DeviceHandleObj{
 	
-	public final long   handle;
-	public final Device device;
 	
 	public final Extent3D          extent;
 	public final VkFormat          format;
 	public final VkSampleCountFlag samples;
 	public final VKImageType       type;
 	
-	public VkImage(long handle, Device device, VkImageCreateInfo info){
-		this(handle, device,
+	public VkImage(Device device, long handle, VkImageCreateInfo info){
+		this(device, handle,
 		     new Extent3D(info.extent()),
 		     VkFormat.from(info.format()),
 		     VkSampleCountFlag.from(info.samples()).asOne(),
 		     VKImageType.from(info.imageType())
 		);
 	}
-	public VkImage(long handle, Device device, Extent3D extent, VkFormat format, VkSampleCountFlag samples, VKImageType type){
-		this.handle = handle;
-		this.device = device;
+	public VkImage(Device device, long handle, Extent3D extent, VkFormat format, VkSampleCountFlag samples, VKImageType type){
+		super(device, handle);
 		this.extent = extent;
 		this.format = format;
 		this.samples = samples;
