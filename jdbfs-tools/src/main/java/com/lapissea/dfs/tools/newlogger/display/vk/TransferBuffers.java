@@ -43,9 +43,8 @@ public class TransferBuffers implements VulkanResource{
 	
 	private CommandPool newPool(){
 		try{
-			var device         = queue.device;
-			var transferFamily = queue.familyProps;
-			var pool           = device.createCommandPool(transferFamily, CommandPool.Type.SHORT_LIVED);
+			var device = queue.device;
+			var pool   = device.createCommandPool(queue.queueFamily, CommandPool.Type.SHORT_LIVED);
 			Log.info("Created pool on thread {}", Thread.currentThread());
 			return pool;
 		}catch(VulkanCodeException e){

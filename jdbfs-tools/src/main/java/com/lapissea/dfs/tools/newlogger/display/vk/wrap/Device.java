@@ -48,6 +48,7 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkViewport;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
@@ -59,9 +60,12 @@ public class Device implements VulkanResource{
 	
 	public final PhysicalDevice physicalDevice;
 	
-	public Device(VkDevice value, PhysicalDevice physicalDevice){
+	private final Map<QueueFamilyProps, Integer> familyAllocIndexes;
+	
+	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies){
 		this.value = value;
 		this.physicalDevice = physicalDevice;
+		this.familyAllocIndexes = Iters.from(queueFamilies).toModMap(e -> e, e -> -1);
 		if(!physicalDevice.pDevice.equals(value.getPhysicalDevice())){
 			throw new IllegalArgumentException("physical device is not the argument");
 		}
@@ -145,11 +149,17 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public VkQueue getQueue(QueueFamilyProps family, int queueIndex){
+	
+	public synchronized VulkanQueue allocateQueue(QueueFamilyProps queueFamily){
+		if(!familyAllocIndexes.containsKey(queueFamily)){
+			throw new IllegalArgumentException("Queue family not registered with device");
+		}
+		int queueIndex = familyAllocIndexes.compute(queueFamily, (q, c) -> c + 1);
 		try(var stack = MemoryStack.stackPush()){
 			var ptr = stack.mallocPointer(1);
-			VK10.vkGetDeviceQueue(value, family.index, queueIndex, ptr);
-			return new VkQueue(ptr.get(0), value);
+			VK10.vkGetDeviceQueue(value, queueFamily.index, queueIndex, ptr);
+			var vq = new VkQueue(ptr.get(0), value);
+			return new VulkanQueue(this, queueFamily, vq);
 		}
 	}
 	

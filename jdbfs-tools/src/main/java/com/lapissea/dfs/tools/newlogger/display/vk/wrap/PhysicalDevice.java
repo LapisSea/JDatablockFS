@@ -80,8 +80,10 @@ public class PhysicalDevice{
 			VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, familyProps);
 			
 			var families = new ArrayList<QueueFamilyProps>();
-			for(VkQueueFamilyProperties familyProp : familyProps){
-				families.add(new QueueFamilyProps(pDevice, surface, familyProp, families.size()));
+			for(int i = 0; i<familyProps.capacity(); i++){
+				var supportsPresent = surface.supportsPresent(pDevice, i);
+				var familyProp      = familyProps.get(i);
+				families.add(new QueueFamilyProps(supportsPresent, familyProp, i));
 			}
 			return List.copyOf(families);
 		}
@@ -113,13 +115,18 @@ public class PhysicalDevice{
 	}
 	
 	
-	public Device createDevice(QueueFamilyProps family) throws VulkanCodeException{
+	public Device createDevice(List<QueueFamilyProps> queueFamilies) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
-			var queueInfo = VkDeviceQueueCreateInfo.calloc(1, stack);
-			queueInfo.position(0).sType$Default()
-			         .queueFamilyIndex(family.index)
-			         .pQueuePriorities(stack.floats(decreasingPriority(family.queueCount)));
+			var queueInfo = VkDeviceQueueCreateInfo.calloc(queueFamilies.size(), stack);
+			for(int i = 0; i<queueFamilies.size(); i++){
+				var family = queueFamilies.get(i);
+				queueInfo.position(i)
+				         .sType$Default()
+				         .queueFamilyIndex(family.index)
+				         .pQueuePriorities(stack.floats(decreasingPriority(family.queueCount)));
+			}
+			queueInfo.position(0);
 			
 			
 			var features = VkPhysicalDeviceFeatures.calloc(stack)
@@ -137,14 +144,16 @@ public class PhysicalDevice{
 			
 			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
-			return new Device(vkd, this);
+			return new Device(vkd, this, queueFamilies);
 		}
 	}
 	
 	private static float[] decreasingPriority(int count){
+		if(count == 1) return new float[]{1};
 		var res = new float[count];
+		var cm1 = count - 1;
 		for(int i = 0; i<count; i++){
-			res[i] = (count - i)/(float)count;
+			res[i] = (cm1 - i)/(float)cm1;
 		}
 		return res;
 	}

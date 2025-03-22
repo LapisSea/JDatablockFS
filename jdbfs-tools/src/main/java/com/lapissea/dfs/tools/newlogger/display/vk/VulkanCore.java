@@ -43,6 +43,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
@@ -127,6 +128,7 @@ public class VulkanCore implements AutoCloseable{
 	public final  Device         device;
 	
 	public final QueueFamilyProps renderQueueFamily;
+	public final QueueFamilyProps transferQueueFamily;
 	
 	public Swapchain           swapchain;
 	public List<VulkanTexture> mssaImages;
@@ -137,6 +139,7 @@ public class VulkanCore implements AutoCloseable{
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
 	private final TransferBuffers transferBuffers;
+	private final TransferBuffers transientGraphicsBuffs;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
@@ -146,20 +149,22 @@ public class VulkanCore implements AutoCloseable{
 		
 		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
 		
-		var physicalDevices = new PhysicalDevices(instance, surface);
-		physicalDevice = physicalDevices.selectDevice(VkQueueFlag.GRAPHICS, true);
+		var requiredFeatures = Set.of(VkQueueFlag.GRAPHICS, VkQueueFlag.TRANSFER);
 		
-		renderQueueFamily = findQueueFamilyBy(VkQueueFlag.GRAPHICS).orElseThrow();
+		var physicalDevices = new PhysicalDevices(instance, surface);
+		physicalDevice = physicalDevices.selectDevice(requiredFeatures, true);
+		
+		renderQueueFamily = queueFamiliesBy(VkQueueFlag.GRAPHICS).getFirst();
+		transferQueueFamily = queueFamiliesBy(VkQueueFlag.TRANSFER).filter(f -> f != renderQueueFamily).findFirst()
+		                                                           .orElse(queueFamiliesBy(VkQueueFlag.TRANSFER).getFirst());
 		
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
-		device = physicalDevice.createDevice(renderQueueFamily);
+		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
 		
-		
-		var transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
-		
-		var transferQueue = new VulkanQueue(device, null, transferFamily, 1);
-		transferBuffers = new TransferBuffers(transferQueue);
+		renderQueue = device.allocateQueue(renderQueueFamily);
+		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
+		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
 		createSwapchainContext();
 	}
@@ -198,7 +203,7 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	private void generateMips(VkImage image, int mipLevels) throws VulkanCodeException{
-		transferBuffers.syncAction(buf -> {
+		transientGraphicsBuffs.syncAction(buf -> {
 			try(var stack = MemoryStack.stackPush()){
 				var subresource = VkImageSubresourceRange.malloc(stack);
 				subresource.aspectMask(VkImageAspectFlag.COLOR.bit)
@@ -364,8 +369,6 @@ public class VulkanCore implements AutoCloseable{
 		}
 		mssaImages = images;
 		
-		renderQueue = new VulkanQueue(device, swapchain, renderQueueFamily, 0);
-		
 		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
 	}
@@ -379,7 +382,6 @@ public class VulkanCore implements AutoCloseable{
 			frameBuffer.destroy();
 		}
 		renderPass.close();
-		renderQueue.destroy();
 		mssaImages.forEach(VulkanTexture::destroy);
 		if(destroySwapchain) swapchain.destroy();
 	}
@@ -462,8 +464,8 @@ public class VulkanCore implements AutoCloseable{
 		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
 	}
 	
-	public Optional<QueueFamilyProps> findQueueFamilyBy(VkQueueFlag capability){
-		return Iters.from(physicalDevice.families).firstMatching(e -> e.capabilities.contains(capability));
+	public IterablePP<QueueFamilyProps> queueFamiliesBy(VkQueueFlag capability){
+		return Iters.from(physicalDevice.families).filter(e -> e.capabilities.contains(capability));
 	}
 	
 	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of();
@@ -589,11 +591,9 @@ public class VulkanCore implements AutoCloseable{
 	public void close(){
 		destroySwapchainContext(true);
 		
-		try{
-			renderQueue.waitIdle();
-		}catch(VulkanCodeException e){ e.printStackTrace(); }
-		
-		transferBuffers.destroy();
+		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
+			queue.destroy();
+		}
 		
 		testShaderModules.destroy();
 		device.destroy();

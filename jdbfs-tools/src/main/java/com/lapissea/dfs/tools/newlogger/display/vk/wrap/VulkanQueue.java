@@ -12,32 +12,32 @@ import org.lwjgl.vulkan.VkSubmitInfo;
 
 public class VulkanQueue implements VulkanResource{
 	
-	private final VkQueue   value;
-	private final Swapchain swapchain;
+	private final VkQueue value;
 	
-	private final VulkanSemaphore presentCompleteSemaphore;
-	private final VulkanSemaphore renderCompleteSemaphore;
+	private VulkanSemaphore presentCompleteSemaphore;
+	private VulkanSemaphore renderCompleteSemaphore;
 	
-	public final Device           device;
-	public final QueueFamilyProps familyProps;
+	public final Device device;
 	
-	public VulkanQueue(Device device, Swapchain swapchain, QueueFamilyProps familyProps, int queueIndex) throws VulkanCodeException{
+	public final QueueFamilyProps queueFamily;
+	
+	public VulkanQueue(Device device, QueueFamilyProps queueFamily, VkQueue value){
 		this.device = device;
-		this.familyProps = familyProps;
-		this.swapchain = swapchain;
-		
-		this.value = device.getQueue(familyProps, queueIndex);
-		
-		presentCompleteSemaphore = swapchain == null? null : device.createSemaphore();
-		try{
-			renderCompleteSemaphore = swapchain == null? null : device.createSemaphore();
-		}catch(VulkanCodeException e){
-			presentCompleteSemaphore.destroy();
-			throw e;
+		this.queueFamily = queueFamily;
+		this.value = value;
+	}
+	private void ensureSemaphores() throws VulkanCodeException{
+		if(presentCompleteSemaphore == null){
+			createSemaphores();
 		}
 	}
+	private void createSemaphores() throws VulkanCodeException{
+		presentCompleteSemaphore = device.createSemaphore();
+		renderCompleteSemaphore = device.createSemaphore();
+	}
 	
-	public int acquireNextImage() throws VulkanCodeException{
+	public int acquireNextImage(Swapchain swapchain) throws VulkanCodeException{
+		ensureSemaphores();
 		waitIdle();//TODO: BLOCKS EVERYTHING!!! FIX THIS PLEASE
 		
 		return VKCalls.vkAcquireNextImageKHR(
@@ -57,6 +57,7 @@ public class VulkanQueue implements VulkanResource{
 	}
 	
 	public void submitAsync(CommandBuffer commandBuffer) throws VulkanCodeException{
+		ensureSemaphores();
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkSubmitInfo.malloc(stack)
@@ -72,7 +73,8 @@ public class VulkanQueue implements VulkanResource{
 		}
 	}
 	
-	public void present(int index) throws VulkanCodeException{
+	public void present(Swapchain swapchain, int index) throws VulkanCodeException{
+		ensureSemaphores();
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkPresentInfoKHR.calloc(stack).sType$Default()
 			                           .pWaitSemaphores(stack.longs(renderCompleteSemaphore.handle))
@@ -90,9 +92,12 @@ public class VulkanQueue implements VulkanResource{
 	
 	@Override
 	public void destroy(){
-		if(swapchain != null){
-			presentCompleteSemaphore.destroy();
-			renderCompleteSemaphore.destroy();
-		}
+		try{
+			waitIdle();
+		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		if(presentCompleteSemaphore != null) presentCompleteSemaphore.destroy();
+		if(renderCompleteSemaphore != null) renderCompleteSemaphore.destroy();
+		
 	}
 }

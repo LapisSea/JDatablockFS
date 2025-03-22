@@ -1,9 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
-import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
-import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
 public class QueueFamilyProps{
@@ -12,12 +10,19 @@ public class QueueFamilyProps{
 	public final boolean            supportsPresent;
 	public final int                queueCount;
 	public final Flags<VkQueueFlag> capabilities;
+	public final Extent3D           minImageTransferGranularity;
 	
-	public QueueFamilyProps(VkPhysicalDevice device, Surface surface, VkQueueFamilyProperties properties, int index) throws VulkanCodeException{
+	public QueueFamilyProps(boolean supportsPresent, VkQueueFamilyProperties properties, int index){
 		this.index = index;
-		supportsPresent = surface.supportsPresent(device, index);
+		this.supportsPresent = supportsPresent;
 		queueCount = properties.queueCount();
 		capabilities = VkQueueFlag.from(properties.queueFlags());
+		minImageTransferGranularity = new Extent3D(properties.minImageTransferGranularity());
+		
 	}
 	
+	@Override
+	public String toString(){
+		return capabilities.toShortString() + "x" + queueCount + "@" + index;
+	}
 }

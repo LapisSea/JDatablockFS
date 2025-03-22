@@ -12,6 +12,7 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class PhysicalDevices{
 	
@@ -35,13 +36,13 @@ public class PhysicalDevices{
 		this.devices = List.copyOf(devices);
 	}
 	
-	public PhysicalDevice selectDevice(VkQueueFlag requiredCapability, boolean supportsPresent){
+	public PhysicalDevice selectDevice(Set<VkQueueFlag> requiredCapabilities, boolean supportsPresent){
 		for(PhysicalDevice device : devices){
 			for(QueueFamilyProps family : device.families){
 				if(supportsPresent && !family.supportsPresent){
 					continue;
 				}
-				if(!family.capabilities.contains(requiredCapability)){
+				if(!family.capabilities.containsAll(requiredCapabilities)){
 					continue;
 				}
 				return device;

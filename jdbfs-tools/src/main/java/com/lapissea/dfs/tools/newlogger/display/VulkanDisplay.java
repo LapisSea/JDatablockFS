@@ -5,7 +5,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
@@ -58,9 +57,7 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			vkCore = new VulkanCore("DFS debugger", window);
 			
-			var family = vkCore.findQueueFamilyBy(VkQueueFlag.GRAPHICS).orElseThrow();
-			
-			cmdPool = vkCore.device.createCommandPool(family, CommandPool.Type.NORMAL);
+			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
 			verts = vkCore.createVertexBuffer(6*Vert.SIZE, bb -> {
@@ -140,11 +137,12 @@ public class VulkanDisplay implements AutoCloseable{
 	private void renderQueue() throws VulkanCodeException{
 //		vkCore.renderQueue.waitIdle();
 //		recordCommandBuffers();
-		var bufferQueue = vkCore.renderQueue;
-		var index       = bufferQueue.acquireNextImage();
+		var swapchain = vkCore.swapchain;
+		var queue     = vkCore.renderQueue;
+		var index     = queue.acquireNextImage(swapchain);
 		updateUniforms(index);
-		bufferQueue.submitAsync(graphicsBuffs.get(index));
-		bufferQueue.present(index);
+		queue.submitAsync(graphicsBuffs.get(index));
+		queue.present(swapchain, index);
 	}
 	
 	private boolean resizing;
