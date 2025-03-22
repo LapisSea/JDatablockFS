@@ -24,7 +24,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayoutBinding;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
@@ -52,7 +51,6 @@ import com.lapissea.util.UtilL;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
@@ -65,9 +63,7 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -136,9 +132,9 @@ public class VulkanCore implements AutoCloseable{
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
-	private final CommandPool   transferPool;
-	private final CommandBuffer transferBuffer;
-	private final VulkanQueue   transferQueue;
+	private final VulkanQueue transferQueue;
+	
+	private final TransferBuffers transferBuffers;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
 		this.name = name;
@@ -158,53 +154,34 @@ public class VulkanCore implements AutoCloseable{
 		device = physicalDevice.createDevice(renderQueueFamily);
 		
 		
-		var transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
-		transferPool = device.createCommandPool(transferFamily, CommandPool.Type.NORMAL);
-		transferBuffer = transferPool.createCommandBuffer();
+		QueueFamilyProps transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
 		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
+		transferBuffers = new TransferBuffers(transferQueue);
 		
 		createSwapchainContext();
 	}
 	
-	public VulkanTexture loadTexture(String name) throws VulkanCodeException{
-		ByteBuffer pixels = null, image = null;
-		try(var stack = MemoryStack.stackPush()){
-			var imageJ = VUtils.readResource(name);
-			image = MemoryUtil.memAlloc(imageJ.capacity()).put(imageJ).flip();
-			
-			IntBuffer xB = stack.mallocInt(1), yB = stack.mallocInt(1), channelsB = stack.mallocInt(1);
-			pixels = STBImage.stbi_load_from_memory(image, xB, yB, channelsB, STBImage.STBI_rgb_alpha);
-			if(pixels == null) throw new IOException("Image \"" + name + "\" was invalid");
-			
-			Log.info("loaded image " + name + " " + xB.get(0) + "x" + yB.get(0));
-			
-			var vkimg = device.createImage(
-				xB.get(0), yB.get(0),
-				VkFormat.R8G8B8A8_UNORM,
-				Flags.of(VkImageUsageFlag.TRANSFER_DST, VkImageUsageFlag.SAMPLED),
-				VkSampleCountFlag.N1
-			);
-			
-			var requirements    = vkimg.getRequirements();
-			var memoryTypeIndex = getMemoryTypeIndex(requirements.memoryTypeBits(), Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
-			
-			var memory = device.allocateMemory(requirements.size(), memoryTypeIndex);
-			
-			VKCalls.vkBindImageMemory(vkimg, memory, 0);
-			
-			updateTexture(vkimg, pixels);
-			
-			var view = vkimg.createImageView(VkImageViewType.TYPE_2D, vkimg.format, Flags.of(VkImageAspectFlag.COLOR));
-			
-			var sampler = vkimg.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
-			
-			return new VulkanTexture(vkimg, memory, view, sampler);
-		}catch(IOException e){
-			throw new RuntimeException("Failed to load image", e);
-		}finally{
-			if(image != null) MemoryUtil.memFree(image);
-			if(pixels != null) MemoryUtil.memFree(pixels);
-		}
+	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format) throws VulkanCodeException{
+		var vkimg = device.createImage(
+			width, height, format,
+			Flags.of(VkImageUsageFlag.TRANSFER_DST, VkImageUsageFlag.SAMPLED),
+			VkSampleCountFlag.N1
+		);
+		
+		var requirements    = vkimg.getRequirements();
+		var memoryTypeIndex = getMemoryTypeIndex(requirements.memoryTypeBits(), Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
+		
+		var memory = device.allocateMemory(requirements.size(), memoryTypeIndex);
+		
+		VKCalls.vkBindImageMemory(vkimg, memory, 0);
+		
+		updateTexture(vkimg, pixels);
+		
+		var view = vkimg.createImageView(VkImageViewType.TYPE_2D, vkimg.format, Flags.of(VkImageAspectFlag.COLOR));
+		
+		var sampler = vkimg.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
+		
+		return new VulkanTexture(vkimg, memory, view, sampler);
 	}
 	
 	
@@ -230,9 +207,9 @@ public class VulkanCore implements AutoCloseable{
 		)){
 			imgMem.update(b -> b.put(pixels));
 			
-			image.transitionLayout(transferQueue, transferBuffer, VkImageLayout.UNDEFINED, VkImageLayout.TRANSFER_DST_OPTIMAL);
-			image.copyBufferToImage(transferQueue, transferBuffer, imgMem.buffer);
-			image.transitionLayout(transferQueue, transferBuffer, VkImageLayout.TRANSFER_DST_OPTIMAL, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+			image.transitionLayout(transferBuffers, VkImageLayout.UNDEFINED, VkImageLayout.TRANSFER_DST_OPTIMAL);
+			image.copyBufferToImage(transferBuffers, imgMem.buffer);
+			image.transitionLayout(transferBuffers, VkImageLayout.TRANSFER_DST_OPTIMAL, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 		}
 	}
 	
@@ -289,7 +266,6 @@ public class VulkanCore implements AutoCloseable{
 		return createVertexBuffer(data.remaining(), dst -> dst.put(data));
 	}
 	public BufferAndMemory createVertexBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
-		
 		try(var stagingVb = allocateBuffer(
 			size,
 			Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
@@ -301,7 +277,7 @@ public class VulkanCore implements AutoCloseable{
 				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
 				Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL)
 			);
-			stagingVb.copyTo(transferBuffer, transferQueue, vb);
+			stagingVb.copyTo(transferBuffers, vb);
 			return vb;
 		}
 	}
@@ -563,9 +539,8 @@ public class VulkanCore implements AutoCloseable{
 			transferQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
+		transferBuffers.destroy();
 		transferQueue.destroy();
-		transferBuffer.destroy();
-		transferPool.destroy();
 		
 		testShaderModules.destroy();
 		device.destroy();

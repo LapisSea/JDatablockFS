@@ -135,6 +135,10 @@ public final class VUtils{
 		return uni.mapToInt(IDValue::id).distinct()
 		          .toMap(id -> id, id -> uni.firstMatching(e -> e.id() == id).orElseThrow());
 	}
+	public static ByteBuffer nativeMemCopy(ByteBuffer heap) throws IOException{
+		return MemoryUtil.memAlloc(heap.remaining()).put(heap).flip();
+	}
+	
 	public static ByteBuffer readResource(String resource) throws IOException{
 		URL url = VUtils.class.getResource("/" + resource);
 		if(url == null){

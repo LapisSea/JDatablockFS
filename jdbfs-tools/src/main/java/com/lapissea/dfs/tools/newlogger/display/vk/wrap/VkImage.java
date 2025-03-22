@@ -1,11 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCommandBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
@@ -105,35 +104,25 @@ public class VkImage implements VulkanResource{
 		}
 	}
 	
-	public void transitionLayout(VulkanQueue queue, CommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout) throws VulkanCodeException{
-		cmd.begin(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT);
-		
-		cmd.imageMemoryBarrier(this, oldLayout, newLayout);
-		
-		cmd.end();
-		
-		queue.submitNow(cmd);
-		queue.waitIdle();
+	public void transitionLayout(TransferBuffers transferBuffers, VkImageLayout oldLayout, VkImageLayout newLayout) throws VulkanCodeException{
+		transferBuffers.syncAction(cmd -> {
+			cmd.imageMemoryBarrier(this, oldLayout, newLayout);
+		});
 	}
-	public void copyBufferToImage(VulkanQueue queue, CommandBuffer cmd, VkBuffer buffer) throws VulkanCodeException{
-		cmd.begin(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT);
-		
-		try(var stack = MemoryStack.stackPush()){
-			var info = VkBufferImageCopy.calloc(stack);
-			info.bufferOffset(0)
-			    .bufferRowLength(0)
-			    .bufferImageHeight(0)
-			    .imageSubresource(s -> s.set(VkImageAspectFlag.COLOR.bit, 0, 0, 1))
-			    .imageOffset(e -> e.set(0, 0, 0))
-			    .imageExtent(extent.toStack(stack));
-			
-			cmd.copyBufferToImage(buffer, this, VkImageLayout.TRANSFER_DST_OPTIMAL, info);
-		}
-		
-		cmd.end();
-		
-		queue.submitNow(cmd);
-		queue.waitIdle();
+	public void copyBufferToImage(TransferBuffers transferBuffers, VkBuffer buffer) throws VulkanCodeException{
+		transferBuffers.syncAction(cmd -> {
+			try(var stack = MemoryStack.stackPush()){
+				var info = VkBufferImageCopy.calloc(stack);
+				info.bufferOffset(0)
+				    .bufferRowLength(0)
+				    .bufferImageHeight(0)
+				    .imageSubresource(s -> s.set(VkImageAspectFlag.COLOR.bit, 0, 0, 1))
+				    .imageOffset(e -> e.set(0, 0, 0))
+				    .imageExtent(extent.toStack(stack));
+				
+				cmd.copyBufferToImage(buffer, this, VkImageLayout.TRANSFER_DST_OPTIMAL, info);
+			}
+		});
 	}
 	
 	@Override

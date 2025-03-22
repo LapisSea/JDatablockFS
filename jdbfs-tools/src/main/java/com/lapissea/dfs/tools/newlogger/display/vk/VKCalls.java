@@ -126,6 +126,9 @@ public interface VKCalls{
 	static void vkEndCommandBuffer(VkCommandBuffer commandBuffer) throws VulkanCodeException{
 		check(VK10.vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
 	}
+	static void vkResetCommandBuffer(VkCommandBuffer commandBuffer, int flags) throws VulkanCodeException{
+		check(VK10.vkResetCommandBuffer(commandBuffer, flags), "vkResetCommandBuffer");
+	}
 	static void vkAllocateCommandBuffers(Device device, VkCommandBufferAllocateInfo pAllocateInfo, PointerBuffer pCommandBuffers) throws VulkanCodeException{
 		check(VK10.vkAllocateCommandBuffers(device.value, pAllocateInfo, pCommandBuffers), "vkAllocateCommandBuffers");
 	}

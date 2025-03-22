@@ -56,6 +56,10 @@ public class CommandBuffer implements VulkanResource{
 		VKCalls.vkEndCommandBuffer(val);
 	}
 	
+	public void reset() throws VulkanCodeException{
+		VKCalls.vkResetCommandBuffer(val, 0);
+	}
+	
 	public long handle(){
 		return val.address();
 	}

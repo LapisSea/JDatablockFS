@@ -18,19 +18,24 @@ public class VulkanQueue implements VulkanResource{
 	private final VulkanSemaphore presentCompleteSemaphore;
 	private final VulkanSemaphore renderCompleteSemaphore;
 	
-	public VulkanQueue(Device device, Swapchain swapchain, QueueFamilyProps queue, int queueIndex) throws VulkanCodeException{
-		this.value = device.getQueue(queue, queueIndex);
+	public final Device           device;
+	public final QueueFamilyProps familyProps;
+	
+	public VulkanQueue(Device device, Swapchain swapchain, QueueFamilyProps familyProps, int queueIndex) throws VulkanCodeException{
+		this.device = device;
+		this.familyProps = familyProps;
 		this.swapchain = swapchain;
 		
-		presentCompleteSemaphore = device.createSemaphore();
+		this.value = device.getQueue(familyProps, queueIndex);
+		
+		presentCompleteSemaphore = swapchain == null? null : device.createSemaphore();
 		try{
-			renderCompleteSemaphore = device.createSemaphore();
+			renderCompleteSemaphore = swapchain == null? null : device.createSemaphore();
 		}catch(VulkanCodeException e){
 			presentCompleteSemaphore.destroy();
 			throw e;
 		}
 	}
-	
 	
 	public int acquireNextImage() throws VulkanCodeException{
 		waitIdle();//TODO: BLOCKS EVERYTHING!!! FIX THIS PLEASE
@@ -48,6 +53,7 @@ public class VulkanQueue implements VulkanResource{
 			                       .pCommandBuffers(stack.pointers(commandBuffer.handle()));
 			VKCalls.vkQueueSubmit(value, info, 0);
 		}
+		waitIdle();
 	}
 	
 	public void submitAsync(CommandBuffer commandBuffer) throws VulkanCodeException{
@@ -84,7 +90,9 @@ public class VulkanQueue implements VulkanResource{
 	
 	@Override
 	public void destroy(){
-		presentCompleteSemaphore.destroy();
-		renderCompleteSemaphore.destroy();
+		if(swapchain != null){
+			presentCompleteSemaphore.destroy();
+			renderCompleteSemaphore.destroy();
+		}
 	}
 }

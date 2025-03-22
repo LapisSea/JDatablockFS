@@ -1,10 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCommandBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
@@ -29,13 +27,10 @@ public class BufferAndMemory implements VulkanResource{
 		buffer.destroy();
 	}
 	
-	public void copyTo(CommandBuffer copyBuffer, VulkanQueue queue, BufferAndMemory vb) throws VulkanCodeException{
-		copyBuffer.begin(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT);
-		copyBuffer.copyBuffer(buffer, vb.buffer, buffer.size);
-		copyBuffer.end();
-		
-		queue.submitNow(copyBuffer);
-		queue.waitIdle();
+	public void copyTo(TransferBuffers transferBuffers, BufferAndMemory vb) throws VulkanCodeException{
+		transferBuffers.syncAction(copyBuffer -> {
+			copyBuffer.copyBuffer(buffer, vb.buffer, buffer.size);
+		});
 	}
 	
 	public void update(Consumer<ByteBuffer> populator) throws VulkanCodeException{

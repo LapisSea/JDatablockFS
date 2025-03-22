@@ -21,6 +21,7 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
 
@@ -37,31 +38,10 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private List<BufferAndMemory> uniformBuffs;
 	
-	VulkanTexture texture;
+	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", this::blockingCore);
 	
-	public static class Vert{
+	public static final class Vert{
 		public static final int SIZE = 4*(2 + 3 + 2);
-//		private final       long ptr;
-//
-//		Vert(ByteBuffer data, float x, float y){
-//			this(data);
-//			x(x).y(y);
-//		}
-//		Vert(ByteBuffer data){
-//			ptr = MemoryUtil.memAddress(data);
-//			assert data.remaining()>=SIZE;
-//		}
-//
-//		public Vert x(float x){
-//			MemoryUtil.memPutFloat(ptr, x);
-//			return this;
-//		}
-//		public Vert y(float y){
-//			MemoryUtil.memPutFloat(ptr + 4, y);
-//			return this;
-//		}
-//		public float x(){ return MemoryUtil.memGetFloat(ptr); }
-//		public float y(){ return MemoryUtil.memGetFloat(ptr + 4); }
 		
 		public static void put(ByteBuffer data, float x, float y, float r, float g, float b, float u, float v){
 			data.putFloat(x).putFloat(y)
@@ -93,8 +73,6 @@ public class VulkanDisplay implements AutoCloseable{
 				Vert.put(bb, 1, 0F, 1, 1, 0, 1, 0);
 			});
 			
-			texture = vkCore.loadTexture("roboto/light/mask.png");
-			
 			createPipeline();
 			
 			recordCommandBuffers();
@@ -102,6 +80,11 @@ public class VulkanDisplay implements AutoCloseable{
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
 		
+	}
+	
+	private VulkanCore blockingCore(){
+		UtilL.sleepWhile(() -> vkCore == null);
+		return vkCore;
 	}
 	
 	private void updateUniforms(int index) throws VulkanCodeException{
@@ -134,7 +117,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var fSize   = size*Float.SIZE;
 		
 		uniformBuffs = vkCore.allocateUniformBuffers(fSize);
-		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs, texture);
+		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs, texture.join());
 	}
 	private void destroyPipeline(){
 		gPipeline.destroy();
@@ -264,12 +247,16 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	public void run(){
-		window.show();
-		
 		var t = Thread.ofPlatform().name("render").start(() -> {
+			boolean first = true;
 			while(!window.shouldClose()){
 				try{
 					render();
+					if(first){
+						first = false;
+						vkCore.renderQueue.waitIdle();
+						window.show();
+					}
 				}catch(Throwable e){
 					e.printStackTrace();
 					window.requestClose();
@@ -305,7 +292,7 @@ public class VulkanDisplay implements AutoCloseable{
 		destroyPipeline();
 		
 		verts.destroy();
-		texture.destroy();
+		texture.join().destroy();
 		
 		for(var buf : graphicsBuffs){
 			buf.destroy();
