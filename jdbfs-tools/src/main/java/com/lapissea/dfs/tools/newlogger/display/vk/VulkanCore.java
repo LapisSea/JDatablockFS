@@ -167,7 +167,6 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
 		
-		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
@@ -377,7 +376,11 @@ public class VulkanCore implements AutoCloseable{
 		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
 		
-		renderQueue = new VulkanQueue(renderQueue).withSwap();
+		if(renderQueue == null){
+			renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
+		}else{
+			renderQueue = new VulkanQueue(renderQueue).withSwap();
+		}
 	}
 	
 	private void destroySwapchainContext(boolean destroySwapchain){
@@ -600,7 +603,7 @@ public class VulkanCore implements AutoCloseable{
 	public void close(){
 		destroySwapchainContext(true);
 		
-		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
+		for(var queue : List.of(transferBuffers, transientGraphicsBuffs)){
 			queue.destroy();
 		}
 		
