@@ -1,7 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAccessFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCommandBufferUsageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
@@ -15,6 +18,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCopy;
+import org.lwjgl.vulkan.VkBufferImageCopy;
 import org.lwjgl.vulkan.VkBufferMemoryBarrier;
 import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkClearValue;
@@ -38,6 +42,9 @@ public class CommandBuffer implements VulkanResource{
 		this.pool = pool;
 	}
 	
+	public void begin(VkCommandBufferUsageFlag... usage) throws VulkanCodeException{
+		begin(Flags.of(usage));
+	}
 	public void begin(Flags<VkCommandBufferUsageFlag> usage) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkCommandBufferBeginInfo.calloc(stack).sType$Default()
@@ -167,5 +174,150 @@ public class CommandBuffer implements VulkanResource{
 	}
 	public void copyBuffer(VkBuffer srcBuff, VkBuffer dstBuff, VkBufferCopy.Buffer regions){
 		VK10.vkCmdCopyBuffer(val, srcBuff.handle, dstBuff.handle, regions);
+	}
+	
+	public void imageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout){
+		try(var stack = MemoryStack.stackPush()){
+			var barriers = VkImageMemoryBarrier.calloc(1, stack);
+			var barrier  = barriers.get(0);
+			barrier.sType$Default()
+			       .srcAccessMask(0)
+			       .dstAccessMask(0)
+			       .oldLayout(oldLayout.id)
+			       .newLayout(newLayout.id)
+			       .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+			       .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+			       .image(image.handle);
+			
+			var subresourceRange = barrier.subresourceRange();
+			subresourceRange.set(VkImageAspectFlag.COLOR.bit, 0, 1, 0, 1);
+			
+			VkPipelineStageFlag sourceStage      = VkPipelineStageFlag.NONE;
+			VkPipelineStageFlag destinationStage = VkPipelineStageFlag.NONE;
+			
+			var format = image.format;
+			
+			var srcAccessMask = barrier.srcAccessMask();
+			var dstAccessMask = barrier.dstAccessMask();
+			
+			if(newLayout == VkImageLayout.DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
+			   (format == VkFormat.D16_UNORM) ||
+			   (format == VkFormat.X8_D24_UNORM_PACK32) ||
+			   (format == VkFormat.D32_SFLOAT) ||
+			   (format == VkFormat.S8_UINT) ||
+			   (format == VkFormat.D16_UNORM_S8_UINT) ||
+			   (format == VkFormat.D24_UNORM_S8_UINT)){
+				subresourceRange.aspectMask(VkImageAspectFlag.DEPTH.bit);
+				
+				if(format == VkFormat.D32_SFLOAT_S8_UINT || format == VkFormat.D24_UNORM_S8_UINT){
+					subresourceRange.aspectMask(subresourceRange.aspectMask()|VkImageAspectFlag.STENCIL.bit);
+				}
+			}else{
+				subresourceRange.aspectMask(VkImageAspectFlag.COLOR.bit);
+			}
+			
+			if(oldLayout == VkImageLayout.UNDEFINED && newLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL){
+				srcAccessMask = 0;
+				dstAccessMask = VkAccessFlag.SHADER_READ.bit;
+				
+				sourceStage = VkPipelineStageFlag.TOP_OF_PIPE;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}else if(oldLayout == VkImageLayout.UNDEFINED && newLayout == VkImageLayout.GENERAL){
+				srcAccessMask = 0;
+				dstAccessMask = VkAccessFlag.SHADER_READ.bit;
+				
+				sourceStage = VkPipelineStageFlag.TRANSFER;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}
+			
+			if(oldLayout == VkImageLayout.UNDEFINED &&
+			   newLayout == VkImageLayout.TRANSFER_DST_OPTIMAL){
+				srcAccessMask = 0;
+				dstAccessMask = VkAccessFlag.TRANSFER_WRITE.bit;
+				
+				sourceStage = VkPipelineStageFlag.TOP_OF_PIPE;
+				destinationStage = VkPipelineStageFlag.TRANSFER;
+			}
+			/* Convert back from read-only to updateable */
+			else if(oldLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL && newLayout == VkImageLayout.TRANSFER_DST_OPTIMAL){
+				srcAccessMask = VkAccessFlag.SHADER_READ.bit;
+				dstAccessMask = VkAccessFlag.TRANSFER_WRITE.bit;
+				
+				sourceStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+				destinationStage = VkPipelineStageFlag.TRANSFER;
+			}
+			/* Convert from updateable texture to shader read-only */
+			else if(oldLayout == VkImageLayout.TRANSFER_DST_OPTIMAL &&
+			        newLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL){
+				srcAccessMask = VkAccessFlag.TRANSFER_WRITE.bit;
+				dstAccessMask = VkAccessFlag.SHADER_READ.bit;
+				
+				sourceStage = VkPipelineStageFlag.TRANSFER;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}
+			/* Convert depth texture from undefined state to depth-stencil buffer */
+			else if(oldLayout == VkImageLayout.UNDEFINED && newLayout == VkImageLayout.DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
+				srcAccessMask = 0;
+				dstAccessMask = VkAccessFlag.DEPTH_STENCIL_ATTACHMENT_READ.bit|VkAccessFlag.DEPTH_STENCIL_ATTACHMENT_WRITE.bit;
+				
+				sourceStage = VkPipelineStageFlag.TOP_OF_PIPE;
+				destinationStage = VkPipelineStageFlag.EARLY_FRAGMENT_TESTS;
+			}
+			/* Wait for render pass to complete */
+			else if(oldLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL && newLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL){
+				srcAccessMask = 0; // VkAccessFlag.SHADER_READ;
+				dstAccessMask = 0;
+		/*
+				sourceStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+		///		destinationStage = VkPipelineStageFlag.ALL_GRAPHICS;
+				destinationStage = VkPipelineStageFlag.COLOR_ATTACHMENT_OUTPUT;
+		*/
+				sourceStage = VkPipelineStageFlag.COLOR_ATTACHMENT_OUTPUT;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}
+			/* Convert back from read-only to color attachment */
+			else if(oldLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL && newLayout == VkImageLayout.COLOR_ATTACHMENT_OPTIMAL){
+				srcAccessMask = VkAccessFlag.SHADER_READ.bit;
+				dstAccessMask = VkAccessFlag.COLOR_ATTACHMENT_WRITE.bit;
+				
+				sourceStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+				destinationStage = VkPipelineStageFlag.COLOR_ATTACHMENT_OUTPUT;
+			}
+			/* Convert from updateable texture to shader read-only */
+			else if(oldLayout == VkImageLayout.COLOR_ATTACHMENT_OPTIMAL && newLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL){
+				srcAccessMask = VkAccessFlag.COLOR_ATTACHMENT_WRITE.bit;
+				dstAccessMask = VkAccessFlag.SHADER_READ.bit;
+				
+				sourceStage = VkPipelineStageFlag.COLOR_ATTACHMENT_OUTPUT;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}
+			/* Convert back from read-only to depth attachment */
+			else if(oldLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL && newLayout == VkImageLayout.DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
+				srcAccessMask = VkAccessFlag.SHADER_READ.bit;
+				dstAccessMask = VkAccessFlag.DEPTH_STENCIL_ATTACHMENT_WRITE.bit;
+				
+				sourceStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+				destinationStage = VkPipelineStageFlag.LATE_FRAGMENT_TESTS;
+			}
+			/* Convert from updateable depth texture to shader read-only */
+			else if(oldLayout == VkImageLayout.DEPTH_STENCIL_ATTACHMENT_OPTIMAL && newLayout == VkImageLayout.SHADER_READ_ONLY_OPTIMAL){
+				srcAccessMask = VkAccessFlag.DEPTH_STENCIL_ATTACHMENT_WRITE.bit;
+				dstAccessMask = VkAccessFlag.SHADER_READ.bit;
+				
+				sourceStage = VkPipelineStageFlag.LATE_FRAGMENT_TESTS;
+				destinationStage = VkPipelineStageFlag.FRAGMENT_SHADER;
+			}
+			
+			barrier.srcAccessMask(srcAccessMask);
+			barrier.dstAccessMask(dstAccessMask);
+			
+			VK10.vkCmdPipelineBarrier(
+				val, sourceStage.bit, destinationStage.bit, 0, null, null, barriers
+			);
+			
+		}
+	}
+	public void copyBufferToImage(VkBuffer src, VkImage dest, VkImageLayout imageLayout, VkBufferImageCopy info){
+		VK10.vkCmdCopyBufferToImage(val, src.handle, dest.handle, imageLayout.id, new VkBufferImageCopy.Buffer(info.address(), 1));
 	}
 }

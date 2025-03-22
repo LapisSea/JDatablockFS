@@ -118,4 +118,9 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 	public E getFirst(){
 		return values().getFirst();
 	}
+	
+	public E asOne(){
+		if(size() == 1) return getFirst();
+		throw new IllegalStateException("Only one flag is allowed");
+	}
 }

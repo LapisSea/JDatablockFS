@@ -5,6 +5,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
@@ -21,19 +22,21 @@ import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.SequencedSet;
 import java.util.Set;
 
 public class PhysicalDevice{
 	
 	public record MemoryProperties(List<MemoryType> memoryTypes, List<MemoryHeap> memoryHeaps){ }
 	
-	public final VkPhysicalDevice       pDevice;
-	public final String                 name;
-	public final VkPhysicalDeviceType   type;
-	public final List<QueueFamilyProps> families;
-	public final List<SurfaceFormat>    formats;
-	public final Set<VKPresentMode>     presentModes;
-	public final MemoryProperties       memoryProperties;
+	public final VkPhysicalDevice          pDevice;
+	public final String                    name;
+	public final VkPhysicalDeviceType      type;
+	public final List<QueueFamilyProps>    families;
+	public final SequencedSet<FormatColor> formats;
+	public final Set<VKPresentMode>        presentModes;
+	public final MemoryProperties          memoryProperties;
+	public final VkSampleCountFlag         samples;
 	
 	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
 		this.pDevice = pDevice;
@@ -44,11 +47,44 @@ public class PhysicalDevice{
 			name = properties.deviceNameString();
 			type = VkPhysicalDeviceType.from(properties.deviceType());
 			
-			families = getQueueFamilies(pDevice, surface, stack);
+			samples = findReasonableSamples(properties);
 		}
+		
+		families = getQueueFamilies(pDevice, surface);
+		
 		formats = surface.getFormats(pDevice);
 		presentModes = Collections.unmodifiableSet(surface.getPresentModes(pDevice));
 		
+		memoryProperties = getMemoryProperties(pDevice);
+	}
+	
+	private VkSampleCountFlag findReasonableSamples(VkPhysicalDeviceProperties properties){
+		var limits     = properties.limits();
+		var counts     = VkSampleCountFlag.from(limits.framebufferColorSampleCounts()&limits.framebufferDepthSampleCounts());
+		var maxSamples = counts.isEmpty()? VkSampleCountFlag.N1 : counts.getLast();
+		return switch(maxSamples){
+			case N1, N2, N4, N8 -> maxSamples;
+			case N16, N32, N64 -> VkSampleCountFlag.N8;
+		};
+	}
+	
+	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var ib = stack.mallocInt(1);
+			VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, null);
+			var familyProps = VkQueueFamilyProperties.malloc(ib.get(0), stack);
+			VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, familyProps);
+			
+			var families = new ArrayList<QueueFamilyProps>();
+			for(VkQueueFamilyProperties familyProp : familyProps){
+				families.add(new QueueFamilyProps(pDevice, surface, familyProp, families.size()));
+			}
+			return List.copyOf(families);
+		}
+	}
+	
+	private MemoryProperties getMemoryProperties(VkPhysicalDevice pDevice){
+		final MemoryProperties memoryProperties;
 		try(var stack = MemoryStack.stackPush()){
 			var mem = VkPhysicalDeviceMemoryProperties.malloc(stack);
 			VK10.vkGetPhysicalDeviceMemoryProperties(pDevice, mem);
@@ -57,26 +93,7 @@ public class PhysicalDevice{
 			var memoryHeaps = Iters.from(mem.memoryHeaps()).map(MemoryHeap::new).toList();
 			memoryProperties = new MemoryProperties(memoryTypes, memoryHeaps);
 		}
-
-//		LogUtil.println(TextUtil.toTable(name, families));
-//		LogUtil.println(TextUtil.toTable(name, formats));
-//		LogUtil.println(TextUtil.toNamedPrettyJson(surfaceCapabilities));
-//		LogUtil.println("presentModes", presentModes);
-//		LogUtil.println(TextUtil.toTable(memoryTypes));
-//		LogUtil.println(TextUtil.toTable(memoryHeaps));
-	}
-	
-	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface, MemoryStack stack) throws VulkanCodeException{
-		var ib = stack.mallocInt(1);
-		VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, null);
-		var familyProps = VkQueueFamilyProperties.malloc(ib.get(0), stack);
-		VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, familyProps);
-		
-		var families = new ArrayList<QueueFamilyProps>();
-		for(VkQueueFamilyProperties familyProp : familyProps){
-			families.add(new QueueFamilyProps(pDevice, surface, familyProp, families.size()));
-		}
-		return List.copyOf(families);
+		return memoryProperties;
 	}
 	
 	

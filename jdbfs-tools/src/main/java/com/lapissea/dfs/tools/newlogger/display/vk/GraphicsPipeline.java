@@ -31,7 +31,10 @@ public class GraphicsPipeline implements VulkanResource{
 		this.device = device;
 	}
 	
-	public void initDescriptor(int descriptorSetCount, List<DescriptorSetLayoutBinding> bindings, VkBuffer buffer, List<BufferAndMemory> uniformBuffers) throws VulkanCodeException{
+	public void initDescriptor(
+		int descriptorSetCount, List<DescriptorSetLayoutBinding> bindings, VkBuffer buffer, List<BufferAndMemory> uniformBuffers,
+		VulkanTexture texture
+	) throws VulkanCodeException{
 		assert descriptorPool == null;
 		
 		descriptorPool = device.createDescriptorPool(descriptorSetCount, Flags.of());
@@ -40,7 +43,7 @@ public class GraphicsPipeline implements VulkanResource{
 		
 		for(int i = 0; i<descriptorSets.size(); i++){
 			DescriptorSet descriptorSet = descriptorSets.get(i);
-			descriptorSet.update(buffer, uniformBuffers.get(i).buffer);
+			descriptorSet.update(buffer, uniformBuffers.get(i).buffer, texture);
 		}
 	}
 	

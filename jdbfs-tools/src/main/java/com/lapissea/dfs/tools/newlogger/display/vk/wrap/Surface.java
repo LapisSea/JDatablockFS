@@ -12,7 +12,7 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 
 import java.util.EnumSet;
-import java.util.List;
+import java.util.SequencedSet;
 
 public class Surface implements VulkanResource{
 	
@@ -28,7 +28,7 @@ public class Surface implements VulkanResource{
 		return VKCalls.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, this);
 	}
 	
-	public List<SurfaceFormat> getFormats(VkPhysicalDevice pDevice) throws VulkanCodeException{
+	public SequencedSet<FormatColor> getFormats(VkPhysicalDevice pDevice) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			
 			var count = mem.mallocInt(1);
@@ -36,7 +36,7 @@ public class Surface implements VulkanResource{
 			var formats = VkSurfaceFormatKHR.malloc(count.get(0), mem);
 			VKCalls.vkGetPhysicalDeviceSurfaceFormatsKHR(pDevice, this, count, formats);
 			
-			return Iters.from(formats).toList(f -> new SurfaceFormat(f.format(), f.colorSpace()));
+			return Iters.from(formats).toSequencedSet(f -> new FormatColor(f.format(), f.colorSpace()));
 		}
 	}
 	

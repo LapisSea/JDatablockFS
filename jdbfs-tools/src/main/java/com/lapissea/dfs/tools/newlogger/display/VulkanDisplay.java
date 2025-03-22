@@ -2,9 +2,9 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
@@ -37,8 +37,10 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private List<BufferAndMemory> uniformBuffs;
 	
+	VulkanTexture texture;
+	
 	public static class Vert{
-		public static final int SIZE = 4*(2 + 3);
+		public static final int SIZE = 4*(2 + 3 + 2);
 //		private final       long ptr;
 //
 //		Vert(ByteBuffer data, float x, float y){
@@ -61,9 +63,10 @@ public class VulkanDisplay implements AutoCloseable{
 //		public float x(){ return MemoryUtil.memGetFloat(ptr); }
 //		public float y(){ return MemoryUtil.memGetFloat(ptr + 4); }
 		
-		public static void put(ByteBuffer data, float x, float y, float r, float g, float b){
+		public static void put(ByteBuffer data, float x, float y, float r, float g, float b, float u, float v){
 			data.putFloat(x).putFloat(y)
-			    .putFloat(r).putFloat(g).putFloat(b);
+			    .putFloat(r).putFloat(g).putFloat(b)
+			    .putFloat(u).putFloat(v);
 		}
 	}
 	
@@ -81,14 +84,16 @@ public class VulkanDisplay implements AutoCloseable{
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
 			verts = vkCore.createVertexBuffer(6*Vert.SIZE, bb -> {
-				Vert.put(bb, 0, 1F, 1, 0, 0);
-				Vert.put(bb, 1F, 1F, 0, 1, 0);
-				Vert.put(bb, 0, 0, 0, 0, 1);
+				Vert.put(bb, 0, 1F, 1, 0, 0, 0, 1);
+				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
+				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
 				
-				Vert.put(bb, 0, 0, 0, 0, 1);
-				Vert.put(bb, 1F, 1F, 0, 1, 0);
-				Vert.put(bb, 1, 0F, 1, 1, 0);
+				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
+				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
+				Vert.put(bb, 1, 0F, 1, 1, 0, 1, 0);
 			});
+			
+			texture = vkCore.loadTexture("roboto/light/mask.png");
 			
 			createPipeline();
 			
@@ -106,11 +111,11 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			var t   = System.currentTimeMillis()%100000;
 			var mat = new Matrix4f();
-			mat.translate(120, 155, 0);
+			mat.translate(220, 355, 0);
 			mat.rotate((float)(t/1000D%(Math.PI*2)), new Vector3f(0, 0, 1));
 			mat.scale((float)(Math.sin(t/800D)/3 + 0.5));
 			
-			mat.scale(400);
+			mat.scale(1000);
 			mat.translate(-0.5F, -0.5F, 0);
 			
 			var s = vkCore.swapchain.extent;
@@ -128,8 +133,8 @@ public class VulkanDisplay implements AutoCloseable{
 		var size    = matSize*2;
 		var fSize   = size*Float.SIZE;
 		
-		uniformBuffs = vkCore.createUniformBuffers(fSize);
-		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs);
+		uniformBuffs = vkCore.allocateUniformBuffers(fSize);
+		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs, texture);
 	}
 	private void destroyPipeline(){
 		gPipeline.destroy();
@@ -227,7 +232,7 @@ public class VulkanDisplay implements AutoCloseable{
 				var buf         = graphicsBuffs.get(i);
 				var frameBuffer = vkCore.frameBuffers.get(i);
 				
-				buf.begin(Flags.of());
+				buf.begin();
 				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 					
 					buf.bindPipeline(gPipeline, i);
@@ -298,7 +303,9 @@ public class VulkanDisplay implements AutoCloseable{
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		destroyPipeline();
+		
 		verts.destroy();
+		texture.destroy();
 		
 		for(var buf : graphicsBuffs){
 			buf.destroy();

@@ -16,7 +16,9 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanSemaphore;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.PointerBuffer;
@@ -40,6 +42,7 @@ import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
+import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
@@ -50,6 +53,7 @@ import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
+import org.lwjgl.vulkan.VkSamplerCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import org.lwjgl.vulkan.VkSubmitInfo;
@@ -218,6 +222,9 @@ public interface VKCalls{
 	static void vkBindBufferMemory(VkBuffer buffer, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindBufferMemory(buffer.device.value, buffer.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
 	}
+	static void vkBindImageMemory(VkImage image, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
+		check(VK10.vkBindImageMemory(image.device.value, image.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
+	}
 	static DescriptorSetLayout vkCreateDescriptorSetLayout(DescriptorPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorSetLayout(pool.device.value, pCreateInfo, null, res), "vkCreateDescriptorSetLayout");
@@ -236,5 +243,15 @@ public interface VKCalls{
 			res[i] = new DescriptorSet(arr[i], device);
 		}
 		return List.of(res);
+	}
+	static VkImage vkCreateImage(Device device, VkImageCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreateImage(device.value, pCreateInfo, null, res), "vkCreateImage");
+		return new VkImage(res[0], device, pCreateInfo);
+	}
+	static VkSampler vkCreateSampler(Device device, VkSamplerCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreateSampler(device.value, pCreateInfo, null, res), "vkCreateSampler");
+		return new VkSampler(res[0], device);
 	}
 }

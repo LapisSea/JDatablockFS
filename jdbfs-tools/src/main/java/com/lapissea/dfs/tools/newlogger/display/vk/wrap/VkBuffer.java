@@ -17,7 +17,6 @@ public class VkBuffer implements VulkanResource{
 		this.device = device;
 	}
 	
-	public record MemoryRequirements(long size, long alignment, int memoryTypeBits){ }
 	public MemoryRequirements getRequirements(){
 		try(var stack = MemoryStack.stackPush()){
 			var res = VkMemoryRequirements.malloc(stack);

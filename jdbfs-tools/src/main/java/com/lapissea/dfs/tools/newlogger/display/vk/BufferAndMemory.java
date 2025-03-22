@@ -30,7 +30,7 @@ public class BufferAndMemory implements VulkanResource{
 	}
 	
 	public void copyTo(CommandBuffer copyBuffer, VulkanQueue queue, BufferAndMemory vb) throws VulkanCodeException{
-		copyBuffer.begin(Flags.of(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT));
+		copyBuffer.begin(VkCommandBufferUsageFlag.ONE_TIME_SUBMIT_BIT);
 		copyBuffer.copyBuffer(buffer, vb.buffer, buffer.size);
 		copyBuffer.end();
 		

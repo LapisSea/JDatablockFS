@@ -22,6 +22,10 @@ public class Extent2D{
 		return VkExtent2D.malloc(mem).set(width, height);
 	}
 	
+	public Extent3D as3d(){
+		return new Extent3D(width, height, 1);
+	}
+	
 	@Override
 	public final boolean equals(Object o){
 		return o instanceof Extent2D that && width == that.width && height == that.height;

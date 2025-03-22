@@ -1,9 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkDescriptorBufferInfo;
+import org.lwjgl.vulkan.VkDescriptorImageInfo;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 
 public class DescriptorSet{
@@ -16,11 +18,11 @@ public class DescriptorSet{
 		this.device = device;
 	}
 	
-	public void update(VkBuffer buffer, VkBuffer uniformBuffer){
+	public void update(VkBuffer buffer, VkBuffer uniformBuffer, VulkanTexture texture){
 		
 		try(MemoryStack stack = MemoryStack.stackPush()){
 			
-			var pDescriptorWrites = VkWriteDescriptorSet.calloc(2, stack);
+			var pDescriptorWrites = VkWriteDescriptorSet.calloc(3, stack);
 			
 			pDescriptorWrites.sType$Default()
 			                 .dstSet(handle)
@@ -48,6 +50,21 @@ public class DescriptorSet{
 				                                       .buffer(uniformBuffer.handle)
 				                                       .offset(0)
 				                                       .range(uniformBuffer.size)
+			                 );
+			
+			
+			pDescriptorWrites.position(2)
+			                 .sType$Default()
+			                 .dstSet(handle)
+			                 .dstBinding(2)
+			                 .dstArrayElement(0)
+			                 .descriptorCount(1)
+			                 .descriptorType(VkDescriptorType.COMBINED_IMAGE_SAMPLER.id)
+			                 .pImageInfo(
+				                 VkDescriptorImageInfo.malloc(1, stack)
+				                                      .sampler(texture.sampler.handle)
+				                                      .imageView(texture.view.handle)
+				                                      .imageLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 			                 );
 			
 			pDescriptorWrites.position(0);

@@ -1,26 +1,37 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.util.TextUtil;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
+import org.lwjgl.vulkan.VkExtent3D;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
+import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
+import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
 import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineInputAssemblyStateCreateInfo;
@@ -37,6 +48,10 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkViewport;
 
 import java.util.List;
+import java.util.Optional;
+
+import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
+import static org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE;
 
 public class Device implements VulkanResource{
 	
@@ -52,16 +67,37 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public Swapchain createSwapchain(Surface surface, VKPresentMode preferredPresentMode) throws VulkanCodeException{
+	public Swapchain createSwapchain(Swapchain oldSwapchain, Surface surface, VKPresentMode preferredMode, Iterable<FormatColor> preferred) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
-			var format = Iters.from(physicalDevice.formats)
-			                  .firstMatching(e -> e.format == VkFormat.R8G8B8A8_UNORM && e.colorSpace == VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
-			                  .orElse(physicalDevice.formats.getFirst());
+			
+			if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
+			
+			var available = physicalDevice.formats;
+			
+			var format = switch(Iters.from(preferred).firstMatchingM(available::contains)){
+				case Match.Some(var f) -> {
+					if(oldSwapchain == null) Log.info("Found format: {}#green", f);
+					yield f;
+				}
+				case Match.None() -> {
+					var f = Iters.from(available).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.format).anyIs(fo.format));
+					if(f.isEmpty()){
+						f = Iters.from(available).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.colorSpace).anyIs(fo.colorSpace));
+					}
+					if(f.isEmpty()){
+						f = Optional.of(available.getFirst());
+					}
+					
+					if(oldSwapchain == null) Log.warn("Found no preferred formats! Using: {}#yellow", f);
+					yield f.get();
+				}
+			};
+			
 			
 			SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
 			
-			var presentMode = physicalDevice.presentModes.contains(preferredPresentMode)?
-			                  preferredPresentMode :
+			var presentMode = physicalDevice.presentModes.contains(preferredMode)?
+			                  preferredMode :
 			                  physicalDevice.presentModes.iterator().next();
 			
 			int numOfImages = Math.min(surfaceCapabilities.minImageCount + 1, surfaceCapabilities.maxImageCount);
@@ -80,8 +116,10 @@ public class Device implements VulkanResource{
 			    .preTransform(surfaceCapabilities.currentTransform.bit)
 			    .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
 			    .presentMode(presentMode.id)
-			    .clipped(true)
-			;
+			    .clipped(true);
+			if(oldSwapchain != null){
+				info.oldSwapchain(oldSwapchain.handle);
+			}
 			
 			return VKCalls.vkCreateSwapchainKHR(this, info);
 		}
@@ -226,6 +264,50 @@ public class Device implements VulkanResource{
 			                                            .maxSets(maxSets);
 			
 			return VKCalls.vkCreateDescriptorPool(this, pCreateInfo);
+		}
+	}
+	
+	public VkImage createImage(int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+		
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkImageCreateInfo.calloc(stack);
+			info.sType$Default()
+			    .imageType(VKImageType.IMG_2D.id)
+			    .format(format.id)
+			    .extent(VkExtent3D.malloc(stack).set(width, height, 1))
+			    .mipLevels(1)
+			    .arrayLayers(1)
+			    .samples(samples.bit)
+			    .tiling(VK_IMAGE_TILING_OPTIMAL)
+			    .usage(usage.value)
+			    .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
+			    .pQueueFamilyIndices(null)
+			    .initialLayout(VkImageLayout.UNDEFINED.id);
+			
+			return VKCalls.vkCreateImage(this, info);
+		}
+	}
+	
+	public VkDeviceMemory allocateMemory(long size, int memoryTypeIndex) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkMemoryAllocateInfo.malloc(stack);
+			info.sType$Default()
+			    .pNext(0)
+			    .allocationSize(size)
+			    .memoryTypeIndex(memoryTypeIndex);
+			
+			return VKCalls.vkAllocateMemory(this, info);
+		}
+	}
+	public VkBuffer createBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, VkSharingMode sharingMode) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkBufferCreateInfo.calloc(stack)
+			                             .sType$Default()
+			                             .size(size)
+			                             .usage(usageFlags.value)
+			                             .sharingMode(sharingMode.id);
+			
+			return VKCalls.vkCreateBuffer(this, info);
 		}
 	}
 	

@@ -136,7 +136,7 @@ public final class VUtils{
 		          .toMap(id -> id, id -> uni.firstMatching(e -> e.id() == id).orElseThrow());
 	}
 	public static ByteBuffer readResource(String resource) throws IOException{
-		URL url = VUtils.class.getResource(resource);
+		URL url = VUtils.class.getResource("/" + resource);
 		if(url == null){
 			throw new IOException("Resource not found: " + resource);
 		}
