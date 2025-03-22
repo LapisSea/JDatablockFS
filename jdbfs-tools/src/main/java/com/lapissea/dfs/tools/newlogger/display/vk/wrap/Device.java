@@ -28,6 +28,7 @@ import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkExtent3D;
+import org.lwjgl.vulkan.VkFenceCreateInfo;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
@@ -163,13 +164,38 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public VulkanSemaphore createSemaphore() throws VulkanCodeException{
+	public VkSemaphore[] createSemaphores(int count) throws VulkanCodeException{
+		var res = new VkSemaphore[count];
+		for(int i = 0; i<count; i++){
+			res[i] = createSemaphore();
+		}
+		return res;
+	}
+	public VkSemaphore createSemaphore() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkSemaphoreCreateInfo.calloc(stack)
 			                                .sType$Default();
 			
 			return VKCalls.vkCreateSemaphore(this, info);
+		}
+	}
+	
+	public VkFence[] createFences(int count, boolean signaledInitial) throws VulkanCodeException{
+		var res = new VkFence[count];
+		for(int i = 0; i<count; i++){
+			res[i] = createFence(signaledInitial);
+		}
+		return res;
+	}
+	public VkFence createFence(boolean signaledInitial) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkFenceCreateInfo.malloc(stack);
+			info.sType$Default()
+			    .pNext(0)
+			    .flags(signaledInitial? VK10.VK_FENCE_CREATE_SIGNALED_BIT : 0);
+			
+			return VKCalls.vkCreateFence(this, info);
 		}
 	}
 	
@@ -246,21 +272,22 @@ public class Device implements VulkanResource{
 			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
 			
 			
-			var pCreateInfos = VkGraphicsPipelineCreateInfo.calloc(1, stack).sType$Default()
-			                                               .pStages(shaderStages)
-			                                               .pVertexInputState(vertInput)
-			                                               .pInputAssemblyState(inputAssembly)
-			                                               .pViewportState(viewportState)
-			                                               .pRasterizationState(rasterState)
-			                                               .pMultisampleState(multisampleState)
-			                                               .pColorBlendState(colorBlendState)
-			                                               .layout(layout.handle)
-			                                               .renderPass(renderPass.handle)
-			                                               .subpass(subpass)
-			                                               .basePipelineHandle(0)
-			                                               .basePipelineIndex(-1);
+			var info = VkGraphicsPipelineCreateInfo.calloc(1, stack);
+			info.sType$Default()
+			    .pStages(shaderStages)
+			    .pVertexInputState(vertInput)
+			    .pInputAssemblyState(inputAssembly)
+			    .pViewportState(viewportState)
+			    .pRasterizationState(rasterState)
+			    .pMultisampleState(multisampleState)
+			    .pColorBlendState(colorBlendState)
+			    .layout(layout.handle)
+			    .renderPass(renderPass.handle)
+			    .subpass(subpass)
+			    .basePipelineHandle(0)
+			    .basePipelineIndex(-1);
 			
-			return VKCalls.vkCreateGraphicsPipelines(this, 0, pCreateInfos).getFirst();
+			return VKCalls.vkCreateGraphicsPipelines(this, 0, info).getFirst();
 		}
 	}
 	
@@ -268,12 +295,12 @@ public class Device implements VulkanResource{
 	public DescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
-			var pCreateInfo = VkDescriptorPoolCreateInfo.calloc(stack)
-			                                            .sType$Default()
-			                                            .flags(flags.value)
-			                                            .maxSets(maxSets);
+			var info = VkDescriptorPoolCreateInfo.calloc(stack);
+			info.sType$Default()
+			    .flags(flags.value)
+			    .maxSets(maxSets);
 			
-			return VKCalls.vkCreateDescriptorPool(this, pCreateInfo);
+			return VKCalls.vkCreateDescriptorPool(this, info);
 		}
 	}
 	
@@ -311,11 +338,11 @@ public class Device implements VulkanResource{
 	}
 	public VkBuffer createBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, VkSharingMode sharingMode) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
-			var info = VkBufferCreateInfo.calloc(stack)
-			                             .sType$Default()
-			                             .size(size)
-			                             .usage(usageFlags.value)
-			                             .sharingMode(sharingMode.id);
+			var info = VkBufferCreateInfo.calloc(stack);
+			info.sType$Default()
+			    .size(size)
+			    .usage(usageFlags.value)
+			    .sharingMode(sharingMode.id);
 			
 			return VKCalls.vkCreateBuffer(this, info);
 		}

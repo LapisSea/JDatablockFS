@@ -85,6 +85,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	private static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
 	
+	public static final int MAX_IN_FLIGHT_FRAMES = 2;
+	
 	public static void preload(){
 		try{
 			validateExtensionsLayers(List.of(), List.of());
@@ -141,8 +143,11 @@ public class VulkanCore implements AutoCloseable{
 	private final TransferBuffers transferBuffers;
 	private final TransferBuffers transientGraphicsBuffs;
 	
-	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
+	private final VKPresentMode preferredPresentMode;
+	
+	public VulkanCore(String name, GlfwWindow window, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
+		this.preferredPresentMode = preferredPresentMode;
 		
 		instance = createInstance();
 		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
@@ -348,7 +353,7 @@ public class VulkanCore implements AutoCloseable{
 	private void createSwapchainContext() throws VulkanCodeException{
 		var oldSwapchain = swapchain;
 		swapchain = device.createSwapchain(
-			oldSwapchain, surface, VKPresentMode.IMMEDIATE,
+			oldSwapchain, surface, preferredPresentMode,
 			List.of(
 				new FormatColor(VkFormat.R8G8B8A8_UNORM, VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
 			)

@@ -16,10 +16,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanSemaphore;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSemaphore;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWVulkan;
@@ -40,6 +41,7 @@ import org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
+import org.lwjgl.vulkan.VkFenceCreateInfo;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageCreateInfo;
@@ -74,13 +76,15 @@ public interface VKCalls{
 		throw VulkanCodeException.from(errorCode, action);
 	}
 	
-	static int vkAcquireNextImageKHR(VkDevice device, Swapchain swapchain, long timeout, VulkanSemaphore semaphore, long fence) throws VulkanCodeException{
+	static int vkAcquireNextImageKHR(VkDevice device, Swapchain swapchain, long timeout, VkSemaphore semaphore, VkFence fence) throws VulkanCodeException{
 		var index = new int[1];
-		check(KHRSwapchain.vkAcquireNextImageKHR(device, swapchain.handle, timeout, semaphore.handle, fence, index), "vkAcquireNextImageKHR");
+		check(KHRSwapchain.vkAcquireNextImageKHR(
+			device, swapchain.handle, timeout, semaphore == null? 0 : semaphore.handle, fence == null? 0 : fence.handle, index
+		), "vkAcquireNextImageKHR");
 		return index[0];
 	}
-	static void vkQueueSubmit(VkQueue queue, VkSubmitInfo info, int fence) throws VulkanCodeException{
-		check(VK10.vkQueueSubmit(queue, info, fence), "vkQueueSubmit");
+	static void vkQueueSubmit(VkQueue queue, VkSubmitInfo info, VkFence fence) throws VulkanCodeException{
+		check(VK10.vkQueueSubmit(queue, info, fence == null? 0 : fence.handle), "vkQueueSubmit");
 	}
 	static void vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR info) throws VulkanCodeException{
 		check(KHRSwapchain.vkQueuePresentKHR(queue, info), "vkQueuePresentKHR");
@@ -115,10 +119,10 @@ public interface VKCalls{
 		var res = ptr[0];
 		return res;
 	}
-	static VulkanSemaphore vkCreateSemaphore(Device device, VkSemaphoreCreateInfo info) throws VulkanCodeException{
+	static VkSemaphore vkCreateSemaphore(Device device, VkSemaphoreCreateInfo info) throws VulkanCodeException{
 		var ptr = new long[1];
 		check(VK10.vkCreateSemaphore(device.value, info, null, ptr), "vkCreateSemaphore");
-		return new VulkanSemaphore(ptr[0], device);
+		return new VkSemaphore(ptr[0], device);
 	}
 	static void vkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo info) throws VulkanCodeException{
 		check(VK10.vkBeginCommandBuffer(commandBuffer, info), "vkBeginCommandBuffer");
@@ -256,5 +260,16 @@ public interface VKCalls{
 		var res = new long[1];
 		check(VK10.vkCreateSampler(device.value, pCreateInfo, null, res), "vkCreateSampler");
 		return new VkSampler(res[0], device);
+	}
+	static VkFence vkCreateFence(Device device, VkFenceCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreateFence(device.value, pCreateInfo, null, res), "vkCreateFence");
+		return new VkFence(res[0], device);
+	}
+	static void vkWaitForFence(VkDevice device, VkFence fence, long timeout) throws VulkanCodeException{
+		check(VK10.vkWaitForFences(device, fence.handle, true, timeout), "vkWaitForFences");
+	}
+	static void vkResetFences(VkDevice device, VkFence fence) throws VulkanCodeException{
+		check(VK10.vkResetFences(device, fence.handle), "vkResetFences");
 	}
 }

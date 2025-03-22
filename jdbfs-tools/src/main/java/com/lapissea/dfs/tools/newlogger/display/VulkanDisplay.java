@@ -5,8 +5,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
+import static com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore.MAX_IN_FLIGHT_FRAMES;
 
 public class VulkanDisplay implements AutoCloseable{
 	
@@ -36,6 +39,8 @@ public class VulkanDisplay implements AutoCloseable{
 	public GraphicsPipeline gPipeline;
 	
 	private List<BufferAndMemory> uniformBuffs;
+	
+	private VkFence[] inFlightFences;
 	
 	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
 	
@@ -55,7 +60,7 @@ public class VulkanDisplay implements AutoCloseable{
 		window.size.register(this::onResizeEvent);
 		
 		try{
-			vkCore = new VulkanCore("DFS debugger", window);
+			vkCore = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
 			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
@@ -70,6 +75,7 @@ public class VulkanDisplay implements AutoCloseable{
 				Vert.put(bb, 1, 0F, 1, 1, 0, 1, 0);
 			});
 			
+			inFlightFences = vkCore.device.createFences(MAX_IN_FLIGHT_FRAMES, true);
 			createPipeline();
 			
 			recordCommandBuffers();
@@ -134,15 +140,21 @@ public class VulkanDisplay implements AutoCloseable{
 			}
 		}
 	}
+	
+	private int frame = 0;
 	private void renderQueue() throws VulkanCodeException{
-//		vkCore.renderQueue.waitIdle();
-//		recordCommandBuffers();
+		var fence = inFlightFences[frame];
+		fence.waitFor();
+		fence.reset();
+		
 		var swapchain = vkCore.swapchain;
 		var queue     = vkCore.renderQueue;
-		var index     = queue.acquireNextImage(swapchain);
+		var index     = queue.acquireNextImage(swapchain, frame);
 		updateUniforms(index);
-		queue.submitAsync(graphicsBuffs.get(index));
-		queue.present(swapchain, index);
+		queue.submitAsync(graphicsBuffs.get(index), fence, frame);
+		queue.present(swapchain, index, frame);
+		
+		frame = (++frame)%inFlightFences.length;
 	}
 	
 	private boolean resizing;
@@ -155,6 +167,9 @@ public class VulkanDisplay implements AutoCloseable{
 				graphicsBuffs.forEach(CommandBuffer::destroy);
 				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			}
+			
+			for(var f : inFlightFences) f.destroy();
+			inFlightFences = vkCore.device.createFences(MAX_IN_FLIGHT_FRAMES, true);
 			
 			destroyPipeline();
 			createPipeline();
@@ -285,6 +300,10 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		try{
 			vkCore.renderQueue.waitIdle();
+			
+			for(int i = 0; i<inFlightFences.length; i++){
+				inFlightFences[i].destroy();
+			}
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		destroyPipeline();

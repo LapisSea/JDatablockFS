@@ -63,7 +63,6 @@ public class TransferBuffers implements VulkanResource{
 			buffer.end();
 			
 			synchronized(queue){
-				queue.waitIdle();
 				queue.submitNow(buffer);
 			}
 		}finally{
