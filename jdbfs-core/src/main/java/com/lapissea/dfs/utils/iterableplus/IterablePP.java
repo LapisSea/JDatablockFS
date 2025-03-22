@@ -10,16 +10,19 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.BinaryOperator;
@@ -338,6 +341,25 @@ public interface IterablePP<T> extends Iterable<T>{
 		}
 		if(res.length == siz) return res;
 		return Arrays.copyOf(res, siz);
+	}
+	
+	default <E> LinkedHashSet<E> toModSequencedSet(Function<T, E> map){
+		return map(map).toModSequencedSet();
+	}
+	default LinkedHashSet<T> toModSequencedSet(){
+		var size = tryGetSize().orElse(8);
+		var res  = LinkedHashSet.<T>newLinkedHashSet(size);
+		for(T t : this){
+			res.add(t);
+		}
+		return res;
+	}
+	
+	default <E> SequencedSet<E> toSequencedSet(Function<T, E> map){
+		return map(map).toSequencedSet();
+	}
+	default SequencedSet<T> toSequencedSet(){
+		return Collections.unmodifiableSequencedSet(toModSequencedSet());
 	}
 	
 	default <E> Set<E> toSet(Function<T, E> map){
