@@ -1,7 +1,9 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -155,5 +157,16 @@ public final class VUtils{
 		}
 		
 		return ByteBuffer.wrap(buffer.buf()).order(ByteOrder.nativeOrder()).limit(buffer.size());
+	}
+	public static int getBytesPerPixel(VkFormat format){
+		return switch(format){
+			case R8_SINT, R8_UNORM -> 1;
+			case R16_SFLOAT -> 2;
+			case R16G16_SNORM -> 4;
+			case R8G8B8A8_UNORM -> 4;
+			case R16G16B16A16_SFLOAT -> 4*2;
+			case R32G32B32A32_SFLOAT -> 4*Float.SIZE;
+			default -> throw new NotImplementedException("Unexpected format: " + format);
+		};
 	}
 }

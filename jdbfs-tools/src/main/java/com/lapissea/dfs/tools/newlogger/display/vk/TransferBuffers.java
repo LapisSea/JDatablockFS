@@ -74,6 +74,10 @@ public class TransferBuffers implements VulkanResource{
 	
 	@Override
 	public void destroy(){
+		try{
+			queue.waitIdle();
+		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
 		List<CommandPool> queues;
 		synchronized(allQueues){
 			queues = new ArrayList<>(allQueues);
@@ -82,5 +86,6 @@ public class TransferBuffers implements VulkanResource{
 		for(var node : queues){
 			node.destroy();
 		}
+		queue.destroy();
 	}
 }

@@ -45,7 +45,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import org.lwjgl.stb.STBImage;
@@ -132,8 +131,6 @@ public class VulkanCore implements AutoCloseable{
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
-	private final VulkanQueue transferQueue;
-	
 	private final TransferBuffers transferBuffers;
 	
 	public VulkanCore(String name, GlfwWindow window) throws VulkanCodeException{
@@ -154,57 +151,42 @@ public class VulkanCore implements AutoCloseable{
 		device = physicalDevice.createDevice(renderQueueFamily);
 		
 		
-		QueueFamilyProps transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
-		transferQueue = new VulkanQueue(device, null, transferFamily, 1);
+		var transferFamily = findQueueFamilyBy(VkQueueFlag.TRANSFER).orElseThrow();
+		
+		var transferQueue = new VulkanQueue(device, null, transferFamily, 1);
 		transferBuffers = new TransferBuffers(transferQueue);
 		
 		createSwapchainContext();
 	}
 	
 	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format) throws VulkanCodeException{
-		var vkimg = device.createImage(
+		var image = device.createImage(
 			width, height, format,
 			Flags.of(VkImageUsageFlag.TRANSFER_DST, VkImageUsageFlag.SAMPLED),
 			VkSampleCountFlag.N1
 		);
 		
-		var requirements    = vkimg.getRequirements();
+		var requirements    = image.getRequirements();
 		var memoryTypeIndex = getMemoryTypeIndex(requirements.memoryTypeBits(), Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
 		
 		var memory = device.allocateMemory(requirements.size(), memoryTypeIndex);
 		
-		VKCalls.vkBindImageMemory(vkimg, memory, 0);
+		VKCalls.vkBindImageMemory(image, memory, 0);
 		
-		updateTexture(vkimg, pixels);
+		imageUpdate(image, pixels);
 		
-		var view = vkimg.createImageView(VkImageViewType.TYPE_2D, vkimg.format, Flags.of(VkImageAspectFlag.COLOR));
+		var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, Flags.of(VkImageAspectFlag.COLOR));
 		
-		var sampler = vkimg.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
+		var sampler = image.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		
-		return new VulkanTexture(vkimg, memory, view, sampler);
+		return new VulkanTexture(image, memory, view, sampler);
 	}
 	
-	
-	public void updateTexture(VkImage image, ByteBuffer pixels) throws VulkanCodeException{
-		
-		int bytesPerPixel = switch(image.format){
-			case R8_SINT, R8_UNORM -> 1;
-			case R16_SFLOAT -> 2;
-			case R16G16_SNORM -> 4;
-			case R8G8B8A8_UNORM -> 4;
-			case R16G16B16A16_SFLOAT -> 4*2;
-			case R32G32B32A32_SFLOAT -> 4*Float.SIZE;
-			default -> throw new NotImplementedException("Unexpected format: " + image.format);
-		};
-		int size = bytesPerPixel*image.extent.depth*image.extent.width*image.extent.height;
+	public void imageUpdate(VkImage image, ByteBuffer pixels) throws VulkanCodeException{
+		int size = VUtils.getBytesPerPixel(image.format)*image.extent.depth*image.extent.width*image.extent.height;
 		
 		if(pixels.remaining() != size) throw new AssertionError(pixels.remaining() + " != " + size);
-		
-		try(var imgMem = allocateBuffer(
-			size,
-			Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
-			Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
-		)){
+		try(var imgMem = allocateStagingBuffer(size)){
 			imgMem.update(b -> b.put(pixels));
 			
 			image.transitionLayout(transferBuffers, VkImageLayout.UNDEFINED, VkImageLayout.TRANSFER_DST_OPTIMAL);
@@ -216,28 +198,27 @@ public class VulkanCore implements AutoCloseable{
 	public List<BufferAndMemory> allocateUniformBuffers(int size) throws VulkanCodeException{
 		var res = new BufferAndMemory[swapchain.images.size()];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateUniformBuffer(size);
+			res[i] = allocateBuffer(
+				size,
+				Flags.of(VkBufferUsageFlag.UNIFORM_BUFFER),
+				Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
+			);
 		}
 		return List.of(res);
 	}
-	public BufferAndMemory allocateUniformBuffer(int size) throws VulkanCodeException{
-		return allocateBuffer(
-			size,
-			Flags.of(VkBufferUsageFlag.UNIFORM_BUFFER),
-			Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
-		);
-	}
 	
+	public BufferAndMemory allocateStagingBuffer(long size) throws VulkanCodeException{
+		return allocateBuffer(size, Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
+		                      Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
+	}
 	public BufferAndMemory allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
 		VkBuffer       buffer = null;
 		VkDeviceMemory memory = null;
 		try{
 			buffer = device.createBuffer(size, usageFlags, VkSharingMode.EXCLUSIVE);
 			
-			var requirement = buffer.getRequirements();
-			
+			var requirement     = buffer.getRequirements();
 			int memoryTypeIndex = getMemoryTypeIndex(requirement.memoryTypeBits(), memoryFlags);
-			
 			memory = device.allocateMemory(requirement.size(), memoryTypeIndex);
 			
 			VKCalls.vkBindBufferMemory(buffer, memory, 0);
@@ -262,15 +243,8 @@ public class VulkanCore implements AutoCloseable{
 		            .orElseThrow(() -> new IllegalStateException("Could not find memory type for: " + typeBits + " & " + requiredProperties));
 	}
 	
-	public BufferAndMemory createVertexBuffer(ByteBuffer data) throws VulkanCodeException{
-		return createVertexBuffer(data.remaining(), dst -> dst.put(data));
-	}
 	public BufferAndMemory createVertexBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
-		try(var stagingVb = allocateBuffer(
-			size,
-			Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
-			Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
-		)){
+		try(var stagingVb = allocateStagingBuffer(size)){
 			stagingVb.update(populator);
 			var vb = allocateBuffer(
 				size,
@@ -536,11 +510,10 @@ public class VulkanCore implements AutoCloseable{
 		destroySwapchainContext(true);
 		
 		try{
-			transferQueue.waitIdle();
+			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		transferBuffers.destroy();
-		transferQueue.destroy();
 		
 		testShaderModules.destroy();
 		device.destroy();

@@ -22,56 +22,53 @@ public class DescriptorSet{
 		
 		try(MemoryStack stack = MemoryStack.stackPush()){
 			
-			var pDescriptorWrites = VkWriteDescriptorSet.calloc(3, stack);
+			var info = VkWriteDescriptorSet.calloc(3, stack);
 			
-			pDescriptorWrites.sType$Default()
-			                 .dstSet(handle)
-			                 .dstBinding(0)
-			                 .dstArrayElement(0)
-			                 .descriptorCount(1)
-			                 .descriptorType(VkDescriptorType.STORAGE_BUFFER.id)
-			                 .pBufferInfo(
-				                 VkDescriptorBufferInfo.malloc(1, stack)
-				                                       .buffer(buffer.handle)
-				                                       .offset(0)
-				                                       .range(buffer.size)
-			                 );
+			for(int i = 0; i<info.capacity(); i++){
+				info.position(i)
+				    .sType$Default()
+				    .dstSet(handle)
+				    .dstArrayElement(0)
+				    .descriptorCount(1);
+			}
 			
-			
-			pDescriptorWrites.position(1)
-			                 .sType$Default()
-			                 .dstSet(handle)
-			                 .dstBinding(1)
-			                 .dstArrayElement(0)
-			                 .descriptorCount(1)
-			                 .descriptorType(VkDescriptorType.UNIFORM_BUFFER.id)
-			                 .pBufferInfo(
-				                 VkDescriptorBufferInfo.malloc(1, stack)
-				                                       .buffer(uniformBuffer.handle)
-				                                       .offset(0)
-				                                       .range(uniformBuffer.size)
-			                 );
+			info.position(0)
+			    .dstBinding(0)
+			    .descriptorType(VkDescriptorType.STORAGE_BUFFER.id)
+			    .pBufferInfo(
+				    VkDescriptorBufferInfo.malloc(1, stack)
+				                          .buffer(buffer.handle)
+				                          .offset(0)
+				                          .range(buffer.size)
+			    );
 			
 			
-			pDescriptorWrites.position(2)
-			                 .sType$Default()
-			                 .dstSet(handle)
-			                 .dstBinding(2)
-			                 .dstArrayElement(0)
-			                 .descriptorCount(1)
-			                 .descriptorType(VkDescriptorType.COMBINED_IMAGE_SAMPLER.id)
-			                 .pImageInfo(
-				                 VkDescriptorImageInfo.malloc(1, stack)
-				                                      .sampler(texture.sampler.handle)
-				                                      .imageView(texture.view.handle)
-				                                      .imageLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-			                 );
+			info.position(1)
+			    .dstBinding(1)
+			    .descriptorType(VkDescriptorType.UNIFORM_BUFFER.id)
+			    .pBufferInfo(
+				    VkDescriptorBufferInfo.malloc(1, stack)
+				                          .buffer(uniformBuffer.handle)
+				                          .offset(0)
+				                          .range(uniformBuffer.size)
+			    );
 			
-			pDescriptorWrites.position(0);
+			
+			info.position(2)
+			    .dstBinding(2)
+			    .descriptorType(VkDescriptorType.COMBINED_IMAGE_SAMPLER.id)
+			    .pImageInfo(
+				    VkDescriptorImageInfo.malloc(1, stack)
+				                         .sampler(texture.sampler.handle)
+				                         .imageView(texture.view.handle)
+				                         .imageLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			    );
+			
+			info.position(0);
 
 //			var  pDescriptorCopies =  VkCopyDescriptorSet.calloc(1, stack);
 			
-			VK10.vkUpdateDescriptorSets(device.value, pDescriptorWrites, null);
+			VK10.vkUpdateDescriptorSets(device.value, info, null);
 		}
 		
 	}
