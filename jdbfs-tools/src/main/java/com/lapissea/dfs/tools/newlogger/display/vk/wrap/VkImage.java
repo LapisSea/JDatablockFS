@@ -5,6 +5,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
@@ -23,6 +24,8 @@ import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkSamplerCreateInfo;
 
+import static org.lwjgl.vulkan.VK10.VK_LOD_CLAMP_NONE;
+
 public class VkImage implements VulkanResource{
 	
 	public final long   handle;
@@ -31,20 +34,23 @@ public class VkImage implements VulkanResource{
 	public final Extent3D          extent;
 	public final VkFormat          format;
 	public final VkSampleCountFlag samples;
+	public final VKImageType       type;
 	
 	public VkImage(long handle, Device device, VkImageCreateInfo info){
 		this(handle, device,
 		     new Extent3D(info.extent()),
 		     VkFormat.from(info.format()),
-		     VkSampleCountFlag.from(info.samples()).asOne()
+		     VkSampleCountFlag.from(info.samples()).asOne(),
+		     VKImageType.from(info.imageType())
 		);
 	}
-	public VkImage(long handle, Device device, Extent3D extent, VkFormat format, VkSampleCountFlag samples){
+	public VkImage(long handle, Device device, Extent3D extent, VkFormat format, VkSampleCountFlag samples, VKImageType type){
 		this.handle = handle;
 		this.device = device;
 		this.extent = extent;
 		this.format = format;
 		this.samples = samples;
+		this.type = type;
 	}
 	
 	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> requiredProperties) throws VulkanCodeException{
@@ -111,7 +117,7 @@ public class VkImage implements VulkanResource{
 			    .compareEnable(false)
 			    .compareOp(VK10.VK_COMPARE_OP_ALWAYS)
 			    .minLod(0)
-			    .maxLod(0)
+			    .maxLod(VK_LOD_CLAMP_NONE)
 			    .borderColor(VK10.VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK)
 			    .unnormalizedCoordinates(false);
 			
@@ -119,9 +125,9 @@ public class VkImage implements VulkanResource{
 		}
 	}
 	
-	public void transitionLayout(TransferBuffers transferBuffers, VkImageLayout oldLayout, VkImageLayout newLayout) throws VulkanCodeException{
+	public void transitionLayout(TransferBuffers transferBuffers, VkImageLayout oldLayout, VkImageLayout newLayout, int mipLevels) throws VulkanCodeException{
 		transferBuffers.syncAction(cmd -> {
-			cmd.imageMemoryBarrier(this, oldLayout, newLayout);
+			cmd.imageMemoryBarrier(this, oldLayout, newLayout, mipLevels);
 		});
 	}
 	public void copyBufferToImage(TransferBuffers transferBuffers, VkBuffer buffer) throws VulkanCodeException{

@@ -267,7 +267,7 @@ public class Device implements VulkanResource{
 		}
 	}
 	
-	public VkImage createImage(int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+	public VkImage createImage(int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples, int mipLevels) throws VulkanCodeException{
 		
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkImageCreateInfo.calloc(stack);
@@ -275,7 +275,7 @@ public class Device implements VulkanResource{
 			    .imageType(VKImageType.IMG_2D.id)
 			    .format(format.id)
 			    .extent(VkExtent3D.malloc(stack).set(width, height, 1))
-			    .mipLevels(1)
+			    .mipLevels(mipLevels)
 			    .arrayLayers(1)
 			    .samples(samples.bit)
 			    .tiling(VK_IMAGE_TILING_OPTIMAL)

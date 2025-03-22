@@ -38,7 +38,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private List<BufferAndMemory> uniformBuffs;
 	
-	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", this::blockingCore);
+	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
 	
 	public static final class Vert{
 		public static final int SIZE = 4*(2 + 3 + 2);
@@ -96,7 +96,7 @@ public class VulkanDisplay implements AutoCloseable{
 			var mat = new Matrix4f();
 			mat.translate(220, 355, 0);
 			mat.rotate((float)(t/1000D%(Math.PI*2)), new Vector3f(0, 0, 1));
-			mat.scale((float)(Math.sin(t/800D)/3 + 0.5));
+			mat.scale((float)(Math.sin(t/800D)/2.1 + 0.5));
 			
 			mat.scale(1000);
 			mat.translate(-0.5F, -0.5F, 0);

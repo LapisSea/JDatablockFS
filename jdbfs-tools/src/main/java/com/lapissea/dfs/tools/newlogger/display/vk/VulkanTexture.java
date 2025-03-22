@@ -20,7 +20,7 @@ import java.util.function.Supplier;
 
 public class VulkanTexture implements VulkanResource{
 	
-	public static CompletableFuture<VulkanTexture> loadTexture(String name, Supplier<VulkanCore> coreGet){
+	public static CompletableFuture<VulkanTexture> loadTexture(String name, boolean generateMips, Supplier<VulkanCore> coreGet){
 		return CompletableFuture.supplyAsync(() -> {
 			
 			ByteBuffer pixels = null, image = null;
@@ -33,11 +33,16 @@ public class VulkanTexture implements VulkanResource{
 				
 				if(pixels == null) throw new IOException("Image \"" + name + "\" was invalid");
 				
+				int width  = xB.get(0);
+				int height = yB.get(0);
+				
 				Log.info("loaded image " + name + " " + xB.get(0) + "x" + yB.get(0));
+				
+				var levels = generateMips? (int)Math.floor(Math.log(Math.max(width, height))/Math.log(2)) + 1 : 1;
 				
 				var core = coreGet.get();
 				
-				return core.uploadTexture(xB.get(0), yB.get(0), pixels, VkFormat.R8G8B8A8_UNORM);
+				return core.uploadTexture(width, height, pixels, VkFormat.R8G8B8A8_UNORM, levels);
 				
 			}catch(IOException|VulkanCodeException e){
 				throw new RuntimeException("Failed to load image", e);

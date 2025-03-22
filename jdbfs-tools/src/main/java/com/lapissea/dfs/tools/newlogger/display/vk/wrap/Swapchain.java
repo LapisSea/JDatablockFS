@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
@@ -48,7 +49,7 @@ public class Swapchain implements VulkanResource{
 			
 			return Iters.rangeMap(
 				0, imageRefs.capacity(),
-				i -> new VkImage(imageRefs.get(i), device, extent.as3d(), formatColor.format, VkSampleCountFlag.N1)
+				i -> new VkImage(imageRefs.get(i), device, extent.as3d(), formatColor.format, VkSampleCountFlag.N1, VKImageType.IMG_2D)
 			).toList();
 		}
 	}

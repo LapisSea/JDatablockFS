@@ -9,5 +9,6 @@ layout (location = 1) in vec2 uv;
 layout (binding = 2) uniform sampler2D texSampler;
 
 void main() {
-    out_color = vec4(col, 1.0);
+    vec4 pixel = texture(texSampler, uv);
+    out_color = vec4(col, 1.0) * pixel;
 }

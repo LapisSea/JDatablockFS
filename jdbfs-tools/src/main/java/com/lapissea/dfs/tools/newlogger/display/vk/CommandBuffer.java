@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAccessFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCommandBufferUsageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
@@ -24,6 +25,7 @@ import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
+import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkMemoryBarrier;
@@ -180,7 +182,7 @@ public class CommandBuffer implements VulkanResource{
 		VK10.vkCmdCopyBuffer(val, srcBuff.handle, dstBuff.handle, regions);
 	}
 	
-	public void imageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout){
+	public void imageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, int mipLevels){
 		try(var stack = MemoryStack.stackPush()){
 			var barriers = VkImageMemoryBarrier.calloc(1, stack);
 			var barrier  = barriers.get(0);
@@ -194,7 +196,7 @@ public class CommandBuffer implements VulkanResource{
 			       .image(image.handle);
 			
 			var subresourceRange = barrier.subresourceRange();
-			subresourceRange.set(VkImageAspectFlag.COLOR.bit, 0, 1, 0, 1);
+			subresourceRange.set(VkImageAspectFlag.COLOR.bit, 0, mipLevels, 0, 1);
 			
 			VkPipelineStageFlag sourceStage      = VkPipelineStageFlag.NONE;
 			VkPipelineStageFlag destinationStage = VkPipelineStageFlag.NONE;
@@ -324,4 +326,10 @@ public class CommandBuffer implements VulkanResource{
 	public void copyBufferToImage(VkBuffer src, VkImage dest, VkImageLayout imageLayout, VkBufferImageCopy info){
 		VK10.vkCmdCopyBufferToImage(val, src.handle, dest.handle, imageLayout.id, new VkBufferImageCopy.Buffer(info.address(), 1));
 	}
+	
+	public void blitImage(VkImage src, VkImageLayout srcImageLayout, VkImage dst, VkImageLayout dstImageLayout, VkImageBlit.Buffer regions, VkFilter filter){
+		VK10.vkCmdBlitImage(val, src.handle, srcImageLayout.id, dst.handle, dstImageLayout.id, regions, filter.id);
+	}
+	
+	
 }
