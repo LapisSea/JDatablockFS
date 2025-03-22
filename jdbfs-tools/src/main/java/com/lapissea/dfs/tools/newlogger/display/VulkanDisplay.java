@@ -72,8 +72,6 @@ public class VulkanDisplay implements AutoCloseable{
 			});
 			
 			createPipeline();
-			
-			recordCommandBuffers();
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
@@ -146,9 +144,12 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var index = queue.acquireNextImage(swapchain, frame);
 		
-		updateUniforms(index);
+		var buf = graphicsBuffs.get(frame);
+		buf.reset();
+		updateUniforms(frame);
+		recordCommandBuffers(frame, index);
 		
-		queue.submitFrame(graphicsBuffs.get(index), frame);
+		queue.submitFrame(buf, frame);
 		queue.present(swapchain, index, frame);
 	}
 	
@@ -166,7 +167,6 @@ public class VulkanDisplay implements AutoCloseable{
 			destroyPipeline();
 			createPipeline();
 			
-			recordCommandBuffers();
 			try{
 				renderQueue();
 			}catch(VulkanCodeException e2){
@@ -206,8 +206,7 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	
-	private void recordCommandBuffers() throws VulkanCodeException{
-		
+	private void recordCommandBuffers(int frameID, int swapchainID) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
 			
@@ -216,22 +215,19 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			var renderArea = new Rect2D(vkCore.swapchain.extent);
 			
-			for(int i = 0; i<graphicsBuffs.size(); i++){
-				var buf         = graphicsBuffs.get(i);
-				var frameBuffer = vkCore.frameBuffers.get(i);
+			var buf         = graphicsBuffs.get(frameID);
+			var frameBuffer = vkCore.frameBuffers.get(swapchainID);
+			
+			buf.begin();
+			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 				
-				buf.begin();
-				try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
-					
-					buf.bindPipeline(gPipeline, i);
-					
-					buf.draw(6, 1, 0, 0);
-					
-				}
-				buf.end();
+				buf.bindPipeline(gPipeline, frameID);
+				
+				buf.draw(6, 1, 0, 0);
+				
 			}
-
-//			LogUtil.println("BUFFERS RECORDED!!");
+			buf.end();
+			
 		}
 		
 	}
