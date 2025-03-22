@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
+import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
@@ -36,7 +37,7 @@ public class VulkanDisplay implements AutoCloseable{
 	public BufferAndMemory  verts;
 	public GraphicsPipeline gPipeline;
 	
-	private List<BufferAndMemory> uniformBuffs;
+	private UniformBuffer uniformBuffs;
 	
 	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
 	
@@ -84,8 +85,7 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void updateUniforms(int index) throws VulkanCodeException{
-		var buf = uniformBuffs.get(index);
-		buf.update(b -> {
+		uniformBuffs.update(index, b -> {
 			var f = b.asFloatBuffer();
 			
 			var t   = System.currentTimeMillis()%100000;
@@ -112,12 +112,12 @@ public class VulkanDisplay implements AutoCloseable{
 		var size    = matSize*2;
 		var fSize   = size*Float.SIZE;
 		
-		uniformBuffs = vkCore.allocateUniformBuffers(fSize);
+		uniformBuffs = vkCore.allocateUniformBuffer(fSize);
 		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs, texture.join());
 	}
 	private void destroyPipeline(){
 		gPipeline.destroy();
-		uniformBuffs.forEach(BufferAndMemory::destroy);
+		uniformBuffs.destroy();
 		uniformBuffs = null;
 	}
 	
@@ -295,9 +295,7 @@ public class VulkanDisplay implements AutoCloseable{
 		verts.destroy();
 		texture.join().destroy();
 		
-		for(var buf : graphicsBuffs){
-			buf.destroy();
-		}
+		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();
 		
 		vkCore.close();

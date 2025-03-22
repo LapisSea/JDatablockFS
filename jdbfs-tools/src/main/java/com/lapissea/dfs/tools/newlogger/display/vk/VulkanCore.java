@@ -278,21 +278,19 @@ public class VulkanCore implements AutoCloseable{
 		});
 	}
 	
-	public List<BufferAndMemory> allocateUniformBuffers(int size) throws VulkanCodeException{
-		var res = new BufferAndMemory[swapchain.images.size()];
+	public UniformBuffer allocateUniformBuffer(int size) throws VulkanCodeException{
+		var res = new BufferAndMemory[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateBuffer(
-				size,
-				Flags.of(VkBufferUsageFlag.UNIFORM_BUFFER),
-				Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT)
-			);
+			res[i] = allocateCoherentBuffer(size, VkBufferUsageFlag.UNIFORM_BUFFER);
 		}
-		return List.of(res);
+		return new UniformBuffer(List.of(res));
 	}
 	
 	public BufferAndMemory allocateStagingBuffer(long size) throws VulkanCodeException{
-		return allocateBuffer(size, Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
-		                      Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
+		return allocateCoherentBuffer(size, VkBufferUsageFlag.TRANSFER_SRC);
+	}
+	public BufferAndMemory allocateCoherentBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
+		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
 	}
 	public BufferAndMemory allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
 		VkBuffer       buffer = null;
@@ -398,30 +396,27 @@ public class VulkanCore implements AutoCloseable{
 		if(destroySwapchain) swapchain.destroy();
 	}
 	
-	public GraphicsPipeline createPipeline(VkBuffer vb, List<BufferAndMemory> uniforms, VulkanTexture texture) throws VulkanCodeException{
+	public GraphicsPipeline createPipeline(VkBuffer vb, UniformBuffer uniform, VulkanTexture texture) throws VulkanCodeException{
 		var area = new Rect2D(swapchain.extent);
 		var p    = new GraphicsPipeline(device);
 		
-		p.initDescriptor(swapchain.imageViews.size(), List.of(
+		p.initDescriptor(MAX_IN_FLIGHT_FRAMES, List.of(
 			new DescriptorSetLayoutBinding(
 				0,
 				VkDescriptorType.STORAGE_BUFFER,
-				1,
-				Flags.of(VkShaderStageFlag.VERTEX)
+				VkShaderStageFlag.VERTEX
 			),
 			new DescriptorSetLayoutBinding(
 				1,
 				VkDescriptorType.UNIFORM_BUFFER,
-				1,
-				Flags.of(VkShaderStageFlag.VERTEX)
+				VkShaderStageFlag.VERTEX
 			),
 			new DescriptorSetLayoutBinding(
 				2,
 				VkDescriptorType.COMBINED_IMAGE_SAMPLER,
-				1,
-				Flags.of(VkShaderStageFlag.FRAGMENT)
+				VkShaderStageFlag.FRAGMENT
 			)
-		), vb, uniforms, texture);
+		), vb, uniform, texture);
 		p.initPipeline(renderPass, 0, testShaderModules, area, area, physicalDevice.samples);
 		return p;
 	}

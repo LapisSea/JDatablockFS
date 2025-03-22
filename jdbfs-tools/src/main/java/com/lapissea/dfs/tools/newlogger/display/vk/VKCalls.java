@@ -3,9 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -232,22 +230,22 @@ public interface VKCalls{
 	static void vkBindImageMemory(VkImage image, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindImageMemory(image.device.value, image.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
 	}
-	static DescriptorSetLayout vkCreateDescriptorSetLayout(DescriptorPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
+	static Descriptor.VkLayout vkCreateDescriptorSetLayout(Descriptor.VkPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorSetLayout(pool.device.value, pCreateInfo, null, res), "vkCreateDescriptorSetLayout");
-		return new DescriptorSetLayout(pool, res[0]);
+		return new Descriptor.VkLayout(pool, res[0]);
 	}
-	static DescriptorPool vkCreateDescriptorPool(Device device, VkDescriptorPoolCreateInfo pCreateInfo) throws VulkanCodeException{
+	static Descriptor.VkPool vkCreateDescriptorPool(Device device, VkDescriptorPoolCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorPool(device.value, pCreateInfo, null, res), "vkCreateDescriptorPool");
-		return new DescriptorPool(device, res[0]);
+		return new Descriptor.VkPool(device, res[0]);
 	}
-	static List<DescriptorSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
+	static List<Descriptor.VkSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		long[] arr = new long[pAllocateInfo.descriptorSetCount()];
 		check(VK10.vkAllocateDescriptorSets(device.value, pAllocateInfo, arr), "vkAllocateDescriptorSets");
-		var res = new DescriptorSet[arr.length];
+		var res = new Descriptor.VkSet[arr.length];
 		for(int i = 0; i<arr.length; i++){
-			res[i] = new DescriptorSet(device, arr[i]);
+			res[i] = new Descriptor.VkSet(device, arr[i]);
 		}
 		return List.of(res);
 	}

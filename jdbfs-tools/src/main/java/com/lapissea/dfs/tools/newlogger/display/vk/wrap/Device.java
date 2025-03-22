@@ -210,7 +210,7 @@ public class Device implements VulkanResource{
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount,
-		DescriptorSetLayout descriptorSetLayout
+		Descriptor.VkLayout descriptorSetLayout
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -292,7 +292,7 @@ public class Device implements VulkanResource{
 	}
 	
 	
-	public DescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
+	public Descriptor.VkPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkDescriptorPoolCreateInfo.calloc(stack);

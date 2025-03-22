@@ -5,9 +5,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DescriptorSetLayoutBinding;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -23,16 +21,16 @@ public class GraphicsPipeline implements VulkanResource{
 	
 	private Pipeline pipeline;
 	
-	public DescriptorPool      descriptorPool;
-	public DescriptorSetLayout descriptorSetLayout;
-	public List<DescriptorSet> descriptorSets;
+	public Descriptor.VkPool      descriptorPool;
+	public Descriptor.VkLayout    descriptorSetLayout;
+	public List<Descriptor.VkSet> descriptorSets;
 	
 	public GraphicsPipeline(Device device){
 		this.device = device;
 	}
 	
 	public void initDescriptor(
-		int descriptorSetCount, List<DescriptorSetLayoutBinding> bindings, VkBuffer buffer, List<BufferAndMemory> uniformBuffers,
+		int descriptorSetCount, List<DescriptorSetLayoutBinding> bindings, VkBuffer buffer, UniformBuffer uniformBuffers,
 		VulkanTexture texture
 	) throws VulkanCodeException{
 		assert descriptorPool == null;
@@ -42,8 +40,8 @@ public class GraphicsPipeline implements VulkanResource{
 		descriptorSets = descriptorSetLayout.createDescriptorSets(descriptorSetCount);
 		
 		for(int i = 0; i<descriptorSets.size(); i++){
-			DescriptorSet descriptorSet = descriptorSets.get(i);
-			descriptorSet.update(buffer, uniformBuffers.get(i).buffer, texture);
+			Descriptor.VkSet descriptorSet = descriptorSets.get(i);
+			descriptorSet.update(buffer, uniformBuffers.getBuffer(i), texture);
 		}
 	}
 	
