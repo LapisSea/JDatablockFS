@@ -132,11 +132,11 @@ public class VulkanCore implements AutoCloseable{
 	public final QueueFamilyProps renderQueueFamily;
 	public final QueueFamilyProps transferQueueFamily;
 	
-	public Swapchain           swapchain;
-	public List<VulkanTexture> mssaImages;
-	public VulkanQueue         renderQueue;
-	public RenderPass          renderPass;
-	public List<FrameBuffer>   frameBuffers;
+	public Swapchain            swapchain;
+	public List<VulkanTexture>  mssaImages;
+	public VulkanQueue.SwapSync renderQueue;
+	public RenderPass           renderPass;
+	public List<FrameBuffer>    frameBuffers;
 	
 	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
@@ -167,7 +167,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
 		
-		renderQueue = device.allocateQueue(renderQueueFamily);
+		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
@@ -372,16 +372,20 @@ public class VulkanCore implements AutoCloseable{
 			
 			images.add(new VulkanTexture(image, memory, view, null));
 		}
-		mssaImages = images;
+		mssaImages = List.copyOf(images);
 		
 		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
+		
+		renderQueue = new VulkanQueue(renderQueue).withSwap();
 	}
 	
 	private void destroySwapchainContext(boolean destroySwapchain){
 		try{
 			renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		renderQueue.destroy();
 		
 		for(FrameBuffer frameBuffer : frameBuffers){
 			frameBuffer.destroy();
