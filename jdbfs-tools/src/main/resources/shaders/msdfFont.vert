@@ -1,12 +1,14 @@
 #version 460
+#extension GL_EXT_shader_explicit_arithmetic_types: require
 
 struct Rect {
-    float xOff, yOff;
-    int letterId;
+    float xOff;
+    float yOff;
+    uint16_t letterId;
 };
 struct Letter {
-    float w, h;
-    float u0, v0, u1, v1;
+    float16_t w, h;
+    float16_t u0, v0, u1, v1;
 };
 
 layout (binding = 0) readonly uniform GlobalUniforms {
@@ -14,8 +16,10 @@ layout (binding = 0) readonly uniform GlobalUniforms {
 } gUbo;
 
 layout (binding = 1) readonly uniform Uniforms {
-    mat4 modelMat;
-    vec4 col;
+    vec2 pos;
+    float scale;
+    u8vec4 col;
+    float outline;
 } ubo;
 
 layout (binding = 2) readonly buffer Rects { Rect data[]; } in_rects;
@@ -23,7 +27,6 @@ layout (binding = 2) readonly buffer Rects { Rect data[]; } in_rects;
 layout (binding = 3) readonly buffer Letters { Letter data[]; } atlas;
 
 layout (location = 0) out vec2 uvOut;
-layout (location = 1) out float drawSize;
 
 void main() {
 
@@ -46,15 +49,11 @@ void main() {
         u = letter.u0; v = letter.v0;
     }
 
-    mat4 modelMat = ubo.modelMat;
-    vec4 r0 = modelMat[1];
-    float scalingFactor = sqrt(r0.x * r0.x + r0.y * r0.y + r0.z * r0.z);
+    vec2 pos = vec2(x + rect.xOff, y + rect.yOff);
+    pos *= ubo.scale;
+    pos += ubo.pos;
 
-    x += rect.xOff;
-    y += rect.yOff;
-
-    gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * modelMat * vec4(x, y, 0, 1.0);
+    gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * vec4(pos, 0, 1.0);
 
     uvOut = vec2(u, v);
-    drawSize = scalingFactor;
 }

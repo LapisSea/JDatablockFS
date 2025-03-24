@@ -98,12 +98,12 @@ public class VkImage extends VulkanResource.DeviceHandleObj{
 			return device.createImageView(info);
 		}
 	}
-	public VkSampler createSampler(VkFilter min, VkFilter max, VkSamplerAddressMode samplerAddressMode) throws VulkanCodeException{
+	public VkSampler createSampler(VkFilter min, VkFilter mag, VkSamplerAddressMode samplerAddressMode) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkSamplerCreateInfo.calloc(stack);
 			info.sType$Default()
-			    .magFilter(min.id)
-			    .minFilter(max.id)
+			    .minFilter(min.id)
+			    .magFilter(mag.id)
 			    .mipmapMode(VK10.VK_SAMPLER_MIPMAP_MODE_LINEAR)
 			    .addressModeU(samplerAddressMode.id)
 			    .addressModeV(samplerAddressMode.id)

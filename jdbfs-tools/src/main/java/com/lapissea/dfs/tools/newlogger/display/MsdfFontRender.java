@@ -20,12 +20,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
-import org.joml.Matrix4f;
-import org.joml.Vector4f;
 
+import java.awt.Color;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -39,13 +37,17 @@ public class MsdfFontRender implements VulkanResource{
 	private static final String LAYOUT_PATH  = "/roboto/light/atlas.json";
 	
 	private static class Letter{
-		private static final int SIZE = (2 + 4)*4;
+		private static final int SIZE = (2 + 4)*2;
 		
-		private static void put(FloatBuffer dest,
+		private static void put(ByteBuffer dest,
 		                        float w, float h,
 		                        float u0, float v0, float u1, float v1){
-			dest.put(w).put(h)
-			    .put(u0).put(v0).put(u1).put(v1);
+			dest.putShort(VUtils.toHalfFloat(w))
+			    .putShort(VUtils.toHalfFloat(h))
+			    .putShort(VUtils.toHalfFloat(u0))
+			    .putShort(VUtils.toHalfFloat(v0))
+			    .putShort(VUtils.toHalfFloat(u1))
+			    .putShort(VUtils.toHalfFloat(v1));
 		}
 	}
 	
@@ -55,6 +57,19 @@ public class MsdfFontRender implements VulkanResource{
 		private static void put(ByteBuffer dest, float xOff, float yOff, int letterId){
 			dest.putFloat(xOff).putFloat(yOff)
 			    .putInt(letterId);
+		}
+	}
+	
+	private static class Uniform{
+		private static final int SIZE = (2 + 1 + 1)*4 + 4;
+		
+		private static void put(ByteBuffer dest, float posX, float posY, float scale, Color color, float outline){
+			dest.putFloat(posX).putFloat(posY).putFloat(scale);
+			dest.put((byte)color.getRed())
+			    .put((byte)color.getGreen())
+			    .put((byte)color.getBlue())
+			    .put((byte)color.getAlpha());
+			dest.putFloat(outline);
 		}
 	}
 	
@@ -184,12 +199,11 @@ public class MsdfFontRender implements VulkanResource{
 	private void uploadTable(GlyphTable table) throws VulkanCodeException{
 		var count = table.index.size();
 		tableGpu = core.allocateStorageBuffer(Letter.SIZE*(long)count, b -> {
-			var   bb      = b.asFloatBuffer();
 			var   metrics = table.metrics;
 			float fsScale = (float)(1/(metrics.ascender - metrics.descender));
 			for(int i = 0; i<count; i++){
 				Letter.put(
-					bb,
+					b,
 					(table.x1[i] - table.x0[i])*fsScale, (table.y0[i] - table.y1[i])*fsScale,
 					table.u0[i], table.v0[i],
 					table.u1[i], table.v1[i]
@@ -204,7 +218,7 @@ public class MsdfFontRender implements VulkanResource{
 	
 	private void createResources() throws VulkanCodeException{
 		verts = core.allocateCoherentBuffer(Vert.SIZE*128, VkBufferUsageFlag.STORAGE_BUFFER);
-		uniform = core.allocateUniformBuffer((4*4 + 4)*4);
+		uniform = core.allocateUniformBuffer(Uniform.SIZE);
 		
 		var frag  = Iters.from(shader).filter(e -> e.stage == VkShaderStageFlag.FRAGMENT).getFirst();
 		var table = tableRes.join();
@@ -232,14 +246,13 @@ public class MsdfFontRender implements VulkanResource{
 		waitFullyCreated();
 		
 		uniform.update(frameID, b -> {
-			var f   = b.asFloatBuffer();
-			var mat = new Matrix4f();
-			mat.translate(101, 202, 0);
-			mat.scale(100);
-			mat.translate(-0.5F, -0.5F, 0);
-			mat.get(f);
-			
-			new Vector4f(1, 1, 1, 1).get(f.position(16));
+			Uniform.put(
+				b,
+				101, 302,
+				200,
+				new Color(0.2F, 0.3F, 1, 1),
+				(float)(Math.sin((System.currentTimeMillis()%100000)/500D)/2 + 0.5)*5
+			);
 		});
 		
 		var len = str.length();

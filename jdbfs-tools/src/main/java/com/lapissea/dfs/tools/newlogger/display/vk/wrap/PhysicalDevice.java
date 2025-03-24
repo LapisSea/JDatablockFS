@@ -6,6 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
@@ -14,17 +15,25 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.KHR8bitStorage;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VK11;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
+import org.lwjgl.vulkan.VkExtensionProperties;
+import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkPhysicalDevice16BitStorageFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
+import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
+import org.lwjgl.vulkan.VkPhysicalDeviceVulkan12Features;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -63,6 +72,19 @@ public class PhysicalDevice{
 		presentModes = Collections.unmodifiableSet(surface.getPresentModes(pDevice));
 		
 		memoryProperties = getMemoryProperties(pDevice);
+		
+	}
+	public Set<String> getDeviceExtensionNames(){
+		Set<String> names;
+		try(var stack = MemoryStack.stackPush()){
+			var count = stack.mallocInt(1);
+			VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, null);
+			var props = VkExtensionProperties.malloc(count.get(0), stack);
+			VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, props);
+			
+			names = Iters.from(props).map(VkExtensionProperties::extensionNameString).toSet();
+		}
+		return names;
 	}
 	
 	private VkSampleCountFlag findReasonableSamples(VkPhysicalDeviceProperties properties){
@@ -131,23 +153,74 @@ public class PhysicalDevice{
 			}
 			queueInfo.position(0);
 			
+			checkFeatures();
+			
+			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
+			features16bit.storageBuffer16BitAccess(true);
+			features16bit.uniformAndStorageBuffer16BitAccess(true);
+			
+			var features12 = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();
+			features12.shaderInt8(true)
+			          .uniformAndStorageBuffer8BitAccess(true)
+			          .shaderFloat16(true);
 			
 			var features = VkPhysicalDeviceFeatures.calloc(stack)
-			                                       .geometryShader(true);
+			                                       .shaderInt16(true);
 			
+			var info = VkDeviceCreateInfo.calloc(stack);
+			info.sType$Default()
+			    .pNext(features16bit)
+			    .pNext(features12)
+			    .pQueueCreateInfos(queueInfo)
+			    .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(
+				    stack,
+				    KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+				    KHRShaderDrawParameters.VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+				    KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME
+			    ))
+			    .pEnabledFeatures(features);
 			
-			var info = VkDeviceCreateInfo.calloc(stack).sType$Default()
-			                             .pQueueCreateInfos(queueInfo)
-			                             .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(
-				                             stack,
-				                             KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-				                             KHRShaderDrawParameters.VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME
-			                             ))
-			                             .pEnabledFeatures(features);
 			
 			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
 			return new Device(vkd, this, queueFamilies);
+		}
+	}
+	private void checkFeatures(){
+		try(var stack = MemoryStack.stackPush()){
+			var features = VkPhysicalDeviceFeatures.calloc(stack);
+			VK11.vkGetPhysicalDeviceFeatures(pDevice, features);
+			if(!features.shaderInt16()){
+				throw new IllegalStateException(this + " does not support shaderInt16");
+			}
+			
+			
+			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
+			var features12    = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();
+			
+			VK11.vkGetPhysicalDeviceFeatures2(
+				pDevice,
+				VkPhysicalDeviceFeatures2.calloc(stack)
+				                         .sType$Default()
+				                         .pNext(features12)
+				                         .pNext(features16bit)
+			);
+			
+			if(!features16bit.storageBuffer16BitAccess()){
+				throw new IllegalStateException(this + " does not support storageBuffer16BitAccess");
+			}
+			if(!features16bit.uniformAndStorageBuffer16BitAccess()){
+				throw new IllegalStateException(this + " does not support uniformAndStorageBuffer16BitAccess");
+			}
+			if(!features12.shaderInt8()){
+				throw new IllegalStateException(this + " does not support shaderInt8");
+			}
+			if(!features12.shaderFloat16()){
+				throw new IllegalStateException(this + " does not support shaderFloat16");
+			}
+			if(!features12.uniformAndStorageBuffer8BitAccess()){
+				throw new IllegalStateException(this + " does not support uniformAndStorageBuffer8BitAccess");
+			}
 		}
 	}
 	
@@ -180,6 +253,12 @@ public class PhysicalDevice{
 				yield f.get();
 			}
 		};
+	}
+	
+	public VkFormatProperties getFormatProperties(MemoryStack stack, VkFormat format){
+		var formatProps = VkFormatProperties.malloc(stack);
+		VK10.vkGetPhysicalDeviceFormatProperties(pDevice, format.id, formatProps);
+		return formatProps;
 	}
 	
 	@Override
