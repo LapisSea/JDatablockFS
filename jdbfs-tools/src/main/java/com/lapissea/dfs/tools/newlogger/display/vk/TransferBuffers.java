@@ -25,31 +25,29 @@ public class TransferBuffers implements VulkanResource{
 	
 	public TransferBuffers(VulkanQueue queue){
 		this.queue = queue;
-		threadVkPools = ThreadLocal.withInitial(() -> {
-			var pool = newPool();
-			synchronized(allQueues){
-				allQueues.add(pool);
-			}
-			cleaner.register(Thread.currentThread(), () -> {
-				synchronized(allQueues){
-					if(allQueues.remove(pool)){
-						pool.destroy();
-					}
-				}
-			});
-			return pool;
-		});
+		threadVkPools = ThreadLocal.withInitial(this::initPool);
 	}
 	
-	private CommandPool newPool(){
+	private CommandPool initPool(){
+		CommandPool pool;
 		try{
 			var device = queue.device;
-			var pool   = device.createCommandPool(queue.queueFamily, CommandPool.Type.SHORT_LIVED);
-			Log.info("Created pool on thread {}", Thread.currentThread());
-			return pool;
+			pool = device.createCommandPool(queue.queueFamily, CommandPool.Type.SHORT_LIVED);
+			Log.info("Created pool for queue {} on thread {}", queue, Thread.currentThread());
 		}catch(VulkanCodeException e){
 			throw UtilL.uncheckedThrow(e);
 		}
+		synchronized(allQueues){
+			allQueues.add(pool);
+		}
+		cleaner.register(Thread.currentThread(), () -> {
+			synchronized(allQueues){
+				if(allQueues.remove(pool)){
+					pool.destroy();
+				}
+			}
+		});
+		return pool;
 	}
 	
 	public <E extends Throwable> void syncAction(UnsafeConsumer<CommandBuffer, E> run) throws E, VulkanCodeException{

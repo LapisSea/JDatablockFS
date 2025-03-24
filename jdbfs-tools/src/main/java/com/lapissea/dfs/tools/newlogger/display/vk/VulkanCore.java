@@ -33,6 +33,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FormatColor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
@@ -49,6 +50,7 @@ import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.TextUtil;
+import org.joml.Matrix4f;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
@@ -138,12 +140,12 @@ public class VulkanCore implements AutoCloseable{
 	public RenderPass           renderPass;
 	public List<FrameBuffer>    frameBuffers;
 	
-	private final ShaderModuleSet testShaderModules = new ShaderModuleSet(this, "test", ShaderType.VERTEX, ShaderType.FRAGMENT);
-	
 	private final TransferBuffers transferBuffers;
 	private final TransferBuffers transientGraphicsBuffs;
 	
 	private final VKPresentMode preferredPresentMode;
+	
+	public final Matrix4f screenOrthoMatrix = new Matrix4f();
 	
 	public VulkanCore(String name, GlfwWindow window, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
@@ -308,7 +310,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	public BufferAndMemory createVertexBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
+	public BufferAndMemory createStorageBuffer(int size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
 		try(var stagingVb = allocateStagingBuffer(size)){
 			stagingVb.update(populator);
 			var vb = allocateBuffer(
@@ -379,6 +381,10 @@ public class VulkanCore implements AutoCloseable{
 		}else{
 			renderQueue = new VulkanQueue(renderQueue).withSwap();
 		}
+		
+		var e = swapchain.extent;
+		screenOrthoMatrix.identity()
+		                 .ortho(0, e.width, 0, e.height, -10, 10, true);
 	}
 	
 	private void destroySwapchainContext(boolean destroySwapchain){
@@ -396,7 +402,7 @@ public class VulkanCore implements AutoCloseable{
 		if(destroySwapchain) swapchain.destroy();
 	}
 	
-	public GraphicsPipeline createPipeline(VkBuffer vb, UniformBuffer uniform, VulkanTexture texture) throws VulkanCodeException{
+	public GraphicsPipeline createPipeline(List<ShaderModule> shader, VkBuffer vb, UniformBuffer uniform, VulkanTexture texture, Pipeline.Blending blending) throws VulkanCodeException{
 		var area = new Rect2D(swapchain.extent);
 		var p    = new GraphicsPipeline(device);
 		
@@ -417,7 +423,7 @@ public class VulkanCore implements AutoCloseable{
 				VkShaderStageFlag.FRAGMENT
 			)
 		), vb, uniform, texture);
-		p.initPipeline(renderPass, 0, testShaderModules, area, area, physicalDevice.samples);
+		p.initPipeline(renderPass, 0, shader, area, area, physicalDevice.samples, blending);
 		return p;
 	}
 	
@@ -602,7 +608,6 @@ public class VulkanCore implements AutoCloseable{
 			queue.destroy();
 		}
 		
-		testShaderModules.destroy();
 		device.destroy();
 		surface.destroy();
 		if(debugLog != null) debugLog.destroy();

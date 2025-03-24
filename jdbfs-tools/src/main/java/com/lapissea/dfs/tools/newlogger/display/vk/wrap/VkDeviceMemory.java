@@ -6,6 +6,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.vulkan.VK10;
 
+import java.util.Objects;
+
 public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	
 	public final long allocationSize;
@@ -16,7 +18,11 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	}
 	
 	public MappedVkMemory map() throws VulkanCodeException{
-		return VKCalls.vkMapMemory(this, 0, allocationSize, 0);
+		return map(0, allocationSize);
+	}
+	public MappedVkMemory map(long offset, long size) throws VulkanCodeException{
+		Objects.checkFromIndexSize(offset, size, allocationSize);
+		return VKCalls.vkMapMemory(this, offset, size, 0);
 	}
 	
 	@Override

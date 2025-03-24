@@ -31,7 +31,10 @@ public class BufferAndMemory implements VulkanResource{
 	}
 	
 	public void update(Consumer<ByteBuffer> populator) throws VulkanCodeException{
-		try(var mem = memory.map()){
+		update(0, buffer.size, populator);
+	}
+	public void update(long offset, long size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
+		try(var mem = memory.map(offset, size)){
 			mem.populate(populator);
 		}
 	}

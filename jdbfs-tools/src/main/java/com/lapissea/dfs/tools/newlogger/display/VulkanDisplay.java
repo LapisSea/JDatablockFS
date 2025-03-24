@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
+import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
@@ -41,6 +42,10 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
 	
+	private final MsdfFontRender fontRender = new MsdfFontRender();
+	
+	private final ShaderModuleSet testShader = new ShaderModuleSet("test", ShaderType.VERTEX, ShaderType.FRAGMENT);
+	
 	public static final class Vert{
 		public static final int SIZE = 4*(2 + 3 + 2);
 		
@@ -52,6 +57,7 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	public VulkanDisplay(){
+		
 		window = createWindow();
 		window.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
 		window.size.register(this::onResizeEvent);
@@ -59,10 +65,13 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			vkCore = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
 			
+			testShader.init(vkCore);
+			fontRender.init(vkCore);
+			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
-			verts = vkCore.createVertexBuffer(6*Vert.SIZE, bb -> {
+			verts = vkCore.createStorageBuffer(6*Vert.SIZE, bb -> {
 				Vert.put(bb, 0, 1F, 1, 0, 0, 0, 1);
 				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
 				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
@@ -97,11 +106,9 @@ public class VulkanDisplay implements AutoCloseable{
 			mat.scale(1000);
 			mat.translate(-0.5F, -0.5F, 0);
 			
-			var s = vkCore.swapchain.extent;
 			mat.get(f);
-			mat.identity();
-			mat.ortho(0, s.width, 0, s.height, -10, 10, true);
-			mat.get(f.position(16));
+			
+			vkCore.screenOrthoMatrix.get(f.position(16));
 		});
 	}
 	
@@ -113,7 +120,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var fSize   = size*Float.SIZE;
 		
 		uniformBuffs = vkCore.allocateUniformBuffer(fSize);
-		gPipeline = vkCore.createPipeline(verts.buffer, uniformBuffs, texture.join());
+		gPipeline = vkCore.createPipeline(testShader, verts.buffer, uniformBuffs, texture.join(), null);
 	}
 	private void destroyPipeline(){
 		gPipeline.destroy();
@@ -163,6 +170,8 @@ public class VulkanDisplay implements AutoCloseable{
 				graphicsBuffs.forEach(CommandBuffer::destroy);
 				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			}
+			
+			fontRender.onResize();
 			
 			destroyPipeline();
 			createPipeline();
@@ -224,6 +233,8 @@ public class VulkanDisplay implements AutoCloseable{
 				buf.bindPipeline(gPipeline, frameID);
 				
 				buf.draw(6, 1, 0, 0);
+				
+				fontRender.render(buf, frameID, "Hello world UwU");
 				
 			}
 			buf.end();
@@ -291,6 +302,9 @@ public class VulkanDisplay implements AutoCloseable{
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		destroyPipeline();
+		
+		testShader.destroy();
+		fontRender.destroy();
 		
 		verts.destroy();
 		texture.join().destroy();

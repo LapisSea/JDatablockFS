@@ -83,6 +83,8 @@ public final class ShaderCompiler{
 		shaderc_compile_options_set_target_env(options, shaderc_target_env_vulkan, shadercEnvVersion);
 		shaderc_compile_options_set_target_spirv(options, shadercSpirvVersion);
 		shaderc_compile_options_set_optimization_level(options, shaderc_optimization_level_performance);
+		shaderc_compile_options_set_generate_debug_info(options);
+		
 		shaderc_compile_options_set_include_callbacks(options, resolver, releaser, 0L);
 		
 		long res;

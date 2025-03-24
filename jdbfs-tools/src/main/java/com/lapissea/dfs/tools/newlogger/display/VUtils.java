@@ -142,7 +142,7 @@ public final class VUtils{
 	}
 	
 	public static ByteBuffer readResource(String resource) throws IOException{
-		URL url = VUtils.class.getResource("/" + resource);
+		URL url = VUtils.class.getResource(resource.startsWith("/")? resource : "/" + resource);
 		if(url == null){
 			throw new IOException("Resource not found: " + resource);
 		}

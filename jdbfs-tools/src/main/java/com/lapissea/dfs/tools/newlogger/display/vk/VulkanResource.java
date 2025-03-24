@@ -13,7 +13,7 @@ public interface VulkanResource extends AutoCloseable{
 			this.handle = handle;
 		}
 		
-		private void logCreationDebug(){
+		protected void logCreationDebug(){
 			new Throwable(this.getClass().getSimpleName() + " INIT: 0x" + Long.toUnsignedString(handle, 16)).printStackTrace();
 		}
 	}

@@ -45,6 +45,8 @@ import org.lwjgl.vulkan.VkPipelineViewportStateCreateInfo;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
+import org.lwjgl.vulkan.VkSpecializationInfo;
+import org.lwjgl.vulkan.VkSpecializationMapEntry;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkViewport;
 
@@ -203,14 +205,14 @@ public class Device implements VulkanResource{
 		return new RenderPass.Builder(this);
 	}
 	
-	
 	public Pipeline createPipeline(
 		RenderPass renderPass, int subpass,
 		List<ShaderModule> modules,
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount,
-		Descriptor.VkLayout descriptorSetLayout
+		Descriptor.VkLayout descriptorSetLayout,
+		Pipeline.Blending blending
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -218,11 +220,38 @@ public class Device implements VulkanResource{
 			var main         = stack.UTF8("main");
 			for(int i = 0; i<modules.size(); i++){
 				var module = modules.get(i);
+				
+				VkSpecializationInfo spec     = null;
+				Map<Integer, Object> specVals = module.specializationValues;
+				if(!specVals.isEmpty()){
+					var entries = VkSpecializationMapEntry.calloc(specVals.size(), stack);
+					var buff    = stack.malloc(specVals.size()*8);
+					for(var e : specVals.entrySet()){
+						var id  = e.getKey();
+						var val = e.getValue();
+						
+						var pos = buff.position();
+						switch(val){
+							case Integer i1 -> buff.putInt(i1);
+							case Float f -> buff.putFloat(f);
+							case Double d -> buff.putDouble(d);
+							default -> throw new RuntimeException("unexpected value: " + val.getClass().getName());
+						}
+						var size = buff.position() - pos;
+						entries.get().set(id, pos, size);
+					}
+					
+					spec = VkSpecializationInfo.calloc(stack)
+					                           .pMapEntries(entries.flip())
+					                           .pData(buff.flip());
+				}
+				
 				shaderStages.get(i)
 				            .sType$Default()
 				            .stage(module.stage.bit)
 				            .module(module.handle)
-				            .pName(main);
+				            .pName(main)
+				            .pSpecializationInfo(spec);
 			}
 			
 			var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();
@@ -238,36 +267,50 @@ public class Device implements VulkanResource{
 			var pScissors = VkRect2D.calloc(1, stack);
 			scissors.set(pScissors.get(0));
 			
-			var viewportState = VkPipelineViewportStateCreateInfo.calloc(stack).sType$Default()
-			                                                     .pViewports(viewports)
-			                                                     .pScissors(pScissors);
+			var viewportState = VkPipelineViewportStateCreateInfo.calloc(stack);
+			viewportState.sType$Default()
+			             .pViewports(viewports)
+			             .pScissors(pScissors);
 			
-			var rasterState = VkPipelineRasterizationStateCreateInfo.calloc(stack).sType$Default()
-			                                                        .polygonMode(polygonMode.id)
-			                                                        .cullMode(cullMode.bit)
-			                                                        .frontFace(frontFace.bit)
-			                                                        .depthClampEnable(false)
-			                                                        .rasterizerDiscardEnable(false)
-			                                                        .lineWidth(1);
+			var rasterState = VkPipelineRasterizationStateCreateInfo.calloc(stack);
+			rasterState.sType$Default()
+			           .polygonMode(polygonMode.id)
+			           .cullMode(cullMode.bit)
+			           .frontFace(frontFace.bit)
+			           .depthClampEnable(false)
+			           .rasterizerDiscardEnable(false)
+			           .lineWidth(1);
 			
-			var multisampleState = VkPipelineMultisampleStateCreateInfo.calloc(stack).sType$Default()
-			                                                           .rasterizationSamples(sampleCount.bit)
-			                                                           .sampleShadingEnable(false)
-			                                                           .minSampleShading(1);
+			var multisampleState = VkPipelineMultisampleStateCreateInfo.calloc(stack);
+			multisampleState.sType$Default()
+			                .rasterizationSamples(sampleCount.bit)
+			                .sampleShadingEnable(false)
+			                .minSampleShading(1);
 			
 			var blendAttachState = VkPipelineColorBlendAttachmentState.calloc(1, stack);
 			blendAttachState.blendEnable(false)
 			                .colorWriteMask(VK10.VK_COLOR_COMPONENT_R_BIT|VK10.VK_COLOR_COMPONENT_G_BIT|VK10.VK_COLOR_COMPONENT_B_BIT|
 			                                VK10.VK_COLOR_COMPONENT_A_BIT);
+			if(blending != null){
+				blendAttachState.blendEnable(true)
+				                .srcColorBlendFactor(blending.srcColor().id)
+				                .dstColorBlendFactor(blending.dstColor().id)
+				                .colorBlendOp(blending.colorBlendOp().id)
+				                .srcAlphaBlendFactor(blending.srcAlpha().id)
+				                .dstAlphaBlendFactor(blending.dstAlpha().id)
+				                .alphaBlendOp(blending.alphaBlendOp().id);
+			}
 			
-			var colorBlendState = VkPipelineColorBlendStateCreateInfo.calloc(stack).sType$Default()
-			                                                         .logicOpEnable(false)
-			                                                         .logicOp(VK10.VK_LOGIC_OP_COPY)
-			                                                         .pAttachments(blendAttachState)
-			                                                         .blendConstants(stack.floats(1, 1, 1, 1));
+			var colorBlendState = VkPipelineColorBlendStateCreateInfo.calloc(stack);
+			colorBlendState.sType$Default()
+			               .logicOpEnable(false)
+			               .logicOp(VK10.VK_LOGIC_OP_COPY)
+			               .pAttachments(blendAttachState)
+			               .blendConstants(stack.floats(1, 1, 1, 1));
 			
-			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack).sType$Default()
-			                                             .pSetLayouts(stack.longs(descriptorSetLayout.handle));
+			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack);
+			pipelineInfo.sType$Default()
+			            .pSetLayouts(stack.longs(descriptorSetLayout.handle));
 			
 			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
 			
