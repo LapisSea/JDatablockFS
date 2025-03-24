@@ -1,48 +1,60 @@
 #version 460
 
 struct Rect {
-    float x0, y0, x1, y1;
+    float xOff, yOff;
+    int letterId;
+};
+struct Letter {
+    float w, h;
     float u0, v0, u1, v1;
 };
 
+layout (binding = 0) readonly uniform GlobalUniforms {
+    mat4 projectionMat;
+} gUbo;
 
 layout (binding = 1) readonly uniform Uniforms {
     mat4 modelMat;
-    mat4 projectionMat;
     vec4 col;
-    float drawSize;
 } ubo;
 
-layout (binding = 0) readonly buffer Rects { Rect data[]; } in_rects;
+layout (binding = 2) readonly buffer Rects { Rect data[]; } in_rects;
 
-layout (location = 0) out vec4 colOut;
-layout (location = 1) out vec2 uvOut;
-layout (location = 2) out float drawSize;
+layout (binding = 3) readonly buffer Letters { Letter data[]; } atlas;
+
+layout (location = 0) out vec2 uvOut;
+layout (location = 1) out float drawSize;
 
 void main() {
 
     Rect rect = in_rects.data[gl_VertexIndex / 6];
+    Letter letter = atlas.data[rect.letterId];
 
     float x, y, u, v;
     int quadId = gl_VertexIndex % 6;
     if (quadId == 0 || quadId == 3) {
-        x = rect.x0; y = rect.y0;
-        u = rect.u0; v = rect.v1;
+        x = 0; y = 0;
+        u = letter.u0; v = letter.v1;
     } else if (quadId == 1) {
-        x = rect.x1; y = rect.y0;
-        u = rect.u1; v = rect.v1;
+        x = letter.w; y = 0;
+        u = letter.u1; v = letter.v1;
     } else if (quadId == 2 || quadId == 4) {
-        x = rect.x1; y = rect.y1;
-        u = rect.u1; v = rect.v0;
+        x = letter.w; y = letter.h;
+        u = letter.u1; v = letter.v0;
     } else /*if (quadId == 5)*/ {
-        x = rect.x0; y = rect.y1;
-        u = rect.u0; v = rect.v0;
+        x = 0; y = letter.h;
+        u = letter.u0; v = letter.v0;
     }
 
-    gl_Position = ubo.projectionMat /* * ubo.viewMat */ * ubo.modelMat * vec4(x, y, 0, 1.0);
+    mat4 modelMat = ubo.modelMat;
+    vec4 r0 = modelMat[1];
+    float scalingFactor = sqrt(r0.x * r0.x + r0.y * r0.y + r0.z * r0.z);
 
-    colOut = ubo.col;
+    x += rect.xOff;
+    y += rect.yOff;
+
+    gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * modelMat * vec4(x, y, 0, 1.0);
 
     uvOut = vec2(u, v);
-    drawSize = ubo.drawSize;
+    drawSize = scalingFactor;
 }

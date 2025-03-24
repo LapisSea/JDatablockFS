@@ -5,11 +5,15 @@ layout (constant_id = 1) const float size = 1;
 
 layout (location = 0) out vec4 out_color;
 
-layout (location = 0) in vec4 col;
-layout (location = 1) in vec2 uv;
-layout (location = 2) in float drawSize;
+layout (location = 0) in vec2 uv;
+layout (location = 1) in float drawSize;
 
-layout (binding = 2) uniform sampler2D msdf;
+layout (binding = 1) readonly uniform Uniforms {
+    mat4 projectionMat;
+    vec4 col;
+} ubo;
+
+layout (binding = 4) uniform sampler2D msdf;
 
 
 float median(float r, float g, float b) {
@@ -38,6 +42,7 @@ float sampleMsdf(vec2 uv) {
 void main() {
     float opacity = sampleMsdf(uv);
     if (opacity < 1.0 / 256)discard;
+    vec4 col = ubo.col;
     out_color = vec4(col.rgb, col.a * opacity);
 }
 

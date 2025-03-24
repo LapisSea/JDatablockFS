@@ -2,13 +2,19 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
@@ -71,7 +77,7 @@ public class VulkanDisplay implements AutoCloseable{
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
-			verts = vkCore.createStorageBuffer(6*Vert.SIZE, bb -> {
+			verts = vkCore.allocateStorageBuffer(6*Vert.SIZE, bb -> {
 				Vert.put(bb, 0, 1F, 1, 0, 0, 0, 1);
 				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
 				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
@@ -107,8 +113,6 @@ public class VulkanDisplay implements AutoCloseable{
 			mat.translate(-0.5F, -0.5F, 0);
 			
 			mat.get(f);
-			
-			vkCore.screenOrthoMatrix.get(f.position(16));
 		});
 	}
 	
@@ -117,10 +121,19 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var matSize = 4*4;
 		var size    = matSize*2;
-		var fSize   = size*Float.SIZE;
+		var fSize   = size*Float.BYTES;
 		
 		uniformBuffs = vkCore.allocateUniformBuffer(fSize);
-		gPipeline = vkCore.createPipeline(testShader, verts.buffer, uniformBuffs, texture.join(), null);
+		gPipeline = GraphicsPipeline.create(
+			new Descriptor.LayoutDescription()
+				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), vkCore.globalUniforms)
+				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniformBuffs)
+				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
+				.bind(3, Flags.of(VkShaderStageFlag.FRAGMENT), texture.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
+			Pipeline.Builder.of(vkCore.renderPass, new Rect2D(vkCore.swapchain.extent), testShader)
+			                .blending(Pipeline.Blending.STANDARD)
+			                .multisampling(vkCore.physicalDevice.samples, false)
+		);
 	}
 	private void destroyPipeline(){
 		gPipeline.destroy();
@@ -184,7 +197,7 @@ public class VulkanDisplay implements AutoCloseable{
 					default -> throw new RuntimeException("Failed to render frame", e2);
 				}
 			}
-			vkCore.renderQueue.waitIdle();
+			vkCore.renderQueue.resetSync();
 		}finally{
 			resizing = false;
 		}

@@ -210,8 +210,8 @@ public class Device implements VulkanResource{
 		List<ShaderModule> modules,
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
-		VkSampleCountFlag sampleCount,
-		Descriptor.VkLayout descriptorSetLayout,
+		VkSampleCountFlag sampleCount, boolean multisampleShading,
+		List<Descriptor.VkLayout> descriptorSetLayout,
 		Pipeline.Blending blending
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
@@ -284,7 +284,7 @@ public class Device implements VulkanResource{
 			var multisampleState = VkPipelineMultisampleStateCreateInfo.calloc(stack);
 			multisampleState.sType$Default()
 			                .rasterizationSamples(sampleCount.bit)
-			                .sampleShadingEnable(false)
+			                .sampleShadingEnable(multisampleShading)
 			                .minSampleShading(1);
 			
 			var blendAttachState = VkPipelineColorBlendAttachmentState.calloc(1, stack);
@@ -308,9 +308,12 @@ public class Device implements VulkanResource{
 			               .pAttachments(blendAttachState)
 			               .blendConstants(stack.floats(1, 1, 1, 1));
 			
+			var descriptorSetLayoutPtrs = stack.mallocLong(descriptorSetLayout.size());
+			for(var layout : descriptorSetLayout) descriptorSetLayoutPtrs.put(layout.handle);
+			
 			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack);
 			pipelineInfo.sType$Default()
-			            .pSetLayouts(stack.longs(descriptorSetLayout.handle));
+			            .pSetLayouts(descriptorSetLayoutPtrs.flip());
 			
 			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
 			

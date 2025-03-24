@@ -16,9 +16,9 @@ public class VulkanQueue implements VulkanResource{
 	
 	public static final class SwapSync extends VulkanQueue{
 		
-		private final VkFence[]     inFlightRender;
-		private final VkSemaphore[] presentComplete;
-		private final VkSemaphore[] renderComplete;
+		private VkFence[]     inFlightRender;
+		private VkSemaphore[] presentComplete;
+		private VkSemaphore[] renderComplete;
 		
 		private int frameID;
 		
@@ -74,6 +74,18 @@ public class VulkanQueue implements VulkanResource{
 				
 				VKCalls.vkQueuePresentKHR(value, info);
 			}
+		}
+		
+		public void resetSync() throws VulkanCodeException{
+			waitIdle();
+			for(int i = 0; i<MAX_IN_FLIGHT_FRAMES; i++){
+				inFlightRender[i].destroy();
+				presentComplete[i].destroy();
+				renderComplete[i].destroy();
+			}
+			inFlightRender = device.createFences(MAX_IN_FLIGHT_FRAMES, true);
+			presentComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
+			renderComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
 		}
 		
 		@Override

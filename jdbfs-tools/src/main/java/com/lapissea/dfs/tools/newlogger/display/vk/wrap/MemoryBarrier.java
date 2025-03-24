@@ -27,11 +27,14 @@ public sealed interface MemoryBarrier{
 		VkAccessFlag dstAccessMask,
 		int srcQueueFamilyIndex,
 		int dstQueueFamilyIndex,
-		long buffer,
+		VkBuffer buffer,
 		long offset,
 		long size
 	) implements MemoryBarrier{
-		public BarBuffer(VkAccessFlag srcAccessMask, VkAccessFlag dstAccessMask, long buffer, long offset, long size){
+		public BarBuffer(VkAccessFlag srcAccessMask, VkAccessFlag dstAccessMask, VkBuffer buffer){
+			this(srcAccessMask, dstAccessMask, buffer, 0, VK10.VK_WHOLE_SIZE);
+		}
+		public BarBuffer(VkAccessFlag srcAccessMask, VkAccessFlag dstAccessMask, VkBuffer buffer, long offset, long size){
 			this(srcAccessMask, dstAccessMask, VK10.VK_QUEUE_FAMILY_IGNORED, VK10.VK_QUEUE_FAMILY_IGNORED, buffer, offset, size);
 		}
 		public void set(VkBufferMemoryBarrier.Buffer dest){
@@ -41,7 +44,7 @@ public sealed interface MemoryBarrier{
 			    .dstAccessMask(dstAccessMask.bit)
 			    .srcQueueFamilyIndex(srcQueueFamilyIndex)
 			    .dstQueueFamilyIndex(dstQueueFamilyIndex)
-			    .buffer(buffer)
+			    .buffer(buffer.handle)
 			    .offset(offset)
 			    .size(size);
 		}
