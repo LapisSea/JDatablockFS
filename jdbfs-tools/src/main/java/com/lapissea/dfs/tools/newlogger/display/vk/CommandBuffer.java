@@ -31,6 +31,7 @@ import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
+import org.lwjgl.vulkan.VkViewport;
 
 import java.util.List;
 
@@ -73,6 +74,31 @@ public class CommandBuffer implements VulkanResource{
 	
 	public void clearColorImage(VkImage image, VkImageLayout layout, VkClearColorValue color, VkImageSubresourceRange range){
 		VK10.vkCmdClearColorImage(val, image.handle, layout.id, color, range);
+	}
+	
+	public void setViewportScissor(Rect2D rect){
+		setViewport(rect);
+		setScissor(rect);
+	}
+	public void setViewport(Rect2D viewport){
+		try(var stack = MemoryStack.stackPush()){
+			var viewports = VkViewport.calloc(1, stack);
+			viewport.setViewport(viewports.get(0));
+			setViewport(viewports);
+		}
+	}
+	public void setScissor(Rect2D scissor){
+		try(var stack = MemoryStack.stackPush()){
+			var scissors = VkRect2D.calloc(1, stack);
+			scissor.set(scissors.get(0));
+			setScissor(scissors);
+		}
+	}
+	public void setViewport(VkViewport.Buffer viewports){
+		VK10.vkCmdSetViewport(val, 0, viewports);
+	}
+	public void setScissor(VkRect2D.Buffer scissors){
+		VK10.vkCmdSetScissor(val, 0, scissors);
 	}
 	public void pipelineBarrier(VkPipelineStageFlag srcStageMask, VkPipelineStageFlag dstStageMask, int dependencyFlags, List<MemoryBarrier> barriers){
 		int gc = 0;

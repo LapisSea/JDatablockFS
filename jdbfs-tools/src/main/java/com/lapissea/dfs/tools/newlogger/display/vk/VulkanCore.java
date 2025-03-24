@@ -84,6 +84,10 @@ public class VulkanCore implements AutoCloseable{
 	
 	public static final int MAX_IN_FLIGHT_FRAMES = 2;
 	
+	private static final List<FormatColor> PREFERRED_SWAPCHAIN_FORMATS = List.of(
+		new FormatColor(VkFormat.R8G8B8A8_UNORM, VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
+	);
+	
 	public static void preload(){
 		try{
 			validateExtensionsLayers(List.of(), List.of());
@@ -129,14 +133,14 @@ public class VulkanCore implements AutoCloseable{
 	public final QueueFamilyProps renderQueueFamily;
 	public final QueueFamilyProps transferQueueFamily;
 	
-	public Swapchain            swapchain;
-	public List<VulkanTexture>  mssaImages;
-	public VulkanQueue.SwapSync renderQueue;
-	public RenderPass           renderPass;
-	public List<FrameBuffer>    frameBuffers;
+	public Swapchain           swapchain;
+	public List<VulkanTexture> mssaImages;
+	public List<FrameBuffer>   frameBuffers;
 	
-	public final TransferBuffers transferBuffers;
-	public final TransferBuffers transientGraphicsBuffs;
+	public final VulkanQueue.SwapSync renderQueue;
+	public final RenderPass           renderPass;
+	public final TransferBuffers      transferBuffers;
+	public final TransferBuffers      transientGraphicsBuffs;
 	
 	private final VKPresentMode preferredPresentMode;
 	
@@ -164,10 +168,13 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
 		
+		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
 		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES);
+		
+		renderPass = createRenderPass();
 		
 		createSwapchainContext();
 	}
@@ -342,18 +349,14 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
+		device.waitIdle();
 		destroySwapchainContext(false);
 		createSwapchainContext();
 	}
 	
 	private void createSwapchainContext() throws VulkanCodeException{
 		var oldSwapchain = swapchain;
-		swapchain = device.createSwapchain(
-			oldSwapchain, surface, preferredPresentMode,
-			List.of(
-				new FormatColor(VkFormat.R8G8B8A8_UNORM, VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
-			)
-		);
+		swapchain = device.createSwapchain(oldSwapchain, surface, preferredPresentMode, PREFERRED_SWAPCHAIN_FORMATS);
 		if(oldSwapchain != null) oldSwapchain.destroy();
 		
 		var images = new ArrayList<VulkanTexture>(swapchain.images.size());
@@ -370,14 +373,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 		mssaImages = List.copyOf(images);
 		
-		renderPass = createRenderPass();
 		frameBuffers = createFrameBuffers();
-		
-		if(renderQueue == null){
-			renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
-		}else{
-			renderQueue = new VulkanQueue(renderQueue).withSwap();
-		}
 		
 		var e                = swapchain.extent;
 		var projectionMatrix = new Matrix4f().ortho(0, e.width, 0, e.height, -10, 10, true);
@@ -391,15 +387,12 @@ public class VulkanCore implements AutoCloseable{
 	
 	private void destroySwapchainContext(boolean destroySwapchain){
 		try{
-			renderQueue.waitIdle();
+			renderQueue.resetSync();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
-		
-		renderQueue.destroy();
 		
 		for(FrameBuffer frameBuffer : frameBuffers){
 			frameBuffer.destroy();
 		}
-		renderPass.close();
 		mssaImages.forEach(VulkanTexture::destroy);
 		if(destroySwapchain) swapchain.destroy();
 	}
@@ -428,15 +421,15 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	private RenderPass createRenderPass() throws VulkanCodeException{
-		
+		var formatColor = physicalDevice.chooseSwapchainFormat(false, PREFERRED_SWAPCHAIN_FORMATS).format;
 		var mssaAttachment = new RenderPass.AttachmentInfo(
-			swapchain.formatColor.format,
+			formatColor,
 			physicalDevice.samples,
 			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
 		);
 		var presentAttachment = new RenderPass.AttachmentInfo(
-			swapchain.formatColor.format,
+			formatColor,
 			VkSampleCountFlag.N1,
 			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, VkImageLayout.PRESENT_SRC_KHR
@@ -579,12 +572,15 @@ public class VulkanCore implements AutoCloseable{
 	
 	@Override
 	public void close(){
+		device.waitIdle();
 		destroySwapchainContext(true);
 		
-		for(var queue : List.of(transferBuffers, transientGraphicsBuffs)){
+		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
 			queue.destroy();
 		}
+		
 		globalUniforms.destroy();
+		renderPass.destroy();
 		device.destroy();
 		surface.destroy();
 		if(debugLog != null) debugLog.destroy();

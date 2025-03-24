@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import org.lwjgl.vulkan.VkRect2D;
+import org.lwjgl.vulkan.VkViewport;
 
 public final class Rect2D{
 	
@@ -33,5 +34,12 @@ public final class Rect2D{
 		rect.offset().set(x, y);
 		rect.extent().set(width, height);
 		return rect;
+	}
+	
+	public VkViewport setViewport(VkViewport dest){
+		dest.x(x).y(y)
+		    .width(width).height(height)
+		    .minDepth(0).maxDepth(1);
+		return dest;
 	}
 }

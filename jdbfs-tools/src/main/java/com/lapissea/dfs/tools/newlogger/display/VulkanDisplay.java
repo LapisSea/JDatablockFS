@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
@@ -130,9 +131,10 @@ public class VulkanDisplay implements AutoCloseable{
 				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniformBuffs)
 				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
 				.bind(3, Flags.of(VkShaderStageFlag.FRAGMENT), texture.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
-			Pipeline.Builder.of(vkCore.renderPass, new Rect2D(vkCore.swapchain.extent), testShader)
+			Pipeline.Builder.of(vkCore.renderPass, testShader)
 			                .blending(Pipeline.Blending.STANDARD)
 			                .multisampling(vkCore.physicalDevice.samples, false)
+			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		);
 	}
 	private void destroyPipeline(){
@@ -166,7 +168,6 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var buf = graphicsBuffs.get(frame);
 		buf.reset();
-		updateUniforms(frame);
 		recordCommandBuffers(frame, index);
 		
 		queue.submitFrame(buf, frame);
@@ -184,11 +185,6 @@ public class VulkanDisplay implements AutoCloseable{
 				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			}
 			
-			fontRender.onResize();
-			
-			destroyPipeline();
-			createPipeline();
-			
 			try{
 				renderQueue();
 			}catch(VulkanCodeException e2){
@@ -197,7 +193,6 @@ public class VulkanDisplay implements AutoCloseable{
 					default -> throw new RuntimeException("Failed to render frame", e2);
 				}
 			}
-			vkCore.renderQueue.resetSync();
 		}finally{
 			resizing = false;
 		}
@@ -229,6 +224,8 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void recordCommandBuffers(int frameID, int swapchainID) throws VulkanCodeException{
+		updateUniforms(frameID);
+		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
 			
@@ -244,6 +241,7 @@ public class VulkanDisplay implements AutoCloseable{
 			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 				
 				buf.bindPipeline(gPipeline, frameID);
+				buf.setViewportScissor(renderArea);
 				
 				buf.draw(6, 1, 0, 0);
 				

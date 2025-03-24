@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
@@ -10,6 +11,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
@@ -26,6 +28,7 @@ import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.SequencedSet;
 import java.util.Set;
 
@@ -156,6 +159,27 @@ public class PhysicalDevice{
 			res[i] = (cm1 - i)/(float)cm1;
 		}
 		return res;
+	}
+	
+	public FormatColor chooseSwapchainFormat(boolean log, Iterable<FormatColor> preferred){
+		return switch(Iters.from(preferred).firstMatchingM(formats::contains)){
+			case Match.Some(var f) -> {
+				if(log) Log.info("Found format: {}#green", f);
+				yield f;
+			}
+			case Match.None() -> {
+				var f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.format).anyIs(fo.format));
+				if(f.isEmpty()){
+					f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.colorSpace).anyIs(fo.colorSpace));
+				}
+				if(f.isEmpty()){
+					f = Optional.of(formats.getFirst());
+				}
+				
+				if(log) Log.warn("Found no preferred formats! Using: {}#yellow", f);
+				yield f.get();
+			}
+		};
 	}
 	
 	@Override

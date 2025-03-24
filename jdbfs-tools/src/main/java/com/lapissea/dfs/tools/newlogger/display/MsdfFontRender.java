@@ -12,6 +12,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
@@ -220,16 +221,11 @@ public class MsdfFontRender implements VulkanResource{
 				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
 				.bind(3, Flags.of(VkShaderStageFlag.VERTEX), tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
 				.bind(4, Flags.of(VkShaderStageFlag.FRAGMENT), atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
-			Pipeline.Builder.of(core.renderPass, new Rect2D(core.swapchain.extent), shader)
+			Pipeline.Builder.of(core.renderPass, shader)
 			                .blending(Pipeline.Blending.STANDARD)
 			                .multisampling(core.physicalDevice.samples, false)
+			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		);
-	}
-	
-	public void onResize() throws VulkanCodeException{
-		waitFullyCreated();
-		pipeline.destroy();
-		createPipeline();
 	}
 	
 	public void render(CommandBuffer buf, int frameID, String str) throws VulkanCodeException{
@@ -268,6 +264,7 @@ public class MsdfFontRender implements VulkanResource{
 		});
 		
 		buf.bindPipeline(pipeline, frameID);
+		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
 		buf.draw(6*len, 1, 0, 0);
 	}

@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
@@ -18,7 +19,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.TextUtil;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
@@ -35,6 +35,7 @@ import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
 import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineDynamicStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineInputAssemblyStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPipelineMultisampleStateCreateInfo;
@@ -52,7 +53,7 @@ import org.lwjgl.vulkan.VkViewport;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
 import static org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE;
@@ -79,26 +80,7 @@ public class Device implements VulkanResource{
 			
 			if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
 			
-			var available = physicalDevice.formats;
-			
-			var format = switch(Iters.from(preferred).firstMatchingM(available::contains)){
-				case Match.Some(var f) -> {
-					if(oldSwapchain == null) Log.info("Found format: {}#green", f);
-					yield f;
-				}
-				case Match.None() -> {
-					var f = Iters.from(available).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.format).anyIs(fo.format));
-					if(f.isEmpty()){
-						f = Iters.from(available).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.colorSpace).anyIs(fo.colorSpace));
-					}
-					if(f.isEmpty()){
-						f = Optional.of(available.getFirst());
-					}
-					
-					if(oldSwapchain == null) Log.warn("Found no preferred formats! Using: {}#yellow", f);
-					yield f.get();
-				}
-			};
+			var format = physicalDevice.chooseSwapchainFormat(oldSwapchain == null, preferred);
 			
 			
 			SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
@@ -212,7 +194,7 @@ public class Device implements VulkanResource{
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount, boolean multisampleShading,
 		List<Descriptor.VkLayout> descriptorSetLayout,
-		Pipeline.Blending blending
+		Pipeline.Blending blending, Set<VkDynamicState> dynamicStates
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -261,9 +243,7 @@ public class Device implements VulkanResource{
 			                                                          .primitiveRestartEnable(false);
 			
 			var viewports = VkViewport.calloc(1, stack);
-			viewports.x(viewport.x).y(viewport.y)
-			         .width(viewport.width).height(viewport.height)
-			         .minDepth(0).maxDepth(1);
+			viewport.setViewport(viewports.get(0));
 			var pScissors = VkRect2D.calloc(1, stack);
 			scissors.set(pScissors.get(0));
 			
@@ -317,6 +297,14 @@ public class Device implements VulkanResource{
 			
 			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
 			
+			var dynamicInfo = VkPipelineDynamicStateCreateInfo.calloc(stack).sType$Default();
+			
+			if(!dynamicStates.isEmpty()){
+				var states = stack.mallocInt(dynamicStates.size());
+				for(var dynamicState : dynamicStates) states.put(dynamicState.id);
+				states.flip();
+				dynamicInfo.pDynamicStates(states);
+			}
 			
 			var info = VkGraphicsPipelineCreateInfo.calloc(1, stack);
 			info.sType$Default()
@@ -331,7 +319,8 @@ public class Device implements VulkanResource{
 			    .renderPass(renderPass.handle)
 			    .subpass(subpass)
 			    .basePipelineHandle(0)
-			    .basePipelineIndex(-1);
+			    .basePipelineIndex(-1)
+			    .pDynamicState(dynamicInfo);
 			
 			return VKCalls.vkCreateGraphicsPipelines(this, 0, info).getFirst();
 		}
@@ -392,6 +381,10 @@ public class Device implements VulkanResource{
 			
 			return VKCalls.vkCreateBuffer(this, info);
 		}
+	}
+	
+	public void waitIdle(){
+		VK10.vkDeviceWaitIdle(value);
 	}
 	
 	@Override
