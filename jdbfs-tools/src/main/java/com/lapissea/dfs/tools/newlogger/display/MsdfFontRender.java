@@ -26,15 +26,18 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class MsdfFontRender implements VulkanResource{
 	
-	private static final String TEXTURE_PATH = "/roboto/light/atlas.png";
-	private static final String LAYOUT_PATH  = "/roboto/light/atlas.json";
+	private static final String TEXTURE_PATH = "/roboto/regular/atlas.png";
+	private static final String LAYOUT_PATH  = "/roboto/regular/atlas.json";
 	
 	private static class Letter{
 		private static final int SIZE = (2 + 4)*2;
@@ -42,12 +45,16 @@ public class MsdfFontRender implements VulkanResource{
 		private static void put(ByteBuffer dest,
 		                        float w, float h,
 		                        float u0, float v0, float u1, float v1){
+			assert u0>=0 && u0<=1;
+			assert u1>=0 && u1<=1;
+			assert v0>=0 && v0<=1;
+			assert v1>=0 && v1<=1;
 			dest.putShort(VUtils.toHalfFloat(w))
 			    .putShort(VUtils.toHalfFloat(h))
-			    .putShort(VUtils.toHalfFloat(u0))
-			    .putShort(VUtils.toHalfFloat(v0))
-			    .putShort(VUtils.toHalfFloat(u1))
-			    .putShort(VUtils.toHalfFloat(v1));
+			    .putChar((char)(u0*Character.MAX_VALUE))
+			    .putChar((char)(v0*Character.MAX_VALUE))
+			    .putChar((char)(u1*Character.MAX_VALUE))
+			    .putChar((char)(v1*Character.MAX_VALUE));
 		}
 	}
 	
@@ -61,15 +68,15 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	private static class Uniform{
-		private static final int SIZE = (2 + 1 + 1)*4 + 4;
+		private static final int SIZE = (2 + 1 + 2)*4 + 4;
 		
-		private static void put(ByteBuffer dest, float posX, float posY, float scale, Color color, float outline){
+		private static void put(ByteBuffer dest, float posX, float posY, float scale, Color color, float outline, float xScale){
 			dest.putFloat(posX).putFloat(posY).putFloat(scale);
 			dest.put((byte)color.getRed())
 			    .put((byte)color.getGreen())
 			    .put((byte)color.getBlue())
 			    .put((byte)color.getAlpha());
-			dest.putFloat(outline);
+			dest.putFloat(outline).putFloat(xScale);
 		}
 	}
 	
@@ -159,18 +166,19 @@ public class MsdfFontRender implements VulkanResource{
 		table.missingCharId = Iters.of('\uFFFD', '?', ' ')
 		                           .map(table.index::get)
 		                           .findFirst()
-		                           .orElseThrow();
+		                           .orElseThrow(() -> new NoSuchElementException("No default glyph found"));
 		
 		return table;
 	}
 	
 	private VulkanCore core;
 	
-	private CompletableFuture<GlyphTable>    tableRes = CompletableFuture.supplyAsync(MsdfFontRender::loadTable);
-	private CompletableFuture<VulkanTexture> atlas    = VulkanTexture.loadTexture(TEXTURE_PATH, true, () -> {
+	private final CompletableFuture<GlyphTable>    tableRes = CompletableFuture.supplyAsync(MsdfFontRender::loadTable);
+	private final CompletableFuture<VulkanTexture> atlas    = VulkanTexture.loadTexture(TEXTURE_PATH, false, () -> {
 		UtilL.sleepWhile(() -> core == null);
 		return core;
 	});
+	private       CompletableFuture<Void>          doneTask;
 	
 	private final ShaderModuleSet shader = new ShaderModuleSet("msdfFont", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	private       BufferAndMemory tableGpu;
@@ -179,20 +187,21 @@ public class MsdfFontRender implements VulkanResource{
 		this.core = Objects.requireNonNull(core);
 		shader.init(core);
 		
-		atlas.whenComplete((glyphTable, e) -> {
-			if(e != null) return;
-			try{
-				createResources();
-			}catch(VulkanCodeException ex){
-				throw new RuntimeException(ex);
-			}
-		});
-		tableRes.whenComplete((table, e) -> {
-			if(e != null) return;
+		var tableUploadTask = tableRes.whenComplete((table, e) -> {
+			if(e != null) throw UtilL.uncheckedThrow(e);
 			try{
 				uploadTable(table);
-			}catch(VulkanCodeException ex){
+			}catch(Throwable ex){
 				throw new RuntimeException("Failed to create font table", ex);
+			}
+		});
+		
+		doneTask = CompletableFuture.allOf(atlas, tableUploadTask).whenComplete((v, e) -> {
+			if(e != null) throw UtilL.uncheckedThrow(e);
+			try{
+				createResources();
+			}catch(Throwable ex){
+				throw new RuntimeException(ex);
 			}
 		});
 	}
@@ -217,8 +226,8 @@ public class MsdfFontRender implements VulkanResource{
 	private BufferAndMemory  verts;
 	
 	private void createResources() throws VulkanCodeException{
-		verts = core.allocateCoherentBuffer(Vert.SIZE*128, VkBufferUsageFlag.STORAGE_BUFFER);
-		uniform = core.allocateUniformBuffer(Uniform.SIZE);
+		verts = core.allocateCoherentBuffer(Vert.SIZE*20, VkBufferUsageFlag.STORAGE_BUFFER);
+		uniform = core.allocateUniformBuffer(Uniform.SIZE*20, true);
 		
 		var frag  = Iters.from(shader).filter(e -> e.stage == VkShaderStageFlag.FRAGMENT).getFirst();
 		var table = tableRes.join();
@@ -227,65 +236,161 @@ public class MsdfFontRender implements VulkanResource{
 		
 		createPipeline();
 	}
+	
+	private Descriptor.LayoutDescription description;
+	
 	private void createPipeline() throws VulkanCodeException{
-		pipeline = GraphicsPipeline.create(
+		description =
 			new Descriptor.LayoutDescription()
 				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), core.globalUniforms)
-				.bind(1, Flags.of(VkShaderStageFlag.VERTEX, VkShaderStageFlag.FRAGMENT), uniform)
+				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform)
 				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
 				.bind(3, Flags.of(VkShaderStageFlag.VERTEX), tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(4, Flags.of(VkShaderStageFlag.FRAGMENT), atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
+				.bind(4, Flags.of(VkShaderStageFlag.FRAGMENT), atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+		pipeline = GraphicsPipeline.create(
+			description,
 			Pipeline.Builder.of(core.renderPass, shader)
 			                .blending(Pipeline.Blending.STANDARD)
-			                .multisampling(core.physicalDevice.samples, false)
+			                .multisampling(core.physicalDevice.samples, true)
 			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		);
 	}
 	
-	public void render(CommandBuffer buf, int frameID, String str) throws VulkanCodeException{
+	public record StringDraw(float pixelHeight, Color color, String string, float x, float y, float xScale, float outline){
+		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
+			this(pixelHeight, color, string, x, y, 1, 0);
+		}
+	}
+	
+	private static final int outlineCutoff = 5;
+	
+	private static float mapToRange(float actual, float start, float end){
+		return Math.max(0, Math.min(1, (actual - start)/(end - start)));
+	}
+	public void render(CommandBuffer buf, int frameID, List<StringDraw> strs) throws VulkanCodeException{
+		if(strs.isEmpty()) return;
 		waitFullyCreated();
 		
-		uniform.update(frameID, b -> {
-			Uniform.put(
-				b,
-				101, 302,
-				200,
-				new Color(0.2F, 0.3F, 1, 1),
-				(float)(Math.sin((System.currentTimeMillis()%100000)/500D)/2 + 0.5)*5
-			);
-		});
-		
-		var len = str.length();
-		verts.update(0, (long)Vert.SIZE*len, b -> {
-			var table = tableRes.join();
-			
-			var   metrics = table.metrics;
-			float fsScale = (float)(1/(metrics.ascender - metrics.descender));
-			
-			float x = 0, y = (float)metrics.descender;
-			
-			for(int i = 0; i<len; i++){
-				var ch = str.charAt(i);
-				var p  = table.index.getOrDefault(ch, table.missingCharId);
-				
-				if(!table.empty[p]){
-					Vert.put(b, (table.x0[p] + x)*fsScale, ((-table.y0[p]) + y)*fsScale, p);
-				}
-				
-				x += table.advance[p];
-			}
-		});
+		ensureRequiredMemory(strs);
 		
 		buf.bindPipeline(pipeline, frameID);
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
-		buf.draw(6*len, 1, 0, 0);
+		verts.update(vertMem -> {
+			uniform.update(frameID, uniformMem -> {
+				var table = tableRes.join();
+				
+				record Str(int instance, int vertPos, int vertCount){ }
+				Map<String, Str> instanceMap = HashMap.newHashMap(strs.size());
+				int              vertCounter = 0;
+				int              instance    = 0;
+				
+				int     bDrawVertCount = 0, bDrawInstanceCount = 0, bDrawVertPos = 0, bDrawInstance = 0;
+				boolean hasDraw        = false;
+				
+				for(StringDraw str : strs){
+					if(str.outline>0 && str.pixelHeight<outlineCutoff) continue;
+					
+					Str pos = instanceMap.get(str.string);
+					if(pos == null){
+						var start = vertCounter;
+						var count = putStr(vertMem, table, str.string);
+						instanceMap.put(str.string, pos = new Str(instance, start, count));
+						vertCounter += count;
+					}
+					
+					var outline = str.outline;
+					if(str.outline>0){
+						var aMul = mapToRange(str.pixelHeight, outlineCutoff, 50);
+						outline *= (float)Math.pow(aMul, 0.7F);
+					}
+					Uniform.put(
+						uniformMem,
+						str.x, str.y,
+						str.pixelHeight,
+						str.color,
+						outline,
+						str.xScale
+					);
+					
+					if(!hasDraw){
+						hasDraw = true;
+						bDrawVertCount = pos.vertCount;
+						bDrawInstanceCount = 1;
+						bDrawVertPos = pos.vertPos;
+					}else{
+						if(bDrawVertPos == pos.vertPos && bDrawInstance + bDrawInstanceCount == instance){
+							bDrawInstanceCount++;
+						}else{
+							buf.draw(bDrawVertCount, bDrawInstanceCount, bDrawVertPos, bDrawInstance);
+							bDrawVertCount = pos.vertCount;
+							bDrawInstanceCount = 1;
+							bDrawVertPos = pos.vertPos;
+							bDrawInstance = instance;
+						}
+					}
+//					buf.draw(pos.vertCount, 1, pos.vertPos, instance);
+					instance++;
+				}
+				buf.draw(bDrawVertCount, bDrawInstanceCount, bDrawVertPos, bDrawInstance);
+			});
+		});
+		
+	}
+	private void ensureRequiredMemory(List<StringDraw> strs) throws VulkanCodeException{
+		int instanceCount = 0;
+		int vertCount     = 0;
+		
+		Set<String> uniqueStrings = HashSet.newHashSet(strs.size());
+		for(StringDraw str : strs){
+			if(str.outline>0 && str.pixelHeight<outlineCutoff) continue;
+			if(uniqueStrings.add(str.string)){
+				vertCount += str.string.length();
+			}
+			instanceCount++;
+		}
+		
+		var neededVertMem     = vertCount*(long)Vert.SIZE;
+		var neededInstanceMem = instanceCount*(long)Uniform.SIZE;
+		
+		if(verts.size()<neededVertMem){
+			core.device.waitIdle();
+			verts.destroy();
+			verts = core.allocateCoherentBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
+			description.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
+			pipeline.updateDescriptors(description);
+		}
+		if(uniform.size()<neededInstanceMem){
+			core.device.waitIdle();
+			uniform.destroy();
+			uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true);
+			description.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform);
+			pipeline.updateDescriptors(description);
+		}
+	}
+	private static int putStr(ByteBuffer b, GlyphTable table, String str){
+		var   metrics = table.metrics;
+		float fsScale = (float)(1/(metrics.ascender - metrics.descender));
+		
+		float x     = 0, y = 0;// (float)metrics.descender;
+		int   count = 0;
+		var   len   = str.length();
+		for(int i = 0; i<len; i++){
+			var ch = str.charAt(i);
+			var p  = table.index.getOrDefault(ch, table.missingCharId);
+			
+			if(!table.empty[p]){
+				Vert.put(b, (table.x0[p] + x)*fsScale, ((-table.y0[p]) + y)*fsScale, p);
+				count += 6;
+			}
+			
+			x += table.advance[p];
+		}
+		return count;
 	}
 	
 	private void waitFullyCreated(){
-		atlas.join();
-		shader.size();
-		UtilL.sleepWhile(() -> pipeline == null);
+		doneTask.join();
 	}
 	
 	@Override

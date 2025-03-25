@@ -1,11 +1,11 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
+import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
 
 public class MappedVkMemory implements VulkanResource{
 	
@@ -33,7 +33,7 @@ public class MappedVkMemory implements VulkanResource{
 		src.position(src.position() + toCopy);
 	}
 	
-	public void populate(Consumer<ByteBuffer> populator){
+	public <E extends Throwable> void populate(UnsafeConsumer<ByteBuffer, E> populator) throws E{
 		var bb = MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
 		populator.accept(bb);
 	}

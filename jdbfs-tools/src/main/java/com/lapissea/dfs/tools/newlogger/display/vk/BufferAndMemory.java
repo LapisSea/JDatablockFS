@@ -3,9 +3,9 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
 
 public class BufferAndMemory implements VulkanResource{
 	
@@ -30,12 +30,14 @@ public class BufferAndMemory implements VulkanResource{
 		});
 	}
 	
-	public void update(Consumer<ByteBuffer> populator) throws VulkanCodeException{
+	public <E extends Throwable> void update(UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		update(0, buffer.size, populator);
 	}
-	public void update(long offset, long size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
+	public <E extends Throwable> void update(long offset, long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		try(var mem = memory.map(offset, size)){
 			mem.populate(populator);
 		}
 	}
+	
+	public long size(){ return buffer.size; }
 }

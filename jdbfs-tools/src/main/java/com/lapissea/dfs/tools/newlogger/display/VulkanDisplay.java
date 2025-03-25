@@ -26,9 +26,11 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
 
+import java.awt.Color;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -104,13 +106,13 @@ public class VulkanDisplay implements AutoCloseable{
 		uniformBuffs.update(index, b -> {
 			var f = b.asFloatBuffer();
 			
-			var t   = System.currentTimeMillis()%100000;
+			var t   = System.currentTimeMillis()%200000;
 			var mat = new Matrix4f();
 			mat.translate(220, 355, 0);
-			mat.rotate((float)(t/1000D%(Math.PI*2)), new Vector3f(0, 0, 1));
-			mat.scale((float)(Math.sin(t/800D)/2.1 + 0.5));
+			mat.rotate((float)(t/2000D%(Math.PI*2)), new Vector3f(0, 0, 1));
+			mat.scale((float)(Math.sin(t/1000D)/5.1 + 0.5));
 			
-			mat.scale(1000);
+			mat.scale(500);
 			mat.translate(-0.5F, -0.5F, 0);
 			
 			mat.get(f);
@@ -124,7 +126,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var size    = matSize*2;
 		var fSize   = size*Float.BYTES;
 		
-		uniformBuffs = vkCore.allocateUniformBuffer(fSize);
+		uniformBuffs = vkCore.allocateUniformBuffer(fSize, false);
 		gPipeline = GraphicsPipeline.create(
 			new Descriptor.LayoutDescription()
 				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), vkCore.globalUniforms)
@@ -239,13 +241,36 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			buf.begin();
 			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
+
+//				buf.bindPipeline(gPipeline, frameID);
+//				buf.setViewportScissor(renderArea);
+//
+//				buf.draw(6, 1, 0, 0);
 				
-				buf.bindPipeline(gPipeline, frameID);
-				buf.setViewportScissor(renderArea);
-				
-				buf.draw(6, 1, 0, 0);
-				
-				fontRender.render(buf, frameID, "Hello world UwU");
+				List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
+//				for(int x = 0; x<10; x++){
+//					for(int y = 0; y<10; y++){
+//						sd.add(new MsdfFontRender.StringDraw(20, Color.GREEN.darker(), x + "x" + y, 20 + x*80, 70 + y*60));
+//						sd.add(new MsdfFontRender.StringDraw(20, Color.WHITE, x + "x" + y, 20 + x*80, 70 + y*60, 1, 0.5F));
+//					}
+//				}
+				var pos = 0F;
+				for(int i = 0; i<40; i++){
+					float size = 1 + (i*i)*0.2F;
+					
+					var t = (System.currentTimeMillis())/500D;
+					var h = (float)Math.sin(t + pos/(10 + i*3))*50;
+					sd.add(new MsdfFontRender.StringDraw(size, Color.GREEN.darker(),
+					                                     "a", 20 + pos, 70 + 360 - h));
+					sd.add(new MsdfFontRender.StringDraw(size, Color.WHITE,
+					                                     "a", 20 + pos, 70 + 360 - h, 1, 2F));
+					pos += size*0.4F + 2;
+				}
+				sd.add(new MsdfFontRender.StringDraw(
+					100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
+				sd.add(new MsdfFontRender.StringDraw(
+					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
+				fontRender.render(buf, frameID, sd);
 				
 			}
 			buf.end();

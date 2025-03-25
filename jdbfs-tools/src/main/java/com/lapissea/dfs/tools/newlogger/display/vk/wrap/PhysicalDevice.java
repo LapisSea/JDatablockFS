@@ -156,16 +156,18 @@ public class PhysicalDevice{
 			checkFeatures();
 			
 			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
-			features16bit.storageBuffer16BitAccess(true);
-			features16bit.uniformAndStorageBuffer16BitAccess(true);
+			features16bit.storageBuffer16BitAccess(true)
+			             .uniformAndStorageBuffer16BitAccess(true);
 			
 			var features12 = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();
 			features12.shaderInt8(true)
 			          .uniformAndStorageBuffer8BitAccess(true)
-			          .shaderFloat16(true);
+			          .shaderFloat16(true)
+			          .storageBuffer8BitAccess(true);
 			
 			var features = VkPhysicalDeviceFeatures.calloc(stack)
-			                                       .shaderInt16(true);
+			                                       .shaderInt16(true)
+			                                       .sampleRateShading(true);
 			
 			var info = VkDeviceCreateInfo.calloc(stack);
 			info.sType$Default()
@@ -220,6 +222,9 @@ public class PhysicalDevice{
 			}
 			if(!features12.uniformAndStorageBuffer8BitAccess()){
 				throw new IllegalStateException(this + " does not support uniformAndStorageBuffer8BitAccess");
+			}
+			if(!features12.storageBuffer8BitAccess()){
+				throw new IllegalStateException(this + " does not support storageBuffer8BitAccess");
 			}
 		}
 	}

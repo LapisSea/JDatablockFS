@@ -45,6 +45,7 @@ import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 import org.joml.Matrix4f;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.Configuration;
@@ -72,7 +73,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
@@ -172,7 +172,7 @@ public class VulkanCore implements AutoCloseable{
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
-		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES);
+		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false);
 		
 		renderPass = createRenderPass();
 		
@@ -207,7 +207,7 @@ public class VulkanCore implements AutoCloseable{
 			if(mipLevels>1){
 				generateMips(image, mipLevels);
 			}else{
-				image.transitionLayout(transferBuffers, VkImageLayout.TRANSFER_DST_OPTIMAL, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, mipLevels);
+				image.transitionLayout(transientGraphicsBuffs, VkImageLayout.TRANSFER_DST_OPTIMAL, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, mipLevels);
 			}
 		}
 	}
@@ -284,12 +284,12 @@ public class VulkanCore implements AutoCloseable{
 		});
 	}
 	
-	public UniformBuffer allocateUniformBuffer(int size) throws VulkanCodeException{
+	public UniformBuffer allocateUniformBuffer(int size, boolean ssbo) throws VulkanCodeException{
 		var res = new BufferAndMemory[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateCoherentBuffer(size, VkBufferUsageFlag.UNIFORM_BUFFER);
+			res[i] = allocateCoherentBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
 		}
-		return new UniformBuffer(List.of(res));
+		return new UniformBuffer(List.of(res), ssbo);
 	}
 	
 	public BufferAndMemory allocateStagingBuffer(long size) throws VulkanCodeException{
@@ -314,7 +314,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	public BufferAndMemory allocateStorageBuffer(long size, Consumer<ByteBuffer> populator) throws VulkanCodeException{
+	public <E extends Throwable> BufferAndMemory allocateStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		try(var stagingVb = allocateStagingBuffer(size)){
 			stagingVb.update(populator);
 			var vb = allocateBuffer(

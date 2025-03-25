@@ -7,7 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 
 import java.util.List;
 
-public class GraphicsPipeline implements VulkanResource{
+public final class GraphicsPipeline implements VulkanResource{
 	public final Device device;
 	
 	private Pipeline pipeline;
@@ -25,13 +25,17 @@ public class GraphicsPipeline implements VulkanResource{
 		gp.descriptorSetLayout = gp.descriptorPool.createDescriptorSetLayout(description.bindings());
 		gp.descriptorSets = gp.descriptorSetLayout.createDescriptorSets(descriptorSetCount);
 		
-		for(int i = 0; i<gp.descriptorSets.size(); i++){
-			var descriptorSet = gp.descriptorSets.get(i);
-			descriptorSet.update(description.bindData(), i);
-		}
+		gp.updateDescriptors(description);
 		
 		gp.pipeline = pipelineB.addDesriptorSetLayout(gp.descriptorSetLayout).build();
 		return gp;
+	}
+	
+	public void updateDescriptors(Descriptor.LayoutDescription description){
+		for(int i = 0; i<descriptorSets.size(); i++){
+			var descriptorSet = descriptorSets.get(i);
+			descriptorSet.update(description.bindData(), i);
+		}
 	}
 	
 	private GraphicsPipeline(Device device){
