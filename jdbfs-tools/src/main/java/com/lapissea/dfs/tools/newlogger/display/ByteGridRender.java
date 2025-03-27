@@ -158,8 +158,9 @@ public class ByteGridRender implements VulkanResource{
 		
 		uniform.update(frameID, b -> Uniform.put(b, new Matrix4f().translate(20, 40, 0).scale(100), 32));
 		
-		if(System.currentTimeMillis() - t>100){
+		if(System.currentTimeMillis() - t>50){
 			a++;
+			if(a == 256) a = 0;
 			t = System.currentTimeMillis();
 		}
 		

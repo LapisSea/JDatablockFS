@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ConsoleColors;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.EXTDebugUtils;
@@ -10,6 +11,7 @@ import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkDebugUtilsMessengerCallbackDataEXT;
 import org.lwjgl.vulkan.VkDebugUtilsMessengerCallbackEXT;
 import org.lwjgl.vulkan.VkDebugUtilsMessengerCreateInfoEXT;
+import org.lwjgl.vulkan.VkDebugUtilsObjectNameInfoEXT;
 import org.lwjgl.vulkan.VkInstance;
 
 import java.util.EnumSet;
@@ -55,7 +57,7 @@ public class DebugLoggerEXT implements VulkanResource{
 	}
 	
 	public interface Callback{
-		boolean callback(Severity severity, EnumSet<Type> types, String message, String messageIDName);
+		boolean callback(Severity severity, EnumSet<Type> types, String message, String messageIDName, long[] handles);
 	}
 	
 	private final VkInstance instance;
@@ -85,7 +87,13 @@ public class DebugLoggerEXT implements VulkanResource{
 			
 			var idStr = data.pMessageIdNameString();
 			
-			var res = callback.callback(severity, type, msg, idStr);
+			var po = data.pObjects();
+			var handles = po == null? new long[0] :
+			              Iters.from(po)
+			                   .mapToLong(VkDebugUtilsObjectNameInfoEXT::objectHandle)
+			                   .toArray(po.remaining());
+			
+			var res = callback.callback(severity, type, msg, idStr, handles);
 			
 			return res? VK10.VK_TRUE : VK10.VK_FALSE;
 		});

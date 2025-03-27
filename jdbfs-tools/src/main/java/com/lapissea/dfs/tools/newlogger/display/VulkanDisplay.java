@@ -344,6 +344,7 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		testShader.destroy();
 		fontRender.destroy();
+		byteGridRender.destroy();
 		
 		verts.destroy();
 		texture.join().destroy();

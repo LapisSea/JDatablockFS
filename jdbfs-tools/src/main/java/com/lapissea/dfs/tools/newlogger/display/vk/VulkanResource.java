@@ -8,13 +8,21 @@ public interface VulkanResource extends AutoCloseable{
 		public final Device device;
 		public final long   handle;
 		
+		
 		protected DeviceHandleObj(Device device, long handle){
 			this.device = device;
 			this.handle = handle;
+			
+			if(VulkanCore.VK_DEBUG){
+				device.debugVkObjects.put(handle, getTrace());
+			}
 		}
 		
 		protected void logCreationDebug(){
-			new Throwable(this.getClass().getSimpleName() + " INIT: 0x" + Long.toUnsignedString(handle, 16)).printStackTrace();
+			getTrace().printStackTrace();
+		}
+		private Throwable getTrace(){
+			return new Throwable(this.getClass().getSimpleName() + " INIT: 0x" + Long.toUnsignedString(handle, 16));
 		}
 	}
 	

@@ -54,6 +54,7 @@ import org.lwjgl.vulkan.VkViewport;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
 import static org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE;
@@ -65,6 +66,8 @@ public class Device implements VulkanResource{
 	public final PhysicalDevice physicalDevice;
 	
 	private final Map<QueueFamilyProps, Integer> familyAllocIndexes;
+	
+	public final Map<Long, Throwable> debugVkObjects = new ConcurrentHashMap<>();
 	
 	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies){
 		this.value = value;

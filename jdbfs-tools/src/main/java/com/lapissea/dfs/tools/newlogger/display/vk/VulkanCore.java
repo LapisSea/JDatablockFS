@@ -454,7 +454,7 @@ public class VulkanCore implements AutoCloseable{
 	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of();
 	private static final Set<String> IGNORE_IDS            = new HashSet<>(Set.of("Loader Message"));
 	
-	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName){
+	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName, long[] handles){
 		if(severity == DebugLoggerEXT.Severity.INFO && IGNORE_IDS.contains(messageIDName)){
 			return false;
 		}
@@ -474,8 +474,9 @@ public class VulkanCore implements AutoCloseable{
 		if(severity == DebugLoggerEXT.Severity.ERROR){
 			var err = new RuntimeException(msgFinal);
 			if(messageIDName.equals("VUID-vkDestroyDevice-device-05137")){
-				device.debugVkObjects
-				int a = 0;
+				for(var ctorInit : Iters.ofLongs(handles).box().map(device.debugVkObjects::get).nonNulls()){
+					err.addSuppressed(ctorInit);
+				}
 			}
 			err.printStackTrace();
 			if(!WHITELISTED_ERROR_IDS.contains(messageIDName)){
