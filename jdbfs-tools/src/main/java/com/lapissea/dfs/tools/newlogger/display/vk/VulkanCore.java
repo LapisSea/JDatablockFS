@@ -80,7 +80,7 @@ import static org.lwjgl.vulkan.VK10.VK_MAKE_API_VERSION;
 
 public class VulkanCore implements AutoCloseable{
 	
-	private static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
+	public static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
 	
 	public static final int MAX_IN_FLIGHT_FRAMES = 2;
 	
@@ -314,7 +314,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	public <E extends Throwable> BufferAndMemory allocateStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
+	public <E extends Throwable> BufferAndMemory allocateLocalStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		try(var stagingVb = allocateStagingBuffer(size)){
 			stagingVb.update(populator);
 			var vb = allocateBuffer(
@@ -472,7 +472,12 @@ public class VulkanCore implements AutoCloseable{
 		msgFinal = Log.fmt("[{#purpleVK-Callback#}] [{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, msgFinal);
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
-			new RuntimeException(msgFinal).printStackTrace();
+			var err = new RuntimeException(msgFinal);
+			if(messageIDName.equals("VUID-vkDestroyDevice-device-05137")){
+				device.debugVkObjects
+				int a = 0;
+			}
+			err.printStackTrace();
 			if(!WHITELISTED_ERROR_IDS.contains(messageIDName)){
 				System.exit(1);
 				return true;

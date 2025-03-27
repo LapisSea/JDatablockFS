@@ -33,6 +33,9 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 		}
 	}
 	
+	public static Builder builder(RenderPass renderPass, List<ShaderModule> modules){
+		return Builder.of(renderPass, modules);
+	}
 	public static final class Builder{
 		private       RenderPass                renderPass;
 		private       int                       subpass;
@@ -48,6 +51,7 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 		private       Pipeline.Blending         blending;
 		private       Set<VkDynamicState>       dynamicStates       = new HashSet<>();
 		
+		private Builder(){ }
 		
 		public static Builder of(RenderPass renderPass, List<ShaderModule> modules){
 			var b = new Builder();

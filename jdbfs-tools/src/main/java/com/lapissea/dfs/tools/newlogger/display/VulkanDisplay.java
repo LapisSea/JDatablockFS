@@ -51,7 +51,8 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
 	
-	private final MsdfFontRender fontRender = new MsdfFontRender();
+	private final MsdfFontRender fontRender     = new MsdfFontRender();
+	private final ByteGridRender byteGridRender = new ByteGridRender();
 	
 	private final ShaderModuleSet testShader = new ShaderModuleSet("test", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
@@ -76,11 +77,12 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			testShader.init(vkCore);
 			fontRender.init(vkCore);
+			byteGridRender.init(vkCore);
 			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
-			verts = vkCore.allocateStorageBuffer(6*Vert.SIZE, bb -> {
+			verts = vkCore.allocateLocalStorageBuffer(6*Vert.SIZE, bb -> {
 				Vert.put(bb, 0, 1F, 1, 0, 0, 0, 1);
 				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
 				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
@@ -272,6 +274,7 @@ public class VulkanDisplay implements AutoCloseable{
 					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 				fontRender.render(buf, frameID, sd);
 				
+				byteGridRender.render(buf, frameID);
 			}
 			buf.end();
 			
