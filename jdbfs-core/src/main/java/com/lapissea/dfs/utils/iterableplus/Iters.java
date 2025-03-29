@@ -425,17 +425,27 @@ public final class Iters{
 	}
 	
 	public static IterableLongPP ofLongs(long element){
-		return () -> new IterableLongPP.SingleIter(element);
+		return new IterableLongPP.SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){ return OptionalInt.of(1); }
+			@Override
+			public LongIterator iterator(){ return new IterableLongPP.SingleIter(element); }
+		};
 	}
 	public static IterableLongPP ofLongs(long... data){
 		return switch(data.length){
 			case 0 -> IterableLongPP.empty();
 			case 1 -> ofLongs(data[0]);
-			default -> () -> new IterableLongPP.ArrayIter(data);
+			default -> new IterableLongPP.SizedPP.Default(){
+				@Override
+				public OptionalInt getSize(){ return OptionalInt.of(data.length); }
+				@Override
+				public LongIterator iterator(){ return new IterableLongPP.ArrayIter(data); }
+			};
 		};
 	}
 	public static IterableIntPP ofInts(int element){
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return OptionalInt.of(1); }
 			@Override
@@ -449,7 +459,7 @@ public final class Iters{
 		return switch(data.length){
 			case 0 -> IterableIntPP.empty();
 			case 1 -> ofInts(data[0]);
-			default -> new IterableIntPP.SizedPP.Default<>(){
+			default -> new IterableIntPP.SizedPP.Default(){
 				@Override
 				public OptionalInt getSize(){ return OptionalInt.of(data.length); }
 				@Override
@@ -483,7 +493,7 @@ public final class Iters{
 		if(start == endExclusive) return IterableIntPP.empty();
 		if(endExclusive<start) throw new IllegalArgumentException("endExclusive<start");
 		if(step<=0) throw new IllegalArgumentException("Step must be greater than 0");
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
 				return OptionalInt.of(endExclusive - start);

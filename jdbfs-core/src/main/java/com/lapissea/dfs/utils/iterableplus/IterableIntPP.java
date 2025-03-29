@@ -33,7 +33,7 @@ public interface IterableIntPP{
 			return OptionalInt.empty();
 		}
 		
-		abstract class Default<T> extends Iters.DefaultIntIterable implements SizedPP{ }
+		abstract class Default extends Iters.DefaultIntIterable implements SizedPP{ }
 		
 		OptionalInt getSize();
 		
@@ -70,7 +70,7 @@ public interface IterableIntPP{
 	}
 	
 	static IterableIntPP empty(){
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return OptionalInt.of(0); }
 			@Override
@@ -266,7 +266,7 @@ public interface IterableIntPP{
 	}
 	
 	default IterableIntPP.SizedPP map(IntUnaryOperator map){
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
@@ -286,7 +286,7 @@ public interface IterableIntPP{
 		};
 	}
 	default IterableIntPP mapExact(IntToLongFunction map){
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
@@ -395,7 +395,11 @@ public interface IterableIntPP{
 	
 	default IterableLongPP mapToLong(){ return mapToLong(e -> e); }
 	default IterableLongPP mapToLong(IntToLongFunction mapper){
-		return new Iters.DefaultLongIterable(){
+		return new IterableLongPP.SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return IterableIntPP.SizedPP.tryGet(IterableIntPP.this);
+			}
 			@Override
 			public LongIterator iterator(){
 				var iter = IterableIntPP.this.iterator();
@@ -414,7 +418,7 @@ public interface IterableIntPP{
 	}
 	
 	default IterableIntPP.SizedPP flatMap(IntFunction<IterableIntPP> flatten){
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
 				int size = 0;
@@ -458,7 +462,7 @@ public interface IterableIntPP{
 	}
 	
 	default IterableIntPP.SizedPP flatMapArray(IntFunction<int[]> flatten){
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
 				int size = 0;
@@ -497,7 +501,7 @@ public interface IterableIntPP{
 	
 	default IterableIntPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
 				var siz = SizedPP.tryGet(IterableIntPP.this);
@@ -518,7 +522,7 @@ public interface IterableIntPP{
 	
 	default IterableIntPP limit(int maxLen){
 		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
 				var siz = SizedPP.tryGet(IterableIntPP.this);
@@ -646,7 +650,7 @@ public interface IterableIntPP{
 	}
 	
 	default IterableIntPP sorted(){
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			@Override
@@ -686,7 +690,7 @@ public interface IterableIntPP{
 	}
 	
 	default <T> IterableIntPP sorted(IntFunction<T> map, Comparator<T> compare){
-		return new SizedPP.Default<>(){
+		return new SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterableIntPP.this); }
 			
