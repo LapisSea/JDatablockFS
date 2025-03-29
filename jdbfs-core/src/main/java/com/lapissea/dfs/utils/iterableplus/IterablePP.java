@@ -715,7 +715,6 @@ public interface IterablePP<T> extends Iterable<T>{
 		return new SizedPP.Default<>(){
 			@Override
 			public OptionalInt getSize(){ return SizedPP.tryGet(IterablePP.this); }
-			private Object[] sorted;
 			@Override
 			public Iterator<T> iterator(){
 				return new Iterator<>(){
@@ -742,6 +741,16 @@ public interface IterablePP<T> extends Iterable<T>{
 						return (T)result[index++];
 					}
 				};
+			}
+			@Override
+			public List<T> toModList(){
+				var src = IterablePP.this;
+				var res = new ArrayList<T>(src.tryGetSize().orElse(16));
+				for(T t : src){
+					res.add(t);
+				}
+				res.sort(comparator);
+				return res;
 			}
 			@Override
 			public SizedPP<T> reverse(){
@@ -1069,7 +1078,11 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default IterableLongPP mapToLong(){
-		return new Iters.DefaultLongIterable(){
+		return new IterableLongPP.SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return tryGetSize();
+			}
 			@Override
 			public LongIterator iterator(){
 				var iter = IterablePP.this.iterator();
@@ -1085,7 +1098,11 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableLongPP mapToLong(FunctionOL<T> mapper){
-		return new Iters.DefaultLongIterable(){
+		return new IterableLongPP.SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return tryGetSize();
+			}
 			@Override
 			public LongIterator iterator(){
 				var iter = IterablePP.this.iterator();
@@ -1101,7 +1118,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP mapToInt(){
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
 			@Override
@@ -1119,7 +1136,7 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterableIntPP mapToInt(FunctionOI<T> mapper){
-		return new IterableIntPP.SizedPP.Default<>(){
+		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
 			@Override

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.StringJoiner;
 import java.util.function.LongBinaryOperator;
@@ -21,6 +22,26 @@ import java.util.function.LongUnaryOperator;
 
 @SuppressWarnings("unused")
 public interface IterableLongPP{
+	
+	interface SizedPP extends IterableLongPP{
+		static OptionalInt tryGet(IterableLongPP iter){
+			if(iter instanceof SizedPP s){
+				return s.getSize();
+			}
+			return OptionalInt.empty();
+		}
+		
+		abstract class Default extends Iters.DefaultLongIterable implements SizedPP{ }
+		
+		OptionalInt getSize();
+		
+		@Override
+		default int count(){
+			var s = getSize();
+			if(s.isPresent()) return s.getAsInt();
+			return IterableLongPP.super.count();
+		}
+	}
 	
 	final class ArrayIter implements LongIterator{
 		private final long[] data;
@@ -47,7 +68,11 @@ public interface IterableLongPP{
 	}
 	
 	static IterableLongPP empty(){
-		return new Iters.DefaultLongIterable(){
+		return new SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return OptionalInt.of(0);
+			}
 			@Override
 			public LongIterator iterator(){
 				return new LongIterator(){
@@ -141,7 +166,8 @@ public interface IterableLongPP{
 		return res;
 	}
 	default long[] toArray(){
-		return toArray(8);
+		var size = SizedPP.tryGet(this).orElse(8);
+		return toArray(size);
 	}
 	default long[] toArray(int initialSize){
 		var iter = iterator();
@@ -251,7 +277,11 @@ public interface IterableLongPP{
 	}
 	
 	default IterableLongPP map(LongUnaryOperator map){
-		return new Iters.DefaultLongIterable(){
+		return new SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return SizedPP.tryGet(IterableLongPP.this);
+			}
 			@Override
 			public LongIterator iterator(){
 				var src = IterableLongPP.this.iterator();
@@ -273,7 +303,11 @@ public interface IterableLongPP{
 	default IterableIntPP mapToIntExact()           { return mapToInt(Math::toIntExact); }
 	default IterableIntPP mapToInt()                { return mapToInt(e -> (int)e); }
 	default IterableIntPP mapToInt(LongToIntFunction mapper){
-		return new Iters.DefaultIntIterable(){
+		return new IterableIntPP.SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				return IterableLongPP.SizedPP.tryGet(IterableLongPP.this);
+			}
 			@Override
 			public IntIterator iterator(){
 				var iter = IterableLongPP.this.iterator();
@@ -375,7 +409,13 @@ public interface IterableLongPP{
 	
 	default IterableLongPP skip(int count){
 		if(count<0) throw new IllegalArgumentException("count cannot be negative");
-		return new Iters.DefaultLongIterable(){
+		return new SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				var s = SizedPP.tryGet(IterableLongPP.this);
+				if(s.isEmpty()) return OptionalInt.empty();
+				return OptionalInt.of(Math.max(0, s.getAsInt() - count));
+			}
 			@Override
 			public LongIterator iterator(){
 				var iter = IterableLongPP.this.iterator();
@@ -390,7 +430,13 @@ public interface IterableLongPP{
 	
 	default IterableLongPP limit(int maxLen){
 		if(maxLen<0) throw new IllegalArgumentException("maxLen cannot be negative");
-		return new Iters.DefaultLongIterable(){
+		return new SizedPP.Default(){
+			@Override
+			public OptionalInt getSize(){
+				var s = SizedPP.tryGet(IterableLongPP.this);
+				if(s.isEmpty()) return OptionalInt.empty();
+				return OptionalInt.of(Math.min(s.getAsInt(), maxLen));
+			}
 			@Override
 			public LongIterator iterator(){
 				var src = IterableLongPP.this.iterator();
