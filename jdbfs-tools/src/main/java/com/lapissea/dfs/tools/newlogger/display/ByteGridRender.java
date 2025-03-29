@@ -1,6 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
@@ -62,7 +62,7 @@ public class ByteGridRender implements VulkanResource{
 	private MeshInfo[]       meshInfos;
 	private GraphicsPipeline pipeline;
 	private UniformBuffer    uniform;
-	private BufferAndMemory  verts;
+	private BackedVkBuffer   verts;
 	
 	public void init(VulkanCore core) throws VulkanCodeException{
 		this.core = core;

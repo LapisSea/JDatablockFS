@@ -34,8 +34,11 @@ public class MappedVkMemory implements VulkanResource{
 	}
 	
 	public <E extends Throwable> void populate(UnsafeConsumer<ByteBuffer, E> populator) throws E{
-		var bb = MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
+		var bb = getBuffer();
 		populator.accept(bb);
+	}
+	public ByteBuffer getBuffer(){
+		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
 	}
 	
 	@Override

@@ -53,6 +53,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
+import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
@@ -285,20 +286,27 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public UniformBuffer allocateUniformBuffer(int size, boolean ssbo) throws VulkanCodeException{
-		var res = new BufferAndMemory[MAX_IN_FLIGHT_FRAMES];
+		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
 			res[i] = allocateCoherentBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
 		}
 		return new UniformBuffer(List.of(res), ssbo);
 	}
+	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
+		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
+		for(int i = 0; i<res.length; i++){
+			res[i] = allocateCoherentBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
+		}
+		return new IndirectDrawBuffer(List.of(res));
+	}
 	
-	public BufferAndMemory allocateStagingBuffer(long size) throws VulkanCodeException{
+	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
 		return allocateCoherentBuffer(size, VkBufferUsageFlag.TRANSFER_SRC);
 	}
-	public BufferAndMemory allocateCoherentBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
+	public BackedVkBuffer allocateCoherentBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
 		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
 	}
-	public BufferAndMemory allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
+	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
 		VkBuffer       buffer = null;
 		VkDeviceMemory memory = null;
 		try{
@@ -306,7 +314,7 @@ public class VulkanCore implements AutoCloseable{
 			
 			memory = buffer.allocateAndBindRequiredMemory(physicalDevice, memoryFlags);
 			
-			return new BufferAndMemory(buffer, memory);
+			return new BackedVkBuffer(buffer, memory);
 		}catch(Throwable e){
 			if(memory != null) memory.destroy();
 			if(buffer != null) buffer.destroy();
@@ -314,7 +322,7 @@ public class VulkanCore implements AutoCloseable{
 		}
 	}
 	
-	public <E extends Throwable> BufferAndMemory allocateLocalStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
+	public <E extends Throwable> BackedVkBuffer allocateLocalStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		try(var stagingVb = allocateStagingBuffer(size)){
 			stagingVb.update(populator);
 			var vb = allocateBuffer(

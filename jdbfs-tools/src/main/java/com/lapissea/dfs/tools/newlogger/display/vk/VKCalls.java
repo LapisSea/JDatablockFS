@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
@@ -217,12 +218,14 @@ public interface VKCalls{
 	static VkBuffer vkCreateBuffer(Device device, VkBufferCreateInfo info) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateBuffer(device.value, info, null, res), "vkCreateBuffer");
-		return new VkBuffer(device, res[0], info.size());
+		return new VkBuffer(device, res[0], info.size(), VkBufferUsageFlag.from(info.usage()));
 	}
 	static VkDeviceMemory vkAllocateMemory(Device device, VkMemoryAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkAllocateMemory(device.value, pAllocateInfo, null, res), "vkAllocateMemory");
-		return new VkDeviceMemory(device, res[0], pAllocateInfo.allocationSize());
+		var memoryTypes = device.physicalDevice.memoryProperties.memoryTypes();
+		var type        = memoryTypes.get(pAllocateInfo.memoryTypeIndex());
+		return new VkDeviceMemory(device, res[0], pAllocateInfo.allocationSize(), type.propertyFlags);
 	}
 	static void vkBindBufferMemory(VkBuffer buffer, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindBufferMemory(buffer.device.value, buffer.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");

@@ -1,6 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.tools.newlogger.display.vk.BufferAndMemory;
+import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
@@ -44,7 +44,7 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
-	public BufferAndMemory  verts;
+	public BackedVkBuffer   verts;
 	public GraphicsPipeline gPipeline;
 	
 	private UniformBuffer uniformBuffs;

@@ -23,6 +23,6 @@ public class QueueFamilyProps{
 	
 	@Override
 	public String toString(){
-		return capabilities.toShortString() + "x" + queueCount + "@" + index;
+		return capabilities + "x" + queueCount + "@" + index;
 	}
 }

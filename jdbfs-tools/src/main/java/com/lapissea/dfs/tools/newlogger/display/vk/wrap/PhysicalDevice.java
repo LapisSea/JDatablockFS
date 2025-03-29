@@ -71,7 +71,7 @@ public class PhysicalDevice{
 		formats = surface.getFormats(pDevice);
 		presentModes = Collections.unmodifiableSet(surface.getPresentModes(pDevice));
 		
-		memoryProperties = getMemoryProperties(pDevice);
+		memoryProperties = getMemoryProperties();
 		
 	}
 	public Set<String> getDeviceExtensionNames(){
@@ -114,7 +114,7 @@ public class PhysicalDevice{
 		}
 	}
 	
-	private MemoryProperties getMemoryProperties(VkPhysicalDevice pDevice){
+	private MemoryProperties getMemoryProperties(){
 		final MemoryProperties memoryProperties;
 		try(var stack = MemoryStack.stackPush()){
 			var mem = VkPhysicalDeviceMemoryProperties.malloc(stack);
@@ -167,7 +167,8 @@ public class PhysicalDevice{
 			
 			var features = VkPhysicalDeviceFeatures.calloc(stack)
 			                                       .shaderInt16(true)
-			                                       .sampleRateShading(true);
+			                                       .sampleRateShading(true)
+			                                       .multiDrawIndirect(true);
 			
 			var info = VkDeviceCreateInfo.calloc(stack);
 			info.sType$Default()

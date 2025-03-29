@@ -25,6 +25,7 @@ import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
+import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
@@ -192,6 +193,10 @@ public class CommandBuffer implements VulkanResource{
 	}
 	public void drawIndexed(int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance){
 		VK10.vkCmdDrawIndexed(val, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+	}
+	
+	public void drawIndirect(IndirectDrawBuffer buffer, int frameID, int drawCount){
+		VK10.vkCmdDrawIndirect(val, buffer.getBuffer(frameID).handle, 0, drawCount, VkDrawIndirectCommand.SIZEOF);
 	}
 	public void drawIndirect(VkBuffer buffer, long offset, int drawCount, int stride){
 		VK10.vkCmdDrawIndirect(val, buffer.handle, offset, drawCount, stride);

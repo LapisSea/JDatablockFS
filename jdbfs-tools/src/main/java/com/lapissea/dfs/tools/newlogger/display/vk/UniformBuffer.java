@@ -9,10 +9,10 @@ import java.util.List;
 
 public class UniformBuffer implements VulkanResource{
 	
-	private final List<BufferAndMemory> buffers;
-	public final  boolean               ssbo;
+	private final List<BackedVkBuffer> buffers;
+	public final  boolean              ssbo;
 	
-	public UniformBuffer(List<BufferAndMemory> buffers, boolean ssbo){
+	public UniformBuffer(List<BackedVkBuffer> buffers, boolean ssbo){
 		this.buffers = buffers;
 		this.ssbo = ssbo;
 	}
@@ -20,6 +20,9 @@ public class UniformBuffer implements VulkanResource{
 	public <E extends Throwable> void update(int frameID, UnsafeConsumer<ByteBuffer, E> uniformPopulator) throws VulkanCodeException, E{
 		var buf = buffers.get(frameID);
 		buf.update(uniformPopulator);
+	}
+	public MappedVkMemory update(int frameID) throws VulkanCodeException{
+		return buffers.get(frameID).update();
 	}
 	
 	public VkBuffer getBuffer(int frame){
@@ -32,6 +35,6 @@ public class UniformBuffer implements VulkanResource{
 	
 	@Override
 	public void destroy(){
-		buffers.forEach(BufferAndMemory::destroy);
+		buffers.forEach(BackedVkBuffer::destroy);
 	}
 }

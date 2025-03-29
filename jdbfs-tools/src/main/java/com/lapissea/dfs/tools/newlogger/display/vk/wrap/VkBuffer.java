@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
@@ -11,11 +12,13 @@ import org.lwjgl.vulkan.VkMemoryRequirements;
 
 public class VkBuffer extends VulkanResource.DeviceHandleObj{
 	
-	public final long size;
+	public final long                     size;
+	public final Flags<VkBufferUsageFlag> usageFlags;
 	
-	public VkBuffer(Device device, long handle, long size){
+	public VkBuffer(Device device, long handle, long size, Flags<VkBufferUsageFlag> usageFlags){
 		super(device, handle);
 		this.size = size;
+		this.usageFlags = usageFlags;
 	}
 	
 	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
@@ -43,5 +46,10 @@ public class VkBuffer extends VulkanResource.DeviceHandleObj{
 	@Override
 	public void destroy(){
 		VK10.vkDestroyBuffer(device.value, handle, null);
+	}
+	
+	@Override
+	public String toString(){
+		return "VkBuffer{" + size + "bytes, " + usageFlags + "}";
 	}
 }

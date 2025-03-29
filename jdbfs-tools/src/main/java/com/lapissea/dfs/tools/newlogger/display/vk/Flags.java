@@ -1,6 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
-import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.PPBakedSequence;
@@ -13,7 +12,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.SequencedCollection;
 
-public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E> implements SequencedCollection<E>, Stringify{
+public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E> implements SequencedCollection<E>{
 	
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(Flags.class, Flags::toString);
@@ -72,14 +71,6 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 	
 	@Override
 	public String toString(){
-		if(value == 0){
-			return (enumClass == null? "Flags" : enumClass.getSimpleName()) + "(EMPTY)";
-		}
-		if(enumClass == null) return "Flags(" + value + ")";
-		return values().joinAsStr(", ", enumClass.getSimpleName() + ":{", "}");
-	}
-	@Override
-	public String toShortString(){
 		if(value == 0){
 			return "(EMPTY)";
 		}
