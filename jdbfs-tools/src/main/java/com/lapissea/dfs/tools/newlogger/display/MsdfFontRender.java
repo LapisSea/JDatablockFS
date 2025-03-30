@@ -229,7 +229,7 @@ public class MsdfFontRender implements VulkanResource{
 	private IndirectDrawBuffer indirectInstances;
 	
 	private void createResources() throws VulkanCodeException{
-		verts = core.allocateCoherentBuffer(Vert.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
+		verts = core.allocateHostBuffer(Vert.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
 		uniform = core.allocateUniformBuffer(Uniform.SIZE, true);
 		indirectInstances = core.allocateIndirectBuffer(1);
 		
@@ -324,7 +324,6 @@ public class MsdfFontRender implements VulkanResource{
 					drawCall = drawCmd.get();
 					drawCall.set(instPos.vertCount, 1, instPos.vertPos, 0);
 				}else if(drawCall.firstVertex() == instPos.vertPos){
-					assert drawCall.firstInstance() + drawCall.instanceCount() == instance;
 					drawCall.instanceCount(drawCall.instanceCount() + 1);
 				}else{
 					indirectInstanceCount++;
@@ -362,7 +361,7 @@ public class MsdfFontRender implements VulkanResource{
 		if(verts.size()<neededVertMem){
 			core.device.waitIdle();
 			verts.destroy();
-			verts = core.allocateCoherentBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
+			verts = core.allocateHostBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
 			description.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
 			pipeline.updateDescriptors(description);
 		}

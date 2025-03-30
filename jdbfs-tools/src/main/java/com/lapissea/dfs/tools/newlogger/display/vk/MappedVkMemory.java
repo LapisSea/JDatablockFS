@@ -1,21 +1,31 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkMappedMemoryRange;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
-public class MappedVkMemory implements VulkanResource{
+public class MappedVkMemory implements AutoCloseable{
 	
 	private final VkDeviceMemory memory;
-	private final long           ptr, size;
+	private final long           ptr, mapOffset, mapSize;
 	
-	public MappedVkMemory(VkDeviceMemory memory, long ptr, long size){
-		this.memory = memory;
+	public MappedVkMemory(VkDeviceMemory memory, long ptr, long mapOffset, long mapSize){
+		this.memory = Objects.requireNonNull(memory);
 		this.ptr = ptr;
-		this.size = size;
+		this.mapOffset = mapOffset;
+		this.mapSize = mapSize;
+	}
+	
+	private long getActualSize(){
+		return mapSize == VK10.VK_WHOLE_SIZE? memory.getBoundBuffer().size : mapSize;
 	}
 	
 	public void put(ByteBuffer src){
@@ -25,7 +35,7 @@ public class MappedVkMemory implements VulkanResource{
 		var toCopy = src.remaining();
 		
 		var offPtr    = ptr + dstOffset;
-		var remaining = size - dstOffset;
+		var remaining = getActualSize() - dstOffset;
 		if(remaining<0) throw new IndexOutOfBoundsException("Offset is larger than buffer size");
 		if(toCopy>remaining) throw new IndexOutOfBoundsException("Source is bigger than destination");
 		
@@ -38,11 +48,28 @@ public class MappedVkMemory implements VulkanResource{
 		populator.accept(bb);
 	}
 	public ByteBuffer getBuffer(){
-		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
+		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(getActualSize()));
 	}
 	
 	@Override
-	public void destroy(){
+	public void close() throws VulkanCodeException{
+		if(memory.propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
+			try(var stack = MemoryStack.stackPush()){
+				long atomSize;
+				if(mapSize == VK10.VK_WHOLE_SIZE) atomSize = VK10.VK_WHOLE_SIZE;
+				else{
+					var cas = memory.nonCoherentAtomSize;
+					atomSize = Math.min(Math.ceilDiv(mapSize, cas)*cas, memory.getBoundBuffer().size - mapOffset);
+				}
+				var memoryRange = VkMappedMemoryRange.malloc(stack);
+				memoryRange.sType$Default()
+				           .pNext(0)
+				           .memory(memory.handle)
+				           .offset(mapOffset)
+				           .size(atomSize);
+				VKCalls.vkFlushMappedMemoryRanges(memory.device, memoryRange);
+			}
+		}
 		VK10.vkUnmapMemory(memory.device.value, memory.handle);
 	}
 }

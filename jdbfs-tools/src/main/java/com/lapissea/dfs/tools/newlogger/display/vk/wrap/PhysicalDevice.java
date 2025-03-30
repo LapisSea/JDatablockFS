@@ -53,6 +53,7 @@ public class PhysicalDevice{
 	public final Set<VKPresentMode>        presentModes;
 	public final MemoryProperties          memoryProperties;
 	public final VkSampleCountFlag         samples;
+	public final long                      nonCoherentAtomSize;
 	
 	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
 		this.pDevice = pDevice;
@@ -64,6 +65,7 @@ public class PhysicalDevice{
 			type = VkPhysicalDeviceType.from(properties.deviceType());
 			
 			samples = findReasonableSamples(properties);
+			nonCoherentAtomSize = properties.limits().nonCoherentAtomSize();
 		}
 		
 		families = getQueueFamilies(pDevice, surface);

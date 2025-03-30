@@ -288,23 +288,24 @@ public class VulkanCore implements AutoCloseable{
 	public UniformBuffer allocateUniformBuffer(int size, boolean ssbo) throws VulkanCodeException{
 		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateCoherentBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
+			res[i] = allocateHostBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
 		}
 		return new UniformBuffer(List.of(res), ssbo);
 	}
 	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
 		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateCoherentBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
+			res[i] = allocateHostBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
 		}
 		return new IndirectDrawBuffer(List.of(res));
 	}
 	
 	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
-		return allocateCoherentBuffer(size, VkBufferUsageFlag.TRANSFER_SRC);
+		return allocateBuffer(size, Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
+		                      Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
 	}
-	public BackedVkBuffer allocateCoherentBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
-		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
+	public BackedVkBuffer allocateHostBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
+		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_CACHED));
 	}
 	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
 		VkBuffer       buffer = null;

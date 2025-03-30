@@ -6,14 +6,15 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
+import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
 import java.util.function.Function;
 
 public class BackedVkBuffer implements VulkanResource{
 	
-	public final VkBuffer       buffer;
-	public final VkDeviceMemory memory;
+	public final  VkBuffer       buffer;
+	private final VkDeviceMemory memory;
 	
 	public BackedVkBuffer(VkBuffer buffer, VkDeviceMemory memory){
 		this.buffer = buffer;
@@ -34,7 +35,7 @@ public class BackedVkBuffer implements VulkanResource{
 	}
 	
 	public <E extends Throwable> void update(UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
-		update(0, buffer.size, populator);
+		update(0, VK10.VK_WHOLE_SIZE, populator);
 	}
 	public <E extends Throwable> void update(long offset, long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		try(var mem = update(offset, size)){
@@ -51,7 +52,7 @@ public class BackedVkBuffer implements VulkanResource{
 		}
 		
 		@Override
-		public void close(){
+		public void close() throws VulkanCodeException{
 			mem.close();
 		}
 	}
@@ -71,7 +72,7 @@ public class BackedVkBuffer implements VulkanResource{
 	}
 	
 	public <E extends Throwable> MappedVkMemory update() throws E, VulkanCodeException{
-		return update(0, buffer.size);
+		return update(0, VK10.VK_WHOLE_SIZE);
 	}
 	public <E extends Throwable> MappedVkMemory update(long offset, long size) throws E, VulkanCodeException{
 		return memory.map(offset, size);

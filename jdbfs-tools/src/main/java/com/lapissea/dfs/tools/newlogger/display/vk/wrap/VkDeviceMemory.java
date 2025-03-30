@@ -14,18 +14,20 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	
 	public final long                        allocationSize;
 	public final Flags<VkMemoryPropertyFlag> propertyFlags;
+	public final long                        nonCoherentAtomSize;
+	private      VkBuffer                    boundBuffer;
 	
 	public VkDeviceMemory(Device device, long handle, long allocationSize, Flags<VkMemoryPropertyFlag> propertyFlags){
 		super(device, handle);
 		this.allocationSize = allocationSize;
 		this.propertyFlags = propertyFlags;
+		nonCoherentAtomSize = device.physicalDevice.nonCoherentAtomSize;
 	}
 	
 	public MappedVkMemory map() throws VulkanCodeException{
-		return map(0, allocationSize);
+		return map(0, VK10.VK_WHOLE_SIZE);
 	}
 	public MappedVkMemory map(long offset, long size) throws VulkanCodeException{
-		Objects.checkFromIndexSize(offset, size, allocationSize);
 		return VKCalls.vkMapMemory(this, offset, size, 0);
 	}
 	
@@ -37,5 +39,12 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	@Override
 	public String toString(){
 		return "VkDeviceMemory{" + allocationSize + "bytes, " + propertyFlags + "}";
+	}
+	
+	public void boundBuffer(VkBuffer buffer){
+		boundBuffer = Objects.requireNonNull(buffer);
+	}
+	public VkBuffer getBoundBuffer(){
+		return boundBuffer;
 	}
 }

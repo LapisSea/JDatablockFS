@@ -48,6 +48,7 @@ import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
+import org.lwjgl.vulkan.VkMappedMemoryRange;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
@@ -212,7 +213,7 @@ public interface VKCalls{
 		try(var stack = MemoryStack.stackPush()){
 			var res = stack.mallocPointer(1);
 			check(VK10.vkMapMemory(memory.device.value, memory.handle, offset, size, flags, res), "vkMapMemory");
-			return new MappedVkMemory(memory, res.get(0), size);
+			return new MappedVkMemory(memory, res.get(0), offset, size);
 		}
 	}
 	static VkBuffer vkCreateBuffer(Device device, VkBufferCreateInfo info) throws VulkanCodeException{
@@ -272,5 +273,8 @@ public interface VKCalls{
 	}
 	static void vkResetFences(VkDevice device, VkFence fence) throws VulkanCodeException{
 		check(VK10.vkResetFences(device, fence.handle), "vkResetFences");
+	}
+	static void vkFlushMappedMemoryRanges(Device device, VkMappedMemoryRange memoryRange) throws VulkanCodeException{
+		check(VK10.vkFlushMappedMemoryRanges(device.value, memoryRange), "vkFlushMappedMemoryRanges");
 	}
 }

@@ -32,6 +32,7 @@ public class VkBuffer extends VulkanResource.DeviceHandleObj{
 			memory.destroy();
 			throw e;
 		}
+		memory.boundBuffer(this);
 		return memory;
 	}
 	
