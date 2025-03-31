@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -153,7 +154,9 @@ public class ByteGridRender implements VulkanResource{
 	private long t;
 	public void render(CommandBuffer buf, int frameID) throws VulkanCodeException{
 		
-		buf.bindPipeline(pipeline, frameID);
+		buf.bindPipeline(pipeline.getPipeline(), true);
+		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.getPipeline().layout, 0, pipeline.descriptorSets.get(frameID));
+		
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
 		uniform.update(frameID, b -> Uniform.put(b, new Matrix4f().translate(20, 40, 0).scale(100), 32));

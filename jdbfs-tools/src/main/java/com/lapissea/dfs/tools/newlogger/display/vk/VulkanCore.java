@@ -591,7 +591,11 @@ public class VulkanCore implements AutoCloseable{
 		destroySwapchainContext(true);
 		
 		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
-			queue.destroy();
+			try{
+				queue.destroy();
+			}catch(VulkanCodeException e){
+				e.printStackTrace();
+			}
 		}
 		
 		globalUniforms.destroy();

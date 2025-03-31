@@ -11,10 +11,10 @@ public class VkFence extends VulkanResource.DeviceHandleObj{
 	public VkFence(Device device, long handle){ super(device, handle); }
 	
 	public void waitFor() throws VulkanCodeException{
-		VKCalls.vkWaitForFence(device.value, this, Long.MAX_VALUE);
+		VKCalls.vkWaitForFence(this, Long.MAX_VALUE);
 	}
 	public void reset() throws VulkanCodeException{
-		VKCalls.vkResetFences(device.value, this);
+		VKCalls.vkResetFences(this);
 	}
 	
 	public VkResult getStatus(){

@@ -7,6 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
@@ -15,7 +16,9 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineLayout;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCopy;
@@ -174,16 +177,6 @@ public class CommandBuffer implements VulkanResource{
 		}
 	}
 	
-	public void bindPipeline(GraphicsPipeline pipeline, int descriptorID){
-		bindPipeline(pipeline.getPipeline(), true);
-		
-		VK10.vkCmdBindDescriptorSets(
-			val, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline.getPipeline().layout.handle,
-			0, new long[]{pipeline.descriptorSets.get(descriptorID).handle},
-			null
-		);
-	}
 	public void bindPipeline(Pipeline pipeline, boolean graphics){
 		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
 	}
@@ -371,6 +364,17 @@ public class CommandBuffer implements VulkanResource{
 	
 	public void blitImage(VkImage src, VkImageLayout srcImageLayout, VkImage dst, VkImageLayout dstImageLayout, VkImageBlit.Buffer regions, VkFilter filter){
 		VK10.vkCmdBlitImage(val, src.handle, srcImageLayout.id, dst.handle, dstImageLayout.id, regions, filter.id);
+	}
+	
+	public void bindDescriptorSet(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet descriptorSet){
+		VK10.vkCmdBindDescriptorSets(val, bindPoint.id, layout.handle, firstSet, new long[]{descriptorSet.handle}, null);
+	}
+	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, List<VkDescriptorSet> descriptorSets){
+		var setHandles = new long[descriptorSets.size()];
+		for(int i = 0; i<setHandles.length; i++){
+			setHandles[i] = descriptorSets.get(i).handle;
+		}
+		VK10.vkCmdBindDescriptorSets(val, bindPoint.id, layout.handle, firstSet, setHandles, null);
 	}
 	
 	

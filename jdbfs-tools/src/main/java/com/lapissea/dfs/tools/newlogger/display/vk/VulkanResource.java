@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 
 public interface VulkanResource extends AutoCloseable{
@@ -26,6 +27,6 @@ public interface VulkanResource extends AutoCloseable{
 		}
 	}
 	
-	default void close(){ destroy(); }
-	void destroy();
+	default void close() throws VulkanCodeException{ destroy(); }
+	void destroy() throws VulkanCodeException;
 }

@@ -1,14 +1,19 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkResult;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.NativeType;
 import org.lwjgl.system.Pointer;
+import org.lwjgl.system.StructBuffer;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
@@ -100,7 +105,30 @@ public final class VUtils{
 				var loop = stack.contains(el);
 				if(!loop) stack.add(el);
 				try{
-					return fn.getName() + ": " + (loop? el.toString() : TextUtil.toString(el));
+					String val;
+					if(loop) val = el.toString();
+					else{
+						String eStr = null;
+						if(el instanceof Integer iEl && fn.getAnnotation(NativeType.class) instanceof NativeType t){
+							try{
+								var ec = Class.forName(VkResult.class.getPackageName() + "." + t.value());
+								if(UtilL.instanceOf(ec, VUtils.FlagSetValue.class)){
+									eStr = new Flags<>((Class)ec, iEl).toString();
+								}else if(UtilL.instanceOf(ec, VUtils.IDValue.class)){
+									try{
+										eStr = fromID((Class)ec, iEl).toString();
+									}catch(IllegalArgumentException e){ }
+								}
+							}catch(ClassNotFoundException e){ }
+						}
+						if(eStr != null) val = eStr;
+						else if(el instanceof StructBuffer<?, ?> sb){
+							val = Iters.from(sb).map(VUtils::vkObjToString).joinAsStr(", ", "[", "]");
+						}else{
+							val = TextUtil.toString(el);
+						}
+					}
+					return fn.getName() + ": " + val;
 				}finally{
 					if(!loop) stack.remove(el);
 				}

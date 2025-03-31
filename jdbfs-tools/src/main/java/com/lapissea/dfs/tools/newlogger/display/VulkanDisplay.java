@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
@@ -131,10 +130,10 @@ public class VulkanDisplay implements AutoCloseable{
 		uniformBuffs = vkCore.allocateUniformBuffer(fSize, false);
 		gPipeline = GraphicsPipeline.create(
 			new Descriptor.LayoutDescription()
-				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), vkCore.globalUniforms)
-				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniformBuffs)
-				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(3, Flags.of(VkShaderStageFlag.FRAGMENT), texture.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
+				.bind(0, VkShaderStageFlag.VERTEX, vkCore.globalUniforms)
+				.bind(1, VkShaderStageFlag.VERTEX, uniformBuffs)
+				.bind(2, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER)
+				.bind(3, VkShaderStageFlag.FRAGMENT, texture.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
 			Pipeline.Builder.of(vkCore.renderPass, testShader)
 			                .blending(Pipeline.Blending.STANDARD)
 			                .multisampling(vkCore.physicalDevice.samples, false)

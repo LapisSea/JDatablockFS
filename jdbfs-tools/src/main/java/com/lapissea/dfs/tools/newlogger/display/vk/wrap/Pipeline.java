@@ -37,19 +37,19 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 		return Builder.of(renderPass, modules);
 	}
 	public static final class Builder{
-		private       RenderPass                renderPass;
-		private       int                       subpass;
-		private       List<ShaderModule>        modules;
-		private       Rect2D                    viewport            = new Rect2D(0, 0, 100, 100);
-		private       Rect2D                    scissors            = new Rect2D(0, 0, 100, 100);
-		private       VkPolygonMode             polygonMode         = VkPolygonMode.FILL;
-		private       VkCullModeFlag            cullMode            = VkCullModeFlag.FRONT;
-		private       VkFrontFace               frontFace           = VkFrontFace.CLOCKWISE;
-		private       VkSampleCountFlag         sampleCount         = VkSampleCountFlag.N1;
-		private       boolean                   multisampleShading;
-		private final List<Descriptor.VkLayout> desriptorSetLayouts = new ArrayList<>();
-		private       Pipeline.Blending         blending;
-		private       Set<VkDynamicState>       dynamicStates       = new HashSet<>();
+		private       RenderPass                  renderPass;
+		private       int                         subpass;
+		private       List<ShaderModule>          modules;
+		private       Rect2D                      viewport            = new Rect2D(0, 0, 100, 100);
+		private       Rect2D                      scissors            = new Rect2D(0, 0, 100, 100);
+		private       VkPolygonMode               polygonMode         = VkPolygonMode.FILL;
+		private       VkCullModeFlag              cullMode            = VkCullModeFlag.FRONT;
+		private       VkFrontFace                 frontFace           = VkFrontFace.CLOCKWISE;
+		private       VkSampleCountFlag           sampleCount         = VkSampleCountFlag.N1;
+		private       boolean                     multisampleShading;
+		private final List<VkDescriptorSetLayout> desriptorSetLayouts = new ArrayList<>();
+		private       Pipeline.Blending           blending;
+		private       Set<VkDynamicState>         dynamicStates       = new HashSet<>();
 		
 		private Builder(){ }
 		
@@ -68,7 +68,7 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 			this.subpass = subpass;
 			return this;
 		}
-		public Builder addDesriptorSetLayout(Descriptor.VkLayout layout){
+		public Builder addDesriptorSetLayout(VkDescriptorSetLayout layout){
 			desriptorSetLayouts.add(layout);
 			return this;
 		}
@@ -117,20 +117,9 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 		}
 	}
 	
+	public final VkPipelineLayout layout;
 	
-	public static class Layout extends VulkanResource.DeviceHandleObj{
-		
-		public Layout(Device device, long handle){ super(device, handle); }
-		
-		@Override
-		public void destroy(){
-			VK10.vkDestroyPipelineLayout(device.value, handle, null);
-		}
-	}
-	
-	public final Layout layout;
-	
-	public Pipeline(Device device, long handle, Layout layout){
+	public Pipeline(Device device, long handle, VkPipelineLayout layout){
 		super(device, handle);
 		this.layout = layout;
 	}

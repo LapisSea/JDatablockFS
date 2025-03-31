@@ -15,6 +15,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -246,11 +247,11 @@ public class MsdfFontRender implements VulkanResource{
 	private void createPipeline() throws VulkanCodeException{
 		description =
 			new Descriptor.LayoutDescription()
-				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), core.globalUniforms)
-				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform)
-				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(3, Flags.of(VkShaderStageFlag.VERTEX), tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(4, Flags.of(VkShaderStageFlag.FRAGMENT), atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+				.bind(0, VkShaderStageFlag.VERTEX, core.globalUniforms)
+				.bind(1, VkShaderStageFlag.VERTEX, uniform)
+				.bind(2, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER)
+				.bind(3, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
+				.bind(4, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 		pipeline = GraphicsPipeline.create(
 			description,
 			Pipeline.Builder.of(core.renderPass, shader)
@@ -277,7 +278,8 @@ public class MsdfFontRender implements VulkanResource{
 		
 		ensureRequiredMemory(strs);
 		
-		buf.bindPipeline(pipeline, frameID);
+		buf.bindPipeline(pipeline.getPipeline(), true);
+		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.getPipeline().layout, 0, pipeline.descriptorSets.get(frameID));
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
 		

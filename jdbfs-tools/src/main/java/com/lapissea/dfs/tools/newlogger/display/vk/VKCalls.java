@@ -4,7 +4,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
@@ -14,10 +13,14 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.SurfaceCapabilities;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSemaphore;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -200,14 +203,14 @@ public interface VKCalls{
 		long[] result = new long[pCreateInfos.capacity()];
 		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
 		return Iters.rangeMap(0, result.length, i -> {
-			var layout = new Pipeline.Layout(device, pCreateInfos.get(i).layout());
+			var layout = new VkPipelineLayout(device, pCreateInfos.get(i).layout());
 			return new Pipeline(device, result[i], layout);
 		}).toList();
 	}
-	static Pipeline.Layout vkCreatePipelineLayout(Device device, VkPipelineLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
+	static VkPipelineLayout vkCreatePipelineLayout(Device device, VkPipelineLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		long[] res = new long[1];
 		check(VK10.vkCreatePipelineLayout(device.value, pCreateInfo, null, res), "vkCreatePipelineLayout");
-		return new Pipeline.Layout(device, res[0]);
+		return new VkPipelineLayout(device, res[0]);
 	}
 	static MappedVkMemory vkMapMemory(VkDeviceMemory memory, long offset, long size, int flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
@@ -234,22 +237,23 @@ public interface VKCalls{
 	static void vkBindImageMemory(VkImage image, VkDeviceMemory memoryPtr, long memoryOffset) throws VulkanCodeException{
 		check(VK10.vkBindImageMemory(image.device.value, image.handle, memoryPtr.handle, memoryOffset), "vkBindBufferMemory");
 	}
-	static Descriptor.VkLayout vkCreateDescriptorSetLayout(Descriptor.VkPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
+	static VkDescriptorSetLayout vkCreateDescriptorSetLayout(VkDescriptorPool pool, VkDescriptorSetLayoutCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorSetLayout(pool.device.value, pCreateInfo, null, res), "vkCreateDescriptorSetLayout");
-		return new Descriptor.VkLayout(pool, res[0]);
+		return new VkDescriptorSetLayout(pool, res[0]);
 	}
-	static Descriptor.VkPool vkCreateDescriptorPool(Device device, VkDescriptorPoolCreateInfo pCreateInfo) throws VulkanCodeException{
+	static VkDescriptorPool vkCreateDescriptorPool(Device device, VkDescriptorPoolCreateInfo pCreateInfo) throws VulkanCodeException{
 		var res = new long[1];
 		check(VK10.vkCreateDescriptorPool(device.value, pCreateInfo, null, res), "vkCreateDescriptorPool");
-		return new Descriptor.VkPool(device, res[0]);
+		return new VkDescriptorPool(device, res[0]);
 	}
-	static List<Descriptor.VkSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
+	static List<VkDescriptorSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
 		long[] arr = new long[pAllocateInfo.descriptorSetCount()];
 		check(VK10.vkAllocateDescriptorSets(device.value, pAllocateInfo, arr), "vkAllocateDescriptorSets");
-		var res = new Descriptor.VkSet[arr.length];
+		var res  = new VkDescriptorSet[arr.length];
+		var pool = new VkDescriptorPool(device, pAllocateInfo.descriptorPool());
 		for(int i = 0; i<arr.length; i++){
-			res[i] = new Descriptor.VkSet(device, arr[i]);
+			res[i] = new VkDescriptorSet(device, arr[i], pool);
 		}
 		return List.of(res);
 	}
@@ -268,13 +272,16 @@ public interface VKCalls{
 		check(VK10.vkCreateFence(device.value, pCreateInfo, null, res), "vkCreateFence");
 		return new VkFence(device, res[0]);
 	}
-	static void vkWaitForFence(VkDevice device, VkFence fence, long timeout) throws VulkanCodeException{
-		check(VK10.vkWaitForFences(device, fence.handle, true, timeout), "vkWaitForFences");
+	static void vkWaitForFence(VkFence fence, long timeout) throws VulkanCodeException{
+		check(VK10.vkWaitForFences(fence.device.value, fence.handle, true, timeout), "vkWaitForFences");
 	}
-	static void vkResetFences(VkDevice device, VkFence fence) throws VulkanCodeException{
-		check(VK10.vkResetFences(device, fence.handle), "vkResetFences");
+	static void vkResetFences(VkFence fence) throws VulkanCodeException{
+		check(VK10.vkResetFences(fence.device.value, fence.handle), "vkResetFences");
 	}
 	static void vkFlushMappedMemoryRanges(Device device, VkMappedMemoryRange memoryRange) throws VulkanCodeException{
 		check(VK10.vkFlushMappedMemoryRanges(device.value, memoryRange), "vkFlushMappedMemoryRanges");
+	}
+	static void vkFreeDescriptorSets(Device device, VkDescriptorPool pool, VkDescriptorSet set) throws VulkanCodeException{
+		check(VK10.vkFreeDescriptorSets(device.value, pool.handle, set.handle), "vkFreeDescriptorSets");
 	}
 }

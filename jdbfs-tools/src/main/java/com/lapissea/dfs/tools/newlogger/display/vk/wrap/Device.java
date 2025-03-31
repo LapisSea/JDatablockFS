@@ -196,7 +196,7 @@ public class Device implements VulkanResource{
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount, boolean multisampleShading,
-		List<Descriptor.VkLayout> descriptorSetLayout,
+		List<VkDescriptorSetLayout> descriptorSetLayouts,
 		Pipeline.Blending blending, Set<VkDynamicState> dynamicStates
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
@@ -291,8 +291,8 @@ public class Device implements VulkanResource{
 			               .pAttachments(blendAttachState)
 			               .blendConstants(stack.floats(1, 1, 1, 1));
 			
-			var descriptorSetLayoutPtrs = stack.mallocLong(descriptorSetLayout.size());
-			for(var layout : descriptorSetLayout) descriptorSetLayoutPtrs.put(layout.handle);
+			var descriptorSetLayoutPtrs = stack.mallocLong(descriptorSetLayouts.size());
+			for(var layout : descriptorSetLayouts) descriptorSetLayoutPtrs.put(layout.handle);
 			
 			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack);
 			pipelineInfo.sType$Default()
@@ -330,7 +330,7 @@ public class Device implements VulkanResource{
 	}
 	
 	
-	public Descriptor.VkPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
+	public VkDescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var info = VkDescriptorPoolCreateInfo.calloc(stack);
