@@ -14,8 +14,6 @@ import org.lwjgl.vulkan.VkDescriptorSetLayoutBinding;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 
 import java.nio.LongBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.SequencedMap;
@@ -166,9 +164,8 @@ public final class Descriptor{
 			}
 		}
 		
-		private final List<LayoutBinding> bindings = new ArrayList<>();
-		
-		private final SequencedMap<Integer, BindData> bindData = new LinkedHashMap<>();
+		private final SequencedMap<Integer, LayoutBinding> bindings = new LinkedHashMap<>();
+		private final SequencedMap<Integer, BindData>      bindData = new LinkedHashMap<>();
 		
 		public LayoutDescription(){
 		
@@ -178,10 +175,11 @@ public final class Descriptor{
 			return bind(binding, Flags.of(stages), texture, layout);
 		}
 		public LayoutDescription bind(int binding, Flags<VkShaderStageFlag> stages, VulkanTexture texture, VkImageLayout layout){
-			bindings.add(new LayoutBinding(
+			bindings.put(binding, new LayoutBinding(
 				binding, VkDescriptorType.COMBINED_IMAGE_SAMPLER, 1, stages, List.of(texture.sampler)
 			));
-			bindData.put(binding, new TextureBuff(binding, texture, layout));
+			var old = bindData.put(binding, new TextureBuff(binding, texture, layout));
+			if(old != null) old.close();
 			return this;
 		}
 		public LayoutDescription bind(int binding, VkShaderStageFlag stages, UniformBuffer uniform){
@@ -189,21 +187,23 @@ public final class Descriptor{
 		}
 		public LayoutDescription bind(int binding, Flags<VkShaderStageFlag> stages, UniformBuffer uniform){
 			var type = uniform.ssbo? VkDescriptorType.STORAGE_BUFFER : VkDescriptorType.UNIFORM_BUFFER;
-			bindings.add(new LayoutBinding(binding, type, stages));
-			bindData.put(binding, new UniformBuff(binding, uniform));
+			bindings.put(binding, new LayoutBinding(binding, type, stages));
+			var old = bindData.put(binding, new UniformBuff(binding, uniform));
+			if(old != null) old.close();
 			return this;
 		}
 		public LayoutDescription bind(int binding, VkShaderStageFlag stages, VkBuffer buffer, VkDescriptorType type){
 			return bind(binding, Flags.of(stages), buffer, type);
 		}
 		public LayoutDescription bind(int binding, Flags<VkShaderStageFlag> stages, VkBuffer buffer, VkDescriptorType type){
-			bindings.add(new LayoutBinding(binding, type, stages));
-			bindData.put(binding, new TypeBuff(binding, type, buffer));
+			bindings.put(binding, new LayoutBinding(binding, type, stages));
+			var old = bindData.put(binding, new TypeBuff(binding, type, buffer));
+			if(old != null) old.close();
 			return this;
 		}
 		
 		public List<LayoutBinding> bindings(){
-			return Collections.unmodifiableList(bindings);
+			return List.copyOf(bindings.values());
 		}
 		public List<BindData> bindData(){
 			return List.copyOf(bindData.values());
