@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
-import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
@@ -13,8 +12,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
 
@@ -59,16 +60,47 @@ public class ByteGridRender implements VulkanResource{
 	
 	private record MeshInfo(int vertPos, int vertCount){ }
 	
-	private VulkanCore       core;
-	private MeshInfo[]       meshInfos;
-	private GraphicsPipeline pipeline;
-	private UniformBuffer    uniform;
-	private BackedVkBuffer   verts;
+	private VulkanCore     core;
+	private MeshInfo[]     meshInfos;
+	private UniformBuffer  uniform;
+	private BackedVkBuffer verts;
+	
+	private VkDescriptorSetLayout dsLayout;
+	private List<VkDescriptorSet> dsSets;
+	private VkPipeline            pipeline;
 	
 	public void init(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		shader.init(core);
 		
+		computeByteVerts(core);
+		
+		uniform = core.allocateUniformBuffer(Uniform.SIZE, false);
+		
+		var dsDesc = new Descriptor.LayoutDescription()
+			             .bind(0, Flags.of(VkShaderStageFlag.VERTEX), core.globalUniforms)
+			             .bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform)
+			             .bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
+		
+		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(dsDesc.bindings());
+		dsSets = dsLayout.createDescriptorSets(VulkanCore.MAX_IN_FLIGHT_FRAMES);
+		
+		for(int i = 0; i<dsSets.size(); i++){
+			dsSets.get(i).update(dsDesc.bindData(), i);
+		}
+		
+		pipeline = VkPipeline.builder(core.renderPass, shader)
+		                     .blending(VkPipeline.Blending.STANDARD)
+		                     .multisampling(core.physicalDevice.samples, false)
+		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+		                     .addDesriptorSetLayout(dsLayout)
+		                     .build();
+		
+		
+		dsDesc.close();
+	}
+	
+	private void computeByteVerts(VulkanCore core) throws VulkanCodeException{
 		record SetBitsQuad(int x, int y, int w, int h){ }
 		
 		List<List<SetBitsQuad>> setQuadsSet = new ArrayList<>(256);
@@ -136,26 +168,14 @@ public class ByteGridRender implements VulkanResource{
 				}
 			}
 		});
-		
-		uniform = core.allocateUniformBuffer(Uniform.SIZE, false);
-		
-		pipeline = GraphicsPipeline.create(
-			new Descriptor.LayoutDescription()
-				.bind(0, Flags.of(VkShaderStageFlag.VERTEX), core.globalUniforms)
-				.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform)
-				.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER),
-			Pipeline.builder(core.renderPass, shader)
-			        .blending(Pipeline.Blending.STANDARD)
-			        .multisampling(core.physicalDevice.samples, false)
-			        .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		);
 	}
+	
 	private int  a = 0;
 	private long t;
 	public void render(CommandBuffer buf, int frameID) throws VulkanCodeException{
 		
-		buf.bindPipeline(pipeline.getPipeline(), true);
-		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.getPipeline().layout, 0, pipeline.descriptorSets.get(frameID));
+		buf.bindPipeline(pipeline, true);
+		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSets.get(frameID));
 		
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
@@ -175,8 +195,13 @@ public class ByteGridRender implements VulkanResource{
 	
 	
 	@Override
-	public void destroy(){
+	public void destroy() throws VulkanCodeException{
 		pipeline.destroy();
+		dsLayout.destroy();
+		for(VkDescriptorSet dsSet : dsSets){
+			dsSet.destroy();
+		}
+		
 		uniform.destroy();
 		verts.destroy();
 		

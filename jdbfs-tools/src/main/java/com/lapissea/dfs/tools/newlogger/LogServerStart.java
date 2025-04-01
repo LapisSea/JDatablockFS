@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.util.LogUtil;
@@ -15,7 +16,7 @@ public final class LogServerStart{
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
-	public static void main(String[] args) throws IOException, LockedFlagSet{
+	public static void main(String[] args) throws IOException, LockedFlagSet, VulkanCodeException{
 //		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
 
 //		LogUtil.println(ProcessHandle.current().pid());

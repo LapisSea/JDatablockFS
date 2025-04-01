@@ -6,7 +6,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
@@ -20,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSemaphore;
@@ -199,12 +199,12 @@ public interface VKCalls{
 		check(VK10.vkCreateShaderModule(device.value, pCreateInfo, null, res), "vkCreateShaderModule");
 		return new ShaderModule(device, res[0], stage);
 	}
-	static List<Pipeline> vkCreateGraphicsPipelines(Device device, long pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
+	static List<VkPipeline> vkCreateGraphicsPipelines(Device device, long pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
 		long[] result = new long[pCreateInfos.capacity()];
 		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
 		return Iters.rangeMap(0, result.length, i -> {
 			var layout = new VkPipelineLayout(device, pCreateInfos.get(i).layout());
-			return new Pipeline(device, result[i], layout);
+			return new VkPipeline(device, result[i], layout);
 		}).toList();
 	}
 	static VkPipelineLayout vkCreatePipelineLayout(Device device, VkPipelineLayoutCreateInfo pCreateInfo) throws VulkanCodeException{

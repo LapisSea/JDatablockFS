@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
@@ -67,10 +66,12 @@ public final class Descriptor{
 		}
 	}
 	
-	public static final class LayoutDescription{
+	public static final class LayoutDescription implements AutoCloseable{
 		
-		public interface BindData extends VulkanResource{
+		public interface BindData extends AutoCloseable{
 			void write(VkWriteDescriptorSet.Buffer dest, int id);
+			@Override
+			void close();
 		}
 		
 		private static final class UniformBuff implements BindData{
@@ -103,7 +104,7 @@ public final class Descriptor{
 			}
 			
 			@Override
-			public void destroy(){
+			public void close(){
 				writes.free();
 				infos.free();
 			}
@@ -131,7 +132,7 @@ public final class Descriptor{
 			}
 			
 			@Override
-			public void destroy(){
+			public void close(){
 				write.free();
 				info.free();
 			}
@@ -159,7 +160,7 @@ public final class Descriptor{
 			}
 			
 			@Override
-			public void destroy(){
+			public void close(){
 				write.free();
 				info.free();
 			}
@@ -168,6 +169,10 @@ public final class Descriptor{
 		private final List<LayoutBinding> bindings = new ArrayList<>();
 		
 		private final SequencedMap<Integer, BindData> bindData = new LinkedHashMap<>();
+		
+		public LayoutDescription(){
+		
+		}
 		
 		public LayoutDescription bind(int binding, VkShaderStageFlag stages, VulkanTexture texture, VkImageLayout layout){
 			return bind(binding, Flags.of(stages), texture, layout);
@@ -202,6 +207,13 @@ public final class Descriptor{
 		}
 		public List<BindData> bindData(){
 			return List.copyOf(bindData.values());
+		}
+		
+		@Override
+		public void close(){
+			for(BindData value : bindData.values()){
+				value.close();
+			}
 		}
 	}
 	

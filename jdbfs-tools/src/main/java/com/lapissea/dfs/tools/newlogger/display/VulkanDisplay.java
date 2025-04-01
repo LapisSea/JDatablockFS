@@ -1,37 +1,22 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.GraphicsPipeline;
-import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Pipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
 
 import java.awt.Color;
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
 
@@ -43,27 +28,8 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
-	public BackedVkBuffer   verts;
-	public GraphicsPipeline gPipeline;
-	
-	private UniformBuffer uniformBuffs;
-	
-	private final CompletableFuture<VulkanTexture> texture = VulkanTexture.loadTexture("roboto/light/mask.png", true, this::blockingCore);
-	
 	private final MsdfFontRender fontRender     = new MsdfFontRender();
 	private final ByteGridRender byteGridRender = new ByteGridRender();
-	
-	private final ShaderModuleSet testShader = new ShaderModuleSet("test", ShaderType.VERTEX, ShaderType.FRAGMENT);
-	
-	public static final class Vert{
-		public static final int SIZE = 4*(2 + 3 + 2);
-		
-		public static void put(ByteBuffer data, float x, float y, float r, float g, float b, float u, float v){
-			data.putFloat(x).putFloat(y)
-			    .putFloat(r).putFloat(g).putFloat(b)
-			    .putFloat(u).putFloat(v);
-		}
-	}
 	
 	public VulkanDisplay(){
 		
@@ -74,76 +40,16 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			vkCore = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
 			
-			testShader.init(vkCore);
 			fontRender.init(vkCore);
 			byteGridRender.init(vkCore);
 			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
-			verts = vkCore.allocateLocalStorageBuffer(6*Vert.SIZE, bb -> {
-				Vert.put(bb, 0, 1F, 1, 0, 0, 0, 1);
-				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
-				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
-				
-				Vert.put(bb, 0, 0, 0, 0, 1, 0, 0);
-				Vert.put(bb, 1F, 1F, 0, 1, 0, 1, 1);
-				Vert.put(bb, 1, 0F, 1, 1, 0, 1, 0);
-			});
-			
-			createPipeline();
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
 		
-	}
-	
-	private VulkanCore blockingCore(){
-		UtilL.sleepWhile(() -> vkCore == null);
-		return vkCore;
-	}
-	
-	private void updateUniforms(int index) throws VulkanCodeException{
-		uniformBuffs.update(index, b -> {
-			var f = b.asFloatBuffer();
-			
-			var t   = System.currentTimeMillis()%200000;
-			var mat = new Matrix4f();
-			mat.translate(220, 355, 0);
-			mat.rotate((float)(t/2000D%(Math.PI*2)), new Vector3f(0, 0, 1));
-			mat.scale((float)(Math.sin(t/1000D)/5.1 + 0.5));
-			
-			mat.scale(500);
-			mat.translate(-0.5F, -0.5F, 0);
-			
-			mat.get(f);
-		});
-	}
-	
-	private void createPipeline() throws VulkanCodeException{
-		assert uniformBuffs == null;
-		
-		var matSize = 4*4;
-		var size    = matSize*2;
-		var fSize   = size*Float.BYTES;
-		
-		uniformBuffs = vkCore.allocateUniformBuffer(fSize, false);
-		gPipeline = GraphicsPipeline.create(
-			new Descriptor.LayoutDescription()
-				.bind(0, VkShaderStageFlag.VERTEX, vkCore.globalUniforms)
-				.bind(1, VkShaderStageFlag.VERTEX, uniformBuffs)
-				.bind(2, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(3, VkShaderStageFlag.FRAGMENT, texture.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL),
-			Pipeline.Builder.of(vkCore.renderPass, testShader)
-			                .blending(Pipeline.Blending.STANDARD)
-			                .multisampling(vkCore.physicalDevice.samples, false)
-			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		);
-	}
-	private void destroyPipeline(){
-		gPipeline.destroy();
-		uniformBuffs.destroy();
-		uniformBuffs = null;
 	}
 	
 	private void render() throws VulkanCodeException{
@@ -227,7 +133,6 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void recordCommandBuffers(int frameID, int swapchainID) throws VulkanCodeException{
-		updateUniforms(frameID);
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
@@ -242,19 +147,9 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			buf.begin();
 			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
-
-//				buf.bindPipeline(gPipeline, frameID);
-//				buf.setViewportScissor(renderArea);
-//
-//				buf.draw(6, 1, 0, 0);
 				
 				List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
-//				for(int x = 0; x<10; x++){
-//					for(int y = 0; y<10; y++){
-//						sd.add(new MsdfFontRender.StringDraw(20, Color.GREEN.darker(), x + "x" + y, 20 + x*80, 70 + y*60));
-//						sd.add(new MsdfFontRender.StringDraw(20, Color.WHITE, x + "x" + y, 20 + x*80, 70 + y*60, 1, 0.5F));
-//					}
-//				}
+				
 				var pos = 0F;
 				for(int i = 0; i<40; i++){
 					float size = 1 + (i*i)*0.2F;
@@ -332,21 +227,15 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	@Override
-	public void close(){
+	public void close() throws VulkanCodeException{
 		window.hide();
 		
 		try{
 			vkCore.renderQueue.waitIdle();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
-		destroyPipeline();
-		
-		testShader.destroy();
 		fontRender.destroy();
 		byteGridRender.destroy();
-		
-		verts.destroy();
-		texture.join().destroy();
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();

@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 public interface VulkanResource extends AutoCloseable{
 	
@@ -23,7 +24,11 @@ public interface VulkanResource extends AutoCloseable{
 			getTrace().printStackTrace();
 		}
 		private Throwable getTrace(){
-			return new Throwable(this.getClass().getSimpleName() + " INIT: 0x" + Long.toUnsignedString(handle, 16));
+			var t = new Throwable(this.getClass().getSimpleName() + " INIT: 0x" + Long.toUnsignedString(handle, 16));
+			t.setStackTrace(Iters.from(t.getStackTrace())
+			                     .dropWhile(e -> e.getClassName().equals(DeviceHandleObj.class.getName()))
+			                     .toArray(StackTraceElement[]::new));
+			return t;
 		}
 	}
 	

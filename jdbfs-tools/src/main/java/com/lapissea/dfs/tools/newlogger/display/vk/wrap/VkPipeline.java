@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public class Pipeline extends VulkanResource.DeviceHandleObj{
+public class VkPipeline extends VulkanResource.DeviceHandleObj{
 	
 	public record Blending(
 		VkBlendFactor srcColor, VkBlendFactor dstColor, VkBlendOp colorBlendOp,
@@ -34,12 +34,12 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 	}
 	
 	public static Builder builder(RenderPass renderPass, List<ShaderModule> modules){
-		return Builder.of(renderPass, modules);
+		return new Builder(renderPass, modules);
 	}
 	public static final class Builder{
-		private       RenderPass                  renderPass;
+		private final RenderPass                  renderPass;
 		private       int                         subpass;
-		private       List<ShaderModule>          modules;
+		private final List<ShaderModule>          modules;
 		private       Rect2D                      viewport            = new Rect2D(0, 0, 100, 100);
 		private       Rect2D                      scissors            = new Rect2D(0, 0, 100, 100);
 		private       VkPolygonMode               polygonMode         = VkPolygonMode.FILL;
@@ -48,16 +48,12 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 		private       VkSampleCountFlag           sampleCount         = VkSampleCountFlag.N1;
 		private       boolean                     multisampleShading;
 		private final List<VkDescriptorSetLayout> desriptorSetLayouts = new ArrayList<>();
-		private       Pipeline.Blending           blending;
+		private       VkPipeline.Blending         blending;
 		private       Set<VkDynamicState>         dynamicStates       = new HashSet<>();
 		
-		private Builder(){ }
-		
-		public static Builder of(RenderPass renderPass, List<ShaderModule> modules){
-			var b = new Builder();
-			b.renderPass = Objects.requireNonNull(renderPass);
-			b.modules = Objects.requireNonNull(modules);
-			return b;
+		private Builder(RenderPass renderPass, List<ShaderModule> modules){
+			this.renderPass = Objects.requireNonNull(renderPass);
+			this.modules = Objects.requireNonNull(modules);
 		}
 		
 		public RenderPass getRenderPass(){
@@ -97,7 +93,7 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 			this.multisampleShading = multisampleShading;
 			return this;
 		}
-		public Builder blending(Pipeline.Blending blending){
+		public Builder blending(VkPipeline.Blending blending){
 			this.blending = blending;
 			return this;
 		}
@@ -106,7 +102,7 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 			return this;
 		}
 		
-		public Pipeline build() throws VulkanCodeException{
+		public VkPipeline build() throws VulkanCodeException{
 			return renderPass.device.createPipeline(
 				renderPass, subpass, modules, viewport, scissors,
 				polygonMode, cullMode, frontFace,
@@ -119,7 +115,7 @@ public class Pipeline extends VulkanResource.DeviceHandleObj{
 	
 	public final VkPipelineLayout layout;
 	
-	public Pipeline(Device device, long handle, VkPipelineLayout layout){
+	public VkPipeline(Device device, long handle, VkPipelineLayout layout){
 		super(device, handle);
 		this.layout = layout;
 	}

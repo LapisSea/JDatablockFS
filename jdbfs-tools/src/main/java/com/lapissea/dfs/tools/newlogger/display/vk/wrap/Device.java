@@ -190,14 +190,14 @@ public class Device implements VulkanResource{
 		return new RenderPass.Builder(this);
 	}
 	
-	public Pipeline createPipeline(
+	public VkPipeline createPipeline(
 		RenderPass renderPass, int subpass,
 		List<ShaderModule> modules,
 		Rect2D viewport, Rect2D scissors,
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount, boolean multisampleShading,
 		List<VkDescriptorSetLayout> descriptorSetLayouts,
-		Pipeline.Blending blending, Set<VkDynamicState> dynamicStates
+		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			

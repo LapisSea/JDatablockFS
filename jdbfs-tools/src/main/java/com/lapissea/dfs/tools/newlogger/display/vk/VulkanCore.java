@@ -11,6 +11,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
@@ -36,6 +37,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
@@ -147,6 +149,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final UniformBuffer globalUniforms;
 	
+	public final VkDescriptorPool globalDescriptorPool;
+	
 	public VulkanCore(String name, GlfwWindow window, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
 		this.preferredPresentMode = preferredPresentMode;
@@ -178,6 +182,10 @@ public class VulkanCore implements AutoCloseable{
 		renderPass = createRenderPass();
 		
 		createSwapchainContext();
+		
+		globalDescriptorPool = device.createDescriptorPool(1000, Flags.of(VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET));
+		
+		Log.trace("Finished initializing VulkanCore");
 	}
 	
 	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
@@ -482,6 +490,15 @@ public class VulkanCore implements AutoCloseable{
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
 			var err = new RuntimeException(msgFinal);
+			err.setStackTrace(
+				Iters.concat1N(
+					err.getStackTrace()[0],
+					Iters.from(err.getStackTrace())
+					     .dropWhile(e -> !e.isNativeMethod())
+					     .skip(1)
+					     .dropWhile(e -> e.getMethodName().startsWith("nvk") && e.getClassName().startsWith(VK10.class.getPackageName()))
+				).toArray(StackTraceElement[]::new)
+			);
 			if(messageIDName.equals("VUID-vkDestroyDevice-device-05137")){
 				for(var ctorInit : Iters.ofLongs(handles).box().map(device.debugVkObjects::get).nonNulls()){
 					err.addSuppressed(ctorInit);
@@ -597,7 +614,7 @@ public class VulkanCore implements AutoCloseable{
 				e.printStackTrace();
 			}
 		}
-		
+		globalDescriptorPool.destroy();
 		globalUniforms.destroy();
 		renderPass.destroy();
 		device.destroy();
