@@ -7,9 +7,37 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 
+import java.util.AbstractList;
 import java.util.List;
 
 public class VkDescriptorSet extends VulkanResource.DeviceHandleObj{
+	
+	public static final class PerFrame extends AbstractList<VkDescriptorSet> implements VulkanResource{
+		
+		private final VkDescriptorSet[] sets;
+		
+		public PerFrame(List<VkDescriptorSet> sets){
+			this.sets = sets.toArray(VkDescriptorSet[]::new);
+		}
+		
+		public void updateAll(List<Descriptor.LayoutDescription.BindData> bindings){
+			for(int i = 0; i<sets.length; i++){
+				sets[i].update(bindings, i);
+			}
+		}
+		
+		@Override
+		public void destroy() throws VulkanCodeException{
+			for(VkDescriptorSet set : sets){
+				set.destroy();
+			}
+		}
+		
+		@Override
+		public VkDescriptorSet get(int index){ return sets[index]; }
+		@Override
+		public int size(){ return sets.length; }
+	}
 	
 	private final VkDescriptorPool pool;
 	

@@ -24,8 +24,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FormatColor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
@@ -38,6 +40,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
@@ -147,7 +151,9 @@ public class VulkanCore implements AutoCloseable{
 	
 	private final VKPresentMode preferredPresentMode;
 	
-	public final UniformBuffer globalUniforms;
+	public final UniformBuffer            globalUniforms;
+	public final VkDescriptorSetLayout    globalUniformLayout;
+	public final VkDescriptorSet.PerFrame globalUniformSets;
 	
 	public final VkDescriptorPool globalDescriptorPool;
 	
@@ -177,13 +183,20 @@ public class VulkanCore implements AutoCloseable{
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
+		globalDescriptorPool = device.createDescriptorPool(1000, Flags.of(VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET));
+		
 		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false);
+		
+		try(var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms)){
+			globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(layout.bindings());
+			globalUniformSets = globalUniformLayout.createDescriptorSetsPerFrame();
+			globalUniformSets.updateAll(layout.bindData());
+		}
 		
 		renderPass = createRenderPass();
 		
 		createSwapchainContext();
 		
-		globalDescriptorPool = device.createDescriptorPool(1000, Flags.of(VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET));
 		
 		Log.trace("Finished initializing VulkanCore");
 	}
@@ -603,19 +616,19 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	@Override
-	public void close(){
+	public void close() throws VulkanCodeException{
 		device.waitIdle();
 		destroySwapchainContext(true);
 		
 		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
-			try{
-				queue.destroy();
-			}catch(VulkanCodeException e){
-				e.printStackTrace();
-			}
+			queue.destroy();
 		}
+		
+		globalUniformSets.destroy();
+		globalUniformLayout.destroy();
 		globalDescriptorPool.destroy();
 		globalUniforms.destroy();
+		
 		renderPass.destroy();
 		device.destroy();
 		surface.destroy();

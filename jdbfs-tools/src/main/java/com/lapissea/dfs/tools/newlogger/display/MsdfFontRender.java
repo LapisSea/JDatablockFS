@@ -229,9 +229,14 @@ public class MsdfFontRender implements VulkanResource{
 	private BackedVkBuffer     verts;
 	private IndirectDrawBuffer indirectInstances;
 	
-	private VkDescriptorSetLayout dsLayout;
-	private List<VkDescriptorSet> dsSets;
-	private VkPipeline            pipeline;
+	private Descriptor.LayoutDescription description;
+	private VkDescriptorSetLayout        dsLayout;
+	private VkDescriptorSet.PerFrame     dsSets;
+	
+	private VkDescriptorSetLayout dsLayoutConst;
+	private VkDescriptorSet       dsSetConst;
+	
+	private VkPipeline pipeline;
 	
 	private void createResources() throws VulkanCodeException{
 		verts = core.allocateHostBuffer(Vert.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
@@ -246,33 +251,36 @@ public class MsdfFontRender implements VulkanResource{
 		createPipeline();
 	}
 	
-	private Descriptor.LayoutDescription description;
 	
 	private void createPipeline() throws VulkanCodeException{
+		
+		try(var desc = new Descriptor.LayoutDescription()
+			               .bind(0, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
+			               .bind(1, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL)){
+			
+			dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(desc.bindings());
+			dsSetConst = dsLayoutConst.createDescriptorSet();
+			dsSetConst.update(desc.bindData(), -1);
+		}
+		
 		description =
 			new Descriptor.LayoutDescription()
-				.bind(0, VkShaderStageFlag.VERTEX, core.globalUniforms)
-				.bind(1, VkShaderStageFlag.VERTEX, uniform)
-				.bind(2, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(3, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
-				.bind(4, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+				.bind(0, VkShaderStageFlag.VERTEX, uniform)
+				.bind(1, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER);
 		
 		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(description.bindings());
-		dsSets = dsLayout.createDescriptorSets(VulkanCore.MAX_IN_FLIGHT_FRAMES);
+		dsSets = dsLayout.createDescriptorSetsPerFrame();
 		
-		updateDescriptors(dsSets, description.bindData());
+		dsSets.updateAll(description.bindData());
 		
 		pipeline = VkPipeline.builder(core.renderPass, shader)
 		                     .blending(VkPipeline.Blending.STANDARD)
 		                     .multisampling(core.physicalDevice.samples, true)
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+		                     .addDesriptorSetLayout(core.globalUniformLayout)
+		                     .addDesriptorSetLayout(dsLayoutConst)
 		                     .addDesriptorSetLayout(dsLayout)
 		                     .build();
-	}
-	private void updateDescriptors(List<VkDescriptorSet> dsSets, List<Descriptor.LayoutDescription.BindData> bindings){
-		for(int i = 0; i<dsSets.size(); i++){
-			dsSets.get(i).update(bindings, i);
-		}
 	}
 	
 	public record StringDraw(float pixelHeight, Color color, String string, float x, float y, float xScale, float outline){
@@ -293,7 +301,8 @@ public class MsdfFontRender implements VulkanResource{
 		ensureRequiredMemory(strs);
 		
 		buf.bindPipeline(pipeline, true);
-		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
+		                       core.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
 		
@@ -378,15 +387,15 @@ public class MsdfFontRender implements VulkanResource{
 			core.device.waitIdle();
 			verts.destroy();
 			verts = core.allocateHostBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
-			description.bind(2, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
-			updateDescriptors(dsSets, description.bindData());
+			description.bind(1, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
+			dsSets.updateAll(description.bindData());
 		}
 		if(uniform.size()<neededInstanceMem){
 			core.device.waitIdle();
 			uniform.destroy();
 			uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true);
-			description.bind(1, Flags.of(VkShaderStageFlag.VERTEX), uniform);
-			updateDescriptors(dsSets, description.bindData());
+			description.bind(0, Flags.of(VkShaderStageFlag.VERTEX), uniform);
+			dsSets.updateAll(description.bindData());
 		}
 		if(indirectInstances.instanceCapacity()<drawCallCount){
 			core.device.waitIdle();
@@ -424,10 +433,12 @@ public class MsdfFontRender implements VulkanResource{
 		description.close();
 		
 		pipeline.destroy();
-		for(VkDescriptorSet dsSet : dsSets){
-			dsSet.destroy();
-		}
+		
+		dsSets.destroy();
 		dsLayout.destroy();
+		
+		dsSetConst.destroy();
+		dsLayoutConst.destroy();
 		
 		uniform.destroy();
 		verts.destroy();

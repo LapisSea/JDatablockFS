@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
@@ -18,6 +19,12 @@ public class VkDescriptorSetLayout extends VulkanResource.DeviceHandleObj{
 		this.pool = pool;
 	}
 	
+	public VkDescriptorSet.PerFrame createDescriptorSetsPerFrame() throws VulkanCodeException{
+		return new VkDescriptorSet.PerFrame(createDescriptorSets(VulkanCore.MAX_IN_FLIGHT_FRAMES));
+	}
+	public VkDescriptorSet createDescriptorSet() throws VulkanCodeException{
+		return createDescriptorSets(1).getFirst();
+	}
 	public List<VkDescriptorSet> createDescriptorSets(int count) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var layouts = stack.mallocLong(count);

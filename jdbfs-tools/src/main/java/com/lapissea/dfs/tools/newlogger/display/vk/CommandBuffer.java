@@ -37,6 +37,7 @@ import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 import org.lwjgl.vulkan.VkViewport;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class CommandBuffer implements VulkanResource{
@@ -368,6 +369,9 @@ public class CommandBuffer implements VulkanResource{
 	
 	public void bindDescriptorSet(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet descriptorSet){
 		VK10.vkCmdBindDescriptorSets(val, bindPoint.id, layout.handle, firstSet, new long[]{descriptorSet.handle}, null);
+	}
+	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet... descriptorSets){
+		bindDescriptorSets(bindPoint, layout, firstSet, Arrays.asList(descriptorSets));
 	}
 	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, List<VkDescriptorSet> descriptorSets){
 		var setHandles = new long[descriptorSets.size()];

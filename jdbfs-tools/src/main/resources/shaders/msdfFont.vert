@@ -18,15 +18,15 @@ struct Uniform {
     float xScale;
 };
 
-layout (binding = 0) readonly uniform GlobalUniforms {
+layout (set = 0, binding = 0) readonly uniform GlobalUniforms {
     mat4 projectionMat;
 } gUbo;
 
-layout (binding = 1) readonly buffer Uniforms { Uniform data[]; } in_ubo;
+layout (set = 1, binding = 0) readonly buffer Letters { Letter data[]; } atlas;
 
-layout (binding = 2) readonly buffer Rects { Rect data[]; } in_rects;
+layout (set = 2, binding = 0) readonly buffer Uniforms { Uniform data[]; } in_ubo;
 
-layout (binding = 3) readonly buffer Letters { Letter data[]; } atlas;
+layout (set = 2, binding = 1) readonly buffer Rects { Rect data[]; } in_rects;
 
 layout (location = 0) out vec2 uvOut;
 layout (location = 1) out float outline;
