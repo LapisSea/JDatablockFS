@@ -9,6 +9,7 @@ import org.lwjgl.system.StructBuffer;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class BackedVkBuffer implements VulkanResource{
@@ -57,8 +58,28 @@ public class BackedVkBuffer implements VulkanResource{
 		}
 	}
 	
+	public <T extends Struct<T>> void updateAsVal(Function<ByteBuffer, T> ctor, Consumer<T> fn) throws VulkanCodeException{
+		try(var mem = updateAsVal(0, VK10.VK_WHOLE_SIZE, ctor)){
+			fn.accept(mem.val);
+		}
+	}
+	public <T extends Struct<T>> MemorySession<T> updateAsVal(long offset, long size, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
+		var mem = update(offset, size);
+		try{
+			var buf = ctor.apply(mem.getBuffer());
+			return new MemorySession<>(mem, buf);
+		}catch(Throwable e){
+			mem.close();
+			throw e;
+		}
+	}
+	public <T extends Struct<T>, B extends StructBuffer<T, B>> void updateAs(Function<ByteBuffer, B> ctor, Consumer<B> fn) throws VulkanCodeException{
+		try(var mem = updateAs(0, VK10.VK_WHOLE_SIZE, ctor)){
+			fn.accept(mem.val);
+		}
+	}
 	public <T extends Struct<T>, B extends StructBuffer<T, B>> MemorySession<B> updateAs(Function<ByteBuffer, B> ctor) throws VulkanCodeException{
-		return updateAs(0, buffer.size, ctor);
+		return updateAs(0, VK10.VK_WHOLE_SIZE, ctor);
 	}
 	public <T extends Struct<T>, B extends StructBuffer<T, B>> MemorySession<B> updateAs(long offset, long size, Function<ByteBuffer, B> ctor) throws VulkanCodeException{
 		var mem = update(offset, size);

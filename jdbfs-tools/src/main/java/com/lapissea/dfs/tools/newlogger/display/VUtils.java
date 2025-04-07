@@ -222,4 +222,7 @@ public final class VUtils{
 			default -> Float.intBitsToFloat(((half&0x8000)<<16)|(((half&0x7c00) + 0x1C000)<<13)|((half&0x03FF)<<13));
 		};
 	}
+	static int toRGBAi4(Color color){
+		return color.getRed()|(color.getGreen()<<8)|(color.getBlue()<<16)|(color.getAlpha()<<24);
+	}
 }

@@ -3,9 +3,12 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.lwjgl.system.Struct;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class UniformBuffer implements VulkanResource{
 	
@@ -17,7 +20,13 @@ public class UniformBuffer implements VulkanResource{
 		this.ssbo = ssbo;
 	}
 	
-	public <E extends Throwable> void update(int frameID, UnsafeConsumer<ByteBuffer, E> uniformPopulator) throws VulkanCodeException, E{
+	public <T extends Struct<T>>
+	void updateAs(int frameID, Function<ByteBuffer, T> ctor, Consumer<T> uniformPopulator) throws VulkanCodeException{
+		var buf = buffers.get(frameID);
+		buf.updateAsVal(ctor, uniformPopulator);
+	}
+	public <E extends Throwable>
+	void update(int frameID, UnsafeConsumer<ByteBuffer, E> uniformPopulator) throws VulkanCodeException, E{
 		var buf = buffers.get(frameID);
 		buf.update(uniformPopulator);
 	}
