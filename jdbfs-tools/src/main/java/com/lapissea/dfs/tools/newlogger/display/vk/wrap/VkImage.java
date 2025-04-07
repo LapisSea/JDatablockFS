@@ -50,6 +50,9 @@ public class VkImage extends VulkanResource.DeviceHandleObj{
 		this.type = type;
 	}
 	
+	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, VkMemoryPropertyFlag requiredProperty) throws VulkanCodeException{
+		return allocateAndBindRequiredMemory(physicalDevice, Flags.of(requiredProperty));
+	}
 	public VkDeviceMemory allocateAndBindRequiredMemory(PhysicalDevice physicalDevice, Flags<VkMemoryPropertyFlag> requiredProperties) throws VulkanCodeException{
 		var requirements    = getRequirements();
 		var memoryTypeIndex = physicalDevice.getMemoryTypeIndex(requirements.memoryTypeBits(), requiredProperties);
@@ -72,8 +75,14 @@ public class VkImage extends VulkanResource.DeviceHandleObj{
 		}
 	}
 	
+	public VkImageView createImageView(VkImageViewType type, VkFormat format, VkImageAspectFlag aspectFlag) throws VulkanCodeException{
+		return createImageView(type, format, Flags.of(aspectFlag));
+	}
 	public VkImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlag> aspectFlags) throws VulkanCodeException{
 		return createImageView(type, format, aspectFlags, 1, 1);
+	}
+	public VkImageView createImageView(VkImageViewType type, VkFormat format, VkImageAspectFlag aspectFlag, int mipLevelCount, int layerCount) throws VulkanCodeException{
+		return createImageView(type, format, Flags.of(aspectFlag), mipLevelCount, layerCount);
 	}
 	public VkImageView createImageView(VkImageViewType type, VkFormat format, Flags<VkImageAspectFlag> aspectFlags, int mipLevelCount, int layerCount) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){

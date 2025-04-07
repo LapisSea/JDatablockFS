@@ -98,10 +98,10 @@ public class VulkanCore implements AutoCloseable{
 	public static void preload(){
 		try{
 			validateExtensionsLayers(List.of(), List.of());
-		}catch(VulkanCodeException e){
+			Class.forName(STBImage.class.getName(), true, VulkanCore.class.getClassLoader());
+		}catch(Throwable e){
 			e.printStackTrace();
 		}
-		STBImage.stbi_failure_reason();
 	}
 	
 	static{
@@ -183,7 +183,7 @@ public class VulkanCore implements AutoCloseable{
 		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
 		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
 		
-		globalDescriptorPool = device.createDescriptorPool(1000, Flags.of(VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET));
+		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
 		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false);
 		
@@ -206,11 +206,11 @@ public class VulkanCore implements AutoCloseable{
 		if(mipLevels>1) usage = usage.and(VkImageUsageFlag.TRANSFER_SRC);
 		var image = device.createImage(width, height, format, usage, VkSampleCountFlag.N1, mipLevels);
 		
-		var memory = image.allocateAndBindRequiredMemory(physicalDevice, Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
+		var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
 		
 		imageUpdate(image, pixels, mipLevels);
 		
-		var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, Flags.of(VkImageAspectFlag.COLOR), mipLevels, 1);
+		var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR, mipLevels, 1);
 		
 		var sampler = image.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		
@@ -395,9 +395,9 @@ public class VulkanCore implements AutoCloseable{
 			                               Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT),
 			                               physicalDevice.samples, 1);
 			
-			var memory = image.allocateAndBindRequiredMemory(physicalDevice, Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL));
+			var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
 			
-			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, Flags.of(VkImageAspectFlag.COLOR));
+			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
 			
 			images.add(new VulkanTexture(image, memory, view, null));
 		}

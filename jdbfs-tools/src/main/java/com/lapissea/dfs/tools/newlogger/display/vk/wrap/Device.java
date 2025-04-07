@@ -330,6 +330,9 @@ public class Device implements VulkanResource{
 	}
 	
 	
+	public VkDescriptorPool createDescriptorPool(int maxSets, VkDescriptorPoolCreateFlag flag) throws VulkanCodeException{
+		return createDescriptorPool(maxSets, Flags.of(flag));
+	}
 	public VkDescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			

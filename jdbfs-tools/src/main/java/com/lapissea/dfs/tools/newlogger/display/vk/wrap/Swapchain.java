@@ -1,7 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
@@ -32,7 +31,7 @@ public class Swapchain extends VulkanResource.DeviceHandleObj{
 		
 		var views = new ArrayList<VkImageView>(images.size());
 		for(VkImage image : images){
-			views.add(image.createImageView(VkImageViewType.TYPE_2D, formatColor.format, Flags.of(VkImageAspectFlag.COLOR)));
+			views.add(image.createImageView(VkImageViewType.TYPE_2D, formatColor.format, VkImageAspectFlag.COLOR));
 		}
 		imageViews = List.copyOf(views);
 	}

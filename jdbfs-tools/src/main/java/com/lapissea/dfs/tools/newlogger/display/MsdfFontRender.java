@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.google.gson.GsonBuilder;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
@@ -387,14 +386,14 @@ public class MsdfFontRender implements VulkanResource{
 			core.device.waitIdle();
 			verts.destroy();
 			verts = core.allocateHostBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
-			description.bind(1, Flags.of(VkShaderStageFlag.VERTEX), verts.buffer, VkDescriptorType.STORAGE_BUFFER);
+			description.bind(1, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER);
 			dsSets.updateAll(description.bindData());
 		}
 		if(uniform.size()<neededInstanceMem){
 			core.device.waitIdle();
 			uniform.destroy();
 			uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true);
-			description.bind(0, Flags.of(VkShaderStageFlag.VERTEX), uniform);
+			description.bind(0, VkShaderStageFlag.VERTEX, uniform);
 			dsSets.updateAll(description.bindData());
 		}
 		if(indirectInstances.instanceCapacity()<drawCallCount){
