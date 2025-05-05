@@ -29,4 +29,6 @@ module JDatablockFS.tools {
 	exports com.lapissea.dfs.tools.newlogger.display.vk.enums to jlapisutil;
 	exports com.lapissea.dfs.tools.newlogger.display.vk.wrap to jlapisutil;
 	exports com.lapissea.dfs.tools.newlogger.display to jlapisutil;
+	exports com.lapissea.dfs.tools.newlogger.display.renderers to jlapisutil;
+	opens com.lapissea.dfs.tools.newlogger.display.renderers to com.google.gson;
 }

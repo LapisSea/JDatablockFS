@@ -1,6 +1,9 @@
-package com.lapissea.dfs.tools.newlogger.display;
+package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.dfs.tools.newlogger.display.ShaderType;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
@@ -61,7 +64,7 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	private static class Vert{
+	private static class Quad{
 		private static final int SIZE = (2 + 1)*4;
 		
 		private static void put(ByteBuffer dest, float xOff, float yOff, int letterId){
@@ -238,7 +241,7 @@ public class MsdfFontRender implements VulkanResource{
 	private VkPipeline pipeline;
 	
 	private void createResources() throws VulkanCodeException{
-		verts = core.allocateHostBuffer(Vert.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
+		verts = core.allocateHostBuffer(Quad.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
 		uniform = core.allocateUniformBuffer(Uniform.SIZE, true);
 		indirectInstances = core.allocateIndirectBuffer(1);
 		
@@ -379,7 +382,7 @@ public class MsdfFontRender implements VulkanResource{
 			}
 		}
 		
-		var neededVertMem     = vertCount*(long)Vert.SIZE;
+		var neededVertMem     = vertCount*(long)Quad.SIZE;
 		var neededInstanceMem = instanceCount*(long)Uniform.SIZE;
 		
 		if(verts.size()<neededVertMem){
@@ -414,7 +417,7 @@ public class MsdfFontRender implements VulkanResource{
 			var p  = table.index.getOrDefault(ch, table.missingCharId);
 			
 			if(!table.empty[p]){
-				Vert.put(b, (table.x0[p] + x)*fsScale, ((-table.y0[p]) + y)*fsScale, p);
+				Quad.put(b, (table.x0[p] + x)*fsScale, ((-table.y0[p]) + y)*fsScale, p);
 				count += 6;
 			}
 			

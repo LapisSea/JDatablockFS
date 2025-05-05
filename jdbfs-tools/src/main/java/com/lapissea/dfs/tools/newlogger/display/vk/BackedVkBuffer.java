@@ -14,6 +14,16 @@ import java.util.function.Function;
 
 public class BackedVkBuffer implements VulkanResource{
 	
+	public static class Typed<B extends StructBuffer<?, B>> extends BackedVkBuffer{
+		
+		
+		public Typed(VkBuffer buffer, VkDeviceMemory memory){
+			super(buffer, memory);
+		}
+		
+		
+	}
+	
 	public final  VkBuffer       buffer;
 	private final VkDeviceMemory memory;
 	
