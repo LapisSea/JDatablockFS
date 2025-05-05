@@ -187,11 +187,11 @@ public class VulkanCore implements AutoCloseable{
 		
 		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false);
 		
-		try(var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms)){
-			globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(layout.bindings());
-			globalUniformSets = globalUniformLayout.createDescriptorSetsPerFrame();
-			globalUniformSets.updateAll(layout.bindData());
-		}
+		
+		var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms);
+		globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(layout.bindings());
+		globalUniformSets = globalUniformLayout.createDescriptorSetsPerFrame();
+		globalUniformSets.updateAll(layout.bindData());
 		
 		renderPass = createRenderPass();
 		

@@ -28,8 +28,10 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
-	private final MsdfFontRender fontRender     = new MsdfFontRender();
-	private final ByteGridRender byteGridRender = new ByteGridRender();
+	private final MsdfFontRender fontRender = new MsdfFontRender();
+	
+	private final ByteGridRender                byteGridRender = new ByteGridRender();
+	private final ByteGridRender.RenderResource grid1Res       = new ByteGridRender.RenderResource();
 	
 	public VulkanDisplay(){
 		
@@ -168,7 +170,8 @@ public class VulkanDisplay implements AutoCloseable{
 					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 				fontRender.render(buf, frameID, sd);
 				
-				byteGridRender.render(buf, frameID);
+				byteGridRender.record(grid1Res);
+				byteGridRender.render(buf, frameID, grid1Res);
 			}
 			buf.end();
 			
@@ -230,11 +233,11 @@ public class VulkanDisplay implements AutoCloseable{
 	public void close() throws VulkanCodeException{
 		window.hide();
 		
-		try{
-			vkCore.renderQueue.waitIdle();
-		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		vkCore.device.waitIdle();
 		
 		fontRender.destroy();
+		
+		grid1Res.destroy();
 		byteGridRender.destroy();
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);

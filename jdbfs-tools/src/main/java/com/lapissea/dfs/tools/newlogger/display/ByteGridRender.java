@@ -128,13 +128,18 @@ public class ByteGridRender implements VulkanResource{
 	
 	private record MeshInfo(int vertPos, int vertCount){ }
 	
-	record RenderResource(UniformBuffer uniform, VkDescriptorSet.PerFrame dsSets, BackedVkBuffer buffer) implements VulkanResource{
+	public static final class RenderResource implements VulkanResource{
+		private UniformBuffer   uniform;
+		private VkDescriptorSet dsSets;
+		private BackedVkBuffer  buffer;
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
-			uniform.destroy();
-			dsSets.destroy();
-			buffer.destroy();
+			if(uniform != null){
+				uniform.destroy();
+				dsSets.destroy();
+				buffer.destroy();
+			}
 		}
 	}
 	
@@ -148,54 +153,26 @@ public class ByteGridRender implements VulkanResource{
 	private VkDescriptorSetLayout dsLayout;
 	private VkPipeline            pipeline;
 	
-	private RenderResource r1;
-	private RenderResource r2;
-	
 	public void init(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		shader.init(core);
 		
 		computeByteVerts(core);
 		
-		try(var dsDesc = new Descriptor.LayoutDescription()
-			                 .bind(0, VkShaderStageFlag.VERTEX, verts.buffer, VkDescriptorType.STORAGE_BUFFER)){
-			
-			dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(dsDesc.bindings());
-			dsSetConst = dsLayoutConst.createDescriptorSet();
-			
-			dsSetConst.update(dsDesc.bindData(), -1);
-		}
+		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
+		);
+		dsSetConst = dsLayoutConst.createDescriptorSet();
+		
+		dsSetConst.update(List.of(
+			new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, verts.buffer)
+		), -1);
 		
 		
-		try(var dsDesc = new Descriptor.LayoutDescription()){
-			
-			var uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false);
-			var bb      = core.allocateHostBuffer((long)(8*8)*GByte.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER);
-			
-			dsDesc.bind(0, VkShaderStageFlag.VERTEX, uniform);
-			dsDesc.bind(1, VkShaderStageFlag.VERTEX, bb.buffer, VkDescriptorType.STORAGE_BUFFER);
-			
-			dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(dsDesc.bindings());
-			
-			{
-				var descs = dsLayout.createDescriptorSetsPerFrame();
-				dsDesc.bind(0, VkShaderStageFlag.VERTEX, uniform);
-				dsDesc.bind(1, VkShaderStageFlag.VERTEX, bb.buffer, VkDescriptorType.STORAGE_BUFFER);
-				descs.updateAll(dsDesc.bindData());
-				
-				r1 = new RenderResource(uniform, descs, bb);
-			}
-			{
-				var unif  = core.allocateUniformBuffer(Uniform.SIZEOF, false);
-				var bb2   = core.allocateHostBuffer((long)(8*8)*GByte.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER);
-				var descs = dsLayout.createDescriptorSetsPerFrame();
-				dsDesc.bind(0, VkShaderStageFlag.VERTEX, unif);
-				dsDesc.bind(1, VkShaderStageFlag.VERTEX, bb2.buffer, VkDescriptorType.STORAGE_BUFFER);
-				descs.updateAll(dsDesc.bindData());
-				
-				r2 = new RenderResource(unif, descs, bb2);
-			}
-		}
+		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
+			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
+		);
 		
 		pipeline = VkPipeline.builder(core.renderPass, shader)
 		                     .blending(VkPipeline.Blending.STANDARD)
@@ -277,51 +254,49 @@ public class ByteGridRender implements VulkanResource{
 		});
 	}
 	
-	private int a = 0, c;
-	private long t, t2;
+	public void record(RenderResource resource) throws VulkanCodeException{
+		if(resource.buffer == null){
+			resource.buffer = core.allocateHostBuffer(GByte.SIZEOF*3L, VkBufferUsageFlag.STORAGE_BUFFER);
+			
+			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false);
+			resource.dsSets = dsLayout.createDescriptorSet();
+			resource.dsSets.update(List.of(
+				new Descriptor.LayoutDescription.UniformBuff(0, resource.uniform),
+				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, resource.buffer.buffer)
+			), 0);
+		}
+		
+		resource.buffer.updateAs(GByte.Buf::new, b -> {
+			b.put(0, Color.CYAN);
+			b.put(1, Color.YELLOW);
+			b.put(3, Color.PINK);
+		});
+		for(int i = 0; i<VulkanCore.MAX_IN_FLIGHT_FRAMES; i++){
+			resource.uniform.updateAs(i, Uniform::new, u -> u.set(new Matrix4f().translate(20, 40, 0).scale(100), 8));
+		}
+	}
 	
-	public void render(CommandBuffer buf, int frameID) throws VulkanCodeException{
+	private int  a = 0;
+	private long t;
+	
+	public void render(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
 		
 		buf.bindPipeline(pipeline, true);
 		
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, core.globalUniformSets.get(frameID), dsSetConst);
 		
-		r1.buffer.updateAs(GByte.Buf::new, b -> {
-			b.put(0, Color.CYAN);
-			b.put(1, Color.YELLOW);
-			b.put(3, Color.PINK);
-		});
-		r2.buffer.updateAs(GByte.Buf::new, b -> {
-			b.put(2, Color.RED);
-			b.put(4, Color.blue);
-		});
-		
-		r1.uniform.updateAs(frameID, Uniform::new, u -> u.set(new Matrix4f().translate(20, 40, 0).scale(100), 8));
-		r2.uniform.updateAs(frameID, Uniform::new, u -> u.set(new Matrix4f().translate(20, 40, 0).scale(100), 8));
-		
 		if(System.currentTimeMillis() - t>50){
 			a++;
 			if(a == 256) a = 0;
 			t = System.currentTimeMillis();
 		}
-		if(System.currentTimeMillis() - t2>150){
-			c++;
-			if(c == 256) c = 0;
-			t2 = System.currentTimeMillis();
-		}
 		
 		int b = a;
 		
-		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, r1.dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, resource.dsSets);
 		var info = meshInfos[b];
 		buf.draw(info.vertCount, 3, info.vertPos, 0);
-		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, r2.dsSets.get(frameID));
-		info = meshInfos[c];
-		buf.draw(info.vertCount, 2, info.vertPos, 0);
-		
 	}
 	
 	
@@ -329,8 +304,6 @@ public class ByteGridRender implements VulkanResource{
 	public void destroy() throws VulkanCodeException{
 		pipeline.destroy();
 		
-		r1.destroy();
-		r2.destroy();
 		dsLayout.destroy();
 		
 		dsSetConst.destroy();

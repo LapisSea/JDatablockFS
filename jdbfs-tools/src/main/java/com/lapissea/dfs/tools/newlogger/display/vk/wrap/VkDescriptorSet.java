@@ -54,7 +54,7 @@ public class VkDescriptorSet extends VulkanResource.DeviceHandleObj{
 			
 			for(int i = 0; i<bindings.size(); i++){
 				var binding = bindings.get(i);
-				binding.write(info.position(i), id);
+				binding.write(info.position(i), id, stack);
 				info.position(i)
 				    .sType$Default()
 				    .dstSet(handle)

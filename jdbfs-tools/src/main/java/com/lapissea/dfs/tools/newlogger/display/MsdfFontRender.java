@@ -253,14 +253,14 @@ public class MsdfFontRender implements VulkanResource{
 	
 	private void createPipeline() throws VulkanCodeException{
 		
-		try(var desc = new Descriptor.LayoutDescription()
-			               .bind(0, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
-			               .bind(1, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL)){
-			
-			dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(desc.bindings());
-			dsSetConst = dsLayoutConst.createDescriptorSet();
-			dsSetConst.update(desc.bindData(), -1);
-		}
+		var desc = new Descriptor.LayoutDescription()
+			           .bind(0, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
+			           .bind(1, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+		
+		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(desc.bindings());
+		dsSetConst = dsLayoutConst.createDescriptorSet();
+		dsSetConst.update(desc.bindData(), -1);
+		
 		
 		description =
 			new Descriptor.LayoutDescription()
@@ -429,8 +429,6 @@ public class MsdfFontRender implements VulkanResource{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
-		description.close();
-		
 		pipeline.destroy();
 		
 		dsSets.destroy();
