@@ -1,6 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
-import com.google.gson.GsonBuilder;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
@@ -28,14 +27,11 @@ import com.lapissea.util.UtilL;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
 import java.awt.Color;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -86,100 +82,9 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	record Metrics(double emSize, double lineHeight, double ascender, double descender, double underlineY, double underlineThickness){ }
-	
-	private static final class GlyphTable{
-		
-		private final int    distanceRange;
-		private final double size;
-		
-		private final Metrics metrics;
-		
-		private final float[]   advance;
-		private final boolean[] empty;
-		private final float[]   x0, x1, y0, y1;
-		private final float[] u0, u1, v0, v1;
-		
-		private final Map<Character, Integer> index;
-		
-		private int missingCharId;
-		
-		public GlyphTable(int distanceRange, double size, Metrics metrics, int count){
-			this.metrics = metrics;
-			index = HashMap.newHashMap(count);
-			this.distanceRange = distanceRange;
-			this.size = size;
-			
-			advance = new float[count];
-			empty = new boolean[count];
-			x0 = new float[count];
-			x1 = new float[count];
-			y0 = new float[count];
-			y1 = new float[count];
-			u0 = new float[count];
-			u1 = new float[count];
-			v0 = new float[count];
-			v1 = new float[count];
-		}
-	}
-	
-	
-	private static GlyphTable loadTable(){
-		record Info(String type, int distanceRange, double size, int width, int height, String yOrigin){ }
-		record Bounds(float left, float bottom, float right, float top){ }
-		record Glyph(int unicode, float advance, Bounds planeBounds, Bounds atlasBounds){ }
-		record AtlasInfo(Info atlas, Metrics metrics, List<Glyph> glyphs, List<?> kerning){ }
-		
-		AtlasInfo info;
-		try(var jsonData = VUtils.class.getResourceAsStream(LAYOUT_PATH)){
-			Objects.requireNonNull(jsonData);
-			info = new GsonBuilder().create().fromJson(new InputStreamReader(jsonData, StandardCharsets.UTF_8), AtlasInfo.class);
-		}catch(Throwable e){
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-		
-		var atlas  = info.atlas;
-		var glyphs = info.glyphs;
-		
-		int width = atlas.width, height = atlas.height;
-		
-		var table = new GlyphTable(atlas.distanceRange, atlas.size, info.metrics, glyphs.size());
-		
-		for(int i = 0; i<glyphs.size(); i++){
-			var glyph = glyphs.get(i);
-			table.index.put((char)glyph.unicode, i);
-			table.advance[i] = glyph.advance;
-			
-			var bounds   = glyph.planeBounds;
-			var uvBounds = glyph.atlasBounds;
-			
-			var empty = bounds == null || uvBounds == null;
-			table.empty[i] = empty;
-			if(empty) continue;
-			
-			table.x0[i] = bounds.left;
-			table.x1[i] = bounds.right;
-			table.y0[i] = bounds.bottom;
-			table.y1[i] = bounds.top;
-			
-			table.u0[i] = uvBounds.left/width;
-			table.u1[i] = uvBounds.right/width;
-			table.v0[i] = 1 - (uvBounds.top/height);
-			table.v1[i] = 1 - (uvBounds.bottom/height);
-		}
-		
-		table.missingCharId = Iters.of('\uFFFD', '?', ' ')
-		                           .map(table.index::get)
-		                           .findFirst()
-		                           .orElseThrow(() -> new NoSuchElementException("No default glyph found"));
-		
-		return table;
-	}
-	
 	private VulkanCore core;
 	
-	private final CompletableFuture<GlyphTable>    tableRes = CompletableFuture.supplyAsync(MsdfFontRender::loadTable);
+	private final CompletableFuture<Glyphs.Table>  tableRes = CompletableFuture.supplyAsync(() -> Glyphs.loadTable(LAYOUT_PATH));
 	private final CompletableFuture<VulkanTexture> atlas    = VulkanTexture.loadTexture(TEXTURE_PATH, false, () -> {
 		UtilL.sleepWhile(() -> core == null);
 		return core;
@@ -211,11 +116,11 @@ public class MsdfFontRender implements VulkanResource{
 			}
 		});
 	}
-	private void uploadTable(GlyphTable table) throws VulkanCodeException{
+	private void uploadTable(Glyphs.Table table) throws VulkanCodeException{
 		var count = table.index.size();
 		tableGpu = core.allocateLocalStorageBuffer(Letter.SIZE*(long)count, b -> {
 			var   metrics = table.metrics;
-			float fsScale = (float)(1/(metrics.ascender - metrics.descender));
+			float fsScale = (float)(1/(metrics.ascender() - metrics.descender()));
 			for(int i = 0; i<count; i++){
 				Letter.put(
 					b,
@@ -405,23 +310,23 @@ public class MsdfFontRender implements VulkanResource{
 			indirectInstances = core.allocateIndirectBuffer(drawCallCount);
 		}
 	}
-	private static int putStr(ByteBuffer b, GlyphTable table, String str){
-		var   metrics = table.metrics;
-		float fsScale = (float)(1/(metrics.ascender - metrics.descender));
+	
+	private static int putStr(ByteBuffer b, Glyphs.Table table, String str){
+		float fsScale = table.fsScale;
 		
 		float x     = 0, y = 0;// (float)metrics.descender;
 		int   count = 0;
 		var   len   = str.length();
 		for(int i = 0; i<len; i++){
-			var ch = str.charAt(i);
-			var p  = table.index.getOrDefault(ch, table.missingCharId);
+			var ch     = str.charAt(i);
+			var charID = table.index.getOrDefault(ch, table.missingCharId);
 			
-			if(!table.empty[p]){
-				Quad.put(b, (table.x0[p] + x)*fsScale, ((-table.y0[p]) + y)*fsScale, p);
+			if(!table.empty[charID]){
+				Quad.put(b, (table.x0[charID] + x)*fsScale, ((-table.y0[charID]) + y)*fsScale, charID);
 				count += 6;
 			}
 			
-			x += table.advance[p];
+			x += table.advance[charID];
 		}
 		return count;
 	}
