@@ -313,12 +313,16 @@ public class VulkanCore implements AutoCloseable{
 		}
 		return new UniformBuffer(List.of(res), ssbo);
 	}
-	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
-		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
+	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
+		var res = new IndirectDrawBuffer[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
-			res[i] = allocateHostBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
+			res[i] = allocateIndirectBuffer(instanceCount);
 		}
-		return new IndirectDrawBuffer(List.of(res));
+		return new IndirectDrawBuffer.PerFrame(res);
+	}
+	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
+		var buf = allocateHostBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
+		return new IndirectDrawBuffer(buf);
 	}
 	
 	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{

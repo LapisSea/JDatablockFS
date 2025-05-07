@@ -7,6 +7,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.BitSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -22,9 +23,9 @@ public final class Glyphs{
 		
 		final Metrics metrics;
 		
-		final float[]   advance;
-		final boolean[] empty;
-		final float[]   x0, x1, y0, y1;
+		final float[] advance;
+		final BitSet  empty;
+		final float[] x0, x1, y0, y1;
 		final float[] u0, u1, v0, v1;
 		
 		final CharIntHashMap index;
@@ -39,7 +40,7 @@ public final class Glyphs{
 			this.size = size;
 			
 			advance = new float[count];
-			empty = new boolean[count];
+			empty = new BitSet(count);
 			x0 = new float[count];
 			x1 = new float[count];
 			y0 = new float[count];
@@ -98,7 +99,7 @@ public final class Glyphs{
 			var uvBounds = glyph.atlasBounds;
 			
 			var empty = bounds == null || uvBounds == null;
-			table.empty[i] = empty;
+			table.empty.set(i, empty);
 			if(empty) continue;
 			
 			table.x0[i] = bounds.left;

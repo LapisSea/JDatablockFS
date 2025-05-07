@@ -132,9 +132,9 @@ public class MsdfFontRender implements VulkanResource{
 		});
 	}
 	
-	private UniformBuffer      uniform;
-	private BackedVkBuffer     verts;
-	private IndirectDrawBuffer indirectInstances;
+	private UniformBuffer               uniform;
+	private BackedVkBuffer              verts;
+	private IndirectDrawBuffer.PerFrame indirectInstances;
 	
 	private Descriptor.LayoutDescription description;
 	private VkDescriptorSetLayout        dsLayout;
@@ -148,7 +148,7 @@ public class MsdfFontRender implements VulkanResource{
 	private void createResources() throws VulkanCodeException{
 		verts = core.allocateHostBuffer(Quad.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
 		uniform = core.allocateUniformBuffer(Uniform.SIZE, true);
-		indirectInstances = core.allocateIndirectBuffer(1);
+		indirectInstances = core.allocateIndirectBufferPerFrame(1);
 		
 		var frag  = Iters.from(shader).filter(e -> e.stage == VkShaderStageFlag.FRAGMENT).getFirst();
 		var table = tableRes.join();
@@ -205,7 +205,9 @@ public class MsdfFontRender implements VulkanResource{
 		if(strs.isEmpty()) return;
 		waitFullyCreated();
 		
-		ensureRequiredMemory(strs);
+		var table = tableRes.join();
+		
+		ensureRequiredMemory(table, strs);
 		
 		buf.bindPipeline(pipeline, true);
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
@@ -221,9 +223,8 @@ public class MsdfFontRender implements VulkanResource{
 		){
 			var vertMem    = vertMemWrap.getBuffer();
 			var uniformMem = uniformMemWrap.getBuffer();
-			var drawCmd    = drawCmdWrap.val;
+			var drawCmd    = drawCmdWrap.buffer;
 			
-			var table = tableRes.join();
 			
 			record InstancePos(int vertPos, int vertCount){ }
 			Map<String, InstancePos> instanceMap = HashMap.newHashMap(strs.size());
@@ -266,19 +267,26 @@ public class MsdfFontRender implements VulkanResource{
 			}
 		}
 		
-		buf.drawIndirect(indirectInstances, frameID, indirectInstanceCount);
+		buf.drawIndirect(indirectInstances, frameID, 0, indirectInstanceCount);
 	}
-	private void ensureRequiredMemory(List<StringDraw> strs) throws VulkanCodeException{
+	private void ensureRequiredMemory(Glyphs.Table table, List<StringDraw> strs) throws VulkanCodeException{
 		int instanceCount = 0;
 		int vertCount     = 0;
+		
 		
 		Set<String> uniqueStrings = HashSet.newHashSet(strs.size());
 		int         drawCallCount = 0;
 		String      lastStr       = null;
 		for(StringDraw str : strs){
 			if(str.outline>0 && str.pixelHeight<outlineCutoff) continue;
-			if(uniqueStrings.add(str.string)){
-				vertCount += str.string.length();
+			var s = str.string;
+			if(uniqueStrings.add(s)){
+				for(int i = 0, l = s.length(); i<l; i++){
+					var id = table.index.getOrDefault(s.charAt(i), -1);
+					if(id != -1 && !table.empty.get(id)){
+						vertCount++;
+					}
+				}
 			}
 			instanceCount++;
 			if(!str.string.equals(lastStr)){
@@ -307,7 +315,7 @@ public class MsdfFontRender implements VulkanResource{
 		if(indirectInstances.instanceCapacity()<drawCallCount){
 			core.device.waitIdle();
 			indirectInstances.destroy();
-			indirectInstances = core.allocateIndirectBuffer(drawCallCount);
+			indirectInstances = core.allocateIndirectBufferPerFrame(drawCallCount);
 		}
 	}
 	
@@ -321,7 +329,7 @@ public class MsdfFontRender implements VulkanResource{
 			var ch     = str.charAt(i);
 			var charID = table.index.getOrDefault(ch, table.missingCharId);
 			
-			if(!table.empty[charID]){
+			if(!table.empty.get(charID)){
 				Quad.put(b, (table.x0[charID] + x)*fsScale, ((-table.y0[charID]) + y)*fsScale, charID);
 				count += 6;
 			}

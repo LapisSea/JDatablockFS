@@ -189,8 +189,11 @@ public class CommandBuffer implements VulkanResource{
 		VK10.vkCmdDrawIndexed(val, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 	
-	public void drawIndirect(IndirectDrawBuffer buffer, int frameID, int drawCount){
-		VK10.vkCmdDrawIndirect(val, buffer.getBuffer(frameID).handle, 0, drawCount, VkDrawIndirectCommand.SIZEOF);
+	public void drawIndirect(IndirectDrawBuffer.PerFrame buffer, int frameID, int firstInstance, int instanceCount){
+		drawIndirect(buffer.getBuffer(frameID), firstInstance, instanceCount);
+	}
+	public void drawIndirect(IndirectDrawBuffer buffer, int firstInstance, int instanceCount){
+		drawIndirect(buffer.getVkBuffer(), firstInstance*(long)VkDrawIndirectCommand.SIZEOF, instanceCount, VkDrawIndirectCommand.SIZEOF);
 	}
 	public void drawIndirect(VkBuffer buffer, long offset, int drawCount, int stride){
 		VK10.vkCmdDrawIndirect(val, buffer.handle, offset, drawCount, stride);
