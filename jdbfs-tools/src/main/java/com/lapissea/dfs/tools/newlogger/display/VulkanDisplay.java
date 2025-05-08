@@ -7,9 +7,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
@@ -50,6 +52,18 @@ public class VulkanDisplay implements AutoCloseable{
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
 			
+			byte[] bytes = new RawRandom(10).nextBytes(32*32);
+			
+			byteGridRender.record(
+				grid1Res,
+				new Matrix4f().translate(30, 30, 0).scale(15),
+				32,
+				bytes,
+				List.of(
+					new ByteGridRender.DrawRange(0, bytes.length/2, Color.BLUE),
+					new ByteGridRender.DrawRange(bytes.length/2, bytes.length, Color.RED)
+				)
+			);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
@@ -172,8 +186,12 @@ public class VulkanDisplay implements AutoCloseable{
 					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 				fontRender.render(buf, frameID, sd);
 				
-				byteGridRender.record(grid1Res);
-				byteGridRender.render(buf, frameID, grid1Res);
+				var t = (System.currentTimeMillis())/800D;
+				byteGridRender.record(
+					grid1Res, frameID,
+					new Matrix4f().translate(30, 30, 0).scale((float)(15*(Math.sin(t)/2 + 0.55)))
+				);
+				byteGridRender.submit(buf, frameID, grid1Res);
 			}
 			buf.end();
 			

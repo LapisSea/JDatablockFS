@@ -20,9 +20,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
+import org.lwjgl.system.CustomBuffer;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
@@ -63,23 +65,24 @@ public class ByteGridRender implements VulkanResource{
 		private static final int TILE_WIDTH;
 		
 		static{
-			Layout layout = __struct(
+			var layout = __struct(
 				__member(4*4*Float.BYTES),
 				__member(Integer.BYTES)
 			);
 			
 			SIZEOF = layout.getSize();
-			
 			MAT = layout.offsetof(0);
 			TILE_WIDTH = layout.offsetof(1);
 		}
 		
+		void mat(Matrix4f mat)       { mat.getToAddress(address + MAT); }
+		void tileWidth(int tileWidth){ MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth); }
 		void set(Matrix4f mat, int tileWidth){
-			mat.get(MemoryUtil.memFloatBuffer(address() + MAT, SIZEOF));
-			MemoryUtil.memPutInt(address() + TILE_WIDTH, tileWidth);
+			mat(mat);
+			tileWidth(tileWidth);
 		}
 		
-		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), null); }
+		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
 		protected Uniform(long address)   { super(address, null); }
 		@Override
 		protected Uniform create(long address, ByteBuffer container){ return new Uniform(address); }
@@ -118,6 +121,8 @@ public class ByteGridRender implements VulkanResource{
 			void put(int index, Color color){ get().set(index, color); }
 		}
 		
+		int index(){ return MemoryUtil.memGetInt(address() + INDEX); }
+		
 		void set(int index, Color color){
 			MemoryUtil.memPutInt(address() + INDEX, index);
 			MemoryUtil.memPutInt(address() + COLOR, VUtils.toRGBAi4(color));
@@ -134,20 +139,26 @@ public class ByteGridRender implements VulkanResource{
 	
 	public static final class RenderResource implements VulkanResource{
 		
-		private UniformBuffer   uniform;
-		private VkDescriptorSet dsSet;
-		private BackedVkBuffer  buffer;
+		private UniformBuffer            uniform;
+		private VkDescriptorSet.PerFrame dsSets;
+		private BackedVkBuffer           bytesInfo;
 		
 		private IndirectDrawBuffer indirectDrawBuff;
 		
 		private int instanceCount;
 		
+		private void updateDescriptor(){
+			dsSets.updateAll(List.of(
+				new Descriptor.LayoutDescription.UniformBuff(0, uniform),
+				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer)
+			));
+		}
 		@Override
 		public void destroy() throws VulkanCodeException{
 			if(uniform != null){
 				uniform.destroy();
-				dsSet.destroy();
-				buffer.destroy();
+				dsSets.destroy();
+				bytesInfo.destroy();
 				indirectDrawBuff.destroy();
 			}
 		}
@@ -264,52 +275,79 @@ public class ByteGridRender implements VulkanResource{
 		});
 	}
 	
-	public void record(RenderResource resource) throws VulkanCodeException{
-		if(resource.buffer == null){
-			resource.buffer = core.allocateHostBuffer(GByte.SIZEOF*3L, VkBufferUsageFlag.STORAGE_BUFFER);
-			
+	public record DrawRange(int from, int to, Color color){
+		public DrawRange{
+			if(from>to){
+				throw new IllegalArgumentException();
+			}
+		}
+	}
+	
+	public void record(RenderResource resource, int frameId, Matrix4f transform) throws VulkanCodeException{
+		resource.uniform.updateAs(frameId, Uniform::new, u -> u.mat(transform));
+	}
+	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges) throws VulkanCodeException{
+		if(resource.uniform == null){
 			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false);
-			resource.dsSet = dsLayout.createDescriptorSet();
-			resource.dsSet.update(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, resource.uniform),
-				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, resource.buffer.buffer)
-			), 0);
-			
-			resource.indirectDrawBuff = core.allocateIndirectBuffer(10);
+			resource.dsSets = dsLayout.createDescriptorSetsPerFrame();
+			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
 		}
 		
-		resource.buffer.updateAs(GByte.Buf::new, b -> {
-			b.put(0, Color.CYAN);
-			b.put(1, Color.YELLOW);
-			b.put(3, Color.PINK);
-		});
+		GByte.Buf[] byteBuffers = new GByte.Buf[256];
 		
-		try(var draws = resource.indirectDrawBuff.update()){
+		for(DrawRange range : ranges){
+			for(int i = range.from; i<range.to; i++){
+				var b   = Byte.toUnsignedInt(data[i]);
+				var buf = byteBuffers[b];
+				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
+				else if(!buf.hasRemaining()){
+					var nb = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*buf.capacity()*2));
+					nb.put(buf.flip());
+					buf.free();
+					buf = byteBuffers[b] = nb;
+				}
+				buf.put(i, range.color);
+			}
+		}
+		
+		var cap = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
+		if(resource.bytesInfo == null || resource.bytesInfo.size()/GByte.SIZEOF<cap){
+			if(resource.bytesInfo != null){
+				core.device.waitIdle();
+				resource.bytesInfo.destroy();
+			}
+			resource.bytesInfo = core.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.updateDescriptor();
+		}
+		
+		try(var draws = resource.indirectDrawBuff.update();
+		    var ses = resource.bytesInfo.updateAs(GByte.Buf::new)){
+			var instancesBuff = ses.val;
 			draws.clear();
 			
-			var info = meshInfos[10];
-			draws.draw(info.vertCount, 1, info.vertPos, 0);
+			for(int i = 0; i<byteBuffers.length; i++){
+				var buf = byteBuffers[i];
+				if(buf == null) continue;
+				var info = meshInfos[i];
+				draws.draw(info.vertCount, buf.remaining(), info.vertPos, instancesBuff.position());
+				instancesBuff.put(buf);
+				buf.free();
+			}
 			
-			info = meshInfos[100];
-			draws.draw(info.vertCount, 1, info.vertPos, 1);
-			
-			info = meshInfos[1];
-			draws.draw(info.vertCount, 1, info.vertPos, 2);
 			resource.instanceCount = draws.buffer.position();
 		}
 		
 		for(int i = 0; i<VulkanCore.MAX_IN_FLIGHT_FRAMES; i++){
-			resource.uniform.updateAs(i, Uniform::new, u -> u.set(new Matrix4f().translate(20, 40, 0).scale(100), 8));
+			resource.uniform.updateAs(i, Uniform::new, u -> u.set(transform, tileWidth));
 		}
 	}
 	
-	public void render(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
-		
-		buf.bindPipeline(pipeline, true);
+	public void submit(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
+		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, core.globalUniformSets.get(frameID), dsSetConst);
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, resource.dsSet);
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, resource.dsSets.get(frameID));
 		
 		buf.drawIndirect(resource.indirectDrawBuff, 0, resource.instanceCount);
 	}

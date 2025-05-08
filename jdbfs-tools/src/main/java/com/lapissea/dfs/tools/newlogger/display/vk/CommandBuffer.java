@@ -178,6 +178,9 @@ public class CommandBuffer implements VulkanResource{
 		}
 	}
 	
+	public void bindPipeline(VkPipeline pipeline){
+		bindPipeline(pipeline, true);
+	}
 	public void bindPipeline(VkPipeline pipeline, boolean graphics){
 		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
 	}
