@@ -43,12 +43,13 @@ public class ByteGridRender implements VulkanResource{
 		
 		static final int T_BACK  = 0;
 		static final int T_SET   = 1;
-		static final int T_WRITE = 1;
+		static final int T_WRITE = 2;
 		
 		private static void putQuad(ByteBuffer bb, int x, int y, int w, int h, int type){
 			put(bb, x/3F, y/3F, type);
 			put(bb, x/3F, (y + h)/3F, type);
 			put(bb, (x + w)/3F, (y + h)/3F, type);
+			
 			put(bb, x/3F, y/3F, type);
 			put(bb, (x + w)/3F, (y + h)/3F, type);
 			put(bb, (x + w)/3F, y/3F, type);

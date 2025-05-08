@@ -26,7 +26,14 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 				tasks.add(CompletableFuture.supplyAsync(() -> {
 					try{
 						var spirv = VulkanCore.sourceToSpirv(name, type);
-						UtilL.sleepWhile(() -> core == null);
+						while(true){
+							synchronized(this){
+								if(core != null) break;
+								try{
+									this.wait(20);
+								}catch(InterruptedException e){ throw new RuntimeException(e); }
+							}
+						}
 						return core.createShaderModule(spirv, type);
 					}catch(VulkanCodeException e){
 						throw UtilL.uncheckedThrow(e);
@@ -49,7 +56,10 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 	
 	
 	public void init(VulkanCore core){
-		this.core = Objects.requireNonNull(core);
+		synchronized(this){
+			this.core = Objects.requireNonNull(core);
+			this.notifyAll();
+		}
 	}
 	
 	private ShaderModule[] getModules(){

@@ -17,6 +17,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
@@ -197,7 +198,8 @@ public class Device implements VulkanResource{
 		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
 		VkSampleCountFlag sampleCount, boolean multisampleShading,
 		List<VkDescriptorSetLayout> descriptorSetLayouts,
-		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates
+		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates,
+		Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -206,8 +208,13 @@ public class Device implements VulkanResource{
 			for(int i = 0; i<modules.size(); i++){
 				var module = modules.get(i);
 				
-				VkSpecializationInfo spec     = null;
-				Map<Integer, Object> specVals = module.specializationValues;
+				var stage = shaderStages.get(i);
+				stage.sType$Default()
+				     .stage(module.stage.bit)
+				     .module(module.handle)
+				     .pName(main);
+				
+				Map<Integer, Object> specVals = specializationValues.getOrDefault(module.stage, Map.of());
 				if(!specVals.isEmpty()){
 					var entries = VkSpecializationMapEntry.calloc(specVals.size(), stack);
 					var buff    = stack.malloc(specVals.size()*8);
@@ -217,6 +224,7 @@ public class Device implements VulkanResource{
 						
 						var pos = buff.position();
 						switch(val){
+							case Boolean b -> buff.putInt(b? 1 : 0);
 							case Integer i1 -> buff.putInt(i1);
 							case Float f -> buff.putFloat(f);
 							case Double d -> buff.putDouble(d);
@@ -226,17 +234,11 @@ public class Device implements VulkanResource{
 						entries.get().set(id, pos, size);
 					}
 					
-					spec = VkSpecializationInfo.calloc(stack)
-					                           .pMapEntries(entries.flip())
-					                           .pData(buff.flip());
+					stage.pSpecializationInfo(VkSpecializationInfo.calloc(stack)
+					                                              .pMapEntries(entries.flip())
+					                                              .pData(buff.flip()));
 				}
 				
-				shaderStages.get(i)
-				            .sType$Default()
-				            .stage(module.stage.bit)
-				            .module(module.handle)
-				            .pName(main)
-				            .pSpecializationInfo(spec);
 			}
 			
 			var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();

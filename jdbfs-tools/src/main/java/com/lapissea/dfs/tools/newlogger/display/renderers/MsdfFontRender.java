@@ -22,7 +22,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
@@ -150,11 +149,6 @@ public class MsdfFontRender implements VulkanResource{
 		uniform = core.allocateUniformBuffer(Uniform.SIZE, true);
 		indirectInstances = core.allocateIndirectBufferPerFrame(1);
 		
-		var frag  = Iters.from(shader).filter(e -> e.stage == VkShaderStageFlag.FRAGMENT).getFirst();
-		var table = tableRes.join();
-		frag.specializationValues.put(0, (float)table.distanceRange);
-		frag.specializationValues.put(1, (float)table.size);
-		
 		createPipeline();
 	}
 	
@@ -180,6 +174,8 @@ public class MsdfFontRender implements VulkanResource{
 		
 		dsSets.updateAll(description.bindData());
 		
+		var table = tableRes.join();
+		
 		pipeline = VkPipeline.builder(core.renderPass, shader)
 		                     .blending(VkPipeline.Blending.STANDARD)
 		                     .multisampling(core.physicalDevice.samples, true)
@@ -187,6 +183,8 @@ public class MsdfFontRender implements VulkanResource{
 		                     .addDesriptorSetLayout(core.globalUniformLayout)
 		                     .addDesriptorSetLayout(dsLayoutConst)
 		                     .addDesriptorSetLayout(dsLayout)
+		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 0, (float)table.distanceRange)
+		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 1, (float)table.size)
 		                     .build();
 	}
 	

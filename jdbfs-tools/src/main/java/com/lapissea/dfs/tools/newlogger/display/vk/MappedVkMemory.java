@@ -50,6 +50,9 @@ public class MappedVkMemory implements AutoCloseable{
 	public ByteBuffer getBuffer(){
 		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(getActualSize()));
 	}
+	public long getAddress(){
+		return ptr;
+	}
 	
 	@Override
 	public void close() throws VulkanCodeException{

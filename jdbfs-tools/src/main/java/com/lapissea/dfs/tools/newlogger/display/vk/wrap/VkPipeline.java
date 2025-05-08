@@ -9,12 +9,16 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import org.lwjgl.vulkan.VK10;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -49,7 +53,9 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 		private       boolean                     multisampleShading;
 		private final List<VkDescriptorSetLayout> desriptorSetLayouts = new ArrayList<>();
 		private       VkPipeline.Blending         blending;
-		private       Set<VkDynamicState>         dynamicStates       = new HashSet<>();
+		private final Set<VkDynamicState>         dynamicStates       = new HashSet<>();
+		
+		private final Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues = new EnumMap<>(VkShaderStageFlag.class);
 		
 		private Builder(RenderPass renderPass, List<ShaderModule> modules){
 			this.renderPass = Objects.requireNonNull(renderPass);
@@ -62,6 +68,10 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 		
 		public Builder subpass(int subpass){
 			this.subpass = subpass;
+			return this;
+		}
+		public Builder specializationValue(VkShaderStageFlag stage, int id, Object value){
+			specializationValues.computeIfAbsent(stage, e -> new HashMap<>()).put(id, value);
 			return this;
 		}
 		public Builder addDesriptorSetLayout(VkDescriptorSetLayout layout){
@@ -108,7 +118,7 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 				polygonMode, cullMode, frontFace,
 				sampleCount, multisampleShading,
 				desriptorSetLayouts, blending,
-				dynamicStates
+				dynamicStates, specializationValues
 			);
 		}
 	}
