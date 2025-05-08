@@ -26,9 +26,43 @@ layout (set = 2, binding = 1) readonly buffer Bytes { Byte data[]; } in_bytes;
 
 layout (location = 0) out vec4 colOut;
 
+layout (constant_id = 0) const bool simple = false;
+
+const Vert simpleVerts[] = {
+    {0.0, 0.0, 0},
+    {0.0, 1.0, 0},
+    {1.0, 1.0, 0},
+
+    {0.0, 0.0, 0},
+    {1.0, 1.0, 0},
+    {1.0, 0.0, 0},
+
+    {0.0, 0.0, 1},
+    {0.0, 1.0, 1},
+    {1.0, 1.0, 1},
+
+    {0.0, 0.0, 1},
+    {1.0, 1.0, 1},
+    {1.0, 0.0, 1},
+};
+
 void main() {
 
-    Vert vt = in_verts.data[gl_VertexIndex];
+    Vert vt;
+    if(simple){
+        int vertIdx=gl_VertexIndex-gl_BaseVertex;
+        if(vertIdx>=12){
+            vt=Vert(0.,0.,0);
+        }else{
+            vt = simpleVerts[vertIdx];
+            if(vt.type == 1&&vt.y>0){
+                vt.y=gl_DrawID/255.0;
+            }
+        }
+    }else{
+        vt= in_verts.data[gl_VertexIndex];
+    }
+
     Byte byt = in_bytes.data[gl_InstanceIndex];
 
     int tileX = byt.index % ubo.tileWidth;

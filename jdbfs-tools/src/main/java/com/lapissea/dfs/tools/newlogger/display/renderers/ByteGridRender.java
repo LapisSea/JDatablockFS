@@ -24,6 +24,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.system.CustomBuffer;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
@@ -148,6 +149,18 @@ public class ByteGridRender implements VulkanResource{
 		
 		private int instanceCount;
 		
+		private boolean checkSmallBytes(int frameID) throws VulkanCodeException{
+			var mat = new Matrix4f();
+			try(var mem = uniform.update(frameID)){
+				mat.setFromAddress(mem.getAddress() + Uniform.MAT);
+			}
+			var scale3 = new Vector3f();
+			mat.getScale(scale3);
+			var scale = scale3.x;
+			
+			return scale<5;
+		}
+		
 		private void updateDescriptor(){
 			dsSets.updateAll(List.of(
 				new Descriptor.LayoutDescription.UniformBuff(0, uniform),
@@ -174,6 +187,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	private VkDescriptorSetLayout dsLayout;
 	private VkPipeline            pipeline;
+	private VkPipeline            pipelineSimple;
 	
 	public void init(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
@@ -195,15 +209,17 @@ public class ByteGridRender implements VulkanResource{
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
 			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
 		);
+		var builder = VkPipeline.builder(core.renderPass, shader)
+		                        .blending(VkPipeline.Blending.STANDARD)
+		                        .multisampling(core.physicalDevice.samples, false)
+		                        .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+		                        .addDesriptorSetLayout(core.globalUniformLayout)
+		                        .addDesriptorSetLayout(dsLayoutConst)
+		                        .addDesriptorSetLayout(dsLayout);
+		pipeline = builder.build();
+		pipelineSimple = builder.specializationValue(VkShaderStageFlag.VERTEX, 0, true)
+		                        .build();
 		
-		pipeline = VkPipeline.builder(core.renderPass, shader)
-		                     .blending(VkPipeline.Blending.STANDARD)
-		                     .multisampling(core.physicalDevice.samples, false)
-		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .addDesriptorSetLayout(core.globalUniformLayout)
-		                     .addDesriptorSetLayout(dsLayoutConst)
-		                     .addDesriptorSetLayout(dsLayout)
-		                     .build();
 	}
 	
 	private void computeByteVerts(VulkanCore core) throws VulkanCodeException{
@@ -284,8 +300,8 @@ public class ByteGridRender implements VulkanResource{
 		}
 	}
 	
-	public void record(RenderResource resource, int frameId, Matrix4f transform) throws VulkanCodeException{
-		resource.uniform.updateAs(frameId, Uniform::new, u -> u.mat(transform));
+	public void record(RenderResource resource, int frameId, Matrix4f transform, int tileWidth) throws VulkanCodeException{
+		resource.uniform.updateAs(frameId, Uniform::new, u -> u.set(transform, tileWidth));
 	}
 	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges) throws VulkanCodeException{
 		if(resource.uniform == null){
@@ -328,7 +344,10 @@ public class ByteGridRender implements VulkanResource{
 			
 			for(int i = 0; i<byteBuffers.length; i++){
 				var buf = byteBuffers[i];
-				if(buf == null) continue;
+				if(buf == null){
+					draws.draw(0, 0, 0, 0);
+					continue;
+				}
 				var info = meshInfos[i];
 				draws.draw(info.vertCount, buf.remaining(), info.vertPos, instancesBuff.position());
 				instancesBuff.put(buf);
@@ -344,6 +363,9 @@ public class ByteGridRender implements VulkanResource{
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
+		var small = resource.checkSmallBytes(frameID);
+		
+		var pipeline = small? pipelineSimple : this.pipeline;
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
 		
@@ -357,6 +379,7 @@ public class ByteGridRender implements VulkanResource{
 	@Override
 	public void destroy() throws VulkanCodeException{
 		pipeline.destroy();
+		pipelineSimple.destroy();
 		
 		dsLayout.destroy();
 		

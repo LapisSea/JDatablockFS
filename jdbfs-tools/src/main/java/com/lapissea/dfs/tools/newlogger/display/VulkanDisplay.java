@@ -60,8 +60,8 @@ public class VulkanDisplay implements AutoCloseable{
 				32,
 				bytes,
 				List.of(
-					new ByteGridRender.DrawRange(0, bytes.length/2, Color.BLUE),
-					new ByteGridRender.DrawRange(bytes.length/2, bytes.length, Color.RED)
+					new ByteGridRender.DrawRange(0, bytes.length/2, Color.green.darker()),
+					new ByteGridRender.DrawRange(bytes.length/2, bytes.length, Color.RED.darker())
 				)
 			);
 		}catch(VulkanCodeException e){
@@ -166,37 +166,61 @@ public class VulkanDisplay implements AutoCloseable{
 			buf.begin();
 			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 				
+				int count = 32*32;
+				var space = vkCore.swapchain.extent;
+				
+				int bytesPerRow = 1;
+				
+				while(true){
+					var byteSize   = space.width/(float)bytesPerRow;
+					var rows       = Math.ceilDiv(count, bytesPerRow);
+					var rowsHeight = rows*byteSize;
+					if(rowsHeight>=space.height){
+						bytesPerRow++;
+					}else{
+						break;
+					}
+				}
+				var byteSize = space.width/(float)bytesPerRow;
+				
+				byteGridRender.record(
+					grid1Res, frameID,
+					new Matrix4f().translate(0, 0, 0)
+					              .scale(byteSize),
+					bytesPerRow
+				);
+				byteGridRender.submit(buf, frameID, grid1Res);
+				
 				List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
 				
-				var pos = 0F;
-				for(int i = 0; i<40; i++){
-					float size = 1 + (i*i)*0.2F;
-					
-					var t = (System.currentTimeMillis())/500D;
-					var h = (float)Math.sin(t + pos/(10 + i*3))*50;
-					sd.add(new MsdfFontRender.StringDraw(size, Color.GREEN.darker(),
-					                                     "a", 20 + pos, 70 + 360 - h));
-					sd.add(new MsdfFontRender.StringDraw(size, Color.WHITE,
-					                                     "a", 20 + pos, 70 + 360 - h, 1, 2F));
-					pos += size*0.4F + 2;
-				}
+				//testFontWave(sd);
+				
 				sd.add(new MsdfFontRender.StringDraw(
 					100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
 				sd.add(new MsdfFontRender.StringDraw(
 					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 				fontRender.render(buf, frameID, sd);
 				
-				var t = (System.currentTimeMillis())/800D;
-				byteGridRender.record(
-					grid1Res, frameID,
-					new Matrix4f().translate(30, 30, 0).scale((float)(15*(Math.sin(t)/2 + 0.55)))
-				);
-				byteGridRender.submit(buf, frameID, grid1Res);
 			}
 			buf.end();
 			
 		}
 		
+	}
+	
+	private static void testFontWave(List<MsdfFontRender.StringDraw> sd){
+		var pos = 0F;
+		for(int i = 0; i<40; i++){
+			float size = 1 + (i*i)*0.2F;
+			
+			var t = (System.currentTimeMillis())/500D;
+			var h = (float)Math.sin(t + pos/(10 + i*3))*50;
+			sd.add(new MsdfFontRender.StringDraw(size, Color.GREEN.darker(),
+			                                     "a", 20 + pos, 70 + 360 - h));
+			sd.add(new MsdfFontRender.StringDraw(size, Color.WHITE,
+			                                     "a", 20 + pos, 70 + 360 - h, 1, 2F));
+			pos += size*0.4F + 2;
+		}
 	}
 	
 	private GlfwWindow createWindow(){
