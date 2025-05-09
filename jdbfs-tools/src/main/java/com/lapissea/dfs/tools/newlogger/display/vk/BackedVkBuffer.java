@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.lwjgl.system.Pointer;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
 import org.lwjgl.vulkan.VK10;
@@ -69,11 +70,14 @@ public class BackedVkBuffer implements VulkanResource{
 	}
 	
 	public <T extends Struct<T>> void updateAsVal(Function<ByteBuffer, T> ctor, Consumer<T> fn) throws VulkanCodeException{
-		try(var mem = updateAsVal(0, VK10.VK_WHOLE_SIZE, ctor)){
+		try(var mem = updateAsVal(ctor)){
 			fn.accept(mem.val);
 		}
 	}
-	public <T extends Struct<T>> MemorySession<T> updateAsVal(long offset, long size, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
+	public <T extends Pointer> MemorySession<T> updateAsVal(Function<ByteBuffer, T> ctor) throws VulkanCodeException{
+		return updateAsVal(0, VK10.VK_WHOLE_SIZE, ctor);
+	}
+	public <T extends Pointer> MemorySession<T> updateAsVal(long offset, long size, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
 		var mem = update(offset, size);
 		try{
 			var buf = ctor.apply(mem.getBuffer());

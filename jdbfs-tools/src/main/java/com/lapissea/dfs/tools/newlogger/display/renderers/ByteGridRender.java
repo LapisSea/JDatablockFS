@@ -77,8 +77,10 @@ public class ByteGridRender implements VulkanResource{
 			TILE_WIDTH = layout.offsetof(1);
 		}
 		
+		Matrix4f mat()               { return new Matrix4f().setFromAddress(address + MAT); }
 		void mat(Matrix4f mat)       { mat.getToAddress(address + MAT); }
 		void tileWidth(int tileWidth){ MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth); }
+		
 		void set(Matrix4f mat, int tileWidth){
 			mat(mat);
 			tileWidth(tileWidth);
@@ -141,7 +143,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	public static final class RenderResource implements VulkanResource{
 		
-		private UniformBuffer            uniform;
+		private UniformBuffer<Uniform>   uniform;
 		private VkDescriptorSet.PerFrame dsSets;
 		private BackedVkBuffer           bytesInfo;
 		
@@ -150,9 +152,9 @@ public class ByteGridRender implements VulkanResource{
 		private int instanceCount;
 		
 		private boolean checkSmallBytes(int frameID) throws VulkanCodeException{
-			var mat = new Matrix4f();
+			Matrix4f mat;
 			try(var mem = uniform.update(frameID)){
-				mat.setFromAddress(mem.getAddress() + Uniform.MAT);
+				mat = mem.val.mat();
 			}
 			var scale3 = new Vector3f();
 			mat.getScale(scale3);
@@ -301,11 +303,11 @@ public class ByteGridRender implements VulkanResource{
 	}
 	
 	public void record(RenderResource resource, int frameId, Matrix4f transform, int tileWidth) throws VulkanCodeException{
-		resource.uniform.updateAs(frameId, Uniform::new, u -> u.set(transform, tileWidth));
+		resource.uniform.update(frameId, u -> u.set(transform, tileWidth));
 	}
 	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges) throws VulkanCodeException{
 		if(resource.uniform == null){
-			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false);
+			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false, Uniform::new);
 			resource.dsSets = dsLayout.createDescriptorSetsPerFrame();
 			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
 		}
@@ -357,9 +359,7 @@ public class ByteGridRender implements VulkanResource{
 			resource.instanceCount = draws.buffer.position();
 		}
 		
-		for(int i = 0; i<VulkanCore.MAX_IN_FLIGHT_FRAMES; i++){
-			resource.uniform.updateAs(i, Uniform::new, u -> u.set(transform, tileWidth));
-		}
+		resource.uniform.updateAll(u -> u.set(transform, tileWidth));
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{

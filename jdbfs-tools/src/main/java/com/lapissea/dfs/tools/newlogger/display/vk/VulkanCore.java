@@ -56,7 +56,9 @@ import org.joml.Matrix4f;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
+import org.lwjgl.system.Struct;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
@@ -80,12 +82,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import static org.lwjgl.vulkan.VK10.VK_MAKE_API_VERSION;
 
 public class VulkanCore implements AutoCloseable{
+	
+	public static class GlobalUniform extends Struct<GlobalUniform>{
+		private static final int SIZEOF;
+		private static final int MAT;
+		
+		static{
+			var layout = __struct(
+				__member(4*4*Float.BYTES)
+			);
+			
+			SIZEOF = layout.getSize();
+			MAT = layout.offsetof(0);
+		}
+		
+		void mat(Matrix4f mat){
+			mat.getToAddress(address + MAT);
+		}
+		
+		protected GlobalUniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
+		protected GlobalUniform(long address)   { super(address, null); }
+		@Override
+		protected GlobalUniform create(long address, ByteBuffer container){ return new GlobalUniform(address); }
+		@Override
+		public int sizeof(){ return SIZEOF; }
+	}
+	
 	
 	public static final boolean VK_DEBUG = Configuration.DEBUG.get(false);
 	
@@ -151,9 +180,9 @@ public class VulkanCore implements AutoCloseable{
 	
 	private final VKPresentMode preferredPresentMode;
 	
-	public final UniformBuffer            globalUniforms;
-	public final VkDescriptorSetLayout    globalUniformLayout;
-	public final VkDescriptorSet.PerFrame globalUniformSets;
+	public final UniformBuffer<GlobalUniform> globalUniforms;
+	public final VkDescriptorSetLayout        globalUniformLayout;
+	public final VkDescriptorSet.PerFrame     globalUniformSets;
 	
 	public final VkDescriptorPool globalDescriptorPool;
 	
@@ -185,7 +214,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
-		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false);
+		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false, GlobalUniform::new);
 		
 		
 		var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms);
@@ -306,12 +335,13 @@ public class VulkanCore implements AutoCloseable{
 		});
 	}
 	
-	public UniformBuffer allocateUniformBuffer(int size, boolean ssbo) throws VulkanCodeException{
+	public <T extends Struct<T>>
+	UniformBuffer<T> allocateUniformBuffer(int size, boolean ssbo, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
 		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){
 			res[i] = allocateHostBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
 		}
-		return new UniformBuffer(List.of(res), ssbo);
+		return new UniformBuffer<>(List.of(res), ssbo, ctor);
 	}
 	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
 		var res = new IndirectDrawBuffer[MAX_IN_FLIGHT_FRAMES];
@@ -411,12 +441,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		var e                = swapchain.extent;
 		var projectionMatrix = new Matrix4f().ortho(0, e.width, 0, e.height, -10, 10, true);
-		for(int i = 0; i<MAX_IN_FLIGHT_FRAMES; i++){
-			globalUniforms.update(i, b -> {
-				var bb = b.asFloatBuffer();
-				projectionMatrix.get(bb);
-			});
-		}
+		globalUniforms.updateAll(b -> b.mat(projectionMatrix));
 	}
 	
 	private void destroySwapchainContext(boolean destroySwapchain){

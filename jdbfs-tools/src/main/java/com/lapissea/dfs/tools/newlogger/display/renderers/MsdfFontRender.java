@@ -23,6 +23,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.util.UtilL;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.Struct;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
 import java.awt.Color;
@@ -68,17 +70,50 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	private static class Uniform{
-		private static final int SIZE = (2 + 1 + 2)*4 + 4;
+	private static class Uniform extends Struct<Uniform>{
+		private static final int SIZEOF;
+		private static final int POS_X;
+		private static final int POS_Y;
+		private static final int SCALE;
+		private static final int COLOR;
+		private static final int OUTLINE;
+		private static final int X_SCALE;
 		
-		private static void put(ByteBuffer dest, float posX, float posY, float scale, Color color, float outline, float xScale){
-			dest.putFloat(posX).putFloat(posY).putFloat(scale);
-			dest.put((byte)color.getRed())
-			    .put((byte)color.getGreen())
-			    .put((byte)color.getBlue())
-			    .put((byte)color.getAlpha());
-			dest.putFloat(outline).putFloat(xScale);
+		static{
+			var layout = __struct(
+				__member(Float.BYTES),
+				__member(Float.BYTES),
+				__member(Float.BYTES),
+				__member(4),
+				__member(Float.BYTES),
+				__member(Float.BYTES)
+			);
+			
+			SIZEOF = layout.getSize();
+			POS_X = layout.offsetof(0);
+			POS_Y = layout.offsetof(1);
+			SCALE = layout.offsetof(2);
+			COLOR = layout.offsetof(3);
+			OUTLINE = layout.offsetof(4);
+			X_SCALE = layout.offsetof(5);
 		}
+		
+		void set(float posX, float posY, float scale, Color color, float outline, float xScale){
+			var address = this.address;
+			MemoryUtil.memPutFloat(address + POS_X, posX);
+			MemoryUtil.memPutFloat(address + POS_Y, posY);
+			MemoryUtil.memPutFloat(address + SCALE, scale);
+			MemoryUtil.memPutInt(address + COLOR, VUtils.toRGBAi4(color));
+			MemoryUtil.memPutFloat(address + OUTLINE, outline);
+			MemoryUtil.memPutFloat(address + X_SCALE, xScale);
+		}
+		
+		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
+		protected Uniform(long address)   { super(address, null); }
+		@Override
+		protected Uniform create(long address, ByteBuffer container){ return new Uniform(address); }
+		@Override
+		public int sizeof(){ return SIZEOF; }
 	}
 	
 	private VulkanCore core;
@@ -131,7 +166,7 @@ public class MsdfFontRender implements VulkanResource{
 		});
 	}
 	
-	private UniformBuffer               uniform;
+	private UniformBuffer<Uniform>      uniform;
 	private BackedVkBuffer              verts;
 	private IndirectDrawBuffer.PerFrame indirectInstances;
 	
@@ -146,7 +181,7 @@ public class MsdfFontRender implements VulkanResource{
 	
 	private void createResources() throws VulkanCodeException{
 		verts = core.allocateHostBuffer(Quad.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
-		uniform = core.allocateUniformBuffer(Uniform.SIZE, true);
+		uniform = core.allocateUniformBuffer(Uniform.SIZEOF, true, Uniform::new);
 		indirectInstances = core.allocateIndirectBufferPerFrame(1);
 		
 		createPipeline();
@@ -216,12 +251,12 @@ public class MsdfFontRender implements VulkanResource{
 		int indirectInstanceCount = 0;
 		
 		try(var vertMemWrap = verts.update();
-		    var uniformMemWrap = uniform.update(frameID);
+		    var uniformMemWrap = uniform.updateMulti(frameID);
 		    var drawCmdWrap = indirectInstances.update(frameID)
 		){
-			var vertMem    = vertMemWrap.getBuffer();
-			var uniformMem = uniformMemWrap.getBuffer();
-			var drawCmd    = drawCmdWrap.buffer;
+			var vertMem  = vertMemWrap.getBuffer();
+			var uniforms = uniformMemWrap.val;
+			var drawCmd  = drawCmdWrap.buffer;
 			
 			
 			record InstancePos(int vertPos, int vertCount){ }
@@ -248,7 +283,7 @@ public class MsdfFontRender implements VulkanResource{
 					outline *= (float)Math.pow(aMul, 0.7F);
 				}
 				
-				Uniform.put(uniformMem, str.x, str.y, str.pixelHeight, str.color, outline, str.xScale);
+				uniforms.get().set(str.x, str.y, str.pixelHeight, str.color, outline, str.xScale);
 				
 				if(drawCall == null){
 					indirectInstanceCount++;
@@ -294,7 +329,7 @@ public class MsdfFontRender implements VulkanResource{
 		}
 		
 		var neededVertMem     = vertCount*(long)Quad.SIZE;
-		var neededInstanceMem = instanceCount*(long)Uniform.SIZE;
+		var neededInstanceMem = instanceCount*(long)Uniform.SIZEOF;
 		
 		if(verts.size()<neededVertMem){
 			core.device.waitIdle();
@@ -306,7 +341,7 @@ public class MsdfFontRender implements VulkanResource{
 		if(uniform.size()<neededInstanceMem){
 			core.device.waitIdle();
 			uniform.destroy();
-			uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true);
+			uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true, Uniform::new);
 			description.bind(0, VkShaderStageFlag.VERTEX, uniform);
 			dsSets.updateAll(description.bindData());
 		}
