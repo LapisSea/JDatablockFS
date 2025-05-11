@@ -1,6 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
@@ -20,7 +19,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.TextUtil;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
@@ -82,7 +80,7 @@ public class Device implements VulkanResource{
 	public Swapchain createSwapchain(Swapchain oldSwapchain, Surface surface, VKPresentMode preferredMode, Iterable<FormatColor> preferred) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			
-			if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
+			//if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
 			
 			var format = physicalDevice.chooseSwapchainFormat(oldSwapchain == null, preferred);
 			

@@ -7,6 +7,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
+import com.lapissea.dfs.tools.newlogger.display.vk.Std140;
+import com.lapissea.dfs.tools.newlogger.display.vk.Std430;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -29,22 +31,26 @@ import org.lwjgl.system.CustomBuffer;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
+import org.roaringbitmap.RoaringBitmap;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class ByteGridRender implements VulkanResource{
+	
+	record Theme(Color none, Color write, Color read, Color readWrite){ }
 	
 	private final ShaderModuleSet shader = new ShaderModuleSet("ByteGrid", ShaderType.VERTEX, ShaderType.FRAGMENT);
 	
 	private static class Vert{
 		static final int SIZE = (2)*4 + 4;
 		
-		static final int T_BACK  = 0;
-		static final int T_SET   = 1;
-		static final int T_WRITE = 2;
+		static final int T_BACK = 0;
+		static final int T_SET  = 1;
+		static final int T_MARK = 2;
 		
 		private static void putQuad(ByteBuffer bb, int x, int y, int w, int h, int type){
 			put(bb, x/3F, y/3F, type);
@@ -65,25 +71,50 @@ public class ByteGridRender implements VulkanResource{
 		private static final int SIZEOF;
 		private static final int MAT;
 		private static final int TILE_WIDTH;
+		private static final int FLAG_COLORS;
 		
 		static{
 			var layout = __struct(
-				__member(4*4*Float.BYTES),
-				__member(Integer.BYTES)
+				Std140.__mat4(),
+				Std140.__int(),
+				Std140.__vec4Arr(4)
 			);
 			
 			SIZEOF = layout.getSize();
 			MAT = layout.offsetof(0);
 			TILE_WIDTH = layout.offsetof(1);
+			FLAG_COLORS = layout.offsetof(2);
 		}
 		
-		Matrix4f mat()               { return new Matrix4f().setFromAddress(address + MAT); }
-		void mat(Matrix4f mat)       { mat.getToAddress(address + MAT); }
-		void tileWidth(int tileWidth){ MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth); }
+		Matrix4f mat(){ return new Matrix4f().setFromAddress(address + MAT); }
 		
-		void set(Matrix4f mat, int tileWidth){
+		Uniform mat(Matrix4f mat){
+			mat.getToAddress(address + MAT);
+			return this;
+		}
+		Uniform tileWidth(int tileWidth){
+			MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth);
+			return this;
+		}
+		Uniform flagColors(Theme theme){
+			flagColor(0, theme.none);
+			flagColor(1, theme.write);
+			flagColor(2, theme.read);
+			flagColor(3, theme.readWrite);
+			return this;
+		}
+		private void flagColor(int i, Color none){
+			var ptr = address + FLAG_COLORS + i*4L*Float.BYTES;
+			MemoryUtil.memPutFloat(ptr + 0*Float.BYTES, none.getRed()/255F);
+			MemoryUtil.memPutFloat(ptr + 1*Float.BYTES, none.getGreen()/255F);
+			MemoryUtil.memPutFloat(ptr + 2*Float.BYTES, none.getBlue()/255F);
+			MemoryUtil.memPutFloat(ptr + 3*Float.BYTES, none.getAlpha()/255F);
+		}
+		
+		void set(Matrix4f mat, int tileWidth, Theme theme){
 			mat(mat);
 			tileWidth(tileWidth);
+			flagColors(theme);
 		}
 		
 		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
@@ -97,18 +128,24 @@ public class ByteGridRender implements VulkanResource{
 	private static class GByte extends Struct<GByte>{
 		private static final int SIZEOF;
 		private static final int INDEX;
+		private static final int FLAG;
+		private static final int VALUE;
 		private static final int COLOR;
 		
 		static{
 			Layout layout = __struct(
-				__member(4),
-				__member(4)
+				Std430.__uint16_t(),
+				Std430.__uint8_t(),
+				Std430.__uint8_t(),
+				Std430.__u8vec4()
 			);
 			
 			SIZEOF = layout.getSize();
 			
 			INDEX = layout.offsetof(0);
-			COLOR = layout.offsetof(1);
+			FLAG = layout.offsetof(1);
+			VALUE = layout.offsetof(2);
+			COLOR = layout.offsetof(3);
 		}
 		
 		static class Buf extends StructBuffer<GByte, Buf>{
@@ -122,14 +159,19 @@ public class ByteGridRender implements VulkanResource{
 			protected Buf create(long address, ByteBuffer container, int mark, int position, int limit, int capacity){
 				throw NotImplementedException.infer();//TODO: implement Buf.create()
 			}
-			void put(int index, Color color){ get().set(index, color); }
+			void put(char index, byte flag, byte value, Color color){
+				get().set(index, flag, value, color);
+			}
 		}
 		
-		int index(){ return MemoryUtil.memGetInt(address() + INDEX); }
+		char index(){ return (char)MemoryUtil.memGetShort(address() + INDEX); }
 		
-		void set(int index, Color color){
-			MemoryUtil.memPutInt(address() + INDEX, index);
-			MemoryUtil.memPutInt(address() + COLOR, VUtils.toRGBAi4(color));
+		void set(char index, byte flag, byte value, Color color){
+			var address = address();
+			MemoryUtil.memPutShort(address + INDEX, (short)index);
+			MemoryUtil.memPutByte(address + FLAG, flag);
+			MemoryUtil.memPutByte(address + VALUE, value);
+			MemoryUtil.memPutInt(address + COLOR, VUtils.toRGBAi4(color));
 		}
 		
 		protected GByte(long address){ super(address, null); }
@@ -179,6 +221,13 @@ public class ByteGridRender implements VulkanResource{
 			}
 		}
 	}
+	
+	private Theme theme = new Theme(
+		new Color(0, 0, 0, 0F),
+		new Color(1, 1, 0, 1F),
+		new Color(0, 1, 1, 1F),
+		new Color(1, 1, 1, 1F)
+	);
 	
 	private VulkanCore     core;
 	private MeshInfo[]     meshInfos;
@@ -278,7 +327,7 @@ public class ByteGridRender implements VulkanResource{
 		for(int i = 0; i<meshInfos.length; i++){
 			var quads = setQuadsSet.get(i);
 			
-			int verts   = (quads.size() + 1)*6;
+			int verts   = (quads.size() + 2)*6;
 			int vertPos = vertsTotal;
 			vertsTotal += verts;
 			meshInfos[i] = new MeshInfo(vertPos, verts);
@@ -290,32 +339,75 @@ public class ByteGridRender implements VulkanResource{
 				for(var quad : quads){
 					Vert.putQuad(bb, quad.x, quad.y, quad.w, quad.h, Vert.T_SET);
 				}
+				Vert.putQuad(bb, 2, 2, 1, 1, Vert.T_MARK);
 			}
 		});
 	}
 	
-	public record DrawRange(int from, int to, Color color){
-		public DrawRange{
+	public record IOEvent(char from, char to, Type type){
+		public IOEvent(int from, int to, Type type){
+			this((char)from, (char)to, type);
+			validateCharRangeFromInt(from, to);
+		}
+		public IOEvent{
 			if(from>to){
-				throw new IllegalArgumentException();
+				throw new IllegalArgumentException("From can not be larger than to");
 			}
+			Objects.requireNonNull(type);
+		}
+		public enum Type{
+			NONE(0), READ(1), WRITE(2);
+			final byte flag;
+			Type(int flag){ this.flag = (byte)flag; }
 		}
 	}
 	
-	public void record(RenderResource resource, int frameId, Matrix4f transform, int tileWidth) throws VulkanCodeException{
-		resource.uniform.update(frameId, u -> u.set(transform, tileWidth));
+	public record DrawRange(char from, char to, Color color){
+		
+		public DrawRange(int from, int to, Color color){
+			this((char)from, (char)to, color);
+			validateCharRangeFromInt(from, to);
+		}
+		
+		public DrawRange{
+			if(from>to){
+				throw new IllegalArgumentException("From can not be larger than to");
+			}
+			Objects.requireNonNull(color);
+		}
 	}
-	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges) throws VulkanCodeException{
+	private static void validateCharRangeFromInt(int from, int to){
+		if(from<0) throw new IllegalArgumentException("From can not be negative");
+		if(to<0) throw new IllegalArgumentException("To can not be negative");
+		if(from>Character.MAX_VALUE) throw new IllegalArgumentException("From can not be greater than Character.MAX_VALUE");
+		if(to>Character.MAX_VALUE) throw new IllegalArgumentException("To can not be greater than Character.MAX_VALUE");
+	}
+	
+	public void record(RenderResource resource, int frameId, Matrix4f transform, int tileWidth) throws VulkanCodeException{
+		resource.uniform.update(frameId, u -> u.mat(transform).tileWidth(tileWidth));
+	}
+	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		if(resource.uniform == null){
 			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false, Uniform::new);
 			resource.dsSets = dsLayout.createDescriptorSetsPerFrame();
 			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
 		}
 		
+		var reads  = new RoaringBitmap();
+		var writes = new RoaringBitmap();
+		for(var e : ioEvents){
+			for(var i = e.from; i<e.to; i++){
+				switch(e.type){
+					case READ -> reads.add(i);
+					case WRITE -> writes.add(i);
+				}
+			}
+		}
+		
 		GByte.Buf[] byteBuffers = new GByte.Buf[256];
 		
 		for(DrawRange range : ranges){
-			for(int i = range.from; i<range.to; i++){
+			for(var i = range.from; i<range.to; i++){
 				var b   = Byte.toUnsignedInt(data[i]);
 				var buf = byteBuffers[b];
 				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
@@ -325,7 +417,10 @@ public class ByteGridRender implements VulkanResource{
 					buf.free();
 					buf = byteBuffers[b] = nb;
 				}
-				buf.put(i, range.color);
+				var flags = (byte)0;
+				if(writes.contains(i)) flags |= 0b01;
+				if(reads.contains(i)) flags |= 0b10;
+				buf.put(i, flags, data[i], range.color);
 			}
 		}
 		
@@ -346,10 +441,8 @@ public class ByteGridRender implements VulkanResource{
 			
 			for(int i = 0; i<byteBuffers.length; i++){
 				var buf = byteBuffers[i];
-				if(buf == null){
-					draws.draw(0, 0, 0, 0);
-					continue;
-				}
+				if(buf == null) continue;
+				
 				var info = meshInfos[i];
 				draws.draw(info.vertCount, buf.remaining(), info.vertPos, instancesBuff.position());
 				instancesBuff.put(buf);
@@ -359,7 +452,7 @@ public class ByteGridRender implements VulkanResource{
 			resource.instanceCount = draws.buffer.position();
 		}
 		
-		resource.uniform.updateAll(u -> u.set(transform, tileWidth));
+		resource.uniform.updateAll(u -> u.set(transform, tileWidth, theme));
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{

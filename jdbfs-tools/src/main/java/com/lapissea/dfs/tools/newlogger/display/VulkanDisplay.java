@@ -62,6 +62,10 @@ public class VulkanDisplay implements AutoCloseable{
 				List.of(
 					new ByteGridRender.DrawRange(0, bytes.length/2, Color.green.darker()),
 					new ByteGridRender.DrawRange(bytes.length/2, bytes.length, Color.RED.darker())
+				),
+				List.of(
+					new ByteGridRender.IOEvent(6, 10, ByteGridRender.IOEvent.Type.WRITE),
+					new ByteGridRender.IOEvent(8, 20, ByteGridRender.IOEvent.Type.READ)
 				)
 			);
 		}catch(VulkanCodeException e){
