@@ -102,7 +102,7 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			@Override
 			public int hashCode(){
 				int result = wordSpace.hashCode();
-				result = 31*result + (int)(size^(size >>> 32));
+				result = 31*result + Long.hashCode(size);
 				return result;
 			}
 		}
@@ -225,7 +225,7 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		@Override
 		public int hashCode(){
 			int result = wordSpace.hashCode();
-			result = 31*result + (int)(min^(min >>> 32));
+			result = 31*result + Long.hashCode(min);
 			result = 31*result + max.hashCode();
 			return result;
 		}

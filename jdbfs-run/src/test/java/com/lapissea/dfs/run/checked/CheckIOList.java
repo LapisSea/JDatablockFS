@@ -241,14 +241,14 @@ public class CheckIOList<T> implements IOList<T>{
 //		return a;
 	}
 	@Override
-	public void addMultipleNew(long count) throws IOException{
+	public void addMultipleNew(long count){
 		throw new UnsupportedOperationException();
 //		testData.addMultipleNew(count);
 //		reference.addMultipleNew(count);
 //		dataEquality();
 	}
 	@Override
-	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
+	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer){
 //		testData.addMultipleNew(count, initializer);
 //		reference.addMultipleNew(count, initializer);
 //		dataEquality();

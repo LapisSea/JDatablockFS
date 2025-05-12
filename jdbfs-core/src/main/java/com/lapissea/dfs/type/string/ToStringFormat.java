@@ -24,8 +24,8 @@ public final class ToStringFormat{
 		Runnable flushBuff = () -> {
 			if(buff.isEmpty()) return;
 			if(!roots.isEmpty()){
-				if(roots.getLast() instanceof ToStringFragment.Literal lit){
-					roots.set(roots.size() - 1, new ToStringFragment.Literal(lit.value() + buff));
+				if(roots.getLast() instanceof ToStringFragment.Literal(String value)){
+					roots.set(roots.size() - 1, new ToStringFragment.Literal(value + buff));
 					buff.setLength(0);
 					return;
 				}

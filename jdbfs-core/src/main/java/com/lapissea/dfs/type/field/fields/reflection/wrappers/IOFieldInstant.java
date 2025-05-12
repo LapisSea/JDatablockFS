@@ -80,12 +80,11 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	}
 	
 	private final StructPipe<IOInstant> instancePipe;
-	private final boolean               fixed;
 	
 	public IOFieldInstant(FieldAccessor<CTyp> accessor){ this(accessor, null); }
 	public IOFieldInstant(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.fixed = varProvider != null;
+		boolean fixed = varProvider != null;
 		
 		if(fixed){
 			instancePipe = FixedVaryingStructPipe.tryVarying(IOInstant.STRUCT, varProvider);

@@ -537,7 +537,7 @@ public class MemoryWalker{
 	
 	@SuppressWarnings("rawtypes")
 	private <T extends IOInstance<T>> RefField<T, T> getNoIO(T instance, IOInstance.Unmanaged valueInstance, IOField<T, ?> field){
-		return new RefField.NoIO<T, T>(field.getAccessor(), field.getSizeDescriptor()){
+		return new RefField.NoIO<>(field.getAccessor(), field.getSizeDescriptor()){
 			@Override
 			protected Set<TypeFlag> computeTypeFlags(){
 				throw NotImplementedException.infer();//TODO: implement .computeTypeFlags()

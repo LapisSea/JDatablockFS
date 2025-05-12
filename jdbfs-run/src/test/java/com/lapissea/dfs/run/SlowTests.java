@@ -654,10 +654,10 @@ public class SlowTests{
 			@Override
 			public boolean equals(Object o){
 				if(this == o) return true;
-				if(!(o instanceof Write write)) return false;
+				if(!(o instanceof Write(int off1, byte[] data1))) return false;
 				
-				if(off != write.off) return false;
-				return Arrays.equals(data, write.data);
+				if(off != off1) return false;
+				return Arrays.equals(data, data1);
 			}
 		}
 		
@@ -734,8 +734,8 @@ public class SlowTests{
 			}
 			@Override
 			public boolean equals(Object o){
-				return o instanceof Alloc alloc &&
-				       rootID == alloc.rootID && Arrays.equals(data, alloc.data);
+				return o instanceof Alloc(byte[] data1, int id) &&
+				       rootID == id && Arrays.equals(data, data1);
 			}
 		}
 		

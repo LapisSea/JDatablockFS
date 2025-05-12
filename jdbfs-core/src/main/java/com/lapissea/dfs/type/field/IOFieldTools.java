@@ -213,15 +213,15 @@ public final class IOFieldTools{
 	}
 	public static <T extends IOInstance<T>> long sumVars(List<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
 		long sum = 0L;
-		for(int i = 0; i<fields.size(); i++){
-			sum += mapper.applyAsLong(fields.get(i).getSizeDescriptor());
+		for(var field : fields){
+			sum += mapper.applyAsLong(field.getSizeDescriptor());
 		}
 		return sum;
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
 		var acc = WordSpace.BYTE;
-		for(IOField<T, ?> field : fields){
+		for(var field : fields){
 			var descriptor = field.getSizeDescriptor();
 			var wordSpace  = descriptor.getWordSpace();
 			acc = acc.min(wordSpace);

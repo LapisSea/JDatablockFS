@@ -400,7 +400,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			/**
 			 * Signifies that the generator may or may not have a correct {@link ValueGenerator#shouldGenerate}.
 			 * This is used when the cost of checking if something should be generated is very similar to the cost of actual generation
-			 * */
+			 */
 			NOT_REALLY,
 			/**
 			 * Signifies that the generator will always have correct {@link ValueGenerator#shouldGenerate} when modification is enabled.
@@ -489,6 +489,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		if(getAccessor() instanceof VirtualAccessor<T> vacc) vacc.init(this);
 	}
 	
+	@Override
 	public String getName(){ return getAccessor().getName(); }
 	@SuppressWarnings("unchecked")
 	@Override

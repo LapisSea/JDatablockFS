@@ -45,6 +45,7 @@ public interface IOSet<T> extends Query.BaseSource<T>{
 		return size() == 0;
 	}
 	
+	@Override
 	IOIterator<T> iterator();
 	
 	void requestCapacity(long capacity) throws IOException;

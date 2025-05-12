@@ -309,10 +309,10 @@ public abstract class RenderBackend{
 		public void fillQuad(double x, double y, double width, double height){
 			if(!buffer.isEmpty()){
 				var last = buffer.getLast();
-				if(last instanceof Command.FillQuad q){
+				if(last instanceof Command.FillQuad(double x1, double y1, double width1, double height1)){
 					buffer.removeLast();
 					var qs = new Command.FillQuads();
-					qs.add(q.x, q.y, q.width, q.height);
+					qs.add(x1, y1, width1, height1);
 					qs.add(x, y, width, height);
 					buffer.add(qs);
 					return;
@@ -332,10 +332,10 @@ public abstract class RenderBackend{
 		public void drawLine(double xFrom, double yFrom, double xTo, double yTo){
 			if(!buffer.isEmpty()){
 				var last = buffer.getLast();
-				if(last instanceof Command.DrawLine q){
+				if(last instanceof Command.DrawLine(double xFrom2, double yfrom2, double x2, double y2)){
 					buffer.removeLast();
 					var qs = new Command.DrawLines();
-					qs.add(q.xFrom, q.yFrom, q.xTo, q.yTo);
+					qs.add(xFrom2, yfrom2, x2, y2);
 					qs.add(xFrom, yFrom, xTo, yTo);
 					buffer.add(qs);
 					return;
@@ -371,8 +371,8 @@ public abstract class RenderBackend{
 		@Override
 		public Color readColor(){
 			for(int i = buffer.size() - 1; i>=0; i--){
-				if(buffer.get(i) instanceof Command.SetColor c){
-					return c.color;
+				if(buffer.get(i) instanceof Command.SetColor(Color color)){
+					return color;
 				}
 			}
 			return Color.GRAY;

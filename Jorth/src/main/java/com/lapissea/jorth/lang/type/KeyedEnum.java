@@ -156,7 +156,8 @@ public interface KeyedEnum{
 			return elsStr("Lookup{", "}");
 		}
 		
-		public Lookup<E> excluding(E... es){
+		@SafeVarargs
+		public final Lookup<E> excluding(E... es){
 			if(es.length == 0) return this;
 			
 			var values = EnumSet.copyOf(names.values());

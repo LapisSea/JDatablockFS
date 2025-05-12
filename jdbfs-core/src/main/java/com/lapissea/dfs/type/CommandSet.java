@@ -184,10 +184,11 @@ public final class CommandSet{
 			int        lastIndex = optionals.size() - 1;
 			
 			if(lastIndex>=0 &&
-			   optionals.get(lastIndex) instanceof Skip s1 && cmd instanceof Skip s2 &&
-			   s1.cmd != SKIPB_UNKNOWN && s2.cmd != SKIPB_UNKNOWN &&
-			   (fields = s1.fields + s2.fields)<=255 &&
-			   (bigSum = BigInteger.valueOf(s1.bytes).add(BigInteger.valueOf(s2.bytes))).compareTo(BigInteger.valueOf(Long.MAX_VALUE))<=0
+			   optionals.get(lastIndex) instanceof Skip(byte cmd1, long bytes, int fields1) &&
+			   cmd instanceof Skip(byte cmd2, long bytes1, int fields2) &&
+			   cmd1 != SKIPB_UNKNOWN && cmd2 != SKIPB_UNKNOWN &&
+			   (fields = fields1 + fields2)<=255 &&
+			   (bigSum = BigInteger.valueOf(bytes).add(BigInteger.valueOf(bytes1))).compareTo(BigInteger.valueOf(Long.MAX_VALUE))<=0
 			){
 				var sum = bigSum.longValue();
 				

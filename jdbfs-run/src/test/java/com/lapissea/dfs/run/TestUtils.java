@@ -216,7 +216,7 @@ public final class TestUtils{
 	}
 	
 	public static <E extends Exception> void randomBatch(String name, int totalTasks, Task<E> task){
-		var fuz = new FuzzingRunner<RandomGenerator, Object, E>(FuzzingStateEnv.JustRandom.of(
+		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
 		), FuzzingRunner::noopAction);
 		var conf  = new FuzzConfig().withName(name);

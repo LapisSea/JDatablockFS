@@ -48,11 +48,11 @@ public interface AccessProvider{
 		public MethodHandle unreflect(Constructor<?> constructor){ throw new UnsupportedOperationException(); }
 		
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface) throws IllegalAccessException, Defunct{
+		public <InterfType, T extends InterfType> T makeLambda(Method method, Class<InterfType> functionalInterface){
 			throw NotImplementedException.infer();//TODO: implement UnoptimizedAccessProvider.makeLambda()
 		}
 		@Override
-		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface) throws IllegalAccessException, Defunct{
+		public <InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface){
 			return makeLambdaUnop(constructor, functionalInterface);
 		}
 		
