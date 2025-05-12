@@ -13,6 +13,7 @@ public final class Std430 extends Struct{
 	public static Member __uint16_t()          { return __member(2, 2, true); }
 	public static Member __uint8_t()           { return __member(1, 1, true); }
 	
+	public static Member __vec2()              { return __member(8, 8, true); }
 	public static Member __vec4()              { return __member(16, 16, true); }
 	public static Member __u8vec4()            { return __member(4, 4, true); }
 	public static Member __u8vec4Arr(int count){ return __member(4*count, 4, true); }

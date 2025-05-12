@@ -5,6 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	
 	<properties>
+		<java.version>24</java.version>
 		<github.spair.version>1.86.11</github.spair.version>
 		<lwjgl.version>3.3.6</lwjgl.version>
 		<joml.version>1.10.7</joml.version>
