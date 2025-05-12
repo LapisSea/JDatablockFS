@@ -1,25 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSurfaceTransformFlagKHR;
-import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 
-/**
- *
- * <pre><code>
- * struct VkSurfaceCapabilitiesKHR {
- *     uint32_t {@link #minImageCount};
- *     uint32_t {@link #maxImageCount};
- *     {@link VkExtent2D VkExtent2D} {@link #currentExtent};
- *     {@link VkExtent2D VkExtent2D} {@link #minImageExtent};
- *     {@link VkExtent2D VkExtent2D} {@link #maxImageExtent};
- *     uint32_t {@link #maxImageArrayLayers};
- *     VkSurfaceTransformFlagsKHR {@link #supportedTransforms};
- *     VkSurfaceTransformFlagBitsKHR {@link #currentTransform};
- *     VkCompositeAlphaFlagsKHR {@link #supportedCompositeAlpha};
- *     VkImageUsageFlags {@link #supportedUsageFlags};
- * }</code></pre>
- */
 public class SurfaceCapabilities{
 	
 	public final int      minImageCount;
@@ -33,7 +16,7 @@ public class SurfaceCapabilities{
 	private static VkSurfaceTransformFlagKHR getTransform(int flags){
 		var e = VkSurfaceTransformFlagKHR.from(flags);
 		if(e.size() != 1) throw new IllegalArgumentException("Unrecognised flags: " + flags);
-		return e.iterator().next();
+		return e.getFirst();
 	}
 	public SurfaceCapabilities(VkSurfaceCapabilitiesKHR caps){
 		this(
