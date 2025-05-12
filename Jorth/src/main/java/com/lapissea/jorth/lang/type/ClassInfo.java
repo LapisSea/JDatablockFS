@@ -37,12 +37,8 @@ public interface ClassInfo{
 			throw NotImplementedException.infer();//TODO: implement OfArray.getField()
 		}
 		@Override
-		public FunctionInfo getFunction(Signature signature){
-			try{
-				return base.getFunction(signature);
-			}catch(MalformedJorth e){ }
-			
-			throw NotImplementedException.infer();//TODO: implement OfArray.getFunction()
+		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
+			return base.getFunction(signature);
 		}
 		@Override
 		public Stream<FunctionInfo> getFunctionsByName(String name){

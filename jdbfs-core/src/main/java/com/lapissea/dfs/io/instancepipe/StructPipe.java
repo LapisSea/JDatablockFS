@@ -983,9 +983,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		var stat = new ArrayList<Status>(generators.size());
 		var err  = false;
-		for(int i = 0; i<generators.size(); i++){
-			var generator = generators.get(i);
-			var vg        = generator.generator();
+		for(var generator : generators){
+			var vg = generator.generator();
 			
 			var shouldSkip = switch(vg.strictDetermineLevel()){
 				case NOT_REALLY -> true;

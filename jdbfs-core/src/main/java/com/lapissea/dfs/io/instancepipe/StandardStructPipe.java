@@ -184,8 +184,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			var fixedSizeO = field.getSizeDescriptor().getFixed(WordSpace.BYTE);
 			if(fixedSizeO.isPresent()){
 				var fixedSize = fixedSizeO.getAsLong();
-				if(!cmds.isEmpty() && cmds.getLast() instanceof CmdBuild.SkipFixed f){
-					cmds.set(cmds.size() - 1, new CmdBuild.SkipFixed(f.bytes + fixedSize, f.extraFieldSkips + 1));
+				if(!cmds.isEmpty() && cmds.getLast() instanceof CmdBuild.SkipFixed(long bytes, int extraFieldSkips)){
+					cmds.set(cmds.size() - 1, new CmdBuild.SkipFixed(bytes + fixedSize, extraFieldSkips + 1));
 				}else{
 					cmds.add(new CmdBuild.SkipFixed(fixedSize, 0));
 				}

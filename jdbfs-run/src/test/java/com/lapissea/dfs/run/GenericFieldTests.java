@@ -125,7 +125,7 @@ public class GenericFieldTests{
 		var name = gen.name + (nulls? "?" : "");
 		var lGen = new Gen<>((r, d) -> {
 			var s = r.nextInt(maxLen);
-			var l = new ArrayList<Object>(s);
+			var l = new ArrayList<>(s);
 			for(int i = 0; i<s; i++){
 				l.add(nulls && r.nextBoolean()? null : gen.gen.apply(r, d));
 			}

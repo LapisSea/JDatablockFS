@@ -45,11 +45,7 @@ public final class Preload{
 						fn.invoke(null, args);
 					}
 				}else{
-					if(cLookup != null){
-						cLookup.ensureInitialized(c);
-					}else{
-						MethodHandles.lookup().ensureInitialized(c);
-					}
+					Objects.requireNonNullElseGet(cLookup, MethodHandles::lookup).ensureInitialized(c);
 				}
 			}catch(Throwable e){
 				e.printStackTrace();

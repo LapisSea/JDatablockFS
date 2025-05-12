@@ -124,7 +124,9 @@ public interface CodeStream extends AutoCloseable{
 						try{
 							var f = typ.getMethod("get" + TextUtil.firstToUpperCase(key));
 							return f.invoke(val);
-						}catch(NoSuchMethodException e1){ }
+						}catch(NoSuchMethodException e1){
+							// move on
+						}
 						var f = typ.getMethod(key);
 						return f.invoke(val);
 					}
@@ -188,11 +190,9 @@ public interface CodeStream extends AutoCloseable{
 									if(val.length()>keyEnd){
 										if(val.charAt(keyEnd) == '.'){
 											keyStart++;
-											keyEnd++;
-											
-											while(val.length()>keyEnd && Character.isJavaIdentifierPart(val.charAt(keyEnd))){
+											do{
 												keyEnd++;
-											}
+											}while(val.length()>keyEnd && Character.isJavaIdentifierPart(val.charAt(keyEnd)));
 										}else{
 											//Check if the name is part of a larger word
 											if(Character.isJavaIdentifierPart(val.charAt(keyEnd))){

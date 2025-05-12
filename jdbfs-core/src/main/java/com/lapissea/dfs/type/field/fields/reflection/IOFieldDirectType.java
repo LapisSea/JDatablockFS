@@ -66,8 +66,7 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 			if(!annotations.isPresent(IOUnsafeValue.class)){
 				return false;
 			}
-			if(!UtilL.instanceOf(Utils.typeToRaw(type), Type.class)) return false;
-			return true;
+			return UtilL.instanceOf(Utils.typeToRaw(type), Type.class);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")

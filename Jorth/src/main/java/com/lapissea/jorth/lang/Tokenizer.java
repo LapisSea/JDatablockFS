@@ -301,9 +301,11 @@ public class Tokenizer implements CodeStream, TokenSource{
 		if(acc != null) return new Token.EWord<>(lastLine, acc);
 		
 		
-		if(word.equals("null")) return new Token.Null(lastLine);
-		if(word.equals("true")) return new Token.Bool(lastLine, true);
-		if(word.equals("false")) return new Token.Bool(lastLine, false);
+		switch(word){
+			case "null" -> { return new Token.Null(lastLine); }
+			case "true" -> { return new Token.Bool(lastLine, true); }
+			case "false" -> { return new Token.Bool(lastLine, false); }
+		}
 		
 		var c = word.charAt(0);
 		if(c == '-' || c == '.' || (c>='0' && c<='9')){

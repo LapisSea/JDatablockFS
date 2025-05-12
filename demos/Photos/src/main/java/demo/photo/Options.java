@@ -46,7 +46,7 @@ public class Options{
 		public void initElements(JPanel panel){
 			JPanel p = new JPanel();
 			p.setLayout(new FlowLayout());
-			p.add(new ThumbnailElement(textures.get(0)));
+			p.add(new ThumbnailElement(textures.getFirst()));
 			btns.forEach(p::add);
 			panel.add(p);
 		}

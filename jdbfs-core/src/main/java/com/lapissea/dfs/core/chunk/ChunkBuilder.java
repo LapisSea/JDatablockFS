@@ -10,8 +10,8 @@ import java.util.Optional;
 
 public final class ChunkBuilder{
 	
-	private DataProvider provider;
-	private ChunkPointer pos;
+	private final DataProvider provider;
+	private       ChunkPointer pos;
 	
 	private NumberSize bodyNumSize;
 	private long       capacity;

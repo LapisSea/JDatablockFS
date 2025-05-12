@@ -941,5 +941,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		}
 	}
 	
+	@Override
 	public Query<T> query(){ return new Queries.All<>(QSource::new); }
 }

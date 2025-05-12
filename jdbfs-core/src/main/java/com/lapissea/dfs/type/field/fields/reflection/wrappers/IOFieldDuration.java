@@ -79,12 +79,11 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends IOFiel
 	}
 	
 	private final StructPipe<IODuration> instancePipe;
-	private final boolean                fixed;
 	
 	public IOFieldDuration(FieldAccessor<CTyp> accessor){ this(accessor, null); }
 	public IOFieldDuration(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.fixed = varProvider != null;
+		var fixed = varProvider != null;
 		
 		if(fixed){
 			instancePipe = FixedVaryingStructPipe.tryVarying(IODuration.STRUCT, varProvider);
