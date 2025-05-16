@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
+import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
+import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
@@ -8,10 +10,12 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
@@ -37,6 +41,9 @@ public class VulkanDisplay implements AutoCloseable{
 	private final ByteGridRender                byteGridRender = new ByteGridRender();
 	private final ByteGridRender.RenderResource grid1Res       = new ByteGridRender.RenderResource();
 	
+	private final LineRenderer                lineRenderer = new LineRenderer();
+	private final LineRenderer.RenderResource lineRes      = new LineRenderer.RenderResource();
+	
 	public VulkanDisplay(){
 		
 		window = createWindow();
@@ -48,6 +55,7 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			fontRender.init(vkCore);
 			byteGridRender.init(vkCore);
+			lineRenderer.init(vkCore);
 			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
@@ -68,6 +76,15 @@ public class VulkanDisplay implements AutoCloseable{
 					new ByteGridRender.IOEvent(8, 20, ByteGridRender.IOEvent.Type.READ)
 				)
 			);
+			
+			lineRenderer.record(lineRes, new Matrix4f(), List.of(
+				new Geometry.Line(
+					Iters.rangeMap(0, 50, u -> u/50F*Math.PI)
+					     .map(f -> new Vector2f((float)Math.sin(f)*100 + 150, -(float)Math.cos(f)*100 + 150))
+					     .toList(),
+					5, Color.ORANGE
+				)
+			));
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
@@ -170,30 +187,7 @@ public class VulkanDisplay implements AutoCloseable{
 			buf.begin();
 			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
 				
-				int count = 32*32;
-				var space = vkCore.swapchain.extent;
-				
-				int bytesPerRow = 1;
-				
-				while(true){
-					var byteSize   = space.width/(float)bytesPerRow;
-					var rows       = Math.ceilDiv(count, bytesPerRow);
-					var rowsHeight = rows*byteSize;
-					if(rowsHeight>=space.height){
-						bytesPerRow++;
-					}else{
-						break;
-					}
-				}
-				var byteSize = space.width/(float)bytesPerRow;
-				
-				byteGridRender.record(
-					grid1Res, frameID,
-					new Matrix4f().translate(0, 0, 0)
-					              .scale(byteSize),
-					bytesPerRow
-				);
-				byteGridRender.submit(buf, frameID, grid1Res);
+				renderAutoSizeByteGrid(frameID, buf);
 				
 				List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
 				
@@ -205,11 +199,60 @@ public class VulkanDisplay implements AutoCloseable{
 					100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 				fontRender.render(buf, frameID, sd);
 				
+				
+				renderDecimatedCurve(frameID, buf);
 			}
 			buf.end();
 			
 		}
 		
+	}
+	
+	private void renderDecimatedCurve(int frameID, CommandBuffer buf) throws VulkanCodeException{
+		var t = (System.currentTimeMillis())/500D;
+		
+		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
+			(float)Math.sin(t/s)*100 + 200*(i + 1),
+			(float)Math.cos(t/s)*100 + 200
+		)).toList();
+		
+		var points = Geometry.catmullRomToInterpolated(controlPoints, 30);
+		points = Geometry.douglasPeucker(points, 0.3);
+		
+		lineRenderer.record(lineRes, new Matrix4f(), Iters.concat1N(
+			new Geometry.Line(points, 10, new Color(0.1F, 0.3F, 1, 0.6F)),
+			Iters.from(controlPoints)
+			     .map(p -> new Geometry.Line(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED))
+			     .toList()
+		
+		));
+		lineRenderer.submit(buf, frameID, lineRes);
+	}
+	private void renderAutoSizeByteGrid(int frameID, CommandBuffer buf) throws VulkanCodeException{
+		int count = 32*32;
+		var space = vkCore.swapchain.extent;
+		
+		int bytesPerRow = 1;
+		
+		while(true){
+			var byteSize   = space.width/(float)bytesPerRow;
+			var rows       = Math.ceilDiv(count, bytesPerRow);
+			var rowsHeight = rows*byteSize;
+			if(rowsHeight>=space.height){
+				bytesPerRow++;
+			}else{
+				break;
+			}
+		}
+		var byteSize = space.width/(float)bytesPerRow;
+		
+		byteGridRender.record(
+			grid1Res, frameID,
+			new Matrix4f().translate(0, 0, 0)
+			              .scale(byteSize),
+			bytesPerRow
+		);
+		byteGridRender.submit(buf, frameID, grid1Res);
 	}
 	
 	private static void testFontWave(List<MsdfFontRender.StringDraw> sd){
@@ -287,6 +330,9 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		grid1Res.destroy();
 		byteGridRender.destroy();
+		
+		lineRes.destroy();
+		lineRenderer.destroy();
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();

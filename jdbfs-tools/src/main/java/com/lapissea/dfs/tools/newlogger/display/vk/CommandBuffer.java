@@ -7,6 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
@@ -183,6 +184,10 @@ public class CommandBuffer implements VulkanResource{
 	}
 	public void bindPipeline(VkPipeline pipeline, boolean graphics){
 		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
+	}
+	
+	public void bindIndexBuffer(VkBuffer buffer, long offset, VkIndexType type){
+		VK10.vkCmdBindIndexBuffer(val, buffer.handle, offset, type.id);
 	}
 	
 	public void draw(int vertexCount, int instanceCount, int firstVertex, int firstInstance){
