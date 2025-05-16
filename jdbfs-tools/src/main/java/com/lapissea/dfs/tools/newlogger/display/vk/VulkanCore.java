@@ -50,6 +50,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.joml.Matrix4f;
@@ -367,6 +368,19 @@ public class VulkanCore implements AutoCloseable{
 		VkDeviceMemory memory = null;
 		try{
 			buffer = device.createBuffer(size, usageFlags, VkSharingMode.EXCLUSIVE);
+			
+			var requirements = buffer.getRequirements();
+			var requiredSize = requirements.size();
+			if(requiredSize<size){
+				throw new ShouldNeverHappenError("Required buffer size is too small");
+			}else if(requiredSize != size){
+				buffer.destroy();
+				buffer = device.createBuffer(requiredSize, usageFlags, VkSharingMode.EXCLUSIVE);
+				requirements = buffer.getRequirements();
+				if(requirements.size() != requiredSize){
+					throw new IllegalStateException(requirements + " size does not match " + requiredSize);
+				}
+			}
 			
 			memory = buffer.allocateAndBindRequiredMemory(physicalDevice, memoryFlags);
 			
