@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.random.RandomGenerator;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 import static com.lapissea.dfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.dfs.io.bit.BitUtils.makeMask;
 import static java.nio.charset.CodingErrorAction.REPORT;
@@ -363,8 +362,6 @@ public enum Encoding{
 			}
 		}
 		
-		private static final int CHAR_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(char[].class);
-		
 		@Override
 		public void read(ContentInputStream src, CharBuffer dest) throws IOException{
 			int charCount = dest.remaining();
@@ -421,8 +418,8 @@ public enum Encoding{
 				var acum = src.readWord(blockBytes);
 				
 				for(int inner = 0; inner<blockCharCount; inner++){
-					var idx = (acum>>(bits*inner))&mask;
-					var c   = UNSAFE.getChar(chars, CHAR_ARRAY_OFFSET + (idx<<1));
+					var idx = (int)(acum>>(bits*inner))&mask;
+					var c   = chars[idx];
 					buf[inner] = c;
 				}
 				
@@ -435,7 +432,7 @@ public enum Encoding{
 			var mask = chars.length - 1;
 			
 			var arr = dest.array();
-			var off = CHAR_ARRAY_OFFSET + ((long)(dest.position() + dest.arrayOffset())<<1);
+			var off = dest.position() + dest.arrayOffset();
 			
 			var blockCount = charCount/blockCharCount;
 			
@@ -443,12 +440,12 @@ public enum Encoding{
 				var acum = src.readWord(blockBytes);
 				
 				for(int inner = 0; inner<blockCharCount; inner++){
-					var idx = (acum>>(bits*inner))&mask;
-					var c   = UNSAFE.getChar(chars, CHAR_ARRAY_OFFSET + (idx<<1));
-					UNSAFE.putChar(arr, off + inner*2L, c);
+					var idx = (int)(acum>>(bits*inner))&mask;
+					var c   = chars[idx];
+					arr[off + inner] = c;
 				}
 				
-				off += blockCharCount*2;
+				off += blockCharCount;
 			}
 			
 			var i = blockCount*blockCharCount;

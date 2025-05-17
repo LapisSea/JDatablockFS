@@ -31,8 +31,12 @@ public abstract class CursorIOData implements IOInterface{
 				e.printStackTrace();
 			}
 		});
-		Runtime.getRuntime().addShutdownHook(shutdownThread);
-		TO_SHUTDOWN.put(data, shutdownThread);
+		try{
+			Runtime.getRuntime().addShutdownHook(shutdownThread);
+			TO_SHUTDOWN.put(data, shutdownThread);
+		}catch(IllegalStateException e){
+			//Ignore
+		}
 	}
 	protected static synchronized <T extends IOInterface & Closeable> void unbindCloseOnShutdown(T data){
 		var thread = TO_SHUTDOWN.remove(data);

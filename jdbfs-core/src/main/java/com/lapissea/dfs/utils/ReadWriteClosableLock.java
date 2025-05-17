@@ -45,7 +45,7 @@ public interface ReadWriteClosableLock{
 		return new ReentrantReadWriteClosableLock();
 	}
 	static ReadWriteClosableLock noop(){
-		final class NoopReadWriteClosableLock implements ReadWriteClosableLock{
+		record NoopReadWriteClosableLock(LockSession lock) implements ReadWriteClosableLock{
 			
 			private static final Lock NOOP = new Lock(){
 				@Override
@@ -66,20 +66,12 @@ public interface ReadWriteClosableLock{
 				}
 			};
 			
-			private static final ReadWriteClosableLock NOOP_RW = new NoopReadWriteClosableLock();
-			
-			
-			private final LockSession readLock  = new LockSession(NOOP);
-			private final LockSession writeLock = new LockSession(NOOP);
+			private static final ReadWriteClosableLock NOOP_RW = new NoopReadWriteClosableLock(new LockSession(NOOP));
 			
 			@Override
-			public LockSession read(){
-				return readLock;
-			}
+			public LockSession read(){ return lock; }
 			@Override
-			public LockSession write(){
-				return writeLock;
-			}
+			public LockSession write(){ return lock; }
 		}
 		
 		return NoopReadWriteClosableLock.NOOP_RW;
