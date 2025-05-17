@@ -134,6 +134,12 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 		}
 	}
 	
+	static{
+		if(MyUnsafe.hasNoObjectFieldOffset()){
+			throw new IllegalStateException(UnsafeAccessor.class.getName() + " is disabled. Unsafe offset access is not available!");
+		}
+	}
+	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
 		if(getter == null && setter == null){
 			return new UnsafeAccessor<>(struct, field, name, genericType);

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.internal;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.util.ShouldNeverHappenError;
 import sun.misc.Unsafe;
 
@@ -39,16 +40,17 @@ public final class MyUnsafe{
 		
 		int lastCheckedJVMVersion = 24;
 		if(Runtime.version().feature()>lastCheckedJVMVersion && om.isPresent()){
-			Field off;
+			Field dummyField;
 			try{
-				off = OffsetCheck.class.getDeclaredField("field");
+				dummyField = OffsetCheck.class.getDeclaredField("field");
 			}catch(NoSuchFieldException e){
 				throw new ShouldNeverHappenError(e);
 			}
 			
 			try{
-				om.get().invoke(UNSAFE, off);
+				om.get().invoke(UNSAFE, dummyField);
 			}catch(Throwable e){
+				Log.trace("Unsafe#objectFieldOffset exists but is failing. Disabling unsafe access.");
 				om = Optional.empty();
 			}
 		}
