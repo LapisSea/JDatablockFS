@@ -2,6 +2,7 @@ package com.lapissea.dfs.io.content;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import sun.misc.Unsafe;
 
 import java.lang.invoke.VarHandle;
 import java.util.Objects;
@@ -14,10 +15,8 @@ public final class BBView{
 	
 	private static final class UnsafeView{
 		
-		private static final int ARRAY_BYTE_BASE_OFFSET = UNSAFE.arrayBaseOffset(byte[].class);
-		
 		private static long mem(byte[] ba, int index, int size){
-			return Objects.checkIndex(index, ba.length - (size - 1)) + ARRAY_BYTE_BASE_OFFSET;
+			return Objects.checkIndex(index, ba.length - (size - 1)) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
 		}
 		
 		private static void putByte_(byte[] byteBuffer, long memOff, int localOff, long v){

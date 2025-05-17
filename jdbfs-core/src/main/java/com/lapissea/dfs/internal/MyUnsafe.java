@@ -37,7 +37,8 @@ public final class MyUnsafe{
 			om = Optional.empty();
 		}
 		
-		if(om.isPresent()){
+		int lastCheckedJVMVersion = 24;
+		if(Runtime.version().feature()>lastCheckedJVMVersion && om.isPresent()){
 			Field off;
 			try{
 				off = OffsetCheck.class.getDeclaredField("field");
