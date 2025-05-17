@@ -78,7 +78,7 @@ public class VulkanDisplay implements AutoCloseable{
 			);
 			
 			lineRenderer.record(lineRes, new Matrix4f(), List.of(
-				new Geometry.Line(
+				new Geometry.PointsLine(
 					Iters.rangeMap(0, 50, u -> u/50F*Math.PI)
 					     .map(f -> new Vector2f((float)Math.sin(f)*100 + 150, -(float)Math.cos(f)*100 + 150))
 					     .toList(),
@@ -216,13 +216,10 @@ public class VulkanDisplay implements AutoCloseable{
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
 		
-		var points = Geometry.catmullRomToInterpolated(controlPoints, 30);
-		points = Geometry.douglasPeucker(points, 0.3);
-		
 		lineRenderer.record(lineRes, new Matrix4f(), Iters.concat1N(
-			new Geometry.Line(points, 10, new Color(0.1F, 0.3F, 1, 0.6F)),
+			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
 			Iters.from(controlPoints)
-			     .map(p -> new Geometry.Line(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED))
+			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED))
 			     .toList()
 		
 		));

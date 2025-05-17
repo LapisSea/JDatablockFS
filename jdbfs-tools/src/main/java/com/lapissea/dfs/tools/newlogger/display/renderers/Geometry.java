@@ -4,33 +4,49 @@ import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-public class Geometry{
+public final class Geometry{
 	
+	public interface Path{
+		PointsLine toPoints();
+	}
 	
-	public record Line(List<Vector2f> points, float width, Color color){ }
+	public record PointsLine(List<Vector2f> points, float width, Color color) implements Path{
+		@Override
+		public PointsLine toPoints(){ return this; }
+	}
+	
+	public record BezierCurve(List<Vector2f> controlPoints, float width, Color color, int resolution, double epsilon) implements Path{
+		@Override
+		public PointsLine toPoints(){
+			var points  = catmullRomToInterpolated(controlPoints, resolution);
+			var reduced = epsilon>0? douglasPeuckerReduce(points, epsilon) : points;
+			return new PointsLine(reduced, width, color);
+		}
+	}
 	
 	record Vertex(Vector2f pos, Color color){ }
 	
 	public record IndexedMesh(Vertex[] verts, int[] indices){ }
 	
 	public record MeshSize(int vertCount, int indexCount){ }
-	static MeshSize calculateMeshSize(Line line){
+	static MeshSize calculateMeshSize(PointsLine line){
 		int pointCount = line.points().size();
 		if(pointCount<2) return new MeshSize(0, 0);
 		return new MeshSize(2*pointCount, 6*(pointCount - 1));
 	}
-	static MeshSize calculateMeshSize(Iterable<Line> lines){
+	static MeshSize calculateMeshSize(Iterable<PointsLine> lines){
 		int vertCount = 0, indexCount = 0;
-		for(Line line : lines){
+		for(PointsLine line : lines){
 			var s = calculateMeshSize(line);
 			vertCount += s.vertCount;
 			indexCount += s.indexCount;
 		}
 		return new MeshSize(vertCount, indexCount);
 	}
-	static IndexedMesh generateThickLineMesh(Line line){
+	static IndexedMesh generateThickLineMesh(PointsLine line){
 		
 		var      size    = calculateMeshSize(line);
 		Vertex[] verts   = new Vertex[size.vertCount];
@@ -45,7 +61,7 @@ public class Geometry{
 		float halfWidth = line.width()*0.5f;
 		Color color     = line.color();
 		
-		for(int i = 0; i<pts.size(); i++){
+		for(int i = 0, s = pts.size(); i<s; i++){
 			var current = pts.get(i);
 			
 			var dir = new Vector2f();
@@ -96,8 +112,40 @@ public class Geometry{
 	
 	private record DistMax(int index, double maxDist){ }
 	
-	public static List<Vector2f> douglasPeucker(List<Vector2f> points, double epsilon){
-		if(points.size()<3){
+	private record Slice(Vector2f[] arr, int start, int end){
+		
+		Slice(List<Vector2f> points){
+			this(points.toArray(Vector2f[]::new));
+		}
+		Slice(Vector2f[] points){
+			this(points, 0, points.length);
+		}
+		Slice{
+			assert end>=start;
+			assert arr.length>=end;
+			assert start>=0;
+		}
+		
+		int size()         { return end - start; }
+		Vector2f getFirst(){ return arr[start]; }
+		Vector2f getLast() { return arr[end - 1]; }
+		Vector2f get(int i){ return arr[start + i]; }
+		
+		Slice subSlice(int fromIndex, int toIndex){
+			return new Slice(arr, start + fromIndex, start + toIndex);
+		}
+		List<Vector2f> asList(){
+			return Arrays.asList(arr).subList(start, end);
+		}
+	}
+	
+	public static List<Vector2f> douglasPeuckerReduce(List<Vector2f> points, double epsilon){
+		var result = douglasPeuckerReduce(new Slice(points), epsilon);
+		return List.copyOf(result.asList());
+	}
+	private static Slice douglasPeuckerReduce(Slice points, double epsilon){
+		var pSize = points.size();
+		if(pSize<3){
 			return points;
 		}
 		
@@ -113,13 +161,13 @@ public class Geometry{
 			maxDist = el.maxDist;
 			index = el.index;
 		}else{
-			var    lConstant   = lineEnd.x*lineStart.y - lineEnd.y*lineStart.x;
-			double denominator = Math.hypot(dx, dy);
-			for(int i = 1, s = points.size() - 1; i<s; i++){
-				Vector2f p = points.get(i);
+			var lConstant   = lineEnd.x*lineStart.y - lineEnd.y*lineStart.x;
+			var denominator = Math.hypot(dx, dy);
+			for(int i = 1, s = pSize - 1; i<s; i++){
+				var p = points.get(i);
 				
-				double numerator = Math.abs(dy*p.x - dx*p.y + lConstant);
-				double dist      = numerator/denominator;
+				var numerator = Math.abs(dy*p.x - dx*p.y + lConstant);
+				var dist      = numerator/denominator;
 				if(dist>maxDist){
 					index = i;
 					maxDist = dist;
@@ -127,23 +175,24 @@ public class Geometry{
 			}
 		}
 		if(maxDist<=epsilon){
-			return List.of(lineStart, lineEnd);
+			return new Slice(new Vector2f[]{lineStart, lineEnd}, 0, 2);
 		}
-		if(points.size()<=3){
+		if(pSize == 3){
 			return points;
 		}
 		
-		var left  = douglasPeucker(points.subList(0, index + 1), epsilon);
-		var right = douglasPeucker(points.subList(index, points.size()), epsilon);
+		var left  = douglasPeuckerReduce(points.subSlice(0, index + 1), epsilon);
+		var right = douglasPeuckerReduce(points.subSlice(index, pSize), epsilon);
 		
-		List<Vector2f> result = new ArrayList<>(left.size() - 1 + right.size());
-		result.addAll(left);
-		result.removeLast();
-		result.addAll(right);
-		return result;
+		int leftSize = left.size() - 1, rightSize = right.size();
+		
+		System.arraycopy(left.arr, left.start, points.arr, points.start, leftSize);
+		System.arraycopy(right.arr, right.start, points.arr, points.start + leftSize, rightSize);
+		
+		return new Slice(points.arr, points.start, points.start + leftSize + rightSize);
 	}
 	
-	private static DistMax computeZeroLine(List<Vector2f> points, Vector2f lineStart){
+	private static DistMax computeZeroLine(Slice points, Vector2f lineStart){
 		int    index   = -1;
 		double maxDist = 0;
 		for(int i = 1, s = points.size() - 1; i<s; i++){
@@ -157,7 +206,6 @@ public class Geometry{
 		}
 		return new DistMax(index, maxDist);
 	}
-	
 	
 	public static List<Vector2f> catmullRomToInterpolated(List<Vector2f> points, int stepsPerSegment){
 		return catmullRomToInterpolated(points, 1, stepsPerSegment);

@@ -168,8 +168,7 @@ public class LineRenderer implements VulkanResource{
 		                     .build();
 	}
 	
-	
-	public void record(RenderResource resource, Matrix4f mat, Iterable<Geometry.Line> lines) throws VulkanCodeException{
+	public void record(RenderResource resource, Matrix4f mat, Iterable<Geometry.Path> paths) throws VulkanCodeException{
 		boolean updateDescriptor = false;
 		
 		if(resource.desc == null){
@@ -177,6 +176,8 @@ public class LineRenderer implements VulkanResource{
 			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false, Uniform::new);
 			updateDescriptor = true;
 		}
+		
+		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		
 		var size = Geometry.calculateMeshSize(lines);
 		
