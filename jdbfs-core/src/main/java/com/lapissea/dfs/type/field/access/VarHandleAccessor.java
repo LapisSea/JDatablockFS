@@ -22,7 +22,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
 		
-		public Funct(Struct<CTyp> struct, Field field, @Nullable Method getter, @Nullable Method setter, String name, Type genericType) throws IllegalAccessException{
+		private Funct(Struct<CTyp> struct, Field field, @Nullable Method getter, @Nullable Method setter, String name, Type genericType) throws IllegalAccessException{
 			super(struct, field, name, genericType);
 			
 			if(getter != null) validateGetter(genericType, getter);
@@ -141,7 +141,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	
 	private final VarHandle handle;
 	
-	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
+	private VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		handle = Access.makeVarHandle(field);
 	}

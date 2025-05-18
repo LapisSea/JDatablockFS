@@ -79,7 +79,7 @@ public final class FieldCompiler{
 			Log.info("Could not find Unsafe.objectFieldOffset method. Unsafe field access will be disabled.");
 			acc = AccessType.VAR_HANDLE;
 		}
-		FIELD_ACCESS = acc;
+		FIELD_ACCESS = Objects.requireNonNull(acc, "Field access type cannot be null");
 	}
 	
 	/**
