@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
@@ -15,6 +16,19 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public final class FrameDB{
 	
+	static{
+		Thread.ofVirtual().start(() -> {
+			try{
+				var db = new FrameDB(MemoryData.empty());
+				db.store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0])));
+				db.store("\0", new IPC.DiffFrame(1, 0, -1, new IPC.DiffPart[0], new IPC.RangeSet(new long[0])));
+				db.clear("\0");
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		});
+	}
+	
 	private final Cluster cluster;
 	private final Lock    lock = new ReentrantLock();
 	
@@ -23,22 +37,6 @@ public final class FrameDB{
 			Cluster.init(storage);
 		}
 		cluster = new Cluster(storage);
-		
-		Thread.ofVirtual().start(() -> {
-			lock.lock();
-			try{
-				if(cluster.roots().listAll().hasAny()){
-					return;
-				}
-				store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0])));
-				store("\0", new IPC.DiffFrame(1, 0, -1, new IPC.DiffPart[0], new IPC.RangeSet(new long[0])));
-				clear("\0");
-			}catch(IOException e){
-				e.printStackTrace();
-			}finally{
-				lock.unlock();
-			}
-		});
 	}
 	
 	public void store(String name, IPC.SendFrame frame) throws IOException{

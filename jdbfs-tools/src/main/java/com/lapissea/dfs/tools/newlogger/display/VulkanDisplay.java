@@ -295,7 +295,7 @@ public class VulkanDisplay implements AutoCloseable{
 					}
 				}catch(Throwable e){
 					e.printStackTrace();
-					window.requestClose();
+					requestClose();
 				}
 			}
 		});
@@ -304,17 +304,20 @@ public class VulkanDisplay implements AutoCloseable{
 				window.pollEvents();
 			}catch(Throwable e){
 				e.printStackTrace();
-				window.requestClose();
+				requestClose();
 			}
 			try{
 				Thread.sleep(5);
-			}catch(InterruptedException e){ window.requestClose(); }
+			}catch(InterruptedException e){ requestClose(); }
 		}
 		try{
 			t.join();
 		}catch(InterruptedException e){
 			throw new RuntimeException(e);
 		}
+	}
+	private void requestClose(){
+		window.requestClose();
 	}
 	
 	@Override

@@ -16,25 +16,30 @@ public final class LogServerStart{
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
-	public static void main(String[] args) throws IOException, LockedFlagSet, VulkanCodeException{
-//		ConfigDefs.LOG_LEVEL.set(Log.LogLevel.TRACE);
-
-//		LogUtil.println(ProcessHandle.current().pid());
-//		UtilL.sleep(5000);
-		
-		var t = System.currentTimeMillis();
-		try(var display = new VulkanDisplay()){
-			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
-			display.run();
-		}
-		System.exit(0);
-		
+	public static void main(String[] args) throws IOException, LockedFlagSet, VulkanCodeException, InterruptedException{
 		var logger = LoggedMemoryUtils.createLoggerFromConfig();
 		var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
 		
 		var server = new DBLogIngestServer(() -> new FrameDB(dbFile));
-		server.start();
 		
+		var ingestThread = Thread.ofPlatform().name("Ingest").start(() -> {
+			try{
+				server.start();
+			}catch(Throwable e){
+				e.printStackTrace();
+				System.exit(1);
+			}
+		});
+		var t = System.currentTimeMillis();
+		try(var display = new VulkanDisplay()){
+			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
+			display.run();
+		}catch(VulkanCodeException e){
+			e.printStackTrace();
+		}finally{
+			server.stop();
+		}
+		ingestThread.join();
 	}
 	
 }

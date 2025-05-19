@@ -9,6 +9,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -229,10 +230,10 @@ public final class DBLogIngestServer{
 	
 	private       boolean                  run         = true;
 	private final Map<Integer, Connection> connections = Collections.synchronizedMap(new LinkedHashMap<>());
-	private       Thread                   runThread;
 	
 	private final    UnsafeSupplier<FrameDB, IOException> frameDBInit;
 	private volatile FrameDB                              db;
+	private          ServerSocket                         serverSocket;
 	
 	public DBLogIngestServer(UnsafeSupplier<FrameDB, IOException> frameDBInit){
 		this.frameDBInit = frameDBInit;
@@ -264,14 +265,18 @@ public final class DBLogIngestServer{
 	
 	public void stop(){
 		run = false;
-		if(runThread != null){
-			runThread.interrupt();
+		if(serverSocket != null){
+			try{
+				serverSocket.close();
+			}catch(IOException e){
+				throw new UncheckedIOException(e);
+			}
 		}
 	}
 	
 	public void start() throws IOException{
-		runThread = Thread.currentThread();
 		try(var soc = new ServerSocket(IPC.DEFAULT_PORT)){
+			this.serverSocket = soc;
 			while(run){
 				listenForConnection(soc);
 			}

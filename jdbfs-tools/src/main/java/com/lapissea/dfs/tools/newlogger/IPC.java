@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.StringJoiner;
@@ -83,6 +84,12 @@ public final class IPC{
 			
 			Log.trace("SERVER: Opened session management port on {}#green", connectionSocket.getLocalPort());
 			return connectionSocket;
+		}catch(SocketException e){
+			if(e.getMessage().equals("Socket closed")){
+				return null;
+			}else{
+				throw e;
+			}
 		}
 	}
 	
