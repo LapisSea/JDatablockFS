@@ -78,10 +78,10 @@ public final class Descriptor{
 		
 		public static final class UniformBuff implements BindData{
 			
-			private final int           binding;
-			private final UniformBuffer uniforms;
+			private final int              binding;
+			private final UniformBuffer<?> uniforms;
 			
-			public UniformBuff(int binding, UniformBuffer uniforms){
+			public UniformBuff(int binding, UniformBuffer<?> uniforms){
 				this.binding = binding;
 				this.uniforms = uniforms;
 			}
@@ -174,10 +174,10 @@ public final class Descriptor{
 			bindData.put(binding, new TextureBuff(binding, texture, layout));
 			return this;
 		}
-		public LayoutDescription bind(int binding, VkShaderStageFlag stages, UniformBuffer uniform){
+		public LayoutDescription bind(int binding, VkShaderStageFlag stages, UniformBuffer<?> uniform){
 			return bind(binding, Flags.of(stages), uniform);
 		}
-		public LayoutDescription bind(int binding, Flags<VkShaderStageFlag> stages, UniformBuffer uniform){
+		public LayoutDescription bind(int binding, Flags<VkShaderStageFlag> stages, UniformBuffer<?> uniform){
 			var type = uniform.ssbo? VkDescriptorType.STORAGE_BUFFER : VkDescriptorType.UNIFORM_BUFFER;
 			bindings.put(binding, new LayoutBinding(binding, stages, type));
 			bindData.put(binding, new UniformBuff(binding, uniform));

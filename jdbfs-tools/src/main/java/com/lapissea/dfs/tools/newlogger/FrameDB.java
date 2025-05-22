@@ -7,6 +7,7 @@ import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public final class FrameDB{
 			}catch(IOException e){
 				e.printStackTrace();
 			}
+			LogUtil.println("Preloaded FrameDB IO ops");
 		});
 	}
 	

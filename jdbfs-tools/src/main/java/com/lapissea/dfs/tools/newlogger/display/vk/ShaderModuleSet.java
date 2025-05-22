@@ -49,7 +49,7 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 					throw UtilL.uncheckedThrow(e.getCause());
 				}
 			}
-			LogUtil.println("Compiled shader modules: ", name);
+			LogUtil.println("Compiled shader modules:", name);
 			return modules;
 		});
 	}
