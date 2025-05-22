@@ -1,7 +1,9 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.DisplayManager;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
+import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -14,8 +16,13 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
+import imgui.ImGui;
+import imgui.ImGuiIO;
+import imgui.flag.ImGuiKey;
+import imgui.internal.ImGuiContext;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
+import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkClearColorValue;
@@ -25,8 +32,11 @@ import java.io.File;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
+import static org.lwjgl.glfw.GLFW.glfwGetTime;
 
 public class VulkanDisplay implements AutoCloseable{
 	
@@ -44,11 +54,23 @@ public class VulkanDisplay implements AutoCloseable{
 	private final LineRenderer                lineRenderer = new LineRenderer();
 	private final LineRenderer.RenderResource lineRes      = new LineRenderer.RenderResource();
 	
+	private final ImGUIRenderer imGUIRenderer = new ImGUIRenderer();
+	
+	private final Vector4f clearColor = new Vector4f(0, 0, 0, 1);
+	
+	private final ImGuiContext imGuiContext = ImGui.createContext();
+	
+	private record ImGUIKeyEvent(int code, boolean pressed){ }
+	
+	private final ConcurrentLinkedQueue<ImGUIKeyEvent> keyboardEvents = new ConcurrentLinkedQueue<>();
+	
 	public VulkanDisplay(){
 		
 		window = createWindow();
 		window.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
 		window.size.register(this::onResizeEvent);
+		
+		initImGUI();
 		
 		try{
 			vkCore = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
@@ -56,6 +78,7 @@ public class VulkanDisplay implements AutoCloseable{
 			fontRender.init(vkCore);
 			byteGridRender.init(vkCore);
 			lineRenderer.init(vkCore);
+			imGUIRenderer.init(vkCore);
 			
 			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
@@ -91,6 +114,58 @@ public class VulkanDisplay implements AutoCloseable{
 		
 	}
 	
+	@SuppressWarnings("deprecation")
+	private void initImGUI(){
+		ImGui.setCurrentContext(imGuiContext);
+		
+		ImGuiIO io = ImGui.getIO();
+		io.setKeyMap(ImGuiKey.Tab, GLFW.GLFW_KEY_TAB);
+		io.setKeyMap(ImGuiKey.LeftArrow, GLFW.GLFW_KEY_LEFT);
+		io.setKeyMap(ImGuiKey.RightArrow, GLFW.GLFW_KEY_RIGHT);
+		io.setKeyMap(ImGuiKey.UpArrow, GLFW.GLFW_KEY_UP);
+		io.setKeyMap(ImGuiKey.DownArrow, GLFW.GLFW_KEY_DOWN);
+		io.setKeyMap(ImGuiKey.PageUp, GLFW.GLFW_KEY_PAGE_UP);
+		io.setKeyMap(ImGuiKey.PageDown, GLFW.GLFW_KEY_PAGE_DOWN);
+		io.setKeyMap(ImGuiKey.Home, GLFW.GLFW_KEY_HOME);
+		io.setKeyMap(ImGuiKey.End, GLFW.GLFW_KEY_END);
+		io.setKeyMap(ImGuiKey.Insert, GLFW.GLFW_KEY_INSERT);
+		io.setKeyMap(ImGuiKey.Delete, GLFW.GLFW_KEY_DELETE);
+		io.setKeyMap(ImGuiKey.Backspace, GLFW.GLFW_KEY_BACKSPACE);
+		io.setKeyMap(ImGuiKey.Space, GLFW.GLFW_KEY_SPACE);
+		io.setKeyMap(ImGuiKey.Enter, GLFW.GLFW_KEY_ENTER);
+		io.setKeyMap(ImGuiKey.Escape, GLFW.GLFW_KEY_ESCAPE);
+		io.setKeyMap(ImGuiKey.KeyPadEnter, GLFW.GLFW_KEY_KP_ENTER);
+		io.setKeyMap(ImGuiKey.A, GLFW.GLFW_KEY_A);
+		io.setKeyMap(ImGuiKey.C, GLFW.GLFW_KEY_C);
+		io.setKeyMap(ImGuiKey.V, GLFW.GLFW_KEY_V);
+		io.setKeyMap(ImGuiKey.X, GLFW.GLFW_KEY_X);
+		io.setKeyMap(ImGuiKey.Y, GLFW.GLFW_KEY_Y);
+		io.setKeyMap(ImGuiKey.Z, GLFW.GLFW_KEY_Z);
+		
+		try{
+			var    f = io.getFonts();
+			byte[] bb;
+			try(var t = Objects.requireNonNull(DisplayManager.class.getResourceAsStream("/CourierPrime/Regular/font.ttf"))){
+				bb = t.readAllBytes();
+			}
+			f.clearFonts();
+			f.addFontFromMemoryTTF(bb, 16);
+			f.build();
+		}catch(Throwable e){
+			throw new RuntimeException("Failed to load imgui font");
+		}
+		
+		window.registryKeyboardKey.register(e -> {
+			boolean pressed;
+			switch(e.getType()){
+				case DOWN -> pressed = true;
+				case UP -> pressed = false;
+				default -> { return; }
+			}
+			keyboardEvents.offer(new ImGUIKeyEvent(e.getKey(), pressed));
+		});
+	}
+	
 	private void render() throws VulkanCodeException{
 		try{
 			renderQueue();
@@ -116,10 +191,36 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var buf = graphicsBuffs.get(frame);
 		buf.reset();
+		imguiUpdate();
 		recordCommandBuffers(frame, index);
 		
 		queue.submitFrame(buf, frame);
 		queue.present(swapchain, index, frame);
+	}
+	
+	private double time;
+	
+	private void imguiUpdate(){
+		var io    = ImGui.getIO();
+		var mouse = window.mousePos;
+		
+		var extent = vkCore.swapchain.extent;
+		io.setDisplaySize(extent.width, extent.height);
+		
+		final double currentTime = glfwGetTime();
+		io.setDeltaTime(time>0.0? (float)(currentTime - time) : 1.0f/60.0f);
+		time = currentTime;
+		
+		io.setMousePos(mouse.x(), mouse.y());
+		
+		io.setMouseDown(0, window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT));
+		io.setMouseDown(1, window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_RIGHT));
+		io.setMouseDown(2, window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_MIDDLE));
+		
+		ImGUIKeyEvent event;
+		while((event = keyboardEvents.poll()) != null){
+			io.addKeyEvent(event.code, event.pressed);
+		}
 	}
 	
 	private boolean resizing;
@@ -175,9 +276,7 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
-			
-			var f = (float)Math.abs(Math.sin(System.currentTimeMillis()/1000D))*0.5F;
-			clearColor.float32().put(0, new float[]{0, 0, 0, 1});
+			this.clearColor.get(clearColor.float32());
 			
 			var renderArea = new Rect2D(vkCore.swapchain.extent);
 			
@@ -201,9 +300,31 @@ public class VulkanDisplay implements AutoCloseable{
 				
 				
 				renderDecimatedCurve(frameID, buf);
+				
+				ImGui.newFrame();
+				
+				if(ImGui.beginMainMenuBar()){
+					if(ImGui.beginMenu("File")){
+						ImGui.menuItem("Open");
+						ImGui.menuItem("Exit");
+						ImGui.endMenu();
+					}
+					ImGui.endMainMenuBar();
+				}
+				
+				if(ImGui.begin("Hello")){
+					ImGui.text("Hello from Java + Vulkan!");
+					ImGui.text("It's working!! :DD");
+					for(int i = 0; i<20; i++){
+						ImGui.text("overflow test " + i);
+					}
+				}
+				ImGui.end();
+				ImGui.render();
+				
+				imGUIRenderer.submit(buf, frameID, ImGui.getDrawData());
 			}
 			buf.end();
-			
 		}
 		
 	}
@@ -333,6 +454,8 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		lineRes.destroy();
 		lineRenderer.destroy();
+		
+		imGUIRenderer.destroy();
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();
