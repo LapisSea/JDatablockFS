@@ -6,7 +6,7 @@
 	
 	<properties>
 		<java.version>24</java.version>
-		<github.spair.version>1.86.11</github.spair.version>
+		<github.spair.version>1.89.0</github.spair.version>
 		<lwjgl.version>3.3.6</lwjgl.version>
 		<joml.version>1.10.7</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
@@ -113,7 +113,24 @@
 			<version>${github.spair.version}</version>
 			<scope>compile</scope>
 		</dependency>
-	
+		<dependency>
+			<groupId>io.github.spair</groupId>
+			<artifactId>imgui-java-natives-windows</artifactId>
+			<version>${github.spair.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.github.spair</groupId>
+			<artifactId>imgui-java-natives-linux</artifactId>
+			<version>${github.spair.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.github.spair</groupId>
+			<artifactId>imgui-java-natives-macos</artifactId>
+			<version>${github.spair.version}</version>
+			<scope>runtime</scope>
+		</dependency>
 	</dependencies>
 	
 	<dependencyManagement>

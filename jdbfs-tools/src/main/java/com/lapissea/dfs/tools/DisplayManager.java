@@ -4,7 +4,6 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.config.ConfigUtils;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.MemFrame;
-import com.lapissea.dfs.tools.render.G2DBackend;
 import com.lapissea.dfs.tools.render.ImGuiUtils;
 import com.lapissea.dfs.tools.render.OpenGLBackend;
 import com.lapissea.dfs.tools.render.RenderBackend;
@@ -23,7 +22,6 @@ import java.awt.Color;
 import java.text.NumberFormat;
 import java.time.Duration;
 import java.util.EnumSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -76,22 +74,13 @@ public class DisplayManager implements DataLogger{
 	}
 	
 	private RenderBackend createBackend(){
-		var fails = new LinkedList<Throwable>();
-		
 		try{
 			return new OpenGLBackend();
 		}catch(Throwable e){
-			fails.add(e);
+			var e2 = new RuntimeException("Failed to create render display");
+			e2.addSuppressed(e);
+			throw e2;
 		}
-		try{
-			return new G2DBackend();
-		}catch(Throwable e){
-			fails.add(e);
-		}
-		
-		var e = new RuntimeException("Failed to create render display");
-		fails.forEach(e::addSuppressed);
-		throw e;
 	}
 	
 	private final EnumSet<RenderBackend.DisplayInterface.MouseKey> justPressedKeys = EnumSet.noneOf(RenderBackend.DisplayInterface.MouseKey.class);

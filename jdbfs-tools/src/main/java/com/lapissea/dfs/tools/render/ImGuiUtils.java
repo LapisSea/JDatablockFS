@@ -38,10 +38,5 @@ public final class ImGuiUtils{
 		impl.init("#version 330 core");
 		return impl;
 	}
-	public static synchronized ImGuiImplG2D makeG2DImpl(){
-		var impl = new ImGuiImplG2D();
-		impl.init();
-		return impl;
-	}
 	
 }
