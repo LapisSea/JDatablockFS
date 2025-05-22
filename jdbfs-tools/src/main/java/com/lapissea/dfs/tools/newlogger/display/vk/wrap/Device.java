@@ -48,6 +48,8 @@ import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkSpecializationInfo;
 import org.lwjgl.vulkan.VkSpecializationMapEntry;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
+import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
+import org.lwjgl.vulkan.VkVertexInputBindingDescription;
 import org.lwjgl.vulkan.VkViewport;
 
 import java.util.List;
@@ -197,7 +199,9 @@ public class Device implements VulkanResource{
 		VkSampleCountFlag sampleCount, boolean multisampleShading,
 		List<VkDescriptorSetLayout> descriptorSetLayouts,
 		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates,
-		Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues
+		Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues,
+		List<VkPipeline.VertexInput> vertexInputs,
+		List<VkPipeline.VertexInputBinding> vertexInputBindings
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -240,6 +244,21 @@ public class Device implements VulkanResource{
 			}
 			
 			var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();
+			
+			if(!vertexInputs.isEmpty()){
+				var vertInputAttributes = VkVertexInputAttributeDescription.malloc(vertexInputs.size(), stack);
+				for(VkPipeline.VertexInput attr : vertexInputs){
+					vertInputAttributes.get().set(attr.location(), attr.binding(), attr.format().id, attr.offset());
+				}
+				vertInput.pVertexAttributeDescriptions(vertInputAttributes.flip());
+			}
+			if(!vertexInputBindings.isEmpty()){
+				var bindings = VkVertexInputBindingDescription.malloc(vertexInputBindings.size(), stack);
+				for(var binding : vertexInputBindings){
+					bindings.get().set(binding.binding(), binding.stride(), binding.inputRate().id);
+				}
+				vertInput.pVertexBindingDescriptions(bindings.flip());
+			}
 			
 			var inputAssembly = VkPipelineInputAssemblyStateCreateInfo.calloc(stack).sType$Default()
 			                                                          .topology(VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)

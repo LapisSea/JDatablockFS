@@ -6,10 +6,12 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBlendFactor;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBlendOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
 import org.lwjgl.vulkan.VK10;
 
 import java.util.ArrayList;
@@ -23,6 +25,19 @@ import java.util.Objects;
 import java.util.Set;
 
 public class VkPipeline extends VulkanResource.DeviceHandleObj{
+	
+	public record VertexInputBinding(
+		int binding,
+		int stride,
+		VkVertexInputRate inputRate
+	){ }
+	
+	public record VertexInput(
+		int location,
+		int binding,
+		VkFormat format,
+		int offset
+	){ }
 	
 	public record Blending(
 		VkBlendFactor srcColor, VkBlendFactor dstColor, VkBlendOp colorBlendOp,
@@ -56,6 +71,9 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 		private final Set<VkDynamicState>         dynamicStates       = new HashSet<>();
 		
 		private final Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues = new EnumMap<>(VkShaderStageFlag.class);
+		
+		private final List<VkPipeline.VertexInput>        vertexInputs        = new ArrayList<>();
+		private final List<VkPipeline.VertexInputBinding> vertexInputBindings = new ArrayList<>();
 		
 		private Builder(RenderPass renderPass, List<ShaderModule> modules){
 			this.renderPass = Objects.requireNonNull(renderPass);
@@ -111,6 +129,14 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 			this.dynamicStates.addAll(Arrays.asList(dynamicStates));
 			return this;
 		}
+		public Builder addVertexInput(int location, int binding, VkFormat format, int offset){
+			vertexInputs.add(new VertexInput(location, binding, format, offset));
+			return this;
+		}
+		public Builder addVertexInputBinding(int binding, int stride, VkVertexInputRate inputRate){
+			vertexInputBindings.add(new VertexInputBinding(binding, stride, inputRate));
+			return this;
+		}
 		
 		public VkPipeline build() throws VulkanCodeException{
 			return renderPass.device.createPipeline(
@@ -118,7 +144,8 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 				polygonMode, cullMode, frontFace,
 				sampleCount, multisampleShading,
 				desriptorSetLayouts, blending,
-				dynamicStates, specializationValues
+				dynamicStates, specializationValues,
+				vertexInputs, vertexInputBindings
 			);
 		}
 	}

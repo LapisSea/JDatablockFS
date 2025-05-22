@@ -186,6 +186,9 @@ public class CommandBuffer implements VulkanResource{
 		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
 	}
 	
+	public void bindVertexBuffer(VkBuffer buffer, int binding, long offset){
+		VK10.vkCmdBindVertexBuffers(val, binding, new long[]{buffer.handle}, new long[]{offset});
+	}
 	public void bindIndexBuffer(VkBuffer buffer, long offset, VkIndexType type){
 		VK10.vkCmdBindIndexBuffer(val, buffer.handle, offset, type.id);
 	}
