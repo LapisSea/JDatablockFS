@@ -10,12 +10,14 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -44,6 +46,7 @@ import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineViewportStateCreateInfo;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRect2D;
+import org.lwjgl.vulkan.VkSamplerCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkSpecializationInfo;
 import org.lwjgl.vulkan.VkSpecializationMapEntry;
@@ -58,6 +61,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
+import static org.lwjgl.vulkan.VK10.VK_LOD_CLAMP_NONE;
 import static org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE;
 
 public class Device implements VulkanResource{
@@ -405,6 +409,29 @@ public class Device implements VulkanResource{
 			    .sharingMode(sharingMode.id);
 			
 			return VKCalls.vkCreateBuffer(this, info);
+		}
+	}
+	public VkSampler createSampler(VkFilter min, VkFilter mag, VkSamplerAddressMode samplerAddressMode) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var info = VkSamplerCreateInfo.calloc(stack);
+			info.sType$Default()
+			    .minFilter(min.id)
+			    .magFilter(mag.id)
+			    .mipmapMode(VK10.VK_SAMPLER_MIPMAP_MODE_LINEAR)
+			    .addressModeU(samplerAddressMode.id)
+			    .addressModeV(samplerAddressMode.id)
+			    .addressModeW(samplerAddressMode.id)
+			    .mipLodBias(0)
+			    .anisotropyEnable(false)
+			    .maxAnisotropy(1)
+			    .compareEnable(false)
+			    .compareOp(VK10.VK_COMPARE_OP_ALWAYS)
+			    .minLod(0)
+			    .maxLod(VK_LOD_CLAMP_NONE)
+			    .borderColor(VK10.VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK)
+			    .unnormalizedCoordinates(false);
+			
+			return VKCalls.vkCreateSampler(this, info);
 		}
 	}
 	

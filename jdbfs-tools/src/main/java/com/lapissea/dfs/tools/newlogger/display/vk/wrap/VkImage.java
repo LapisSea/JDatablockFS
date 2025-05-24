@@ -6,14 +6,12 @@ import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferImageCopy;
@@ -22,9 +20,6 @@ import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkMemoryRequirements;
-import org.lwjgl.vulkan.VkSamplerCreateInfo;
-
-import static org.lwjgl.vulkan.VK10.VK_LOD_CLAMP_NONE;
 
 public class VkImage extends VulkanResource.DeviceHandleObj{
 	
@@ -105,29 +100,6 @@ public class VkImage extends VulkanResource.DeviceHandleObj{
 				    layerCount
 			    ));
 			return device.createImageView(info);
-		}
-	}
-	public VkSampler createSampler(VkFilter min, VkFilter mag, VkSamplerAddressMode samplerAddressMode) throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			var info = VkSamplerCreateInfo.calloc(stack);
-			info.sType$Default()
-			    .minFilter(min.id)
-			    .magFilter(mag.id)
-			    .mipmapMode(VK10.VK_SAMPLER_MIPMAP_MODE_LINEAR)
-			    .addressModeU(samplerAddressMode.id)
-			    .addressModeV(samplerAddressMode.id)
-			    .addressModeW(samplerAddressMode.id)
-			    .mipLodBias(0)
-			    .anisotropyEnable(false)
-			    .maxAnisotropy(1)
-			    .compareEnable(false)
-			    .compareOp(VK10.VK_COMPARE_OP_ALWAYS)
-			    .minLod(0)
-			    .maxLod(VK_LOD_CLAMP_NONE)
-			    .borderColor(VK10.VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK)
-			    .unnormalizedCoordinates(false);
-			
-			return VKCalls.vkCreateSampler(device, info);
 		}
 	}
 	

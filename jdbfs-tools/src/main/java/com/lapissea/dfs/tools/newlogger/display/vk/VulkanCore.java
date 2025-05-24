@@ -44,6 +44,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -187,6 +188,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final VkDescriptorPool globalDescriptorPool;
 	
+	public final VkSampler defaultSampler;
+	
 	public VulkanCore(String name, GlfwWindow window, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
 		this.preferredPresentMode = preferredPresentMode;
@@ -217,6 +220,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false, GlobalUniform::new);
 		
+		defaultSampler = device.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		
 		var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms);
 		globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(layout.bindings());
@@ -242,9 +246,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR, mipLevels, 1);
 		
-		var sampler = image.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
-		
-		return new VulkanTexture(image, memory, view, sampler);
+		return new VulkanTexture(image, memory, view, defaultSampler, false);
 	}
 	
 	public void imageUpdate(VkImage image, ByteBuffer pixels, int mipLevels) throws VulkanCodeException{
@@ -447,7 +449,7 @@ public class VulkanCore implements AutoCloseable{
 			
 			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
 			
-			images.add(new VulkanTexture(image, memory, view, null));
+			images.add(new VulkanTexture(image, memory, view, null, false));
 		}
 		mssaImages = List.copyOf(images);
 		
@@ -671,6 +673,8 @@ public class VulkanCore implements AutoCloseable{
 		globalUniformLayout.destroy();
 		globalDescriptorPool.destroy();
 		globalUniforms.destroy();
+		
+		defaultSampler.destroy();
 		
 		renderPass.destroy();
 		device.destroy();

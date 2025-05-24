@@ -54,22 +54,24 @@ public class VulkanTexture implements VulkanResource{
 		});
 	}
 	
-	public final VkImage        image;
-	public final VkDeviceMemory memory;
-	public final VkImageView    view;
-	public final VkSampler      sampler;
+	public final  VkImage        image;
+	public final  VkDeviceMemory memory;
+	public final  VkImageView    view;
+	public final  VkSampler      sampler;
+	private final boolean        ownsSampler;
 	
-	public VulkanTexture(VkImage image, VkDeviceMemory memory, VkImageView view, VkSampler sampler){
+	public VulkanTexture(VkImage image, VkDeviceMemory memory, VkImageView view, VkSampler sampler, boolean ownsSampler){
 		this.image = image;
 		this.memory = memory;
 		this.view = view;
 		this.sampler = sampler;
+		this.ownsSampler = ownsSampler;
 	}
 	
 	
 	@Override
 	public void destroy(){
-		if(sampler != null) sampler.destroy();
+		if(ownsSampler) sampler.destroy();
 		view.destroy();
 		memory.destroy();
 		image.destroy();
