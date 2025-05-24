@@ -146,7 +146,6 @@ public class VulkanDisplay implements AutoCloseable{
 		io.setKeyMap(ImGuiKey.X, GLFW.GLFW_KEY_X);
 		io.setKeyMap(ImGuiKey.Y, GLFW.GLFW_KEY_Y);
 		io.setKeyMap(ImGuiKey.Z, GLFW.GLFW_KEY_Z);
-		io.setKeyMap(ImGuiKey.LeftSuper, GLFW.GLFW_KEY_LEFT_SUPER);
 		
 		try{
 			var    f = io.getFonts();
@@ -167,6 +166,9 @@ public class VulkanDisplay implements AutoCloseable{
 				case DOWN -> pressed = true;
 				case UP -> pressed = false;
 				default -> { return; }
+			}
+			if(e.getKey() == GLFW.GLFW_KEY_LEFT_SUPER){
+				return;
 			}
 			keyboardEvents.offer(new ImGUIKeyEvent(e.getKey(), pressed));
 		});
