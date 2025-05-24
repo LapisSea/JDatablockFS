@@ -1,13 +1,11 @@
 package com.lapissea.dfs.tools.newlogger;
 
-import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.util.LogUtil;
-
-import java.io.IOException;
+import com.lapissea.util.UtilL;
 
 public final class LogServerStart{
 	static{
@@ -16,13 +14,20 @@ public final class LogServerStart{
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
 	}
 	
-	public static void main(String[] args) throws IOException, LockedFlagSet, VulkanCodeException, InterruptedException{
-		var logger = LoggedMemoryUtils.createLoggerFromConfig();
-		var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
-		
-		var server = new DBLogIngestServer(() -> new FrameDB(dbFile));
-		
+	public static void main(String[] args) throws InterruptedException{
+		new LogServerStart().start();
+	}
+	
+	private DBLogIngestServer server;
+	
+	private void start() throws InterruptedException{
 		var ingestThread = Thread.ofPlatform().name("Ingest").start(() -> {
+			UtilL.sleep(100);
+			var logger = LoggedMemoryUtils.createLoggerFromConfig();
+			logger.block();
+			var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
+			
+			server = new DBLogIngestServer(() -> new FrameDB(dbFile));
 			try{
 				server.start();
 			}catch(Throwable e){
@@ -41,5 +46,4 @@ public final class LogServerStart{
 		}
 		ingestThread.join();
 	}
-	
 }

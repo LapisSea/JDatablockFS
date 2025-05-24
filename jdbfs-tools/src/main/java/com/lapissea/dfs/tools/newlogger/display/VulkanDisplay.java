@@ -18,6 +18,7 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
 import imgui.ImGui;
 import imgui.ImGuiIO;
+import imgui.flag.ImGuiConfigFlags;
 import imgui.flag.ImGuiKey;
 import imgui.internal.ImGuiContext;
 import org.joml.Matrix4f;
@@ -40,8 +41,10 @@ import static org.lwjgl.glfw.GLFW.glfwGetTime;
 
 public class VulkanDisplay implements AutoCloseable{
 	
+	static{ Thread.ofVirtual().start(ImGui::init); }
+	
 	private final GlfwWindow window;
-	private final VulkanCore vkCore;
+	private final VulkanCore core;
 	
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
@@ -73,15 +76,15 @@ public class VulkanDisplay implements AutoCloseable{
 		initImGUI();
 		
 		try{
-			vkCore = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
+			core = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
 			
-			fontRender.init(vkCore);
-			byteGridRender.init(vkCore);
-			lineRenderer.init(vkCore);
-			imGUIRenderer.init(vkCore);
+			fontRender.init(core);
+			byteGridRender.init(core);
+			lineRenderer.init(core);
+			imGUIRenderer.init(core);
 			
-			cmdPool = vkCore.device.createCommandPool(vkCore.renderQueueFamily, CommandPool.Type.NORMAL);
-			graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
+			cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
+			graphicsBuffs = cmdPool.createCommandBuffers(core.swapchain.images.size());
 			
 			byte[] bytes = new RawRandom(10).nextBytes(32*32);
 			
@@ -119,6 +122,8 @@ public class VulkanDisplay implements AutoCloseable{
 		ImGui.setCurrentContext(imGuiContext);
 		
 		ImGuiIO io = ImGui.getIO();
+		io.addConfigFlags(ImGuiConfigFlags.DockingEnable);
+		
 		io.setKeyMap(ImGuiKey.Tab, GLFW.GLFW_KEY_TAB);
 		io.setKeyMap(ImGuiKey.LeftArrow, GLFW.GLFW_KEY_LEFT);
 		io.setKeyMap(ImGuiKey.RightArrow, GLFW.GLFW_KEY_RIGHT);
@@ -141,6 +146,7 @@ public class VulkanDisplay implements AutoCloseable{
 		io.setKeyMap(ImGuiKey.X, GLFW.GLFW_KEY_X);
 		io.setKeyMap(ImGuiKey.Y, GLFW.GLFW_KEY_Y);
 		io.setKeyMap(ImGuiKey.Z, GLFW.GLFW_KEY_Z);
+		io.setKeyMap(ImGuiKey.LeftSuper, GLFW.GLFW_KEY_LEFT_SUPER);
 		
 		try{
 			var    f = io.getFonts();
@@ -164,6 +170,10 @@ public class VulkanDisplay implements AutoCloseable{
 			}
 			keyboardEvents.offer(new ImGUIKeyEvent(e.getKey(), pressed));
 		});
+		
+		var style = ImGui.getStyle();
+		style.setFrameRounding(5);
+		style.setScrollbarRounding(5);
 	}
 	
 	private void render() throws VulkanCodeException{
@@ -180,8 +190,8 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void renderQueue() throws VulkanCodeException{
-		var swapchain = vkCore.swapchain;
-		var queue     = vkCore.renderQueue;
+		var swapchain = core.swapchain;
+		var queue     = core.renderQueue;
 		
 		var frame = queue.nextFrame();
 		
@@ -204,7 +214,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var io    = ImGui.getIO();
 		var mouse = window.mousePos;
 		
-		var extent = vkCore.swapchain.extent;
+		var extent = core.swapchain.extent;
 		io.setDisplaySize(extent.width, extent.height);
 		
 		final double currentTime = glfwGetTime();
@@ -219,7 +229,11 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		ImGUIKeyEvent event;
 		while((event = keyboardEvents.poll()) != null){
-			io.addKeyEvent(event.code, event.pressed);
+			try{
+				io.addKeyEvent(event.code, event.pressed);
+			}catch(Throwable e){
+				new RuntimeException(event.toString(), e).printStackTrace();
+			}
 		}
 	}
 	
@@ -228,10 +242,10 @@ public class VulkanDisplay implements AutoCloseable{
 	private void handleResize() throws VulkanCodeException{
 		resizing = true;
 		try{
-			vkCore.recreateSwapchainContext();
-			if(vkCore.swapchain.images.size() != graphicsBuffs.size()){
+			core.recreateSwapchainContext();
+			if(core.swapchain.images.size() != graphicsBuffs.size()){
 				graphicsBuffs.forEach(CommandBuffer::destroy);
-				graphicsBuffs = cmdPool.createCommandBuffers(vkCore.swapchain.images.size());
+				graphicsBuffs = cmdPool.createCommandBuffers(core.swapchain.images.size());
 			}
 			
 			try{
@@ -272,19 +286,20 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	
+	private int[] selectedImageIndexBuf = {0};
 	private void recordCommandBuffers(int frameID, int swapchainID) throws VulkanCodeException{
 		
 		try(var stack = MemoryStack.stackPush()){
 			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
 			this.clearColor.get(clearColor.float32());
 			
-			var renderArea = new Rect2D(vkCore.swapchain.extent);
+			var renderArea = new Rect2D(core.swapchain.extent);
 			
 			var buf         = graphicsBuffs.get(frameID);
-			var frameBuffer = vkCore.frameBuffers.get(swapchainID);
+			var frameBuffer = core.frameBuffers.get(swapchainID);
 			
 			buf.begin();
-			try(var ignore = buf.beginRenderPass(vkCore.renderPass, frameBuffer, renderArea, clearColor)){
+			try(var ignore = buf.beginRenderPass(core.renderPass, frameBuffer, renderArea, clearColor)){
 				
 				renderAutoSizeByteGrid(frameID, buf);
 				
@@ -302,24 +317,28 @@ public class VulkanDisplay implements AutoCloseable{
 				renderDecimatedCurve(frameID, buf);
 				
 				ImGui.newFrame();
+				ImGui.dockSpaceOverViewport();
 				
-				if(ImGui.beginMainMenuBar()){
-					if(ImGui.beginMenu("File")){
-						ImGui.menuItem("Open");
-						ImGui.menuItem("Exit");
-						ImGui.endMenu();
-					}
-					ImGui.endMainMenuBar();
-				}
-				
-				if(ImGui.begin("Hello")){
+				ImGui.dockSpace(1);
+				if(ImGui.begin("Main")){
 					ImGui.text("Hello from Java + Vulkan!");
-					ImGui.text("It's working!! :DD");
-					for(int i = 0; i<20; i++){
-						ImGui.text("overflow test " + i);
-					}
+					ImGui.sliderInt("##Frame slider", selectedImageIndexBuf, 0, 255);
+					ImGui.text("Frame: " + selectedImageIndexBuf[0]);
 				}
 				ImGui.end();
+				
+				if(ImGui.begin("Binary view")){
+					ImGui.textColored(0xFF0000FF, "TODO");
+//					ImGui.image(69, ImGui.getContentRegionAvailX(), ImGui.getContentRegionAvailY());
+				}
+				ImGui.end();
+				
+				if(ImGui.begin("Reference tree view")){
+					ImGui.textColored(0xFF0000FF, "TODO");
+//					ImGui.image(69, ImGui.getContentRegionAvailX(), ImGui.getContentRegionAvailY());
+				}
+				ImGui.end();
+				
 				ImGui.render();
 				
 				imGUIRenderer.submit(buf, frameID, ImGui.getDrawData());
@@ -348,7 +367,7 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	private void renderAutoSizeByteGrid(int frameID, CommandBuffer buf) throws VulkanCodeException{
 		int count = 32*32;
-		var space = vkCore.swapchain.extent;
+		var space = core.swapchain.extent;
 		
 		int bytesPerRow = 1;
 		
@@ -411,7 +430,7 @@ public class VulkanDisplay implements AutoCloseable{
 					render();
 					if(first){
 						first = false;
-						vkCore.renderQueue.waitIdle();
+						core.renderQueue.waitIdle();
 						window.show();
 					}
 				}catch(Throwable e){
@@ -445,7 +464,7 @@ public class VulkanDisplay implements AutoCloseable{
 	public void close() throws VulkanCodeException{
 		window.hide();
 		
-		vkCore.device.waitIdle();
+		core.device.waitIdle();
 		
 		fontRender.destroy();
 		
@@ -460,7 +479,7 @@ public class VulkanDisplay implements AutoCloseable{
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();
 		
-		vkCore.close();
+		core.close();
 		window.destroy();
 	}
 }
