@@ -6,6 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
@@ -37,6 +38,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedSet;
 import java.util.Set;
@@ -267,10 +269,15 @@ public class PhysicalDevice{
 		return res;
 	}
 	
-	public FormatColor chooseSwapchainFormat(boolean log, Iterable<FormatColor> preferred){
+	private static final FormatColor DUMMY_FAIL_FORMAT = new FormatColor(VkFormat.UNDEFINED, VkColorSpaceKHR.SRGB_NONLINEAR_KHR);
+	private              FormatColor lastFormat;
+	public FormatColor chooseSwapchainFormat(Iterable<FormatColor> preferred){
 		return switch(Iters.from(preferred).firstMatchingM(formats::contains)){
 			case Match.Some(var f) -> {
-				if(log) Log.info("Found format: {}#green", f);
+				if(!Objects.equals(lastFormat, f)){
+					lastFormat = f;
+					Log.info("Found format: {}#green", f);
+				}
 				yield f;
 			}
 			case Match.None() -> {
@@ -281,8 +288,10 @@ public class PhysicalDevice{
 				if(f.isEmpty()){
 					f = Optional.of(formats.getFirst());
 				}
-				
-				if(log) Log.warn("Found no preferred formats! Using: {}#yellow", f);
+				if(lastFormat != DUMMY_FAIL_FORMAT){
+					lastFormat = DUMMY_FAIL_FORMAT;
+					Log.warn("Found no preferred formats! Using: {}#yellow", f.map(Object::toString).orElse("UNKNOWN"));
+				}
 				yield f.get();
 			}
 		};

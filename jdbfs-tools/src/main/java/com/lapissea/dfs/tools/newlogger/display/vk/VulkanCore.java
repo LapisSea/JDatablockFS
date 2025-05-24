@@ -444,7 +444,9 @@ public class VulkanCore implements AutoCloseable{
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
 		device.waitIdle();
-		destroySwapchainContext(false);
+		if(swapchain != null){
+			destroySwapchainContext(false);
+		}
 		createSwapchainContext();
 	}
 	
@@ -452,6 +454,9 @@ public class VulkanCore implements AutoCloseable{
 		var oldSwapchain = swapchain;
 		swapchain = device.createSwapchain(oldSwapchain, surface, preferredPresentMode, PREFERRED_SWAPCHAIN_FORMATS);
 		if(oldSwapchain != null) oldSwapchain.destroy();
+		if(swapchain == null){
+			return;
+		}
 		
 		var images = new ArrayList<VulkanTexture>(swapchain.images.size());
 		for(int i = 0; i<swapchain.images.size(); i++){
@@ -510,7 +515,7 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	private RenderPass createRenderPass() throws VulkanCodeException{
-		var formatColor = physicalDevice.chooseSwapchainFormat(false, PREFERRED_SWAPCHAIN_FORMATS).format;
+		var formatColor = physicalDevice.chooseSwapchainFormat(PREFERRED_SWAPCHAIN_FORMATS).format;
 		var mssaAttachment = new RenderPass.AttachmentInfo(
 			formatColor,
 			physicalDevice.samples,

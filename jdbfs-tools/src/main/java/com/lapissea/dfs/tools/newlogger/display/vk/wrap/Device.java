@@ -86,23 +86,22 @@ public class Device implements VulkanResource{
 	}
 	
 	public Swapchain createSwapchain(Swapchain oldSwapchain, Surface surface, VKPresentMode preferredMode, Iterable<FormatColor> preferred) throws VulkanCodeException{
+		//if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
+		
+		SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
+		if(surfaceCapabilities.currentExtent.width == 0 || surfaceCapabilities.currentExtent.height == 0){
+			return null;
+		}
+		
+		var format = physicalDevice.chooseSwapchainFormat(preferred);
+		
+		var presentMode = physicalDevice.presentModes.contains(preferredMode)?
+		                  preferredMode :
+		                  physicalDevice.presentModes.iterator().next();
+		
+		int numOfImages = Math.min(surfaceCapabilities.minImageCount + 1, surfaceCapabilities.maxImageCount);
+		
 		try(var mem = MemoryStack.stackPush()){
-			
-			//if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
-			
-			var format = physicalDevice.chooseSwapchainFormat(oldSwapchain == null, preferred);
-			
-			
-			SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
-			
-			var presentMode = physicalDevice.presentModes.contains(preferredMode)?
-			                  preferredMode :
-			                  physicalDevice.presentModes.iterator().next();
-			
-			int numOfImages = Math.min(surfaceCapabilities.minImageCount + 1, surfaceCapabilities.maxImageCount);
-			
-			var usage = VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			
 			var info = VkSwapchainCreateInfoKHR.calloc(mem).sType$Default();
 			info.surface(surface.handle)
 			    .minImageCount(numOfImages)
@@ -110,7 +109,7 @@ public class Device implements VulkanResource{
 			    .imageColorSpace(format.colorSpace.id)
 			    .imageExtent(surfaceCapabilities.currentExtent.toStack(mem))
 			    .imageArrayLayers(1)
-			    .imageUsage(usage)
+			    .imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
 			    .imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
 			    .preTransform(surfaceCapabilities.currentTransform.bit)
 			    .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)

@@ -177,6 +177,11 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void render() throws VulkanCodeException{
+		if(core.swapchain == null){
+			UtilL.sleep(50);
+			handleResize();
+			return;
+		}
 		try{
 			renderQueue();
 		}catch(VulkanCodeException e){
@@ -243,6 +248,9 @@ public class VulkanDisplay implements AutoCloseable{
 		resizing = true;
 		try{
 			core.recreateSwapchainContext();
+			if(core.swapchain == null){
+				return;
+			}
 			if(core.swapchain.images.size() != graphicsBuffs.size()){
 				graphicsBuffs.forEach(CommandBuffer::destroy);
 				graphicsBuffs = cmdPool.createCommandBuffers(core.swapchain.images.size());
