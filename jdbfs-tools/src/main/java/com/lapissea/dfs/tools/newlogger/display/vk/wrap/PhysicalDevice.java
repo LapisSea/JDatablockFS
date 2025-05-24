@@ -191,14 +191,14 @@ public class PhysicalDevice{
 			return new Device(vkd, this, queueFamilies);
 		}
 	}
-	private void checkFeatures(){
+	
+	public void checkFeatures(){
 		try(var stack = MemoryStack.stackPush()){
 			var features = VkPhysicalDeviceFeatures.calloc(stack);
 			VK11.vkGetPhysicalDeviceFeatures(pDevice, features);
 			if(!features.shaderInt16()){
 				throw new IllegalStateException(this + " does not support shaderInt16");
 			}
-			
 			
 			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
 			var features12    = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();

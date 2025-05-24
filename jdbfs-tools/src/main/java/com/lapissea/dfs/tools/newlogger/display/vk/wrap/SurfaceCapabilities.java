@@ -18,9 +18,17 @@ public class SurfaceCapabilities{
 		if(e.size() != 1) throw new IllegalArgumentException("Unrecognised flags: " + flags);
 		return e.getFirst();
 	}
+	
+	private static int sanitizeMaxImageCount(int maxImageCount){
+		if(maxImageCount == 0){//The spec states: "A value of 0 means that there is no limit on the number of images"
+			return Integer.MAX_VALUE;
+		}
+		return maxImageCount;
+	}
+	
 	public SurfaceCapabilities(VkSurfaceCapabilitiesKHR caps){
 		this(
-			caps.minImageCount(), caps.maxImageCount(),
+			caps.minImageCount(), sanitizeMaxImageCount(caps.maxImageCount()),
 			new Extent2D(caps.currentExtent()), new Extent2D(caps.minImageExtent()), new Extent2D(caps.maxImageExtent()),
 			getTransform(caps.currentTransform())
 		);

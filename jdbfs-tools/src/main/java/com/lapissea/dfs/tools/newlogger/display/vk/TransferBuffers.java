@@ -18,14 +18,17 @@ public class TransferBuffers implements VulkanResource{
 	
 	
 	private final Set<CommandPool>         allQueues = new HashSet<>();
-	private final VulkanQueue              queue;
+	public final  VulkanQueue              queue;
 	private final ThreadLocal<CommandPool> threadVkPools;
 	
 	private final Cleaner cleaner = Cleaner.create();
 	
-	public TransferBuffers(VulkanQueue queue){
+	private final boolean ownsQueue;
+	
+	public TransferBuffers(VulkanQueue queue, boolean ownsQueue){
 		this.queue = queue;
 		threadVkPools = ThreadLocal.withInitial(this::initPool);
+		this.ownsQueue = ownsQueue;
 	}
 	
 	private CommandPool initPool(){
@@ -82,6 +85,6 @@ public class TransferBuffers implements VulkanResource{
 		for(var node : queues){
 			node.destroy();
 		}
-		queue.destroy();
+		if(ownsQueue) queue.destroy();
 	}
 }

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
@@ -38,6 +39,12 @@ public class PhysicalDevices{
 	
 	public PhysicalDevice selectDevice(Set<VkQueueFlag> requiredCapabilities, boolean supportsPresent){
 		for(PhysicalDevice device : devices){
+			try{
+				device.checkFeatures();
+			}catch(Throwable e){
+				new Throwable(Log.fmt("The device {}#red does not support the necessary features", device), e).printStackTrace();
+				continue;
+			}
 			for(QueueFamilyProps family : device.families){
 				if(supportsPresent && !family.supportsPresent){
 					continue;

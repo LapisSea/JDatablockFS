@@ -179,6 +179,7 @@ public class VulkanCore implements AutoCloseable{
 	public final RenderPass           renderPass;
 	public final TransferBuffers      transferBuffers;
 	public final TransferBuffers      transientGraphicsBuffs;
+	public final boolean              singleQueueMode;
 	
 	private final VKPresentMode preferredPresentMode;
 	
@@ -213,8 +214,21 @@ public class VulkanCore implements AutoCloseable{
 		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
 		
 		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
-		transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily));
-		transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(renderQueueFamily));
+		
+		boolean         singleQueueMode = false;
+		TransferBuffers transferBuffers, transientGraphicsBuffs;
+		try{
+			transferBuffers = new TransferBuffers(device.allocateQueue(transferQueueFamily), true);
+			transientGraphicsBuffs = new TransferBuffers(device.allocateQueue(transferQueueFamily), true);
+		}catch(UnsupportedOperationException e){
+			Log.warn("Switching to single queue mode!\n  {}#red", e);
+			transferBuffers = transientGraphicsBuffs = new TransferBuffers(renderQueue, false);
+			singleQueueMode = true;
+		}
+		this.transferBuffers = transferBuffers;
+		this.transientGraphicsBuffs = transientGraphicsBuffs;
+		this.singleQueueMode = singleQueueMode;
+		
 		
 		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
@@ -665,7 +679,7 @@ public class VulkanCore implements AutoCloseable{
 		device.waitIdle();
 		destroySwapchainContext(true);
 		
-		for(var queue : List.of(renderQueue, transferBuffers, transientGraphicsBuffs)){
+		for(var queue : List.of(transferBuffers, transientGraphicsBuffs, renderQueue)){
 			queue.destroy();
 		}
 		
