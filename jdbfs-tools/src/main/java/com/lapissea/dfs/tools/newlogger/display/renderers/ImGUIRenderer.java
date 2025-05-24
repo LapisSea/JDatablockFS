@@ -51,27 +51,28 @@ public class ImGUIRenderer implements VulkanResource{
 		}
 	}
 	
-	private final ShaderModuleSet shader = new ShaderModuleSet("ImGUI", ShaderType.VERTEX, ShaderType.FRAGMENT);
+	private final ShaderModuleSet shader;
 	
-	private VulkanCore core;
+	private final VulkanCore core;
 	
-	private VkPipeline pipeline;
+	private final VkPipeline pipeline;
 	
 	private BackedVkBuffer vtxBuf;
 	private BackedVkBuffer idxBuf;
 	
-	private VkDescriptorSetLayout dsLayoutConst;
-	private VkDescriptorSet       dsSetConst;
+	private final VkDescriptorSetLayout dsLayoutConst;
+	private final VkDescriptorSet       dsSetConst;
 	
-	private VulkanTexture emptyTexture, imGuiFontTexture;
+	private final VulkanTexture emptyTexture;
+	private final VulkanTexture imGuiFontTexture;
 	
 	
-	public void init(VulkanCore core) throws VulkanCodeException{
+	public ImGUIRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
-		shader.init(core);
+		shader = new ShaderModuleSet(core, "ImGUI", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
 		emptyTexture = core.uploadTexture(1, 1, ByteBuffer.allocateDirect(1), VkFormat.R8_UNORM, 1);
-		createFontsTexture();
+		imGuiFontTexture = createFontsTexture();
 		
 		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
@@ -92,13 +93,13 @@ public class ImGUIRenderer implements VulkanResource{
 		                     .build();
 	}
 	
-	private void createFontsTexture() throws VulkanCodeException{
+	private VulkanTexture createFontsTexture() throws VulkanCodeException{
 		final ImFontAtlas fontAtlas = ImGui.getIO().getFonts();
 		
 		ImInt width  = new ImInt(), height = new ImInt();
 		var   pixels = fontAtlas.getTexDataAsAlpha8(width, height);
 		
-		imGuiFontTexture = core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
+		return core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, ImDrawData drawData) throws VulkanCodeException{
@@ -199,8 +200,10 @@ public class ImGUIRenderer implements VulkanResource{
 		pipeline.destroy();
 		emptyTexture.destroy();
 		imGuiFontTexture.destroy();
-		idxBuf.destroy();
-		vtxBuf.destroy();
+		if(idxBuf != null){
+			idxBuf.destroy();
+			vtxBuf.destroy();
+		}
 		shader.destroy();
 	}
 }

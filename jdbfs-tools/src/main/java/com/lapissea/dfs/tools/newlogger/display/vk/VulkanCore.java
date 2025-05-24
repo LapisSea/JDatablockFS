@@ -426,12 +426,16 @@ public class VulkanCore implements AutoCloseable{
 			return VKCalls.vkCreateShaderModule(device, type.vkFlag, pCreateInfo);
 		}
 	}
-	public static ByteBuffer sourceToSpirv(String name, ShaderType type){
+	
+	public ByteBuffer sourceToSpirv(String name, ShaderType type){
 		var path = "shaders/" + name + "." + type.extension;
 		
 		ByteBuffer spirv;
 		try{
-			spirv = ShaderCompiler.glslToSpirv(path, type.vkFlag, VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0));
+			spirv = ShaderCompiler.glslToSpirv(
+				path, type.vkFlag, VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0),
+				!device.hasArithmeticTypes
+			);
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to compile shader: " + name + " - " + type, e);
 		}

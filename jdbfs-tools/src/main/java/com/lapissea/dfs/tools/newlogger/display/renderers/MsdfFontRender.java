@@ -123,14 +123,14 @@ public class MsdfFontRender implements VulkanResource{
 		UtilL.sleepWhile(() -> core == null);
 		return core;
 	});
-	private       CompletableFuture<Void>          doneTask;
+	private final CompletableFuture<Void>          doneTask;
 	
-	private final ShaderModuleSet shader = new ShaderModuleSet("msdfFont", ShaderType.VERTEX, ShaderType.FRAGMENT);
+	private final ShaderModuleSet shader;
 	private       BackedVkBuffer  tableGpu;
 	
-	public void init(VulkanCore core){
+	public MsdfFontRender(VulkanCore core){
 		this.core = Objects.requireNonNull(core);
-		shader.init(core);
+		shader = new ShaderModuleSet(core, "msdfFont", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
 		var tableUploadTask = tableRes.whenComplete((table, e) -> {
 			if(e != null) throw UtilL.uncheckedThrow(e);

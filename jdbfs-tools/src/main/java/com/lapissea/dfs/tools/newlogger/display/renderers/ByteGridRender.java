@@ -43,9 +43,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	record Theme(Color none, Color write, Color read, Color readWrite){ }
 	
-	private final ShaderModuleSet shader = new ShaderModuleSet("ByteGrid", ShaderType.VERTEX, ShaderType.FRAGMENT);
-	
-	private static class Vert{
+	private static final class Vert{
 		static final int SIZE = (2)*4 + 4;
 		
 		static final int T_BACK = 0;
@@ -222,29 +220,33 @@ public class ByteGridRender implements VulkanResource{
 		}
 	}
 	
-	private Theme theme = new Theme(
+	private final ShaderModuleSet shader;
+	
+	private final Theme theme = new Theme(
 		new Color(0, 0, 0, 0F),
 		new Color(1, 1, 0, 1F),
 		new Color(0, 1, 1, 1F),
 		new Color(1, 1, 1, 1F)
 	);
 	
-	private VulkanCore     core;
-	private MeshInfo[]     meshInfos;
-	private BackedVkBuffer verts;
+	private final VulkanCore     core;
+	private final MeshInfo[]     meshInfos;
+	private final BackedVkBuffer verts;
 	
-	private VkDescriptorSetLayout dsLayoutConst;
-	private VkDescriptorSet       dsSetConst;
+	private final VkDescriptorSetLayout dsLayoutConst;
+	private final VkDescriptorSet       dsSetConst;
 	
-	private VkDescriptorSetLayout dsLayout;
-	private VkPipeline            pipeline;
-	private VkPipeline            pipelineSimple;
+	private final VkDescriptorSetLayout dsLayout;
+	private final VkPipeline            pipeline;
+	private final VkPipeline            pipelineSimple;
 	
-	public void init(VulkanCore core) throws VulkanCodeException{
+	public ByteGridRender(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
-		shader.init(core);
+		shader = new ShaderModuleSet(core, "ByteGrid", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		computeByteVerts(core);
+		var vertsI = computeByteVerts(core);
+		meshInfos = vertsI.infos;
+		verts = vertsI.verts;
 		
 		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
@@ -273,7 +275,8 @@ public class ByteGridRender implements VulkanResource{
 		
 	}
 	
-	private void computeByteVerts(VulkanCore core) throws VulkanCodeException{
+	private record ByteVerts(MeshInfo[] infos, BackedVkBuffer verts){ }
+	private ByteVerts computeByteVerts(VulkanCore core) throws VulkanCodeException{
 		record SetBitsQuad(int x, int y, int w, int h){ }
 		
 		List<List<SetBitsQuad>> setQuadsSet = new ArrayList<>(256);
@@ -322,7 +325,7 @@ public class ByteGridRender implements VulkanResource{
 			}while(change);
 		}
 		
-		meshInfos = new MeshInfo[256];
+		var meshInfos  = new MeshInfo[256];
 		int vertsTotal = 0;
 		for(int i = 0; i<meshInfos.length; i++){
 			var quads = setQuadsSet.get(i);
@@ -333,7 +336,7 @@ public class ByteGridRender implements VulkanResource{
 			meshInfos[i] = new MeshInfo(vertPos, verts);
 		}
 		
-		verts = core.allocateLocalStorageBuffer((long)vertsTotal*Vert.SIZE, bb -> {
+		var verts = core.allocateLocalStorageBuffer((long)vertsTotal*Vert.SIZE, bb -> {
 			for(List<SetBitsQuad> quads : setQuadsSet){
 				Vert.putQuad(bb, 0, 0, 3, 3, Vert.T_BACK);
 				for(var quad : quads){
@@ -342,6 +345,7 @@ public class ByteGridRender implements VulkanResource{
 				Vert.putQuad(bb, 2, 2, 1, 1, Vert.T_MARK);
 			}
 		});
+		return new ByteVerts(meshInfos, verts);
 	}
 	
 	public record IOEvent(char from, char to, Type type){

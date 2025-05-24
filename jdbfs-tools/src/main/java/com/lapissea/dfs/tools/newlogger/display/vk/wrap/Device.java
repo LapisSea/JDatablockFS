@@ -73,11 +73,13 @@ public class Device implements VulkanResource{
 	private final Map<QueueFamilyProps, Integer> familyAllocIndexes;
 	
 	public final Map<Long, Throwable> debugVkObjects = new ConcurrentHashMap<>();
+	public final boolean              hasArithmeticTypes;
 	
-	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies){
+	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies, boolean hasArithmeticTypes){
 		this.value = value;
 		this.physicalDevice = physicalDevice;
 		this.familyAllocIndexes = Iters.from(queueFamilies).toModMap(e -> e, e -> -1);
+		this.hasArithmeticTypes = hasArithmeticTypes;
 		if(!physicalDevice.pDevice.equals(value.getPhysicalDevice())){
 			throw new IllegalArgumentException("physical device is not the argument");
 		}

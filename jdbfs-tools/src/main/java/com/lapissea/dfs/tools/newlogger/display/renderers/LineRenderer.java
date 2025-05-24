@@ -143,16 +143,16 @@ public class LineRenderer implements VulkanResource{
 		}
 	}
 	
-	private final ShaderModuleSet shader = new ShaderModuleSet("Line", ShaderType.VERTEX, ShaderType.FRAGMENT);
+	private final ShaderModuleSet shader;
 	
-	private VulkanCore core;
+	private final VulkanCore core;
 	
-	private VkPipeline            pipeline;
-	private VkDescriptorSetLayout dsLayout;
+	private final VkPipeline            pipeline;
+	private final VkDescriptorSetLayout dsLayout;
 	
-	public void init(VulkanCore core) throws VulkanCodeException{
+	public LineRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
-		shader.init(core);
+		shader = new ShaderModuleSet(core, "Line", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
 		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),

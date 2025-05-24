@@ -1,19 +1,39 @@
 #version 460
 #extension GL_EXT_shader_explicit_arithmetic_types: require
 
+#include <vec4_u8>
+
 struct Rect {
     float xOff;
     float yOff;
-    uint16_t letterId;
+    uint letterId;
 };
-struct Letter {
-    float16_t w, h;
-    uint16_t u0, v0, u1, v1;
-};
+#ifdef NO_ARITHMETIC_TYPES
+    struct Letter {
+        uint wh;
+        uint u0v0, u1v1;
+    };
+	vec2 wh(Letter value){return unpackHalf2x16(value.wh);}
+	uint u0(Letter value){return value.u0v0 & 0xFFFFu;}
+	uint v0(Letter value){return (value.u0v0 >> 16) & 0xFFFFu;}
+	uint u1(Letter value){return value.u1v1 & 0xFFFFu;}
+	uint v1(Letter value){return (value.u1v1 >> 16) & 0xFFFFu;}
+#else
+    struct Letter {
+        float16_t w, h;
+        uint16_t u0, v0, u1, v1;
+    };
+	vec2 wh(Letter value){return vec2(value.w, value.h);}
+	uint u0(Letter value){return value.u0;}
+	uint v0(Letter value){return value.v0;}
+	uint u1(Letter value){return value.u1;}
+	uint v1(Letter value){return value.v1;}
+#endif
+
 struct Uniform {
     vec2 pos;
     float scale;
-    u8vec4 col;
+    vec4_u8 col;
     float outline;
     float xScale;
 };
@@ -43,16 +63,18 @@ void main() {
     int quadId = gl_VertexIndex % 6;
     if (quadId == 0 || quadId == 3) {
         x = 0; y = 0;
-        u = letter.u0; v = letter.v1;
+        u = u0(letter); v = v1(letter);
     } else if (quadId == 1) {
-        x = letter.w; y = 0;
-        u = letter.u1; v = letter.v1;
+        x = wh(letter).x; y = 0;
+        u = u1(letter); v = v1(letter);
     } else if (quadId == 2 || quadId == 4) {
-        x = letter.w; y = letter.h;
-        u = letter.u1; v = letter.v0;
+        vec2 wh=wh(letter);
+        x = wh.x; y = wh.y;
+        u = u1(letter); v = v0(letter);
     } else /*if (quadId == 5)*/ {
-        x = 0; y = letter.h;
-        u = letter.u0; v = letter.v0;
+        vec2 wh=wh(letter);
+        x = 0; y = wh.y;
+        u = u0(letter); v = v0(letter);
     }
 
     vec2 pos = vec2(x + rect.xOff, y + rect.yOff);
@@ -65,5 +87,5 @@ void main() {
     uvOut = vec2(u, v) / 65535;
     outline = ubo.outline;
     scale = ubo.scale;
-    col = vec4(ubo.col) / 255;
+    col = toVec4(ubo.col);
 }

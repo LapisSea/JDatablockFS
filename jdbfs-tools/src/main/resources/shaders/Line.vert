@@ -1,9 +1,11 @@
 #version 460
 #extension GL_EXT_shader_explicit_arithmetic_types: require
 
+#include <vec4_u8>
+
 struct Vert {
 	vec2 xy;
-	u8vec4 color;
+	vec4_u8 color;
 };
 
 
@@ -24,5 +26,5 @@ void main() {
 
 	gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * ubo.modelMat * vec4(vt.xy, 0, 1.0);
 
-	colOut = vec4(vt.color)/255.0;
+	colOut = toVec4(vt.color);
 }

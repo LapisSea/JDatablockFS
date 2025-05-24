@@ -8,7 +8,6 @@ import com.lapissea.util.UtilL;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -17,23 +16,13 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 	private final CompletableFuture<ShaderModule[]> task;
 	private       ShaderModule[]                    modules;
 	
-	private VulkanCore core;
-	
-	public ShaderModuleSet(String name, ShaderType... types){
+	public ShaderModuleSet(VulkanCore core, String name, ShaderType... types){
 		task = CompletableFuture.supplyAsync(() -> {
 			var tasks = new ArrayList<CompletableFuture<ShaderModule>>(types.length);
 			for(ShaderType type : types){
 				tasks.add(CompletableFuture.supplyAsync(() -> {
 					try{
-						var spirv = VulkanCore.sourceToSpirv(name, type);
-						while(true){
-							synchronized(this){
-								if(core != null) break;
-								try{
-									this.wait(20);
-								}catch(InterruptedException e){ throw new RuntimeException(e); }
-							}
-						}
+						var spirv = core.sourceToSpirv(name, type);
 						return core.createShaderModule(spirv, type);
 					}catch(VulkanCodeException e){
 						throw UtilL.uncheckedThrow(e);
@@ -52,14 +41,6 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 			LogUtil.println("Compiled shader modules:", name);
 			return modules;
 		});
-	}
-	
-	
-	public void init(VulkanCore core){
-		synchronized(this){
-			this.core = Objects.requireNonNull(core);
-			this.notifyAll();
-		}
 	}
 	
 	private ShaderModule[] getModules(){

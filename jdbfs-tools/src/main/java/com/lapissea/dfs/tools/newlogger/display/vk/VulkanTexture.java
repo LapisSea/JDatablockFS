@@ -25,8 +25,7 @@ public class VulkanTexture implements VulkanResource{
 			
 			ByteBuffer pixels = null, image = null;
 			try(var stack = MemoryStack.stackPush()){
-				var imageJ = VUtils.readResource(name);
-				image = VUtils.nativeMemCopy(imageJ);
+				image = VUtils.nativeMemCopy(VUtils.readResource(name));
 				
 				IntBuffer xB = stack.mallocInt(1), yB = stack.mallocInt(1), channelsB = stack.mallocInt(1);
 				pixels = STBImage.stbi_load_from_memory(image, xB, yB, channelsB, STBImage.STBI_rgb_alpha);

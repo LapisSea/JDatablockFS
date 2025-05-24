@@ -49,15 +49,15 @@ public class VulkanDisplay implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	private       List<CommandBuffer> graphicsBuffs;
 	
-	private final MsdfFontRender fontRender = new MsdfFontRender();
+	private final MsdfFontRender fontRender;
 	
-	private final ByteGridRender                byteGridRender = new ByteGridRender();
-	private final ByteGridRender.RenderResource grid1Res       = new ByteGridRender.RenderResource();
+	private final ByteGridRender                byteGridRender;
+	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
 	
-	private final LineRenderer                lineRenderer = new LineRenderer();
-	private final LineRenderer.RenderResource lineRes      = new LineRenderer.RenderResource();
+	private final LineRenderer                lineRenderer;
+	private final LineRenderer.RenderResource lineRes = new LineRenderer.RenderResource();
 	
-	private final ImGUIRenderer imGUIRenderer = new ImGUIRenderer();
+	private final ImGUIRenderer imGUIRenderer;
 	
 	private final Vector4f clearColor = new Vector4f(0, 0, 0, 1);
 	
@@ -78,10 +78,10 @@ public class VulkanDisplay implements AutoCloseable{
 		try{
 			core = new VulkanCore("DFS debugger", window, VKPresentMode.IMMEDIATE);
 			
-			fontRender.init(core);
-			byteGridRender.init(core);
-			lineRenderer.init(core);
-			imGUIRenderer.init(core);
+			fontRender = new MsdfFontRender(core);
+			byteGridRender = new ByteGridRender(core);
+			lineRenderer = new LineRenderer(core);
+			imGUIRenderer = new ImGUIRenderer(core);
 			
 			cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 			graphicsBuffs = cmdPool.createCommandBuffers(core.swapchain.images.size());
@@ -340,8 +340,8 @@ public class VulkanDisplay implements AutoCloseable{
 				ImGui.end();
 				
 				ImGui.render();
-				
-				imGUIRenderer.submit(buf, frameID, ImGui.getDrawData());
+
+//				imGUIRenderer.submit(buf, frameID, ImGui.getDrawData());
 			}
 			buf.end();
 		}

@@ -24,6 +24,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -169,6 +170,26 @@ public final class VUtils{
 		return MemoryUtil.memAlloc(heap.remaining()).put(heap).flip();
 	}
 	
+	public static StringBuilder readResourceAsStr(String resource) throws IOException{
+		URL url = VUtils.class.getResource(resource.startsWith("/")? resource : "/" + resource);
+		if(url == null){
+			throw new IOException("Resource not found: " + resource);
+		}
+		var buffer = new StringBuilder();
+		try(var source = url.openStream()){
+			if(source == null){
+				throw new FileNotFoundException(resource);
+			}
+			var buf = new char[512];
+			try(var reader = new InputStreamReader(source)){
+				int read;
+				while((read = reader.read(buf)) != -1){
+					buffer.append(buf, 0, read);
+				}
+			}
+		}
+		return buffer;
+	}
 	public static ByteBuffer readResource(String resource) throws IOException{
 		URL url = VUtils.class.getResource(resource.startsWith("/")? resource : "/" + resource);
 		if(url == null){

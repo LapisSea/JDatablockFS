@@ -11,13 +11,16 @@ import org.lwjgl.vulkan.VK10;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 
 import static org.lwjgl.util.shaderc.Shaderc.*;
 
 public final class ShaderCompiler{
 	
+	
 	//Thanks to: https://github.com/LWJGL/lwjgl3-demos/blob/main/src/org/lwjgl/demo/vulkan/VKUtil.java
-	public static ByteBuffer glslToSpirv(String classPath, VkShaderStageFlag vulkanStage, int vulkanApiVersion) throws IOException{
+	public static ByteBuffer glslToSpirv(String classPath, VkShaderStageFlag vulkanStage, int vulkanApiVersion, boolean disableArithmeticTypes) throws IOException{
 		
 		var major = VK10.VK_API_VERSION_MAJOR(vulkanApiVersion);
 		var minor = VK10.VK_API_VERSION_MINOR(vulkanApiVersion);
@@ -47,7 +50,15 @@ public final class ShaderCompiler{
 			case COMPUTE -> shaderc_compute_shader;
 		};
 		
-		var src = VUtils.readResource(classPath);
+		var src = VUtils.readResourceAsStr(classPath);
+		if(disableArithmeticTypes){
+			var extension = "#extension GL_EXT_shader_explicit_arithmetic_types: require";
+			var index     = src.indexOf(extension);
+			if(index != -1){
+				src.replace(index, index + extension.length(), "#define NO_ARITHMETIC_TYPES");
+			}
+		}
+		
 		
 		long compiler = shaderc_compiler_initialize();
 		long options  = shaderc_compile_options_initialize();
@@ -56,9 +67,9 @@ public final class ShaderCompiler{
 			public long invoke(long user_data, long requested_source, int type, long requesting_source, long include_depth){
 				var res = ShadercIncludeResult.calloc();
 				var src = classPath.substring(0, classPath.lastIndexOf('/')) + "/" + MemoryUtil.memUTF8(requested_source);
+				if(!src.contains(".")) src += ".glsl";
 				try{
-					var data = VUtils.readResource(src);
-					var mem  = MemoryUtil.memAlloc(data.remaining()).put(data).flip();
+					var mem = VUtils.nativeMemCopy(VUtils.readResource(src));
 					res.content(mem);
 				}catch(IOException e){
 					new IOException("Failed to resolve include: " + src, e).printStackTrace();
@@ -89,7 +100,7 @@ public final class ShaderCompiler{
 		
 		long res;
 		try(MemoryStack stack = MemoryStack.stackPush()){
-			var srcN = MemoryUtil.memAlloc(src.remaining()).put(src).flip();
+			var srcN = VUtils.nativeMemCopy(StandardCharsets.UTF_8.encode(CharBuffer.wrap(src)));
 			try{
 				res = shaderc_compile_into_spv(compiler, srcN, shaderc_kind, stack.UTF8(classPath), stack.UTF8("main"), options);
 			}finally{

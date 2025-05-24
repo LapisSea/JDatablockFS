@@ -155,49 +155,72 @@ public class PhysicalDevice{
 			}
 			queueInfo.position(0);
 			
-			checkFeatures();
+			var optionalFeatures = checkFeatures();
+			optionalFeatures.arithmeticTypesError.ifPresent(e -> Log.warn("Using GPU without arithmetic types! Reason:\n  {}#red", e));
+			
+			boolean hasArithmeticTypes = optionalFeatures.arithmeticTypesError.isEmpty();
 			
 			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
-			features16bit.storageBuffer16BitAccess(true)
-			             .uniformAndStorageBuffer16BitAccess(true);
+			if(hasArithmeticTypes){
+				features16bit.storageBuffer16BitAccess(true)
+				             .uniformAndStorageBuffer16BitAccess(true);
+			}
 			
 			var features12 = VkPhysicalDeviceVulkan12Features.calloc(stack).sType$Default();
-			features12.shaderInt8(true)
-			          .uniformAndStorageBuffer8BitAccess(true)
-			          .shaderFloat16(true)
-			          .storageBuffer8BitAccess(true);
+			if(hasArithmeticTypes){
+				features12.shaderInt8(true)
+				          .uniformAndStorageBuffer8BitAccess(true)
+				          .shaderFloat16(true)
+				          .storageBuffer8BitAccess(true);
+			}
 			
 			var features = VkPhysicalDeviceFeatures.calloc(stack)
-			                                       .shaderInt16(true)
 			                                       .sampleRateShading(true)
 			                                       .multiDrawIndirect(true);
+			if(hasArithmeticTypes){
+				features.shaderInt16(true);
+			}
+			
+			List<String> extensionNames = new ArrayList<>();
+			extensionNames.add(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+			extensionNames.add(KHRShaderDrawParameters.VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+			if(hasArithmeticTypes){
+				extensionNames.add(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+			}
 			
 			var info = VkDeviceCreateInfo.calloc(stack);
 			info.sType$Default()
 			    .pNext(features16bit)
 			    .pNext(features12)
 			    .pQueueCreateInfos(queueInfo)
-			    .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(
-				    stack,
-				    KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-				    KHRShaderDrawParameters.VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-				    KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME
-			    ))
+			    .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames))
 			    .pEnabledFeatures(features);
 			
 			
 			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
-			return new Device(vkd, this, queueFamilies);
+			return new Device(vkd, this, queueFamilies, hasArithmeticTypes);
 		}
 	}
 	
-	public void checkFeatures(){
+	public record OptionalFeatures(Optional<String> arithmeticTypesError){ }
+	
+	public OptionalFeatures checkFeatures(){
 		try(var stack = MemoryStack.stackPush()){
 			var features = VkPhysicalDeviceFeatures.calloc(stack);
 			VK11.vkGetPhysicalDeviceFeatures(pDevice, features);
+			
+			List<String> arithmeticTypesError = new ArrayList<>();
+			
+			if(!features.sampleRateShading()){
+				throw new IllegalStateException("Does not support sampleRateShading");
+			}
+			if(!features.multiDrawIndirect()){
+				throw new IllegalStateException("Does not support multiDrawIndirect");
+			}
+			
 			if(!features.shaderInt16()){
-				throw new IllegalStateException(this + " does not support shaderInt16");
+				arithmeticTypesError.add("shaderInt16");
 			}
 			
 			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
@@ -212,23 +235,25 @@ public class PhysicalDevice{
 			);
 			
 			if(!features16bit.storageBuffer16BitAccess()){
-				throw new IllegalStateException(this + " does not support storageBuffer16BitAccess");
+				arithmeticTypesError.add("storageBuffer16BitAccess");
 			}
 			if(!features16bit.uniformAndStorageBuffer16BitAccess()){
-				throw new IllegalStateException(this + " does not support uniformAndStorageBuffer16BitAccess");
+				arithmeticTypesError.add("uniformAndStorageBuffer16BitAccess");
 			}
 			if(!features12.shaderInt8()){
-				throw new IllegalStateException(this + " does not support shaderInt8");
+				arithmeticTypesError.add("shaderInt8");
 			}
 			if(!features12.shaderFloat16()){
-				throw new IllegalStateException(this + " does not support shaderFloat16");
+				arithmeticTypesError.add("shaderFloat16");
 			}
 			if(!features12.uniformAndStorageBuffer8BitAccess()){
-				throw new IllegalStateException(this + " does not support uniformAndStorageBuffer8BitAccess");
+				arithmeticTypesError.add("uniformAndStorageBuffer8BitAccess");
 			}
 			if(!features12.storageBuffer8BitAccess()){
-				throw new IllegalStateException(this + " does not support storageBuffer8BitAccess");
+				arithmeticTypesError.add("storageBuffer8BitAccess");
 			}
+			
+			return new OptionalFeatures(Iters.from(arithmeticTypesError).joinAsOptionalStr(", ", "Does not support: ", ""));
 		}
 	}
 	
