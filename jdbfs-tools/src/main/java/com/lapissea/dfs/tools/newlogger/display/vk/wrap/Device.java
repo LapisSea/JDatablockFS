@@ -147,13 +147,15 @@ public class Device implements VulkanResource{
 		if(!familyAllocIndexes.containsKey(queueFamily)){
 			throw new IllegalArgumentException("Queue family not registered with device");
 		}
-		int queueIndex = familyAllocIndexes.compute(queueFamily, (q, c) -> c + 1);
-		try(var stack = MemoryStack.stackPush()){
-			var ptr = stack.mallocPointer(1);
-			VK10.vkGetDeviceQueue(value, queueFamily.index, queueIndex, ptr);
-			var vq = new VkQueue(ptr.get(0), value);
-			return new VulkanQueue(this, queueFamily, vq);
-		}
+		int queueIndex = familyAllocIndexes.compute(queueFamily, (q, c) -> {
+			var nextIndex = c + 1;
+			if(nextIndex>=q.queueCount){
+				throw new UnsupportedOperationException("Ran out of queues for " + q);
+			}
+			return nextIndex;
+		});
+		VkQueue vq = VKCalls.vkGetDeviceQueue(value, queueFamily, queueIndex);
+		return new VulkanQueue(this, queueFamily, vq);
 	}
 	
 	public VkSemaphore[] createSemaphores(int count) throws VulkanCodeException{

@@ -6,6 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
@@ -283,5 +284,16 @@ public interface VKCalls{
 	}
 	static void vkFreeDescriptorSets(Device device, VkDescriptorPool pool, VkDescriptorSet set) throws VulkanCodeException{
 		check(VK10.vkFreeDescriptorSets(device.value, pool.handle, set.handle), "vkFreeDescriptorSets");
+	}
+	static VkQueue vkGetDeviceQueue(VkDevice value, QueueFamilyProps queueFamily, int queueIndex){
+		try(var stack = MemoryStack.stackPush()){
+			var ptrRef = stack.mallocPointer(1);
+			VK10.vkGetDeviceQueue(value, queueFamily.index, queueIndex, ptrRef);
+			var ptr = ptrRef.get(0);
+			if(ptr == 0){
+				throw new RuntimeException("Failed to execute vkGetDeviceQueue");
+			}
+			return new VkQueue(ptr, value);
+		}
 	}
 }
