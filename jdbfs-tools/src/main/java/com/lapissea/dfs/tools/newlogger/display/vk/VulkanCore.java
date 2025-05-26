@@ -12,6 +12,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
@@ -30,17 +31,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FormatColor;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
@@ -67,7 +64,6 @@ import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
-import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkInstance;
@@ -105,12 +101,12 @@ public class VulkanCore implements AutoCloseable{
 			MAT = layout.offsetof(0);
 		}
 		
-		void mat(Matrix4f mat){
+		public void mat(Matrix4f mat){
 			mat.getToAddress(address + MAT);
 		}
 		
-		protected GlobalUniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
-		protected GlobalUniform(long address)   { super(address, null); }
+		public GlobalUniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
+		protected GlobalUniform(long address){ super(address, null); }
 		@Override
 		protected GlobalUniform create(long address, ByteBuffer container){ return new GlobalUniform(address); }
 		@Override
@@ -122,7 +118,7 @@ public class VulkanCore implements AutoCloseable{
 	
 	public static final int MAX_IN_FLIGHT_FRAMES = 2;
 	
-	private static final List<FormatColor> PREFERRED_SWAPCHAIN_FORMATS = List.of(
+	public static final List<FormatColor> PREFERRED_SWAPCHAIN_FORMATS = List.of(
 		new FormatColor(VkFormat.R8G8B8A8_UNORM, VkColorSpaceKHR.SRGB_NONLINEAR_KHR)
 	);
 	
@@ -163,46 +159,37 @@ public class VulkanCore implements AutoCloseable{
 	private final String         name;
 	private final DebugLoggerEXT debugLog;
 	
-	private final VkInstance     instance;
-	private final Surface        surface;
-	public final  PhysicalDevice physicalDevice;
-	public final  Device         device;
+	public final VkInstance     instance;
+	public final PhysicalDevice physicalDevice;
+	public final Device         device;
 	
 	public final QueueFamilyProps renderQueueFamily;
 	public final QueueFamilyProps transferQueueFamily;
 	
-	public Swapchain           swapchain;
-	public List<VulkanTexture> mssaImages;
-	public List<FrameBuffer>   frameBuffers;
-	
 	public final VulkanQueue.SwapSync renderQueue;
-	public final RenderPass           renderPass;
+	public       RenderPass           renderPass;
 	public final TransferBuffers      transferBuffers;
 	public final TransferBuffers      transientGraphicsBuffs;
 	
-	private final VKPresentMode preferredPresentMode;
+	public final VKPresentMode preferredPresentMode;
 	
-	public final UniformBuffer<GlobalUniform> globalUniforms;
-	public final VkDescriptorSetLayout        globalUniformLayout;
-	public final VkDescriptorSet.PerFrame     globalUniformSets;
+	public final VkDescriptorSetLayout globalUniformLayout;
 	
 	public final VkDescriptorPool globalDescriptorPool;
 	
 	public final VkSampler defaultSampler;
 	
-	public VulkanCore(String name, GlfwWindow window, VKPresentMode preferredPresentMode) throws VulkanCodeException{
+	public VulkanCore(String name, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
 		this.preferredPresentMode = preferredPresentMode;
 		
 		instance = createInstance();
 		debugLog = VK_DEBUG? new DebugLoggerEXT(instance, this::debugLogCallback) : null;
 		
-		surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle());
-		
 		var requiredFeatures = Set.of(VkQueueFlag.GRAPHICS, VkQueueFlag.TRANSFER);
 		
-		var physicalDevices = new PhysicalDevices(instance, surface);
-		physicalDevice = physicalDevices.selectDevice(requiredFeatures, true);
+		var physicalDevices = new PhysicalDevices(instance);
+		physicalDevice = physicalDevices.selectDevice(requiredFeatures);
 		
 		renderQueueFamily = queueFamiliesBy(VkQueueFlag.GRAPHICS).getFirst();
 		transferQueueFamily = queueFamiliesBy(VkQueueFlag.TRANSFER).filter(f -> f != renderQueueFamily).findFirst()
@@ -228,19 +215,13 @@ public class VulkanCore implements AutoCloseable{
 		
 		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
-		globalUniforms = allocateUniformBuffer(4*4*Float.BYTES, false, GlobalUniform::new);
-		
 		defaultSampler = device.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		
-		var layout = new Descriptor.LayoutDescription().bind(0, VkShaderStageFlag.VERTEX, globalUniforms);
-		globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(layout.bindings());
-		globalUniformSets = globalUniformLayout.createDescriptorSetsPerFrame();
-		globalUniformSets.updateAll(layout.bindData());
+		globalUniformLayout = globalDescriptorPool.createDescriptorSetLayout(List.of(
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER)
+		));
 		
-		renderPass = createRenderPass();
-		
-		createSwapchainContext();
-		
+		renderPass = createRenderPass(device, VkFormat.R8G8B8A8_UNORM);
 		
 		Log.trace("Finished initializing VulkanCore");
 	}
@@ -442,88 +423,16 @@ public class VulkanCore implements AutoCloseable{
 		return spirv;
 	}
 	
-	public void recreateSwapchainContext() throws VulkanCodeException{
-		device.waitIdle();
-		if(swapchain != null){
-			destroySwapchainContext(false);
-		}
-		createSwapchainContext();
-	}
-	
-	private void createSwapchainContext() throws VulkanCodeException{
-		var oldSwapchain = swapchain;
-		swapchain = device.createSwapchain(oldSwapchain, surface, preferredPresentMode, PREFERRED_SWAPCHAIN_FORMATS);
-		if(oldSwapchain != null) oldSwapchain.destroy();
-		if(swapchain == null){
-			return;
-		}
-		
-		var images = new ArrayList<VulkanTexture>(swapchain.images.size());
-		for(int i = 0; i<swapchain.images.size(); i++){
-			var image = device.createImage(swapchain.extent.width, swapchain.extent.height, swapchain.formatColor.format,
-			                               Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT),
-			                               physicalDevice.samples, 1);
-			
-			var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
-			
-			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
-			
-			images.add(new VulkanTexture(image, memory, view, null, false));
-		}
-		mssaImages = List.copyOf(images);
-		
-		frameBuffers = createFrameBuffers();
-		
-		var e                = swapchain.extent;
-		var projectionMatrix = new Matrix4f().ortho(0, e.width, 0, e.height, -10, 10, true);
-		globalUniforms.updateAll(b -> b.mat(projectionMatrix));
-	}
-	
-	private void destroySwapchainContext(boolean destroySwapchain){
-		try{
-			renderQueue.resetSync();
-		}catch(VulkanCodeException e){ e.printStackTrace(); }
-		
-		for(FrameBuffer frameBuffer : frameBuffers){
-			frameBuffer.destroy();
-		}
-		mssaImages.forEach(VulkanTexture::destroy);
-		if(destroySwapchain) swapchain.destroy();
-	}
-	
-	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			var viewRef = stack.mallocLong(2);
-			var info = VkFramebufferCreateInfo.calloc(stack)
-			                                  .sType$Default()
-			                                  .renderPass(renderPass.handle)
-			                                  .pAttachments(viewRef)
-			                                  .width(swapchain.extent.width)
-			                                  .height(swapchain.extent.height)
-			                                  .layers(1);
-			
-			var views = swapchain.imageViews;
-			var fbs   = new ArrayList<FrameBuffer>(views.size());
-			for(int i = 0; i<views.size(); i++){
-				var mssaView      = mssaImages.get(i).view;
-				var swapchainView = views.get(i);
-				viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
-				fbs.add(VKCalls.vkCreateFramebuffer(device, info));
-			}
-			return List.copyOf(fbs);
-		}
-	}
-	
-	private RenderPass createRenderPass() throws VulkanCodeException{
-		var formatColor = physicalDevice.chooseSwapchainFormat(PREFERRED_SWAPCHAIN_FORMATS).format;
+	private static RenderPass createRenderPass(Device device, VkFormat colorFormat) throws VulkanCodeException{
+		var physicalDevice = device.physicalDevice;
 		var mssaAttachment = new RenderPass.AttachmentInfo(
-			formatColor,
+			colorFormat,
 			physicalDevice.samples,
 			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
 		);
 		var presentAttachment = new RenderPass.AttachmentInfo(
-			formatColor,
+			colorFormat,
 			VkSampleCountFlag.N1,
 			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, VkImageLayout.PRESENT_SRC_KHR
@@ -607,6 +516,7 @@ public class VulkanCore implements AutoCloseable{
 				extraExtensionNames.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 			}
 			
+			GlfwWindow.initGLFW();
 			var requiredExtensions = VUtils.UTF8ArrayToJava(glfwGetRequiredInstanceExtensions());
 			if(requiredExtensions == null){
 				throw new IllegalStateException("glfwGetRequiredInstanceExtensions failed to find the platform surface extensions.");
@@ -682,22 +592,19 @@ public class VulkanCore implements AutoCloseable{
 	@Override
 	public void close() throws VulkanCodeException{
 		device.waitIdle();
-		destroySwapchainContext(true);
 		
 		for(var queue : List.of(transferBuffers, transientGraphicsBuffs, renderQueue)){
 			queue.destroy();
 		}
 		
-		globalUniformSets.destroy();
 		globalUniformLayout.destroy();
 		globalDescriptorPool.destroy();
-		globalUniforms.destroy();
 		
 		defaultSampler.destroy();
 		
 		renderPass.destroy();
 		device.destroy();
-		surface.destroy();
+		
 		if(debugLog != null) debugLog.destroy();
 		VK10.vkDestroyInstance(instance, null);
 	}

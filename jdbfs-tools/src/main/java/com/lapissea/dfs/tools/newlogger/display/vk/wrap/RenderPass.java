@@ -174,11 +174,20 @@ public class RenderPass extends VulkanResource.DeviceHandleObj{
 		}
 	}
 	
+	private boolean destroyed;
 	
-	public RenderPass(Device device, long handle){ super(device, handle); }
+	public RenderPass(Device device, long handle){
+		super(device, handle);
+	}
 	
 	@Override
 	public void destroy(){
+		if(destroyed) throw new IllegalStateException("Already destroyed");
+		destroyed = true;
 		VK10.vkDestroyRenderPass(device.value, handle, null);
+	}
+	
+	public boolean isDestroyed(){
+		return destroyed;
 	}
 }

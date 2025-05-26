@@ -1,10 +1,14 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VkInstance;
@@ -12,6 +16,8 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 
 import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.SequencedSet;
 
 public class Surface implements VulkanResource{
@@ -24,10 +30,42 @@ public class Surface implements VulkanResource{
 		this.handle = handle;
 	}
 	
-	public boolean supportsPresent(VkPhysicalDevice device, int familyIndex) throws VulkanCodeException{
-		return VKCalls.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, this);
+	public boolean supportsPresent(VkPhysicalDevice device, QueueFamilyProps family) throws VulkanCodeException{
+		return VKCalls.vkGetPhysicalDeviceSurfaceSupportKHR(device, family.index, this);
 	}
 	
+	private static final FormatColor DUMMY_FAIL_FORMAT = new FormatColor(VkFormat.UNDEFINED, VkColorSpaceKHR.SRGB_NONLINEAR_KHR);
+	private              FormatColor lastFormat;
+	public FormatColor chooseSwapchainFormat(PhysicalDevice physicalDevice, Iterable<FormatColor> preferred) throws VulkanCodeException{
+		var formats = getFormats(physicalDevice);
+		return switch(Iters.from(preferred).firstMatchingM(formats::contains)){
+			case Match.Some(var f) -> {
+				if(!Objects.equals(lastFormat, f)){
+					lastFormat = f;
+					Log.info("Found format: {}#green", f);
+				}
+				yield f;
+			}
+			case Match.None() -> {
+				var f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.format).anyIs(fo.format));
+				if(f.isEmpty()){
+					f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.colorSpace).anyIs(fo.colorSpace));
+				}
+				if(f.isEmpty()){
+					f = Optional.of(formats.getFirst());
+				}
+				if(lastFormat != DUMMY_FAIL_FORMAT){
+					lastFormat = DUMMY_FAIL_FORMAT;
+					Log.warn("Found no preferred formats! Using: {}#yellow", f.map(Object::toString).orElse("UNKNOWN"));
+				}
+				yield f.get();
+			}
+		};
+	}
+	
+	public SequencedSet<FormatColor> getFormats(PhysicalDevice pDevice) throws VulkanCodeException{
+		return getFormats(pDevice.pDevice);
+	}
 	public SequencedSet<FormatColor> getFormats(VkPhysicalDevice pDevice) throws VulkanCodeException{
 		try(var mem = MemoryStack.stackPush()){
 			
@@ -44,6 +82,9 @@ public class Surface implements VulkanResource{
 		return VKCalls.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice.pDevice, handle);
 	}
 	
+	public EnumSet<VKPresentMode> getPresentModes(PhysicalDevice physicalDevice) throws VulkanCodeException{
+		return getPresentModes(physicalDevice.pDevice);
+	}
 	public EnumSet<VKPresentMode> getPresentModes(VkPhysicalDevice physicalDevice) throws VulkanCodeException{
 		var surface = this;
 		

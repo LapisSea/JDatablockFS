@@ -93,11 +93,13 @@ public class Device implements VulkanResource{
 			return null;
 		}
 		
-		var format = physicalDevice.chooseSwapchainFormat(preferred);
+		var presentModes = surface.getPresentModes(physicalDevice);
 		
-		var presentMode = physicalDevice.presentModes.contains(preferredMode)?
+		var format = surface.chooseSwapchainFormat(physicalDevice, preferred);
+		
+		var presentMode = presentModes.contains(preferredMode)?
 		                  preferredMode :
-		                  physicalDevice.presentModes.iterator().next();
+		                  presentModes.iterator().next();
 		
 		int numOfImages = Math.min(surfaceCapabilities.minImageCount + 1, surfaceCapabilities.maxImageCount);
 		

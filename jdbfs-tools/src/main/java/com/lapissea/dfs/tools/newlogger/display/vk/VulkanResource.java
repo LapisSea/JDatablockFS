@@ -10,7 +10,6 @@ public interface VulkanResource extends AutoCloseable{
 		public final Device device;
 		public final long   handle;
 		
-		
 		protected DeviceHandleObj(Device device, long handle){
 			this.device = device;
 			this.handle = handle;
@@ -29,6 +28,11 @@ public interface VulkanResource extends AutoCloseable{
 			                     .dropWhile(e -> e.getClassName().equals(DeviceHandleObj.class.getName()))
 			                     .toArray(StackTraceElement[]::new));
 			return t;
+		}
+		
+		@Override
+		public int hashCode(){
+			return Long.hashCode(handle);
 		}
 	}
 	

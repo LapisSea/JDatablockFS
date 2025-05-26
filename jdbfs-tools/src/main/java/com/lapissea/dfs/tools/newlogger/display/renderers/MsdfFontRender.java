@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
@@ -234,7 +235,7 @@ public class MsdfFontRender implements VulkanResource{
 	private static float mapToRange(float actual, float start, float end){
 		return Math.max(0, Math.min(1, (actual - start)/(end - start)));
 	}
-	public void render(CommandBuffer buf, int frameID, List<StringDraw> strs) throws VulkanCodeException{
+	public void render(VulkanWindow window, CommandBuffer buf, int frameID, List<StringDraw> strs) throws VulkanCodeException{
 		if(strs.isEmpty()) return;
 		waitFullyCreated();
 		
@@ -244,8 +245,8 @@ public class MsdfFontRender implements VulkanResource{
 		
 		buf.bindPipeline(pipeline);
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
-		                       core.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
-		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
+		                       window.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
+		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
 		
 		
 		int indirectInstanceCount = 0;

@@ -5,7 +5,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
@@ -19,7 +18,7 @@ public class PhysicalDevices{
 	
 	private final List<PhysicalDevice> devices;
 	
-	public PhysicalDevices(VkInstance instance, Surface surface) throws VulkanCodeException{
+	public PhysicalDevices(VkInstance instance) throws VulkanCodeException{
 		List<VkPhysicalDevice> handles;
 		try(var mem = MemoryStack.stackPush()){
 			var count = mem.mallocInt(1);
@@ -32,12 +31,12 @@ public class PhysicalDevices{
 		}
 		var devices = new ArrayList<PhysicalDevice>(handles.size());
 		for(var handle : handles){
-			devices.add(new PhysicalDevice(handle, surface));
+			devices.add(new PhysicalDevice(handle));
 		}
 		this.devices = List.copyOf(devices);
 	}
 	
-	public PhysicalDevice selectDevice(Set<VkQueueFlag> requiredCapabilities, boolean supportsPresent){
+	public PhysicalDevice selectDevice(Set<VkQueueFlag> requiredCapabilities){
 		for(PhysicalDevice device : devices){
 			try{
 				device.checkFeatures();
@@ -46,9 +45,6 @@ public class PhysicalDevices{
 				continue;
 			}
 			for(QueueFamilyProps family : device.families){
-				if(supportsPresent && !family.supportsPresent){
-					continue;
-				}
 				if(!family.capabilities.containsAll(requiredCapabilities)){
 					continue;
 				}

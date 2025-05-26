@@ -5,15 +5,12 @@ import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHR8bitStorage;
@@ -36,28 +33,23 @@ import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.SequencedSet;
 import java.util.Set;
 
 public class PhysicalDevice{
 	
 	public record MemoryProperties(List<MemoryType> memoryTypes, List<MemoryHeap> memoryHeaps){ }
 	
-	public final VkPhysicalDevice          pDevice;
-	public final String                    name;
-	public final VkPhysicalDeviceType      type;
-	public final List<QueueFamilyProps>    families;
-	public final SequencedSet<FormatColor> formats;
-	public final Set<VKPresentMode>        presentModes;
-	public final MemoryProperties          memoryProperties;
-	public final VkSampleCountFlag         samples;
-	public final long                      nonCoherentAtomSize;
+	public final VkPhysicalDevice       pDevice;
+	public final String                 name;
+	public final VkPhysicalDeviceType   type;
+	public final List<QueueFamilyProps> families;
+	public final MemoryProperties       memoryProperties;
+	public final VkSampleCountFlag      samples;
+	public final long                   nonCoherentAtomSize;
 	
-	public PhysicalDevice(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
+	public PhysicalDevice(VkPhysicalDevice pDevice){
 		this.pDevice = pDevice;
 		try(var stack = MemoryStack.stackPush()){
 			var properties = VkPhysicalDeviceProperties.malloc(stack);
@@ -70,10 +62,7 @@ public class PhysicalDevice{
 			nonCoherentAtomSize = properties.limits().nonCoherentAtomSize();
 		}
 		
-		families = getQueueFamilies(pDevice, surface);
-		
-		formats = surface.getFormats(pDevice);
-		presentModes = Collections.unmodifiableSet(surface.getPresentModes(pDevice));
+		families = getQueueFamilies(pDevice);
 		
 		memoryProperties = getMemoryProperties();
 		
@@ -101,20 +90,14 @@ public class PhysicalDevice{
 		};
 	}
 	
-	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice, Surface surface) throws VulkanCodeException{
+	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice){
 		try(var stack = MemoryStack.stackPush()){
 			var ib = stack.mallocInt(1);
 			VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, null);
 			var familyProps = VkQueueFamilyProperties.malloc(ib.get(0), stack);
 			VK10.vkGetPhysicalDeviceQueueFamilyProperties(pDevice, ib, familyProps);
 			
-			var families = new ArrayList<QueueFamilyProps>();
-			for(int i = 0; i<familyProps.capacity(); i++){
-				var supportsPresent = surface.supportsPresent(pDevice, i);
-				var familyProp      = familyProps.get(i);
-				families.add(new QueueFamilyProps(supportsPresent, familyProp, i));
-			}
-			return List.copyOf(families);
+			return Iters.from(familyProps).enumerate(QueueFamilyProps::new).toList();
 		}
 	}
 	
@@ -267,34 +250,6 @@ public class PhysicalDevice{
 			res[i] = (cm1 - i)/(float)cm1;
 		}
 		return res;
-	}
-	
-	private static final FormatColor DUMMY_FAIL_FORMAT = new FormatColor(VkFormat.UNDEFINED, VkColorSpaceKHR.SRGB_NONLINEAR_KHR);
-	private              FormatColor lastFormat;
-	public FormatColor chooseSwapchainFormat(Iterable<FormatColor> preferred){
-		return switch(Iters.from(preferred).firstMatchingM(formats::contains)){
-			case Match.Some(var f) -> {
-				if(!Objects.equals(lastFormat, f)){
-					lastFormat = f;
-					Log.info("Found format: {}#green", f);
-				}
-				yield f;
-			}
-			case Match.None() -> {
-				var f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.format).anyIs(fo.format));
-				if(f.isEmpty()){
-					f = Iters.from(formats).firstMatching(fo -> Iters.from(preferred).map(fp -> fp.colorSpace).anyIs(fo.colorSpace));
-				}
-				if(f.isEmpty()){
-					f = Optional.of(formats.getFirst());
-				}
-				if(lastFormat != DUMMY_FAIL_FORMAT){
-					lastFormat = DUMMY_FAIL_FORMAT;
-					Log.warn("Found no preferred formats! Using: {}#yellow", f.map(Object::toString).orElse("UNKNOWN"));
-				}
-				yield f.get();
-			}
-		};
 	}
 	
 	public VkFormatProperties getFormatProperties(MemoryStack stack, VkFormat format){

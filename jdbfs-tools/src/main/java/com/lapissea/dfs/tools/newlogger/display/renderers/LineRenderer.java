@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
@@ -232,12 +233,12 @@ public class LineRenderer implements VulkanResource{
 		
 	}
 	
-	public void submit(CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
+	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
 		buf.bindPipeline(pipeline);
-		buf.setViewportScissor(new Rect2D(core.swapchain.extent));
+		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
 		
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
-		                       core.globalUniformSets.get(frameID),
+		                       window.globalUniformSets.get(frameID),
 		                       resource.desc.get(frameID));
 		
 		buf.bindIndexBuffer(resource.ibos.buffer, 0, resource.indexType);

@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
@@ -102,7 +103,7 @@ public class ImGUIRenderer implements VulkanResource{
 		return core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 	}
 	
-	public void submit(CommandBuffer buf, int frameID, ImDrawData drawData) throws VulkanCodeException{
+	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, ImDrawData drawData) throws VulkanCodeException{
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
 		var sizeOfIndex  = ImDrawData.sizeOfImDrawIdx();
 		
@@ -116,10 +117,10 @@ public class ImGUIRenderer implements VulkanResource{
 		                    ).toModSequencedSet();
 		
 		buf.bindPipeline(pipeline);
-		buf.setViewport(new Rect2D(core.swapchain.extent));
+		buf.setViewport(new Rect2D(window.swapchain.extent));
 		switch(textures.size()){
 			case 0 -> dsSetConst.update(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, core.globalUniforms),
+				new Descriptor.LayoutDescription.UniformBuff(0, window.globalUniforms),
 				new Descriptor.LayoutDescription.TextureBuff(1, emptyTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
 			), -1);
 			case 1 -> {
@@ -128,7 +129,7 @@ public class ImGUIRenderer implements VulkanResource{
 					throw new NotImplementedException("More imgui textures");
 				}
 				dsSetConst.update(List.of(
-					new Descriptor.LayoutDescription.UniformBuff(0, core.globalUniforms),
+					new Descriptor.LayoutDescription.UniformBuff(0, window.globalUniforms),
 					new Descriptor.LayoutDescription.TextureBuff(1, imGuiFontTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
 				), frameID);
 			}
