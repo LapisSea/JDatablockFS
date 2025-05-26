@@ -222,9 +222,24 @@ public class VulkanCore implements AutoCloseable{
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER)
 		));
 		
-		renderPass = createRenderPass(device, VkFormat.R8G8B8A8_UNORM);
+		
+		VkFormat format = chooseFormat();
+		renderPass = createRenderPass(device, format);
+		
 		
 		Log.trace("Finished initializing VulkanCore");
+	}
+	
+	private VkFormat chooseFormat() throws VulkanCodeException{
+		VkFormat format;
+		var      window = new GlfwWindow();
+		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).resizeable(true));
+		try(var surface = VKCalls.glfwCreateWindowSurface(instance, window.getHandle())){
+			format = surface.chooseSwapchainFormat(physicalDevice, PREFERRED_SWAPCHAIN_FORMATS).format;
+		}finally{
+			window.destroy();
+		}
+		return format;
 	}
 	
 	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
