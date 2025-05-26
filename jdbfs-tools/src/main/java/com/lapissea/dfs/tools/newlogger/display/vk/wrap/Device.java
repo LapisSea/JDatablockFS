@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
@@ -34,6 +35,7 @@ import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
+import org.lwjgl.vulkan.VkPipelineCacheCreateInfo;
 import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
 import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineDynamicStateCreateInfo;
@@ -55,6 +57,11 @@ import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
 import org.lwjgl.vulkan.VkVertexInputBindingDescription;
 import org.lwjgl.vulkan.VkViewport;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,13 +82,44 @@ public class Device implements VulkanResource{
 	public final Map<Long, Throwable> debugVkObjects = new ConcurrentHashMap<>();
 	public final boolean              hasArithmeticTypes;
 	
-	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies, boolean hasArithmeticTypes){
+	private final VkPipelineCache pipelineCache;
+	
+	private final File pipelineCacheFile;
+	
+	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies, boolean hasArithmeticTypes, File pipelineCacheFile) throws VulkanCodeException{
 		this.value = value;
 		this.physicalDevice = physicalDevice;
 		this.familyAllocIndexes = Iters.from(queueFamilies).toModMap(e -> e, e -> -1);
 		this.hasArithmeticTypes = hasArithmeticTypes;
+		this.pipelineCacheFile = pipelineCacheFile;
 		if(!physicalDevice.pDevice.equals(value.getPhysicalDevice())){
 			throw new IllegalArgumentException("physical device is not the argument");
+		}
+		
+		RandomAccessFile file = null;
+		try(var mem = MemoryStack.stackPush()){
+			var info = VkPipelineCacheCreateInfo.calloc(mem).sType$Default();
+			
+			try{
+				file = new RandomAccessFile(pipelineCacheFile, "r");
+				var channel = file.getChannel();
+				var data    = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+				info.pInitialData(data);
+			}catch(FileNotFoundException e){
+				Log.info("No pipeline cache found");
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+			
+			pipelineCache = VKCalls.vkCreatePipelineCache(this, info);
+		}finally{
+			if(file != null){
+				try{
+					file.close();
+				}catch(IOException e){
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 	
@@ -214,61 +252,6 @@ public class Device implements VulkanResource{
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
-			var shaderStages = VkPipelineShaderStageCreateInfo.calloc(modules.size(), stack);
-			var main         = stack.UTF8("main");
-			for(int i = 0; i<modules.size(); i++){
-				var module = modules.get(i);
-				
-				var stage = shaderStages.get(i);
-				stage.sType$Default()
-				     .stage(module.stage.bit)
-				     .module(module.handle)
-				     .pName(main);
-				
-				Map<Integer, Object> specVals = specializationValues.getOrDefault(module.stage, Map.of());
-				if(!specVals.isEmpty()){
-					var entries = VkSpecializationMapEntry.calloc(specVals.size(), stack);
-					var buff    = stack.malloc(specVals.size()*8);
-					for(var e : specVals.entrySet()){
-						var id  = e.getKey();
-						var val = e.getValue();
-						
-						var pos = buff.position();
-						switch(val){
-							case Boolean b -> buff.putInt(b? 1 : 0);
-							case Integer i1 -> buff.putInt(i1);
-							case Float f -> buff.putFloat(f);
-							case Double d -> buff.putDouble(d);
-							default -> throw new RuntimeException("unexpected value: " + val.getClass().getName());
-						}
-						var size = buff.position() - pos;
-						entries.get().set(id, pos, size);
-					}
-					
-					stage.pSpecializationInfo(VkSpecializationInfo.calloc(stack)
-					                                              .pMapEntries(entries.flip())
-					                                              .pData(buff.flip()));
-				}
-				
-			}
-			
-			var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();
-			
-			if(!vertexInputs.isEmpty()){
-				var vertInputAttributes = VkVertexInputAttributeDescription.malloc(vertexInputs.size(), stack);
-				for(VkPipeline.VertexInput attr : vertexInputs){
-					vertInputAttributes.get().set(attr.location(), attr.binding(), attr.format().id, attr.offset());
-				}
-				vertInput.pVertexAttributeDescriptions(vertInputAttributes.flip());
-			}
-			if(!vertexInputBindings.isEmpty()){
-				var bindings = VkVertexInputBindingDescription.malloc(vertexInputBindings.size(), stack);
-				for(var binding : vertexInputBindings){
-					bindings.get().set(binding.binding(), binding.stride(), binding.inputRate().id);
-				}
-				vertInput.pVertexBindingDescriptions(bindings.flip());
-			}
-			
 			var inputAssembly = VkPipelineInputAssemblyStateCreateInfo.calloc(stack).sType$Default()
 			                                                          .topology(VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
 			                                                          .primitiveRestartEnable(false);
@@ -339,9 +322,9 @@ public class Device implements VulkanResource{
 			
 			var info = VkGraphicsPipelineCreateInfo.calloc(1, stack);
 			info.sType$Default()
-			    .pStages(shaderStages)
-			    .pVertexInputState(vertInput)
+			    .pVertexInputState(createVertexInput(stack, vertexInputs, vertexInputBindings))
 			    .pInputAssemblyState(inputAssembly)
+			    .pStages(createShaderStages(stack, modules, specializationValues))
 			    .pViewportState(viewportState)
 			    .pRasterizationState(rasterState)
 			    .pMultisampleState(multisampleState)
@@ -353,8 +336,73 @@ public class Device implements VulkanResource{
 			    .basePipelineIndex(-1)
 			    .pDynamicState(dynamicInfo);
 			
-			return VKCalls.vkCreateGraphicsPipelines(this, 0, info).getFirst();
+			return VKCalls.vkCreateGraphicsPipelines(this, pipelineCache, info).getFirst();
 		}
+	}
+	
+	private static VkPipelineVertexInputStateCreateInfo createVertexInput(
+		MemoryStack stack, List<VkPipeline.VertexInput> vertexInputs, List<VkPipeline.VertexInputBinding> vertexInputBindings
+	){
+		var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();
+		
+		if(!vertexInputs.isEmpty()){
+			var vertInputAttributes = VkVertexInputAttributeDescription.malloc(vertexInputs.size(), stack);
+			for(VkPipeline.VertexInput attr : vertexInputs){
+				vertInputAttributes.get().set(attr.location(), attr.binding(), attr.format().id, attr.offset());
+			}
+			vertInput.pVertexAttributeDescriptions(vertInputAttributes.flip());
+		}
+		if(!vertexInputBindings.isEmpty()){
+			var bindings = VkVertexInputBindingDescription.malloc(vertexInputBindings.size(), stack);
+			for(var binding : vertexInputBindings){
+				bindings.get().set(binding.binding(), binding.stride(), binding.inputRate().id);
+			}
+			vertInput.pVertexBindingDescriptions(bindings.flip());
+		}
+		return vertInput;
+	}
+	
+	private static VkPipelineShaderStageCreateInfo.Buffer createShaderStages(
+		MemoryStack stack, List<ShaderModule> modules, Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues
+	){
+		var shaderStages = VkPipelineShaderStageCreateInfo.calloc(modules.size(), stack);
+		var main         = stack.UTF8("main");
+		for(int i = 0; i<modules.size(); i++){
+			var module = modules.get(i);
+			
+			var stage = shaderStages.get(i);
+			stage.sType$Default()
+			     .stage(module.stage.bit)
+			     .module(module.handle)
+			     .pName(main);
+			
+			Map<Integer, Object> specVals = specializationValues.getOrDefault(module.stage, Map.of());
+			if(!specVals.isEmpty()){
+				var entries = VkSpecializationMapEntry.calloc(specVals.size(), stack);
+				var buff    = stack.malloc(specVals.size()*8);
+				for(var e : specVals.entrySet()){
+					var id  = e.getKey();
+					var val = e.getValue();
+					
+					var pos = buff.position();
+					switch(val){
+						case Boolean b -> buff.putInt(b? 1 : 0);
+						case Integer i1 -> buff.putInt(i1);
+						case Float f -> buff.putFloat(f);
+						case Double d -> buff.putDouble(d);
+						default -> throw new RuntimeException("unexpected value: " + val.getClass().getName());
+					}
+					var size = buff.position() - pos;
+					entries.get().set(id, pos, size);
+				}
+				
+				stage.pSpecializationInfo(VkSpecializationInfo.calloc(stack)
+				                                              .pMapEntries(entries.flip())
+				                                              .pData(buff.flip()));
+			}
+			
+		}
+		return shaderStages;
 	}
 	
 	
@@ -446,6 +494,13 @@ public class Device implements VulkanResource{
 	
 	@Override
 	public void destroy(){
+		try{
+			pipelineCache.saveDataTo(pipelineCacheFile);
+		}catch(Exception e){
+			new RuntimeException("Failed to save cache data", e).printStackTrace();
+		}
+		
+		pipelineCache.destroy();
 		VK10.vkDestroyDevice(value, null);
 	}
 	

@@ -71,6 +71,7 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -197,7 +198,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		Log.info("Using physical device: {}#green", physicalDevice);
 		
-		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList());
+		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList(), new File("pipelineCache.bin"));
 		
 		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
 		

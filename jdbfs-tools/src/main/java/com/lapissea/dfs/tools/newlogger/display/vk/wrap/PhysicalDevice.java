@@ -31,6 +31,7 @@ import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan12Features;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -127,7 +128,7 @@ public class PhysicalDevice{
 	}
 	
 	
-	public Device createDevice(List<QueueFamilyProps> queueFamilies) throws VulkanCodeException{
+	public Device createDevice(List<QueueFamilyProps> queueFamilies, File pipelineCacheFile) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
 			var queueInfo = VkDeviceQueueCreateInfo.calloc(queueFamilies.size(), stack);
@@ -184,7 +185,7 @@ public class PhysicalDevice{
 			
 			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
-			return new Device(vkd, this, queueFamilies, hasArithmeticTypes);
+			return new Device(vkd, this, queueFamilies, hasArithmeticTypes, pipelineCacheFile);
 		}
 	}
 	

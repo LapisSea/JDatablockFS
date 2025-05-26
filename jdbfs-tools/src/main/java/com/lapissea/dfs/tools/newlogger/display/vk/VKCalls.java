@@ -21,6 +21,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineCache;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSemaphore;
@@ -55,6 +56,7 @@ import org.lwjgl.vulkan.VkLayerProperties;
 import org.lwjgl.vulkan.VkMappedMemoryRange;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkPipelineCacheCreateInfo;
 import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
@@ -67,6 +69,7 @@ import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.List;
@@ -200,9 +203,9 @@ public interface VKCalls{
 		check(VK10.vkCreateShaderModule(device.value, pCreateInfo, null, res), "vkCreateShaderModule");
 		return new ShaderModule(device, res[0], stage);
 	}
-	static List<VkPipeline> vkCreateGraphicsPipelines(Device device, long pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
+	static List<VkPipeline> vkCreateGraphicsPipelines(Device device, VkPipelineCache pipelineCache, VkGraphicsPipelineCreateInfo.Buffer pCreateInfos) throws VulkanCodeException{
 		long[] result = new long[pCreateInfos.capacity()];
-		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
+		check(VK10.vkCreateGraphicsPipelines(device.value, pipelineCache == null? 0 : pipelineCache.handle, pCreateInfos, null, result), "vkCreateGraphicsPipelines");
 		return Iters.rangeMap(0, result.length, i -> {
 			var layout = new VkPipelineLayout(device, pCreateInfos.get(i).layout());
 			return new VkPipeline(device, result[i], layout);
@@ -294,6 +297,18 @@ public interface VKCalls{
 				throw new RuntimeException("Failed to execute vkGetDeviceQueue");
 			}
 			return new VkQueue(ptr, value);
+		}
+	}
+	static VkPipelineCache vkCreatePipelineCache(Device device, VkPipelineCacheCreateInfo pCreateInfo) throws VulkanCodeException{
+		var res = new long[1];
+		check(VK10.vkCreatePipelineCache(device.value, pCreateInfo, null, res), "vkCreatePipelineCache");
+		return new VkPipelineCache(device, res[0]);
+	}
+	static long vkGetPipelineCacheData(VkPipelineCache pipelineCache, ByteBuffer pData) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var ptr = stack.mallocPointer(1);
+			check(VK10.vkGetPipelineCacheData(pipelineCache.device.value, pipelineCache.handle, ptr, pData), "vkCreatePipelineCache");
+			return ptr.get(0);
 		}
 	}
 }
