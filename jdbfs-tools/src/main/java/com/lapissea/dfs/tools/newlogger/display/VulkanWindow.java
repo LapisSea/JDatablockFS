@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
@@ -9,11 +10,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.glfw.GlfwWindow;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -39,6 +42,11 @@ public class VulkanWindow implements AutoCloseable{
 	public final UniformBuffer<VulkanCore.GlobalUniform> globalUniforms;
 	public final VkDescriptorSet.PerFrame                globalUniformSets;
 	
+	public final VulkanQueue.SwapSync renderQueue;
+	
+	private final CommandPool         cmdPool;
+	public        List<CommandBuffer> graphicsBuffs;
+	
 	public VulkanWindow(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		
@@ -56,6 +64,10 @@ public class VulkanWindow implements AutoCloseable{
 		globalUniformSets.updateAll(List.of(new Descriptor.LayoutDescription.UniformBuff(0, globalUniforms)));
 		
 		createSwapchainContext();
+		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
+		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
+		renderQueue = core.renderQueue.withSwap();
+		window.show();
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
@@ -69,7 +81,7 @@ public class VulkanWindow implements AutoCloseable{
 	
 	private void destroySwapchainContext(boolean destroySwapchain){
 		try{
-			core.renderQueue.resetSync();
+			renderQueue.resetSync();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		frameBuffers.forEach(FrameBuffer::destroy);
@@ -140,8 +152,13 @@ public class VulkanWindow implements AutoCloseable{
 	
 	public void close() throws VulkanCodeException{
 		destroySwapchainContext(true);
+		renderQueue.destroy();
+		
 		globalUniformSets.destroy();
 		globalUniforms.destroy();
+		
+		graphicsBuffs.forEach(CommandBuffer::destroy);
+		cmdPool.destroy();
 		
 		surface.destroy();
 		window.destroy();

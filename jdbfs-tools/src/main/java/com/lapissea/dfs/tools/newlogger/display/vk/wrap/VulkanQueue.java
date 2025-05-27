@@ -97,8 +97,6 @@ public class VulkanQueue implements VulkanResource{
 				renderComplete[i].destroy();
 			}
 		}
-		@Override
-		public SwapSync withSwap(){ return this; }
 	}
 	
 	protected final VkQueue value;
