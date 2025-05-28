@@ -192,9 +192,12 @@ public class VulkanCore implements AutoCloseable{
 		var physicalDevices = new PhysicalDevices(instance);
 		physicalDevice = physicalDevices.selectDevice(requiredFeatures);
 		
-		renderQueueFamily = queueFamiliesBy(VkQueueFlag.GRAPHICS).getFirst();
-		transferQueueFamily = queueFamiliesBy(VkQueueFlag.TRANSFER).filter(f -> f != renderQueueFamily).findFirst()
-		                                                           .orElse(queueFamiliesBy(VkQueueFlag.TRANSFER).getFirst());
+		var graphicsFamilies = queueFamiliesBy(VkQueueFlag.GRAPHICS);
+		var transferFamilies = queueFamiliesBy(VkQueueFlag.TRANSFER);
+		
+		renderQueueFamily = graphicsFamilies.getFirst();
+		transferQueueFamily = transferFamilies.filter(graphicsFamilies::noneIs).findFirst()
+		                                      .orElseGet(transferFamilies::getFirst);
 		
 		Log.info("Using physical device: {}#green", physicalDevice);
 		

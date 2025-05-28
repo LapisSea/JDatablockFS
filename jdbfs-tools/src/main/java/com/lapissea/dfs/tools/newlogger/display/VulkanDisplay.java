@@ -10,7 +10,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
@@ -21,8 +20,6 @@ import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkClearColorValue;
 
 import java.awt.Color;
 import java.io.File;
@@ -76,7 +73,6 @@ public class VulkanDisplay implements AutoCloseable{
 			window = createMainWindow();
 			window2 = new VulkanWindow(core);
 			window2.getGlfwWindow().title.set("AAAAAAA");
-			window2.getGlfwWindow().show();
 			
 			fontRender = new MsdfFontRender(core);
 			byteGridRender = new ByteGridRender(core);
@@ -148,21 +144,17 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private void renderQueue(VulkanWindow window) throws VulkanCodeException{
-		var swapchain = window.swapchain;
-		var queue     = window.renderQueue;
+		window.renderQueue((win, frameID, buf, fb) -> {
+			try(var ignore = buf.beginRenderPass(core.renderPass, fb, win.swapchain.extent.asRect(), clearColor)){
+				recordToBuff(win, buf, frameID);
+			}
+		});
 		
-		var frame = queue.nextFrame();
-		
-		queue.waitForFrameDone(frame);
-		
-		var index = queue.acquireNextImage(swapchain, frame);
-		
-		var buf = window.graphicsBuffs.get(frame);
-		buf.reset();
-		recordCommandBuffers(window, frame, index);
-		
-		queue.submitFrame(buf, frame);
-		queue.present(swapchain, index, frame);
+		var w = window.getGlfwWindow();
+		if(!w.isVisible() && !w.shouldClose()){
+			core.device.waitIdle();
+			w.show();
+		}
 	}
 	
 	private double time;
@@ -244,24 +236,6 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 		if(resizing){
 			nextResizeWaitAttempt = Instant.now().plusMillis(1000);
-		}
-	}
-	
-	private void recordCommandBuffers(VulkanWindow window, int frameID, int swapchainID) throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			VkClearColorValue clearColor = VkClearColorValue.malloc(stack);
-			this.clearColor.get(clearColor.float32());
-			
-			var renderArea = new Rect2D(window.swapchain.extent);
-			
-			var buf         = window.graphicsBuffs.get(frameID);
-			var frameBuffer = window.frameBuffers.get(swapchainID);
-			
-			buf.begin();
-			try(var ignore = buf.beginRenderPass(core.renderPass, frameBuffer, renderArea, clearColor)){
-				recordToBuff(window, buf, frameID);
-			}
-			buf.end();
 		}
 	}
 	

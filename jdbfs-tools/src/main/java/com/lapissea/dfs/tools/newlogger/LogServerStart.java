@@ -21,8 +21,8 @@ public final class LogServerStart{
 	private DBLogIngestServer server;
 	
 	private void start() throws InterruptedException{
-		var ingestThread = Thread.ofPlatform().name("Ingest").start(() -> {
-			UtilL.sleep(100);
+		var ingestThread = Thread.ofPlatform().name("Ingest").unstarted(() -> {
+			UtilL.sleep(1000);
 			var logger = LoggedMemoryUtils.createLoggerFromConfig();
 			logger.block();
 			var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
@@ -38,11 +38,12 @@ public final class LogServerStart{
 		var t = System.currentTimeMillis();
 		try(var display = new VulkanDisplay()){
 			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
+			ingestThread.start();
 			display.run();
 		}catch(VulkanCodeException e){
 			e.printStackTrace();
 		}finally{
-			server.stop();
+			if(server != null) server.stop();
 		}
 		ingestThread.join();
 	}

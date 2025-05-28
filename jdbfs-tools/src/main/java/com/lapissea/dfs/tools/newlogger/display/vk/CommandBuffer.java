@@ -20,6 +20,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipelineLayout;
+import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCopy;
@@ -163,15 +164,17 @@ public class CommandBuffer implements VulkanResource{
 		void close();
 	}
 	
-	public RenderPassScope beginRenderPass(RenderPass renderPass, FrameBuffer frameBuffer, Rect2D renderArea, VkClearColorValue color){
+	public RenderPassScope beginRenderPass(RenderPass renderPass, FrameBuffer frameBuffer, Rect2D renderArea, Vector4f clearColor){
 		try(var stack = MemoryStack.stackPush()){
+			var cc = VkClearColorValue.malloc(stack);
+			clearColor.get(cc.float32());
 			
 			var info = VkRenderPassBeginInfo.malloc(stack)
 			                                .sType$Default().pNext(0)
 			                                .renderPass(renderPass.handle)
 			                                .framebuffer(frameBuffer.handle)
 			                                .renderArea(renderArea.set(VkRect2D.malloc(stack)))
-			                                .pClearValues(VkClearValue.malloc(2, stack).color(color).position(1).color(color).position(0));
+			                                .pClearValues(VkClearValue.malloc(2, stack).color(cc).position(1).color(cc).position(0));
 			
 			VK10.vkCmdBeginRenderPass(val, info, VK10.VK_SUBPASS_CONTENTS_INLINE);
 			

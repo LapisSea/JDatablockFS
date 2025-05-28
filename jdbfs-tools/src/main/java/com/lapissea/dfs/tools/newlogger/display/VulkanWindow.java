@@ -67,7 +67,28 @@ public class VulkanWindow implements AutoCloseable{
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		renderQueue = core.renderQueue.withSwap();
-		window.show();
+	}
+	
+	public interface FillBuffer{
+		void record(VulkanWindow window, int frameID, CommandBuffer buf, FrameBuffer fb) throws VulkanCodeException;
+	}
+	
+	public void renderQueue(FillBuffer fillBuffer) throws VulkanCodeException{
+		var frame = renderQueue.nextFrame();
+		renderQueue.waitForFrameDone(frame);
+		
+		var index = renderQueue.acquireNextImage(swapchain, frame);
+		
+		var buf = graphicsBuffs.get(frame);
+		var fb  = frameBuffers.get(index);
+		
+		buf.reset();
+		buf.begin();
+		fillBuffer.record(this, frame, buf, fb);
+		buf.end();
+		
+		renderQueue.submitFrame(buf, frame);
+		renderQueue.present(swapchain, index, frame);
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{

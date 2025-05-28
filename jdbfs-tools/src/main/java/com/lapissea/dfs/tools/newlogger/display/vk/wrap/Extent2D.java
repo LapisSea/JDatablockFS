@@ -26,6 +26,10 @@ public class Extent2D{
 		return new Extent3D(width, height, 1);
 	}
 	
+	public Rect2D asRect(){
+		return new Rect2D(width, height);
+	}
+	
 	@Override
 	public final boolean equals(Object o){
 		return o instanceof Extent2D that && width == that.width && height == that.height;
