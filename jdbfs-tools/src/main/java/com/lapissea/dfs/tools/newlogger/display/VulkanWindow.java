@@ -47,14 +47,14 @@ public class VulkanWindow implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	public        List<CommandBuffer> graphicsBuffs;
 	
-	public VulkanWindow(VulkanCore core) throws VulkanCodeException{
+	public VulkanWindow(VulkanCore core, boolean decorated) throws VulkanCodeException{
 		this.core = core;
 		
 		window = new GlfwWindow();
 		window.title.set("DFS visual debugger");
 		window.size.set(800, 600);
 		
-		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).resizeable(true));
+		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).decorated(decorated).resizeable(true));
 		Thread.ofVirtual().start(() -> window.setIcon(createVulkanIcon(128, 128)));
 		
 		surface = VKCalls.glfwCreateWindowSurface(core.instance, window.getHandle());
@@ -67,6 +67,7 @@ public class VulkanWindow implements AutoCloseable{
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		renderQueue = core.renderQueue.withSwap();
+		window.show();
 	}
 	
 	public interface FillBuffer{
@@ -97,6 +98,11 @@ public class VulkanWindow implements AutoCloseable{
 			destroySwapchainContext(false);
 		}
 		createSwapchainContext();
+		
+		if(swapchain.images.size() != graphicsBuffs.size()){
+			graphicsBuffs.forEach(CommandBuffer::destroy);
+			graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
+		}
 	}
 	
 	

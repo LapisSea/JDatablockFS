@@ -31,6 +31,7 @@ import imgui.ImFontAtlas;
 import imgui.ImGui;
 import imgui.ImVec4;
 import imgui.type.ImInt;
+import org.joml.Matrix4f;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -65,7 +66,7 @@ public class ImGUIRenderer implements VulkanResource{
 	private final VkDescriptorSet       dsSetConst;
 	
 	private final VulkanTexture emptyTexture;
-	private final VulkanTexture imGuiFontTexture;
+	private       VulkanTexture imGuiFontTexture;
 	
 	
 	public ImGUIRenderer(VulkanCore core) throws VulkanCodeException{
@@ -73,7 +74,6 @@ public class ImGUIRenderer implements VulkanResource{
 		shader = new ShaderModuleSet(core, "ImGUI", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
 		emptyTexture = core.uploadTexture(1, 1, ByteBuffer.allocateDirect(1), VkFormat.R8_UNORM, 1);
-		imGuiFontTexture = createFontsTexture();
 		
 		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
@@ -116,6 +116,11 @@ public class ImGUIRenderer implements VulkanResource{
 		                                       .mapToObj(cmdIdx -> drawData.getCmdListCmdBufferTextureId(n, cmdIdx))
 		                    ).toModSequencedSet();
 		
+		var e                = window.swapchain.extent;
+		var pos              = window.getGlfwWindow().pos;
+		var projectionMatrix = new Matrix4f().ortho(pos.x(), pos.x() + e.width, pos.y(), pos.y() + e.height, -10, 10, true);
+		window.globalUniforms.update(frameID, b -> b.mat(projectionMatrix));
+		
 		buf.bindPipeline(pipeline);
 		buf.setViewport(new Rect2D(window.swapchain.extent));
 		switch(textures.size()){
@@ -127,6 +132,9 @@ public class ImGUIRenderer implements VulkanResource{
 				long textureID = textures.getFirst();
 				if(textureID != 0){
 					throw new NotImplementedException("More imgui textures");
+				}
+				if(imGuiFontTexture == null){
+					imGuiFontTexture = createFontsTexture();
 				}
 				dsSetConst.update(List.of(
 					new Descriptor.LayoutDescription.UniformBuff(0, window.globalUniforms),
@@ -178,7 +186,11 @@ public class ImGUIRenderer implements VulkanResource{
 			
 			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
-				buf.setScissor(new Rect2D((int)clipRect.x, (int)clipRect.y, (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
+				clipRect.x -= pos.x();
+				clipRect.z -= pos.x();
+				clipRect.y -= pos.y();
+				clipRect.w -= pos.y();
+				buf.setScissor(new Rect2D(Math.max(0, (int)clipRect.x), Math.max(0, (int)clipRect.y), (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
 //				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
 				int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
 				int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
