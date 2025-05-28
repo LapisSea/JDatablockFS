@@ -116,9 +116,10 @@ public class ImGUIRenderer implements VulkanResource{
 		                                       .mapToObj(cmdIdx -> drawData.getCmdListCmdBufferTextureId(n, cmdIdx))
 		                    ).toModSequencedSet();
 		
-		var e                = window.swapchain.extent;
-		var pos              = window.getGlfwWindow().pos;
-		var projectionMatrix = new Matrix4f().ortho(pos.x(), pos.x() + e.width, pos.y(), pos.y() + e.height, -10, 10, true);
+		var e   = window.swapchain.extent;
+		var pos = drawData.getDisplayPos();
+		;
+		var projectionMatrix = new Matrix4f().ortho(pos.x, pos.x + e.width, pos.y, pos.y + e.height, -10, 10, true);
 		window.globalUniforms.update(frameID, b -> b.mat(projectionMatrix));
 		
 		buf.bindPipeline(pipeline);
@@ -186,11 +187,11 @@ public class ImGUIRenderer implements VulkanResource{
 			
 			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
-				clipRect.x -= pos.x();
-				clipRect.z -= pos.x();
-				clipRect.y -= pos.y();
-				clipRect.w -= pos.y();
-				buf.setScissor(new Rect2D(Math.max(0, (int)clipRect.x), Math.max(0, (int)clipRect.y), (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
+				clipRect.x -= pos.x;
+				clipRect.z -= pos.x;
+				clipRect.y -= pos.y;
+				clipRect.w -= pos.y;
+				buf.setScissor(new Rect2D((int)clipRect.x, (int)clipRect.y, (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
 //				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
 				int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
 				int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);

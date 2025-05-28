@@ -6,7 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
+import imgui.ImDrawData;
 import imgui.ImGui;
 import imgui.ImGuiIO;
 import imgui.ImGuiPlatformIO;
@@ -762,6 +762,13 @@ public class ImGuiImplGlfw{
 			glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
 			glfwWindowHint(GLFW_DECORATED, vp.hasFlags(ImGuiViewportFlags.NoDecoration)? GLFW_FALSE : GLFW_TRUE);
 			glfwWindowHint(GLFW_FLOATING, vp.hasFlags(ImGuiViewportFlags.TopMost)? GLFW_TRUE : GLFW_FALSE);
+
+//			long parentWindow = 0;
+//			if(vp.getParentViewportId() != 0){
+//				var parentViewport = ImGui.findViewportByID(vp.getParentViewportId());
+//				var uvd            = (ViewportData)parentViewport.getPlatformUserData();
+//				parentWindow = uvd.window.getGlfwWindow().getHandle();
+//			}
 			
 			VulkanWindow w;
 			try{
@@ -769,7 +776,8 @@ public class ImGuiImplGlfw{
 				var ww = w.getGlfwWindow();
 				ww.size.set((int)vp.getSizeX(), (int)vp.getSizeY());
 				ww.title.set("No Title Yet");
-			}catch(VulkanCodeException e){
+			}catch(Throwable e){
+				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
 			
@@ -780,14 +788,6 @@ public class ImGuiImplGlfw{
 			
 			var gWindow = vd.window.getGlfwWindow();
 			var windowH = gWindow.getHandle();
-			
-			gWindow.whileOpen(() -> {
-				UtilL.sleep(Math.random()*2);
-				synchronized(imGUIRenderer){
-					gWindow.grabContext();
-					gWindow.pollEvents();
-				}
-			}, "A");
 			
 			vp.setPlatformHandle(windowH);
 			
@@ -816,7 +816,7 @@ public class ImGuiImplGlfw{
 	private final class DestroyWindowFunction extends ImPlatformFuncViewport{
 		@Override
 		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
+			var vd = (ViewportData)vp.getPlatformUserData();
 			
 			if(vd != null && vd.windowOwned){
 				var wHandle = vd.window.getGlfwWindow().getHandle();
@@ -881,18 +881,13 @@ public class ImGuiImplGlfw{
 			}
 			vd.ignoreWindowPosEventFrame = ImGui.getFrameCount();
 			vd.window.getGlfwWindow().pos.set((int)value.x, (int)value.y);
-			LogUtil.println("SetWindowPosFunction", vd.window.getGlfwWindow());
 		}
 	}
 	
 	private static final class GetWindowSizeFunction extends ImPlatformFuncViewportSuppImVec2{
-		
 		@Override
 		public void get(final ImGuiViewport vp, final ImVec2 dst){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd == null){
-				return;
-			}
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
 			var size = vd.window.getGlfwWindow().size;
 			dst.x = size.x();
 			dst.y = size.y();
@@ -903,114 +898,85 @@ public class ImGuiImplGlfw{
 	private static final class SetWindowSizeFunction extends ImPlatformFuncViewportImVec2{
 		@Override
 		public void accept(final ImGuiViewport vp, final ImVec2 value){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd == null){
-				return;
-			}
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
 			vd.ignoreWindowSizeEventFrame = ImGui.getFrameCount();
 			vd.window.getGlfwWindow().size.set((int)value.x, (int)value.y);
-			LogUtil.println("SetWindowSizeFunction", vd.window.getGlfwWindow());
 		}
 	}
 	
 	private static final class SetWindowTitleFunction extends ImPlatformFuncViewportString{
 		@Override
 		public void accept(final ImGuiViewport vp, final String value){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null){
-				vd.window.getGlfwWindow().title.set(value);
-				LogUtil.println("SetWindowTitleFunction", vd.window.getGlfwWindow());
-			}
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+			vd.window.getGlfwWindow().title.set(value);
 		}
 	}
 	
 	private static final class SetWindowFocusFunction extends ImPlatformFuncViewport{
 		@Override
 		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null){
-				vd.window.getGlfwWindow().focus();
-				LogUtil.println("SetWindowFocusFunction", vd.window.getGlfwWindow());
-			}
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+			vd.window.getGlfwWindow().focus();
 		}
 	}
 	
 	private static final class GetWindowFocusFunction extends ImPlatformFuncViewportSuppBoolean{
 		@Override
 		public boolean get(final ImGuiViewport vp){
-			final ViewportData data = (ViewportData)vp.getPlatformUserData();
-			return data.window.getGlfwWindow().isFocused();
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
+			return vd.window.getGlfwWindow().isFocused();
 		}
 	}
 	
 	private static final class GetWindowMinimizedFunction extends ImPlatformFuncViewportSuppBoolean{
 		@Override
 		public boolean get(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null){
-				return vd.window.getGlfwWindow().isIconified();
-			}
-			return false;
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
+			return vd.window.getGlfwWindow().isIconified();
 		}
 	}
 	
 	private static final class SetWindowAlphaFunction extends ImPlatformFuncViewportFloat{
 		@Override
 		public void accept(final ImGuiViewport vp, final float value){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null){
-				glfwSetWindowOpacity(vd.window.getGlfwWindow().getHandle(), value);
-			}
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+			glfwSetWindowOpacity(vd.window.getGlfwWindow().getHandle(), value);
 		}
 	}
 	
 	private final class RenderWindowFunction extends ImPlatformFuncViewport{
 		@Override
 		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null && vd.windowOwned){
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+			try{
+				vd.window.getGlfwWindow().grabContext();
+				vd.window.getGlfwWindow().pollEvents();
+				core.device.waitIdle();
+				var dd = vp.getDrawData();
+				
 				try{
-					vd.window.swapchain.device.waitIdle();
-					var dd = vp.getDrawData();
-					
-					try{
-						vd.window.renderQueue((win, frameID, buf, fb) -> {
-							try(var ignore = buf.beginRenderPass(
-								core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
-							){
-								imGUIRenderer.submit(win, buf, frameID, dd);
-							}
-						});
-					}catch(VulkanCodeException e){
-						switch(e.code){
-							case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
-								vd.window.recreateSwapchainContext();
-							}
-							default -> throw new RuntimeException("Failed to render frame", e);
-						}
-					}
-					
-					var w = vd.window.getGlfwWindow();
-					if(!w.isVisible() && !w.shouldClose()){
-						core.device.waitIdle();
-						w.show();
-					}
+					render(vd, dd);
 				}catch(VulkanCodeException e){
-					throw new RuntimeException(e);
+					switch(e.code){
+						case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
+							vd.window.recreateSwapchainContext();
+							render(vd, dd);
+						}
+						default -> throw new RuntimeException("Failed to render frame", e);
+					}
 				}
+			}catch(VulkanCodeException e){
+				throw new RuntimeException(e);
 			}
 		}
-	}
-	
-	private static final class SwapBuffersFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd != null && vd.windowOwned){
-//				glfwMakeContextCurrent(vd.window);
-//				glfwSwapBuffers(vd.window);
-//				vd.window.getGlfwWindow().grabContext();
-			}
+		private void render(ViewportData vd, ImDrawData dd) throws VulkanCodeException{
+			vd.window.renderQueue((win, frameID, buf, fb) -> {
+				try(var ignore = buf.beginRenderPass(
+					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
+				){
+					imGUIRenderer.submit(win, buf, frameID, dd);
+				}
+			});
 		}
 	}
 	
@@ -1031,7 +997,6 @@ public class ImGuiImplGlfw{
 		platformIO.setPlatformGetWindowMinimized(new GetWindowMinimizedFunction());
 		platformIO.setPlatformSetWindowAlpha(new SetWindowAlphaFunction());
 		platformIO.setPlatformRenderWindow(new RenderWindowFunction());
-		platformIO.setPlatformSwapBuffers(new SwapBuffersFunction());
 		
 		// Register main window handle (which is owned by the main application, not by us)
 		// This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.

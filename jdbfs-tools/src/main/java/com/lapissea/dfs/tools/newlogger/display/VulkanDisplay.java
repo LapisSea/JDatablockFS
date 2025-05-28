@@ -64,7 +64,6 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public final VulkanWindow window;
 	
-	ImHandler imHandler;
 	
 	public VulkanDisplay(){
 		try{
@@ -77,8 +76,6 @@ public class VulkanDisplay implements AutoCloseable{
 			byteGridRender = new ByteGridRender(core);
 			lineRenderer = new LineRenderer(core);
 			imGUIRenderer = new ImGUIRenderer(core);
-			
-			imHandler = new ImHandler(core, window, imGUIRenderer);
 			
 			cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 			
@@ -376,11 +373,10 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public void run(){
 		var window = this.window.getGlfwWindow();
-		var t = Thread.ofPlatform().name("render").start(() -> {
 		
-		});
-		while(!window.shouldClose()){
-			try{
+		var imHandler = new ImHandler(core, this.window, imGUIRenderer);
+		try{
+			while(!window.shouldClose()){
 				window.grabContext();
 				window.pollEvents();
 				
@@ -388,21 +384,15 @@ public class VulkanDisplay implements AutoCloseable{
 				
 				core.device.waitIdle();
 				render(this.window);
-//
-//				core.device.waitIdle();
-//				render(this.window2);
-			}catch(Throwable e){
-				e.printStackTrace();
-				requestClose();
+				try{
+					Thread.sleep(5);
+				}catch(InterruptedException e){ requestClose(); }
 			}
-			try{
-				Thread.sleep(5);
-			}catch(InterruptedException e){ requestClose(); }
-		}
-		try{
-			t.join();
-		}catch(InterruptedException e){
-			throw new RuntimeException(e);
+		}catch(Throwable e){
+			e.printStackTrace();
+			requestClose();
+		}finally{
+			imHandler.close();
 		}
 	}
 	private void requestClose(){

@@ -67,7 +67,7 @@ public class VulkanWindow implements AutoCloseable{
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		renderQueue = core.renderQueue.withSwap();
-		window.show();
+		
 	}
 	
 	public interface FillBuffer{

@@ -29,11 +29,14 @@ public class ImHandler{
 		ImGui.newFrame();
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
 		ImGui.showDemoWindow();
+		ImGui.showMetricsWindow();
 		ImGui.render();
 		
 		ImGui.updatePlatformWindows();
 		ImGui.renderPlatformWindowsDefault();
 	}
-	
+	public void close(){
+		imGuiImplGlfw.shutdown();
+	}
 	
 }
