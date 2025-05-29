@@ -8,18 +8,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFrontFace;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPolygonMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
@@ -31,32 +26,14 @@ import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkExtent3D;
 import org.lwjgl.vulkan.VkFenceCreateInfo;
-import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkPipelineCacheCreateInfo;
-import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
-import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineDynamicStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineInputAssemblyStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
-import org.lwjgl.vulkan.VkPipelineMultisampleStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineRasterizationStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
-import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
-import org.lwjgl.vulkan.VkPipelineViewportStateCreateInfo;
-import org.lwjgl.vulkan.VkPushConstantRange;
 import org.lwjgl.vulkan.VkQueue;
-import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkSamplerCreateInfo;
 import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
-import org.lwjgl.vulkan.VkSpecializationInfo;
-import org.lwjgl.vulkan.VkSpecializationMapEntry;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
-import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
-import org.lwjgl.vulkan.VkVertexInputBindingDescription;
-import org.lwjgl.vulkan.VkViewport;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -65,7 +42,6 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
@@ -83,7 +59,7 @@ public class Device implements VulkanResource{
 	public final Map<Long, Throwable> debugVkObjects = new ConcurrentHashMap<>();
 	public final boolean              hasArithmeticTypes;
 	
-	private final VkPipelineCache pipelineCache;
+	public final VkPipelineCache pipelineCache;
 	
 	private final File pipelineCacheFile;
 	
@@ -237,182 +213,6 @@ public class Device implements VulkanResource{
 	
 	public RenderPass.Builder buildRenderPass(){
 		return new RenderPass.Builder(this);
-	}
-	
-	public VkPipeline createPipeline(
-		RenderPass renderPass, int subpass,
-		List<ShaderModule> modules,
-		Rect2D viewport, Rect2D scissors,
-		VkPolygonMode polygonMode, VkCullModeFlag cullMode, VkFrontFace frontFace,
-		VkSampleCountFlag sampleCount, boolean multisampleShading,
-		List<VkDescriptorSetLayout> descriptorSetLayouts,
-		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates,
-		Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues,
-		List<VkPipeline.VertexInput> vertexInputs,
-		List<VkPipeline.VertexInputBinding> vertexInputBindings,
-		List<VkPipeline.PushConstantRange> pushConstantRanges
-	) throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			
-			var inputAssembly = VkPipelineInputAssemblyStateCreateInfo.calloc(stack).sType$Default()
-			                                                          .topology(VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-			                                                          .primitiveRestartEnable(false);
-			
-			var viewports = VkViewport.calloc(1, stack);
-			viewport.setViewport(viewports.get(0));
-			var pScissors = VkRect2D.calloc(1, stack);
-			scissors.set(pScissors.get(0));
-			
-			var viewportState = VkPipelineViewportStateCreateInfo.calloc(stack);
-			viewportState.sType$Default()
-			             .pViewports(viewports)
-			             .pScissors(pScissors);
-			
-			var rasterState = VkPipelineRasterizationStateCreateInfo.calloc(stack);
-			rasterState.sType$Default()
-			           .polygonMode(polygonMode.id)
-			           .cullMode(cullMode.bit)
-			           .frontFace(frontFace.bit)
-			           .depthClampEnable(false)
-			           .rasterizerDiscardEnable(false)
-			           .lineWidth(1);
-			
-			var multisampleState = VkPipelineMultisampleStateCreateInfo.calloc(stack);
-			multisampleState.sType$Default()
-			                .rasterizationSamples(sampleCount.bit)
-			                .sampleShadingEnable(multisampleShading)
-			                .minSampleShading(1);
-			
-			var blendAttachState = VkPipelineColorBlendAttachmentState.calloc(1, stack);
-			blendAttachState.blendEnable(false)
-			                .colorWriteMask(VK10.VK_COLOR_COMPONENT_R_BIT|VK10.VK_COLOR_COMPONENT_G_BIT|VK10.VK_COLOR_COMPONENT_B_BIT|
-			                                VK10.VK_COLOR_COMPONENT_A_BIT);
-			if(blending != null){
-				blendAttachState.blendEnable(true)
-				                .srcColorBlendFactor(blending.srcColor().id)
-				                .dstColorBlendFactor(blending.dstColor().id)
-				                .colorBlendOp(blending.colorBlendOp().id)
-				                .srcAlphaBlendFactor(blending.srcAlpha().id)
-				                .dstAlphaBlendFactor(blending.dstAlpha().id)
-				                .alphaBlendOp(blending.alphaBlendOp().id);
-			}
-			
-			var colorBlendState = VkPipelineColorBlendStateCreateInfo.calloc(stack);
-			colorBlendState.sType$Default()
-			               .logicOpEnable(false)
-			               .logicOp(VK10.VK_LOGIC_OP_COPY)
-			               .pAttachments(blendAttachState)
-			               .blendConstants(stack.floats(1, 1, 1, 1));
-			
-			var descriptorSetLayoutPtrs = stack.mallocLong(descriptorSetLayouts.size());
-			for(var layout : descriptorSetLayouts) descriptorSetLayoutPtrs.put(layout.handle);
-			
-			var pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc(stack);
-			pipelineLayoutInfo.sType$Default()
-			                  .pSetLayouts(descriptorSetLayoutPtrs.flip());
-			
-			if(!pushConstantRanges.isEmpty()){
-				var ranges = VkPushConstantRange.malloc(pushConstantRanges.size(), stack);
-				for(var val : pushConstantRanges){
-					ranges.get().set(val.stages().value, val.offset(), val.size());
-				}
-				pipelineLayoutInfo.pPushConstantRanges(ranges.flip());
-			}
-			
-			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineLayoutInfo);
-			
-			var dynamicInfo = VkPipelineDynamicStateCreateInfo.calloc(stack).sType$Default();
-			
-			if(!dynamicStates.isEmpty()){
-				var states = stack.mallocInt(dynamicStates.size());
-				for(var dynamicState : dynamicStates) states.put(dynamicState.id);
-				states.flip();
-				dynamicInfo.pDynamicStates(states);
-			}
-			
-			var info = VkGraphicsPipelineCreateInfo.calloc(1, stack);
-			info.sType$Default()
-			    .pVertexInputState(createVertexInput(stack, vertexInputs, vertexInputBindings))
-			    .pInputAssemblyState(inputAssembly)
-			    .pStages(createShaderStages(stack, modules, specializationValues))
-			    .pViewportState(viewportState)
-			    .pRasterizationState(rasterState)
-			    .pMultisampleState(multisampleState)
-			    .pColorBlendState(colorBlendState)
-			    .layout(layout.handle)
-			    .renderPass(renderPass.handle)
-			    .subpass(subpass)
-			    .basePipelineHandle(0)
-			    .basePipelineIndex(-1)
-			    .pDynamicState(dynamicInfo);
-			
-			return VKCalls.vkCreateGraphicsPipelines(this, pipelineCache, info).getFirst();
-		}
-	}
-	
-	private static VkPipelineVertexInputStateCreateInfo createVertexInput(
-		MemoryStack stack, List<VkPipeline.VertexInput> vertexInputs, List<VkPipeline.VertexInputBinding> vertexInputBindings
-	){
-		var vertInput = VkPipelineVertexInputStateCreateInfo.calloc(stack).sType$Default();
-		
-		if(!vertexInputs.isEmpty()){
-			var vertInputAttributes = VkVertexInputAttributeDescription.malloc(vertexInputs.size(), stack);
-			for(VkPipeline.VertexInput attr : vertexInputs){
-				vertInputAttributes.get().set(attr.location(), attr.binding(), attr.format().id, attr.offset());
-			}
-			vertInput.pVertexAttributeDescriptions(vertInputAttributes.flip());
-		}
-		if(!vertexInputBindings.isEmpty()){
-			var bindings = VkVertexInputBindingDescription.malloc(vertexInputBindings.size(), stack);
-			for(var binding : vertexInputBindings){
-				bindings.get().set(binding.binding(), binding.stride(), binding.inputRate().id);
-			}
-			vertInput.pVertexBindingDescriptions(bindings.flip());
-		}
-		return vertInput;
-	}
-	
-	private static VkPipelineShaderStageCreateInfo.Buffer createShaderStages(
-		MemoryStack stack, List<ShaderModule> modules, Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues
-	){
-		var shaderStages = VkPipelineShaderStageCreateInfo.calloc(modules.size(), stack);
-		var main         = stack.UTF8("main");
-		for(int i = 0; i<modules.size(); i++){
-			var module = modules.get(i);
-			
-			var stage = shaderStages.get(i);
-			stage.sType$Default()
-			     .stage(module.stage.bit)
-			     .module(module.handle)
-			     .pName(main);
-			
-			Map<Integer, Object> specVals = specializationValues.getOrDefault(module.stage, Map.of());
-			if(!specVals.isEmpty()){
-				var entries = VkSpecializationMapEntry.calloc(specVals.size(), stack);
-				var buff    = stack.malloc(specVals.size()*8);
-				for(var e : specVals.entrySet()){
-					var id  = e.getKey();
-					var val = e.getValue();
-					
-					var pos = buff.position();
-					switch(val){
-						case Boolean b -> buff.putInt(b? 1 : 0);
-						case Integer i1 -> buff.putInt(i1);
-						case Float f -> buff.putFloat(f);
-						case Double d -> buff.putDouble(d);
-						default -> throw new RuntimeException("unexpected value: " + val.getClass().getName());
-					}
-					var size = buff.position() - pos;
-					entries.get().set(id, pos, size);
-				}
-				
-				stage.pSpecializationInfo(VkSpecializationInfo.calloc(stack)
-				                                              .pMapEntries(entries.flip())
-				                                              .pData(buff.flip()));
-			}
-			
-		}
-		return shaderStages;
 	}
 	
 	
