@@ -193,6 +193,8 @@ public class VulkanWindow implements AutoCloseable{
 		globalUniformSets.destroy();
 		globalUniforms.destroy();
 		
+		imguiResource.destroy();
+		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();
 		
