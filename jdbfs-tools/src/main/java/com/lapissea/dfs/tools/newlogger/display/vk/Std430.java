@@ -20,6 +20,8 @@ public final class Std430 extends Struct{
 	
 	public static Member __mat4()              { return __member(16*Float.BYTES, 16, true); }
 	
+	public static Member __vec4Arr(int count)  { return __member(4*4*count, 4, true); }
+	
 	private Std430()                           { super(0, null); }
 	@Override
 	protected Struct create(long address, ByteBuffer container){ return null; }

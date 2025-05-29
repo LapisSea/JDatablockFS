@@ -24,6 +24,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
@@ -76,7 +77,7 @@ public class ByteGridRender implements VulkanResource{
 			var layout = __struct(
 				Std140.__mat4(),
 				Std140.__int(),
-				Std140.__vec4Arr(4)
+				Std140.__vec4()
 			);
 			
 			SIZEOF = layout.getSize();
@@ -103,11 +104,8 @@ public class ByteGridRender implements VulkanResource{
 			return this;
 		}
 		private void flagColor(int i, Color none){
-			var ptr = address + FLAG_COLORS + i*4L*Float.BYTES;
-			MemoryUtil.memPutFloat(ptr + 0*Float.BYTES, none.getRed()/255F);
-			MemoryUtil.memPutFloat(ptr + 1*Float.BYTES, none.getGreen()/255F);
-			MemoryUtil.memPutFloat(ptr + 2*Float.BYTES, none.getBlue()/255F);
-			MemoryUtil.memPutFloat(ptr + 3*Float.BYTES, none.getAlpha()/255F);
+			var ptr = address + FLAG_COLORS + i*Float.BYTES;
+			MemoryUtil.memPutInt(ptr, VUtils.toRGBAi4(none));
 		}
 		
 		void set(Matrix4f mat, int tileWidth, Theme theme){

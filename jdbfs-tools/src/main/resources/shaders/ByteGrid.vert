@@ -43,7 +43,7 @@ layout (set = 1, binding = 0) readonly buffer Verts { Vert data[]; } in_verts;
 layout (set = 2, binding = 0) readonly uniform Uniforms {
 	mat4 modelMat;
 	int tileWidth;
-	vec4 flagColors[4];
+	uvec4 flagColors;
 } ubo;
 layout (set = 2, binding = 1) readonly buffer Bytes { Byte data[]; } in_bytes;
 
@@ -101,8 +101,10 @@ void main() {
 	} else if (vt.type == T_SET) {
 		colOut = col;
 	} else if (vt.type == T_MARK){
-		if (simple) colOut = ubo.flagColors[0];
-		else colOut = ubo.flagColors[byteFlag(byt)];
+		uint col8;
+		if (simple) col8 = ubo.flagColors[0];
+		else col8 = ubo.flagColors[byteFlag(byt)];
+		colOut = unpackUnorm4x8(col8);
 	} else {
 		colOut = vec4(0, 0, 1, 1);
 	}
