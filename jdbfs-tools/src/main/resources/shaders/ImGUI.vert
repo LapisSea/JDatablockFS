@@ -7,12 +7,13 @@ layout (location = 2) in vec4 color;
 layout (location = 0) out vec2 uvOut;
 layout (location = 1) out vec4 colOut;
 
-layout (binding = 0) readonly uniform GlobalUniforms {
-	mat4 projectionMat;
-} gUbo;
+layout (push_constant) uniform Push {
+	vec2 offset;
+	vec2 scale;
+} push;
 
 void main() {
 	uvOut=uv;
 	colOut=color;
-	gl_Position = gUbo.projectionMat * vec4(pos.xy, 0, 1.0);
+	gl_Position = vec4((pos.xy+push.offset)*push.scale*2.-1., 0, 1.0);
 }

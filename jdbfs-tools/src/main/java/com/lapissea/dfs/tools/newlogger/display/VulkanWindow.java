@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
@@ -46,6 +47,8 @@ public class VulkanWindow implements AutoCloseable{
 	
 	private final CommandPool         cmdPool;
 	public        List<CommandBuffer> graphicsBuffs;
+	
+	public final ImGUIRenderer.RenderResource imguiResource = new ImGUIRenderer.RenderResource();
 	
 	public VulkanWindow(VulkanCore core, boolean decorated) throws VulkanCodeException{
 		this.core = core;

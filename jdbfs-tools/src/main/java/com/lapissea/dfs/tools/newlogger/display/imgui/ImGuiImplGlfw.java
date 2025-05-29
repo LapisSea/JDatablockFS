@@ -948,10 +948,9 @@ public class ImGuiImplGlfw{
 		@Override
 		public void accept(final ImGuiViewport vp){
 			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+			vd.window.getGlfwWindow().grabContext();
+			vd.window.getGlfwWindow().pollEvents();
 			try{
-				vd.window.getGlfwWindow().grabContext();
-				vd.window.getGlfwWindow().pollEvents();
-				core.device.waitIdle();
 				var dd = vp.getDrawData();
 				
 				try{
@@ -974,7 +973,7 @@ public class ImGuiImplGlfw{
 				try(var ignore = buf.beginRenderPass(
 					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(win, buf, frameID, dd);
+					imGUIRenderer.submit(buf, frameID, win.imguiResource, dd);
 				}
 			});
 		}

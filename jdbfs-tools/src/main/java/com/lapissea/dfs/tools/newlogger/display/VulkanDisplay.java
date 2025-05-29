@@ -276,7 +276,7 @@ public class VulkanDisplay implements AutoCloseable{
 //
 //		ImGui.render();
 		
-		imGUIRenderer.submit(window, buf, frameID, ImGui.getMainViewport().getDrawData());
+		imGUIRenderer.submit(buf, frameID, window.imguiResource, ImGui.getMainViewport().getDrawData());
 	}
 	
 	private void renderDecimatedCurve(int frameID, CommandBuffer buf) throws VulkanCodeException{
@@ -382,7 +382,6 @@ public class VulkanDisplay implements AutoCloseable{
 				
 				imHandler.renderAll();
 				
-				core.device.waitIdle();
 				render(this.window);
 				try{
 					Thread.sleep(5);

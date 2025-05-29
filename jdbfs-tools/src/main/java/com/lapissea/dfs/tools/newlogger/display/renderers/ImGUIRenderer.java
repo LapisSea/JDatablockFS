@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
@@ -31,25 +30,46 @@ import imgui.ImFontAtlas;
 import imgui.ImGui;
 import imgui.ImVec4;
 import imgui.type.ImInt;
-import org.joml.Matrix4f;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 
 public class ImGUIRenderer implements VulkanResource{
 	
+	private static final class PushConstant{
+		private static final int SIZE = (2 + 2)*Float.BYTES;
+		public static float[] make(float offX, float offY, float sizeX, float sizeY){
+			return new float[]{offX, offY, sizeX, sizeY};
+		}
+	}
 	
 	public static class RenderResource implements VulkanResource{
 		
-		private BackedVkBuffer vbos;
-		private BackedVkBuffer ibos;
-		private int            indexCount;
+		private BackedVkBuffer vtxBuf;
+		private BackedVkBuffer idxBuf;
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
-			if(vbos == null) return;
-			vbos.destroy();
-			ibos.destroy();
+			if(vtxBuf == null) return;
+			vtxBuf.destroy();
+			idxBuf.destroy();
+		}
+		private void ensureBuffers(VulkanCore core, int vtxSize, int idxSize) throws VulkanCodeException{
+			
+			if(vtxBuf == null || vtxBuf.size()<vtxSize){
+				if(vtxBuf != null){
+					core.device.waitIdle();
+					vtxBuf.destroy();
+				}
+				vtxBuf = core.allocateHostBuffer(vtxSize, VkBufferUsageFlag.VERTEX_BUFFER);
+			}
+			if(idxBuf == null || idxBuf.size()<idxSize){
+				if(idxBuf != null){
+					core.device.waitIdle();
+					idxBuf.destroy();
+				}
+				idxBuf = core.allocateHostBuffer(idxSize, VkBufferUsageFlag.INDEX_BUFFER);
+			}
 		}
 	}
 	
@@ -58,9 +78,6 @@ public class ImGUIRenderer implements VulkanResource{
 	private final VulkanCore core;
 	
 	private final VkPipeline pipeline;
-	
-	private BackedVkBuffer vtxBuf;
-	private BackedVkBuffer idxBuf;
 	
 	private final VkDescriptorSetLayout dsLayoutConst;
 	private final VkDescriptorSet       dsSetConst;
@@ -87,6 +104,7 @@ public class ImGUIRenderer implements VulkanResource{
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		                     .cullMode(VkCullModeFlag.NONE)
 		                     .addDesriptorSetLayout(dsLayoutConst)
+		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
 		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, 0)
 		                     .addVertexInput(1, 0, VkFormat.R32G32_SFLOAT, 4*2)
 		                     .addVertexInput(2, 0, VkFormat.R8G8B8A8_UNORM, 4*4)
@@ -103,7 +121,7 @@ public class ImGUIRenderer implements VulkanResource{
 		return core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 	}
 	
-	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, ImDrawData drawData) throws VulkanCodeException{
+	public void submit(CommandBuffer buf, int frameID, RenderResource renderResource, ImDrawData drawData) throws VulkanCodeException{
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
 		var sizeOfIndex  = ImDrawData.sizeOfImDrawIdx();
 		
@@ -116,19 +134,12 @@ public class ImGUIRenderer implements VulkanResource{
 		                                       .mapToObj(cmdIdx -> drawData.getCmdListCmdBufferTextureId(n, cmdIdx))
 		                    ).toModSequencedSet();
 		
-		var e   = window.swapchain.extent;
-		var pos = drawData.getDisplayPos();
-		;
-		var projectionMatrix = new Matrix4f().ortho(pos.x, pos.x + e.width, pos.y, pos.y + e.height, -10, 10, true);
-		window.globalUniforms.update(frameID, b -> b.mat(projectionMatrix));
+		var winSize = drawData.getDisplaySize();
+		var winPos  = drawData.getDisplayPos();
 		
 		buf.bindPipeline(pipeline);
-		buf.setViewport(new Rect2D(window.swapchain.extent));
+		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
 		switch(textures.size()){
-			case 0 -> dsSetConst.update(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, window.globalUniforms),
-				new Descriptor.LayoutDescription.TextureBuff(1, emptyTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
-			), -1);
 			case 1 -> {
 				long textureID = textures.getFirst();
 				if(textureID != 0){
@@ -136,36 +147,22 @@ public class ImGUIRenderer implements VulkanResource{
 				}
 				if(imGuiFontTexture == null){
 					imGuiFontTexture = createFontsTexture();
+					dsSetConst.update(List.of(
+						new Descriptor.LayoutDescription.TextureBuff(1, imGuiFontTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
+					), frameID);
 				}
-				dsSetConst.update(List.of(
-					new Descriptor.LayoutDescription.UniformBuff(0, window.globalUniforms),
-					new Descriptor.LayoutDescription.TextureBuff(1, imGuiFontTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
-				), frameID);
 			}
 			default -> throw new IllegalStateException("Unsupported texture count: " + textures.size());
 		}
 		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSetConst);
 		
-		if(vtxBuf == null || vtxBuf.size()<vtxSize){
-			if(vtxBuf != null){
-				core.device.waitIdle();
-				vtxBuf.destroy();
-			}
-			vtxBuf = core.allocateHostBuffer(vtxSize, VkBufferUsageFlag.VERTEX_BUFFER);
-		}
-		if(idxBuf == null || idxBuf.size()<idxSize){
-			if(idxBuf != null){
-				core.device.waitIdle();
-				idxBuf.destroy();
-			}
-			idxBuf = core.allocateHostBuffer(idxSize, VkBufferUsageFlag.INDEX_BUFFER);
-		}
+		renderResource.ensureBuffers(core, vtxSize, idxSize);
 		
 		var vtxCmdOffsets = new int[drawData.getCmdListsCount()];
 		var idxCmdOffsets = new int[drawData.getCmdListsCount()];
 		
-		try(var vtxSes = vtxBuf.update();
-		    var idxSes = idxBuf.update()){
+		try(var vtxSes = renderResource.vtxBuf.update();
+		    var idxSes = renderResource.idxBuf.update()){
 			ByteBuffer vtxMem = vtxSes.getBuffer(), idxMem = idxSes.getBuffer();
 			for(int n = 0; n<drawData.getCmdListsCount(); n++){
 				vtxCmdOffsets[n] = vtxMem.position();
@@ -187,18 +184,24 @@ public class ImGUIRenderer implements VulkanResource{
 			
 			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
-				clipRect.x -= pos.x;
-				clipRect.z -= pos.x;
-				clipRect.y -= pos.y;
-				clipRect.w -= pos.y;
+				clipRect.x -= winPos.x;
+				clipRect.z -= winPos.x;
+				clipRect.y -= winPos.y;
+				clipRect.w -= winPos.y;
 				buf.setScissor(new Rect2D((int)clipRect.x, (int)clipRect.y, (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
 //				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
 				int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
 				int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
 				int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 				
-				buf.bindVertexBuffer(vtxBuf.buffer, 0, vtxCmdOffsets[n]);
-				buf.bindIndexBuffer(idxBuf.buffer, idxCmdOffsets[n], idxType);
+				buf.bindVertexBuffer(renderResource.vtxBuf.buffer, 0, vtxCmdOffsets[n]);
+				buf.bindIndexBuffer(renderResource.idxBuf.buffer, idxCmdOffsets[n], idxType);
+				buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(
+					-winPos.x,
+					-winPos.y,
+					1F/winSize.x,
+					1F/winSize.y
+				));
 				buf.drawIndexed(elemCount, 1, idxOffset, vtxOffset, 0);
 			}
 		}
@@ -214,10 +217,6 @@ public class ImGUIRenderer implements VulkanResource{
 		pipeline.destroy();
 		emptyTexture.destroy();
 		imGuiFontTexture.destroy();
-		if(idxBuf != null){
-			idxBuf.destroy();
-			vtxBuf.destroy();
-		}
 		shader.destroy();
 	}
 }
