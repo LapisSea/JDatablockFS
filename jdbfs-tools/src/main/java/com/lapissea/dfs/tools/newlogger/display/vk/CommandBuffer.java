@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
@@ -39,6 +40,7 @@ import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 import org.lwjgl.vulkan.VkViewport;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
@@ -396,6 +398,19 @@ public class CommandBuffer implements VulkanResource{
 			setHandles[i] = descriptorSets.get(i).handle;
 		}
 		VK10.vkCmdBindDescriptorSets(val, bindPoint.id, layout.handle, firstSet, setHandles, null);
+	}
+	
+	public void pushConstants(VkPipelineLayout layout, Flags<VkShaderStageFlag> stages, int offset, ByteBuffer data){
+		VK10.vkCmdPushConstants(val, layout.handle, stages.value, offset, data);
+	}
+	public void pushConstants(VkPipelineLayout layout, VkShaderStageFlag stage, int offset, ByteBuffer data){
+		VK10.vkCmdPushConstants(val, layout.handle, stage.bit, offset, data);
+	}
+	public void pushConstants(VkPipelineLayout layout, Flags<VkShaderStageFlag> stages, int offset, float[] data){
+		VK10.vkCmdPushConstants(val, layout.handle, stages.value, offset, data);
+	}
+	public void pushConstants(VkPipelineLayout layout, VkShaderStageFlag stage, int offset, float[] data){
+		VK10.vkCmdPushConstants(val, layout.handle, stage.bit, offset, data);
 	}
 	
 	

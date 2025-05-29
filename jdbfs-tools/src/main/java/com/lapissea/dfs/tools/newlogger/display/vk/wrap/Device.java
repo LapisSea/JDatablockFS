@@ -46,6 +46,7 @@ import org.lwjgl.vulkan.VkPipelineRasterizationStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
 import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
 import org.lwjgl.vulkan.VkPipelineViewportStateCreateInfo;
+import org.lwjgl.vulkan.VkPushConstantRange;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkSamplerCreateInfo;
@@ -248,7 +249,8 @@ public class Device implements VulkanResource{
 		VkPipeline.Blending blending, Set<VkDynamicState> dynamicStates,
 		Map<VkShaderStageFlag, Map<Integer, Object>> specializationValues,
 		List<VkPipeline.VertexInput> vertexInputs,
-		List<VkPipeline.VertexInputBinding> vertexInputBindings
+		List<VkPipeline.VertexInputBinding> vertexInputBindings,
+		List<VkPipeline.PushConstantRange> pushConstantRanges
 	) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			
@@ -305,11 +307,19 @@ public class Device implements VulkanResource{
 			var descriptorSetLayoutPtrs = stack.mallocLong(descriptorSetLayouts.size());
 			for(var layout : descriptorSetLayouts) descriptorSetLayoutPtrs.put(layout.handle);
 			
-			var pipelineInfo = VkPipelineLayoutCreateInfo.calloc(stack);
-			pipelineInfo.sType$Default()
-			            .pSetLayouts(descriptorSetLayoutPtrs.flip());
+			var pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc(stack);
+			pipelineLayoutInfo.sType$Default()
+			                  .pSetLayouts(descriptorSetLayoutPtrs.flip());
 			
-			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineInfo);
+			if(!pushConstantRanges.isEmpty()){
+				var ranges = VkPushConstantRange.malloc(pushConstantRanges.size(), stack);
+				for(var val : pushConstantRanges){
+					ranges.get().set(val.stages().value, val.offset(), val.size());
+				}
+				pipelineLayoutInfo.pPushConstantRanges(ranges.flip());
+			}
+			
+			var layout = VKCalls.vkCreatePipelineLayout(this, pipelineLayoutInfo);
 			
 			var dynamicInfo = VkPipelineDynamicStateCreateInfo.calloc(stack).sType$Default();
 			

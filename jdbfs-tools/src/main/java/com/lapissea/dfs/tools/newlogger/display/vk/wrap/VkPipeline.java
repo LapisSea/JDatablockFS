@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBlendFactor;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBlendOp;
@@ -25,6 +26,13 @@ import java.util.Objects;
 import java.util.Set;
 
 public class VkPipeline extends VulkanResource.DeviceHandleObj{
+	
+	public record PushConstantRange(
+		Flags<VkShaderStageFlag> stages,
+		int offset,
+		int size
+	){
+	}
 	
 	public record VertexInputBinding(
 		int binding,
@@ -74,6 +82,7 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 		
 		private final List<VkPipeline.VertexInput>        vertexInputs        = new ArrayList<>();
 		private final List<VkPipeline.VertexInputBinding> vertexInputBindings = new ArrayList<>();
+		private final List<VkPipeline.PushConstantRange>  pushConstantRanges  = new ArrayList<>();
 		
 		private Builder(RenderPass renderPass, List<ShaderModule> modules){
 			this.renderPass = Objects.requireNonNull(renderPass);
@@ -138,6 +147,14 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 			return this;
 		}
 		
+		public Builder addPushConstantRange(VkShaderStageFlag stage, int offset, int size){
+			return addPushConstantRange(Flags.of(stage), offset, size);
+		}
+		public Builder addPushConstantRange(Flags<VkShaderStageFlag> stages, int offset, int size){
+			pushConstantRanges.add(new PushConstantRange(stages, offset, size));
+			return this;
+		}
+		
 		public VkPipeline build() throws VulkanCodeException{
 			return renderPass.device.createPipeline(
 				renderPass, subpass, modules, viewport, scissors,
@@ -145,7 +162,8 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 				sampleCount, multisampleShading,
 				desriptorSetLayouts, blending,
 				dynamicStates, specializationValues,
-				vertexInputs, vertexInputBindings
+				vertexInputs, vertexInputBindings,
+				pushConstantRanges
 			);
 		}
 	}
