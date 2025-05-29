@@ -7,25 +7,20 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.Std140;
 import com.lapissea.dfs.tools.newlogger.display.vk.Std430;
-import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
-import org.joml.Matrix4f;
+import org.joml.Matrix3x2f;
 import org.joml.Vector2f;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
@@ -33,40 +28,14 @@ import org.lwjgl.system.StructBuffer;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
-import java.util.List;
 
 public class LineRenderer implements VulkanResource{
 	
-	private static class Uniform extends Struct<Uniform>{
-		private static final int SIZEOF;
-		private static final int MAT;
-		
-		static{
-			var layout = __struct(
-				Std140.__mat4()
-			);
-			
-			SIZEOF = layout.getSize();
-			MAT = layout.offsetof(0);
+	private static final class PushConstant{
+		private static final int SIZE = (2*3)*Float.BYTES;
+		public static float[] make(Matrix3x2f matrix){
+			return matrix.get(new float[6]);
 		}
-		
-		Matrix4f mat(){ return new Matrix4f().setFromAddress(address + MAT); }
-		
-		Uniform mat(Matrix4f mat){
-			mat.getToAddress(address + MAT);
-			return this;
-		}
-		
-		void set(Matrix4f mat){
-			mat(mat);
-		}
-		
-		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
-		protected Uniform(long address)   { super(address, null); }
-		@Override
-		protected Uniform create(long address, ByteBuffer container){ return new Uniform(address); }
-		@Override
-		public int sizeof(){ return SIZEOF; }
 	}
 	
 	private static class Vert extends Struct<Vert>{
@@ -119,26 +88,14 @@ public class LineRenderer implements VulkanResource{
 	
 	public static class RenderResource implements VulkanResource{
 		
-		private UniformBuffer<Uniform> uniform;
-		
-		private BackedVkBuffer           vbos;
-		private BackedVkBuffer           ibos;
-		private VkDescriptorSet.PerFrame desc;
-		private int                      indexCount;
-		private VkIndexType              indexType;
-		
-		void updateDescriptor(){
-			desc.updateAll(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, uniform),
-				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, vbos.buffer)
-			));
-		}
+		private BackedVkBuffer vbos;
+		private BackedVkBuffer ibos;
+		private int            indexCount;
+		private VkIndexType    indexType;
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
 			if(vbos == null) return;
-			desc.destroy();
-			uniform.destroy();
 			vbos.destroy();
 			ibos.destroy();
 		}
@@ -148,35 +105,24 @@ public class LineRenderer implements VulkanResource{
 	
 	private final VulkanCore core;
 	
-	private final VkPipeline            pipeline;
-	private final VkDescriptorSetLayout dsLayout;
+	private final VkPipeline pipeline;
 	
 	public LineRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		shader = new ShaderModuleSet(core, "Line", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
-			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
-			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
-		);
-		
 		pipeline = VkPipeline.builder(core.renderPass, shader)
 		                     .blending(VkPipeline.Blending.STANDARD)
 		                     .multisampling(core.physicalDevice.samples, false)
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .addDesriptorSetLayout(core.globalUniformLayout)
-		                     .addDesriptorSetLayout(dsLayout)
+		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, Vert.XY)
+		                     .addVertexInput(1, 0, core.device.color8bitFormat, Vert.COLOR)
+		                     .addVertexInputBinding(0, Vert.SIZEOF, VkVertexInputRate.VERTEX)
+		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
 		                     .build();
 	}
 	
-	public void record(RenderResource resource, Matrix4f mat, Iterable<Geometry.Path> paths) throws VulkanCodeException{
-		boolean updateDescriptor = false;
-		
-		if(resource.desc == null){
-			resource.desc = dsLayout.createDescriptorSetsPerFrame();
-			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false, Uniform::new);
-			updateDescriptor = true;
-		}
+	public void record(RenderResource resource, Iterable<Geometry.Path> paths) throws VulkanCodeException{
 		
 		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		
@@ -188,8 +134,7 @@ public class LineRenderer implements VulkanResource{
 		if(resource.vbos == null || resource.vbos.size()/Vert.SIZEOF<size.vertCount()){
 			core.device.waitIdle();
 			if(resource.vbos != null) resource.vbos.destroy();
-			resource.vbos = core.allocateHostBuffer(size.vertCount()*(long)Vert.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER);
-			updateDescriptor = true;
+			resource.vbos = core.allocateHostBuffer(size.vertCount()*(long)Vert.SIZEOF, VkBufferUsageFlag.VERTEX_BUFFER);
 		}
 		var indexSize = switch(resource.indexType){
 			case UINT16 -> 2;
@@ -200,14 +145,7 @@ public class LineRenderer implements VulkanResource{
 			core.device.waitIdle();
 			if(resource.ibos != null) resource.ibos.destroy();
 			resource.ibos = core.allocateHostBuffer(size.indexCount()*(long)indexSize, VkBufferUsageFlag.INDEX_BUFFER);
-			updateDescriptor = true;
 		}
-		
-		if(updateDescriptor){
-			resource.updateDescriptor();
-		}
-		
-		resource.uniform.updateAll(e -> e.set(mat));
 		
 		core.device.waitIdle();
 		try(var vertsSes = resource.vbos.updateAs(Vert.Buf::new);
@@ -233,22 +171,20 @@ public class LineRenderer implements VulkanResource{
 		
 	}
 	
-	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
+	public void submit(VulkanWindow window, CommandBuffer buf, Matrix3x2f pvm, RenderResource resource) throws VulkanCodeException{
 		buf.bindPipeline(pipeline);
+		
 		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
 		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
-		                       window.globalUniformSets.get(frameID),
-		                       resource.desc.get(frameID));
-		
+		buf.bindVertexBuffer(resource.vbos.buffer, 0, 0);
 		buf.bindIndexBuffer(resource.ibos.buffer, 0, resource.indexType);
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(pvm));
 		buf.drawIndexed(resource.indexCount, 1, 0, 0, 0);
 	}
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
 		pipeline.destroy();
-		dsLayout.destroy();
 		shader.destroy();
 	}
 }

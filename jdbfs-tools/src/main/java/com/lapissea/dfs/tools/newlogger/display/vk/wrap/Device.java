@@ -63,6 +63,8 @@ public class Device implements VulkanResource{
 	
 	private final File pipelineCacheFile;
 	
+	public final VkFormat color8bitFormat;
+	
 	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies, boolean hasArithmeticTypes, File pipelineCacheFile) throws VulkanCodeException{
 		this.value = value;
 		this.physicalDevice = physicalDevice;
@@ -98,6 +100,7 @@ public class Device implements VulkanResource{
 				}
 			}
 		}
+		color8bitFormat = hasArithmeticTypes? VkFormat.R8G8B8A8_UINT : VkFormat.R32_UINT;
 	}
 	
 	public Swapchain createSwapchain(Swapchain oldSwapchain, Surface surface, VKPresentMode preferredMode, Iterable<FormatColor> preferred) throws VulkanCodeException{

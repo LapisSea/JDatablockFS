@@ -96,7 +96,7 @@ public class VulkanDisplay implements AutoCloseable{
 				)
 			);
 			
-			lineRenderer.record(lineRes, new Matrix4f(), List.of(
+			lineRenderer.record(lineRes, List.of(
 				new Geometry.PointsLine(
 					Iters.rangeMap(0, 50, u -> u/50F*Math.PI)
 					     .map(f -> new Vector2f((float)Math.sin(f)*100 + 150, -(float)Math.cos(f)*100 + 150))
@@ -249,7 +249,7 @@ public class VulkanDisplay implements AutoCloseable{
 //		fontRender.render(window, buf, frameID, sd);
 //
 //
-//		renderDecimatedCurve(frameID, buf);
+//		renderDecimatedCurve(window, buf);
 //
 //		imguiUpdate(window);
 //
@@ -279,7 +279,7 @@ public class VulkanDisplay implements AutoCloseable{
 		imGUIRenderer.submit(buf, frameID, window.imguiResource, ImGui.getMainViewport().getDrawData());
 	}
 	
-	private void renderDecimatedCurve(int frameID, CommandBuffer buf) throws VulkanCodeException{
+	private void renderDecimatedCurve(VulkanWindow window, CommandBuffer buf) throws VulkanCodeException{
 		var t = (System.currentTimeMillis())/500D;
 		
 		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
@@ -287,15 +287,17 @@ public class VulkanDisplay implements AutoCloseable{
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
 		
-		lineRenderer.record(lineRes, new Matrix4f(), Iters.concat1N(
+		lineRenderer.record(lineRes, Iters.concat1N(
 			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
 			Iters.from(controlPoints)
 			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED))
 			     .toList()
 		
 		));
-		lineRenderer.submit(window, buf, frameID, lineRes);
+		
+		lineRenderer.submit(this.window, buf, window.projectionMatrix2D, lineRes);
 	}
+	
 	private void renderAutoSizeByteGrid(VulkanWindow window, int frameID, CommandBuffer buf) throws VulkanCodeException{
 		int count = 32*32;
 		var space = window.swapchain.extent;

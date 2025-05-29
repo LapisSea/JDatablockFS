@@ -19,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.glfw.GlfwWindow;
+import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
@@ -40,6 +41,7 @@ public class VulkanWindow implements AutoCloseable{
 	public List<VulkanTexture> mssaImages;
 	public List<FrameBuffer>   frameBuffers;
 	
+	public final Matrix3x2f                              projectionMatrix2D = new Matrix3x2f();
 	public final UniformBuffer<VulkanCore.GlobalUniform> globalUniforms;
 	public final VkDescriptorSet.PerFrame                globalUniformSets;
 	
@@ -149,6 +151,10 @@ public class VulkanWindow implements AutoCloseable{
 		var e                = swapchain.extent;
 		var projectionMatrix = new Matrix4f().ortho(0, e.width, 0, e.height, -10, 10, true);
 		globalUniforms.updateAll(b -> b.mat(projectionMatrix));
+		
+		projectionMatrix2D.identity()
+		                  .translate(-1, -1)
+		                  .scale(2F/e.width, 2F/e.height);
 	}
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
