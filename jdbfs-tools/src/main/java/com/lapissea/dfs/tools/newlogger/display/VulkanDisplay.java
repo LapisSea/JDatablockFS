@@ -1,6 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.tools.newlogger.display.imgui.ImTools;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
@@ -27,7 +26,6 @@ import java.io.File;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class VulkanDisplay implements AutoCloseable{
 	
@@ -52,16 +50,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final Vector4f clearColor = new Vector4f(0, 0, 0, 1);
 	
-	private record ImGUIKeyEvent(int code, boolean pressed){
-		int imguiCode(){
-			return ImTools.glfwKeyToImGuiKey(code);
-		}
-	}
-	
-	private final ConcurrentLinkedQueue<ImGUIKeyEvent> keyboardEvents = new ConcurrentLinkedQueue<>();
-	
 	public final VulkanWindow window;
-	
 	
 	public VulkanDisplay(){
 		try{
