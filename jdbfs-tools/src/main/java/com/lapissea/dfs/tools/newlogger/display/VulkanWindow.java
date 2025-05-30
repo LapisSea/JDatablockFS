@@ -18,6 +18,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
@@ -50,20 +51,20 @@ public class VulkanWindow implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	public        List<CommandBuffer> graphicsBuffs;
 	
-	public final ImGUIRenderer.RenderResource[] imguiResource = new ImGUIRenderer.RenderResource[VulkanCore.MAX_IN_FLIGHT_FRAMES];
+	public final List<ImGUIRenderer.RenderResource> imguiResource
+		= Iters.rangeMap(0, VulkanCore.MAX_IN_FLIGHT_FRAMES, i -> new ImGUIRenderer.RenderResource()).toList();
 	
 	public VulkanWindow(VulkanCore core, boolean decorated) throws VulkanCodeException{
 		this.core = core;
 		
-		for(int i = 0; i<imguiResource.length; i++){
-			imguiResource[i] = new ImGUIRenderer.RenderResource();
-		}
 		
 		window = new GlfwWindow();
 		window.title.set("DFS visual debugger");
 		window.size.set(800, 600);
 		
-		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR)).decorated(decorated).resizeable(true));
+		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR))
+		                  .decorated(decorated)
+		                  .resizeable(true));
 		Thread.ofVirtual().start(() -> window.setIcon(createVulkanIcon(128, 128)));
 		
 		surface = VKCalls.glfwCreateWindowSurface(core.instance, window.getHandle());

@@ -85,7 +85,6 @@ public class ImGUIRenderer implements VulkanResource{
 	private final VulkanTexture emptyTexture;
 	private       VulkanTexture imGuiFontTexture;
 	
-	
 	public ImGUIRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		shader = new ShaderModuleSet(core, "ImGUI", ShaderType.VERTEX, ShaderType.FRAGMENT);
@@ -121,7 +120,7 @@ public class ImGUIRenderer implements VulkanResource{
 		return core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 	}
 	
-	public void submit(CommandBuffer buf, int frameID, RenderResource renderResource, ImDrawData drawData) throws VulkanCodeException{
+	public void submit(CommandBuffer buf, int frameID, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
 		var sizeOfIndex  = ImDrawData.sizeOfImDrawIdx();
 		
@@ -156,13 +155,13 @@ public class ImGUIRenderer implements VulkanResource{
 		}
 		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSetConst);
 		
-		renderResource.ensureBuffers(core, vtxSize, idxSize);
+		resource.ensureBuffers(core, vtxSize, idxSize);
 		
 		var vtxCmdOffsets = new int[drawData.getCmdListsCount()];
 		var idxCmdOffsets = new int[drawData.getCmdListsCount()];
 		
-		try(var vtxSes = renderResource.vtxBuf.update();
-		    var idxSes = renderResource.idxBuf.update()){
+		try(var vtxSes = resource.vtxBuf.update();
+		    var idxSes = resource.idxBuf.update()){
 			ByteBuffer vtxMem = vtxSes.getBuffer(), idxMem = idxSes.getBuffer();
 			for(int n = 0; n<drawData.getCmdListsCount(); n++){
 				vtxCmdOffsets[n] = vtxMem.position();
@@ -170,8 +169,6 @@ public class ImGUIRenderer implements VulkanResource{
 				vtxMem.put(drawData.getCmdListVtxBufferData(n));
 				idxMem.put(drawData.getCmdListIdxBufferData(n));
 			}
-//			LogUtil.println(vtxMem.flip().asFloatBuffer());
-//			LogUtil.println(idxMem.flip().asShortBuffer());
 		}
 		var idxType = switch(sizeOfIndex){
 			case 2 -> VkIndexType.UINT16;
@@ -184,18 +181,20 @@ public class ImGUIRenderer implements VulkanResource{
 			
 			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
-				clipRect.x -= winPos.x;
-				clipRect.z -= winPos.x;
-				clipRect.y -= winPos.y;
-				clipRect.w -= winPos.y;
-				buf.setScissor(new Rect2D((int)clipRect.x, (int)clipRect.y, (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y)));
+				
+				var clipX = (int)(clipRect.x - winPos.x);
+				var clipY = (int)(clipRect.y - winPos.y);
+				var clipW = (int)(clipRect.z - clipRect.x);
+				var clipH = (int)(clipRect.w - clipRect.y);
+				buf.setScissor(new Rect2D(clipX, clipY, clipW, clipH));
+
 //				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
 				int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
 				int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
 				int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 				
-				buf.bindVertexBuffer(renderResource.vtxBuf.buffer, 0, vtxCmdOffsets[n]);
-				buf.bindIndexBuffer(renderResource.idxBuf.buffer, idxCmdOffsets[n], idxType);
+				buf.bindVertexBuffer(resource.vtxBuf.buffer, 0, vtxCmdOffsets[n]);
+				buf.bindIndexBuffer(resource.idxBuf.buffer, idxCmdOffsets[n], idxType);
 				buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(
 					-winPos.x,
 					-winPos.y,

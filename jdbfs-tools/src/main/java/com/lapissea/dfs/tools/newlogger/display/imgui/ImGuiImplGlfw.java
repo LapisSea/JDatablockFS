@@ -987,7 +987,7 @@ public class ImGuiImplGlfw{
 				try(var ignore = buf.beginRenderPass(
 					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(buf, frameID, win.imguiResource[frameID], dd);
+					imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), dd);
 				}
 			});
 		}

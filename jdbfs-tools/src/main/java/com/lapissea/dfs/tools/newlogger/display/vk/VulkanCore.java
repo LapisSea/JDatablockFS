@@ -154,7 +154,7 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public static final int API_VERSION_MAJOR = 1;
-	public static final int API_VERSION_MINOR = 1;
+	public static final int API_VERSION_MINOR = 2;
 	
 	
 	private final String         name;

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
@@ -204,8 +205,8 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		
 		renderDecimatedCurve(window, buf);
-
-//		imGUIRenderer.submit(buf, frameID, window.imguiResource[frameID], ImGui.getMainViewport().getDrawData());
+		
+		imGUIRenderer.submit(buf, frameID, window.imguiResource.get(frameID), ImGui.getMainViewport().getDrawData());
 	}
 	
 	private void renderDecimatedCurve(VulkanWindow window, CommandBuffer buf) throws VulkanCodeException{
@@ -273,34 +274,35 @@ public class VulkanDisplay implements AutoCloseable{
 	public void run(){
 		var window = this.window.getGlfwWindow();
 		window.size.register(this::onResizeEvent);
-//		var imHandler = new ImHandler(core, this.window, imGUIRenderer);
-		Thread.ofPlatform().start(() -> {
-			try{
-				while(!window.shouldClose()){
-					window.grabContext();
-					window.pollEvents();
-
-//				imHandler.renderAll();
-					
-					render(this.window);
-				}
-			}catch(Throwable e){
-				e.printStackTrace();
-				requestClose();
-			}finally{
-//			imHandler.close();
-			}
-		});
 		
-		window.whileOpen(() -> {
-			try{
-				Thread.sleep(5);
-			}catch(InterruptedException e){ requestClose(); }
-			
-			window.grabContext();
-			window.pollEvents();
-//			imHandler.poolWindowEvents();
-		});
+		var imHandler = new ImHandler(core, this.window, imGUIRenderer);
+//		Thread.ofPlatform().start(() -> {
+		try{
+			while(!window.shouldClose()){
+				window.grabContext();
+				window.pollEvents();
+				
+				imHandler.renderAll();
+				
+				render(this.window);
+			}
+		}catch(Throwable e){
+			e.printStackTrace();
+			requestClose();
+		}finally{
+			imHandler.close();
+		}
+//		});
+//
+//		window.whileOpen(() -> {
+//			try{
+//				Thread.sleep(5);
+//			}catch(InterruptedException e){ requestClose(); }
+//
+//			window.grabContext();
+//			window.pollEvents();
+////			imHandler.poolWindowEvents();
+//		});
 	}
 	private void requestClose(){
 		window.requestClose();
