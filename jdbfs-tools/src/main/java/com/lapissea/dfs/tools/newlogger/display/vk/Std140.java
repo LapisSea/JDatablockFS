@@ -16,7 +16,7 @@ public final class Std140 extends Struct{
 	
 	public static Member __mat4()            { return __member(4*4*Float.BYTES, 16, true); }
 	public static Member __mat2()            { return __member(2*2*Float.BYTES, 16, true); }
-	public static Member __mat3x2()          { return __member(3*2*Float.BYTES, 16, true); }
+	public static Member __mat3x2()          { return __member(4*3*Float.BYTES, 16, true); }
 	
 	private Std140()                         { super(0, null); }
 	@Override

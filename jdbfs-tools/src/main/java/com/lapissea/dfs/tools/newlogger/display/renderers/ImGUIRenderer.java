@@ -216,7 +216,7 @@ public class ImGUIRenderer implements VulkanResource{
 		
 		pipeline.destroy();
 		emptyTexture.destroy();
-		imGuiFontTexture.destroy();
+		if(imGuiFontTexture != null) imGuiFontTexture.destroy();
 		shader.destroy();
 	}
 }

@@ -8,9 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.Std140;
 import com.lapissea.dfs.tools.newlogger.display.vk.Std430;
-import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
@@ -24,7 +22,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;
@@ -67,36 +64,36 @@ public class ByteGridRender implements VulkanResource{
 		}
 	}
 	
-	private static class Uniform extends Struct<Uniform>{
+	private static class PushConstant extends Struct<PushConstant>{
 		private static final int SIZEOF;
 		private static final int MAT;
-		private static final int TILE_WIDTH;
 		private static final int FLAG_COLORS;
+		private static final int TILE_WIDTH;
 		
 		static{
 			var layout = __struct(
-				Std140.__mat4(),
-				Std140.__int(),
-				Std140.__vec4()
+				Std430.__mat4(),
+				Std430.__vec4(),
+				Std430.__int()
 			);
 			
 			SIZEOF = layout.getSize();
 			MAT = layout.offsetof(0);
-			TILE_WIDTH = layout.offsetof(1);
-			FLAG_COLORS = layout.offsetof(2);
+			FLAG_COLORS = layout.offsetof(1);
+			TILE_WIDTH = layout.offsetof(2);
 		}
 		
 		Matrix4f mat(){ return new Matrix4f().setFromAddress(address + MAT); }
 		
-		Uniform mat(Matrix4f mat){
+		PushConstant mat(Matrix4f mat){
 			mat.getToAddress(address + MAT);
 			return this;
 		}
-		Uniform tileWidth(int tileWidth){
+		PushConstant tileWidth(int tileWidth){
 			MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth);
 			return this;
 		}
-		Uniform flagColors(Theme theme){
+		PushConstant flagColors(Theme theme){
 			flagColor(0, theme.none);
 			flagColor(1, theme.write);
 			flagColor(2, theme.read);
@@ -108,16 +105,17 @@ public class ByteGridRender implements VulkanResource{
 			MemoryUtil.memPutInt(ptr, VUtils.toRGBAi4(none));
 		}
 		
-		void set(Matrix4f mat, int tileWidth, Theme theme){
+		PushConstant set(Matrix4f mat, int tileWidth, Theme theme){
 			mat(mat);
 			tileWidth(tileWidth);
 			flagColors(theme);
+			return this;
 		}
 		
-		protected Uniform(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
-		protected Uniform(long address)   { super(address, null); }
+		protected PushConstant(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
+		protected PushConstant(long address)   { super(address, null); }
 		@Override
-		protected Uniform create(long address, ByteBuffer container){ return new Uniform(address); }
+		protected PushConstant create(long address, ByteBuffer container){ return new PushConstant(address); }
 		@Override
 		public int sizeof(){ return SIZEOF; }
 	}
@@ -182,7 +180,6 @@ public class ByteGridRender implements VulkanResource{
 	
 	public static final class RenderResource implements VulkanResource{
 		
-		private UniformBuffer<Uniform>   uniform;
 		private VkDescriptorSet.PerFrame dsSets;
 		private BackedVkBuffer           bytesInfo;
 		
@@ -190,11 +187,7 @@ public class ByteGridRender implements VulkanResource{
 		
 		private int instanceCount;
 		
-		private boolean checkSmallBytes(int frameID) throws VulkanCodeException{
-			Matrix4f mat;
-			try(var mem = uniform.update(frameID)){
-				mat = mem.val.mat();
-			}
+		private boolean checkSmallBytes(Matrix4f mat){
 			var scale3 = new Vector3f();
 			mat.getScale(scale3);
 			var scale = scale3.x;
@@ -204,14 +197,12 @@ public class ByteGridRender implements VulkanResource{
 		
 		private void updateDescriptor(){
 			dsSets.updateAll(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, uniform),
-				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer)
+				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer)
 			));
 		}
 		@Override
 		public void destroy() throws VulkanCodeException{
-			if(uniform != null){
-				uniform.destroy();
+			if(bytesInfo != null){
 				dsSets.destroy();
 				bytesInfo.destroy();
 				indirectDrawBuff.destroy();
@@ -258,16 +249,15 @@ public class ByteGridRender implements VulkanResource{
 		
 		
 		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
-			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
-			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
 		);
 		var builder = VkPipeline.builder(core.renderPass, shader)
 		                        .blending(VkPipeline.Blending.STANDARD)
 		                        .multisampling(core.physicalDevice.samples, false)
 		                        .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                        .addDesriptorSetLayout(core.globalUniformLayout)
 		                        .addDesriptorSetLayout(dsLayoutConst)
-		                        .addDesriptorSetLayout(dsLayout);
+		                        .addDesriptorSetLayout(dsLayout)
+		                        .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZEOF);
 		pipeline = builder.build();
 		pipelineSimple = builder.specializationValue(VkShaderStageFlag.VERTEX, 0, true)
 		                        .build();
@@ -386,12 +376,8 @@ public class ByteGridRender implements VulkanResource{
 		if(to>Character.MAX_VALUE) throw new IllegalArgumentException("To can not be greater than Character.MAX_VALUE");
 	}
 	
-	public void record(RenderResource resource, int frameId, Matrix4f transform, int tileWidth) throws VulkanCodeException{
-		resource.uniform.update(frameId, u -> u.mat(transform).tileWidth(tileWidth));
-	}
-	public void record(RenderResource resource, Matrix4f transform, int tileWidth, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
-		if(resource.uniform == null){
-			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, false, Uniform::new);
+	public void record(RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+		if(resource.indirectDrawBuff == null){
 			resource.dsSets = dsLayout.createDescriptorSetsPerFrame();
 			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
 		}
@@ -454,19 +440,25 @@ public class ByteGridRender implements VulkanResource{
 			
 			resource.instanceCount = draws.buffer.position();
 		}
-		
-		resource.uniform.updateAll(u -> u.set(transform, tileWidth, theme));
 	}
 	
-	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, RenderResource resource) throws VulkanCodeException{
-		var small = resource.checkSmallBytes(frameID);
+	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
+		var small  = resource.checkSmallBytes(transform);
+		var extent = window.swapchain.extent;
 		
 		var pipeline = small? pipelineSimple : this.pipeline;
 		buf.bindPipeline(pipeline);
-		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
+		buf.setViewportScissor(new Rect2D(extent));
 		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, window.globalUniformSets.get(frameID), dsSetConst);
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 2, resource.dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSetConst, resource.dsSets.get(frameID));
+		
+		var mat = new Matrix4f().translate(-1, -1, 0)
+		                        .scale(2F/extent.width, 2F/extent.height, 1)
+		                        .mul(transform);
+		
+		var data = ByteBuffer.allocateDirect(PushConstant.SIZEOF);
+		new PushConstant(data).set(mat, tileWidth, theme);
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, data);
 		
 		buf.drawIndirect(resource.indirectDrawBuff, 0, resource.instanceCount);
 	}

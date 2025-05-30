@@ -147,7 +147,6 @@ public class LineRenderer implements VulkanResource{
 			resource.ibos = core.allocateHostBuffer(size.indexCount()*(long)indexSize, VkBufferUsageFlag.INDEX_BUFFER);
 		}
 		
-		core.device.waitIdle();
 		try(var vertsSes = resource.vbos.updateAs(Vert.Buf::new);
 		    var indeciesSes = resource.ibos.update()){
 			var verts    = vertsSes.val;

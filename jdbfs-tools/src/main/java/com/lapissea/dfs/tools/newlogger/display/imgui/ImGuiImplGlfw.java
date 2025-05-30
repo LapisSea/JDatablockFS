@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.LogUtil;
 import imgui.ImDrawData;
@@ -650,6 +651,19 @@ public class ImGuiImplGlfw{
 		}
 	}
 	
+	public void poolWindowEvents(){
+		var platformIO = ImGui.getPlatformIO();
+		for(var v : Iters.range(0, platformIO.getViewportsSize()).mapToObj(platformIO::getViewports)){
+			if(v.hasFlags(ImGuiViewportFlags.IsMinimized)) continue;
+			if(!(v.getPlatformUserData() instanceof ViewportData vd) || vd.window == null) continue;
+			var win = vd.window.getGlfwWindow();
+			if(!win.isCreated()) continue;
+			win.grabContext();
+			win.pollEvents();
+			LogUtil.println(win);
+		}
+	}
+	
 	public void newFrame(){
 		final ImGuiIO io = ImGui.getIO();
 		
@@ -973,9 +987,16 @@ public class ImGuiImplGlfw{
 				try(var ignore = buf.beginRenderPass(
 					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(buf, frameID, win.imguiResource, dd);
+					imGUIRenderer.submit(buf, frameID, win.imguiResource[frameID], dd);
 				}
 			});
+		}
+	}
+	
+	private static final class SwapBuffersFunction extends ImPlatformFuncViewport{
+		@Override
+		public void accept(final ImGuiViewport vp){
+			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
 		}
 	}
 	
@@ -996,6 +1017,7 @@ public class ImGuiImplGlfw{
 		platformIO.setPlatformGetWindowMinimized(new GetWindowMinimizedFunction());
 		platformIO.setPlatformSetWindowAlpha(new SetWindowAlphaFunction());
 		platformIO.setPlatformRenderWindow(new RenderWindowFunction());
+		platformIO.setPlatformSwapBuffers(new SwapBuffersFunction());
 		
 		// Register main window handle (which is owned by the main application, not by us)
 		// This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.

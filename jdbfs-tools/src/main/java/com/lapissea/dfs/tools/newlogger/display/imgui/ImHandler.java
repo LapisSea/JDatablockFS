@@ -9,8 +9,7 @@ import imgui.flag.ImGuiConfigFlags;
 
 public class ImHandler{
 	
-	
-	ImGuiImplGlfw imGuiImplGlfw;
+	private final ImGuiImplGlfw imGuiImplGlfw;
 	
 	public ImHandler(VulkanCore core, VulkanWindow window, ImGUIRenderer imGuiRenderer){
 		ImGui.setCurrentContext(ImGui.createContext());
@@ -22,6 +21,10 @@ public class ImHandler{
 		
 		imGuiImplGlfw = new ImGuiImplGlfw(core, imGuiRenderer);
 		imGuiImplGlfw.init(window, true);
+	}
+	
+	public void poolWindowEvents(){
+		imGuiImplGlfw.poolWindowEvents();
 	}
 	
 	public void renderAll(){

@@ -34,18 +34,14 @@ struct Vert {
 #endif
 
 
-layout (set = 0, binding = 0) readonly uniform GlobalUniforms {
-	mat4 projectionMat;
-} gUbo;
+layout (set = 0, binding = 0) readonly buffer Verts { Vert data[]; } in_verts;
 
-layout (set = 1, binding = 0) readonly buffer Verts { Vert data[]; } in_verts;
-
-layout (set = 2, binding = 0) readonly uniform Uniforms {
-	mat4 modelMat;
-	int tileWidth;
+layout (push_constant) uniform Uniforms {
+	mat4 mvpMat;
 	uvec4 flagColors;
+	int tileWidth;
 } ubo;
-layout (set = 2, binding = 1) readonly buffer Bytes { Byte data[]; } in_bytes;
+layout (set = 1, binding = 0) readonly buffer Bytes { Byte data[]; } in_bytes;
 
 layout (location = 0) out vec4 colOut;
 
@@ -93,7 +89,7 @@ void main() {
 	uint tileX = index % ubo.tileWidth;
 	uint tileY = index / ubo.tileWidth;
 
-	gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * ubo.modelMat * vec4(vt.x + tileX, vt.y + tileY, 0, 1.0);
+	gl_Position =ubo.mvpMat * vec4( vt.x + tileX, vt.y + tileY, 0, 1.0);
 
 	vec4 col = toVec4(byt.color);
 	if (vt.type == T_BACK) {

@@ -50,10 +50,14 @@ public class VulkanWindow implements AutoCloseable{
 	private final CommandPool         cmdPool;
 	public        List<CommandBuffer> graphicsBuffs;
 	
-	public final ImGUIRenderer.RenderResource imguiResource = new ImGUIRenderer.RenderResource();
+	public final ImGUIRenderer.RenderResource[] imguiResource = new ImGUIRenderer.RenderResource[VulkanCore.MAX_IN_FLIGHT_FRAMES];
 	
 	public VulkanWindow(VulkanCore core, boolean decorated) throws VulkanCodeException{
 		this.core = core;
+		
+		for(int i = 0; i<imguiResource.length; i++){
+			imguiResource[i] = new ImGUIRenderer.RenderResource();
+		}
 		
 		window = new GlfwWindow();
 		window.title.set("DFS visual debugger");
@@ -193,7 +197,8 @@ public class VulkanWindow implements AutoCloseable{
 		globalUniformSets.destroy();
 		globalUniforms.destroy();
 		
-		imguiResource.destroy();
+		for(var renderResource : imguiResource) renderResource.destroy();
+		
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();
