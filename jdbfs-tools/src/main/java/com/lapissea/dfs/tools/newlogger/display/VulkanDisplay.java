@@ -11,6 +11,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
@@ -24,6 +25,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
 import java.io.File;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -115,20 +117,12 @@ public class VulkanDisplay implements AutoCloseable{
 			handleResize(window);
 			return;
 		}
-		try{
-			renderQueue(window);
-		}catch(VulkanCodeException e){
-			switch(e.code){
-				case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
-					handleResize(window);
-				}
-				default -> throw new RuntimeException("Failed to render frame", e);
-			}
-		}
+		var swap = renderQueue(window);
+		core.pushSwap(swap);
 	}
 	
-	private void renderQueue(VulkanWindow window) throws VulkanCodeException{
-		window.renderQueue((win, frameID, buf, fb) -> {
+	private VulkanQueue.SwapSync.PresentFrame renderQueue(VulkanWindow window) throws VulkanCodeException{
+		var present = window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 			try(var ignore = buf.beginRenderPass(core.renderPass, fb, win.swapchain.extent.asRect(), clearColor)){
 				recordToBuff(win, buf, frameID);
 			}
@@ -139,6 +133,7 @@ public class VulkanDisplay implements AutoCloseable{
 			core.device.waitIdle();
 			w.show();
 		}
+		return present;
 	}
 	
 	private boolean resizing;
@@ -150,9 +145,10 @@ public class VulkanDisplay implements AutoCloseable{
 			if(window.swapchain == null){
 				return;
 			}
-			
+			core.device.waitIdle();
 			try{
-				renderQueue(window);
+				var swap = renderQueue(window);
+				core.renderQueue.present(List.of(swap));
 			}catch(VulkanCodeException e2){
 				switch(e2.code){
 					case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> { }
@@ -278,13 +274,19 @@ public class VulkanDisplay implements AutoCloseable{
 		var imHandler = new ImHandler(core, this.window, imGUIRenderer);
 //		Thread.ofPlatform().start(() -> {
 		try{
+			var lastTime = Instant.now();
 			while(!window.shouldClose()){
+				while(Duration.between(lastTime, Instant.now()).compareTo(Duration.ofMillis(6))<0) UtilL.sleep(1);
+				lastTime = Instant.now();
+				
 				window.grabContext();
 				window.pollEvents();
-				
-				imHandler.renderAll();
+				imHandler.doFrame();
 				
 				render(this.window);
+				imHandler.renderViewports();
+				
+				core.executeSwaps();
 			}
 		}catch(Throwable e){
 			e.printStackTrace();

@@ -27,17 +27,20 @@ public class ImHandler{
 		imGuiImplGlfw.poolWindowEvents();
 	}
 	
-	public void renderAll(){
+	public void doFrame(){
 		imGuiImplGlfw.newFrame();
 		ImGui.newFrame();
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
 		ImGui.showDemoWindow();
 		ImGui.showMetricsWindow();
 		ImGui.render();
-		
+	}
+	
+	public void renderViewports(){
 		ImGui.updatePlatformWindows();
 		ImGui.renderPlatformWindowsDefault();
 	}
+	
 	public void close(){
 		imGuiImplGlfw.shutdown();
 	}

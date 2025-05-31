@@ -627,4 +627,14 @@ public class VulkanCore implements AutoCloseable{
 		if(debugLog != null) debugLog.destroy();
 		VK10.vkDestroyInstance(instance, null);
 	}
+	
+	private final List<VulkanQueue.SwapSync.PresentFrame> present = new ArrayList<>();
+	
+	public void pushSwap(VulkanQueue.SwapSync.PresentFrame presentFrame){
+		present.add(presentFrame);
+	}
+	public void executeSwaps() throws VulkanCodeException{
+		renderQueue.present(present);
+		present.clear();
+	}
 }

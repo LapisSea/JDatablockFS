@@ -1,14 +1,19 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkResult;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkSubmitInfo;
+
+import java.util.List;
 
 import static com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore.MAX_IN_FLIGHT_FRAMES;
 
@@ -63,16 +68,52 @@ public class VulkanQueue implements VulkanResource{
 			}
 		}
 		
-		public void present(Swapchain swapchain, int index, int frame) throws VulkanCodeException{
+		public record PresentFrame(VulkanWindow window, int index, VkSemaphore renderCompleteSemaphore){ }
+		
+		public PresentFrame makePresentFrame(VulkanWindow window, int index, int frame){
+			return new PresentFrame(window, index, renderComplete[frame]);
+		}
+		public void present(List<PresentFrame> presentFrames) throws VulkanCodeException{
 			try(var stack = MemoryStack.stackPush()){
+				
+				var semaphores = stack.mallocLong(presentFrames.size());
+				var swapchains = stack.mallocLong(presentFrames.size());
+				var indices    = stack.mallocInt(presentFrames.size());
+				var results    = stack.mallocInt(presentFrames.size());
+				
 				var info = VkPresentInfoKHR.calloc(stack);
 				info.sType$Default()
-				    .pWaitSemaphores(stack.longs(renderComplete[frame].handle))
-				    .swapchainCount(1)
-				    .pSwapchains(stack.longs(swapchain.handle))
-				    .pImageIndices(stack.ints(index));
+				    .pWaitSemaphores(semaphores)
+				    .swapchainCount(presentFrames.size())
+				    .pSwapchains(swapchains)
+				    .pImageIndices(indices)
+				    .pResults(results);
 				
-				VKCalls.vkQueuePresentKHR(value, info);
+				for(var f : presentFrames){
+					semaphores.put(f.renderCompleteSemaphore.handle);
+					swapchains.put(f.window.swapchain.handle);
+					indices.put(f.index);
+				}
+				try{
+					VKCalls.vkQueuePresentKHR(value, info);
+				}catch(VulkanCodeException e){
+					var errs = Iters.ofInts(results).mapToObj(VkResult::from);
+					for(var ent : errs.enumerate().filter(v -> v.val() != VkResult.SUCCESS)){
+						var err    = ent.val();
+						var window = presentFrames.get(ent.index()).window;
+						
+						if(err == VkResult.SUBOPTIMAL_KHR || err == VkResult.ERROR_OUT_OF_DATE_KHR){
+							device.waitIdle();
+							window.recreateSwapchainContext();
+							continue;
+						}
+						throw new VulkanCodeException(
+							"vkQueuePresentKHR: " +
+							errs.enumerate((i, v) -> "  " + presentFrames.get(i).window + " : " + v).joinAsStr("\n"),
+							err
+						);
+					}
+				}
 			}
 		}
 		

@@ -84,7 +84,7 @@ public class VulkanWindow implements AutoCloseable{
 		void record(VulkanWindow window, int frameID, CommandBuffer buf, FrameBuffer fb) throws VulkanCodeException;
 	}
 	
-	public void renderQueue(FillBuffer fillBuffer) throws VulkanCodeException{
+	public VulkanQueue.SwapSync.PresentFrame renderQueueNoSwap(FillBuffer fillBuffer) throws VulkanCodeException{
 		var frame = renderQueue.nextFrame();
 		renderQueue.waitForFrameDone(frame);
 		
@@ -99,7 +99,7 @@ public class VulkanWindow implements AutoCloseable{
 		buf.end();
 		
 		renderQueue.submitFrame(buf, frame);
-		renderQueue.present(swapchain, index, frame);
+		return renderQueue.makePresentFrame(this, index, frame);
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{

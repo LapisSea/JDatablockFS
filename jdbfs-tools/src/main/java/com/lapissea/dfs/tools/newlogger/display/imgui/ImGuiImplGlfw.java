@@ -983,13 +983,15 @@ public class ImGuiImplGlfw{
 			}
 		}
 		private void render(ViewportData vd, ImDrawData dd) throws VulkanCodeException{
-			vd.window.renderQueue((win, frameID, buf, fb) -> {
+			var swap = vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 				try(var ignore = buf.beginRenderPass(
 					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
 					imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), dd);
 				}
 			});
+			
+			core.pushSwap(swap);
 		}
 	}
 	
