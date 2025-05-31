@@ -16,6 +16,7 @@ public class ImHandler{
 		
 		ImGuiIO io = ImGui.getIO();
 		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.ViewportsEnable);
+		io.setConfigDockingTransparentPayload(true);
 		
 		ImTools.setupFont("/CourierPrime/Regular/font.ttf");
 		

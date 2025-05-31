@@ -121,6 +121,8 @@ public class ImGUIRenderer implements VulkanResource{
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
+		if(drawData.isNotValidPtr()) return;
+		
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
 		var sizeOfIndex  = ImDrawData.sizeOfImDrawIdx();
 		
