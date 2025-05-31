@@ -49,7 +49,7 @@ import static org.lwjgl.glfw.GLFW.*;
  * It supports clipboard, gamepad, mouse and keyboard in the same way the original Dear ImGui code does. You can copy-paste this class in your codebase and
  * modify the rendering routine in the way you'd like.
  */
-public class ImGuiImplGlfw{
+public class ImGuiImpl{
 	
 	private sealed interface NativeImpl{
 		final class Unknown implements NativeImpl{
@@ -124,7 +124,7 @@ public class ImGuiImplGlfw{
 	private final VulkanCore    core;
 	private final ImGUIRenderer imGUIRenderer;
 	
-	public ImGuiImplGlfw(VulkanCore core, ImGUIRenderer imGUIRenderer){
+	public ImGuiImpl(VulkanCore core, ImGUIRenderer imGUIRenderer){
 		this.core = core;
 		this.imGUIRenderer = imGUIRenderer;
 	}
@@ -770,15 +770,15 @@ public class ImGuiImplGlfw{
 		
 		gWindow.focused.register(e -> windowFocusCallback(windowH, e));
 		
-		glfwSetCursorEnterCallback(windowH, ImGuiImplGlfw.this::cursorEnterCallback);
-		glfwSetCursorPosCallback(windowH, ImGuiImplGlfw.this::cursorPosCallback);
-		glfwSetMouseButtonCallback(windowH, ImGuiImplGlfw.this::mouseButtonCallback);
-		glfwSetScrollCallback(windowH, ImGuiImplGlfw.this::scrollCallback);
-		glfwSetKeyCallback(windowH, ImGuiImplGlfw.this::keyCallback);
-		glfwSetCharCallback(windowH, ImGuiImplGlfw.this::charCallback);
-		glfwSetWindowCloseCallback(windowH, ImGuiImplGlfw.this::windowCloseCallback);
-		glfwSetWindowPosCallback(windowH, ImGuiImplGlfw.this::windowPosCallback);
-		glfwSetWindowSizeCallback(windowH, ImGuiImplGlfw.this::windowSizeCallback);
+		glfwSetCursorEnterCallback(windowH, ImGuiImpl.this::cursorEnterCallback);
+		glfwSetCursorPosCallback(windowH, ImGuiImpl.this::cursorPosCallback);
+		glfwSetMouseButtonCallback(windowH, ImGuiImpl.this::mouseButtonCallback);
+		glfwSetScrollCallback(windowH, ImGuiImpl.this::scrollCallback);
+		glfwSetKeyCallback(windowH, ImGuiImpl.this::keyCallback);
+		glfwSetCharCallback(windowH, ImGuiImpl.this::charCallback);
+		glfwSetWindowCloseCallback(windowH, ImGuiImpl.this::windowCloseCallback);
+		glfwSetWindowPosCallback(windowH, ImGuiImpl.this::windowPosCallback);
+		glfwSetWindowSizeCallback(windowH, ImGuiImpl.this::windowSizeCallback);
 	}
 	
 	private void destroyWindow(ImGuiViewport vp){

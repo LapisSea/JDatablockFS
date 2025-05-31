@@ -9,7 +9,7 @@ import imgui.flag.ImGuiConfigFlags;
 
 public class ImHandler{
 	
-	private final ImGuiImplGlfw imGuiImplGlfw;
+	private final ImGuiImpl imGuiImpl;
 	
 	public ImHandler(VulkanCore core, VulkanWindow window, ImGUIRenderer imGuiRenderer){
 		ImGui.setCurrentContext(ImGui.createContext());
@@ -22,16 +22,16 @@ public class ImHandler{
 		
 		ImTools.setupFont("/CourierPrime/Regular/font.ttf");
 		
-		imGuiImplGlfw = new ImGuiImplGlfw(core, imGuiRenderer);
-		imGuiImplGlfw.init(window, true);
+		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
+		imGuiImpl.init(window, true);
 	}
 	
 	public void poolWindowEvents(){
-		imGuiImplGlfw.poolWindowEvents();
+		imGuiImpl.poolWindowEvents();
 	}
 	
 	public void doFrame(){
-		imGuiImplGlfw.newFrame();
+		imGuiImpl.newFrame();
 		ImGui.newFrame();
 		renderImGUI();
 		ImGui.render();
@@ -49,7 +49,7 @@ public class ImHandler{
 	}
 	
 	public void close(){
-		imGuiImplGlfw.shutdown();
+		imGuiImpl.shutdown();
 	}
 	
 }
