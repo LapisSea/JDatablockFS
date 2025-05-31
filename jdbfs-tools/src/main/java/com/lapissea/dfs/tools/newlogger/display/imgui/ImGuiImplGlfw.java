@@ -6,19 +6,11 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
-import com.lapissea.util.LogUtil;
-import imgui.ImDrawData;
 import imgui.ImGui;
 import imgui.ImGuiIO;
 import imgui.ImGuiPlatformIO;
 import imgui.ImGuiViewport;
 import imgui.ImVec2;
-import imgui.callback.ImPlatformFuncViewport;
-import imgui.callback.ImPlatformFuncViewportFloat;
-import imgui.callback.ImPlatformFuncViewportImVec2;
-import imgui.callback.ImPlatformFuncViewportString;
-import imgui.callback.ImPlatformFuncViewportSuppBoolean;
-import imgui.callback.ImPlatformFuncViewportSuppImVec2;
 import imgui.callback.ImStrConsumer;
 import imgui.callback.ImStrSupplier;
 import imgui.flag.ImGuiBackendFlags;
@@ -28,6 +20,7 @@ import imgui.flag.ImGuiMouseButton;
 import imgui.flag.ImGuiMouseCursor;
 import imgui.flag.ImGuiViewportFlags;
 import imgui.lwjgl3.glfw.ImGuiImplGlfwNative;
+import org.joml.Vector2i;
 import org.joml.Vector4f;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.Callbacks;
@@ -56,14 +49,53 @@ import static org.lwjgl.glfw.GLFW.*;
  * It supports clipboard, gamepad, mouse and keyboard in the same way the original Dear ImGui code does. You can copy-paste this class in your codebase and
  * modify the rendering routine in the way you'd like.
  */
-@SuppressWarnings({"checkstyle:DesignForExtension", "checkstyle:NeedBraces", "checkstyle:LocalVariableName", "checkstyle:FinalLocalVariable", "checkstyle:ParameterName", "checkstyle:EmptyBlock", "checkstyle:AvoidNestedBlocks"})
 public class ImGuiImplGlfw{
-	protected static final String  OS         = System.getProperty("os.name", "generic").toLowerCase();
-	protected static final boolean IS_WINDOWS = OS.contains("win");
-	protected static final boolean IS_APPLE   = OS.contains("mac") || OS.contains("darwin");
+	
+	private sealed interface NativeImpl{
+		final class Unknown implements NativeImpl{
+			@Override
+			public void initNativeWindowHandle(ImGuiViewport viewport){ }
+			@Override
+			public void hideFromTaskbar(ImGuiViewport viewport){ }
+		}
+		
+		final class Win implements NativeImpl{
+			@Override
+			public void initNativeWindowHandle(ImGuiViewport viewport){
+				viewport.setPlatformHandleRaw(GLFWNativeWin32.glfwGetWin32Window(viewport.getPlatformHandle()));
+			}
+			@Override
+			public void hideFromTaskbar(ImGuiViewport viewport){
+				ImGuiImplGlfwNative.win32hideFromTaskBar(viewport.getPlatformHandleRaw());
+			}
+		}
+		
+		final class Apple implements NativeImpl{
+			@Override
+			public void initNativeWindowHandle(ImGuiViewport viewport){
+				viewport.setPlatformHandleRaw(GLFWNativeCocoa.glfwGetCocoaWindow(viewport.getPlatformHandle()));
+			}
+			@Override
+			public void hideFromTaskbar(ImGuiViewport viewport){
+				//TODO: do something here? Not sure. I'm not an apple user
+			}
+		}
+		
+		void initNativeWindowHandle(ImGuiViewport viewport);
+		void hideFromTaskbar(ImGuiViewport viewport);
+	}
+	
+	private static final NativeImpl NATIVE;
+	
+	static{
+		String os = System.getProperty("os.name", "generic").toLowerCase();
+		if(os.contains("win")) NATIVE = new NativeImpl.Win();
+		else if(os.contains("mac") || os.contains("darwin")) NATIVE = new NativeImpl.Apple();
+		else NATIVE = new NativeImpl.Unknown();
+	}
 	
 	/**
-	 * Data class to store implementation specific fields.
+	 * Data class to store implementation-specific fields.
 	 * Same as {@code ImGui_ImplGlfw_Data}.
 	 */
 	protected static class Data{
@@ -86,51 +118,9 @@ public class ImGuiImplGlfw{
 		protected GLFWKeyCallback         prevUserCallbackKey;
 		protected GLFWCharCallback        prevUserCallbackChar;
 		protected GLFWMonitorCallback     prevUserCallbackMonitor;
-		
-		// This field is required to use GLFW with touch screens on Windows.
-		// For compatibility reasons it was added here as a comment. But we don't use somewhere in the binding implementation.
-		// protected long glfwWndProc;
-	}
-	
-	/**
-	 * Internal class to store containers for frequently used arrays.
-	 * This class helps minimize the number of object allocations on the JVM side,
-	 * thereby improving performance and reducing garbage collection overhead.
-	 */
-	private static final class Properties{
-		private final int[] windowW  = new int[1];
-		private final int[] windowH  = new int[1];
-		private final int[] windowX  = new int[1];
-		private final int[] windowY  = new int[1];
-		private final int[] displayW = new int[1];
-		private final int[] displayH = new int[1];
-		
-		// For mouse tracking
-		private final ImVec2   mousePosPrev = new ImVec2();
-		private final double[] mouseX       = new double[1];
-		private final double[] mouseY       = new double[1];
-		
-		// Monitor properties
-		private final int[]   monitorX              = new int[1];
-		private final int[]   monitorY              = new int[1];
-		private final int[]   monitorWorkAreaX      = new int[1];
-		private final int[]   monitorWorkAreaY      = new int[1];
-		private final int[]   monitorWorkAreaWidth  = new int[1];
-		private final int[]   monitorWorkAreaHeight = new int[1];
-		private final float[] monitorContentScaleX  = new float[1];
-		private final float[] monitorContentScaleY  = new float[1];
-		
-		// For char translation
-		private final String charNames = "`-=[]\\,;'./";
-		private final int[]  charKeys  = {
-			GLFW_KEY_GRAVE_ACCENT, GLFW_KEY_MINUS, GLFW_KEY_EQUAL, GLFW_KEY_LEFT_BRACKET,
-			GLFW_KEY_RIGHT_BRACKET, GLFW_KEY_BACKSLASH, GLFW_KEY_COMMA, GLFW_KEY_SEMICOLON,
-			GLFW_KEY_APOSTROPHE, GLFW_KEY_PERIOD, GLFW_KEY_SLASH
-		};
 	}
 	
 	protected     Data          data;
-	private final Properties    props = new Properties();
 	private final VulkanCore    core;
 	private final ImGUIRenderer imGUIRenderer;
 	
@@ -139,28 +129,9 @@ public class ImGuiImplGlfw{
 		this.imGUIRenderer = imGUIRenderer;
 	}
 	
-	protected ImStrSupplier getClipboardTextFn(){
-		return new ImStrSupplier(){
-			@Override
-			public String get(){
-				final String clipboardString = glfwGetClipboardString(data.window.getGlfwWindow().getHandle());
-				return clipboardString != null? clipboardString : "";
-			}
-		};
-	}
-	
-	protected ImStrConsumer setClipboardTextFn(){
-		return new ImStrConsumer(){
-			@Override
-			public void accept(final String text){
-				glfwSetClipboardString(data.window.getGlfwWindow().getHandle(), text);
-			}
-		};
-	}
-	
 	// X11 does not include current pressed/released modifier key in 'mods' flags submitted by GLFW
 	// See https://github.com/ocornut/imgui/issues/6034 and https://github.com/glfw/glfw/issues/1630
-	protected void updateKeyModifiers(final long window){
+	protected void updateKeyModifiers(long window){
 		final ImGuiIO io = ImGui.getIO();
 		io.addKeyEvent(ImGuiKey.ModCtrl, (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS));
 		io.addKeyEvent(ImGuiKey.ModShift, (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS));
@@ -168,11 +139,11 @@ public class ImGuiImplGlfw{
 		io.addKeyEvent(ImGuiKey.ModSuper, (glfwGetKey(window, GLFW_KEY_LEFT_SUPER) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SUPER) == GLFW_PRESS));
 	}
 	
-	protected boolean shouldChainCallback(final long window){
+	protected boolean shouldChainCallback(long window){
 		return data.callbacksChainForAllWindows || (window == data.window.getGlfwWindow().getHandle());
 	}
 	
-	public void mouseButtonCallback(final long window, final int button, final int action, final int mods){
+	public void mouseButtonCallback(long window, int button, int action, int mods){
 		if(data.prevUserCallbackMousebutton != null && shouldChainCallback(window)){
 			data.prevUserCallbackMousebutton.invoke(window, button, action, mods);
 		}
@@ -185,7 +156,7 @@ public class ImGuiImplGlfw{
 		}
 	}
 	
-	public void scrollCallback(final long window, final double xOffset, final double yOffset){
+	public void scrollCallback(long window, double xOffset, double yOffset){
 		if(data.prevUserCallbackScroll != null && shouldChainCallback(window)){
 			data.prevUserCallbackScroll.invoke(window, xOffset, yOffset);
 		}
@@ -194,7 +165,13 @@ public class ImGuiImplGlfw{
 		io.addMouseWheelEvent((float)xOffset, (float)yOffset);
 	}
 	
-	protected int translateUntranslatedKey(final int key, final int scancode){
+	private static final String charNames = "`-=[]\\,;'./";
+	private static final int[]  charKeys  = {
+		GLFW_KEY_GRAVE_ACCENT, GLFW_KEY_MINUS, GLFW_KEY_EQUAL, GLFW_KEY_LEFT_BRACKET,
+		GLFW_KEY_RIGHT_BRACKET, GLFW_KEY_BACKSLASH, GLFW_KEY_COMMA, GLFW_KEY_SEMICOLON,
+		GLFW_KEY_APOSTROPHE, GLFW_KEY_PERIOD, GLFW_KEY_SLASH
+	};
+	protected int translateUntranslatedKey(int key, int scancode){
 		
 		// GLFW 3.1+ attempts to "untranslate" keys, which goes the opposite of what every other framework does, making using lettered shortcuts difficult.
 		// (It had reasons to do so: namely GLFW is/was more likely to be used for WASD-type game controls rather than lettered shortcuts, but IHMO the 3.1 change could have been done differently)
@@ -209,16 +186,14 @@ public class ImGuiImplGlfw{
 		final String keyName   = glfwGetKeyName(key, scancode);
 		eatErrors();
 		if(keyName != null && keyName.length()>2 && keyName.charAt(0) != 0 && keyName.charAt(1) == 0){
-			if(keyName.charAt(0)>='0' && keyName.charAt(0)<='9'){
-				resultKey = GLFW_KEY_0 + (keyName.charAt(0) - '0');
-			}else if(keyName.charAt(0)>='A' && keyName.charAt(0)<='Z'){
-				resultKey = GLFW_KEY_A + (keyName.charAt(0) - 'A');
-			}else if(keyName.charAt(0)>='a' && keyName.charAt(0)<='z'){
-				resultKey = GLFW_KEY_A + (keyName.charAt(0) - 'a');
-			}else{
-				final int index = props.charNames.indexOf(keyName.charAt(0));
+			char ch = keyName.charAt(0);
+			if(ch>='0' && ch<='9') resultKey = GLFW_KEY_0 + (ch - '0');
+			else if(ch>='A' && ch<='Z') resultKey = GLFW_KEY_A + (ch - 'A');
+			else if(ch>='a' && ch<='z') resultKey = GLFW_KEY_A + (ch - 'a');
+			else{
+				final int index = charNames.indexOf(ch);
 				if(index != -1){
-					resultKey = props.charKeys[index];
+					resultKey = charKeys[index];
 				}
 			}
 		}
@@ -232,7 +207,7 @@ public class ImGuiImplGlfw{
 		MemoryUtil.memFree(pb);
 	}
 	
-	public void keyCallback(final long window, final int keycode, final int scancode, final int action, final int mods){
+	public void keyCallback(long window, int keycode, int scancode, int action, int mods){
 		if(data.prevUserCallbackKey != null && shouldChainCallback(window)){
 			data.prevUserCallbackKey.invoke(window, keycode, scancode, action, mods);
 		}
@@ -255,7 +230,7 @@ public class ImGuiImplGlfw{
 		io.setKeyEventNativeData(imguiKey, key, scancode); // To support legacy indexing (<1.87 user code)
 	}
 	
-	public void windowFocusCallback(final long window, final boolean focused){
+	public void windowFocusCallback(long window, boolean focused){
 		if(data.prevUserCallbackWindowFocus != null && shouldChainCallback(window)){
 			data.prevUserCallbackWindowFocus.invoke(window, focused);
 		}
@@ -263,7 +238,13 @@ public class ImGuiImplGlfw{
 		ImGui.getIO().addFocusEvent(focused);
 	}
 	
-	public void cursorPosCallback(final long window, final double x, final double y){
+	private static Vector2i getWindowPos(long window){
+		int[] xp = {0}, yp = {0};
+		glfwGetWindowPos(window, xp, yp);
+		return new Vector2i(xp[0], yp[0]);
+	}
+	
+	public void cursorPosCallback(long window, double x, double y){
 		if(data.prevUserCallbackCursorPos != null && shouldChainCallback(window)){
 			data.prevUserCallbackCursorPos.invoke(window, x, y);
 		}
@@ -274,9 +255,9 @@ public class ImGuiImplGlfw{
 		final ImGuiIO io = ImGui.getIO();
 		
 		if(io.hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)){
-			glfwGetWindowPos(window, props.windowX, props.windowY);
-			posX += props.windowX[0];
-			posY += props.windowY[0];
+			var pos = getWindowPos(window);
+			posX += pos.x;
+			posY += pos.y;
 		}
 		
 		io.addMousePosEvent(posX, posY);
@@ -285,7 +266,7 @@ public class ImGuiImplGlfw{
 	
 	// Workaround: X11 seems to send spurious Leave/Enter events which would make us lose our position,
 	// so we back it up and restore on Leave/Enter (see https://github.com/ocornut/imgui/issues/4984)
-	public void cursorEnterCallback(final long window, final boolean entered){
+	public void cursorEnterCallback(long window, boolean entered){
 		if(data.prevUserCallbackCursorEnter != null && shouldChainCallback(window)){
 			data.prevUserCallbackCursorEnter.invoke(window, entered);
 		}
@@ -358,30 +339,38 @@ public class ImGuiImplGlfw{
 	 * We cannot set this to 'true' by default because user callbacks code may be not testing the 'window' parameter of their callback.
 	 * If you set this to 'true' your user callback code will need to make sure you are testing the 'window' parameter.
 	 */
-	public void setCallbacksChainForAllWindows(final boolean chainForAllWindows){
+	public void setCallbacksChainForAllWindows(boolean chainForAllWindows){
 		data.callbacksChainForAllWindows = chainForAllWindows;
 	}
 	
-	protected Data newData(){
-		return new Data();
-	}
-	
-	public boolean init(VulkanWindow window, final boolean installCallbacks){
+	public boolean init(VulkanWindow window, boolean installCallbacks){
 		final ImGuiIO io = ImGui.getIO();
 		
 		io.setBackendPlatformName("imgui-java_impl_glfw-lsvk");
-		io.addBackendFlags(ImGuiBackendFlags.HasMouseCursors|ImGuiBackendFlags.HasSetMousePos|
-		                   ImGuiBackendFlags.PlatformHasViewports|ImGuiBackendFlags.RendererHasViewports
+		io.addBackendFlags(
+			ImGuiBackendFlags.HasMouseCursors|ImGuiBackendFlags.HasSetMousePos|
+			ImGuiBackendFlags.PlatformHasViewports|ImGuiBackendFlags.RendererHasViewports
 		);
 		io.addBackendFlags(ImGuiBackendFlags.HasMouseHoveredViewport);
 		
-		data = newData();
+		data = new Data();
 		data.window = window;
 		data.time = 0.0;
 		data.wantUpdateMonitors = true;
 		
-		io.setGetClipboardTextFn(getClipboardTextFn());
-		io.setSetClipboardTextFn(setClipboardTextFn());
+		io.setGetClipboardTextFn(new ImStrSupplier(){
+			@Override
+			public String get(){
+				final String clipboardString = glfwGetClipboardString(data.window.getGlfwWindow().getHandle());
+				return clipboardString != null? clipboardString : "";
+			}
+		});
+		io.setSetClipboardTextFn(new ImStrConsumer(){
+			@Override
+			public void accept(final String text){
+				glfwSetClipboardString(data.window.getGlfwWindow().getHandle(), text);
+			}
+		});
 		
 		// Create mouse cursors
 		// (By design, on X11 cursors are user configurable and some cursors may be missing. When a cursor doesn't exist,
@@ -412,12 +401,8 @@ public class ImGuiImplGlfw{
 		// Our mouse update function expect PlatformHandle to be filled for the main viewport
 		final ImGuiViewport mainViewport = ImGui.getMainViewport();
 		mainViewport.setPlatformHandle(data.window.getGlfwWindow().getHandle());
-		if(IS_WINDOWS){
-			mainViewport.setPlatformHandleRaw(GLFWNativeWin32.glfwGetWin32Window(data.window.getGlfwWindow().getHandle()));
-		}
-		if(IS_APPLE){
-			mainViewport.setPlatformHandleRaw(GLFWNativeCocoa.glfwGetCocoaWindow(data.window.getGlfwWindow().getHandle()));
-		}
+		NATIVE.initNativeWindowHandle(mainViewport);
+		
 		if(io.hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)){
 			initPlatformInterface();
 		}
@@ -428,7 +413,7 @@ public class ImGuiImplGlfw{
 	public void shutdown(){
 		final ImGuiIO io = ImGui.getIO();
 		
-		shutdownPlatformInterface();
+		ImGui.destroyPlatformWindows();
 		
 		if(data.installedCallbacks){
 			restoreCallbacks(data.window.getGlfwWindow().getHandle());
@@ -445,11 +430,13 @@ public class ImGuiImplGlfw{
 	}
 	
 	protected void updateMouseData(){
-		final ImGuiIO         io         = ImGui.getIO();
-		final ImGuiPlatformIO platformIO = ImGui.getPlatformIO();
+		var io         = ImGui.getIO();
+		var platformIO = ImGui.getPlatformIO();
 		
 		int mouseViewportId = 0;
-		io.getMousePos(props.mousePosPrev);
+		
+		var mousePosPrev = new ImVec2();
+		io.getMousePos(mousePosPrev);
 		
 		for(int n = 0; n<platformIO.getViewportsSize(); n++){
 			final ImGuiViewport viewport        = platformIO.getViewports(n);
@@ -460,20 +447,21 @@ public class ImGuiImplGlfw{
 				// (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
 				// When multi-viewports are enabled, all Dear ImGui positions are same as OS positions.
 				if(io.getWantSetMousePos()){
-					glfwSetCursorPos(window, props.mousePosPrev.x - viewport.getPosX(), props.mousePosPrev.y - viewport.getPosY());
+					glfwSetCursorPos(window, mousePosPrev.x - viewport.getPosX(), mousePosPrev.y - viewport.getPosY());
 				}
 				
 				// (Optional) Fallback to provide mouse position when focused (ImGui_ImplGlfw_CursorPosCallback already provides this when hovered or captured)
 				if(data.mouseWindow == -1){
-					glfwGetCursorPos(window, props.mouseX, props.mouseY);
-					double mouseX = props.mouseX[0];
-					double mouseY = props.mouseY[0];
+					double[] mx = {0}, my = {0};
+					glfwGetCursorPos(window, mx, my);
+					double mouseX = mx[0];
+					double mouseY = my[0];
 					if(io.hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)){
 						// Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when the mouse is on the upper-left corner of the app window)
 						// Multi-viewport mode: mouse position in OS absolute coordinates (io.MousePos is (0,0) when the mouse is on the upper-left of the primary monitor)
-						glfwGetWindowPos(window, props.windowX, props.windowY);
-						mouseX += props.windowX[0];
-						mouseY += props.windowY[0];
+						var pos = getWindowPos(window);
+						mouseX += pos.x;
+						mouseY += pos.y;
 					}
 					data.lastValidMousePos.set((float)mouseX, (float)mouseY);
 					io.addMousePosEvent((float)mouseX, (float)mouseY);
@@ -540,11 +528,6 @@ public class ImGuiImplGlfw{
 		void run(int keyNo, int axisNo, int _unused, float v0, float v1);
 	}
 	
-	@SuppressWarnings("ManualMinMaxCalculation")
-	private float saturate(final float v){
-		return v<0.0f? 0.0f : v>1.0f? 1.0f : v;
-	}
-	
 	protected void updateGamepads(){
 		final ImGuiIO io = ImGui.getIO();
 		
@@ -565,7 +548,7 @@ public class ImGuiImplGlfw{
 			mapAnalog = (keyNo, axisNo, _unused, v0, v1) -> {
 				float v = gamepad.axes(axisNo);
 				v = (v - v0)/(v1 - v0);
-				io.addKeyAnalogEvent(keyNo, v>0.10f, saturate(v));
+				io.addKeyAnalogEvent(keyNo, v>0.10f, Math.max(0, Math.min(v, 1)));
 			};
 		}
 		
@@ -597,10 +580,10 @@ public class ImGuiImplGlfw{
 	}
 	
 	protected void updateMonitors(){
-		final ImGuiPlatformIO platformIO = ImGui.getPlatformIO();
+		var platformIO = ImGui.getPlatformIO();
 		data.wantUpdateMonitors = false;
 		
-		final PointerBuffer monitors = glfwGetMonitors();
+		var monitors = glfwGetMonitors();
 		if(monitors == null){
 			System.err.println("Unable to get monitors!");
 			return;
@@ -619,10 +602,11 @@ public class ImGuiImplGlfw{
 				continue;
 			}
 			
-			glfwGetMonitorPos(monitor, props.monitorX, props.monitorY);
+			int[] mx = {0}, my = {0};
+			glfwGetMonitorPos(monitor, mx, my);
 			
-			final float mainPosX  = props.monitorX[0];
-			final float mainPosY  = props.monitorY[0];
+			final float mainPosX  = mx[0];
+			final float mainPosY  = my[0];
 			final float mainSizeX = vidMode.width();
 			final float mainSizeY = vidMode.height();
 			
@@ -632,20 +616,22 @@ public class ImGuiImplGlfw{
 			float workSizeY = 0;
 			
 			// Workaround a small GLFW issue reporting zero on monitor changes: https://github.com/glfw/glfw/pull/1761
-			glfwGetMonitorWorkarea(monitor, props.monitorWorkAreaX, props.monitorWorkAreaY, props.monitorWorkAreaWidth, props.monitorWorkAreaHeight);
-			if(props.monitorWorkAreaWidth[0]>0 && props.monitorWorkAreaHeight[0]>0){
-				workPosX = props.monitorWorkAreaX[0];
-				workPosY = props.monitorWorkAreaY[0];
-				workSizeX = props.monitorWorkAreaWidth[0];
-				workSizeY = props.monitorWorkAreaHeight[0];
+			int[] monitorWorkAreaX = {0}, monitorWorkAreaY = {0}, monitorWorkAreaWidth = {0}, monitorWorkAreaHeight = {0};
+			glfwGetMonitorWorkarea(monitor, monitorWorkAreaX, monitorWorkAreaY, monitorWorkAreaWidth, monitorWorkAreaHeight);
+			if(monitorWorkAreaWidth[0]>0 && monitorWorkAreaHeight[0]>0){
+				workPosX = monitorWorkAreaX[0];
+				workPosY = monitorWorkAreaY[0];
+				workSizeX = monitorWorkAreaWidth[0];
+				workSizeY = monitorWorkAreaHeight[0];
 			}
 			
 			float dpiScale = 0;
 			
 			// Warning: the validity of monitor DPI information on Windows depends on the application DPI awareness settings,
 			// which generally needs to be set in the manifest or at runtime.
-			glfwGetMonitorContentScale(monitor, props.monitorContentScaleX, props.monitorContentScaleY);
-			dpiScale = props.monitorContentScaleX[0];
+			float[] monitorContentScaleX = {0}, monitorContentScaleY = {0};
+			glfwGetMonitorContentScale(monitor, monitorContentScaleX, monitorContentScaleY);
+			dpiScale = (monitorContentScaleX[0] + monitorContentScaleY[0])/2;
 			
 			platformIO.pushMonitors(monitor, mainPosX, mainPosY, mainSizeX, mainSizeY, workPosX, workPosY, workSizeX, workSizeY, dpiScale);
 		}
@@ -660,25 +646,22 @@ public class ImGuiImplGlfw{
 			if(!win.isCreated()) continue;
 			win.grabContext();
 			win.pollEvents();
-			LogUtil.println(win);
 		}
 	}
 	
 	public void newFrame(){
-		final ImGuiIO io = ImGui.getIO();
+		var io = ImGui.getIO();
 		
 		// Setup display size (every frame to accommodate for window resizing)
-		var size = data.window.getGlfwWindow().size;
-		props.windowW[0] = size.x();
-		props.windowH[0] = size.y();
-		var sSize = data.window.swapchain.extent;
-		props.displayW[0] = sSize.width;
-		props.displayH[0] = sSize.height;
+		var   size         = data.window.getGlfwWindow().size;
+		float windowWidth  = size.x();
+		float windowHeight = size.y();
+		var   displaySize  = data.window.swapchain.extent;
 		
-		io.setDisplaySize((float)props.windowW[0], (float)props.windowH[0]);
-		if(props.windowW[0]>0 && props.windowH[0]>0){
-			final float scaleX = (float)props.displayW[0]/props.windowW[0];
-			final float scaleY = (float)props.displayH[0]/props.windowH[0];
+		io.setDisplaySize(windowWidth, windowHeight);
+		if(windowWidth>0 && windowHeight>0){
+			var scaleX = displaySize.width/windowWidth;
+			var scaleY = displaySize.height/windowHeight;
 			io.setDisplayFramebufferScale(scaleX, scaleY);
 		}
 		
@@ -732,17 +715,11 @@ public class ImGuiImplGlfw{
 	// Because the event doesn't always fire on glfwSetWindowXXX() we use a frame counter tag to only
 	// ignore recent glfwSetWindowXXX() calls.
 	private void windowPosCallback(final long windowId, final int xPos, final int yPos){
-		final ImGuiViewport vp = ImGui.findViewportByPlatformHandle(windowId);
-		if(vp.isNotValidPtr()){
-			return;
-		}
+		var vp = ImGui.findViewportByPlatformHandle(windowId);
+		if(vp.isNotValidPtr()) return;
 		
-		final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-		if(vd != null){
-			final boolean ignoreEvent = (ImGui.getFrameCount()<=vd.ignoreWindowPosEventFrame + 1);
-			if(ignoreEvent){
-				return;
-			}
+		if(vp.getPlatformUserData() instanceof ViewportData vd && ImGui.getFrameCount()<=vd.ignoreWindowPosEventFrame + 1){
+			return;
 		}
 		
 		vp.setPlatformRequestMove(true);
@@ -750,288 +727,195 @@ public class ImGuiImplGlfw{
 	
 	private void windowSizeCallback(final long windowId, final int width, final int height){
 		final ImGuiViewport vp = ImGui.findViewportByPlatformHandle(windowId);
-		if(vp.isNotValidPtr()){
-			return;
-		}
+		if(vp.isNotValidPtr()) return;
 		
-		final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-		if(vd != null){
-			final boolean ignoreEvent = (ImGui.getFrameCount()<=vd.ignoreWindowSizeEventFrame + 1);
-			if(ignoreEvent){
-				return;
-			}
+		if(vp.getPlatformUserData() instanceof ViewportData vd && ImGui.getFrameCount()<=vd.ignoreWindowSizeEventFrame + 1){
+			return;
 		}
 		
 		vp.setPlatformRequestResize(true);
 	}
 	
-	private final class CreateWindowFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = new ViewportData();
-			vp.setPlatformUserData(vd);
+	private void createWindow(ImGuiViewport vp){
+		final ViewportData vd = new ViewportData();
+		vp.setPlatformUserData(vd);
+		
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+		glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
+		glfwWindowHint(GLFW_DECORATED, vp.hasFlags(ImGuiViewportFlags.NoDecoration)? GLFW_FALSE : GLFW_TRUE);
+		glfwWindowHint(GLFW_FLOATING, vp.hasFlags(ImGuiViewportFlags.TopMost)? GLFW_TRUE : GLFW_FALSE);
+		
+		VulkanWindow w;
+		try{
+			w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration));
+			var ww = w.getGlfwWindow();
+			ww.size.set((int)vp.getSizeX(), (int)vp.getSizeY());
+			ww.title.set("No Title Yet");
+		}catch(Throwable e){
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+		
+		vd.window = w;
+		vd.windowOwned = true;
+		
+		var gWindow = vd.window.getGlfwWindow();
+		var windowH = gWindow.getHandle();
+		
+		vp.setPlatformHandle(windowH);
+		NATIVE.initNativeWindowHandle(vp);
+		
+		gWindow.pos.set((int)vp.getPosX(), (int)vp.getPosY());
+		
+		gWindow.focused.register(e -> windowFocusCallback(windowH, e));
+		
+		glfwSetCursorEnterCallback(windowH, ImGuiImplGlfw.this::cursorEnterCallback);
+		glfwSetCursorPosCallback(windowH, ImGuiImplGlfw.this::cursorPosCallback);
+		glfwSetMouseButtonCallback(windowH, ImGuiImplGlfw.this::mouseButtonCallback);
+		glfwSetScrollCallback(windowH, ImGuiImplGlfw.this::scrollCallback);
+		glfwSetKeyCallback(windowH, ImGuiImplGlfw.this::keyCallback);
+		glfwSetCharCallback(windowH, ImGuiImplGlfw.this::charCallback);
+		glfwSetWindowCloseCallback(windowH, ImGuiImplGlfw.this::windowCloseCallback);
+		glfwSetWindowPosCallback(windowH, ImGuiImplGlfw.this::windowPosCallback);
+		glfwSetWindowSizeCallback(windowH, ImGuiImplGlfw.this::windowSizeCallback);
+	}
+	
+	private void destroyWindow(ImGuiViewport vp){
+		if(vp.getPlatformUserData() instanceof ViewportData vd && vd.windowOwned){
+			var wHandle = vd.window.getGlfwWindow().getHandle();
 			
-			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-			glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
-			glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-			glfwWindowHint(GLFW_DECORATED, vp.hasFlags(ImGuiViewportFlags.NoDecoration)? GLFW_FALSE : GLFW_TRUE);
-			glfwWindowHint(GLFW_FLOATING, vp.hasFlags(ImGuiViewportFlags.TopMost)? GLFW_TRUE : GLFW_FALSE);
-
-//			long parentWindow = 0;
-//			if(vp.getParentViewportId() != 0){
-//				var parentViewport = ImGui.findViewportByID(vp.getParentViewportId());
-//				var uvd            = (ViewportData)parentViewport.getPlatformUserData();
-//				parentWindow = uvd.window.getGlfwWindow().getHandle();
-//			}
+			// Release any keys that were pressed in the window being destroyed and are still held down,
+			// because we will not receive any release events after window is destroyed.
+			for(int i = 0; i<data.keyOwnerWindows.length; i++){
+				if(data.keyOwnerWindows[i] == wHandle){
+					keyCallback(wHandle, i, 0, GLFW_RELEASE, 0); // Later params are only used for main viewport, on which this function is never called.
+				}
+			}
 			
-			VulkanWindow w;
+			Callbacks.glfwFreeCallbacks(wHandle);
 			try{
-				w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration));
-				var ww = w.getGlfwWindow();
-				ww.size.set((int)vp.getSizeX(), (int)vp.getSizeY());
-				ww.title.set("No Title Yet");
-			}catch(Throwable e){
-				e.printStackTrace();
-				throw new RuntimeException(e);
-			}
-			
-			vd.window = w;
-
-//			vd.window = glfwCreateWindow((int)vp.getSizeX(), (int)vp.getSizeY(), "No Title Yet", NULL, data.window); TODO: implement the last argument window "share"
-			vd.windowOwned = true;
-			
-			var gWindow = vd.window.getGlfwWindow();
-			var windowH = gWindow.getHandle();
-			
-			vp.setPlatformHandle(windowH);
-			
-			if(IS_WINDOWS){
-				vp.setPlatformHandleRaw(GLFWNativeWin32.glfwGetWin32Window(windowH));
-			}else if(IS_APPLE){
-				vp.setPlatformHandleRaw(GLFWNativeCocoa.glfwGetCocoaWindow(windowH));
-			}
-			
-			gWindow.pos.set((int)vp.getPosX(), (int)vp.getPosY());
-			
-			gWindow.focused.register(e -> windowFocusCallback(windowH, e));
-			
-			glfwSetCursorEnterCallback(windowH, ImGuiImplGlfw.this::cursorEnterCallback);
-			glfwSetCursorPosCallback(windowH, ImGuiImplGlfw.this::cursorPosCallback);
-			glfwSetMouseButtonCallback(windowH, ImGuiImplGlfw.this::mouseButtonCallback);
-			glfwSetScrollCallback(windowH, ImGuiImplGlfw.this::scrollCallback);
-			glfwSetKeyCallback(windowH, ImGuiImplGlfw.this::keyCallback);
-			glfwSetCharCallback(windowH, ImGuiImplGlfw.this::charCallback);
-			glfwSetWindowCloseCallback(windowH, ImGuiImplGlfw.this::windowCloseCallback);
-			glfwSetWindowPosCallback(windowH, ImGuiImplGlfw.this::windowPosCallback);
-			glfwSetWindowSizeCallback(windowH, ImGuiImplGlfw.this::windowSizeCallback);
-		}
-	}
-	
-	private final class DestroyWindowFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			var vd = (ViewportData)vp.getPlatformUserData();
-			
-			if(vd != null && vd.windowOwned){
-				var wHandle = vd.window.getGlfwWindow().getHandle();
-				
-				// Release any keys that were pressed in the window being destroyed and are still held down,
-				// because we will not receive any release events after window is destroyed.
-				for(int i = 0; i<data.keyOwnerWindows.length; i++){
-					if(data.keyOwnerWindows[i] == wHandle){
-						keyCallback(wHandle, i, 0, GLFW_RELEASE, 0); // Later params are only used for main viewport, on which this function is never called.
-					}
-				}
-				
-				Callbacks.glfwFreeCallbacks(wHandle);
-				try{
-					vd.window.close();
-				}catch(VulkanCodeException e){
-					throw new RuntimeException(e);
-				}
-			}
-			
-			
-			vp.setPlatformHandle(-1);
-			vp.setPlatformUserData(null);
-		}
-	}
-	
-	private static final class ShowWindowFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd == null){
-				return;
-			}
-			
-			if(IS_WINDOWS && vp.hasFlags(ImGuiViewportFlags.NoTaskBarIcon)){
-				ImGuiImplGlfwNative.win32hideFromTaskBar(vp.getPlatformHandleRaw());
-			}
-			
-			vd.window.getGlfwWindow().show();
-			LogUtil.println("ShowWindowFunction", vd.window.getGlfwWindow());
-		}
-	}
-	
-	private static final class GetWindowPosFunction extends ImPlatformFuncViewportSuppImVec2{
-		@Override
-		public void get(final ImGuiViewport vp, final ImVec2 dst){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd == null){
-				return;
-			}
-			var pos = vd.window.getGlfwWindow().pos;
-			dst.set(pos.x(), pos.y());
-		}
-	}
-	
-	private static final class SetWindowPosFunction extends ImPlatformFuncViewportImVec2{
-		@Override
-		public void accept(final ImGuiViewport vp, final ImVec2 value){
-			final ViewportData vd = (ViewportData)vp.getPlatformUserData();
-			if(vd == null){
-				return;
-			}
-			vd.ignoreWindowPosEventFrame = ImGui.getFrameCount();
-			vd.window.getGlfwWindow().pos.set((int)value.x, (int)value.y);
-		}
-	}
-	
-	private static final class GetWindowSizeFunction extends ImPlatformFuncViewportSuppImVec2{
-		@Override
-		public void get(final ImGuiViewport vp, final ImVec2 dst){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			var size = vd.window.getGlfwWindow().size;
-			dst.x = size.x();
-			dst.y = size.y();
-			LogUtil.println("GetWindowSizeFunction", vd.window.getGlfwWindow());
-		}
-	}
-	
-	private static final class SetWindowSizeFunction extends ImPlatformFuncViewportImVec2{
-		@Override
-		public void accept(final ImGuiViewport vp, final ImVec2 value){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			vd.ignoreWindowSizeEventFrame = ImGui.getFrameCount();
-			vd.window.getGlfwWindow().size.set((int)value.x, (int)value.y);
-		}
-	}
-	
-	private static final class SetWindowTitleFunction extends ImPlatformFuncViewportString{
-		@Override
-		public void accept(final ImGuiViewport vp, final String value){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			vd.window.getGlfwWindow().title.set(value);
-		}
-	}
-	
-	private static final class SetWindowFocusFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			vd.window.getGlfwWindow().focus();
-		}
-	}
-	
-	private static final class GetWindowFocusFunction extends ImPlatformFuncViewportSuppBoolean{
-		@Override
-		public boolean get(final ImGuiViewport vp){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
-			return vd.window.getGlfwWindow().isFocused();
-		}
-	}
-	
-	private static final class GetWindowMinimizedFunction extends ImPlatformFuncViewportSuppBoolean{
-		@Override
-		public boolean get(final ImGuiViewport vp){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
-			return vd.window.getGlfwWindow().isIconified();
-		}
-	}
-	
-	private static final class SetWindowAlphaFunction extends ImPlatformFuncViewportFloat{
-		@Override
-		public void accept(final ImGuiViewport vp, final float value){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			glfwSetWindowOpacity(vd.window.getGlfwWindow().getHandle(), value);
-		}
-	}
-	
-	private final class RenderWindowFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-			vd.window.getGlfwWindow().grabContext();
-			vd.window.getGlfwWindow().pollEvents();
-			try{
-				var dd = vp.getDrawData();
-				
-				try{
-					render(vd, dd);
-				}catch(VulkanCodeException e){
-					switch(e.code){
-						case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> {
-							vd.window.recreateSwapchainContext();
-							render(vd, dd);
-						}
-						default -> throw new RuntimeException("Failed to render frame", e);
-					}
-				}
+				vd.window.close();
 			}catch(VulkanCodeException e){
 				throw new RuntimeException(e);
 			}
 		}
-		private void render(ViewportData vd, ImDrawData dd) throws VulkanCodeException{
-			var swap = vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
+		
+		vp.setPlatformHandle(-1);
+		vp.setPlatformUserData(null);
+	}
+	
+	private void showWindow(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		
+		if(vp.hasFlags(ImGuiViewportFlags.NoTaskBarIcon)){
+			NATIVE.hideFromTaskbar(vp);
+		}
+		
+		vd.window.getGlfwWindow().show();
+	}
+	
+	private void getWindowPos(ImGuiViewport vp, ImVec2 dst){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)){ return; }
+		var pos = vd.window.getGlfwWindow().pos;
+		dst.set(pos.x(), pos.y());
+	}
+	private void setWindowPos(ImGuiViewport vp, ImVec2 value){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)){ return; }
+		vd.ignoreWindowPosEventFrame = ImGui.getFrameCount();
+		vd.window.getGlfwWindow().pos.set((int)value.x, (int)value.y);
+	}
+	
+	private void getWindowSize(ImGuiViewport vp, ImVec2 dst){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		var size = vd.window.getGlfwWindow().size;
+		dst.x = size.x();
+		dst.y = size.y();
+	}
+	private void setWindowSize(ImGuiViewport vp, ImVec2 value){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		vd.ignoreWindowSizeEventFrame = ImGui.getFrameCount();
+		vd.window.getGlfwWindow().size.set((int)value.x, (int)value.y);
+	}
+	
+	private void setWindowTitle(ImGuiViewport vp, String value){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		vd.window.getGlfwWindow().title.set(value);
+	}
+	
+	private void setWindowFocus(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		vd.window.getGlfwWindow().focus();
+	}
+	private boolean getWindowFocus(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
+		return vd.window.getGlfwWindow().isFocused();
+	}
+	
+	private boolean getWindowMinimized(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return false;
+		return vd.window.getGlfwWindow().isIconified();
+	}
+	
+	private void setWindowAlpha(ImGuiViewport vp, float value){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		glfwSetWindowOpacity(vd.window.getGlfwWindow().getHandle(), value);
+	}
+	
+	private void renderWindow(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
+		vd.window.getGlfwWindow().grabContext();
+		vd.window.getGlfwWindow().pollEvents();
+		try{
+			core.pushSwap(vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 				try(var ignore = buf.beginRenderPass(
 					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), dd);
+					imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), vp.getDrawData());
 				}
-			});
-			
-			core.pushSwap(swap);
+			}));
+		}catch(VulkanCodeException e){
+			throw new RuntimeException(e);
 		}
 	}
 	
-	private static final class SwapBuffersFunction extends ImPlatformFuncViewport{
-		@Override
-		public void accept(final ImGuiViewport vp){
-			if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-		}
+	private float getWindowDpiScale(ImGuiViewport vp){
+		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return 1;
+		var     window = vd.window.getGlfwWindow().getHandle();
+		float[] x      = {1}, y = {1};
+		glfwGetWindowContentScale(window, x, y);
+		return (x[0] + y[0])/2;
 	}
 	
 	protected void initPlatformInterface(){
 		final ImGuiPlatformIO platformIO = ImGui.getPlatformIO();
 		
+		
 		// Register platform interface (will be coupled with a renderer interface)
-		platformIO.setPlatformCreateWindow(new CreateWindowFunction());
-		platformIO.setPlatformDestroyWindow(new DestroyWindowFunction());
-		platformIO.setPlatformShowWindow(new ShowWindowFunction());
-		platformIO.setPlatformGetWindowPos(new GetWindowPosFunction());
-		platformIO.setPlatformSetWindowPos(new SetWindowPosFunction());
-		platformIO.setPlatformGetWindowSize(new GetWindowSizeFunction());
-		platformIO.setPlatformSetWindowSize(new SetWindowSizeFunction());
-		platformIO.setPlatformSetWindowTitle(new SetWindowTitleFunction());
-		platformIO.setPlatformSetWindowFocus(new SetWindowFocusFunction());
-		platformIO.setPlatformGetWindowFocus(new GetWindowFocusFunction());
-		platformIO.setPlatformGetWindowMinimized(new GetWindowMinimizedFunction());
-		platformIO.setPlatformSetWindowAlpha(new SetWindowAlphaFunction());
-		platformIO.setPlatformRenderWindow(new RenderWindowFunction());
-		platformIO.setPlatformSwapBuffers(new SwapBuffersFunction());
+		platformIO.setPlatformCreateWindow(ImTools.ImPlatformFuncViewport(this::createWindow));
+		platformIO.setPlatformDestroyWindow(ImTools.ImPlatformFuncViewport(this::destroyWindow));
+		platformIO.setPlatformShowWindow(ImTools.ImPlatformFuncViewport(this::showWindow));
+		platformIO.setPlatformGetWindowPos(ImTools.ImPlatformFuncViewportSuppImVec2(this::getWindowPos));
+		platformIO.setPlatformSetWindowPos(ImTools.ImPlatformFuncViewportImVec2(this::setWindowPos));
+		platformIO.setPlatformGetWindowSize(ImTools.ImPlatformFuncViewportSuppImVec2(this::getWindowSize));
+		platformIO.setPlatformSetWindowSize(ImTools.ImPlatformFuncViewportImVec2(this::setWindowSize));
+		platformIO.setPlatformSetWindowFocus(ImTools.ImPlatformFuncViewport(this::setWindowFocus));
+		platformIO.setPlatformGetWindowFocus(ImTools.ImPlatformFuncViewportSuppBoolean(this::getWindowFocus));
+		platformIO.setPlatformGetWindowMinimized(ImTools.ImPlatformFuncViewportSuppBoolean(this::getWindowMinimized));
+		platformIO.setPlatformSetWindowTitle(ImTools.ImPlatformFuncViewportString(this::setWindowTitle));
+		platformIO.setPlatformSetWindowAlpha(ImTools.ImPlatformFuncViewportFloat(this::setWindowAlpha));
+//		platformIO.setPlatformUpdateWindow(ImTools.ImPlatformFuncViewport(this::updateWindow));
+		platformIO.setPlatformRenderWindow(ImTools.ImPlatformFuncViewport(this::renderWindow));
+//		platformIO.setPlatformSwapBuffers(ImTools.ImPlatformFuncViewport(this::swapBuffers));
+		platformIO.setPlatformGetWindowDpiScale(ImTools.ImPlatformFuncViewportSuppFloat(this::getWindowDpiScale));
 		
 		// Register main window handle (which is owned by the main application, not by us)
 		// This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.
-		final ImGuiViewport mainViewport = ImGui.getMainViewport();
-		final ViewportData  vd           = new ViewportData();
+		var mainViewport = ImGui.getMainViewport();
+		var vd           = new ViewportData();
 		vd.window = data.window;
 		vd.windowOwned = false;
 		mainViewport.setPlatformUserData(vd);
 		mainViewport.setPlatformHandle(data.window.getGlfwWindow().getHandle());
-	}
-	
-	protected void shutdownPlatformInterface(){
-		ImGui.destroyPlatformWindows();
 	}
 }

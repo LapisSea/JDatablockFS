@@ -15,8 +15,10 @@ public class ImHandler{
 		ImGui.setCurrentContext(ImGui.createContext());
 		
 		ImGuiIO io = ImGui.getIO();
-		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.ViewportsEnable);
+		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.ViewportsEnable|
+		                  ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos);
 		io.setConfigDockingTransparentPayload(true);
+		
 		
 		ImTools.setupFont("/CourierPrime/Regular/font.ttf");
 		
@@ -31,10 +33,14 @@ public class ImHandler{
 	public void doFrame(){
 		imGuiImplGlfw.newFrame();
 		ImGui.newFrame();
+		renderImGUI();
+		ImGui.render();
+	}
+	
+	private static void renderImGUI(){
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
 		ImGui.showDemoWindow();
 		ImGui.showMetricsWindow();
-		ImGui.render();
 	}
 	
 	public void renderViewports(){

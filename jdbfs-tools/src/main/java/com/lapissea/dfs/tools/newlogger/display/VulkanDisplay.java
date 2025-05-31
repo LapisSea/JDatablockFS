@@ -303,7 +303,7 @@ public class VulkanDisplay implements AutoCloseable{
 //
 //			window.grabContext();
 //			window.pollEvents();
-////			imHandler.poolWindowEvents();
+//  //		imHandler.poolWindowEvents();
 //		});
 	}
 	private void requestClose(){

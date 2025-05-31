@@ -2,6 +2,15 @@ package com.lapissea.dfs.tools.newlogger.display.imgui;
 
 import com.lapissea.dfs.tools.DisplayManager;
 import imgui.ImGui;
+import imgui.ImGuiViewport;
+import imgui.ImVec2;
+import imgui.callback.ImPlatformFuncViewport;
+import imgui.callback.ImPlatformFuncViewportFloat;
+import imgui.callback.ImPlatformFuncViewportImVec2;
+import imgui.callback.ImPlatformFuncViewportString;
+import imgui.callback.ImPlatformFuncViewportSuppBoolean;
+import imgui.callback.ImPlatformFuncViewportSuppFloat;
+import imgui.callback.ImPlatformFuncViewportSuppImVec2;
 import imgui.flag.ImGuiKey;
 
 import java.util.Objects;
@@ -9,6 +18,77 @@ import java.util.Objects;
 import static org.lwjgl.glfw.GLFW.*;
 
 public final class ImTools{
+	
+	interface IImPlatformFuncViewport{
+		void accept(ImGuiViewport vp);
+	}
+	
+	static ImPlatformFuncViewport ImPlatformFuncViewport(IImPlatformFuncViewport fn){
+		return new ImPlatformFuncViewport(){
+			@Override
+			public void accept(ImGuiViewport vp){ fn.accept(vp); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportSuppImVec2{
+		void get(ImGuiViewport vp, ImVec2 dstImVec2);
+	}
+	static ImPlatformFuncViewportSuppImVec2 ImPlatformFuncViewportSuppImVec2(IImPlatformFuncViewportSuppImVec2 fn){
+		return new ImPlatformFuncViewportSuppImVec2(){
+			@Override
+			public void get(ImGuiViewport vp, ImVec2 dstImVec2){ fn.get(vp, dstImVec2); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportImVec2{
+		void accept(ImGuiViewport vp, ImVec2 imVec2);
+	}
+	static ImPlatformFuncViewportImVec2 ImPlatformFuncViewportImVec2(IImPlatformFuncViewportImVec2 fn){
+		return new ImPlatformFuncViewportImVec2(){
+			@Override
+			public void accept(ImGuiViewport vp, ImVec2 imVec2){ fn.accept(vp, imVec2); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportString{
+		void accept(ImGuiViewport vp, String str);
+	}
+	static ImPlatformFuncViewportString ImPlatformFuncViewportString(IImPlatformFuncViewportString fn){
+		return new ImPlatformFuncViewportString(){
+			@Override
+			public void accept(ImGuiViewport vp, String str){ fn.accept(vp, str); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportSuppBoolean{
+		boolean get(ImGuiViewport vp);
+	}
+	static ImPlatformFuncViewportSuppBoolean ImPlatformFuncViewportSuppBoolean(IImPlatformFuncViewportSuppBoolean fn){
+		return new ImPlatformFuncViewportSuppBoolean(){
+			@Override
+			public boolean get(ImGuiViewport vp){ return fn.get(vp); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportFloat{
+		void accept(ImGuiViewport vp, float f);
+	}
+	static ImPlatformFuncViewportFloat ImPlatformFuncViewportFloat(IImPlatformFuncViewportFloat fn){
+		return new ImPlatformFuncViewportFloat(){
+			@Override
+			public void accept(ImGuiViewport vp, float f){ fn.accept(vp, f); }
+		};
+	}
+	
+	interface IImPlatformFuncViewportSuppFloat{
+		float get(ImGuiViewport vp);
+	}
+	static ImPlatformFuncViewportSuppFloat ImPlatformFuncViewportSuppFloat(IImPlatformFuncViewportSuppFloat fn){
+		return new ImPlatformFuncViewportSuppFloat(){
+			@Override
+			public float get(ImGuiViewport vp){ return fn.get(vp); }
+		};
+	}
 	
 	public static int glfwKeyToImGuiKey(final int glfwKey){
 		return switch(glfwKey){
