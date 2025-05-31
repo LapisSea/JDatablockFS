@@ -5,6 +5,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.util.ZeroArrays;
 
+import java.nio.IntBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
@@ -53,6 +54,16 @@ public interface IterableIntPP{
 		public boolean hasNext(){ return i<data.length; }
 		@Override
 		public int nextInt(){ return data[i++]; }
+	}
+	
+	final class BuffIter implements IntIterator{
+		private final IntBuffer data;
+		private       int       i;
+		public BuffIter(IntBuffer data){ this.data = data; }
+		@Override
+		public boolean hasNext(){ return i<data.limit(); }
+		@Override
+		public int nextInt(){ return data.get(i++); }
 	}
 	
 	final class SingleIter implements IntIterator{
