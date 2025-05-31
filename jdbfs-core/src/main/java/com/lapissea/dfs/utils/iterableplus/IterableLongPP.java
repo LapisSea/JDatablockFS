@@ -3,6 +3,7 @@ package com.lapissea.dfs.utils.iterableplus;
 import com.lapissea.dfs.Utils;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 
+import java.nio.LongBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -51,6 +52,16 @@ public interface IterableLongPP{
 		public boolean hasNext(){ return i<data.length; }
 		@Override
 		public long nextLong(){ return data[i++]; }
+	}
+	
+	final class BuffIter implements LongIterator{
+		private final LongBuffer data;
+		private       int        i;
+		public BuffIter(LongBuffer data){ this.data = data; }
+		@Override
+		public boolean hasNext(){ return i<data.limit(); }
+		@Override
+		public long nextLong(){ return data.get(i++); }
 	}
 	
 	final class SingleIter implements LongIterator{

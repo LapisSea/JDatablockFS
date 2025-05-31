@@ -4,6 +4,8 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.TextUtil;
 
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -444,6 +446,18 @@ public final class Iters{
 			};
 		};
 	}
+	public static IterableLongPP ofLongs(LongBuffer data){
+		return switch(data.remaining()){
+			case 0 -> IterableLongPP.empty();
+			case 1 -> ofLongs(data.get(data.position()));
+			default -> new IterableLongPP.SizedPP.Default(){
+				@Override
+				public OptionalInt getSize(){ return OptionalInt.of(data.remaining()); }
+				@Override
+				public LongIterator iterator(){ return new IterableLongPP.BuffIter(data); }
+			};
+		};
+	}
 	public static IterableIntPP ofInts(int element){
 		return new IterableIntPP.SizedPP.Default(){
 			@Override
@@ -464,6 +478,18 @@ public final class Iters{
 				public OptionalInt getSize(){ return OptionalInt.of(data.length); }
 				@Override
 				public IntIterator iterator(){ return new IterableIntPP.ArrayIter(data); }
+			};
+		};
+	}
+	public static IterableIntPP ofInts(IntBuffer data){
+		return switch(data.remaining()){
+			case 0 -> IterableIntPP.empty();
+			case 1 -> ofInts(data.get(data.position()));
+			default -> new IterableIntPP.SizedPP.Default(){
+				@Override
+				public OptionalInt getSize(){ return OptionalInt.of(data.remaining()); }
+				@Override
+				public IntIterator iterator(){ return new IterableIntPP.BuffIter(data); }
 			};
 		};
 	}

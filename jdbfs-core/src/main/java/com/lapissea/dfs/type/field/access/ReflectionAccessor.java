@@ -23,7 +23,7 @@ public final class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	private final Method getter;
 	private final Method setter;
 	
-	public ReflectionAccessor(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType){
+	private ReflectionAccessor(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType){
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		this.field = field;
 		genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
