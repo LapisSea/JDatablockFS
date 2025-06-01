@@ -407,6 +407,10 @@ public class ImGuiImpl{
 			initPlatformInterface();
 		}
 		
+		try{
+			cachedClosedWindow = new VulkanWindow(core, false, false);
+		}catch(VulkanCodeException e){ throw new RuntimeException(e); }
+		
 		return true;
 	}
 	
@@ -414,6 +418,13 @@ public class ImGuiImpl{
 		final ImGuiIO io = ImGui.getIO();
 		
 		ImGui.destroyPlatformWindows();
+		
+		if(cachedClosedWindow != null){
+			try{
+				cachedClosedWindow.close();
+			}catch(VulkanCodeException e){ throw new RuntimeException(e); }
+			cachedClosedWindow = null;
+		}
 		
 		if(data.installedCallbacks){
 			restoreCallbacks(data.window.getGlfwWindow().getHandle());
@@ -736,6 +747,8 @@ public class ImGuiImpl{
 		vp.setPlatformRequestResize(true);
 	}
 	
+	private VulkanWindow cachedClosedWindow;
+	
 	private void createWindow(ImGuiViewport vp){
 		final ViewportData vd = new ViewportData();
 		vp.setPlatformUserData(vd);
@@ -745,7 +758,14 @@ public class ImGuiImpl{
 		
 		VulkanWindow w;
 		try{
-			w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration));
+			if(cachedClosedWindow == null){
+				w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration), vp.hasFlags(ImGuiViewportFlags.TopMost));
+			}else{
+				w = cachedClosedWindow;
+				cachedClosedWindow = null;
+				glfwSetWindowAttrib(w.getGlfwWindow().getHandle(), GLFW_FLOATING, vp.hasFlags(ImGuiViewportFlags.TopMost)? GLFW_TRUE : GLFW_FALSE);
+				glfwSetWindowAttrib(w.getGlfwWindow().getHandle(), GLFW_DECORATED, !vp.hasFlags(ImGuiViewportFlags.NoDecoration)? GLFW_TRUE : GLFW_FALSE);
+			}
 			var ww = w.getGlfwWindow();
 			ww.size.set((int)vp.getSizeX(), (int)vp.getSizeY());
 			ww.title.set("No Title Yet");
@@ -791,10 +811,15 @@ public class ImGuiImpl{
 			}
 			
 			Callbacks.glfwFreeCallbacks(wHandle);
-			try{
-				vd.window.close();
-			}catch(VulkanCodeException e){
-				throw new RuntimeException(e);
+			if(cachedClosedWindow == null){
+				cachedClosedWindow = vd.window;
+				cachedClosedWindow.getGlfwWindow().hide();
+			}else{
+				try{
+					vd.window.close();
+				}catch(VulkanCodeException e){
+					throw new RuntimeException(e);
+				}
 			}
 		}
 		
