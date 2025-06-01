@@ -740,11 +740,8 @@ public class ImGuiImpl{
 		final ViewportData vd = new ViewportData();
 		vp.setPlatformUserData(vd);
 		
-		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 		glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
 		glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-		glfwWindowHint(GLFW_DECORATED, vp.hasFlags(ImGuiViewportFlags.NoDecoration)? GLFW_FALSE : GLFW_TRUE);
-		glfwWindowHint(GLFW_FLOATING, vp.hasFlags(ImGuiViewportFlags.TopMost)? GLFW_TRUE : GLFW_FALSE);
 		
 		VulkanWindow w;
 		try{

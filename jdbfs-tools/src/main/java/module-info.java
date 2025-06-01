@@ -3,7 +3,7 @@ module JDatablockFS.tools {
 	requires org.joml;
 	requires JDatablockFS.core;
 	requires jlapisutil;
-	requires glfw.window;
+	requires GLFWWindow;
 	requires jlapisvector;
 	requires org.lwjgl.glfw;
 	requires org.lwjgl.opengl;

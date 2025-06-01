@@ -54,9 +54,8 @@ public class VulkanWindow implements AutoCloseable{
 	public final List<ImGUIRenderer.RenderResource> imguiResource
 		= Iters.rangeMap(0, VulkanCore.MAX_IN_FLIGHT_FRAMES, i -> new ImGUIRenderer.RenderResource()).toList();
 	
-	public VulkanWindow(VulkanCore core, boolean decorated) throws VulkanCodeException{
+	public VulkanWindow(VulkanCore core, boolean decorated, boolean alwaysOnTop) throws VulkanCodeException{
 		this.core = core;
-		
 		
 		window = new GlfwWindow();
 		window.title.set("DFS visual debugger");
@@ -64,7 +63,9 @@ public class VulkanWindow implements AutoCloseable{
 		
 		window.init(i -> i.withVulkan(v -> v.withVersion(VulkanCore.API_VERSION_MAJOR, VulkanCore.API_VERSION_MINOR))
 		                  .decorated(decorated)
+		                  .alwaysOnTop(alwaysOnTop)
 		                  .resizeable(true));
+		
 		Thread.ofVirtual().start(() -> window.setIcon(createVulkanIcon(128, 128)));
 		
 		surface = VKCalls.glfwCreateWindowSurface(core.instance, window.getHandle());

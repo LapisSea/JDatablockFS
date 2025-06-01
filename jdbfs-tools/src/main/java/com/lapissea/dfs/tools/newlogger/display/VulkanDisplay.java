@@ -99,7 +99,7 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private VulkanWindow createMainWindow() throws VulkanCodeException{
-		var window = new VulkanWindow(core, true);
+		var window = new VulkanWindow(core, true, false);
 		
 		var win = window.getGlfwWindow();
 		win.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
