@@ -5,7 +5,10 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import imgui.ImGui;
 import imgui.ImGuiIO;
+import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
+import imgui.flag.ImGuiWindowFlags;
+import imgui.type.ImBoolean;
 
 public class ImHandler{
 	
@@ -37,10 +40,27 @@ public class ImHandler{
 		ImGui.render();
 	}
 	
-	private static void renderImGUI(){
+	
+	private void renderImGUI(){
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
+		
+		showFps();
+		
 		ImGui.showDemoWindow();
 		ImGui.showMetricsWindow();
+	}
+	
+	private static void showFps(){
+		ImGui.setNextWindowPos(ImGui.getMainViewport().getPos());
+		
+		int flags = ImGuiWindowFlags.NoDecoration|ImGuiWindowFlags.AlwaysAutoResize|
+		            ImGuiWindowFlags.NoFocusOnAppearing|ImGuiWindowFlags.NoNav|ImGuiWindowFlags.NoDocking|ImGuiWindowFlags.NoInputs;
+		ImGui.begin("FPS Overlay", new ImBoolean(true), flags|ImGuiWindowFlags.NoBackground);
+		
+		ImVec2 pos     = ImGui.getWindowPos();
+		var    hovered = ImGui.isMouseHoveringRect(pos, pos.plus(ImGui.getWindowSize()));
+		ImGui.textColored(hovered? 0x55FFFFFF : 0xFFFFFFFF, String.format("FPS: %.1f", ImGui.getIO().getFramerate()));
+		ImGui.end();
 	}
 	
 	public void renderViewports(){
