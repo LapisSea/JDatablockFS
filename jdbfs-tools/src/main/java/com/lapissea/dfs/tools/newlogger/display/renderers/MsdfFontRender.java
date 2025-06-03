@@ -153,7 +153,7 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	private void uploadTable(Glyphs.Table table) throws VulkanCodeException{
 		var count = table.index.size();
-		tableGpu = core.allocateLocalStorageBuffer(Letter.SIZE*(long)count, b -> {
+		tableGpu = core.allocateDeviceLocalBuffer(Letter.SIZE*(long)count, b -> {
 			var   metrics = table.metrics;
 			float fsScale = (float)(1/(metrics.ascender() - metrics.descender()));
 			for(int i = 0; i<count; i++){

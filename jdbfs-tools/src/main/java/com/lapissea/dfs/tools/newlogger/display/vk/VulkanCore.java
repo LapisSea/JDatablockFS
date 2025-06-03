@@ -3,10 +3,10 @@ package com.lapissea.dfs.tools.newlogger.display.vk;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.ShaderCompiler;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
+import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAccessFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
@@ -21,26 +21,20 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.DebugLoggerEXT;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FormatColor;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.MemoryBarrier;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImage;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -48,7 +42,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.ConsoleColors;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.joml.Matrix4f;
@@ -64,8 +57,6 @@ import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
-import org.lwjgl.vulkan.VkImageBlit;
-import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
@@ -180,6 +171,8 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final VkSampler defaultSampler;
 	
+	public final TextureRegistry textureRegistry = new TextureRegistry();
+	
 	public VulkanCore(String name, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
 		this.preferredPresentMode = preferredPresentMode;
@@ -252,100 +245,11 @@ public class VulkanCore implements AutoCloseable{
 		
 		var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
 		
-		imageUpdate(image, pixels, mipLevels);
+		image.updateContents(transferBuffers, transientGraphicsBuffs, pixels, mipLevels);
 		
 		var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR, mipLevels, 1);
 		
 		return new VulkanTexture(image, memory, view, defaultSampler, false);
-	}
-	
-	public void imageUpdate(VkImage image, ByteBuffer pixels, int mipLevels) throws VulkanCodeException{
-		int size = VUtils.getBytesPerPixel(image.format)*image.extent.depth*image.extent.width*image.extent.height;
-		
-		if(pixels.remaining() != size) throw new AssertionError(pixels.remaining() + " != " + size);
-		try(var imgMem = allocateStagingBuffer(size)){
-			imgMem.update(b -> b.put(pixels));
-			
-			image.transitionLayout(transferBuffers, VkImageLayout.UNDEFINED, VkImageLayout.TRANSFER_DST_OPTIMAL, mipLevels);
-			image.copyBufferToImage(transferBuffers, imgMem.buffer);
-			if(mipLevels>1){
-				generateMips(image, mipLevels);
-			}else{
-				image.transitionLayout(transientGraphicsBuffs, VkImageLayout.TRANSFER_DST_OPTIMAL, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, mipLevels);
-			}
-		}
-	}
-	
-	private void generateMips(VkImage image, int mipLevels) throws VulkanCodeException{
-		transientGraphicsBuffs.syncAction(buf -> {
-			try(var stack = MemoryStack.stackPush()){
-				var subresource = VkImageSubresourceRange.malloc(stack);
-				subresource.aspectMask(VkImageAspectFlag.COLOR.bit)
-				           .baseArrayLayer(0)
-				           .layerCount(1)
-				           .levelCount(1);
-				
-				
-				var blits = VkImageBlit.calloc(1, stack);
-				var blit  = blits.get(0);
-				
-				int mipWidth  = image.extent.width;
-				int mipHeight = image.extent.height;
-				
-				for(int i0 = 1; i0<mipLevels; i0++){
-					var i = i0;
-					subresource.baseMipLevel(i - 1);
-					var imgBar = new MemoryBarrier.BarImage(
-						VkAccessFlag.TRANSFER_WRITE,
-						VkAccessFlag.TRANSFER_READ,
-						VkImageLayout.TRANSFER_DST_OPTIMAL,
-						VkImageLayout.TRANSFER_SRC_OPTIMAL,
-						image,
-						subresource
-					);
-					buf.pipelineBarrier(VkPipelineStageFlag.TRANSFER, VkPipelineStageFlag.TRANSFER, 0, List.of(imgBar));
-					
-					blit.srcOffsets(0).set(0, 0, 0);
-					blit.srcOffsets(1).set(mipWidth, mipHeight, 1);
-					blit.srcSubresource(r -> r.aspectMask(VkImageAspectFlag.COLOR.bit)
-					                          .mipLevel(i - 1)
-					                          .baseArrayLayer(0)
-					                          .layerCount(1));
-					
-					mipWidth = Math.max(1, mipWidth/2);
-					mipHeight = Math.max(1, mipHeight/2);
-					
-					blit.dstOffsets(0).set(0, 0, 0);
-					blit.dstOffsets(1).set(mipWidth, mipHeight, 1);
-					blit.dstSubresource(r -> r.aspectMask(VkImageAspectFlag.COLOR.bit)
-					                          .mipLevel(i)
-					                          .baseArrayLayer(0)
-					                          .layerCount(1));
-					
-					buf.blitImage(image, VkImageLayout.TRANSFER_SRC_OPTIMAL,
-					              image, VkImageLayout.TRANSFER_DST_OPTIMAL,
-					              blits, VkFilter.LINEAR);
-					
-					buf.pipelineBarrier(VkPipelineStageFlag.TRANSFER, VkPipelineStageFlag.FRAGMENT_SHADER, 0, List.of(
-						new MemoryBarrier.BarImage(
-							imgBar,
-							VkAccessFlag.SHADER_READ,
-							VkImageLayout.SHADER_READ_ONLY_OPTIMAL
-						)
-					));
-				}
-				subresource.baseMipLevel(mipLevels - 1);
-				buf.pipelineBarrier(VkPipelineStageFlag.TRANSFER, VkPipelineStageFlag.FRAGMENT_SHADER, 0, List.of(new MemoryBarrier.BarImage(
-					VkAccessFlag.TRANSFER_WRITE,
-					VkAccessFlag.SHADER_READ,
-					VkImageLayout.TRANSFER_DST_OPTIMAL,
-					VkImageLayout.SHADER_READ_ONLY_OPTIMAL,
-					image,
-					subresource
-				)));
-			}
-			
-		});
 	}
 	
 	public <T extends Struct<T>>
@@ -369,52 +273,17 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
-		return allocateBuffer(size, Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
-		                      Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
+		return device.allocateStagingBuffer(size);
 	}
 	public BackedVkBuffer allocateHostBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
-		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_CACHED));
-	}
-	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
-		VkBuffer       buffer = null;
-		VkDeviceMemory memory = null;
-		try{
-			buffer = device.createBuffer(size, usageFlags, VkSharingMode.EXCLUSIVE);
-			
-			var requirements = buffer.getRequirements();
-			var requiredSize = requirements.size();
-			if(requiredSize<size){
-				throw new ShouldNeverHappenError("Required buffer size is too small");
-			}else if(requiredSize != size){
-				buffer.destroy();
-				buffer = device.createBuffer(requiredSize, usageFlags, VkSharingMode.EXCLUSIVE);
-				requirements = buffer.getRequirements();
-				if(requirements.size() != requiredSize){
-					throw new IllegalStateException(requirements + " size does not match " + requiredSize);
-				}
-			}
-			
-			memory = buffer.allocateAndBindRequiredMemory(physicalDevice, memoryFlags);
-			
-			return new BackedVkBuffer(buffer, memory);
-		}catch(Throwable e){
-			if(memory != null) memory.destroy();
-			if(buffer != null) buffer.destroy();
-			throw e;
-		}
+		return device.allocateHostBuffer(size, usage);
 	}
 	
-	public <E extends Throwable> BackedVkBuffer allocateLocalStorageBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
-		try(var stagingVb = allocateStagingBuffer(size)){
-			stagingVb.update(populator);
-			var vb = allocateBuffer(
-				size,
-				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
-				Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL)
-			);
-			stagingVb.copyTo(transferBuffers, vb);
-			return vb;
-		}
+	public <E extends Throwable> BackedVkBuffer allocateDeviceLocalBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
+		return device.allocateDeviceLocalBuffer(transferBuffers, size, populator);
+	}
+	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
+		return device.allocateBuffer(size, usageFlags, memoryFlags);
 	}
 	
 	public ShaderModule createShaderModule(ByteBuffer spirv, ShaderType type) throws VulkanCodeException{

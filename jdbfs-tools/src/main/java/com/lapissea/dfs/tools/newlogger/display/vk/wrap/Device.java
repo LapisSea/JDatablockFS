@@ -2,7 +2,9 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
@@ -13,10 +15,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFilter;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
@@ -39,6 +44,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Map;
@@ -277,6 +283,56 @@ public class Device implements VulkanResource{
 			return VKCalls.vkCreateBuffer(this, info);
 		}
 	}
+	
+	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
+		return allocateBuffer(size, Flags.of(VkBufferUsageFlag.TRANSFER_SRC),
+		                      Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_COHERENT));
+	}
+	public BackedVkBuffer allocateHostBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
+		return allocateBuffer(size, Flags.of(usage), Flags.of(VkMemoryPropertyFlag.HOST_VISIBLE, VkMemoryPropertyFlag.HOST_CACHED));
+	}
+	
+	public <E extends Throwable> BackedVkBuffer allocateDeviceLocalBuffer(TransferBuffers transferBuffers, long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
+		try(var stagingVb = allocateStagingBuffer(size)){
+			stagingVb.update(populator);
+			var vb = allocateBuffer(
+				size,
+				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
+				Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL)
+			);
+			stagingVb.copyTo(transferBuffers, vb);
+			return vb;
+		}
+	}
+	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
+		VkBuffer       buffer = null;
+		VkDeviceMemory memory = null;
+		try{
+			buffer = createBuffer(size, usageFlags, VkSharingMode.EXCLUSIVE);
+			
+			var requirements = buffer.getRequirements();
+			var requiredSize = requirements.size();
+			if(requiredSize<size){
+				throw new ShouldNeverHappenError("Required buffer size is too small");
+			}else if(requiredSize != size){
+				buffer.destroy();
+				buffer = createBuffer(requiredSize, usageFlags, VkSharingMode.EXCLUSIVE);
+				requirements = buffer.getRequirements();
+				if(requirements.size() != requiredSize){
+					throw new IllegalStateException(requirements + " size does not match " + requiredSize);
+				}
+			}
+			
+			memory = buffer.allocateAndBindRequiredMemory(physicalDevice, memoryFlags);
+			
+			return new BackedVkBuffer(buffer, memory);
+		}catch(Throwable e){
+			if(memory != null) memory.destroy();
+			if(buffer != null) buffer.destroy();
+			throw e;
+		}
+	}
+	
 	public VkSampler createSampler(VkFilter min, VkFilter mag, VkSamplerAddressMode samplerAddressMode) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
 			var info = VkSamplerCreateInfo.calloc(stack);

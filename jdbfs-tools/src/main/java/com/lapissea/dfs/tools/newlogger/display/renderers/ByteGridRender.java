@@ -325,7 +325,7 @@ public class ByteGridRender implements VulkanResource{
 			meshInfos[i] = new MeshInfo(vertPos, verts);
 		}
 		
-		var verts = core.allocateLocalStorageBuffer((long)vertsTotal*Vert.SIZE, bb -> {
+		var verts = core.allocateDeviceLocalBuffer((long)vertsTotal*Vert.SIZE, bb -> {
 			for(List<SetBitsQuad> quads : setQuadsSet){
 				Vert.putQuad(bb, 0, 0, 3, 3, Vert.T_BACK);
 				for(var quad : quads){
