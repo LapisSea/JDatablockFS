@@ -244,8 +244,7 @@ public class MsdfFontRender implements VulkanResource{
 		ensureRequiredMemory(table, strs);
 		
 		buf.bindPipeline(pipeline);
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0,
-		                       window.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, window.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
 		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
 		
 		

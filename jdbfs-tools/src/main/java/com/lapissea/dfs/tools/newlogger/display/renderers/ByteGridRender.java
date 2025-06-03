@@ -450,7 +450,7 @@ public class ByteGridRender implements VulkanResource{
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(extent));
 		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSetConst, resource.dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSets.get(frameID));
 		
 		var mat = new Matrix4f().translate(-1, -1, 0)
 		                        .scale(2F/extent.width, 2F/extent.height, 1)

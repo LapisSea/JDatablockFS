@@ -184,11 +184,14 @@ public class CommandBuffer implements VulkanResource{
 		}
 	}
 	
+	private VkPipeline currentPipeline;
+	
 	public void bindPipeline(VkPipeline pipeline){
 		bindPipeline(pipeline, true);
 	}
 	public void bindPipeline(VkPipeline pipeline, boolean graphics){
 		VK10.vkCmdBindPipeline(val, graphics? VK10.VK_PIPELINE_BIND_POINT_GRAPHICS : VK10.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
+		currentPipeline = pipeline;
 	}
 	
 	public void bindVertexBuffer(VkBuffer buffer, int binding, long offset){
@@ -386,8 +389,14 @@ public class CommandBuffer implements VulkanResource{
 		VK10.vkCmdBlitImage(val, src.handle, srcImageLayout.id, dst.handle, dstImageLayout.id, regions, filter.id);
 	}
 	
-	public void bindDescriptorSet(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet descriptorSet){
+	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, int firstSet, VkDescriptorSet descriptorSet){
+		bindDescriptorSets(bindPoint, currentPipeline.layout, firstSet, descriptorSet);
+	}
+	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet descriptorSet){
 		VK10.vkCmdBindDescriptorSets(val, bindPoint.id, layout.handle, firstSet, new long[]{descriptorSet.handle}, null);
+	}
+	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, int firstSet, VkDescriptorSet... descriptorSets){
+		bindDescriptorSets(bindPoint, currentPipeline.layout, firstSet, descriptorSets);
 	}
 	public void bindDescriptorSets(VkPipelineBindPoint bindPoint, VkPipelineLayout layout, int firstSet, VkDescriptorSet... descriptorSets){
 		bindDescriptorSets(bindPoint, layout, firstSet, Arrays.asList(descriptorSets));
