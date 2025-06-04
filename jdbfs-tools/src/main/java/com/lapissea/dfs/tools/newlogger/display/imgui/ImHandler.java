@@ -1,28 +1,25 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
+import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
-import com.lapissea.glfw.BuffUtil;
 import imgui.ImGui;
 import imgui.ImGuiIO;
 import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
-import imgui.flag.ImGuiStyleVar;
 import imgui.flag.ImGuiWindowFlags;
 import imgui.type.ImBoolean;
 
-import javax.imageio.ImageIO;
-import java.io.File;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ImHandler{
 	
 	private final ImGuiImpl     imGuiImpl;
 	private final ImGUIRenderer imGuiRenderer;
 	
-	long id;
+	private final List<UIComponent> components = new ArrayList<>();
 	
 	public ImHandler(VulkanCore core, VulkanWindow window, ImGUIRenderer imGuiRenderer){
 		this.imGuiRenderer = imGuiRenderer;
@@ -40,15 +37,7 @@ public class ImHandler{
 		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
 		imGuiImpl.init(window, true);
 		
-		try{
-			var image = ImageIO.read(new File("C:\\users\\lapissea\\Desktop\\test.png"));
-			var buff  = ByteBuffer.allocate(image.getWidth()*image.getHeight()*4);
-			BuffUtil.imageToBuffer(image, buff);
-			
-			id = core.textureRegistry.loadTextureAsID(image.getWidth(), image.getHeight(), buff, VkFormat.R8G8B8A8_UNORM, 1);
-		}catch(Throwable e){
-			throw new RuntimeException(e);
-		}
+		components.add(new ImageViewerComp());
 	}
 	
 	public void doFrame(){
@@ -64,14 +53,11 @@ public class ImHandler{
 	private void renderImGUI(){
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
 		
-		showFps();
-		
-		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
-		if(ImGui.begin("LOLL")){
-			ImGui.image(id, ImGui.getContentRegionAvailX(), ImGui.getContentRegionAvailY());
+		for(UIComponent component : components){
+			component.imRender(imGuiRenderer.textureScope);
 		}
-		ImGui.end();
-		ImGui.popStyleVar();
+		
+		showFps();
 		
 		ImGui.showDemoWindow();
 		ImGui.showMetricsWindow();
@@ -91,6 +77,9 @@ public class ImHandler{
 	}
 	
 	public void close(){
+		for(UIComponent component : components){
+			component.unload(imGuiRenderer.textureScope);
+		}
 		imGuiImpl.shutdown();
 	}
 	
