@@ -116,20 +116,12 @@ public class ImGUIRenderer implements VulkanResource{
 		var winSize = drawData.getDisplaySize();
 		var winPos  = drawData.getDisplayPos();
 		
-		buf.bindPipeline(pipeline);
-		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
-		
 		resource.ensureBuffers(core, vtxSize, idxSize);
-		
-		var vtxCmdOffsets = new int[drawData.getCmdListsCount()];
-		var idxCmdOffsets = new int[drawData.getCmdListsCount()];
 		
 		try(var vtxSes = resource.vtxBuf.update();
 		    var idxSes = resource.idxBuf.update()){
 			ByteBuffer vtxMem = vtxSes.getBuffer(), idxMem = idxSes.getBuffer();
 			for(int n = 0; n<drawData.getCmdListsCount(); n++){
-				vtxCmdOffsets[n] = vtxMem.position();
-				idxCmdOffsets[n] = idxMem.position();
 				vtxMem.put(drawData.getCmdListVtxBufferData(n));
 				idxMem.put(drawData.getCmdListIdxBufferData(n));
 			}
@@ -143,9 +135,21 @@ public class ImGUIRenderer implements VulkanResource{
 		
 		long lastTextureID = -1;
 		
-		for(int n = 0; n<drawData.getCmdListsCount(); n++){
-			
-			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
+		buf.bindPipeline(pipeline);
+		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
+		
+		buf.bindVertexBuffer(resource.vtxBuf.buffer, 0, 0);
+		buf.bindIndexBuffer(resource.idxBuf.buffer, 0, idxType);
+		
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(
+			-winPos.x, -winPos.y,
+			1F/winSize.x, 1F/winSize.y
+		));
+		
+		int globalVtxOffset = 0;
+		int globalIdxOffset = 0;
+		for(int n = 0, lc = drawData.getCmdListsCount(); n<lc; n++){
+			for(int cmdIdx = 0, bc = drawData.getCmdListCmdBufferSize(n); cmdIdx<bc; cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
 				
 				var clipX = (int)(clipRect.x - winPos.x);
@@ -160,19 +164,14 @@ public class ImGUIRenderer implements VulkanResource{
 				int  vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
 				
 				if(lastTextureID != textureId){
+					lastTextureID = textureId;
 					buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, textureScope.getTextureBind(dsLayoutTexture, textureId));
 				}
 				
-				buf.bindVertexBuffer(resource.vtxBuf.buffer, 0, vtxCmdOffsets[n]);
-				buf.bindIndexBuffer(resource.idxBuf.buffer, idxCmdOffsets[n], idxType);
-				buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(
-					-winPos.x,
-					-winPos.y,
-					1F/winSize.x,
-					1F/winSize.y
-				));
-				buf.drawIndexed(elemCount, 1, idxOffset, vtxOffset, 0);
+				buf.drawIndexed(elemCount, 1, globalIdxOffset + idxOffset, globalVtxOffset + vtxOffset, 0);
 			}
+			globalVtxOffset += drawData.getCmdListVtxBufferSize(n);
+			globalIdxOffset += drawData.getCmdListIdxBufferSize(n);
 		}
 		
 	}
