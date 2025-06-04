@@ -212,7 +212,6 @@ public final class ImTools{
 			}
 			f.clearFonts();
 			f.addFontFromMemoryTTF(bb, 16);
-			f.build();
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to load imgui font");
 		}

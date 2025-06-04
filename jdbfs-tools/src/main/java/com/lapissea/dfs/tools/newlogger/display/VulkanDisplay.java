@@ -9,7 +9,6 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.RawRandom;
@@ -39,8 +38,6 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final VulkanCore core;
 	
-	private final CommandPool cmdPool;
-	
 	private final MsdfFontRender fontRender;
 	
 	private final ByteGridRender                byteGridRender;
@@ -66,8 +63,6 @@ public class VulkanDisplay implements AutoCloseable{
 			byteGridRender = new ByteGridRender(core);
 			lineRenderer = new LineRenderer(core);
 			imGUIRenderer = new ImGUIRenderer(core);
-			
-			cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 			
 			byte[] bytes = new RawRandom(10).nextBytes(32*32);
 			
@@ -269,7 +264,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public void run(){
 		var window = this.window.getGlfwWindow();
-		window.size.register(this::onResizeEvent);
+//		window.size.register(this::onResizeEvent);
 		
 		var imHandler = new ImHandler(core, this.window, imGUIRenderer);
 //		Thread.ofPlatform().start(() -> {
@@ -284,9 +279,16 @@ public class VulkanDisplay implements AutoCloseable{
 				imHandler.doFrame();
 				
 				render(this.window);
-				imHandler.renderViewports();
+				ImGui.renderPlatformWindowsDefault();
 				
-				core.executeSwaps();
+				if(core.executeSwaps()){
+					
+					render(this.window);
+					ImGui.renderPlatformWindowsDefault();
+					
+					core.executeSwaps();
+					core.device.waitIdle();
+				}
 			}
 		}catch(Throwable e){
 			e.printStackTrace();
@@ -325,8 +327,6 @@ public class VulkanDisplay implements AutoCloseable{
 		lineRenderer.destroy();
 		
 		imGUIRenderer.destroy();
-		
-		cmdPool.destroy();
 		
 		window.close();
 		core.close();

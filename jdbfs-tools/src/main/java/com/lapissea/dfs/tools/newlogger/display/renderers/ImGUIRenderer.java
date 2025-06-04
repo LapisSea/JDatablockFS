@@ -1,38 +1,33 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
+import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
-import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkCullModeFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.util.NotImplementedException;
 import imgui.ImDrawData;
-import imgui.ImFontAtlas;
 import imgui.ImGui;
 import imgui.ImVec4;
 import imgui.type.ImInt;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 public class ImGUIRenderer implements VulkanResource{
 	
@@ -79,45 +74,33 @@ public class ImGUIRenderer implements VulkanResource{
 	
 	private final VkPipeline pipeline;
 	
-	private final VkDescriptorSetLayout dsLayoutConst;
-	private final VkDescriptorSet       dsSetConst;
+	private final VkDescriptorSetLayout dsLayoutTexture;
 	
-	private final VulkanTexture emptyTexture;
-	private       VulkanTexture imGuiFontTexture;
+	public final TextureRegistry.Scope textureScope;
 	
 	public ImGUIRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
+		textureScope = core.textureRegistry.new Scope();
+		
 		shader = new ShaderModuleSet(core, "ImGUI", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		emptyTexture = core.uploadTexture(1, 1, ByteBuffer.allocateDirect(1), VkFormat.R8_UNORM, 1);
-		
-		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(
-			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER),
-			new Descriptor.LayoutBinding(1, VkShaderStageFlag.FRAGMENT, VkDescriptorType.COMBINED_IMAGE_SAMPLER)
+		dsLayoutTexture = core.globalDescriptorPool.createDescriptorSetLayout(
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.FRAGMENT, VkDescriptorType.COMBINED_IMAGE_SAMPLER)
 		);
-		dsSetConst = dsLayoutConst.createDescriptorSet();
 		
 		pipeline = VkPipeline.builder(core.renderPass, shader)
 		                     .blending(VkPipeline.Blending.STANDARD)
 		                     .multisampling(core.physicalDevice.samples, false)
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		                     .cullMode(VkCullModeFlag.NONE)
-		                     .addDesriptorSetLayout(dsLayoutConst)
+		                     .addDesriptorSetLayout(dsLayoutTexture)
 		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
 		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, 0)
 		                     .addVertexInput(1, 0, VkFormat.R32G32_SFLOAT, 4*2)
 		                     .addVertexInput(2, 0, VkFormat.R8G8B8A8_UNORM, 4*4)
 		                     .addVertexInputBinding(0, ImDrawData.sizeOfImDrawVert(), VkVertexInputRate.VERTEX)
 		                     .build();
-	}
-	
-	private VulkanTexture createFontsTexture() throws VulkanCodeException{
-		final ImFontAtlas fontAtlas = ImGui.getIO().getFonts();
 		
-		ImInt width  = new ImInt(), height = new ImInt();
-		var   pixels = fontAtlas.getTexDataAsAlpha8(width, height);
-		
-		return core.uploadTexture(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 	}
 	
 	public void submit(CommandBuffer buf, int frameID, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
@@ -130,32 +113,11 @@ public class ImGUIRenderer implements VulkanResource{
 		var idxSize = Iters.range(0, drawData.getCmdListsCount()).map(drawData::getCmdListIdxBufferSize).sum()*sizeOfIndex;
 		if(vtxSize == 0 || idxSize == 0) return;
 		
-		var textures = Iters.range(0, drawData.getCmdListsCount()).box()
-		                    .flatMap(n -> Iters.range(0, drawData.getCmdListCmdBufferSize(n))
-		                                       .mapToObj(cmdIdx -> drawData.getCmdListCmdBufferTextureId(n, cmdIdx))
-		                    ).toModSequencedSet();
-		
 		var winSize = drawData.getDisplaySize();
 		var winPos  = drawData.getDisplayPos();
 		
 		buf.bindPipeline(pipeline);
 		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
-		switch(textures.size()){
-			case 1 -> {
-				long textureID = textures.getFirst();
-				if(textureID != 0){
-					throw new NotImplementedException("More imgui textures");
-				}
-				if(imGuiFontTexture == null){
-					imGuiFontTexture = createFontsTexture();
-					dsSetConst.update(List.of(
-						new Descriptor.LayoutDescription.TextureBuff(1, imGuiFontTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL)
-					), frameID);
-				}
-			}
-			default -> throw new IllegalStateException("Unsupported texture count: " + textures.size());
-		}
-		buf.bindDescriptorSet(VkPipelineBindPoint.GRAPHICS, pipeline.layout, 0, dsSetConst);
 		
 		resource.ensureBuffers(core, vtxSize, idxSize);
 		
@@ -179,6 +141,8 @@ public class ImGUIRenderer implements VulkanResource{
 		};
 		var clipRect = new ImVec4();
 		
+		long lastTextureID = -1;
+		
 		for(int n = 0; n<drawData.getCmdListsCount(); n++){
 			
 			for(int cmdIdx = 0; cmdIdx<drawData.getCmdListCmdBufferSize(n); cmdIdx++){
@@ -189,11 +153,15 @@ public class ImGUIRenderer implements VulkanResource{
 				var clipW = (int)(clipRect.z - clipRect.x);
 				var clipH = (int)(clipRect.w - clipRect.y);
 				buf.setScissor(new Rect2D(clipX, clipY, clipW, clipH));
-
-//				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
-				int elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
-				int idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
-				int vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
+				
+				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
+				int  elemCount = drawData.getCmdListCmdBufferElemCount(n, cmdIdx);
+				int  idxOffset = drawData.getCmdListCmdBufferIdxOffset(n, cmdIdx);
+				int  vtxOffset = drawData.getCmdListCmdBufferVtxOffset(n, cmdIdx);
+				
+				if(lastTextureID != textureId){
+					buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, textureScope.getTextureBind(dsLayoutTexture, textureId));
+				}
 				
 				buf.bindVertexBuffer(resource.vtxBuf.buffer, 0, vtxCmdOffsets[n]);
 				buf.bindIndexBuffer(resource.idxBuf.buffer, idxCmdOffsets[n], idxType);
@@ -209,15 +177,30 @@ public class ImGUIRenderer implements VulkanResource{
 		
 	}
 	
+	public void checkFonts(){
+		var fontAtlas = ImGui.getIO().getFonts();
+		if(fontAtlas.isBuilt()) return;
+		if(!fontAtlas.build()){
+			throw new RuntimeException("Failed to build font atlas");
+		}
+		
+		ImInt width  = new ImInt(), height = new ImInt();
+		var   pixels = fontAtlas.getTexDataAsAlpha8(width, height);
+		try{
+			var id = core.textureRegistry.loadTextureAsID(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
+			fontAtlas.setTexID(id);
+		}catch(VulkanCodeException e){
+			throw new RuntimeException("Failed to load font atlas texture", e);
+		}
+	}
+	
 	@Override
 	public void destroy() throws VulkanCodeException{
 		
-		dsSetConst.destroy();
-		dsLayoutConst.destroy();
+		dsLayoutTexture.destroy();
 		
 		pipeline.destroy();
-		emptyTexture.destroy();
-		if(imGuiFontTexture != null) imGuiFontTexture.destroy();
+		textureScope.destroy();
 		shader.destroy();
 	}
 }

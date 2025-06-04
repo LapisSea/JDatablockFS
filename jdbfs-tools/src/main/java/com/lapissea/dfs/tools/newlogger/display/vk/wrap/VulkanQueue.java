@@ -73,7 +73,10 @@ public class VulkanQueue implements VulkanResource{
 		public PresentFrame makePresentFrame(VulkanWindow window, int index, int frame){
 			return new PresentFrame(window, index, renderComplete[frame]);
 		}
-		public void present(List<PresentFrame> presentFrames) throws VulkanCodeException{
+		/**
+		 * @return if there was a swapchain recreation
+		 */
+		public boolean present(List<PresentFrame> presentFrames) throws VulkanCodeException{
 			try(var stack = MemoryStack.stackPush()){
 				
 				var semaphores = stack.mallocLong(presentFrames.size());
@@ -96,6 +99,7 @@ public class VulkanQueue implements VulkanResource{
 				}
 				try{
 					VKCalls.vkQueuePresentKHR(value, info);
+					return false;
 				}catch(VulkanCodeException e){
 					var errs = Iters.ofInts(results).mapToObj(VkResult::from);
 					for(var ent : errs.enumerate().filter(v -> v.val() != VkResult.SUCCESS)){
@@ -113,6 +117,7 @@ public class VulkanQueue implements VulkanResource{
 							err
 						);
 					}
+					return true;
 				}
 			}
 		}

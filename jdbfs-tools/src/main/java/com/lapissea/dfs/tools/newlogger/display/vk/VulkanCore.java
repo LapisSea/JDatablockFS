@@ -171,7 +171,7 @@ public class VulkanCore implements AutoCloseable{
 	
 	public final VkSampler defaultSampler;
 	
-	public final TextureRegistry textureRegistry = new TextureRegistry();
+	public final TextureRegistry textureRegistry = new TextureRegistry(this);
 	
 	public VulkanCore(String name, VKPresentMode preferredPresentMode) throws VulkanCodeException{
 		this.name = name;
@@ -502,8 +502,9 @@ public class VulkanCore implements AutoCloseable{
 	public void pushSwap(VulkanQueue.SwapSync.PresentFrame presentFrame){
 		present.add(presentFrame);
 	}
-	public void executeSwaps() throws VulkanCodeException{
-		renderQueue.present(present);
+	public boolean executeSwaps() throws VulkanCodeException{
+		var swap = renderQueue.present(present);
 		present.clear();
+		return swap;
 	}
 }
