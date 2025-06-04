@@ -28,13 +28,18 @@ import imgui.ImVec4;
 import imgui.type.ImInt;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class ImGUIRenderer implements VulkanResource{
 	
 	private static final class PushConstant{
-		private static final int SIZE = (2 + 2)*Float.BYTES;
-		public static float[] make(float offX, float offY, float sizeX, float sizeY){
-			return new float[]{offX, offY, sizeX, sizeY};
+		private static final int IS_MASK_OFF = (2 + 2)*Float.BYTES;
+		private static final int SIZE        = IS_MASK_OFF + Integer.BYTES;
+		public static ByteBuffer make(float offX, float offY, float sizeX, float sizeY){
+			return ByteBuffer.allocateDirect(IS_MASK_OFF).order(ByteOrder.nativeOrder()).putFloat(offX).putFloat(offY).putFloat(sizeX).putFloat(sizeY).flip();
+		}
+		public static ByteBuffer make(boolean isMask){
+			return ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).putInt(isMask? 1 : 0).flip();
 		}
 	}
 	
@@ -94,7 +99,8 @@ public class ImGUIRenderer implements VulkanResource{
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 		                     .cullMode(VkCullModeFlag.NONE)
 		                     .addDesriptorSetLayout(dsLayoutTexture)
-		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
+		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.IS_MASK_OFF)
+		                     .addPushConstantRange(VkShaderStageFlag.FRAGMENT, PushConstant.IS_MASK_OFF, Integer.BYTES)
 		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, 0)
 		                     .addVertexInput(1, 0, VkFormat.R32G32_SFLOAT, 4*2)
 		                     .addVertexInput(2, 0, VkFormat.R8G8B8A8_UNORM, 4*4)
@@ -133,7 +139,8 @@ public class ImGUIRenderer implements VulkanResource{
 		};
 		var clipRect = new ImVec4();
 		
-		long lastTextureID = -1;
+		long    lastTextureID = -1;
+		boolean isMask        = true;
 		
 		buf.bindPipeline(pipeline);
 		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
@@ -145,6 +152,7 @@ public class ImGUIRenderer implements VulkanResource{
 			-winPos.x, -winPos.y,
 			1F/winSize.x, 1F/winSize.y
 		));
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.FRAGMENT, PushConstant.IS_MASK_OFF, PushConstant.make(isMask));
 		
 		int globalVtxOffset = 0;
 		int globalIdxOffset = 0;
@@ -165,6 +173,15 @@ public class ImGUIRenderer implements VulkanResource{
 				
 				if(lastTextureID != textureId){
 					lastTextureID = textureId;
+					
+					var texture = textureScope.registry().getTexture(textureId);
+					assert texture != null : textureId + " is null";
+					var newIsMask = texture.image.format == VkFormat.R8_UNORM;
+					if(newIsMask != isMask){
+						isMask = newIsMask;
+						buf.pushConstants(pipeline.layout, VkShaderStageFlag.FRAGMENT, PushConstant.IS_MASK_OFF, PushConstant.make(isMask));
+					}
+					
 					buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, textureScope.getTextureBind(dsLayoutTexture, textureId));
 				}
 				

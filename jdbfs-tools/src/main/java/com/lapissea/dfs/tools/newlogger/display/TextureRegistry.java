@@ -8,8 +8,10 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +26,8 @@ public final class TextureRegistry{
 		
 		private final Map<LayoutID, VkDescriptorSet> descriptorSets = new HashMap<>();
 		
+		public TextureRegistry registry(){ return TextureRegistry.this; }
+		
 		public VkDescriptorSet getTextureBind(VkDescriptorSetLayout layout, long textureID) throws VulkanCodeException{
 			if(textureID == -1) throw new IllegalArgumentException("Illegal textureId");
 			var id = new LayoutID(layout, textureID);
@@ -31,11 +35,8 @@ public final class TextureRegistry{
 				var set = descriptorSets.get(id);
 				if(set != null) return set;
 			}
-			TexNode tex;
-			synchronized(textures){
-				tex = textures.get(textureID);
-			}
-			if(tex != null){
+			
+			if(getTex(textureID) instanceof TexNode tex){
 				var set = createSet(layout, tex.texture);
 				tex.scopes.add(this);
 				descriptorSets.put(id, set);
@@ -64,27 +65,44 @@ public final class TextureRegistry{
 			return set;
 		}
 		
+		
+		public long loadTextureAsID(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
+			var texture = registry().loadTexture(width, height, pixels, format, mipLevels);
+			texture.scopes.add(this);
+			return texture.id;
+		}
+		
 		@Override
 		public void destroy() throws VulkanCodeException{
 			for(VkDescriptorSet value : descriptorSets.values()){
 				value.destroy();
 			}
 			synchronized(textures){
-				textures.values().removeIf(tx -> {
-					tx.scopes.remove(this);
-					if(tx.scopes.isEmpty()){
-						tx.texture.destroy();
-						return true;
-					}
-					return false;
-				});
+				for(var tx : Iters.from(textures.values()).filter(e -> e.scopes.contains(this)).toList()){
+					releaseTexture(tx);
+				}
+			}
+		}
+		
+		private void releaseTexture(TexNode tx){
+			if(!tx.scopes.remove(this) || !tx.scopes.isEmpty()) return;
+			tx.texture.image.device.waitIdle();
+			tx.texture.destroy();
+			textures.remove(tx.id);
+		}
+		
+		public void releaseTexture(long textureID){
+			if(getTex(textureID) instanceof TexNode tx){
+				synchronized(textures){
+					releaseTexture(tx);
+				}
 			}
 		}
 	}
 	
 	private static final class TexNode{
 		private final VulkanTexture texture;
-		private final Set<Scope>    scopes = new HashSet<>();
+		private final Set<Scope>    scopes = Collections.synchronizedSet(new HashSet<>());
 		private final long          id;
 		
 		private TexNode(VulkanTexture texture, long id){
@@ -101,9 +119,12 @@ public final class TextureRegistry{
 	
 	public TextureRegistry(VulkanCore core){ this.core = core; }
 	
-	public long loadTextureAsID(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
+	private TexNode loadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
 		var texture = core.uploadTexture(width, height, pixels, format, mipLevels);
-		return registerTexture(texture).id;
+		return registerTexture(texture);
+	}
+	public long loadTextureAsID(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
+		return loadTexture(width, height, pixels, format, mipLevels).id;
 	}
 	
 	private TexNode registerTexture(VulkanTexture texture){
@@ -123,5 +144,16 @@ public final class TextureRegistry{
 			}
 			return noTexture;
 		}
+	}
+	
+	private TexNode getTex(long textureID){
+		synchronized(textures){
+			return textures.get(textureID);
+		}
+	}
+	
+	public VulkanTexture getTexture(long textureID){
+		var node = getTex(textureID);
+		return node == null? null : node.texture;
 	}
 }
