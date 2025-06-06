@@ -49,6 +49,72 @@ import java.util.List;
 
 public class ByteGridComponent implements UIComponent{
 	
+	private static class RenderTarget{
+		private final long          imageID;
+		private final VulkanTexture image;
+		private final VulkanTexture mssaImage;
+		private final FrameBuffer   frameBuffer;
+		private final VkFence       fence;
+		private final CommandBuffer cmdBuffer;
+		
+		private final Instant               creationTime = Instant.now();
+		private final TextureRegistry.Scope tScope;
+		private       Extent2D              renderArea;
+		
+		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height) throws VulkanCodeException{
+			this.tScope = tScope;
+			image = createTexture(core, width, height, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
+			mssaImage = createTexture(core, width, height, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
+			
+			try(var stack = MemoryStack.stackPush()){
+				var viewRef = stack.mallocLong(2);
+				var info = VkFramebufferCreateInfo.calloc(stack)
+				                                  .sType$Default()
+				                                  .renderPass(core.renderPass.handle)
+				                                  .pAttachments(viewRef)
+				                                  .width(width).height(height)
+				                                  .layers(1);
+				
+				var mssaView      = mssaImage.view;
+				var swapchainView = image.view;
+				viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
+				frameBuffer = VKCalls.vkCreateFramebuffer(core.device, info);
+			}
+			
+			cmdBuffer = cmdPool.createCommandBuffer();
+			fence = core.device.createFence(true);
+			
+			imageID = tScope.registerTextureAsID(image);
+		}
+		
+		Extent3D size(){ return image.image.extent; }
+		
+		private VulkanTexture createTexture(VulkanCore core, int width, int height, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+			var image = core.device.createImage(width, height, VkFormat.R8G8B8A8_UNORM,
+			                                    usage,
+			                                    samples, 1);
+			var memory = image.allocateAndBindRequiredMemory(core.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
+			var view   = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
+			return new VulkanTexture(image, memory, view, core.defaultSampler, false);
+		}
+		
+		private boolean isSizeOptimal(int width, int height){
+			var extent = image.image.extent;
+			if(extent.equals(width, height, 1)) return true;
+			return extent.width>=width && extent.height>=height &&
+			       extent.width<=width*1.2 && extent.height<=height*1.2;
+		}
+		
+		public void destroy(){
+			fence.destroy();
+			cmdBuffer.destroy();
+			tScope.releaseTexture(imageID);
+			frameBuffer.destroy();
+			image.destroy();
+			mssaImage.destroy();
+		}
+	}
+	
 	private final ImBoolean  open;
 	private final VulkanCore core;
 	
@@ -59,10 +125,10 @@ public class ByteGridComponent implements UIComponent{
 	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
 	private final LineRenderer.RenderResource   lineRes  = new LineRenderer.RenderResource();
 	
-	private final CommandPool   cmdPool;
-	private final CommandBuffer cmdBuffer;
-	private final RenderPass    renderPass;
-	private final VkFence       fence;
+	private final CommandPool cmdPool;
+	private final RenderPass  renderPass;
+	
+	private RenderTarget renderTarget;
 	
 	public ByteGridComponent(
 		ImBoolean open, VulkanCore core,
@@ -89,55 +155,8 @@ public class ByteGridComponent implements UIComponent{
 			)
 		);
 		
-		lineRenderer.record(lineRes, List.of(
-			new Geometry.PointsLine(
-				Iters.rangeMap(0, 50, u -> u/50F*Math.PI)
-				     .map(f -> new Vector2f((float)Math.sin(f)*100 + 150, -(float)Math.cos(f)*100 + 150))
-				     .toList(),
-				5, Color.ORANGE
-			)
-		));
-		
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
-		cmdBuffer = cmdPool.createCommandBuffer();
-		
 		renderPass = createRenderPass(core.device, VkFormat.R8G8B8A8_UNORM);
-		
-		fence = core.device.createFence(true);
-	}
-	
-	@Override
-	public void imRender(TextureRegistry.Scope tScope){
-		if(!open.get()) return;
-		
-		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
-		if(ImGui.begin("byteGrid", open)){
-			var width  = (int)ImGui.getContentRegionAvailX();
-			var height = (int)ImGui.getContentRegionAvailY();
-			drawFB(tScope, width, height);
-			
-			var imageSize = image.image.extent;
-			ImGui.image(imageID, width, height, 0, 0,
-			            renderArea.width/(float)imageSize.width,
-			            renderArea.height/(float)imageSize.height);
-		}
-		ImGui.end();
-		ImGui.popStyleVar();
-	}
-	
-	private long          imageID;
-	private Extent2D      renderArea;
-	private VulkanTexture image;
-	private VulkanTexture mssaImage;
-	private FrameBuffer   frameBuffer;
-	
-	private VulkanTexture createTexture(int width, int height, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
-		var image = core.device.createImage(width, height, VkFormat.R8G8B8A8_UNORM,
-		                                    usage,
-		                                    samples, 1);
-		var memory = image.allocateAndBindRequiredMemory(core.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
-		var view   = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
-		return new VulkanTexture(image, memory, view, core.defaultSampler, false);
 	}
 	
 	private RenderPass createRenderPass(Device device, VkFormat colorFormat) throws VulkanCodeException{
@@ -167,42 +186,31 @@ public class ByteGridComponent implements UIComponent{
 		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
 	}
 	
-	private void createImages(int width, int height) throws VulkanCodeException{
-		image = createTexture(width, height, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
-		mssaImage = createTexture(width, height, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
-		try(var stack = MemoryStack.stackPush()){
-			var viewRef = stack.mallocLong(2);
-			var info = VkFramebufferCreateInfo.calloc(stack)
-			                                  .sType$Default()
-			                                  .renderPass(core.renderPass.handle)
-			                                  .pAttachments(viewRef)
-			                                  .width(width).height(height)
-			                                  .layers(1);
-			
-			var mssaView      = mssaImage.view;
-			var swapchainView = image.view;
-			viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
-			frameBuffer = VKCalls.vkCreateFramebuffer(core.device, info);
-		}
+	@Override
+	public void imRender(TextureRegistry.Scope tScope){
+		if(!open.get()) return;
 		
-		core.transientGraphicsBuffs.syncAction(cmd -> {
-			cmd.imageMemoryBarrier(image.image, VkImageLayout.UNDEFINED, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, 1);
-		});
-	}
-	private void freeImages(TextureRegistry.Scope tScope){
-		tScope.releaseTexture(imageID);
-		frameBuffer.destroy();
-		image.destroy();
-		mssaImage.destroy();
+		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
+		if(ImGui.begin("byteGrid", open)){
+			var width  = (int)ImGui.getContentRegionAvailX();
+			var height = (int)ImGui.getContentRegionAvailY();
+			drawFB(tScope, width, height);
+			
+			var renderArea = renderTarget.renderArea;
+			var imageSize  = renderTarget.size();
+			ImGui.image(renderTarget.imageID, width, height, 0, 0,
+			            renderArea.width/(float)imageSize.width,
+			            renderArea.height/(float)imageSize.height);
+		}
+		ImGui.end();
+		ImGui.popStyleVar();
 	}
 	
-	private boolean extentOk(Extent3D extent, int width, int height){
-		if(extent.equals(width, height, 1)) return true;
-		return extent.width>=width && extent.height>=height &&
-		       extent.width<=width*1.2 && extent.height<=height*1.2;
-	}
 	private void drawFB(TextureRegistry.Scope tScope, int width, int height){
 		ensureImage(tScope, width, height);
+		
+		var fence     = renderTarget.fence;
+		var cmdBuffer = renderTarget.cmdBuffer;
 		
 		try{
 			fence.waitFor();
@@ -211,9 +219,9 @@ public class ByteGridComponent implements UIComponent{
 			cmdBuffer.reset();
 			cmdBuffer.begin();
 			
-			renderArea = new Extent2D(width, height);
-			try(var ignore = cmdBuffer.beginRenderPass(renderPass, frameBuffer, renderArea.asRect(), new Vector4f(0, 0, 0, 1))){
-				recordToBuff(renderArea, cmdBuffer, 0);
+			var area = renderTarget.renderArea = new Extent2D(width, height);
+			try(var ignore = cmdBuffer.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
+				recordToBuff(area, cmdBuffer, 0);
 			}
 			cmdBuffer.end();
 			
@@ -223,43 +231,35 @@ public class ByteGridComponent implements UIComponent{
 		}
 	}
 	
-	private Instant lastResize = Instant.now();
 	private void ensureImage(TextureRegistry.Scope tScope, int width, int height){
-		if(image == null || !extentOk(image.image.extent, width, height)){
+		if(renderTarget == null || !renderTarget.isSizeOptimal(width, height)){
 			recreateImage(tScope, (int)(width*1.1), (int)(height*1.1));
-			lastResize = Instant.now();
 		}else{
 			var now          = Instant.now();
-			var recentResize = Duration.between(lastResize, now).toMillis()<1000;
-			if(!recentResize && !image.image.extent.equals(width, height, 1)){
+			var recentResize = Duration.between(renderTarget.creationTime, now).compareTo(Duration.ofMillis(1000))<0;
+			if(!recentResize && !renderTarget.size().equals(width, height, 1)){
 				recreateImage(tScope, width, height);
-				lastResize = Instant.now();
 			}
 		}
 	}
 	
 	private void recreateImage(TextureRegistry.Scope tScope, int imgWidth, int imgHeight){
 		core.device.waitIdle();
-		if(image != null) freeImages(tScope);
+		if(renderTarget != null) renderTarget.destroy();
 		try{
-			createImages(imgWidth, imgHeight);
+			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to create images", e);
 		}
-		imageID = tScope.registerTextureAsID(image);
 	}
 	
 	@Override
 	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
-		if(image != null) freeImages(tScope);
+		if(renderTarget != null) renderTarget.destroy();
 		grid1Res.destroy();
 		lineRes.destroy();
 		
-		cmdBuffer.destroy();
 		cmdPool.destroy();
-		
-		fence.destroy();
-		
 		renderPass.destroy();
 	}
 	
