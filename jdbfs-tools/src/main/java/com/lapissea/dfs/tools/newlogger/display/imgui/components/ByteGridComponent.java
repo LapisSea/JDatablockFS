@@ -2,29 +2,55 @@ package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent3D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import imgui.ImGui;
 import imgui.flag.ImGuiStyleVar;
 import imgui.type.ImBoolean;
+import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
+import org.joml.Vector4f;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
 import java.awt.Color;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ByteGridComponent implements UIComponent{
 	
-	private final ImBoolean open;
+	private final ImBoolean  open;
+	private final VulkanCore core;
 	
 	private final MsdfFontRender fontRender;
 	private final ByteGridRender byteGridRender;
@@ -33,8 +59,17 @@ public class ByteGridComponent implements UIComponent{
 	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
 	private final LineRenderer.RenderResource   lineRes  = new LineRenderer.RenderResource();
 	
-	public ByteGridComponent(ImBoolean open, MsdfFontRender fontRender, ByteGridRender byteGridRender, LineRenderer lineRenderer) throws VulkanCodeException{
+	private final CommandPool   cmdPool;
+	private final CommandBuffer cmdBuffer;
+	private final RenderPass    renderPass;
+	private final VkFence       fence;
+	
+	public ByteGridComponent(
+		ImBoolean open, VulkanCore core,
+		MsdfFontRender fontRender, ByteGridRender byteGridRender, LineRenderer lineRenderer
+	) throws VulkanCodeException{
 		this.open = open;
+		this.core = core;
 		this.fontRender = fontRender;
 		this.byteGridRender = byteGridRender;
 		this.lineRenderer = lineRenderer;
@@ -63,6 +98,12 @@ public class ByteGridComponent implements UIComponent{
 			)
 		));
 		
+		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
+		cmdBuffer = cmdPool.createCommandBuffer();
+		
+		renderPass = createRenderPass(core.device, VkFormat.R8G8B8A8_UNORM);
+		
+		fence = core.device.createFence(true);
 	}
 	
 	@Override
@@ -71,21 +112,160 @@ public class ByteGridComponent implements UIComponent{
 		
 		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
 		if(ImGui.begin("byteGrid", open)){
-			ImGui.textColored(0xFF0000FF, "TODO");
+			var width  = (int)ImGui.getContentRegionAvailX();
+			var height = (int)ImGui.getContentRegionAvailY();
+			drawFB(tScope, width, height);
+			
+			var imageSize = image.image.extent;
+			ImGui.image(imageID, width, height, 0, 0,
+			            renderArea.width/(float)imageSize.width,
+			            renderArea.height/(float)imageSize.height);
 		}
 		ImGui.end();
 		ImGui.popStyleVar();
 	}
 	
-	@Override
-	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
-		grid1Res.destroy();
-		lineRes.destroy();
+	private long          imageID;
+	private Extent2D      renderArea;
+	private VulkanTexture image;
+	private VulkanTexture mssaImage;
+	private FrameBuffer   frameBuffer;
+	
+	private VulkanTexture createTexture(int width, int height, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+		var image = core.device.createImage(width, height, VkFormat.R8G8B8A8_UNORM,
+		                                    usage,
+		                                    samples, 1);
+		var memory = image.allocateAndBindRequiredMemory(core.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
+		var view   = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
+		return new VulkanTexture(image, memory, view, core.defaultSampler, false);
 	}
 	
-	private void recordToBuff(VulkanWindow window, CommandBuffer buf, int frameID) throws VulkanCodeException{
+	private RenderPass createRenderPass(Device device, VkFormat colorFormat) throws VulkanCodeException{
+		var physicalDevice = device.physicalDevice;
+		var mssaAttachment = new RenderPass.AttachmentInfo(
+			colorFormat,
+			physicalDevice.samples,
+			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
+		);
+		var presentAttachment = new RenderPass.AttachmentInfo(
+			colorFormat,
+			VkSampleCountFlag.N1,
+			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
+			VkImageLayout.UNDEFINED, VkImageLayout.SHADER_READ_ONLY_OPTIMAL
+		);
 		
-		renderAutoSizeByteGrid(window, frameID, buf);
+		var subpass = new RenderPass.SubpassInfo(
+			VkPipelineBindPoint.GRAPHICS,
+			List.of(),
+			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
+			List.of(new RenderPass.AttachmentReference(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
+			null,
+			new int[0]
+		);
+		
+		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
+	}
+	
+	private void createImages(int width, int height) throws VulkanCodeException{
+		image = createTexture(width, height, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
+		mssaImage = createTexture(width, height, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
+		try(var stack = MemoryStack.stackPush()){
+			var viewRef = stack.mallocLong(2);
+			var info = VkFramebufferCreateInfo.calloc(stack)
+			                                  .sType$Default()
+			                                  .renderPass(core.renderPass.handle)
+			                                  .pAttachments(viewRef)
+			                                  .width(width).height(height)
+			                                  .layers(1);
+			
+			var mssaView      = mssaImage.view;
+			var swapchainView = image.view;
+			viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
+			frameBuffer = VKCalls.vkCreateFramebuffer(core.device, info);
+		}
+		
+		core.transientGraphicsBuffs.syncAction(cmd -> {
+			cmd.imageMemoryBarrier(image.image, VkImageLayout.UNDEFINED, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, 1);
+		});
+	}
+	private void freeImages(TextureRegistry.Scope tScope){
+		tScope.releaseTexture(imageID);
+		frameBuffer.destroy();
+		image.destroy();
+		mssaImage.destroy();
+	}
+	
+	private boolean extentOk(Extent3D extent, int width, int height){
+		if(extent.equals(width, height, 1)) return true;
+		return extent.width>=width && extent.height>=height &&
+		       extent.width<=width*1.2 && extent.height<=height*1.2;
+	}
+	private void drawFB(TextureRegistry.Scope tScope, int width, int height){
+		ensureImage(tScope, width, height);
+		
+		try{
+			fence.waitFor();
+			fence.reset();
+			
+			cmdBuffer.reset();
+			cmdBuffer.begin();
+			
+			renderArea = new Extent2D(width, height);
+			try(var ignore = cmdBuffer.beginRenderPass(renderPass, frameBuffer, renderArea.asRect(), new Vector4f(0, 0, 0, 1))){
+				recordToBuff(renderArea, cmdBuffer, 0);
+			}
+			cmdBuffer.end();
+			
+			core.renderQueue.submit(cmdBuffer, fence);
+		}catch(VulkanCodeException e){
+			throw new RuntimeException("Failed to render", e);
+		}
+	}
+	
+	private Instant lastResize = Instant.now();
+	private void ensureImage(TextureRegistry.Scope tScope, int width, int height){
+		if(image == null || !extentOk(image.image.extent, width, height)){
+			recreateImage(tScope, (int)(width*1.1), (int)(height*1.1));
+			lastResize = Instant.now();
+		}else{
+			var now          = Instant.now();
+			var recentResize = Duration.between(lastResize, now).toMillis()<1000;
+			if(!recentResize && !image.image.extent.equals(width, height, 1)){
+				recreateImage(tScope, width, height);
+				lastResize = Instant.now();
+			}
+		}
+	}
+	
+	private void recreateImage(TextureRegistry.Scope tScope, int imgWidth, int imgHeight){
+		core.device.waitIdle();
+		if(image != null) freeImages(tScope);
+		try{
+			createImages(imgWidth, imgHeight);
+		}catch(VulkanCodeException e){
+			throw new RuntimeException("Failed to create images", e);
+		}
+		imageID = tScope.registerTextureAsID(image);
+	}
+	
+	@Override
+	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
+		if(image != null) freeImages(tScope);
+		grid1Res.destroy();
+		lineRes.destroy();
+		
+		cmdBuffer.destroy();
+		cmdPool.destroy();
+		
+		fence.destroy();
+		
+		renderPass.destroy();
+	}
+	
+	private void recordToBuff(Extent2D viewSize, CommandBuffer buf, int frameID) throws VulkanCodeException{
+		
+		renderAutoSizeByteGrid(viewSize, frameID, buf);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
 		
@@ -95,11 +275,10 @@ public class ByteGridComponent implements UIComponent{
 			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
 		sd.add(new MsdfFontRender.StringDraw(
 			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
-		fontRender.render(window, buf, frameID, sd);
+		fontRender.render(viewSize, buf, frameID, sd);
 		
-		renderDecimatedCurve(window, buf);
+		renderDecimatedCurve(viewSize, buf);
 	}
-	
 	
 	private static void testFontWave(List<MsdfFontRender.StringDraw> sd){
 		var pos = 0F;
@@ -116,7 +295,7 @@ public class ByteGridComponent implements UIComponent{
 		}
 	}
 	
-	private void renderDecimatedCurve(VulkanWindow window, CommandBuffer buf) throws VulkanCodeException{
+	private void renderDecimatedCurve(Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
 		var t = (System.currentTimeMillis())/500D;
 		
 		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
@@ -132,15 +311,17 @@ public class ByteGridComponent implements UIComponent{
 		
 		));
 		
-		lineRenderer.submit(window, buf, window.projectionMatrix2D, lineRes);
+		var projectionMatrix2D = new Matrix3x2f()
+			                         .translate(-1, -1)
+			                         .scale(2F/viewSize.width, 2F/viewSize.height);
+		lineRenderer.submit(viewSize, buf, projectionMatrix2D, lineRes);
 	}
 	
-	private void renderAutoSizeByteGrid(VulkanWindow window, int frameID, CommandBuffer buf) throws VulkanCodeException{
-		int byteCount  = 32*32;
-		var windowSize = window.swapchain.extent;
+	private void renderAutoSizeByteGrid(Extent2D viewSize, int frameID, CommandBuffer buf) throws VulkanCodeException{
+		int byteCount = 32*32;
 		
-		var res = ByteGridSize.compute(windowSize, byteCount);
-		byteGridRender.submit(window, buf, frameID, new Matrix4f().scale(res.byteSize), res.bytesPerRow, grid1Res);
+		var res = ByteGridSize.compute(viewSize, byteCount);
+		byteGridRender.submit(viewSize, buf, frameID, new Matrix4f().scale(res.byteSize), res.bytesPerRow, grid1Res);
 	}
 	
 	private record ByteGridSize(int bytesPerRow, float byteSize){

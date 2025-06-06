@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
@@ -17,6 +16,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
@@ -442,18 +442,17 @@ public class ByteGridRender implements VulkanResource{
 		}
 	}
 	
-	public void submit(VulkanWindow window, CommandBuffer buf, int frameID, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
-		var small  = resource.checkSmallBytes(transform);
-		var extent = window.swapchain.extent;
+	public void submit(Extent2D viewSize, CommandBuffer buf, int frameID, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
+		var small = resource.checkSmallBytes(transform);
 		
 		var pipeline = small? pipelineSimple : this.pipeline;
 		buf.bindPipeline(pipeline);
-		buf.setViewportScissor(new Rect2D(extent));
+		buf.setViewportScissor(new Rect2D(viewSize));
 		
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSets.get(frameID));
 		
 		var mat = new Matrix4f().translate(-1, -1, 0)
-		                        .scale(2F/extent.width, 2F/extent.height, 1)
+		                        .scale(2F/viewSize.width, 2F/viewSize.height, 1)
 		                        .mul(transform);
 		
 		var data = ByteBuffer.allocateDirect(PushConstant.SIZEOF);

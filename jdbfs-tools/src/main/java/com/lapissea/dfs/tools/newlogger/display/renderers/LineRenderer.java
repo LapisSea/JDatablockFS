@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
@@ -16,6 +15,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -170,10 +170,10 @@ public class LineRenderer implements VulkanResource{
 		
 	}
 	
-	public void submit(VulkanWindow window, CommandBuffer buf, Matrix3x2f pvm, RenderResource resource) throws VulkanCodeException{
+	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, RenderResource resource) throws VulkanCodeException{
 		buf.bindPipeline(pipeline);
 		
-		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
+		buf.setViewportScissor(new Rect2D(viewSize));
 		
 		buf.bindVertexBuffer(resource.vbos.buffer, 0, 0);
 		buf.bindIndexBuffer(resource.ibos.buffer, 0, resource.indexType);

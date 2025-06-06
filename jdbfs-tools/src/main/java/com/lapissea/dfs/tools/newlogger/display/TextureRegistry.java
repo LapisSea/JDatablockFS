@@ -71,6 +71,11 @@ public final class TextureRegistry{
 			texture.scopes.add(this);
 			return texture.id;
 		}
+		public long registerTextureAsID(VulkanTexture image){
+			var texture = registry().registerTexture(image, false);
+			texture.scopes.add(this);
+			return texture.id;
+		}
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
@@ -86,8 +91,10 @@ public final class TextureRegistry{
 		
 		private void releaseTexture(TexNode tx){
 			if(!tx.scopes.remove(this) || !tx.scopes.isEmpty()) return;
-			tx.texture.image.device.waitIdle();
-			tx.texture.destroy();
+			if(tx.owning){
+				tx.texture.image.device.waitIdle();
+				tx.texture.destroy();
+			}
 			textures.remove(tx.id);
 		}
 		
@@ -104,10 +111,12 @@ public final class TextureRegistry{
 		private final VulkanTexture texture;
 		private final Set<Scope>    scopes = Collections.synchronizedSet(new HashSet<>());
 		private final long          id;
+		private final boolean       owning;
 		
-		private TexNode(VulkanTexture texture, long id){
+		private TexNode(VulkanTexture texture, long id, boolean owning){
 			this.texture = texture;
 			this.id = id;
+			this.owning = owning;
 		}
 	}
 	
@@ -121,17 +130,17 @@ public final class TextureRegistry{
 	
 	private TexNode loadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
 		var texture = core.uploadTexture(width, height, pixels, format, mipLevels);
-		return registerTexture(texture);
+		return registerTexture(texture, true);
 	}
 	public long loadTextureAsID(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
 		return loadTexture(width, height, pixels, format, mipLevels).id;
 	}
 	
-	private TexNode registerTexture(VulkanTexture texture){
+	private TexNode registerTexture(VulkanTexture texture, boolean owning){
 		TexNode node;
 		synchronized(textures){
 			var id = idInc++;
-			node = new TexNode(texture, id);
+			node = new TexNode(texture, id, owning);
 			textures.put(id, node);
 		}
 		return node;

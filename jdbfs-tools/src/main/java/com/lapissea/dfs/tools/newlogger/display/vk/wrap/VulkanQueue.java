@@ -158,14 +158,17 @@ public class VulkanQueue implements VulkanResource{
 	}
 	
 	public void submitNow(CommandBuffer commandBuffer) throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush();
-		    var fence = device.createFence(false)){
-			
+		try(var fence = device.createFence(false)){
+			submit(commandBuffer, fence);
+			fence.waitFor();
+		}
+	}
+	public void submit(CommandBuffer commandBuffer, VkFence fence) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
 			var info = VkSubmitInfo.calloc(stack)
 			                       .sType$Default()
 			                       .pCommandBuffers(stack.pointers(commandBuffer.handle()));
 			VKCalls.vkQueueSubmit(value, info, fence);
-			fence.waitFor();
 		}
 	}
 	

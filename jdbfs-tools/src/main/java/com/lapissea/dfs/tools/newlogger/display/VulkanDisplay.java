@@ -34,7 +34,7 @@ public class VulkanDisplay implements AutoCloseable{
 	private static final class SettingsUI implements UIComponent{
 		
 		final ImBoolean imageViewerOpen = new ImBoolean();
-		final ImBoolean byteGridOpen    = new ImBoolean();
+		final ImBoolean byteGridOpen    = new ImBoolean(true);
 		
 		@Override
 		public void imRender(TextureRegistry.Scope tScope){
@@ -76,7 +76,7 @@ public class VulkanDisplay implements AutoCloseable{
 			var settings = new SettingsUI();
 			imHandler.addComponent(settings);
 			imHandler.addComponent(new ImageViewerComp(settings.imageViewerOpen));
-			imHandler.addComponent(new ByteGridComponent(settings.byteGridOpen, fontRender, byteGridRender, lineRenderer));
+			imHandler.addComponent(new ByteGridComponent(settings.byteGridOpen, core, fontRender, byteGridRender, lineRenderer));
 			
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);

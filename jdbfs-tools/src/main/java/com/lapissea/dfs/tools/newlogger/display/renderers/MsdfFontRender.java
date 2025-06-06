@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
@@ -19,11 +18,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
 import com.lapissea.util.UtilL;
+import org.joml.Matrix3x2f;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
@@ -235,7 +236,7 @@ public class MsdfFontRender implements VulkanResource{
 	private static float mapToRange(float actual, float start, float end){
 		return Math.max(0, Math.min(1, (actual - start)/(end - start)));
 	}
-	public void render(VulkanWindow window, CommandBuffer buf, int frameID, List<StringDraw> strs) throws VulkanCodeException{
+	public void render(Extent2D viewSize, CommandBuffer buf, int frameID, List<StringDraw> strs) throws VulkanCodeException{
 		if(strs.isEmpty()) return;
 		waitFullyCreated();
 		
@@ -244,11 +245,14 @@ public class MsdfFontRender implements VulkanResource{
 		ensureRequiredMemory(table, strs);
 		
 		buf.bindPipeline(pipeline);
-		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
+		buf.setViewportScissor(new Rect2D(viewSize));
 		
 		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, dsSets.get(frameID));
 		
-		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, window.projectionMatrix2D.get(new float[6]));
+		var projectionMatrix2D = new Matrix3x2f()
+			                         .translate(-1, -1)
+			                         .scale(2F/viewSize.width, 2F/viewSize.height);
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, projectionMatrix2D.get(new float[6]));
 		
 		int indirectInstanceCount = 0;
 		

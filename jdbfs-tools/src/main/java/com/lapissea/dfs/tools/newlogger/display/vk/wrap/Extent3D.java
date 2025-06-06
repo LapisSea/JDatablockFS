@@ -26,7 +26,10 @@ public class Extent3D{
 	
 	@Override
 	public final boolean equals(Object o){
-		return o instanceof Extent3D that && width == that.width && height == that.height && depth == that.depth;
+		return o instanceof Extent3D that && equals(that.width, that.height, that.depth);
+	}
+	public final boolean equals(int width, int height, int depth){
+		return this.width == width && this.height == height && this.depth == depth;
 	}
 	@Override
 	public int hashCode(){
