@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
+import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
-import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import imgui.ImGui;
@@ -36,8 +36,10 @@ public class ImHandler{
 		
 		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
 		imGuiImpl.init(window, true);
-		
-		components.add(new ImageViewerComp());
+	}
+	
+	public void addComponent(UIComponent component){
+		components.add(component);
 	}
 	
 	public void doFrame(){
@@ -76,7 +78,7 @@ public class ImHandler{
 		ImGui.end();
 	}
 	
-	public void close(){
+	public void close() throws VulkanCodeException{
 		for(UIComponent component : components){
 			component.unload(imGuiRenderer.textureScope);
 		}

@@ -8,6 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import imgui.ImGui;
 import imgui.flag.ImGuiInputTextFlags;
 import imgui.flag.ImGuiStyleVar;
+import imgui.type.ImBoolean;
 import imgui.type.ImString;
 
 import java.io.File;
@@ -25,6 +26,12 @@ public final class ImageViewerComp implements UIComponent{
 	private File  file;
 	
 	private final ImString imFile = new ImString();
+	
+	private final ImBoolean open;
+	public ImageViewerComp(ImBoolean open){
+		this.open = open;
+	}
+	
 	@Override
 	public void unload(TextureRegistry.Scope tScope){
 		if(state instanceof State.Ok(var id)){
@@ -37,8 +44,10 @@ public final class ImageViewerComp implements UIComponent{
 	@SuppressWarnings("DataFlowIssue")
 	@Override
 	public void imRender(TextureRegistry.Scope tScope){
+		if(!open.get()) return;
+		
 		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
-		if(ImGui.begin("Image viewer")){
+		if(ImGui.begin("Image viewer", open)){
 			if(ImGui.inputText("Image path", imFile, ImGuiInputTextFlags.AutoSelectAll)){
 				var f = new File(imFile.get());
 				if(!f.equals(file)){
