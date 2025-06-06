@@ -3,7 +3,6 @@ package com.lapissea.dfs.tools.newlogger.display;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
-import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
@@ -12,16 +11,13 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import org.joml.Matrix3x2f;
-import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
@@ -42,9 +38,7 @@ public class VulkanWindow implements AutoCloseable{
 	public List<VulkanTexture> mssaImages;
 	public List<FrameBuffer>   frameBuffers;
 	
-	public final Matrix3x2f                              projectionMatrix2D = new Matrix3x2f();
-	public final UniformBuffer<VulkanCore.GlobalUniform> globalUniforms;
-	public final VkDescriptorSet.PerFrame                globalUniformSets;
+	public final Matrix3x2f projectionMatrix2D = new Matrix3x2f();
 	
 	public final VulkanQueue.SwapSync renderQueue;
 	
@@ -69,10 +63,6 @@ public class VulkanWindow implements AutoCloseable{
 		Thread.ofVirtual().start(() -> window.setIcon(createVulkanIcon(128, 128)));
 		
 		surface = VKCalls.glfwCreateWindowSurface(core.instance, window.getHandle());
-		
-		globalUniforms = core.allocateUniformBuffer(4*4*Float.BYTES, false, VulkanCore.GlobalUniform::new);
-		globalUniformSets = core.globalUniformLayout.createDescriptorSetsPerFrame();
-		globalUniformSets.updateAll(List.of(new Descriptor.LayoutDescription.UniformBuff(0, globalUniforms)));
 		
 		createSwapchainContext();
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
@@ -154,9 +144,7 @@ public class VulkanWindow implements AutoCloseable{
 		
 		frameBuffers = createFrameBuffers();
 		
-		var e                = swapchain.extent;
-		var projectionMatrix = new Matrix4f().ortho(0, e.width, 0, e.height, -10, 10, true);
-		globalUniforms.updateAll(b -> b.mat(projectionMatrix));
+		var e = swapchain.extent;
 		
 		projectionMatrix2D.identity()
 		                  .translate(-1, -1)
@@ -196,11 +184,7 @@ public class VulkanWindow implements AutoCloseable{
 		destroySwapchainContext(true);
 		renderQueue.destroy();
 		
-		globalUniformSets.destroy();
-		globalUniforms.destroy();
-		
 		for(var renderResource : imguiResource) renderResource.destroy();
-		
 		
 		graphicsBuffs.forEach(CommandBuffer::destroy);
 		cmdPool.destroy();

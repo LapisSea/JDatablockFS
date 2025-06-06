@@ -216,11 +216,11 @@ public class MsdfFontRender implements VulkanResource{
 		                     .blending(VkPipeline.Blending.STANDARD)
 		                     .multisampling(core.physicalDevice.samples, true)
 		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .addDesriptorSetLayout(core.globalUniformLayout)
 		                     .addDesriptorSetLayout(dsLayoutConst)
 		                     .addDesriptorSetLayout(dsLayout)
 		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 0, (float)table.distanceRange)
 		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 1, (float)table.size)
+		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, Float.BYTES*3*2)
 		                     .build();
 	}
 	
@@ -244,9 +244,11 @@ public class MsdfFontRender implements VulkanResource{
 		ensureRequiredMemory(table, strs);
 		
 		buf.bindPipeline(pipeline);
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, window.globalUniformSets.get(frameID), dsSetConst, dsSets.get(frameID));
 		buf.setViewportScissor(new Rect2D(window.swapchain.extent));
 		
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, dsSets.get(frameID));
+		
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, window.projectionMatrix2D.get(new float[6]));
 		
 		int indirectInstanceCount = 0;
 		

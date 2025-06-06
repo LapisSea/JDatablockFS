@@ -5,7 +5,7 @@ layout (constant_id = 1) const float size = 1;
 layout (constant_id = 2) const bool BuiltInAA = false;
 
 
-layout (set = 1, binding = 1) uniform sampler2D msdf;
+layout (set = 0, binding = 1) uniform sampler2D msdf;
 
 layout (location = 0) out vec4 out_color;
 layout (location = 0) in vec2 uv;

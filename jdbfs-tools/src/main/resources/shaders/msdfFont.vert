@@ -38,15 +38,15 @@ struct Uniform {
     float xScale;
 };
 
-layout (set = 0, binding = 0) readonly uniform GlobalUniforms {
-    mat4 projectionMat;
-} gUbo;
+layout (push_constant) uniform Push {
+	mat3x2 modelViewProjection;
+} push;
 
-layout (set = 1, binding = 0) readonly buffer Letters { Letter data[]; } atlas;
+layout (set = 0, binding = 0) readonly buffer Letters { Letter data[]; } atlas;
 
-layout (set = 2, binding = 0) readonly buffer Uniforms { Uniform data[]; } in_ubo;
+layout (set = 1, binding = 0) readonly buffer Uniforms { Uniform data[]; } in_ubo;
 
-layout (set = 2, binding = 1) readonly buffer Rects { Rect data[]; } in_rects;
+layout (set = 1, binding = 1) readonly buffer Rects { Rect data[]; } in_rects;
 
 layout (location = 0) out vec2 uvOut;
 layout (location = 1) out float outline;
@@ -82,7 +82,7 @@ void main() {
     pos *= ubo.scale;
     pos += ubo.pos;
 
-    gl_Position = gUbo.projectionMat /* * gUbo.viewMat */ * vec4(pos, 0, 1.0);
+    gl_Position =  vec4(push.modelViewProjection * vec3(pos, 1.0), 0, 1);
 
     uvOut = vec2(u, v) / 65535;
     outline = ubo.outline;
