@@ -7,6 +7,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
+import java.time.Duration;
+
 public final class LogServerStart{
 	static{
 		//Eager init to reduce startup time
@@ -35,16 +37,23 @@ public final class LogServerStart{
 				System.exit(1);
 			}
 		});
+		boolean ingestStarted = false;
+		
 		var t = System.currentTimeMillis();
 		try(var display = new VulkanDisplay()){
 			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
 			ingestThread.start();
+			ingestStarted = true;
 			display.run();
 		}catch(VulkanCodeException e){
 			e.printStackTrace();
 		}finally{
-			if(server != null) server.stop();
-			ingestThread.join();
+			if(ingestStarted) do{
+				if(server != null){
+					server.stop();
+					ingestThread.join();
+				}
+			}while(!ingestThread.join(Duration.ofMillis(10)));
 		}
 	}
 }

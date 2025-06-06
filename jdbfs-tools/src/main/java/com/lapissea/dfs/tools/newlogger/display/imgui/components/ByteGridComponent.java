@@ -26,9 +26,9 @@ public class ByteGridComponent implements UIComponent{
 	
 	private final ImBoolean open;
 	
-	public final MsdfFontRender fontRender;
-	public final ByteGridRender byteGridRender;
-	public final LineRenderer   lineRenderer;
+	private final MsdfFontRender fontRender;
+	private final ByteGridRender byteGridRender;
+	private final LineRenderer   lineRenderer;
 	
 	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
 	private final LineRenderer.RenderResource   lineRes  = new LineRenderer.RenderResource();
