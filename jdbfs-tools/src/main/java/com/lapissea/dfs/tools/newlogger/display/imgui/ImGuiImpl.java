@@ -450,32 +450,29 @@ public class ImGuiImpl{
 		io.getMousePos(mousePosPrev);
 		
 		for(int n = 0; n<platformIO.getViewportsSize(); n++){
-			final ImGuiViewport viewport        = platformIO.getViewports(n);
-			final long          window          = viewport.getPlatformHandle();
-			final boolean       isWindowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0;
+			var viewport = platformIO.getViewports(n);
+			var vd       = (ViewportData)viewport.getPlatformUserData();
+			var window   = vd.window.getGlfwWindow();
 			
-			if(isWindowFocused){
+			if(window.isFocused()){
 				// (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
 				// When multi-viewports are enabled, all Dear ImGui positions are same as OS positions.
 				if(io.getWantSetMousePos()){
-					glfwSetCursorPos(window, mousePosPrev.x - viewport.getPosX(), mousePosPrev.y - viewport.getPosY());
+					window.mousePos.set((int)(mousePosPrev.x - viewport.getPosX()), (int)(mousePosPrev.y - viewport.getPosY()));
 				}
 				
 				// (Optional) Fallback to provide mouse position when focused (ImGui_ImplGlfw_CursorPosCallback already provides this when hovered or captured)
 				if(data.mouseWindow == -1){
-					double[] mx = {0}, my = {0};
-					glfwGetCursorPos(window, mx, my);
-					double mouseX = mx[0];
-					double mouseY = my[0];
+					int mouseX = window.mousePos.x();
+					int mouseY = window.mousePos.y();
 					if(io.hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)){
 						// Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when the mouse is on the upper-left corner of the app window)
 						// Multi-viewport mode: mouse position in OS absolute coordinates (io.MousePos is (0,0) when the mouse is on the upper-left of the primary monitor)
-						var pos = getWindowPos(window);
-						mouseX += pos.x;
-						mouseY += pos.y;
+						mouseX += window.pos.x();
+						mouseY += window.pos.y();
 					}
-					data.lastValidMousePos.set((float)mouseX, (float)mouseY);
-					io.addMousePosEvent((float)mouseX, (float)mouseY);
+					data.lastValidMousePos.set(mouseX, mouseY);
+					io.addMousePosEvent(mouseX, mouseY);
 				}
 			}
 			
@@ -491,8 +488,8 @@ public class ImGuiImpl{
 			// See https://github.com/glfw/glfw/issues/1236 if you want to help in making this a GLFW feature.
 			
 			boolean windowNoInput = viewport.hasFlags(ImGuiViewportFlags.NoInputs);
-			glfwSetWindowAttrib(window, GLFW_MOUSE_PASSTHROUGH, windowNoInput? GLFW_TRUE : GLFW_FALSE);
-			if(glfwGetWindowAttrib(window, GLFW_HOVERED) == GLFW_TRUE && !windowNoInput){
+			glfwSetWindowAttrib(window.getHandle(), GLFW_MOUSE_PASSTHROUGH, windowNoInput? GLFW_TRUE : GLFW_FALSE);
+			if(glfwGetWindowAttrib(window.getHandle(), GLFW_HOVERED) == GLFW_TRUE && !windowNoInput){
 				mouseViewportId = viewport.getID();
 			}
 			// else
@@ -636,13 +633,12 @@ public class ImGuiImpl{
 				workSizeY = monitorWorkAreaHeight[0];
 			}
 			
-			float dpiScale = 0;
 			
 			// Warning: the validity of monitor DPI information on Windows depends on the application DPI awareness settings,
 			// which generally needs to be set in the manifest or at runtime.
 			float[] monitorContentScaleX = {0}, monitorContentScaleY = {0};
 			glfwGetMonitorContentScale(monitor, monitorContentScaleX, monitorContentScaleY);
-			dpiScale = (monitorContentScaleX[0] + monitorContentScaleY[0])/2;
+			var dpiScale = (monitorContentScaleX[0] + monitorContentScaleY[0])/2;
 			
 			platformIO.pushMonitors(monitor, mainPosX, mainPosY, mainSizeX, mainSizeY, workPosX, workPosY, workSizeX, workSizeY, dpiScale);
 		}

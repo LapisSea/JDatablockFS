@@ -26,6 +26,9 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(E value){
 		return new Flags<>(value.getDeclaringClass(), value.bit());
 	}
+	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(E value1, E value2){
+		return new Flags<>(value1.getDeclaringClass(), value1.bit()|value2.bit());
+	}
 	@SafeVarargs
 	public static <E extends Enum<E> & VUtils.FlagSetValue> Flags<E> of(E... values){
 		return of(Arrays.asList(values));

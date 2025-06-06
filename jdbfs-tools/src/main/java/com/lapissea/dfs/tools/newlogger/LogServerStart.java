@@ -44,7 +44,7 @@ public final class LogServerStart{
 			e.printStackTrace();
 		}finally{
 			if(server != null) server.stop();
+			ingestThread.join();
 		}
-		ingestThread.join();
 	}
 }
