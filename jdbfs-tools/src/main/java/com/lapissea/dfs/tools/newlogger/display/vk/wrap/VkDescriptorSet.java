@@ -46,6 +46,12 @@ public class VkDescriptorSet extends VulkanResource.DeviceHandleObj{
 		this.pool = pool;
 	}
 	
+	public void update(Descriptor.LayoutDescription.BindData binding){
+		update(List.of(binding), -1);
+	}
+	public void update(List<Descriptor.LayoutDescription.BindData> bindings){
+		update(bindings, -1);
+	}
 	public void update(List<Descriptor.LayoutDescription.BindData> bindings, int id){
 		
 		try(MemoryStack stack = MemoryStack.stackPush()){

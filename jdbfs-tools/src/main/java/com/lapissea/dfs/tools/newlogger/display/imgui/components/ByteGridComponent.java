@@ -124,6 +124,7 @@ public class ByteGridComponent implements UIComponent{
 	
 	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
 	private final LineRenderer.RenderResource   lineRes  = new LineRenderer.RenderResource();
+	private final MsdfFontRender.RenderResource fontRes  = new MsdfFontRender.RenderResource();
 	
 	private final CommandPool cmdPool;
 	private final RenderPass  renderPass;
@@ -221,7 +222,7 @@ public class ByteGridComponent implements UIComponent{
 			
 			var area = renderTarget.renderArea = new Extent2D(width, height);
 			try(var ignore = cmdBuffer.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
-				recordToBuff(area, cmdBuffer, 0);
+				recordToBuff(area, cmdBuffer);
 			}
 			cmdBuffer.end();
 			
@@ -258,12 +259,13 @@ public class ByteGridComponent implements UIComponent{
 		if(renderTarget != null) renderTarget.destroy();
 		grid1Res.destroy();
 		lineRes.destroy();
+		fontRes.destroy();
 		
 		cmdPool.destroy();
 		renderPass.destroy();
 	}
 	
-	private void recordToBuff(Extent2D viewSize, CommandBuffer buf, int frameID) throws VulkanCodeException{
+	private void recordToBuff(Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
 		
 		renderAutoSizeByteGrid(viewSize, buf);
 		
@@ -275,7 +277,7 @@ public class ByteGridComponent implements UIComponent{
 			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
 		sd.add(new MsdfFontRender.StringDraw(
 			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
-		fontRender.render(viewSize, buf, frameID, sd);
+		fontRender.render(viewSize, buf, fontRes, sd);
 		
 		renderDecimatedCurve(viewSize, buf);
 	}
