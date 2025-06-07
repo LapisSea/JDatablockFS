@@ -265,7 +265,7 @@ public class ByteGridComponent implements UIComponent{
 	
 	private void recordToBuff(Extent2D viewSize, CommandBuffer buf, int frameID) throws VulkanCodeException{
 		
-		renderAutoSizeByteGrid(viewSize, frameID, buf);
+		renderAutoSizeByteGrid(viewSize, buf);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
 		
@@ -317,11 +317,11 @@ public class ByteGridComponent implements UIComponent{
 		lineRenderer.submit(viewSize, buf, projectionMatrix2D, lineRes);
 	}
 	
-	private void renderAutoSizeByteGrid(Extent2D viewSize, int frameID, CommandBuffer buf) throws VulkanCodeException{
+	private void renderAutoSizeByteGrid(Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
 		int byteCount = 32*32;
 		
 		var res = ByteGridSize.compute(viewSize, byteCount);
-		byteGridRender.submit(viewSize, buf, frameID, new Matrix4f().scale(res.byteSize), res.bytesPerRow, grid1Res);
+		byteGridRender.submit(viewSize, buf, new Matrix4f().scale(res.byteSize), res.bytesPerRow, grid1Res);
 	}
 	
 	private record ByteGridSize(int bytesPerRow, float byteSize){

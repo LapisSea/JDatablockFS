@@ -180,8 +180,8 @@ public class ByteGridRender implements VulkanResource{
 	
 	public static final class RenderResource implements VulkanResource{
 		
-		private VkDescriptorSet.PerFrame dsSets;
-		private BackedVkBuffer           bytesInfo;
+		private VkDescriptorSet dsSet;
+		private BackedVkBuffer  bytesInfo;
 		
 		private IndirectDrawBuffer indirectDrawBuff;
 		
@@ -196,14 +196,14 @@ public class ByteGridRender implements VulkanResource{
 		}
 		
 		private void updateDescriptor(){
-			dsSets.updateAll(List.of(
+			dsSet.update(List.of(
 				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer)
-			));
+			), -1);
 		}
 		@Override
 		public void destroy() throws VulkanCodeException{
 			if(bytesInfo != null){
-				dsSets.destroy();
+				dsSet.destroy();
 				bytesInfo.destroy();
 				indirectDrawBuff.destroy();
 			}
@@ -378,7 +378,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	public void record(RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		if(resource.indirectDrawBuff == null){
-			resource.dsSets = dsLayout.createDescriptorSetsPerFrame();
+			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
 		}
 		
@@ -442,14 +442,14 @@ public class ByteGridRender implements VulkanResource{
 		}
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer buf, int frameID, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
+	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
 		var small = resource.checkSmallBytes(transform);
 		
 		var pipeline = small? pipelineSimple : this.pipeline;
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(viewSize));
 		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSets.get(frameID));
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSet);
 		
 		var mat = new Matrix4f().translate(-1, -1, 0)
 		                        .scale(2F/viewSize.width, 2F/viewSize.height, 1)
