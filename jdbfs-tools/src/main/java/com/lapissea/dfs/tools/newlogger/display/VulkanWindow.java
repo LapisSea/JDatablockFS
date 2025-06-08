@@ -100,7 +100,7 @@ public class VulkanWindow implements AutoCloseable{
 		}
 		createSwapchainContext();
 		
-		if(swapchain.images.size() != graphicsBuffs.size()){
+		if(swapchain != null && swapchain.images.size() != graphicsBuffs.size()){
 			graphicsBuffs.forEach(CommandBuffer::destroy);
 			graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		}

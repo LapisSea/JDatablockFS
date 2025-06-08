@@ -22,7 +22,8 @@ import org.lwjgl.glfw.GLFW;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+
+import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
 public class VulkanDisplay implements AutoCloseable{
 	
@@ -92,6 +93,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var winFile = new File("winRemember.json");
 		win.loadState(winFile);
 		win.autoHandleStateSaving(winFile);
+		if(win.size.equals(0, 0)) win.size.set(100, 100);
 		
 		return window;
 	}
@@ -99,7 +101,7 @@ public class VulkanDisplay implements AutoCloseable{
 	private void render(VulkanWindow window) throws VulkanCodeException{
 		if(window.swapchain == null){
 			UtilL.sleep(50);
-			handleResize(window);
+			window.recreateSwapchainContext();
 			return;
 		}
 		var swap = renderQueue(window);
@@ -121,94 +123,44 @@ public class VulkanDisplay implements AutoCloseable{
 		return present;
 	}
 	
-	private boolean resizing;
-	private Instant nextResizeWaitAttempt = Instant.now();
-	private void handleResize(VulkanWindow window) throws VulkanCodeException{
-		resizing = true;
-		try{
-			window.recreateSwapchainContext();
-			if(window.swapchain == null){
-				return;
-			}
-			core.device.waitIdle();
-			try{
-				var swap = renderQueue(window);
-				core.renderQueue.present(List.of(swap));
-			}catch(VulkanCodeException e2){
-				switch(e2.code){
-					case SUBOPTIMAL_KHR, ERROR_OUT_OF_DATE_KHR -> { }
-					default -> throw new RuntimeException("Failed to render frame", e2);
-				}
-			}
-		}finally{
-			resizing = false;
-		}
+	public void run() throws VulkanCodeException{
+		var window = this.window.getGlfwWindow();
 		
-	}
-	private void onResizeEvent(){
-		var now = Instant.now();
-		if(now.isBefore(nextResizeWaitAttempt)){
-			return;
-		}
-		var end = now.plusMillis(50);
-		if(!resizing){
-			for(int i = 0; i<50; i++){
-				if(resizing || Instant.now().isAfter(end)){
-					break;
-				}
-				UtilL.sleep(0.5);
+		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), (window1, width, height) -> {
+			try{
+				this.window.recreateSwapchainContext();
+			}catch(VulkanCodeException e){
+				window.requestClose();
+				throw new RuntimeException("Failed to render", e);
 			}
-		}
-		for(int i = 0; i<100; i++){
-			if(!resizing || Instant.now().isAfter(end)){
-				break;
+			renderAndSwap();
+		});
+		
+		var lastTime = Instant.now();
+		while(!window.shouldClose()){
+			glfwPollEvents();
+			while(Duration.between(lastTime, Instant.now()).compareTo(Duration.ofMillis(6))<0){
+				glfwPollEvents();
+				UtilL.sleep(1);
 			}
-			UtilL.sleep(0.5);
-		}
-		if(resizing){
-			nextResizeWaitAttempt = Instant.now().plusMillis(1000);
+			lastTime = Instant.now();
+			renderAndSwap();
 		}
 	}
 	
-	public void run() throws VulkanCodeException{
-		var window = this.window.getGlfwWindow();
-//		window.size.register(this::onResizeEvent); //TODO: async render/event loop
-
-//		Thread.ofPlatform().start(() -> {
-		var lastTime = Instant.now();
-		while(!window.shouldClose()){
-			while(Duration.between(lastTime, Instant.now()).compareTo(Duration.ofMillis(6))<0) UtilL.sleep(1);
-			lastTime = Instant.now();
-			
-			window.grabContext();
-			window.pollEvents();
-			imHandler.doFrame();
-			
+	private void renderAndSwap(){
+		if(window.swapchain == null || window.getGlfwWindow().size.equals(0, 0)){
+			return;
+		}
+		try{
+			imHandler.newFrame();
 			render(this.window);
 			ImGui.renderPlatformWindowsDefault();
-			
-			if(core.executeSwaps()){
-				render(this.window);
-				ImGui.renderPlatformWindowsDefault();
-				
-				core.executeSwaps();
-				core.device.waitIdle();
-			}
+			core.executeSwaps();
+		}catch(VulkanCodeException e){
+			window.requestClose();
+			throw new RuntimeException("Failed to render", e);
 		}
-//		});
-//
-//		window.whileOpen(() -> {
-//			try{
-//				Thread.sleep(5);
-//			}catch(InterruptedException e){ requestClose(); }
-//
-//			window.grabContext();
-//			window.pollEvents();
-//  //		imHandler.poolWindowEvents();
-//		});
-	}
-	private void requestClose(){
-		window.requestClose();
 	}
 	
 	@Override

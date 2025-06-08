@@ -39,7 +39,7 @@ public class ImHandler{
 		components.add(component);
 	}
 	
-	public void doFrame(){
+	public void newFrame(){
 		imGuiRenderer.checkFonts();
 		imGuiImpl.newFrame();
 		ImGui.newFrame();
