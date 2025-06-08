@@ -158,7 +158,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			var width  = (int)ImGui.getContentRegionAvailX();
 			var height = (int)ImGui.getContentRegionAvailY();
 			
-			if(needsRerender()){
+			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
 				drawFB(tScope, width, height);
 			}
 			
@@ -175,23 +175,20 @@ public abstract class BackbufferComponent implements UIComponent{
 	private void drawFB(TextureRegistry.Scope tScope, int width, int height){
 		ensureImage(tScope, width, height);
 		
-		var fence     = renderTarget.fence;
-		var cmdBuffer = renderTarget.cmdBuffer;
-		
 		try{
-			fence.waitFor();
-			fence.reset();
+			renderTarget.fence.waitReset();
 			
-			cmdBuffer.reset();
-			cmdBuffer.begin();
+			var buff = renderTarget.cmdBuffer;
+			buff.reset();
+			buff.begin();
 			
 			var area = renderTarget.renderArea = new Extent2D(width, height);
-			try(var ignore = cmdBuffer.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
-				renderBackbuffer(area, cmdBuffer);
+			try(var ignore = buff.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
+				renderBackbuffer(area, buff);
 			}
-			cmdBuffer.end();
+			buff.end();
 			
-			core.renderQueue.submit(cmdBuffer, fence);
+			core.renderQueue.submit(buff, renderTarget.fence);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to render", e);
 		}

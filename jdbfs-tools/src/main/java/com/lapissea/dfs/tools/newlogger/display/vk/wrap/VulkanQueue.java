@@ -40,9 +40,7 @@ public class VulkanQueue implements VulkanResource{
 		}
 		
 		public void waitForFrameDone(int frame) throws VulkanCodeException{
-			var fence = inFlightRender[frame];
-			fence.waitFor();
-			fence.reset();
+			inFlightRender[frame].waitReset();
 		}
 		
 		public int acquireNextImage(Swapchain swapchain, int frame) throws VulkanCodeException{

@@ -32,7 +32,10 @@ public class Extent2D{
 	
 	@Override
 	public final boolean equals(Object o){
-		return o instanceof Extent2D that && width == that.width && height == that.height;
+		return o instanceof Extent2D that && equals(that.width, that.height);
+	}
+	public final boolean equals(int width, int height){
+		return this.width == width && this.height == height;
 	}
 	@Override
 	public int hashCode(){

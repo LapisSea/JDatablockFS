@@ -342,8 +342,7 @@ public class VulkanCore implements AutoCloseable{
 		return Iters.from(physicalDevice.families).filter(e -> e.capabilities.contains(capability));
 	}
 	
-	private static final Set<String> WHITELISTED_ERROR_IDS = Set.of();
-	private static final Set<String> IGNORE_IDS            = new HashSet<>(Set.of("Loader Message"));
+	private static final Set<String> IGNORE_IDS = new HashSet<>(Set.of("Loader Message"));
 	
 	private synchronized boolean debugLogCallback(DebugLoggerEXT.Severity severity, EnumSet<DebugLoggerEXT.Type> messageTypes, String message, String messageIDName, long[] handles){
 		if(severity == DebugLoggerEXT.Severity.INFO && IGNORE_IDS.contains(messageIDName)){
@@ -378,11 +377,7 @@ public class VulkanCore implements AutoCloseable{
 					err.addSuppressed(ctorInit);
 				}
 			}
-			err.printStackTrace();
-			if(!WHITELISTED_ERROR_IDS.contains(messageIDName)){
-				System.exit(1);
-				return true;
-			}
+			throw err;
 		}else{
 			Log.log(msgFinal);
 		}
