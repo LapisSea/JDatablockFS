@@ -112,7 +112,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		lineRenderer.record(lineRes, Iters.concat1N(
 			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
 			Iters.from(controlPoints)
-			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED))
+			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED, false))
 			     .toList()
 		
 		));

@@ -1,5 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import org.joml.Intersectionf;
+import org.joml.Matrix2f;
 import org.joml.Vector2f;
 
 import java.awt.Color;
@@ -13,7 +15,7 @@ public final class Geometry{
 		PointsLine toPoints();
 	}
 	
-	public record PointsLine(List<Vector2f> points, float width, Color color) implements Path{
+	public record PointsLine(List<Vector2f> points, float width, Color color, boolean miterJoints) implements Path{
 		@Override
 		public PointsLine toPoints(){ return this; }
 	}
@@ -23,7 +25,7 @@ public final class Geometry{
 		public PointsLine toPoints(){
 			var points  = catmullRomToInterpolated(controlPoints, resolution);
 			var reduced = epsilon>0? douglasPeuckerReduce(points, epsilon) : points;
-			return new PointsLine(reduced, width, color);
+			return new PointsLine(reduced, width, color, false);
 		}
 	}
 	
@@ -61,29 +63,40 @@ public final class Geometry{
 		float halfWidth = line.width()*0.5f;
 		Color color     = line.color();
 		
-		for(int i = 0, s = pts.size(); i<s; i++){
+		{
+			Vector2f p1    = pts.get(0), p2 = pts.get(1);
+			double   angle = -Math.atan2(p1.y - p2.y, p1.x - p2.x);
+			Vector2f mx    = new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
+			verts[vertPos++] = new Vertex(p1.add(mx, new Vector2f()), color);
+			verts[vertPos++] = new Vertex(p1.sub(mx, new Vector2f()), color);
+		}
+		
+		var intersect = new Vector2f();
+		for(int i = 1, s = pts.size() - 1; i<s; i++){
+			var prev    = pts.get(i - 1);
 			var current = pts.get(i);
+			var next    = pts.get(i + 1);
 			
-			var dir = new Vector2f();
-			
-			if(i == 0){
-				var next = pts.get(i + 1);
-				current.sub(next, dir);
-			}else if(i<pts.size() - 1){
-				var prev = pts.get(i - 1);
-				var next = pts.get(i + 1);
-				prev.sub(current, dir);
-				dir.add(current.sub(next, new Vector2f()));
+			if(line.miterJoints && computeMitterIntersect(prev, current, next, halfWidth, intersect)){
+				var intersect1 = new Vector2f(intersect);
+				var intersect2 = new Vector2f(intersect).add(current.sub(intersect, new Vector2f()).mul(2));
+				
+				verts[vertPos++] = new Vertex(intersect1, color);
+				verts[vertPos++] = new Vertex(intersect2, color);
 			}else{
-				var prev = pts.get(i - 1);
-				prev.sub(current, dir);
+				var mx = computeAvgAngleOff(prev, current, next, halfWidth);
+				verts[vertPos++] = new Vertex(current.add(mx, new Vector2f()), color);
+				verts[vertPos++] = new Vertex(current.sub(mx, new Vector2f()), color);
 			}
-			var angle = -Math.atan2(dir.y, dir.x);
-			
-			var mx = new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
-			
-			verts[vertPos++] = new Vertex(current.add(mx, new Vector2f()), color);
-			verts[vertPos++] = new Vertex(current.sub(mx, new Vector2f()), color);
+		}
+		
+		{
+			int      i     = pts.size() - 1;
+			Vector2f p1    = pts.get(i), p2 = pts.get(i - 1);
+			double   angle = -Math.atan2(p2.y - p1.y, p2.x - p1.x);
+			Vector2f mx    = new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
+			verts[vertPos++] = new Vertex(p1.add(mx, new Vector2f()), color);
+			verts[vertPos++] = new Vertex(p1.sub(mx, new Vector2f()), color);
 		}
 		
 		int[] quad1 = {0, 1, 2,
@@ -107,6 +120,35 @@ public final class Geometry{
 		assert idxPos == indices.length;
 		
 		return new IndexedMesh(verts, indices);
+	}
+	
+	private static Vector2f computeAvgAngleOff(Vector2f prev, Vector2f current, Vector2f next, float halfWidth){
+		var dir = new Vector2f();
+		prev.sub(current, dir);
+		dir.normalize().add(current.sub(next, new Vector2f()).normalize());
+		
+		var angle = -Math.atan2(dir.y, dir.x);
+		
+		return new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
+	}
+	private static boolean computeMitterIntersect(Vector2f prev, Vector2f current, Vector2f next, float width, Vector2f intersect){
+		var dir1 = prev.sub(current, new Vector2f()).normalize(width).mul(new Matrix2f().rotate((float)(Math.PI/2)));
+		var dir2 = current.sub(next, new Vector2f()).normalize(width).mul(new Matrix2f().rotate((float)(Math.PI/2)));
+		
+		var segment1l1p1 = prev.add(dir1, new Vector2f());
+		var segment1l1p2 = current.add(dir1, new Vector2f());
+		
+		var segment1l2p1 = current.add(dir2, new Vector2f());
+		var segment1l2p2 = next.add(dir2, new Vector2f());
+		
+		if(!Intersectionf.intersectLineLine(segment1l1p1.x, segment1l1p1.y, segment1l1p2.x, segment1l1p2.y,
+		                                    segment1l2p1.x, segment1l2p1.y, segment1l2p2.x, segment1l2p2.y, intersect)) return false;
+		
+		var off = intersect.sub(current, new Vector2f());
+		if(off.length()>width*4){
+			intersect.set(current).add(off.normalize(width*4));
+		}
+		return true;
 	}
 	
 	
