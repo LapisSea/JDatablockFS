@@ -79,7 +79,13 @@ public class VulkanWindow implements AutoCloseable{
 		var frame = renderQueue.nextFrame();
 		renderQueue.waitForFrameDone(frame);
 		
-		var index = renderQueue.acquireNextImage(swapchain, frame);
+		int index;
+		try{
+			index = renderQueue.acquireNextImage(swapchain, frame);
+		}catch(VulkanRecreateSwapchainException rec){
+			recreateSwapchainContext();
+			index = renderQueue.acquireNextImage(swapchain, frame);
+		}
 		
 		var buf = graphicsBuffs.get(frame);
 		var fb  = frameBuffers.get(index);
