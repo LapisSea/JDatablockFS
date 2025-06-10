@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -173,7 +174,7 @@ public class MsdfFontRender implements VulkanResource{
 	private VkDescriptorSetLayout dsLayoutConst;
 	private VkDescriptorSet       dsSetConst;
 	
-	private VkPipeline pipeline;
+	private VkPipelineSet pipelines;
 	
 	private void createResources() throws VulkanCodeException{
 		createPipeline();
@@ -199,16 +200,18 @@ public class MsdfFontRender implements VulkanResource{
 		
 		var table = tableRes.join();
 		
-		pipeline = VkPipeline.builder(core.renderPass, shader)
-		                     .blending(VkPipeline.Blending.STANDARD)
-		                     .multisampling(core.physicalDevice.samples, true)
-		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .addDesriptorSetLayout(dsLayoutConst)
-		                     .addDesriptorSetLayout(dsLayout)
-		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 0, (float)table.distanceRange)
-		                     .specializationValue(VkShaderStageFlag.FRAGMENT, 1, (float)table.size)
-		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, Float.BYTES*3*2)
-		                     .build();
+		pipelines = new VkPipelineSet(rp -> {
+			return VkPipeline.builder(rp, shader)
+			                 .blending(VkPipeline.Blending.STANDARD)
+			                 .multisampling(rp.samples, true)
+			                 .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+			                 .addDesriptorSetLayout(dsLayoutConst)
+			                 .addDesriptorSetLayout(dsLayout)
+			                 .specializationValue(VkShaderStageFlag.FRAGMENT, 0, (float)table.distanceRange)
+			                 .specializationValue(VkShaderStageFlag.FRAGMENT, 1, (float)table.size)
+			                 .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, Float.BYTES*3*2)
+			                 .build();
+		});
 	}
 	
 	public record StringDraw(float pixelHeight, Color color, String string, float x, float y, float xScale, float outline){
@@ -246,6 +249,7 @@ public class MsdfFontRender implements VulkanResource{
 		
 		ensureRequiredMemory(table, resource, strs);
 		
+		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(viewSize));
 		
@@ -400,7 +404,7 @@ public class MsdfFontRender implements VulkanResource{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
-		pipeline.destroy();
+		pipelines.destroy();
 		
 		dsLayout.destroy();
 		

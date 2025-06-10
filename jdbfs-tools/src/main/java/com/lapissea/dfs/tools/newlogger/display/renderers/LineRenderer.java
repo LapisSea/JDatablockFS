@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -105,21 +106,23 @@ public class LineRenderer implements VulkanResource{
 	
 	private final VulkanCore core;
 	
-	private final VkPipeline pipeline;
+	private final VkPipelineSet pipelines;
 	
 	public LineRenderer(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
 		shader = new ShaderModuleSet(core, "Line", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		pipeline = VkPipeline.builder(core.renderPass, shader)
-		                     .blending(VkPipeline.Blending.STANDARD)
-		                     .multisampling(core.physicalDevice.samples, false)
-		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, Vert.XY)
-		                     .addVertexInput(1, 0, core.device.color8bitFormat, Vert.COLOR)
-		                     .addVertexInputBinding(0, Vert.SIZEOF, VkVertexInputRate.VERTEX)
-		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
-		                     .build();
+		pipelines = new VkPipelineSet(
+			rp -> VkPipeline.builder(rp, shader)
+			                .blending(VkPipeline.Blending.STANDARD)
+			                .multisampling(rp.samples, false)
+			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+			                .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, Vert.XY)
+			                .addVertexInput(1, 0, core.device.color8bitFormat, Vert.COLOR)
+			                .addVertexInputBinding(0, Vert.SIZEOF, VkVertexInputRate.VERTEX)
+			                .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
+			                .build()
+		);
 	}
 	
 	public void record(RenderResource resource, Iterable<Geometry.Path> paths) throws VulkanCodeException{
@@ -171,6 +174,7 @@ public class LineRenderer implements VulkanResource{
 	}
 	
 	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, RenderResource resource) throws VulkanCodeException{
+		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		
 		buf.setViewportScissor(new Rect2D(viewSize));
@@ -183,7 +187,7 @@ public class LineRenderer implements VulkanResource{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
-		pipeline.destroy();
+		pipelines.destroy();
 		shader.destroy();
 	}
 }

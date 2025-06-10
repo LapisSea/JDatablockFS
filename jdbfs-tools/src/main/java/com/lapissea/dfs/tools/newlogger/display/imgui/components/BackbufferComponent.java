@@ -8,22 +8,17 @@ import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent3D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import imgui.ImGui;
 import imgui.flag.ImGuiStyleVar;
@@ -34,7 +29,6 @@ import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 public abstract class BackbufferComponent implements UIComponent{
 	
@@ -50,16 +44,16 @@ public abstract class BackbufferComponent implements UIComponent{
 		private final TextureRegistry.Scope tScope;
 		private       Extent2D              renderArea;
 		
-		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height) throws VulkanCodeException{
+		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height, VkFormat format) throws VulkanCodeException{
 			this.tScope = tScope;
-			image = createTexture(core, width, height, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
-			mssaImage = createTexture(core, width, height, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
+			image = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
+			mssaImage = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
 			
 			try(var stack = MemoryStack.stackPush()){
 				var viewRef = stack.mallocLong(2);
 				var info = VkFramebufferCreateInfo.calloc(stack)
 				                                  .sType$Default()
-				                                  .renderPass(core.renderPass.handle)
+				                                  .renderPass(core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL).handle)
 				                                  .pAttachments(viewRef)
 				                                  .width(width).height(height)
 				                                  .layers(1);
@@ -78,10 +72,8 @@ public abstract class BackbufferComponent implements UIComponent{
 		
 		Extent3D size(){ return image.image.extent; }
 		
-		private VulkanTexture createTexture(VulkanCore core, int width, int height, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
-			var image = core.device.createImage(width, height, VkFormat.R8G8B8A8_UNORM,
-			                                    usage,
-			                                    samples, 1);
+		private VulkanTexture createTexture(VulkanCore core, int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+			var image  = core.device.createImage(width, height, format, usage, samples, 1);
 			var memory = image.allocateAndBindRequiredMemory(core.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
 			var view   = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
 			return new VulkanTexture(image, memory, view, core.defaultSampler, false);
@@ -105,7 +97,6 @@ public abstract class BackbufferComponent implements UIComponent{
 	}
 	
 	private final CommandPool cmdPool;
-	private final RenderPass  renderPass;
 	
 	private RenderTarget renderTarget;
 	
@@ -116,38 +107,10 @@ public abstract class BackbufferComponent implements UIComponent{
 		this.core = core;
 		this.open = open;
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
-		renderPass = createRenderPass(core.device, VkFormat.R8G8B8A8_UNORM);
 	}
 	
 	protected abstract boolean needsRerender();
 	protected abstract void renderBackbuffer(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException;
-	
-	private RenderPass createRenderPass(Device device, VkFormat colorFormat) throws VulkanCodeException{
-		var physicalDevice = device.physicalDevice;
-		var mssaAttachment = new RenderPass.AttachmentInfo(
-			colorFormat,
-			physicalDevice.samples,
-			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
-			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
-		);
-		var presentAttachment = new RenderPass.AttachmentInfo(
-			colorFormat,
-			VkSampleCountFlag.N1,
-			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
-			VkImageLayout.UNDEFINED, VkImageLayout.SHADER_READ_ONLY_OPTIMAL
-		);
-		
-		var subpass = new RenderPass.SubpassInfo(
-			VkPipelineBindPoint.GRAPHICS,
-			List.of(),
-			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
-			List.of(new RenderPass.AttachmentReference(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
-			null,
-			new int[0]
-		);
-		
-		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
-	}
 	
 	@Override
 	public void imRender(TextureRegistry.Scope tScope){
@@ -182,7 +145,8 @@ public abstract class BackbufferComponent implements UIComponent{
 			buff.reset();
 			buff.begin();
 			
-			var area = renderTarget.renderArea = new Extent2D(width, height);
+			var area       = renderTarget.renderArea = new Extent2D(width, height);
+			var renderPass = core.getRenderPass(VkFormat.R8G8B8A8_UNORM, core.physicalDevice.samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 			try(var ignore = buff.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
 				renderBackbuffer(area, buff);
 			}
@@ -210,7 +174,7 @@ public abstract class BackbufferComponent implements UIComponent{
 		core.device.waitIdle();
 		if(renderTarget != null) renderTarget.destroy();
 		try{
-			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight);
+			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to create images", e);
 		}
@@ -220,6 +184,5 @@ public abstract class BackbufferComponent implements UIComponent{
 	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
 		if(renderTarget != null) renderTarget.destroy();
 		cmdPool.destroy();
-		renderPass.destroy();
 	}
 }

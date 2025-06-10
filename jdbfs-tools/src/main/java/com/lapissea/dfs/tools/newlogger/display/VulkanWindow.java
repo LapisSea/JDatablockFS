@@ -7,13 +7,17 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Swapchain;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
@@ -48,7 +52,7 @@ public class VulkanWindow implements AutoCloseable{
 	public final List<ImGUIRenderer.RenderResource> imguiResource
 		= Iters.rangeMap(0, VulkanCore.MAX_IN_FLIGHT_FRAMES, i -> new ImGUIRenderer.RenderResource()).toList();
 	
-	public VulkanWindow(VulkanCore core, boolean decorated, boolean alwaysOnTop) throws VulkanCodeException{
+	public VulkanWindow(VulkanCore core, boolean decorated, boolean alwaysOnTop, VkSampleCountFlag renderSamples) throws VulkanCodeException{
 		this.core = core;
 		
 		window = new GlfwWindow();
@@ -64,7 +68,7 @@ public class VulkanWindow implements AutoCloseable{
 		
 		surface = VKCalls.glfwCreateWindowSurface(core.instance, window.getHandle());
 		
-		createSwapchainContext();
+		createSwapchainContext(renderSamples);
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		renderQueue = core.renderQueue.withSwap();
@@ -100,16 +104,23 @@ public class VulkanWindow implements AutoCloseable{
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
+		recreateSwapchainContext(getRenderTargetSampleCount());
+	}
+	public void recreateSwapchainContext(VkSampleCountFlag renderSamples) throws VulkanCodeException{
 		core.device.waitIdle();
 		if(swapchain != null){
 			destroySwapchainContext(false);
 		}
-		createSwapchainContext();
+		createSwapchainContext(renderSamples);
 		
 		if(swapchain != null && swapchain.images.size() != graphicsBuffs.size()){
 			graphicsBuffs.forEach(CommandBuffer::destroy);
 			graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		}
+	}
+	
+	public VkSampleCountFlag getRenderTargetSampleCount(){
+		return mssaImages == null? VkSampleCountFlag.N1 : mssaImages.getFirst().image.samples;
 	}
 	
 	
@@ -119,13 +130,12 @@ public class VulkanWindow implements AutoCloseable{
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 		
 		frameBuffers.forEach(FrameBuffer::destroy);
-		mssaImages.forEach(VulkanTexture::destroy);
+		if(mssaImages != null) mssaImages.forEach(VulkanTexture::destroy);
 		if(destroySwapchain) swapchain.destroy();
 	}
 	
-	private void createSwapchainContext() throws VulkanCodeException{
-		var device         = core.device;
-		var physicalDevice = device.physicalDevice;
+	private void createSwapchainContext(VkSampleCountFlag renderSamples) throws VulkanCodeException{
+		var device = core.device;
 		
 		var oldSwapchain = swapchain;
 		swapchain = device.createSwapchain(oldSwapchain, surface, core.preferredPresentMode, VulkanCore.PREFERRED_SWAPCHAIN_FORMATS);
@@ -133,20 +143,23 @@ public class VulkanWindow implements AutoCloseable{
 		if(swapchain == null){
 			return;
 		}
-		
-		var images = new ArrayList<VulkanTexture>(swapchain.images.size());
-		for(int i = 0; i<swapchain.images.size(); i++){
-			var image = device.createImage(swapchain.extent.width, swapchain.extent.height, swapchain.formatColor.format,
-			                               Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT),
-			                               physicalDevice.samples, 1);
-			
-			var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
-			
-			var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
-			
-			images.add(new VulkanTexture(image, memory, view, null, false));
+		if(renderSamples != VkSampleCountFlag.N1){
+			var images = new ArrayList<VulkanTexture>(swapchain.images.size());
+			for(int i = 0; i<swapchain.images.size(); i++){
+				var image = device.createImage(swapchain.extent.width, swapchain.extent.height, swapchain.formatColor.format,
+				                               Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT),
+				                               renderSamples, 1);
+				
+				var memory = image.allocateAndBindRequiredMemory(device.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
+				
+				var view = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
+				
+				images.add(new VulkanTexture(image, memory, view, null, false));
+			}
+			mssaImages = List.copyOf(images);
+		}else{
+			mssaImages = null;
 		}
-		mssaImages = List.copyOf(images);
 		
 		frameBuffers = createFrameBuffers();
 		
@@ -159,11 +172,16 @@ public class VulkanWindow implements AutoCloseable{
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
-			var viewRef = stack.mallocLong(2);
+			
+			List<List<VkImageView>> viewStack = new ArrayList<>(2);
+			if(mssaImages != null) viewStack.add(Iters.from(mssaImages).map(e -> e.view).toList());
+			viewStack.add(swapchain.imageViews);
+			
+			var viewRefs = stack.mallocLong(viewStack.size());
 			var info = VkFramebufferCreateInfo.calloc(stack)
 			                                  .sType$Default()
-			                                  .renderPass(core.renderPass.handle)
-			                                  .pAttachments(viewRef)
+			                                  .renderPass(getSurfaceRenderPass().handle)
+			                                  .pAttachments(viewRefs)
 			                                  .width(swapchain.extent.width)
 			                                  .height(swapchain.extent.height)
 			                                  .layers(1);
@@ -171,13 +189,16 @@ public class VulkanWindow implements AutoCloseable{
 			var views = swapchain.imageViews;
 			var fbs   = new ArrayList<FrameBuffer>(views.size());
 			for(int i = 0; i<views.size(); i++){
-				var mssaView      = mssaImages.get(i).view;
-				var swapchainView = views.get(i);
-				viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
+				viewRefs.clear();
+				for(var part : viewStack) viewRefs.put(part.get(i).handle);
 				fbs.add(VKCalls.vkCreateFramebuffer(core.device, info));
 			}
 			return List.copyOf(fbs);
 		}
+	}
+	
+	public RenderPass getSurfaceRenderPass(){
+		return core.getRenderPass(swapchain.formatColor.format, getRenderTargetSampleCount(), VkImageLayout.PRESENT_SRC_KHR);
 	}
 	
 	public void requestClose(){

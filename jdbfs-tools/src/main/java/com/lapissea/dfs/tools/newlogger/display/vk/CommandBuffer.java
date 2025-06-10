@@ -166,7 +166,10 @@ public class CommandBuffer implements VulkanResource{
 		void close();
 	}
 	
+	private RenderPass currentRenderPass;
+	
 	public RenderPassScope beginRenderPass(RenderPass renderPass, FrameBuffer frameBuffer, Rect2D renderArea, Vector4f clearColor){
+		assert currentRenderPass == null;
 		try(var stack = MemoryStack.stackPush()){
 			var cc = VkClearColorValue.malloc(stack);
 			clearColor.get(cc.float32());
@@ -179,9 +182,16 @@ public class CommandBuffer implements VulkanResource{
 			                                .pClearValues(VkClearValue.malloc(2, stack).color(cc).position(1).color(cc).position(0));
 			
 			VK10.vkCmdBeginRenderPass(val, info, VK10.VK_SUBPASS_CONTENTS_INLINE);
-			
-			return () -> VK10.vkCmdEndRenderPass(val);
+			currentRenderPass = renderPass;
+			return () -> {
+				VK10.vkCmdEndRenderPass(val);
+				currentRenderPass = null;
+			};
 		}
+	}
+	
+	public RenderPass getCurrentRenderPass(){
+		return currentRenderPass;
 	}
 	
 	private VkPipeline currentPipeline;

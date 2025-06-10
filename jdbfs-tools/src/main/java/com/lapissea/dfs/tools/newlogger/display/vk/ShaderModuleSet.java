@@ -22,8 +22,10 @@ public class ShaderModuleSet extends AbstractList<ShaderModule> implements Vulka
 			for(ShaderType type : types){
 				tasks.add(CompletableFuture.supplyAsync(() -> {
 					try{
-						var spirv = core.sourceToSpirv(name, type);
-						return core.createShaderModule(spirv, type);
+						var spirv  = core.sourceToSpirv(name, type);
+						var module = core.createShaderModule(spirv, type);
+						module.name = name;
+						return module;
 					}catch(VulkanCodeException e){
 						throw UtilL.uncheckedThrow(e);
 					}

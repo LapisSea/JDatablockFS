@@ -75,6 +75,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
@@ -167,7 +168,6 @@ public class VulkanCore implements AutoCloseable{
 	public final QueueFamilyProps transferQueueFamily;
 	
 	public final VulkanQueue.SwapSync renderQueue;
-	public       RenderPass           renderPass;
 	public final TransferBuffers      transferBuffers;
 	public final TransferBuffers      transientGraphicsBuffs;
 	
@@ -226,11 +226,6 @@ public class VulkanCore implements AutoCloseable{
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.UNIFORM_BUFFER)
 		));
 		
-		
-		VkFormat format = chooseFormat();
-		renderPass = createRenderPass(device, format);
-		
-		
 		Log.trace("Finished initializing VulkanCore");
 	}
 	
@@ -244,6 +239,20 @@ public class VulkanCore implements AutoCloseable{
 			window.destroy();
 		}
 		return format;
+	}
+	
+	private record RPI(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout){ }
+	
+	private final Map<RPI, RenderPass> renderPasses = new ConcurrentHashMap<>();
+	
+	public RenderPass getRenderPass(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout){
+		return renderPasses.computeIfAbsent(new RPI(colorFormat, samples, finalColorLayout), r -> {
+			try{
+				return createRenderPass(device, r);
+			}catch(VulkanCodeException e){
+				throw new RuntimeException("Failed to create render pass", e);
+			}
+		});
 	}
 	
 	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
@@ -319,31 +328,37 @@ public class VulkanCore implements AutoCloseable{
 		return spirv;
 	}
 	
-	private static RenderPass createRenderPass(Device device, VkFormat colorFormat) throws VulkanCodeException{
-		var physicalDevice = device.physicalDevice;
-		var mssaAttachment = new RenderPass.AttachmentInfo(
-			colorFormat,
-			physicalDevice.samples,
-			VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
-			VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
-		);
+	private static RenderPass createRenderPass(Device device, RPI rpi) throws VulkanCodeException{
 		var presentAttachment = new RenderPass.AttachmentInfo(
-			colorFormat,
+			rpi.colorFormat,
 			VkSampleCountFlag.N1,
 			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
-			VkImageLayout.UNDEFINED, VkImageLayout.PRESENT_SRC_KHR
+			VkImageLayout.UNDEFINED, rpi.finalColorLayout
 		);
 		
-		var subpass = new RenderPass.SubpassInfo(
-			VkPipelineBindPoint.GRAPHICS,
-			List.of(),
-			List.of(new RenderPass.AttachmentReference(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
-			List.of(new RenderPass.AttachmentReference(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)),
-			null,
-			new int[0]
-		);
 		
-		return device.buildRenderPass().attachment(mssaAttachment).attachment(presentAttachment).subpass(subpass).build();
+		var build = device.buildRenderPass();
+		if(rpi.samples != VkSampleCountFlag.N1){
+			var mssaAttachment = new RenderPass.AttachmentInfo(
+				rpi.colorFormat,
+				rpi.samples,
+				VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+				VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
+			);
+			build.attachment(mssaAttachment).attachment(presentAttachment);
+			
+			build.subpass(new RenderPass.SubpassInfo(VkPipelineBindPoint.GRAPHICS)
+				              .colorAttachment(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)
+				              .resolveAttachment(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL));
+		}else{
+			build.attachment(presentAttachment);
+			
+			build.subpass(new RenderPass.SubpassInfo(VkPipelineBindPoint.GRAPHICS)
+				              .colorAttachment(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL));
+		}
+		var rp = build.build();
+		rp.samples = rpi.samples;
+		return rp;
 	}
 	
 	public IterablePP<QueueFamilyProps> queueFamiliesBy(VkQueueFlag capability){
@@ -493,7 +508,9 @@ public class VulkanCore implements AutoCloseable{
 		
 		defaultSampler.destroy();
 		
-		renderPass.destroy();
+		renderPasses.values().forEach(RenderPass::destroy);
+		renderPasses.clear();
+		
 		device.destroy();
 		
 		if(debugLog != null) debugLog.destroy();

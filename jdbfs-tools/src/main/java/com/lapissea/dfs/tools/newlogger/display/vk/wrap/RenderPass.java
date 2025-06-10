@@ -12,6 +12,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
@@ -63,6 +64,39 @@ public class RenderPass extends VulkanResource.DeviceHandleObj{
 		@Nullable AttachmentReference depthStencilAttachment,
 		int[] preserveAttachments
 	){
+		public SubpassInfo(VkPipelineBindPoint pipelineBindPoint){
+			this(pipelineBindPoint, List.of(), List.of(), List.of(), null, new int[0]);
+		}
+		
+		public SubpassInfo inputAttachment(int attachment, VkImageLayout layout){
+			return new SubpassInfo(
+				pipelineBindPoint,
+				Iters.concatN1(inputAttachments, new AttachmentReference(attachment, layout)).toList(),
+				colorAttachments, resolveAttachments, depthStencilAttachment, preserveAttachments
+			);
+		}
+		public SubpassInfo colorAttachment(int attachment, VkImageLayout layout){
+			return new SubpassInfo(
+				pipelineBindPoint, inputAttachments,
+				Iters.concatN1(colorAttachments, new AttachmentReference(attachment, layout)).toList(),
+				resolveAttachments, depthStencilAttachment, preserveAttachments
+			);
+		}
+		public SubpassInfo resolveAttachment(int attachment, VkImageLayout layout){
+			return new SubpassInfo(
+				pipelineBindPoint, inputAttachments, colorAttachments,
+				Iters.concatN1(resolveAttachments, new AttachmentReference(attachment, layout)).toList(),
+				depthStencilAttachment, preserveAttachments
+			);
+		}
+		public SubpassInfo depthStencilAttachment(int attachment, VkImageLayout layout){
+			return new SubpassInfo(
+				pipelineBindPoint, inputAttachments, colorAttachments, resolveAttachments,
+				new AttachmentReference(attachment, layout),
+				preserveAttachments
+			);
+		}
+		
 		private VkAttachmentReference.Buffer attachments(MemoryStack stack, List<AttachmentReference> refs){
 			if(refs.isEmpty()){
 				return null;
@@ -173,6 +207,8 @@ public class RenderPass extends VulkanResource.DeviceHandleObj{
 			}
 		}
 	}
+	
+	public VkSampleCountFlag samples;
 	
 	private boolean destroyed;
 	

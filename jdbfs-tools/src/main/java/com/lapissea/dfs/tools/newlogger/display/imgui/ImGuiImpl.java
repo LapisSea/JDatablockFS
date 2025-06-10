@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import imgui.ImGui;
@@ -408,7 +409,7 @@ public class ImGuiImpl{
 		}
 		
 		try{
-			cachedClosedWindow = new VulkanWindow(core, false, false);
+			cachedClosedWindow = new VulkanWindow(core, false, false, VkSampleCountFlag.N1);
 		}catch(VulkanCodeException e){ throw new RuntimeException(e); }
 		
 		return true;
@@ -755,7 +756,7 @@ public class ImGuiImpl{
 		VulkanWindow w;
 		try{
 			if(cachedClosedWindow == null){
-				w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration), vp.hasFlags(ImGuiViewportFlags.TopMost));
+				w = new VulkanWindow(core, !vp.hasFlags(ImGuiViewportFlags.NoDecoration), vp.hasFlags(ImGuiViewportFlags.TopMost), VkSampleCountFlag.N1);
 			}else{
 				w = cachedClosedWindow;
 				cachedClosedWindow = null;
@@ -887,9 +888,9 @@ public class ImGuiImpl{
 		try{
 			core.pushSwap(vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 				try(var ignore = buf.beginRenderPass(
-					core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
+					win.getSurfaceRenderPass(), fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), vp.getDrawData());
+					imGUIRenderer.submit(buf, win.imguiResource.get(frameID), vp.getDrawData());
 				}
 			}));
 		}catch(VulkanCodeException e){

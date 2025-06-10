@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
+import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -77,7 +78,7 @@ public class ImGUIRenderer implements VulkanResource{
 	
 	private final VulkanCore core;
 	
-	private final VkPipeline pipeline;
+	private final VkPipelineSet pipelines;
 	
 	private final VkDescriptorSetLayout dsLayoutTexture;
 	
@@ -93,23 +94,24 @@ public class ImGUIRenderer implements VulkanResource{
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.FRAGMENT, VkDescriptorType.COMBINED_IMAGE_SAMPLER)
 		);
 		
-		pipeline = VkPipeline.builder(core.renderPass, shader)
-		                     .blending(VkPipeline.Blending.STANDARD)
-		                     .multisampling(core.physicalDevice.samples, false)
-		                     .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                     .cullMode(VkCullModeFlag.NONE)
-		                     .addDesriptorSetLayout(dsLayoutTexture)
-		                     .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.IS_MASK_OFF)
-		                     .addPushConstantRange(VkShaderStageFlag.FRAGMENT, PushConstant.IS_MASK_OFF, Integer.BYTES)
-		                     .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, 0)
-		                     .addVertexInput(1, 0, VkFormat.R32G32_SFLOAT, 4*2)
-		                     .addVertexInput(2, 0, VkFormat.R8G8B8A8_UNORM, 4*4)
-		                     .addVertexInputBinding(0, ImDrawData.sizeOfImDrawVert(), VkVertexInputRate.VERTEX)
-		                     .build();
-		
+		pipelines = new VkPipelineSet(
+			rp -> VkPipeline.builder(rp, shader)
+			                .blending(VkPipeline.Blending.STANDARD)
+			                .multisampling(rp.samples, false)
+			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+			                .cullMode(VkCullModeFlag.NONE)
+			                .addDesriptorSetLayout(dsLayoutTexture)
+			                .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.IS_MASK_OFF)
+			                .addPushConstantRange(VkShaderStageFlag.FRAGMENT, PushConstant.IS_MASK_OFF, Integer.BYTES)
+			                .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, 0)
+			                .addVertexInput(1, 0, VkFormat.R32G32_SFLOAT, 4*2)
+			                .addVertexInput(2, 0, VkFormat.R8G8B8A8_UNORM, 4*4)
+			                .addVertexInputBinding(0, ImDrawData.sizeOfImDrawVert(), VkVertexInputRate.VERTEX)
+			                .build()
+		);
 	}
 	
-	public void submit(CommandBuffer buf, int frameID, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
+	public void submit(CommandBuffer buf, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
 		if(drawData.isNotValidPtr()) return;
 		
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
@@ -141,6 +143,8 @@ public class ImGUIRenderer implements VulkanResource{
 		
 		long    lastTextureID = -1;
 		boolean isMask        = true;
+		
+		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		
 		buf.bindPipeline(pipeline);
 		buf.setViewport(new Rect2D((int)winSize.x, (int)winSize.y));
@@ -215,7 +219,7 @@ public class ImGUIRenderer implements VulkanResource{
 		
 		dsLayoutTexture.destroy();
 		
-		pipeline.destroy();
+		pipelines.destroy();
 		textureScope.destroy();
 		shader.destroy();
 	}

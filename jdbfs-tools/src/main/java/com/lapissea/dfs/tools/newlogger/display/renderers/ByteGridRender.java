@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -18,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
@@ -227,8 +229,8 @@ public class ByteGridRender implements VulkanResource{
 	private final VkDescriptorSet       dsSetConst;
 	
 	private final VkDescriptorSetLayout dsLayout;
-	private final VkPipeline            pipeline;
-	private final VkPipeline            pipelineSimple;
+	private final VkPipelineSet         pipelines;
+	private final VkPipelineSet         pipelinesSimple;
 	
 	public ByteGridRender(VulkanCore core) throws VulkanCodeException{
 		this.core = core;
@@ -251,17 +253,21 @@ public class ByteGridRender implements VulkanResource{
 		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
 			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
 		);
-		var builder = VkPipeline.builder(core.renderPass, shader)
-		                        .blending(VkPipeline.Blending.STANDARD)
-		                        .multisampling(core.physicalDevice.samples, false)
-		                        .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
-		                        .addDesriptorSetLayout(dsLayoutConst)
-		                        .addDesriptorSetLayout(dsLayout)
-		                        .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZEOF);
-		pipeline = builder.build();
-		pipelineSimple = builder.specializationValue(VkShaderStageFlag.VERTEX, 0, true)
-		                        .build();
-		
+		pipelines = new VkPipelineSet(rp -> basePipeline(rp).build());
+		pipelinesSimple = new VkPipelineSet(rp -> {
+			return basePipeline(rp)
+				       .specializationValue(VkShaderStageFlag.VERTEX, 0, true)
+				       .build();
+		});
+	}
+	private VkPipeline.Builder basePipeline(RenderPass rp){
+		return VkPipeline.builder(rp, shader)
+		                 .blending(VkPipeline.Blending.STANDARD)
+		                 .multisampling(rp.samples, false)
+		                 .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
+		                 .addDesriptorSetLayout(dsLayoutConst)
+		                 .addDesriptorSetLayout(dsLayout)
+		                 .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZEOF);
 	}
 	
 	private record ByteVerts(MeshInfo[] infos, BackedVkBuffer verts){ }
@@ -445,7 +451,7 @@ public class ByteGridRender implements VulkanResource{
 	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
 		var small = resource.checkSmallBytes(transform);
 		
-		var pipeline = small? pipelineSimple : this.pipeline;
+		var pipeline = (small? pipelinesSimple : pipelines).get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(viewSize));
 		
@@ -465,8 +471,8 @@ public class ByteGridRender implements VulkanResource{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
-		pipeline.destroy();
-		pipelineSimple.destroy();
+		pipelines.destroy();
+		pipelinesSimple.destroy();
 		
 		dsLayout.destroy();
 		

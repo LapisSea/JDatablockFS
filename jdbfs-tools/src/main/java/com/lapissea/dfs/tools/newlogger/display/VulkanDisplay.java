@@ -10,7 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.UtilL;
@@ -28,7 +28,6 @@ import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 public class VulkanDisplay implements AutoCloseable{
 	
 	static{
-		Thread.ofVirtual().start(ImGui::init);
 		Thread.ofVirtual().start(GlfwWindow::initGLFW);
 	}
 	
@@ -62,7 +61,6 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public VulkanDisplay(){
 		try{
-			ImGui.setCurrentContext(ImGui.createContext());
 			core = new VulkanCore("DFS debugger", VKPresentMode.IMMEDIATE);
 			
 			window = createMainWindow();
@@ -85,7 +83,7 @@ public class VulkanDisplay implements AutoCloseable{
 	}
 	
 	private VulkanWindow createMainWindow() throws VulkanCodeException{
-		var window = new VulkanWindow(core, true, false);
+		var window = new VulkanWindow(core, true, false, VkSampleCountFlag.N1);
 		
 		var win = window.getGlfwWindow();
 		win.registryKeyboardKey.register(GLFW.GLFW_KEY_ESCAPE, GlfwKeyboardEvent.Type.DOWN, e -> window.requestClose());
@@ -100,31 +98,21 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private void render(VulkanWindow window) throws VulkanCodeException{
 		if(window.swapchain == null){
-			UtilL.sleep(50);
 			window.recreateSwapchainContext();
 			return;
 		}
-		var swap = renderQueue(window);
-		core.pushSwap(swap);
-	}
-	
-	private VulkanQueue.SwapSync.PresentFrame renderQueue(VulkanWindow window) throws VulkanCodeException{
-		var present = window.renderQueueNoSwap((win, frameID, buf, fb) -> {
-			try(var ignore = buf.beginRenderPass(core.renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))){
-				imGUIRenderer.submit(buf, frameID, win.imguiResource.get(frameID), ImGui.getMainViewport().getDrawData());
-			}
-		});
 		
-		var w = window.getGlfwWindow();
-		if(!w.isVisible() && !w.shouldClose()){
-			core.device.waitIdle();
-			w.show();
-		}
-		return present;
+		core.pushSwap(window.renderQueueNoSwap((win, frameID, buf, fb) -> {
+			var renderPass = win.getSurfaceRenderPass();
+			try(var ignore = buf.beginRenderPass(renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))){
+				imGUIRenderer.submit(buf, win.imguiResource.get(frameID), ImGui.getMainViewport().getDrawData());
+			}
+		}));
 	}
 	
 	public void run() throws VulkanCodeException{
 		var window = this.window.getGlfwWindow();
+		window.show();
 		
 		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), (window1, width, height) -> {
 			try{

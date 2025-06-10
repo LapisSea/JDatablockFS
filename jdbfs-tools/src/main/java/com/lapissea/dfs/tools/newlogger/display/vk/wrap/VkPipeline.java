@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
@@ -97,7 +98,7 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 	}
 	public static final class Builder{
 		
-		private final RenderPass         renderPass;
+		private       RenderPass         renderPass;
 		private       int                subpass;
 		private final List<ShaderModule> modules;
 		
