@@ -24,6 +24,11 @@ public class Extent3D{
 		return VkExtent3D.malloc(mem).set(width, height, depth);
 	}
 	
+	public Extent2D to2D(){
+		if(depth != 1) throw new IllegalStateException("Only depth = 1 extents can be converted to 2d ones");
+		return new Extent2D(width, height);
+	}
+	
 	@Override
 	public final boolean equals(Object o){
 		return o instanceof Extent3D that && equals(that.width, that.height, that.depth);

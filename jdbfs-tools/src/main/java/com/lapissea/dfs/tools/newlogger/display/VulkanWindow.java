@@ -27,6 +27,7 @@ import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
 
@@ -40,7 +41,9 @@ public class VulkanWindow implements AutoCloseable{
 	
 	public Swapchain           swapchain;
 	public List<VulkanTexture> mssaImages;
-	public List<FrameBuffer>   frameBuffers;
+	
+	private List<FrameBuffer> frameBuffers;
+	private RenderPass        surfaceRenderPass;
 	
 	public final Matrix3x2f projectionMatrix2D = new Matrix3x2f();
 	
@@ -161,6 +164,7 @@ public class VulkanWindow implements AutoCloseable{
 			mssaImages = null;
 		}
 		
+		surfaceRenderPass = core.getRenderPass(swapchain.formatColor.format, getRenderTargetSampleCount(), VkImageLayout.PRESENT_SRC_KHR);
 		frameBuffers = createFrameBuffers();
 		
 		var e = swapchain.extent;
@@ -198,7 +202,7 @@ public class VulkanWindow implements AutoCloseable{
 	}
 	
 	public RenderPass getSurfaceRenderPass(){
-		return core.getRenderPass(swapchain.formatColor.format, getRenderTargetSampleCount(), VkImageLayout.PRESENT_SRC_KHR);
+		return Objects.requireNonNull(surfaceRenderPass);
 	}
 	
 	public void requestClose(){

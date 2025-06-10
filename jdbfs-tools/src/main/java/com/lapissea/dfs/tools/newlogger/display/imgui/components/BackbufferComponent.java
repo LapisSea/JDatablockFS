@@ -79,9 +79,9 @@ public abstract class BackbufferComponent implements UIComponent{
 			return buff.beginRenderPass(renderPass, frameBuffer, renderArea.asRect(), clearColor);
 		}
 		
-		Extent3D size(){ return image.image.extent; }
+		private Extent2D size(){ return image.image.extent.to2D(); }
 		
-		private VulkanTexture createTexture(VulkanCore core, int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
+		private static VulkanTexture createTexture(VulkanCore core, int width, int height, VkFormat format, Flags<VkImageUsageFlag> usage, VkSampleCountFlag samples) throws VulkanCodeException{
 			var image  = core.device.createImage(width, height, format, usage, samples, 1);
 			var memory = image.allocateAndBindRequiredMemory(core.physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
 			var view   = image.createImageView(VkImageViewType.TYPE_2D, image.format, VkImageAspectFlag.COLOR);
@@ -172,7 +172,7 @@ public abstract class BackbufferComponent implements UIComponent{
 		}else{
 			var now          = Instant.now();
 			var recentResize = Duration.between(renderTarget.creationTime, now).compareTo(Duration.ofMillis(1000))<0;
-			if(!recentResize && !renderTarget.size().equals(width, height, 1)){
+			if(!recentResize && !renderTarget.size().equals(width, height)){
 				recreateImage(tScope, width, height);
 			}
 		}
