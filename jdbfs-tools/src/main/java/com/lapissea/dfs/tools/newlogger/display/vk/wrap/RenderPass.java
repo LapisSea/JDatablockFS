@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -18,12 +19,15 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkAttachmentDescription;
 import org.lwjgl.vulkan.VkAttachmentReference;
+import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkSubpassDependency;
 import org.lwjgl.vulkan.VkSubpassDescription;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 public class RenderPass extends VulkanResource.DeviceHandleObj{
 	
@@ -208,12 +212,49 @@ public class RenderPass extends VulkanResource.DeviceHandleObj{
 		}
 	}
 	
+	public enum AttachmentSlot{
+		MULTISAMPLE_INTERMEDIATE_IMAGE,
+		RESULT_IMAGE
+	}
+	
 	public VkSampleCountFlag samples;
+	
+	public Map<AttachmentSlot, Integer> attachmentMap;
 	
 	private boolean destroyed;
 	
 	public RenderPass(Device device, long handle){
 		super(device, handle);
+	}
+	
+	public FrameBuffer createFrameBuffer(Map<AttachmentSlot, VkImageView> attachments, Extent2D extent) throws VulkanCodeException{
+		try(var stack = MemoryStack.stackPush()){
+			var viewRefs = stack.callocLong(Iters.values(attachmentMap).mapToInt().max().orElseThrow() + 1);
+			var info = VkFramebufferCreateInfo.calloc(stack)
+			                                  .sType$Default()
+			                                  .renderPass(handle)
+			                                  .pAttachments(viewRefs)
+			                                  .width(extent.width)
+			                                  .height(extent.height)
+			                                  .layers(1);
+			
+			EnumSet<AttachmentSlot> presentSlots = EnumSet.noneOf(AttachmentSlot.class);
+			for(var e : attachmentMap.entrySet()){
+				var slot  = e.getKey();
+				var index = e.getValue();
+				
+				var view = attachments.get(slot);
+				if(view == null) continue;
+				presentSlots.add(slot);
+				viewRefs.put(index, view.handle);
+			}
+			if(!presentSlots.equals(attachmentMap.keySet())){
+				throw new IllegalArgumentException(
+					Log.fmt("Render pass requires {}#yellow attachments but {}#red have been provided!", attachments.keySet(), presentSlots)
+				);
+			}
+			return VKCalls.vkCreateFramebuffer(device, info);
+		}
 	}
 	
 	@Override

@@ -22,11 +22,11 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import org.joml.Matrix3x2f;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static com.lapissea.dfs.tools.newlogger.display.VUtils.createVulkanIcon;
@@ -175,30 +175,14 @@ public class VulkanWindow implements AutoCloseable{
 	}
 	
 	private List<FrameBuffer> createFrameBuffers() throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			
-			List<List<VkImageView>> viewStack = new ArrayList<>(2);
-			if(mssaImages != null) viewStack.add(Iters.from(mssaImages).map(e -> e.view).toList());
-			viewStack.add(swapchain.imageViews);
-			
-			var viewRefs = stack.mallocLong(viewStack.size());
-			var info = VkFramebufferCreateInfo.calloc(stack)
-			                                  .sType$Default()
-			                                  .renderPass(getSurfaceRenderPass().handle)
-			                                  .pAttachments(viewRefs)
-			                                  .width(swapchain.extent.width)
-			                                  .height(swapchain.extent.height)
-			                                  .layers(1);
-			
-			var views = swapchain.imageViews;
-			var fbs   = new ArrayList<FrameBuffer>(views.size());
-			for(int i = 0; i<views.size(); i++){
-				viewRefs.clear();
-				for(var part : viewStack) viewRefs.put(part.get(i).handle);
-				fbs.add(VKCalls.vkCreateFramebuffer(core.device, info));
-			}
-			return List.copyOf(fbs);
+		var fbs = new ArrayList<FrameBuffer>(swapchain.imageViews.size());
+		for(int i = 0; i<swapchain.imageViews.size(); i++){
+			Map<RenderPass.AttachmentSlot, VkImageView> attachments = new HashMap<>();
+			attachments.put(RenderPass.AttachmentSlot.RESULT_IMAGE, swapchain.imageViews.get(i));
+			if(mssaImages != null) attachments.put(RenderPass.AttachmentSlot.MULTISAMPLE_INTERMEDIATE_IMAGE, mssaImages.get(i).view);
+			fbs.add(getSurfaceRenderPass().createFrameBuffer(attachments, swapchain.extent));
 		}
+		return List.copyOf(fbs);
 	}
 	
 	public RenderPass getSurfaceRenderPass(){

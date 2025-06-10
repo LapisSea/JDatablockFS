@@ -68,6 +68,7 @@ import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -336,6 +337,7 @@ public class VulkanCore implements AutoCloseable{
 			VkImageLayout.UNDEFINED, rpi.finalColorLayout
 		);
 		
+		var attachments = new EnumMap<RenderPass.AttachmentSlot, Integer>(RenderPass.AttachmentSlot.class);
 		
 		var build = device.buildRenderPass();
 		if(rpi.samples != VkSampleCountFlag.N1){
@@ -350,14 +352,18 @@ public class VulkanCore implements AutoCloseable{
 			build.subpass(new RenderPass.SubpassInfo(VkPipelineBindPoint.GRAPHICS)
 				              .colorAttachment(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL)
 				              .resolveAttachment(1, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL));
+			attachments.put(RenderPass.AttachmentSlot.MULTISAMPLE_INTERMEDIATE_IMAGE, 0);
+			attachments.put(RenderPass.AttachmentSlot.RESULT_IMAGE, 1);
 		}else{
 			build.attachment(presentAttachment);
 			
 			build.subpass(new RenderPass.SubpassInfo(VkPipelineBindPoint.GRAPHICS)
 				              .colorAttachment(0, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL));
+			attachments.put(RenderPass.AttachmentSlot.RESULT_IMAGE, 0);
 		}
 		var rp = build.build();
 		rp.samples = rpi.samples;
+		rp.attachmentMap = attachments;
 		return rp;
 	}
 	

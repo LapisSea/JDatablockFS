@@ -5,7 +5,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
-import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
@@ -17,19 +16,19 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent3D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import imgui.ImGui;
 import imgui.flag.ImGuiStyleVar;
 import imgui.type.ImBoolean;
 import org.joml.Vector4f;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 public abstract class BackbufferComponent implements UIComponent{
 	
@@ -54,20 +53,10 @@ public abstract class BackbufferComponent implements UIComponent{
 			
 			renderPass = core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 			
-			try(var stack = MemoryStack.stackPush()){
-				var viewRef = stack.mallocLong(2);
-				var info = VkFramebufferCreateInfo.calloc(stack)
-				                                  .sType$Default()
-				                                  .renderPass(renderPass.handle)
-				                                  .pAttachments(viewRef)
-				                                  .width(width).height(height)
-				                                  .layers(1);
-				
-				var mssaView      = mssaImage.view;
-				var swapchainView = image.view;
-				viewRef.clear().put(mssaView.handle).put(swapchainView.handle).flip();
-				frameBuffer = VKCalls.vkCreateFramebuffer(core.device, info);
-			}
+			Map<RenderPass.AttachmentSlot, VkImageView> attachments = new HashMap<>();
+			attachments.put(RenderPass.AttachmentSlot.RESULT_IMAGE, image.view);
+			attachments.put(RenderPass.AttachmentSlot.MULTISAMPLE_INTERMEDIATE_IMAGE, mssaImage.view);
+			frameBuffer = renderPass.createFrameBuffer(attachments, size());
 			
 			cmdBuffer = cmdPool.createCommandBuffer();
 			fence = core.device.createFence(true);
