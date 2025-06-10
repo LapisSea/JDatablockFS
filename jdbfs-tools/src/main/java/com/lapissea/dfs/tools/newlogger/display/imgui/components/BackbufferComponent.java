@@ -19,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent3D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkFence;
 import imgui.ImGui;
 import imgui.flag.ImGuiStyleVar;
@@ -36,9 +37,11 @@ public abstract class BackbufferComponent implements UIComponent{
 		private final long          imageID;
 		private final VulkanTexture image;
 		private final VulkanTexture mssaImage;
-		private final FrameBuffer   frameBuffer;
 		private final VkFence       fence;
 		private final CommandBuffer cmdBuffer;
+		
+		private final FrameBuffer frameBuffer;
+		private final RenderPass  renderPass;
 		
 		private final Instant               creationTime = Instant.now();
 		private final TextureRegistry.Scope tScope;
@@ -49,11 +52,13 @@ public abstract class BackbufferComponent implements UIComponent{
 			image = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
 			mssaImage = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
 			
+			renderPass = core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL);
+			
 			try(var stack = MemoryStack.stackPush()){
 				var viewRef = stack.mallocLong(2);
 				var info = VkFramebufferCreateInfo.calloc(stack)
 				                                  .sType$Default()
-				                                  .renderPass(core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL).handle)
+				                                  .renderPass(renderPass.handle)
 				                                  .pAttachments(viewRef)
 				                                  .width(width).height(height)
 				                                  .layers(1);
@@ -68,6 +73,10 @@ public abstract class BackbufferComponent implements UIComponent{
 			fence = core.device.createFence(true);
 			
 			imageID = tScope.registerTextureAsID(image);
+		}
+		
+		CommandBuffer.RenderPassScope beginRenderPass(CommandBuffer buff, Vector4f clearColor){
+			return buff.beginRenderPass(renderPass, frameBuffer, renderArea.asRect(), clearColor);
 		}
 		
 		Extent3D size(){ return image.image.extent; }
@@ -145,10 +154,9 @@ public abstract class BackbufferComponent implements UIComponent{
 			buff.reset();
 			buff.begin();
 			
-			var area       = renderTarget.renderArea = new Extent2D(width, height);
-			var renderPass = core.getRenderPass(VkFormat.R8G8B8A8_UNORM, core.physicalDevice.samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
-			try(var ignore = buff.beginRenderPass(renderPass, renderTarget.frameBuffer, area.asRect(), new Vector4f(0, 0, 0, 1))){
-				renderBackbuffer(area, buff);
+			renderTarget.renderArea = new Extent2D(width, height);
+			try(var ignore = renderTarget.beginRenderPass(buff, new Vector4f(0, 0, 0, 1))){
+				renderBackbuffer(renderTarget.renderArea, buff);
 			}
 			buff.end();
 			
