@@ -52,7 +52,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			image = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
 			mssaImage = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
 			
-			renderPass = core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL);
+			renderPass = core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 			
 			try(var stack = MemoryStack.stackPush()){
 				var viewRef = stack.mallocLong(2);
