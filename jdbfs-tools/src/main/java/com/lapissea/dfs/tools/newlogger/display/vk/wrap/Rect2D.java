@@ -1,9 +1,10 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.dfs.objects.Stringify;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkViewport;
 
-public final class Rect2D{
+public final class Rect2D implements Stringify{
 	
 	public final int x, y, width, height;
 	
@@ -41,5 +42,13 @@ public final class Rect2D{
 		    .width(width).height(height)
 		    .minDepth(0).maxDepth(1);
 		return dest;
+	}
+	@Override
+	public String toString(){
+		return "Rect2D" + toShortString();
+	}
+	@Override
+	public String toShortString(){
+		return "{x: " + x + ", y: " + y + ", width: " + width + ", height: " + height + "}";
 	}
 }

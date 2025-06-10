@@ -31,6 +31,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FormatColor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.ShaderModule;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorPool;
@@ -60,6 +61,8 @@ import org.lwjgl.vulkan.VkExtent3D;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkLayerProperties;
+import org.lwjgl.vulkan.VkOffset2D;
+import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 
 import java.io.File;
@@ -126,7 +129,12 @@ public class VulkanCore implements AutoCloseable{
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(VkExtent2D.class, e -> e.width() + "x" + e.height());
 		TextUtil.CUSTOM_TO_STRINGS.register(VkExtent3D.class, e -> e.width() + "x" + e.height() + "x" + e.depth());
-		TextUtil.CUSTOM_TO_STRINGS.register(Pointer.class, VUtils::vkObjToString);
+		TextUtil.CUSTOM_TO_STRINGS.register(Pointer.class, p -> VUtils.vkObjToString(p, true));
+		TextUtil.SHORT_TO_STRINGS.register(Pointer.class, p -> VUtils.vkObjToString(p, false));
+		TextUtil.CUSTOM_TO_STRINGS.register(VkOffset2D.class, p -> "VkOffset2D{x: " + p.x() + ", y: " + p.y() + "}");
+		TextUtil.SHORT_TO_STRINGS.register(VkOffset2D.class, p -> "{x: " + p.x() + ", y: " + p.y() + "}");
+		TextUtil.CUSTOM_TO_STRINGS.register(VkRect2D.class, p -> new Rect2D(p).toString());
+		TextUtil.SHORT_TO_STRINGS.register(VkRect2D.class, p -> new Rect2D(p).toShortString());
 		TextUtil.CUSTOM_TO_STRINGS.register(VulkanResource.class, res -> {
 			Map<String, String> data = new LinkedHashMap<>();
 			

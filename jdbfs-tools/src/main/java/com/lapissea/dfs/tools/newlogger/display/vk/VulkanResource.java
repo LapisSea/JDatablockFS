@@ -31,6 +31,16 @@ public interface VulkanResource extends AutoCloseable{
 		}
 		
 		@Override
+		public String toString(){
+			return this.getClass().getSimpleName() + "(0x" + Long.toHexString(handle) + ")";
+		}
+		@Override
+		public boolean equals(Object obj){
+			return obj instanceof DeviceHandleObj that &&
+			       this.device == that.device &&
+			       this.handle == that.handle;
+		}
+		@Override
 		public int hashCode(){
 			return Long.hashCode(handle);
 		}

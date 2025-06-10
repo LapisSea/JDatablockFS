@@ -86,6 +86,10 @@ public final class VUtils{
 	private static final ThreadLocal<Set<Object>> STR_STACK = ThreadLocal.withInitial(HashSet::new);
 	
 	public static String vkObjToString(Pointer obj){
+		return vkObjToString(obj, false);
+	}
+	public static String vkObjToString(Pointer obj, boolean typeName){
+		if(obj == null) return "null";
 		var cls   = obj.getClass();
 		var stack = STR_STACK.get();
 		var fieldMethods = Iters.from(cls.getDeclaredMethods()).sortedBy(Method::getName).filter(
@@ -98,13 +102,26 @@ public final class VUtils{
 		var bbs              = fieldMethods.filter(fn -> fn.getReturnType() == ByteBuffer.class);
 		var ignoreBBVariants = bbs.filter(fn -> nameType.get(fn.getName() + "String") == String.class).toSet();
 		
-		return fieldMethods.filterNot(ignoreBBVariants::contains).map(fn -> {
+		var structBuffers = fieldMethods.filter(fn -> fn.getName().startsWith("p") && UtilL.instanceOf(fn.getReturnType(), StructBuffer.class))
+		                                .map(Method::getName).toSet();
+		var bufferLengths = structBuffers.isEmpty()? Set.of() :
+		                    fieldMethods.filter(fn -> {
+			                    if(fn.getReturnType() != int.class) return false;
+			                    var name       = fn.getName();
+			                    var noCount    = name.endsWith("Count")? name.substring(0, name.length() - "Count".length()) : name;
+			                    var plural     = TextUtil.plural(noCount);
+			                    var bufferName = "p" + TextUtil.firstToUpperCase(plural);
+			                    return structBuffers.contains(bufferName);
+		                    }).toSet();
+		
+		
+		return fieldMethods.filterNot(ignoreBBVariants::contains).filterNot(bufferLengths::contains).map(fn -> {
 			try{
 				var el = fn.invoke(obj);
 				if(el == null) return null;
 				if(el instanceof Number n && n.longValue() == 0) return null;
-				var loop = stack.contains(el);
-				if(!loop) stack.add(el);
+				var loop = el instanceof Pointer && stack.contains(el);
+				if(!loop && !(el instanceof Pointer)) stack.add(el);
 				try{
 					String val;
 					if(loop) val = el.toString();
@@ -112,10 +129,13 @@ public final class VUtils{
 						String eStr = null;
 						if(el instanceof Integer iEl && fn.getAnnotation(NativeType.class) instanceof NativeType t){
 							try{
-								var ec = Class.forName(VkResult.class.getPackageName() + "." + t.value());
-								if(UtilL.instanceOf(ec, VUtils.FlagSetValue.class)){
+								var className = t.value();
+								if(className.endsWith("Bits")) className = className.substring(0, className.length() - 4);
+								if(className.endsWith("Flags")) className = className.substring(0, className.length() - 1);
+								var ec = Class.forName(VkResult.class.getPackageName() + "." + className);
+								if(UtilL.instanceOf(ec, FlagSetValue.class)){
 									eStr = new Flags<>((Class)ec, iEl).toString();
-								}else if(UtilL.instanceOf(ec, VUtils.IDValue.class)){
+								}else if(UtilL.instanceOf(ec, IDValue.class)){
 									try{
 										eStr = fromID((Class)ec, iEl).toString();
 									}catch(IllegalArgumentException e){ }
@@ -124,7 +144,7 @@ public final class VUtils{
 						}
 						if(eStr != null) val = eStr;
 						else if(el instanceof StructBuffer<?, ?> sb){
-							val = Iters.from(sb).map(VUtils::vkObjToString).joinAsStr(", ", "[", "]");
+							val = Iters.from(sb).map(TextUtil::toShortString).joinAsStr(", ", "[", "]");
 						}else{
 							val = TextUtil.toString(el);
 						}
@@ -136,7 +156,7 @@ public final class VUtils{
 			}catch(IllegalAccessException|InvocationTargetException e){
 				return fn.getName() + ": <ERROR: " + e + ">";
 			}
-		}).filter(Objects::nonNull).joinAsStr(", ", cls.getSimpleName() + "{", "}");
+		}).filter(Objects::nonNull).joinAsStr(", ", typeName? cls.getSimpleName() + "{" : "{", "}");
 	}
 	
 	public interface IDValue{

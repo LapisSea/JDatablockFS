@@ -242,7 +242,26 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 					info.pDynamicState(dynamicInfo);
 				}
 				
-				return VKCalls.vkCreateGraphicsPipelines(renderPass.device, renderPass.device.pipelineCache, info).getFirst();
+				var pipeline = VKCalls.vkCreateGraphicsPipelines(renderPass.device, renderPass.device.pipelineCache, info).getFirst();
+				if(Log.INFO) Log.info(
+					"""
+						{#greenBrightPIPELINE CREATED#}:
+						  modules: {}#green
+						  pVertexInputState: {}~
+						  pInputAssemblyState: {}~
+						  pViewportState: {}~
+						  pRasterizationState: {}~
+						  pMultisampleState: {}~
+						  pColorBlendState: {}~""",
+					modules,
+					info.get(0).pVertexInputState(),
+					info.get(0).pInputAssemblyState(),
+					info.get(0).pViewportState(),
+					info.get(0).pRasterizationState(),
+					info.get(0).pMultisampleState(),
+					info.get(0).pColorBlendState()
+				);
+				return pipeline;
 			}
 		}
 		
