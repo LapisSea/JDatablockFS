@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.DrawFont;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
@@ -220,6 +221,26 @@ public class MsdfFontRender implements VulkanResource{
 		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
 			this(pixelHeight, color, string, x, y, 1, 0);
 		}
+		public StringDraw withOutline(Color color, float outline){
+			return new StringDraw(pixelHeight, color, string, x, y, xScale, outline);
+		}
+	}
+	
+	public DrawFont.Bounds getStringBounds(String string, float fontScale){
+		var   table   = tableRes.join();
+		float width   = calcUnitWidth(table, string);
+		var   metrics = table.metrics;
+		return new DrawFont.Bounds(width*fontScale, fontScale);
+	}
+	
+	private float calcUnitWidth(Glyphs.Table table, String str){
+		float width = 0;
+		for(int i = 0, len = str.length(); i<len; i++){
+			var ch     = str.charAt(i);
+			var charID = table.index.getOrDefault(ch, table.missingCharId);
+			width += table.advance[charID];
+		}
+		return width*table.fsScale;
 	}
 	
 	private static final int outlineCutoff = 5;
@@ -383,7 +404,7 @@ public class MsdfFontRender implements VulkanResource{
 	private static int putStr(ByteBuffer b, Glyphs.Table table, String str){
 		float fsScale = table.fsScale;
 		
-		float x     = 0, y = 0;// (float)metrics.descender;
+		float x     = 0, y = (float)table.metrics.descender();
 		int   count = 0;
 		var   len   = str.length();
 		for(int i = 0; i<len; i++){

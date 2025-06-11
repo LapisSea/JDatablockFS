@@ -130,6 +130,7 @@ public class LineRenderer implements VulkanResource{
 		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		
 		var size = Geometry.calculateMeshSize(lines);
+		if(size.vertCount() == 0) return;
 		
 		resource.indexType = size.indexCount()<=Character.MAX_VALUE? VkIndexType.UINT16 : VkIndexType.UINT32;
 		resource.indexCount = size.indexCount();

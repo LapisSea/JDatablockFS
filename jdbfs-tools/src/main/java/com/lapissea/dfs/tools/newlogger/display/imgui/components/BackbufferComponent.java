@@ -102,6 +102,8 @@ public abstract class BackbufferComponent implements UIComponent{
 	
 	private final CommandPool cmdPool;
 	
+	protected final Vector4f clearColor = new Vector4f(0, 0, 0, 1);
+	
 	private RenderTarget renderTarget;
 	
 	private final VulkanCore core;
@@ -158,7 +160,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			buff.begin();
 			
 			renderTarget.renderArea = new Extent2D(width, height);
-			try(var ignore = renderTarget.beginRenderPass(buff, new Vector4f(0, 0, 0, 1))){
+			try(var ignore = renderTarget.beginRenderPass(buff, clearColor)){
 				renderBackbuffer(renderTarget.renderArea, buff);
 			}
 			buff.end();
