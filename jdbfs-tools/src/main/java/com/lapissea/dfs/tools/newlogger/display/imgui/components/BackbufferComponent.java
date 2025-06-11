@@ -46,16 +46,17 @@ public abstract class BackbufferComponent implements UIComponent{
 		private final TextureRegistry.Scope tScope;
 		private       Extent2D              renderArea;
 		
-		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height, VkFormat format) throws VulkanCodeException{
+		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height, VkFormat format, VkSampleCountFlag samples) throws VulkanCodeException{
 			this.tScope = tScope;
 			image = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
-			mssaImage = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), core.physicalDevice.samples);
+			mssaImage = samples == VkSampleCountFlag.N1? null :
+			            createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.TRANSIENT_ATTACHMENT, VkImageUsageFlag.COLOR_ATTACHMENT), samples);
 			
-			renderPass = core.getRenderPass(format, core.physicalDevice.samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+			renderPass = core.getRenderPass(format, samples, VkImageLayout.SHADER_READ_ONLY_OPTIMAL, true);
 			
 			Map<RenderPass.AttachmentSlot, VkImageView> attachments = new HashMap<>();
 			attachments.put(RenderPass.AttachmentSlot.RESULT_IMAGE, image.view);
-			attachments.put(RenderPass.AttachmentSlot.MULTISAMPLE_INTERMEDIATE_IMAGE, mssaImage.view);
+			if(mssaImage != null) attachments.put(RenderPass.AttachmentSlot.MULTISAMPLE_INTERMEDIATE_IMAGE, mssaImage.view);
 			frameBuffer = renderPass.createFrameBuffer(attachments, size());
 			
 			cmdBuffer = cmdPool.createCommandBuffer();
@@ -90,7 +91,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			tScope.releaseTexture(imageID);
 			frameBuffer.destroy();
 			image.destroy();
-			mssaImage.destroy();
+			if(mssaImage != null) mssaImage.destroy();
 		}
 	}
 	
@@ -171,7 +172,7 @@ public abstract class BackbufferComponent implements UIComponent{
 		core.device.waitIdle();
 		if(renderTarget != null) renderTarget.destroy();
 		try{
-			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM);
+			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM, VkSampleCountFlag.N4);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to create images", e);
 		}

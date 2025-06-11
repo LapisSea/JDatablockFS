@@ -164,7 +164,7 @@ public class VulkanWindow implements AutoCloseable{
 			mssaImages = null;
 		}
 		
-		surfaceRenderPass = core.getRenderPass(swapchain.formatColor.format, getRenderTargetSampleCount(), VkImageLayout.PRESENT_SRC_KHR);
+		surfaceRenderPass = core.getRenderPass(swapchain.formatColor.format, getRenderTargetSampleCount(), VkImageLayout.PRESENT_SRC_KHR, false);
 		frameBuffers = createFrameBuffers();
 		
 		var e = swapchain.extent;

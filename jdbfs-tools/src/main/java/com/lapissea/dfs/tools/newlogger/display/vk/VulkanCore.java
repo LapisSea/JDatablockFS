@@ -242,12 +242,12 @@ public class VulkanCore implements AutoCloseable{
 		return format;
 	}
 	
-	private record RPI(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout){ }
+	private record RPI(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout, boolean clearOnStart){ }
 	
 	private final Map<RPI, RenderPass> renderPasses = new ConcurrentHashMap<>();
 	
-	public RenderPass getRenderPass(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout){
-		return renderPasses.computeIfAbsent(new RPI(colorFormat, samples, finalColorLayout), r -> {
+	public RenderPass getRenderPass(VkFormat colorFormat, VkSampleCountFlag samples, VkImageLayout finalColorLayout, boolean clearOnStart){
+		return renderPasses.computeIfAbsent(new RPI(colorFormat, samples, finalColorLayout, clearOnStart), r -> {
 			try{
 				return createRenderPass(device, r);
 			}catch(VulkanCodeException e){
@@ -333,7 +333,7 @@ public class VulkanCore implements AutoCloseable{
 		var presentAttachment = new RenderPass.AttachmentInfo(
 			rpi.colorFormat,
 			VkSampleCountFlag.N1,
-			VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
+			rpi.clearOnStart && rpi.samples == VkSampleCountFlag.N1? VkAttachmentLoadOp.CLEAR : VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
 			VkImageLayout.UNDEFINED, rpi.finalColorLayout
 		);
 		
@@ -344,7 +344,7 @@ public class VulkanCore implements AutoCloseable{
 			var mssaAttachment = new RenderPass.AttachmentInfo(
 				rpi.colorFormat,
 				rpi.samples,
-				VkAttachmentLoadOp.CLEAR, VkAttachmentStoreOp.STORE,
+				rpi.clearOnStart? VkAttachmentLoadOp.CLEAR : VkAttachmentLoadOp.DONT_CARE, VkAttachmentStoreOp.STORE,
 				VkImageLayout.UNDEFINED, VkImageLayout.COLOR_ATTACHMENT_OPTIMAL
 			);
 			build.attachment(mssaAttachment).attachment(presentAttachment);
