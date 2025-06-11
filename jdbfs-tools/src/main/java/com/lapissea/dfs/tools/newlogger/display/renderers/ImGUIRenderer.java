@@ -122,7 +122,8 @@ public class ImGUIRenderer implements VulkanResource{
 		if(vtxSize == 0 || idxSize == 0) return;
 		
 		var winSize = drawData.getDisplaySize();
-		var winPos  = drawData.getDisplayPos();
+		if(winSize.x == 0 && winSize.y == 0) return;
+		var winPos = drawData.getDisplayPos();
 		
 		resource.ensureBuffers(core, vtxSize, idxSize);
 		

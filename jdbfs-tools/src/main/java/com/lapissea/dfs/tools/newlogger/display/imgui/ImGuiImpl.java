@@ -793,6 +793,21 @@ public class ImGuiImpl{
 		glfwSetWindowCloseCallback(windowH, ImGuiImpl.this::windowCloseCallback);
 		glfwSetWindowPosCallback(windowH, ImGuiImpl.this::windowPosCallback);
 		glfwSetWindowSizeCallback(windowH, ImGuiImpl.this::windowSizeCallback);
+		
+		
+		glfwSetFramebufferSizeCallback(windowH, (window1, width, height) -> {
+			var viewport = ImGui.findViewportByPlatformHandle(window1);
+			if(!(viewport.getPlatformUserData() instanceof ViewportData data)) return;
+			try{
+				data.window.recreateSwapchainContext();
+				if(data.window.swapchain == null || data.window.getGlfwWindow().size.equals(0, 0)) return;
+				
+				renderWindow(viewport);
+				core.executeSwaps();
+			}catch(VulkanCodeException e){
+				throw new RuntimeException(e);
+			}
+		});
 	}
 	
 	private void destroyWindow(ImGuiViewport vp){

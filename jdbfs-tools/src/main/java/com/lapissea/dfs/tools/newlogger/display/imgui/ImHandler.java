@@ -29,6 +29,7 @@ public class ImHandler{
 			io.addConfigFlags(ImGuiConfigFlags.ViewportsEnable);
 		}
 		io.setConfigDockingTransparentPayload(true);
+		io.setConfigWindowsResizeFromEdges(true);
 		
 		
 		ImTools.setupFont("/CourierPrime/Regular/font.ttf");
