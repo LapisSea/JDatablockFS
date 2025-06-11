@@ -10,9 +10,9 @@ import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.SequencedCollection;
+import java.util.SequencedSet;
 
-public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E> implements SequencedCollection<E>{
+public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends AbstractSet<E> implements SequencedSet<E>{
 	
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(Flags.class, Flags::toString);
@@ -118,9 +118,20 @@ public final class Flags<E extends Enum<E> & VUtils.FlagSetValue> extends Abstra
 		throw new IllegalStateException("Only one flag is allowed");
 	}
 	
-	public Flags<E> and(E flag){
-		var ec = enumClass;
-		if(ec == null) ec = flag.getDeclaringClass();
-		return new Flags<>(ec, this.value|flag.bit());
+	public Flags<E> with(E flag){
+		return join(flag.getDeclaringClass(), flag.bit());
+	}
+	public Flags<E> join(Flags<E> other){
+		return join(other.enumClass, other.value);
+	}
+	private Flags<E> join(Class<E> clazz, int addValue){
+		var ec       = enumClass;
+		var newValue = this.value|addValue;
+		if(ec == null) ec = clazz;
+		else{
+			if(ec != clazz) throw new IllegalArgumentException("Class mismatch");
+			if(newValue == this.value) return this;
+		}
+		return new Flags<>(ec, newValue);
 	}
 }

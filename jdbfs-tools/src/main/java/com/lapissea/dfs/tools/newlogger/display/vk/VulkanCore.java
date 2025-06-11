@@ -258,7 +258,7 @@ public class VulkanCore implements AutoCloseable{
 	
 	public VulkanTexture uploadTexture(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
 		var usage = Flags.of(VkImageUsageFlag.TRANSFER_DST, VkImageUsageFlag.SAMPLED);
-		if(mipLevels>1) usage = usage.and(VkImageUsageFlag.TRANSFER_SRC);
+		if(mipLevels>1) usage = usage.with(VkImageUsageFlag.TRANSFER_SRC);
 		var image = device.createImage(width, height, format, usage, VkSampleCountFlag.N1, mipLevels);
 		
 		var memory = image.allocateAndBindRequiredMemory(physicalDevice, VkMemoryPropertyFlag.DEVICE_LOCAL);
@@ -368,7 +368,7 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	public IterablePP<QueueFamilyProps> queueFamiliesBy(VkQueueFlag capability){
-		return Iters.from(physicalDevice.families).filter(e -> e.capabilities.contains(capability));
+		return Iters.from(physicalDevice.queueFamilies).filter(e -> e.capabilities.contains(capability));
 	}
 	
 	private static final Set<String> IGNORE_IDS = new HashSet<>(Set.of("Loader Message"));

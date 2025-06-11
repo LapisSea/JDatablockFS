@@ -4,7 +4,6 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.PhysicalDevice;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.QueueFamilyProps;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
@@ -39,17 +38,12 @@ public class PhysicalDevices{
 	public PhysicalDevice selectDevice(Set<VkQueueFlag> requiredCapabilities){
 		for(PhysicalDevice device : devices){
 			try{
-				device.checkFeatures();
+				device.checkFeatures(requiredCapabilities);
 			}catch(Throwable e){
 				new Throwable(Log.fmt("The device {}#red does not support the necessary features", device), e).printStackTrace();
 				continue;
 			}
-			for(QueueFamilyProps family : device.families){
-				if(!family.capabilities.containsAll(requiredCapabilities)){
-					continue;
-				}
-				return device;
-			}
+			return device;
 		}
 		throw new IllegalStateException("Could not find compatible physical device: " + devices);
 	}

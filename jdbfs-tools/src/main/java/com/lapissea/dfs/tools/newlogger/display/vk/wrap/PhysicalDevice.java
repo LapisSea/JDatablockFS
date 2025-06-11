@@ -8,6 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPhysicalDeviceType;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -45,7 +46,7 @@ public class PhysicalDevice{
 	public final VkPhysicalDevice       pDevice;
 	public final String                 name;
 	public final VkPhysicalDeviceType   type;
-	public final List<QueueFamilyProps> families;
+	public final List<QueueFamilyProps> queueFamilies;
 	public final MemoryProperties       memoryProperties;
 	public final VkSampleCountFlag      samples;
 	public final long                   nonCoherentAtomSize;
@@ -63,7 +64,7 @@ public class PhysicalDevice{
 			nonCoherentAtomSize = properties.limits().nonCoherentAtomSize();
 		}
 		
-		families = getQueueFamilies(pDevice);
+		queueFamilies = getQueueFamilies(pDevice);
 		
 		memoryProperties = getMemoryProperties();
 		
@@ -141,7 +142,7 @@ public class PhysicalDevice{
 			}
 			queueInfo.position(0);
 			
-			var optionalFeatures = checkFeatures();
+			var optionalFeatures = checkFeatures(Set.of());
 			optionalFeatures.arithmeticTypesError.ifPresent(e -> Log.warn("Using GPU without arithmetic types! Reason:\n  {}#red", e));
 			
 			boolean hasArithmeticTypes = optionalFeatures.arithmeticTypesError.isEmpty();
@@ -191,7 +192,20 @@ public class PhysicalDevice{
 	
 	public record OptionalFeatures(Optional<String> arithmeticTypesError){ }
 	
-	public OptionalFeatures checkFeatures(){
+	public OptionalFeatures checkFeatures(Set<VkQueueFlag> requiredCapabilities){
+		
+		var combinedCaps = Iters.from(queueFamilies).map(e -> e.capabilities).reduce(Flags.of(), Flags::join);
+		if(!combinedCaps.containsAll(requiredCapabilities)){
+			throw new IllegalStateException(Log.fmt(
+				"""
+					Required capabilities are missing!
+					  Requires : {}#yellow
+					  But has  : {}#red""",
+				Iters.from(VkQueueFlag.class).filter(requiredCapabilities::contains).joinAsStr(", "),
+				Iters.from(combinedCaps).joinAsStr(", "))
+			);
+		}
+		
 		try(var stack = MemoryStack.stackPush()){
 			var features = VkPhysicalDeviceFeatures.calloc(stack);
 			VK11.vkGetPhysicalDeviceFeatures(pDevice, features);
@@ -239,8 +253,18 @@ public class PhysicalDevice{
 				arithmeticTypesError.add("storageBuffer8BitAccess");
 			}
 			
-			return new OptionalFeatures(Iters.from(arithmeticTypesError).joinAsOptionalStr(", ", "Does not support: ", ""));
+			var extensions = getDeviceExtensionNames();
+			
+			if(!extensions.contains(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME)){
+				arithmeticTypesError.add(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+			}
+			
+			return new OptionalFeatures(toErr(arithmeticTypesError));
 		}
+	}
+	
+	private static Optional<String> toErr(List<String> arithmeticTypesError){
+		return Iters.from(arithmeticTypesError).joinAsOptionalStr(", ", "Does not support: ", "");
 	}
 	
 	private static float[] decreasingPriority(int count){
