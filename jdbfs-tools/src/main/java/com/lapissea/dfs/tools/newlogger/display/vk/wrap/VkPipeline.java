@@ -218,7 +218,8 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 		public VkPipeline build() throws VulkanCodeException{
 			try(var stack = MemoryStack.stackPush()){
 				
-				var info = VkGraphicsPipelineCreateInfo.calloc(1, stack);
+				var infos = VkGraphicsPipelineCreateInfo.calloc(1, stack);
+				var info  = infos.get(0);
 				info.sType$Default()
 				    .pVertexInputState(createVertexInput(stack))
 				    .pInputAssemblyState(createInputAssembly(stack))
@@ -243,8 +244,8 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 					info.pDynamicState(dynamicInfo);
 				}
 				
-				var pipeline = VKCalls.vkCreateGraphicsPipelines(renderPass.device, renderPass.device.pipelineCache, info).getFirst();
-				if(Log.INFO) Log.info(
+				var pipeline = VKCalls.vkCreateGraphicsPipelines(renderPass.device, renderPass.device.pipelineCache, infos).getFirst();
+				if(Log.TRACE) Log.trace(
 					"""
 						{#greenBrightPIPELINE CREATED#}:
 						  modules: {}#green
@@ -255,12 +256,12 @@ public class VkPipeline extends VulkanResource.DeviceHandleObj{
 						  pMultisampleState: {}~
 						  pColorBlendState: {}~""",
 					modules,
-					info.get(0).pVertexInputState(),
-					info.get(0).pInputAssemblyState(),
-					info.get(0).pViewportState(),
-					info.get(0).pRasterizationState(),
-					info.get(0).pMultisampleState(),
-					info.get(0).pColorBlendState()
+					info.pVertexInputState(),
+					info.pInputAssemblyState(),
+					info.pViewportState(),
+					info.pRasterizationState(),
+					info.pMultisampleState(),
+					info.pColorBlendState()
 				);
 				return pipeline;
 			}
