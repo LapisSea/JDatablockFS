@@ -22,38 +22,41 @@ public final class TextureRegistry{
 	
 	public final class Scope implements VulkanResource{
 		
-		private record LayoutID(VkDescriptorSetLayout layout, long textureID){ }
-		
-		private final Map<LayoutID, VkDescriptorSet> descriptorSets = new HashMap<>();
+		private final Map<Long, Map<VkDescriptorSetLayout, VkDescriptorSet>> descriptorSets = new HashMap<>();
 		
 		public TextureRegistry registry(){ return TextureRegistry.this; }
 		
 		public VkDescriptorSet getTextureBind(VkDescriptorSetLayout layout, long textureID) throws VulkanCodeException{
 			if(textureID == -1) throw new IllegalArgumentException("Illegal textureId");
-			var id = new LayoutID(layout, textureID);
 			{
-				var set = descriptorSets.get(id);
+				var set = getDescSet(layout, textureID);
 				if(set != null) return set;
 			}
 			
 			if(getTex(textureID) instanceof TexNode tex){
 				var set = createSet(layout, tex.texture);
 				tex.scopes.add(this);
-				descriptorSets.put(id, set);
+				putDescSet(layout, textureID, set);
 				return set;
 			}
 			
 			return getDefaultSet(layout);
 		}
 		
+		private void putDescSet(VkDescriptorSetLayout layout, long textureID, VkDescriptorSet set){
+			descriptorSets.computeIfAbsent(textureID, i -> new HashMap<>()).put(layout, set);
+		}
+		private VkDescriptorSet getDescSet(VkDescriptorSetLayout layout, long textureID){
+			var map = descriptorSets.get(textureID);
+			return map == null? null : map.get(layout);
+		}
+		
 		private VkDescriptorSet getDefaultSet(VkDescriptorSetLayout layout) throws VulkanCodeException{
-			var lid = new LayoutID(layout, -1);
-			
-			var defaultSet = descriptorSets.get(lid);
+			var defaultSet = getDescSet(layout, -1);
 			if(defaultSet != null) return defaultSet;
 			
 			var set = createSet(layout, getNoTexture());
-			descriptorSets.put(lid, set);
+			putDescSet(layout, -1, set);
 			return set;
 		}
 		
@@ -79,9 +82,6 @@ public final class TextureRegistry{
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
-			for(VkDescriptorSet value : descriptorSets.values()){
-				value.destroy();
-			}
 			synchronized(textures){
 				for(var tx : Iters.from(textures.values()).filter(e -> e.scopes.contains(this)).toList()){
 					releaseTexture(tx);
@@ -96,6 +96,17 @@ public final class TextureRegistry{
 				tx.texture.destroy();
 			}
 			textures.remove(tx.id);
+			
+			var map = descriptorSets.remove(tx.id);
+			if(map != null){
+				for(var set : map.values()){
+					try{
+						set.destroy();
+					}catch(VulkanCodeException ex){
+						throw new RuntimeException(ex);
+					}
+				}
+			}
 		}
 		
 		public void releaseTexture(long textureID){
