@@ -24,8 +24,10 @@ public class ImHandler{
 		ImGui.setCurrentContext(ImGui.createContext());
 		
 		ImGuiIO io = ImGui.getIO();
-		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.ViewportsEnable|
-		                  ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos);
+		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos);
+		if(ImGuiImpl.supportsViewports()){
+			io.addConfigFlags(ImGuiConfigFlags.ViewportsEnable);
+		}
 		io.setConfigDockingTransparentPayload(true);
 		
 		

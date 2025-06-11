@@ -5,7 +5,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import imgui.ImGui;
 import imgui.ImGuiIO;
@@ -58,6 +57,8 @@ public class ImGuiImpl{
 			public void initNativeWindowHandle(ImGuiViewport viewport){ }
 			@Override
 			public void hideFromTaskbar(ImGuiViewport viewport){ }
+			@Override
+			public boolean supportsViewports(){ return false; }
 		}
 		
 		final class Win implements NativeImpl{
@@ -69,6 +70,8 @@ public class ImGuiImpl{
 			public void hideFromTaskbar(ImGuiViewport viewport){
 				ImGuiImplGlfwNative.win32hideFromTaskBar(viewport.getPlatformHandleRaw());
 			}
+			@Override
+			public boolean supportsViewports(){ return true; }
 		}
 		
 		final class Apple implements NativeImpl{
@@ -80,10 +83,13 @@ public class ImGuiImpl{
 			public void hideFromTaskbar(ImGuiViewport viewport){
 				//TODO: do something here? Not sure. I'm not an apple user
 			}
+			@Override
+			public boolean supportsViewports(){ return true; }
 		}
 		
 		void initNativeWindowHandle(ImGuiViewport viewport);
 		void hideFromTaskbar(ImGuiViewport viewport);
+		boolean supportsViewports();
 	}
 	
 	private static final NativeImpl NATIVE;
@@ -94,6 +100,8 @@ public class ImGuiImpl{
 		else if(os.contains("mac") || os.contains("darwin")) NATIVE = new NativeImpl.Apple();
 		else NATIVE = new NativeImpl.Unknown();
 	}
+	
+	public static boolean supportsViewports(){ return NATIVE.supportsViewports(); }
 	
 	/**
 	 * Data class to store implementation-specific fields.
@@ -400,13 +408,17 @@ public class ImGuiImpl{
 		glfwSetMonitorCallback(this::monitorCallback);
 		
 		// Our mouse update function expect PlatformHandle to be filled for the main viewport
-		final ImGuiViewport mainViewport = ImGui.getMainViewport();
+		var mainViewport = ImGui.getMainViewport();
 		mainViewport.setPlatformHandle(data.window.getGlfwWindow().getHandle());
 		NATIVE.initNativeWindowHandle(mainViewport);
 		
 		if(io.hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)){
 			initPlatformInterface();
 		}
+		var vd = new ViewportData();
+		vd.window = data.window;
+		vd.windowOwned = false;
+		mainViewport.setPlatformUserData(vd);
 		
 		try{
 			cachedClosedWindow = new VulkanWindow(core, false, false, VkSampleCountFlag.N1);
@@ -645,18 +657,6 @@ public class ImGuiImpl{
 		}
 	}
 	
-	public void poolWindowEvents(){
-		var platformIO = ImGui.getPlatformIO();
-		for(var v : Iters.range(0, platformIO.getViewportsSize()).mapToObj(platformIO::getViewports)){
-			if(v.hasFlags(ImGuiViewportFlags.IsMinimized)) continue;
-			if(!(v.getPlatformUserData() instanceof ViewportData vd) || vd.window == null) continue;
-			var win = vd.window.getGlfwWindow();
-			if(!win.isCreated()) continue;
-			win.grabContext();
-			win.pollEvents();
-		}
-	}
-	
 	public void newFrame(){
 		var io = ImGui.getIO();
 		
@@ -883,8 +883,6 @@ public class ImGuiImpl{
 	
 	private void renderWindow(ImGuiViewport vp){
 		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
-		vd.window.getGlfwWindow().grabContext();
-		vd.window.getGlfwWindow().pollEvents();
 		try{
 			core.pushSwap(vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 				try(var ignore = buf.beginRenderPass(
@@ -927,14 +925,5 @@ public class ImGuiImpl{
 		platformIO.setPlatformRenderWindow(ImTools.ImPlatformFuncViewport(this::renderWindow));
 //		platformIO.setPlatformSwapBuffers(ImTools.ImPlatformFuncViewport(this::swapBuffers));
 		platformIO.setPlatformGetWindowDpiScale(ImTools.ImPlatformFuncViewportSuppFloat(this::getWindowDpiScale));
-		
-		// Register main window handle (which is owned by the main application, not by us)
-		// This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.
-		var mainViewport = ImGui.getMainViewport();
-		var vd           = new ViewportData();
-		vd.window = data.window;
-		vd.windowOwned = false;
-		mainViewport.setPlatformUserData(vd);
-		mainViewport.setPlatformHandle(data.window.getGlfwWindow().getHandle());
 	}
 }
