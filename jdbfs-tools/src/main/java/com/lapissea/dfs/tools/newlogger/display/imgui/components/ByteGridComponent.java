@@ -55,7 +55,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		this.lineRenderer = lineRenderer;
 		
 		displayData = new DisplayData(MemoryData.empty().asReadOnly(), 0);
-		clearColor.set(0.5, 0.5, 0.5, 1);
+		clearColor.set(0.4, 0.4, 0.4, 1);
 	}
 	
 	@Override
@@ -85,6 +85,9 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private void renderNoData(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+		lineRenderer.record(lineRes, backgroundDots(viewSize, false));
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRes);
+		
 		var str = "No data!";
 		
 		int w         = viewSize.width, h = viewSize.height;
@@ -92,29 +95,33 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		var draw = stringDrawIn(str, new Rect2D(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false);
 		if(draw != null){
-			fontRender.render(viewSize, cmdBuffer, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1)));
+			fontRender.render(viewSize, cmdBuffer, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F)));
 		}
 	}
 	
-	private void backgroundDots(Extent2D viewSize, CommandBuffer cmdBuffer, boolean errorMode) throws VulkanCodeException{
+	private List<Geometry.PointsLine> backgroundDots(Extent2D viewSize, boolean errorMode){
 		
-		var color = errorMode? Color.RED.darker() : Color.LIGHT_GRAY;
+		var color = errorMode? Color.RED.darker() : new Color(0xC2FFD700, true);
 		
-		var screenHeight = viewSize.height;
-		var screenWidth  = viewSize.width;
-		
-		float jitter       = 4;
-		int   step         = 15;
-		float randX        = ImGui.getFrameCount()/20f;
-		float randY        = ImGui.getFrameCount()/20f + 10000;
+		float jitter       = 25;
+		int   step         = 25;
+		float randX        = (float)ImGui.getTime()/2f;
+		float randY        = (float)ImGui.getTime()/2f + 10000;
 		float simplexScale = 50;
-		for(int x = 0; x<screenWidth + 2; x += step){
-			for(int y = (x/step)%step; y<screenHeight + 2; y += step){
+		
+		var res = new ArrayList<Geometry.PointsLine>();
+		
+		for(int x = 0; x<viewSize.width + 2; x += step){
+			for(int y = (x/step)%step; y<viewSize.height + 2; y += step){
 				float xf = x/simplexScale;
 				float yf = y/simplexScale;
-				renderer.fillQuad(x + SimplexNoise.noise(xf, yf, randX)*jitter, y + SimplexNoise.noise(xf, yf, randY)*jitter, 1.5, 1.5);
+				float px = x + SimplexNoise.noise(xf, yf, randX)*jitter, py = y + SimplexNoise.noise(xf, yf, randY)*jitter;
+				res.add(new Geometry.PointsLine(List.of(
+					new Vector2f(px, py), new Vector2f(px + 2F, py)
+				), 2F, color, false));
 			}
 		}
+		return res;
 	}
 	
 	private MsdfFontRender.StringDraw stringDrawIn(String s, Rect2D area, Color color, float fontScale, boolean alignLeft){

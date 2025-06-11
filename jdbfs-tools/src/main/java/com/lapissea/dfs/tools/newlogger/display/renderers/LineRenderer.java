@@ -125,7 +125,7 @@ public class LineRenderer implements VulkanResource{
 		);
 	}
 	
-	public void record(RenderResource resource, Iterable<Geometry.Path> paths) throws VulkanCodeException{
+	public void record(RenderResource resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
 		
 		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		

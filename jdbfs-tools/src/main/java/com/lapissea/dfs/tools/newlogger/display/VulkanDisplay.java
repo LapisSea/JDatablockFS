@@ -127,6 +127,7 @@ public class VulkanDisplay implements AutoCloseable{
 		win.autoHandleStateSaving(winFile);
 		if(win.size.equals(0, 0)) win.size.set(100, 100);
 		
+		win.focus();
 		return window;
 	}
 	
