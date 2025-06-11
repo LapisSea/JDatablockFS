@@ -17,6 +17,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
+import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
@@ -209,6 +210,7 @@ public class MsdfFontRender implements VulkanResource{
 			                 .addDesriptorSetLayout(dsLayout)
 			                 .specializationValue(VkShaderStageFlag.FRAGMENT, 0, (float)table.distanceRange)
 			                 .specializationValue(VkShaderStageFlag.FRAGMENT, 1, (float)table.size)
+			                 .specializationValue(VkShaderStageFlag.FRAGMENT, 2, rp.samples == VkSampleCountFlag.N1)
 			                 .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, Float.BYTES*3*2)
 			                 .build();
 		});

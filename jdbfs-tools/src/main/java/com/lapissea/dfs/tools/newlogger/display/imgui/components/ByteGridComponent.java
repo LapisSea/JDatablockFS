@@ -12,6 +12,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import imgui.type.ImBoolean;
+import imgui.type.ImInt;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
@@ -31,10 +32,10 @@ public class ByteGridComponent extends BackbufferComponent{
 	private final MsdfFontRender.RenderResource fontRes  = new MsdfFontRender.RenderResource();
 	
 	public ByteGridComponent(
-		ImBoolean open, VulkanCore core,
+		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
 		MsdfFontRender fontRender, ByteGridRender byteGridRender, LineRenderer lineRenderer
 	) throws VulkanCodeException{
-		super(core, open);
+		super(core, open, sampleEnumIndex);
 		
 		this.fontRender = fontRender;
 		this.byteGridRender = byteGridRender;

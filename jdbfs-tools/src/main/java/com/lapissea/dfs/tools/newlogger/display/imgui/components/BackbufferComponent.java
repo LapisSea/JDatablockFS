@@ -23,6 +23,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkImageView;
 import imgui.ImGui;
 import imgui.flag.ImGuiStyleVar;
 import imgui.type.ImBoolean;
+import imgui.type.ImInt;
 import org.joml.Vector4f;
 
 import java.time.Duration;
@@ -65,6 +66,10 @@ public abstract class BackbufferComponent implements UIComponent{
 			imageID = tScope.registerTextureAsID(image);
 		}
 		
+		VkSampleCountFlag getSamples(){
+			return mssaImage == null? VkSampleCountFlag.N1 : mssaImage.image.samples;
+		}
+		
 		CommandBuffer.RenderPassScope beginRenderPass(CommandBuffer buff, Vector4f clearColor){
 			return buff.beginRenderPass(renderPass, frameBuffer, renderArea.asRect(), clearColor);
 		}
@@ -101,11 +106,13 @@ public abstract class BackbufferComponent implements UIComponent{
 	
 	private final VulkanCore core;
 	private final ImBoolean  open;
+	private final ImInt      sampleEnumIndex;
 	
-	public BackbufferComponent(VulkanCore core, ImBoolean open) throws VulkanCodeException{
+	public BackbufferComponent(VulkanCore core, ImBoolean open, ImInt sampleEnumIndex) throws VulkanCodeException{
 		this.core = core;
 		this.open = open;
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
+		this.sampleEnumIndex = sampleEnumIndex;
 	}
 	
 	protected abstract boolean needsRerender();
@@ -119,6 +126,12 @@ public abstract class BackbufferComponent implements UIComponent{
 		if(ImGui.begin("byteGrid", open)){
 			var width  = (int)ImGui.getContentRegionAvailX();
 			var height = (int)ImGui.getContentRegionAvailY();
+			
+			if(renderTarget != null && sampleEnumIndex.get() != renderTarget.getSamples().ordinal()){
+				renderTarget.fence.device.waitIdle();
+				renderTarget.destroy();
+				renderTarget = null;
+			}
 			
 			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
 				drawFB(tScope, width, height);
@@ -172,7 +185,8 @@ public abstract class BackbufferComponent implements UIComponent{
 		core.device.waitIdle();
 		if(renderTarget != null) renderTarget.destroy();
 		try{
-			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM, VkSampleCountFlag.N4);
+			var samples = VkSampleCountFlag.values()[sampleEnumIndex.get()];
+			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM, samples);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to create images", e);
 		}

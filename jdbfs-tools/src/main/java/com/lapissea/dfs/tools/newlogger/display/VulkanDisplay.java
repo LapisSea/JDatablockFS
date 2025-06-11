@@ -11,11 +11,14 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import imgui.ImGui;
 import imgui.type.ImBoolean;
+import imgui.type.ImInt;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 
@@ -33,16 +36,44 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private static final class SettingsUI implements UIComponent{
 		
-		final ImBoolean imageViewerOpen = new ImBoolean();
-		final ImBoolean byteGridOpen    = new ImBoolean(true);
+		final ImBoolean imageViewerOpen         = new ImBoolean();
+		final ImBoolean byteGridOpen            = new ImBoolean(true);
+		final ImInt     byteGridSampleEnumIndex = new ImInt(2);
+		
+		VkSampleCountFlag[] samplesSet;
 		
 		@Override
 		public void imRender(TextureRegistry.Scope tScope){
 			if(ImGui.begin("Settings")){
 				ImGui.checkbox("Image viewer", imageViewerOpen);
 				ImGui.checkbox("Byte grid viewer", byteGridOpen);
+				if(byteGridOpen.get()){
+					if(ImGui.beginCombo("Sample count", sampleName(byteGridSampleEnumIndex.get()))){
+						for(int i = 0; i<samplesSet.length; i++){
+							var selected = byteGridSampleEnumIndex.get() == i;
+							if(ImGui.selectable(sampleName(i), selected)){
+								byteGridSampleEnumIndex.set(i);
+							}
+							if(selected) ImGui.setItemDefaultFocus();
+						}
+						ImGui.endCombo();
+					}
+				}
 			}
 			ImGui.end();
+		}
+		
+		private void setMaxSample(VkSampleCountFlag max){
+			
+			samplesSet = Iters.from(VkSampleCountFlag.class)
+			                  .takeWhile(e -> e.ordinal()<=max.ordinal())
+			                  .toArray(VkSampleCountFlag[]::new);
+			
+			byteGridSampleEnumIndex.set(Math.min(byteGridSampleEnumIndex.get(), samplesSet.length - 1));
+		}
+		
+		private String sampleName(int cid){
+			return samplesSet[cid].name().substring(1) + " " + TextUtil.plural("sample", cid + 1);
 		}
 		@Override
 		public void unload(TextureRegistry.Scope tScope){ }
@@ -73,9 +104,12 @@ public class VulkanDisplay implements AutoCloseable{
 			imHandler = new ImHandler(core, window, imGUIRenderer);
 			
 			var settings = new SettingsUI();
+			settings.setMaxSample(core.physicalDevice.samples);
+			
 			imHandler.addComponent(settings);
 			imHandler.addComponent(new ImageViewerComp(settings.imageViewerOpen));
-			imHandler.addComponent(new ByteGridComponent(settings.byteGridOpen, core, fontRender, byteGridRender, lineRenderer));
+			imHandler.addComponent(new ByteGridComponent(core, settings.byteGridOpen, settings.byteGridSampleEnumIndex,
+			                                             fontRender, byteGridRender, lineRenderer));
 			
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);

@@ -83,13 +83,9 @@ public class PhysicalDevice{
 	}
 	
 	private VkSampleCountFlag findReasonableSamples(VkPhysicalDeviceProperties properties){
-		var limits     = properties.limits();
-		var counts     = VkSampleCountFlag.from(limits.framebufferColorSampleCounts()&limits.framebufferDepthSampleCounts());
-		var maxSamples = counts.isEmpty()? VkSampleCountFlag.N1 : counts.getLast();
-		return switch(maxSamples){
-			case N1, N2, N4, N8 -> maxSamples;
-			case N16, N32, N64 -> VkSampleCountFlag.N8;
-		};
+		var limits = properties.limits();
+		var counts = VkSampleCountFlag.from(limits.framebufferColorSampleCounts()&limits.framebufferDepthSampleCounts());
+		return counts.isEmpty()? VkSampleCountFlag.N1 : counts.getLast();
 	}
 	
 	private List<QueueFamilyProps> getQueueFamilies(VkPhysicalDevice pDevice){
