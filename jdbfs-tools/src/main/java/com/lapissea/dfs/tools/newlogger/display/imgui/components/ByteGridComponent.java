@@ -101,23 +101,24 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private List<Geometry.PointsLine> backgroundDots(Extent2D viewSize, boolean errorMode){
 		
-		var color = errorMode? Color.RED.darker() : new Color(0xC2FFD700, true);
+		var color = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
 		
-		float jitter       = 25;
-		int   step         = 25;
-		float randX        = (float)ImGui.getTime()/2f;
-		float randY        = (float)ImGui.getTime()/2f + 10000;
-		float simplexScale = 50;
+		float jitter     = 125;
+		int   step       = 25;
+		float randX      = (float)ImGui.getTime()/10f;
+		float randY      = (float)ImGui.getTime()/10f + 10000;
+		float noiseScale = 175;
 		
 		var res = new ArrayList<Geometry.PointsLine>();
 		
 		for(int x = 0; x<viewSize.width + 2; x += step){
 			for(int y = (x/step)%step; y<viewSize.height + 2; y += step){
-				float xf = x/simplexScale;
-				float yf = y/simplexScale;
-				float px = x + SimplexNoise.noise(xf, yf, randX)*jitter, py = y + SimplexNoise.noise(xf, yf, randY)*jitter;
+				float xf = x/noiseScale, yf = y/noiseScale;
+				
+				var nOff = new Vector2f(SimplexNoise.noise(xf, yf, randX), SimplexNoise.noise(xf, yf, randY));
+				var pos  = new Vector2f(x, y).add(nOff.mul(jitter));
 				res.add(new Geometry.PointsLine(List.of(
-					new Vector2f(px, py), new Vector2f(px + 2F, py)
+					pos, pos.add(2, 0, new Vector2f())
 				), 2F, color, false));
 			}
 		}
