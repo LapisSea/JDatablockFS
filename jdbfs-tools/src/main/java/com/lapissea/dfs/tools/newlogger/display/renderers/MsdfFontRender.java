@@ -259,9 +259,13 @@ public class MsdfFontRender implements VulkanResource{
 		@Override
 		public void destroy() throws VulkanCodeException{
 			if(dsSets != null) dsSets.destroy();
+			dsSets = null;
 			if(uniform != null) uniform.destroy();
+			uniform = null;
 			if(verts != null) verts.destroy();
+			verts = null;
 			if(indirectInstances != null) indirectInstances.destroy();
+			indirectInstances = null;
 		}
 	}
 	public void render(Extent2D viewSize, CommandBuffer buf, RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{

@@ -206,8 +206,11 @@ public class ByteGridRender implements VulkanResource{
 		public void destroy() throws VulkanCodeException{
 			if(bytesInfo != null){
 				dsSet.destroy();
+				dsSet = null;
 				bytesInfo.destroy();
+				bytesInfo = null;
 				indirectDrawBuff.destroy();
+				indirectDrawBuff = null;
 			}
 		}
 	}

@@ -106,7 +106,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		float jitter     = 125;
 		int   step       = 25;
 		float randX      = (float)ImGui.getTime()/10f;
-		float randY      = (float)ImGui.getTime()/10f + 10000;
+		float randY      = randX + 10000;
 		float noiseScale = 175;
 		
 		var res = new ArrayList<Geometry.PointsLine>();

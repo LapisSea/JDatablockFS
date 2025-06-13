@@ -98,7 +98,9 @@ public class LineRenderer implements VulkanResource{
 		public void destroy() throws VulkanCodeException{
 			if(vbos == null) return;
 			vbos.destroy();
+			vbos = null;
 			ibos.destroy();
+			ibos = null;
 		}
 	}
 	
