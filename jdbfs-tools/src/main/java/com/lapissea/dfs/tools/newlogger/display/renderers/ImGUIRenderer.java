@@ -165,10 +165,17 @@ public class ImGUIRenderer implements VulkanResource{
 			for(int cmdIdx = 0, bc = drawData.getCmdListCmdBufferSize(n); cmdIdx<bc; cmdIdx++){
 				drawData.getCmdListCmdBufferClipRect(clipRect, n, cmdIdx);
 				
+				if(clipRect.x<winPos.x) clipRect.x = winPos.x;
+				if(clipRect.y<winPos.y) clipRect.y = winPos.y;
+				
 				var clipX = (int)(clipRect.x - winPos.x);
 				var clipY = (int)(clipRect.y - winPos.y);
 				var clipW = (int)(clipRect.z - clipRect.x);
 				var clipH = (int)(clipRect.w - clipRect.y);
+				
+				if(clipX + clipW>winSize.x) clipW = (int)(winSize.x - clipX);
+				if(clipY + clipH>winSize.y) clipH = (int)(winSize.y - clipY);
+				
 				buf.setScissor(new Rect2D(clipX, clipY, clipW, clipH));
 				
 				long textureId = drawData.getCmdListCmdBufferTextureId(n, cmdIdx);
