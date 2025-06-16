@@ -19,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkPipelineBindPoint;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Descriptor;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
@@ -55,21 +56,21 @@ public class ImGUIRenderer implements VulkanResource{
 			vtxBuf.destroy();
 			idxBuf.destroy();
 		}
-		private void ensureBuffers(VulkanCore core, int vtxSize, int idxSize) throws VulkanCodeException{
+		private void ensureBuffers(Device device, int vtxSize, int idxSize) throws VulkanCodeException{
 			
 			if(vtxBuf == null || vtxBuf.size()<vtxSize){
 				if(vtxBuf != null){
-					core.device.waitIdle();
+					device.waitIdle();
 					vtxBuf.destroy();
 				}
-				vtxBuf = core.allocateHostBuffer(vtxSize, VkBufferUsageFlag.VERTEX_BUFFER);
+				vtxBuf = device.allocateHostBuffer(vtxSize, VkBufferUsageFlag.VERTEX_BUFFER);
 			}
 			if(idxBuf == null || idxBuf.size()<idxSize){
 				if(idxBuf != null){
-					core.device.waitIdle();
+					device.waitIdle();
 					idxBuf.destroy();
 				}
-				idxBuf = core.allocateHostBuffer(idxSize, VkBufferUsageFlag.INDEX_BUFFER);
+				idxBuf = device.allocateHostBuffer(idxSize, VkBufferUsageFlag.INDEX_BUFFER);
 			}
 		}
 	}
@@ -125,7 +126,7 @@ public class ImGUIRenderer implements VulkanResource{
 		if(winSize.x == 0 && winSize.y == 0) return;
 		var winPos = drawData.getDisplayPos();
 		
-		resource.ensureBuffers(core, vtxSize, idxSize);
+		resource.ensureBuffers(core.device, vtxSize, idxSize);
 		
 		try(var vtxSes = resource.vtxBuf.update();
 		    var idxSes = resource.idxBuf.update()){

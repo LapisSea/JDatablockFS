@@ -16,6 +16,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkVertexInputRate;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
@@ -106,12 +107,12 @@ public class LineRenderer implements VulkanResource{
 	
 	private final ShaderModuleSet shader;
 	
-	private final VulkanCore core;
+	private final Device device;
 	
 	private final VkPipelineSet pipelines;
 	
 	public LineRenderer(VulkanCore core) throws VulkanCodeException{
-		this.core = core;
+		this.device = core.device;
 		shader = new ShaderModuleSet(core, "Line", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
 		pipelines = new VkPipelineSet(
@@ -120,7 +121,7 @@ public class LineRenderer implements VulkanResource{
 			                .multisampling(rp.samples, false)
 			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 			                .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, Vert.XY)
-			                .addVertexInput(1, 0, core.device.color8bitFormat, Vert.COLOR)
+			                .addVertexInput(1, 0, device.color8bitFormat, Vert.COLOR)
 			                .addVertexInputBinding(0, Vert.SIZEOF, VkVertexInputRate.VERTEX)
 			                .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
 			                .build()
@@ -138,9 +139,9 @@ public class LineRenderer implements VulkanResource{
 		resource.indexCount = size.indexCount();
 		
 		if(resource.vbos == null || resource.vbos.size()/Vert.SIZEOF<size.vertCount()){
-			core.device.waitIdle();
+			device.waitIdle();
 			if(resource.vbos != null) resource.vbos.destroy();
-			resource.vbos = core.allocateHostBuffer(size.vertCount()*(long)Vert.SIZEOF, VkBufferUsageFlag.VERTEX_BUFFER);
+			resource.vbos = device.allocateHostBuffer(size.vertCount()*(long)Vert.SIZEOF, VkBufferUsageFlag.VERTEX_BUFFER);
 		}
 		var indexSize = switch(resource.indexType){
 			case UINT16 -> 2;
@@ -148,9 +149,9 @@ public class LineRenderer implements VulkanResource{
 			case UINT8 -> 1;
 		};
 		if(resource.ibos == null || resource.ibos.size()/indexSize<size.indexCount()){
-			core.device.waitIdle();
+			device.waitIdle();
 			if(resource.ibos != null) resource.ibos.destroy();
-			resource.ibos = core.allocateHostBuffer(size.indexCount()*(long)indexSize, VkBufferUsageFlag.INDEX_BUFFER);
+			resource.ibos = device.allocateHostBuffer(size.indexCount()*(long)indexSize, VkBufferUsageFlag.INDEX_BUFFER);
 		}
 		
 		try(var vertsSes = resource.vbos.updateAs(Vert.Buf::new);

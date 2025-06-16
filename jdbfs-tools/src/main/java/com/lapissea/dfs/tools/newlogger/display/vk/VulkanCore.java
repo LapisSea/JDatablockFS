@@ -9,7 +9,6 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkAttachmentStoreOp;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorPoolCreateFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
@@ -76,7 +75,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
@@ -269,33 +267,8 @@ public class VulkanCore implements AutoCloseable{
 		return new VulkanTexture(image, memory, view, defaultSampler, false);
 	}
 	
-	public <T extends Struct<T>>
-	UniformBuffer<T> allocateUniformBuffer(int size, boolean ssbo, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
-		var res = new BackedVkBuffer[MAX_IN_FLIGHT_FRAMES];
-		for(int i = 0; i<res.length; i++){
-			res[i] = allocateHostBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
-		}
-		return new UniformBuffer<>(List.of(res), ssbo, ctor);
-	}
-	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
-		return device.allocateIndirectBufferPerFrame(instanceCount);
-	}
-	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
-		return device.allocateIndirectBuffer(instanceCount);
-	}
-	
-	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
-		return device.allocateStagingBuffer(size);
-	}
-	public BackedVkBuffer allocateHostBuffer(long size, VkBufferUsageFlag usage) throws VulkanCodeException{
-		return device.allocateHostBuffer(size, usage);
-	}
-	
 	public <E extends Throwable> BackedVkBuffer allocateDeviceLocalBuffer(long size, UnsafeConsumer<ByteBuffer, E> populator) throws E, VulkanCodeException{
 		return device.allocateDeviceLocalBuffer(transferBuffers, size, populator);
-	}
-	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
-		return device.allocateBuffer(size, usageFlags, memoryFlags);
 	}
 	
 	public ShaderModule createShaderModule(ByteBuffer spirv, ShaderType type) throws VulkanCodeException{

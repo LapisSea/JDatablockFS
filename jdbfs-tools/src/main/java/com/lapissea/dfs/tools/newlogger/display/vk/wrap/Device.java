@@ -6,6 +6,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
+import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -25,6 +26,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.Struct;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
@@ -52,6 +54,7 @@ import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import static org.lwjgl.vulkan.VK10.VK_IMAGE_TILING_OPTIMAL;
 import static org.lwjgl.vulkan.VK10.VK_LOD_CLAMP_NONE;
@@ -287,6 +290,14 @@ public class Device implements VulkanResource{
 		}
 	}
 	
+	public <T extends Struct<T>>
+	UniformBuffer<T> allocateUniformBuffer(int size, boolean ssbo, Function<ByteBuffer, T> ctor) throws VulkanCodeException{
+		var res = new BackedVkBuffer[VulkanCore.MAX_IN_FLIGHT_FRAMES];
+		for(int i = 0; i<res.length; i++){
+			res[i] = allocateHostBuffer(size, ssbo? VkBufferUsageFlag.STORAGE_BUFFER : VkBufferUsageFlag.UNIFORM_BUFFER);
+		}
+		return new UniformBuffer<>(List.of(res), ssbo, ctor);
+	}
 	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
 		var res = new IndirectDrawBuffer[VulkanCore.MAX_IN_FLIGHT_FRAMES];
 		for(int i = 0; i<res.length; i++){

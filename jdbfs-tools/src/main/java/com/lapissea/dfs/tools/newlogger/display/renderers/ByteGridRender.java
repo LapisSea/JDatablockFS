@@ -386,9 +386,10 @@ public class ByteGridRender implements VulkanResource{
 	}
 	
 	public void record(RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+		var device = core.device;
 		if(resource.indirectDrawBuff == null){
 			resource.dsSet = dsLayout.createDescriptorSet();
-			resource.indirectDrawBuff = core.allocateIndirectBuffer(256);
+			resource.indirectDrawBuff = device.allocateIndirectBuffer(256);
 		}
 		
 		var reads  = new RoaringBitmap();
@@ -425,10 +426,10 @@ public class ByteGridRender implements VulkanResource{
 		var cap = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
 		if(resource.bytesInfo == null || resource.bytesInfo.size()/GByte.SIZEOF<cap){
 			if(resource.bytesInfo != null){
-				core.device.waitIdle();
+				device.waitIdle();
 				resource.bytesInfo.destroy();
 			}
-			resource.bytesInfo = core.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
 			resource.updateDescriptor();
 		}
 		
