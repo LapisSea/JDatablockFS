@@ -14,6 +14,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
@@ -23,6 +25,7 @@ import org.joml.SimplexNoise;
 import org.joml.Vector2f;
 
 import java.awt.Color;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -43,6 +46,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	private record DisplayData(IOInterface src, long size){ }
 	
 	private DisplayData displayData;
+	private boolean     uploadData;
 	
 	public ByteGridComponent(
 		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
@@ -58,17 +62,37 @@ public class ByteGridComponent extends BackbufferComponent{
 		clearColor.set(0.4, 0.4, 0.4, 1);
 	}
 	
+	public void setDisplayData(IOInterface src) throws IOException{
+		assert src.isReadOnly();
+		displayData = new DisplayData(src, src.getIOSize());
+		uploadData = true;
+	}
+	
 	@Override
 	protected boolean needsRerender(){ return true; }
 	
 	@Override
 	protected void renderBackbuffer(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
 		
+		fontRes.reset();
+		
 		if(displayData.size == 0){
 			renderNoData(viewSize, cmdBuffer);
 			return;
 		}
 		
+		if(uploadData){
+			uploadData = false;
+			try{
+				byteGridRender.record(
+					grid1Res, displayData.src.readAll(),
+					List.of(new ByteGridRender.DrawRange(0, (int)displayData.size, Color.BLUE.brighter())),
+					List.of()
+				);
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
 		renderAutoSizeByteGrid(viewSize, cmdBuffer);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
@@ -79,7 +103,9 @@ public class ByteGridComponent extends BackbufferComponent{
 			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
 		sd.add(new MsdfFontRender.StringDraw(
 			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
-		fontRender.render(viewSize, cmdBuffer, fontRes, sd);
+		
+		var fontDraws = fontRender.record(fontRes, sd);
+		fontRender.submit(viewSize, cmdBuffer, fontDraws);
 		
 		renderDecimatedCurve(viewSize, cmdBuffer);
 	}
@@ -93,9 +119,14 @@ public class ByteGridComponent extends BackbufferComponent{
 		int w         = viewSize.width, h = viewSize.height;
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
-		var draw = stringDrawIn(str, new Rect2D(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false);
-		if(draw != null){
-			fontRender.render(viewSize, cmdBuffer, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F)));
+		List<MsdfFontRender.RenderToken> tokens = new ArrayList<>();
+		
+		if(stringDrawIn(str, new Rect2D(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
+			tokens.add(fontRender.record(fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
+		}
+		
+		for(var token : tokens){
+			fontRender.submit(viewSize, cmdBuffer, token);
 		}
 	}
 	
@@ -112,7 +143,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res = new ArrayList<Geometry.PointsLine>();
 		
 		for(int x = 0; x<viewSize.width + 2; x += step){
-			for(int y = (x/step)%step; y<viewSize.height + 2; y += step){
+			for(int y = (x/2)%step; y<viewSize.height + 2; y += step){
 				float xf = x/noiseScale, yf = y/noiseScale;
 				
 				var nOff = new Vector2f(SimplexNoise.noise(xf, yf, randX), SimplexNoise.noise(xf, yf, randY));
@@ -125,8 +156,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		return res;
 	}
 	
-	private MsdfFontRender.StringDraw stringDrawIn(String s, Rect2D area, Color color, float fontScale, boolean alignLeft){
-		if(s.isEmpty()) return null;
+	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, Rect2D area, Color color, float fontScale, boolean alignLeft){
+		if(s.isEmpty()) return Match.empty();
 		
 		if(area.height<fontScale){
 			fontScale = area.height;
@@ -149,7 +180,7 @@ public class ByteGridComponent extends BackbufferComponent{
 				}
 				DrawFont.Bounds sbDots = null;
 				while((area.width - 1)/w<0.5){
-					if(s.isEmpty()) return null;
+					if(s.isEmpty()) return Match.empty();
 					if(s.length() == 1){
 						break;
 					}
@@ -178,7 +209,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			}
 		}
 		
-		return new MsdfFontRender.StringDraw(fontScale, color, s, x, y, xScale, 0);
+		return Match.of(new MsdfFontRender.StringDraw(fontScale, color, s, x, y, xScale, 0));
 	}
 	
 	@Override

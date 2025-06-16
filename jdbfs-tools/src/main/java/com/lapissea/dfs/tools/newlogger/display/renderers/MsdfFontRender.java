@@ -9,7 +9,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
-import com.lapissea.dfs.tools.newlogger.display.vk.UniformBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
@@ -30,6 +29,7 @@ import com.lapissea.util.UtilL;
 import org.joml.Matrix3x2f;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
+import org.lwjgl.system.StructBuffer;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
 import java.awt.Color;
@@ -66,13 +66,41 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	private static class Quad{
-		private static final int SIZE = (2 + 1)*4;
+	private static class Quad extends Struct<Quad>{
+		private static final int SIZEOF;
+		private static final int X_OFF;
+		private static final int Y_OFF;
+		private static final int LETTER_ID;
 		
-		private static void put(ByteBuffer dest, float xOff, float yOff, int letterId){
-			dest.putFloat(xOff).putFloat(yOff)
-			    .putInt(letterId);
+		static{
+			var layout = __struct(
+				__member(Float.BYTES),
+				__member(Float.BYTES),
+				__member(Integer.BYTES)
+			);
+			SIZEOF = layout.getSize();
+			X_OFF = layout.offsetof(0);
+			Y_OFF = layout.offsetof(1);
+			LETTER_ID = layout.offsetof(2);
 		}
+		
+		void set(float xOff, float yOff, int letterId){
+			var address = this.address;
+			MemoryUtil.memPutFloat(address + X_OFF, xOff);
+			MemoryUtil.memPutFloat(address + Y_OFF, yOff);
+			MemoryUtil.memPutInt(address + LETTER_ID, letterId);
+		}
+		
+		int letterId(){
+			return MemoryUtil.memGetInt(address + LETTER_ID);
+		}
+		
+		protected Quad(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
+		protected Quad(long address)   { super(address, null); }
+		@Override
+		protected Quad create(long address, ByteBuffer container){ return new Quad(address); }
+		@Override
+		public int sizeof(){ return SIZEOF; }
 	}
 	
 	private static class Uniform extends Struct<Uniform>{
@@ -121,41 +149,57 @@ public class MsdfFontRender implements VulkanResource{
 		public int sizeof(){ return SIZEOF; }
 	}
 	
-	private VulkanCore core;
+	private final VulkanCore core;
 	
-	private final CompletableFuture<Glyphs.Table>  tableRes = CompletableFuture.supplyAsync(() -> Glyphs.loadTable(LAYOUT_PATH));
-	private final CompletableFuture<VulkanTexture> atlas    = VulkanTexture.loadTexture(TEXTURE_PATH, false, () -> {
-		UtilL.sleepWhile(() -> core == null);
-		return core;
-	});
-	private final CompletableFuture<Void>          doneTask;
+	private Glyphs.Table  table;
+	private VulkanTexture atlasTexture;
+	
+	private final CompletableFuture<Void> doneTask;
 	
 	private final ShaderModuleSet shader;
 	private       BackedVkBuffer  tableGpu;
+	
+	private VkDescriptorSetLayout dsLayout;
+	
+	private VkDescriptorSetLayout dsLayoutConst;
+	private VkDescriptorSet       dsSetConst;
+	
+	private VkPipelineSet pipelines;
 	
 	public MsdfFontRender(VulkanCore core){
 		this.core = Objects.requireNonNull(core);
 		shader = new ShaderModuleSet(core, "msdfFont", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		var tableUploadTask = tableRes.whenComplete((table, e) -> {
+		var tableTask = CompletableFuture.supplyAsync(() -> Glyphs.loadTable(LAYOUT_PATH)).whenComplete((table, e) -> {
 			if(e != null) throw UtilL.uncheckedThrow(e);
+			this.table = table;
+		});
+		var atlasTask = VulkanTexture.loadTexture(TEXTURE_PATH, false, () -> core).whenComplete((texture, e) -> {
+			if(e != null) throw UtilL.uncheckedThrow(e);
+			atlasTexture = texture;
+		});
+		
+		var tableUploadTask = tableTask.whenComplete((table, e) -> {
+			if(e != null) throw UtilL.uncheckedThrow(e);
+			this.table = table;
 			try{
-				uploadTable(table);
+				uploadTable();
 			}catch(Throwable ex){
 				throw new RuntimeException("Failed to create font table", ex);
 			}
 		});
 		
-		doneTask = CompletableFuture.allOf(atlas, tableUploadTask).whenComplete((v, e) -> {
+		doneTask = CompletableFuture.allOf(atlasTask, tableUploadTask).whenComplete((v, e) -> {
 			if(e != null) throw UtilL.uncheckedThrow(e);
 			try{
-				createResources();
+				createPipeline();
 			}catch(Throwable ex){
 				throw new RuntimeException(ex);
 			}
 		});
 	}
-	private void uploadTable(Glyphs.Table table) throws VulkanCodeException{
+	
+	private void uploadTable() throws VulkanCodeException{
 		var count = table.index.size();
 		tableGpu = core.allocateDeviceLocalBuffer(Letter.SIZE*(long)count, b -> {
 			var   metrics = table.metrics;
@@ -171,23 +215,11 @@ public class MsdfFontRender implements VulkanResource{
 		});
 	}
 	
-	private VkDescriptorSetLayout dsLayout;
-	
-	private VkDescriptorSetLayout dsLayoutConst;
-	private VkDescriptorSet       dsSetConst;
-	
-	private VkPipelineSet pipelines;
-	
-	private void createResources() throws VulkanCodeException{
-		createPipeline();
-	}
-	
-	
 	private void createPipeline() throws VulkanCodeException{
 		
 		var desc = new Descriptor.LayoutDescription()
 			           .bind(0, VkShaderStageFlag.VERTEX, tableGpu.buffer, VkDescriptorType.STORAGE_BUFFER)
-			           .bind(1, VkShaderStageFlag.FRAGMENT, atlas.join(), VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
+			           .bind(1, VkShaderStageFlag.FRAGMENT, atlasTexture, VkImageLayout.SHADER_READ_ONLY_OPTIMAL);
 		
 		dsLayoutConst = core.globalDescriptorPool.createDescriptorSetLayout(desc.bindings());
 		dsSetConst = dsLayoutConst.createDescriptorSet();
@@ -200,7 +232,7 @@ public class MsdfFontRender implements VulkanResource{
 			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
 		));
 		
-		var table = tableRes.join();
+		var table = this.table;
 		
 		pipelines = new VkPipelineSet(rp -> {
 			return VkPipeline.builder(rp, shader)
@@ -227,9 +259,8 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	public DrawFont.Bounds getStringBounds(String string, float fontScale){
-		var   table   = tableRes.join();
-		float width   = calcUnitWidth(table, string);
-		var   metrics = table.metrics;
+		var   table = this.table;
+		float width = calcUnitWidth(table, string);
 		return new DrawFont.Bounds(width*fontScale, fontScale);
 	}
 	
@@ -250,58 +281,69 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	public static final class RenderResource implements VulkanResource{
-		private VkDescriptorSet        dsSets;
-		private UniformBuffer<Uniform> uniform;
-		private BackedVkBuffer         verts;
+		private VkDescriptorSet               dsSet;
+		private BackedVkBuffer.Typed<Uniform> uniform;
+		private BackedVkBuffer.Typed<Quad>    quads;
 		
 		private IndirectDrawBuffer indirectInstances;
 		
+		private int drawStart, uniformPos, quadPos;
+		
+		public void reset(){
+			drawStart = uniformPos = quadPos = 0;
+		}
+		
 		@Override
 		public void destroy() throws VulkanCodeException{
-			if(dsSets != null) dsSets.destroy();
-			dsSets = null;
+			if(dsSet != null) dsSet.destroy();
+			dsSet = null;
 			if(uniform != null) uniform.destroy();
 			uniform = null;
-			if(verts != null) verts.destroy();
-			verts = null;
+			if(quads != null) quads.destroy();
+			quads = null;
 			if(indirectInstances != null) indirectInstances.destroy();
 			indirectInstances = null;
 		}
 	}
-	public void render(Extent2D viewSize, CommandBuffer buf, RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
-		if(strs.isEmpty()) return;
+	
+	public static final class RenderToken{
+		private final RenderResource resource;
+		public final  int            drawOffset;
+		public final  int            drawCount;
+		
+		public RenderToken(RenderResource resource, int drawOffset, int drawCount){
+			this.resource = resource;
+			this.drawOffset = drawOffset;
+			this.drawCount = drawCount;
+		}
+		
+		@Override
+		public String toString(){
+			return "{off: " + drawOffset + ", count: " + drawCount + "}";
+		}
+	}
+	
+	public RenderToken record(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
+		if(strs.isEmpty()) return null;
 		waitFullyCreated();
 		
-		var table = tableRes.join();
+		ensureRequiredMemory(resource, strs);
 		
-		ensureRequiredMemory(table, resource, strs);
-		
-		var pipeline = pipelines.get(buf.getCurrentRenderPass());
-		buf.bindPipeline(pipeline);
-		buf.setViewportScissor(new Rect2D(viewSize));
-		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSets);
-		
-		var projectionMatrix2D = new Matrix3x2f()
-			                         .translate(-1, -1)
-			                         .scale(2F/viewSize.width, 2F/viewSize.height);
-		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, projectionMatrix2D.get(new float[6]));
-		
-		int indirectInstanceCount = 0;
-		
-		try(var vertMemWrap = resource.verts.update();
-		    var uniformMemWrap = resource.uniform.updateMulti(0);
+		try(var quadMemWrap = resource.quads.updateMulti();
+		    var uniformMemWrap = resource.uniform.updateMulti();
 		    var drawCmdWrap = resource.indirectInstances.update()
 		){
-			var vertMem  = vertMemWrap.getBuffer();
-			var uniforms = uniformMemWrap.val;
-			var drawCmd  = drawCmdWrap.buffer;
+			var quadMem  = quadMemWrap.val.position(resource.quadPos);
+			var uniforms = uniformMemWrap.val.position(resource.uniformPos);
+			var drawCmd  = drawCmdWrap.buffer.position(resource.drawStart);
 			
-			
-			record InstancePos(int vertPos, int vertCount){ }
+			record InstancePos(int quadPos, int quadCount){
+				int vertPos()  { return quadPos*6; }
+				int vertCount(){ return quadCount*6; }
+			}
 			Map<String, InstancePos> instanceMap = HashMap.newHashMap(strs.size());
-			int                      vertCounter = 0;
-			int                      instance    = 0;
+			int                      quadCounter = resource.quadPos;
+			int                      instance    = resource.uniformPos;
 			
 			VkDrawIndirectCommand drawCall = null;
 			
@@ -310,10 +352,10 @@ public class MsdfFontRender implements VulkanResource{
 				
 				InstancePos instPos = instanceMap.get(str.string);
 				if(instPos == null){
-					var start = vertCounter;
-					var count = putStr(vertMem, table, str.string);
+					var start = quadCounter;
+					var count = putStr(quadMem, table, str.string);
 					instanceMap.put(str.string, instPos = new InstancePos(start, count));
-					vertCounter += count;
+					quadCounter += count;
 				}
 				
 				var outline = str.outline;
@@ -325,38 +367,63 @@ public class MsdfFontRender implements VulkanResource{
 				uniforms.get().set(str.x, str.y, str.pixelHeight, str.color, outline, str.xScale);
 				
 				if(drawCall == null){
-					indirectInstanceCount++;
 					drawCall = drawCmd.get();
-					drawCall.set(instPos.vertCount, 1, instPos.vertPos, 0);
-				}else if(drawCall.firstVertex() == instPos.vertPos){
+					drawCall.set(instPos.vertCount(), 1, instPos.vertPos(), instance);
+				}else if(drawCall.firstVertex() == instPos.vertPos()){
 					drawCall.instanceCount(drawCall.instanceCount() + 1);
 				}else{
-					indirectInstanceCount++;
 					drawCall = drawCmd.get();
-					drawCall.set(instPos.vertCount, 1, instPos.vertPos, instance);
+					drawCall.set(instPos.vertCount(), 1, instPos.vertPos(), instance);
 				}
 				instance++;
 			}
+			
+			var drawOffset = resource.drawStart;
+			var drawCount  = drawCmd.position() - resource.drawStart;
+			
+			resource.quadPos = quadMem.position();
+			resource.uniformPos = uniforms.position();
+			resource.drawStart = drawCmd.position();
+			
+			return new RenderToken(resource, drawOffset, drawCount);
 		}
-		
-		buf.drawIndirect(resource.indirectInstances, 0, indirectInstanceCount);
 	}
-	private void ensureRequiredMemory(Glyphs.Table table, RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
+	
+	public void submit(Extent2D viewSize, CommandBuffer buf, RenderToken token) throws VulkanCodeException{
+		if(token.drawCount == 0) return;
+		waitFullyCreated();
+		
+		var resource = token.resource;
+		
+		var pipeline = pipelines.get(buf.getCurrentRenderPass());
+		buf.bindPipeline(pipeline);
+		buf.setViewportScissor(new Rect2D(viewSize));
+		
+		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSet);
+		
+		var projectionMatrix2D = new Matrix3x2f()
+			                         .translate(-1, -1)
+			                         .scale(2F/viewSize.width, 2F/viewSize.height);
+		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, projectionMatrix2D.get(new float[6]));
+		
+		buf.drawIndirect(resource.indirectInstances, token.drawOffset, token.drawCount);
+	}
+	
+	private void ensureRequiredMemory(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
 		boolean update = false;
-		if(resource.dsSets == null){
-			resource.dsSets = dsLayout.createDescriptorSet();
-			resource.verts = core.allocateHostBuffer(Quad.SIZE, VkBufferUsageFlag.STORAGE_BUFFER);
-			resource.uniform = core.allocateUniformBuffer(Uniform.SIZEOF, true, Uniform::new);
+		if(resource.dsSet == null){
+			resource.dsSet = dsLayout.createDescriptorSet();
+			resource.quads = core.allocateHostBuffer(Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
+			resource.uniform = core.allocateHostBuffer(Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
 			resource.indirectInstances = core.allocateIndirectBuffer(4);
 			update = true;
 		}
 		
-		int instanceCount = 0;
-		int vertCount     = 0;
-		
+		int instanceCount = resource.uniformPos;
+		int quadCount     = resource.quadPos;
 		
 		Set<String> uniqueStrings = HashSet.newHashSet(strs.size());
-		int         drawCallCount = 0;
+		int         drawCallCount = resource.drawStart;
 		String      lastStr       = null;
 		for(StringDraw str : strs){
 			if(str.outline>0 && str.pixelHeight<outlineCutoff) continue;
@@ -365,7 +432,7 @@ public class MsdfFontRender implements VulkanResource{
 				for(int i = 0, l = s.length(); i<l; i++){
 					var id = table.index.getOrDefault(s.charAt(i), -1);
 					if(id != -1 && !table.empty.get(id)){
-						vertCount++;
+						quadCount++;
 					}
 				}
 			}
@@ -376,26 +443,37 @@ public class MsdfFontRender implements VulkanResource{
 			}
 		}
 		
-		var neededVertMem     = vertCount*(long)Quad.SIZE;
-		var neededInstanceMem = instanceCount*(long)Uniform.SIZEOF;
-		
-		if(resource.uniform.size()<neededInstanceMem){
+		if(resource.uniform.elementCount()<instanceCount){
+			var newBuff = core.allocateHostBuffer(instanceCount*(long)Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
+			var oldBuff = resource.uniform;
+			
+			try(var oldD = oldBuff.update(); var newB = newBuff.update()){
+				newB.put(oldD.getBuffer());
+			}
+			
 			core.device.waitIdle();
-			resource.uniform.destroy();
-			resource.uniform = core.allocateUniformBuffer(Math.toIntExact(neededInstanceMem), true, Uniform::new);
+			oldBuff.destroy();
+			resource.uniform = newBuff;
 			update = true;
 		}
-		if(resource.verts.size()<neededVertMem){
+		if(resource.quads.elementCount()<quadCount){
+			var newBuff = core.allocateHostBuffer(quadCount*(long)Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
+			var oldBuff = resource.quads;
+			
+			try(var oldD = oldBuff.update(); var newB = newBuff.update()){
+				newB.put(oldD.getBuffer());
+			}
+			
 			core.device.waitIdle();
-			resource.verts.destroy();
-			resource.verts = core.allocateHostBuffer(neededVertMem, VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.quads = newBuff;
+			oldBuff.destroy();
 			update = true;
 		}
 		if(update){
-			resource.dsSets.update(List.of(
-				new Descriptor.LayoutDescription.UniformBuff(0, resource.uniform),
-				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, resource.verts.buffer)
-			), 0);
+			resource.dsSet.update(List.of(
+				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, resource.uniform.buffer),
+				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, resource.quads.buffer)
+			));
 		}
 		
 		if(resource.indirectInstances.instanceCapacity()<drawCallCount){
@@ -405,7 +483,7 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	private static int putStr(ByteBuffer b, Glyphs.Table table, String str){
+	private static int putStr(StructBuffer<Quad, ?> b, Glyphs.Table table, String str){
 		float fsScale = table.fsScale;
 		
 		float x     = 0, y = (float)table.metrics.descender();
@@ -416,8 +494,8 @@ public class MsdfFontRender implements VulkanResource{
 			var charID = table.index.getOrDefault(ch, table.missingCharId);
 			
 			if(!table.empty.get(charID)){
-				Quad.put(b, (table.x0[charID] + x)*fsScale, ((-table.y0[charID]) + y)*fsScale, charID);
-				count += 6;
+				b.get().set((table.x0[charID] + x)*fsScale, ((-table.y0[charID]) + y)*fsScale, charID);
+				count++;
 			}
 			
 			x += table.advance[charID];
@@ -431,6 +509,8 @@ public class MsdfFontRender implements VulkanResource{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
+		waitFullyCreated();
+		
 		pipelines.destroy();
 		
 		dsLayout.destroy();
@@ -441,6 +521,6 @@ public class MsdfFontRender implements VulkanResource{
 		tableGpu.destroy();
 		
 		shader.destroy();
-		atlas.join().destroy();
+		atlasTexture.destroy();
 	}
 }

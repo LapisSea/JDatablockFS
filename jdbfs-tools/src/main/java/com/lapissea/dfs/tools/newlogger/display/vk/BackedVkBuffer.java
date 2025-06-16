@@ -10,18 +10,43 @@ import org.lwjgl.system.StructBuffer;
 import org.lwjgl.vulkan.VK10;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class BackedVkBuffer implements VulkanResource{
 	
-	public static class Typed<B extends StructBuffer<?, B>> extends BackedVkBuffer{
+	public static class Typed<T extends Struct<T>> extends BackedVkBuffer{
 		
+		private final Function<ByteBuffer, T> ctor;
+		private       T                       dummy;
+		private       int                     sizeOf = -1;
 		
-		public Typed(VkBuffer buffer, VkDeviceMemory memory){
+		public Typed(VkBuffer buffer, VkDeviceMemory memory, Function<ByteBuffer, T> ctor){
 			super(buffer, memory);
+			this.ctor = ctor;
 		}
 		
+		private T getDummy(){
+			if(dummy == null) makeDummy();
+			return dummy;
+		}
+		private void makeDummy(){
+			dummy = Objects.requireNonNull(ctor.apply(ByteBuffer.allocateDirect(1)));
+		}
+		
+		public BackedVkBuffer.MemorySession<UniformBuffer.SimpleBuffer<T>> updateMulti() throws VulkanCodeException{
+			return updateAsVal(bb -> {
+				var dummy = getDummy();
+				return new UniformBuffer.SimpleBuffer<>(bb, bb.remaining()/dummy.sizeof(), dummy);
+			});
+		}
+		
+		public long elementCount(){
+			var s = sizeOf;
+			if(s == -1) s = sizeOf = getDummy().sizeof();
+			return size()/s;
+		}
 		
 	}
 	
@@ -117,6 +142,10 @@ public class BackedVkBuffer implements VulkanResource{
 	
 	@Override
 	public String toString(){
-		return "BackedVkBuffer{" + size() + "bytes, usage: " + buffer.usageFlags + " memoryProps: " + memory.propertyFlags + "}";
+		return "BackedVkBuffer{" + size() + " bytes, usage: " + buffer.usageFlags + " memoryProps: " + memory.propertyFlags + "}";
+	}
+	
+	public <T extends Struct<T>> Typed<T> asTyped(Function<ByteBuffer, T> ctor){
+		return new Typed<>(buffer, memory, ctor);
 	}
 }
