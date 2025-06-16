@@ -281,13 +281,54 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	public static final class RenderResource implements VulkanResource{
-		private VkDescriptorSet               dsSet;
+		private VkDescriptorSet dsSet;
+		
 		private BackedVkBuffer.Typed<Uniform> uniform;
 		private BackedVkBuffer.Typed<Quad>    quads;
-		
-		private IndirectDrawBuffer indirectInstances;
+		private IndirectDrawBuffer            indirectInstances;
 		
 		private int drawStart, uniformPos, quadPos;
+		
+		private void ensureMemory(VkDescriptorSetLayout dsLayout, int quadCount, int uniformCount, int indirectInstanceCount) throws VulkanCodeException{
+			var device = dsLayout.device;
+			
+			boolean update = dsSet == null;
+			if(quads == null || quads.elementCount()<quadCount){
+				var newBuff = device.allocateHostBuffer(quadCount*(long)Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
+				copyDestroy(quads, newBuff);
+				quads = newBuff;
+				update = true;
+			}
+			if(uniform == null || uniform.elementCount()<uniformCount){
+				var newBuff = device.allocateHostBuffer(uniformCount*(long)Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
+				copyDestroy(uniform, newBuff);
+				uniform = newBuff;
+				update = true;
+			}
+			if(indirectInstances == null || indirectInstances.instanceCapacity()<indirectInstanceCount){
+				var newIBuff = device.allocateIndirectBuffer(indirectInstanceCount);
+				if(indirectInstances != null){
+					indirectInstances.buffer.transferTo(newIBuff.buffer);
+					device.waitIdle();
+					indirectInstances.destroy();
+				}
+				indirectInstances = newIBuff;
+			}
+			
+			if(update){
+				if(dsSet == null) dsSet = dsLayout.createDescriptorSet();
+				dsSet.update(List.of(
+					new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, uniform.buffer),
+					new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, quads.buffer)
+				));
+			}
+		}
+		private void copyDestroy(BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
+			if(oldBuff == null) return;
+			oldBuff.transferTo(newBuff);
+			oldBuff.buffer.device.waitIdle();
+			oldBuff.destroy();
+		}
 		
 		public void reset(){
 			drawStart = uniformPos = quadPos = 0;
@@ -417,15 +458,6 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	private void ensureRequiredMemory(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
-		boolean update = false;
-		if(resource.dsSet == null){
-			resource.dsSet = dsLayout.createDescriptorSet();
-			resource.quads = core.allocateHostBuffer(Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
-			resource.uniform = core.allocateHostBuffer(Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
-			resource.indirectInstances = core.allocateIndirectBuffer(4);
-			update = true;
-		}
-		
 		int instanceCount = resource.uniformPos;
 		int quadCount     = resource.quadPos;
 		
@@ -450,44 +482,7 @@ public class MsdfFontRender implements VulkanResource{
 			}
 		}
 		
-		if(resource.uniform.elementCount()<instanceCount){
-			var newBuff = core.allocateHostBuffer(instanceCount*(long)Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
-			var oldBuff = resource.uniform;
-			
-			try(var oldD = oldBuff.update(); var newB = newBuff.update()){
-				newB.put(oldD.getBuffer());
-			}
-			
-			core.device.waitIdle();
-			oldBuff.destroy();
-			resource.uniform = newBuff;
-			update = true;
-		}
-		if(resource.quads.elementCount()<quadCount){
-			var newBuff = core.allocateHostBuffer(quadCount*(long)Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
-			var oldBuff = resource.quads;
-			
-			try(var oldD = oldBuff.update(); var newB = newBuff.update()){
-				newB.put(oldD.getBuffer());
-			}
-			
-			core.device.waitIdle();
-			resource.quads = newBuff;
-			oldBuff.destroy();
-			update = true;
-		}
-		if(update){
-			resource.dsSet.update(List.of(
-				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, resource.uniform.buffer),
-				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, resource.quads.buffer)
-			));
-		}
-		
-		if(resource.indirectInstances.instanceCapacity()<drawCallCount){
-			core.device.waitIdle();
-			resource.indirectInstances.destroy();
-			resource.indirectInstances = core.allocateIndirectBuffer(drawCallCount);
-		}
+		resource.ensureMemory(dsLayout, quadCount, instanceCount, drawCallCount);
 	}
 	
 	private static int putStr(StructBuffer<Quad, ?> b, Glyphs.Table table, String str){

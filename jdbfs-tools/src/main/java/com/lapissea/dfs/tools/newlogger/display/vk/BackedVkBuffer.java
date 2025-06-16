@@ -133,11 +133,17 @@ public class BackedVkBuffer implements VulkanResource{
 		}
 	}
 	
-	public <E extends Throwable> MappedVkMemory update() throws E, VulkanCodeException{
+	public MappedVkMemory update() throws VulkanCodeException{
 		return update(0, VK10.VK_WHOLE_SIZE);
 	}
-	public <E extends Throwable> MappedVkMemory update(long offset, long size) throws E, VulkanCodeException{
+	public MappedVkMemory update(long offset, long size) throws VulkanCodeException{
 		return memory.map(offset, size);
+	}
+	
+	public void transferTo(BackedVkBuffer dest) throws VulkanCodeException{
+		try(var srcMem = update(); var dstMem = dest.update()){
+			dstMem.put(srcMem.getBuffer());
+		}
 	}
 	
 	public long size(){ return buffer.size; }

@@ -52,7 +52,7 @@ public class IndirectDrawBuffer implements VulkanResource{
 		public void close() throws VulkanCodeException{ mem.close(); }
 	}
 	
-	private final BackedVkBuffer buffer;
+	public final BackedVkBuffer buffer;
 	
 	public IndirectDrawBuffer(BackedVkBuffer buffer){
 		this.buffer = buffer;

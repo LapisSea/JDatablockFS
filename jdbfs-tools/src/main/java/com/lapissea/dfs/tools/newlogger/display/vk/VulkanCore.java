@@ -54,7 +54,6 @@ import org.lwjgl.system.Pointer;
 import org.lwjgl.system.Struct;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
-import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkExtent3D;
@@ -279,15 +278,10 @@ public class VulkanCore implements AutoCloseable{
 		return new UniformBuffer<>(List.of(res), ssbo, ctor);
 	}
 	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
-		var res = new IndirectDrawBuffer[MAX_IN_FLIGHT_FRAMES];
-		for(int i = 0; i<res.length; i++){
-			res[i] = allocateIndirectBuffer(instanceCount);
-		}
-		return new IndirectDrawBuffer.PerFrame(res);
+		return device.allocateIndirectBufferPerFrame(instanceCount);
 	}
 	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
-		var buf = allocateHostBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
-		return new IndirectDrawBuffer(buf);
+		return device.allocateIndirectBuffer(instanceCount);
 	}
 	
 	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{

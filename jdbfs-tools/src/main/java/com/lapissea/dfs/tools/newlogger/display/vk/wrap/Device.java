@@ -4,8 +4,10 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
+import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.TransferBuffers;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKImageType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
@@ -29,6 +31,7 @@ import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
+import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtent3D;
 import org.lwjgl.vulkan.VkFenceCreateInfo;
 import org.lwjgl.vulkan.VkImageCreateInfo;
@@ -282,6 +285,18 @@ public class Device implements VulkanResource{
 			
 			return VKCalls.vkCreateBuffer(this, info);
 		}
+	}
+	
+	public IndirectDrawBuffer.PerFrame allocateIndirectBufferPerFrame(int instanceCount) throws VulkanCodeException{
+		var res = new IndirectDrawBuffer[VulkanCore.MAX_IN_FLIGHT_FRAMES];
+		for(int i = 0; i<res.length; i++){
+			res[i] = allocateIndirectBuffer(instanceCount);
+		}
+		return new IndirectDrawBuffer.PerFrame(res);
+	}
+	public IndirectDrawBuffer allocateIndirectBuffer(int instanceCount) throws VulkanCodeException{
+		var buf = allocateHostBuffer((long)instanceCount*VkDrawIndirectCommand.SIZEOF, VkBufferUsageFlag.INDIRECT_BUFFER);
+		return new IndirectDrawBuffer(buf);
 	}
 	
 	public BackedVkBuffer allocateStagingBuffer(long size) throws VulkanCodeException{
