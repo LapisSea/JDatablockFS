@@ -105,7 +105,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 		
 		var fontDraws = fontRender.record(fontRes, sd);
-		fontRender.submit(viewSize, cmdBuffer, fontDraws);
+		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
 		
 		renderDecimatedCurve(viewSize, cmdBuffer);
 	}
@@ -125,9 +125,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			tokens.add(fontRender.record(fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
 		}
 		
-		for(var token : tokens){
-			fontRender.submit(viewSize, cmdBuffer, token);
-		}
+		fontRender.submit(viewSize, cmdBuffer, tokens);
 	}
 	
 	private List<Geometry.PointsLine> backgroundDots(Extent2D viewSize, boolean errorMode){

@@ -28,7 +28,9 @@ public class BackedVkBuffer implements VulkanResource{
 		}
 		
 		private T getDummy(){
-			if(dummy == null) makeDummy();
+			if(dummy == null){
+				makeDummy();
+			}
 			return dummy;
 		}
 		private void makeDummy(){

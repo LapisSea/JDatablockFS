@@ -307,12 +307,13 @@ public class MsdfFontRender implements VulkanResource{
 	}
 	
 	public static final class RenderToken{
+		
 		private final RenderResource resource;
 		public final  int            drawOffset;
 		public final  int            drawCount;
 		
 		public RenderToken(RenderResource resource, int drawOffset, int drawCount){
-			this.resource = resource;
+			this.resource = Objects.requireNonNull(resource);
 			this.drawOffset = drawOffset;
 			this.drawCount = drawCount;
 		}
@@ -389,24 +390,30 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer buf, RenderToken token) throws VulkanCodeException{
-		if(token.drawCount == 0) return;
+	public void submit(Extent2D viewSize, CommandBuffer buf, List<RenderToken> tokens) throws VulkanCodeException{
+		if(tokens.isEmpty()) return;
 		waitFullyCreated();
 		
-		var resource = token.resource;
 		
 		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		buf.setViewportScissor(new Rect2D(viewSize));
-		
-		buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSet);
 		
 		var projectionMatrix2D = new Matrix3x2f()
 			                         .translate(-1, -1)
 			                         .scale(2F/viewSize.width, 2F/viewSize.height);
 		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, projectionMatrix2D.get(new float[6]));
 		
-		buf.drawIndirect(resource.indirectInstances, token.drawOffset, token.drawCount);
+		RenderResource lastResource = null;
+		for(var token : tokens){
+			var resource = token.resource;
+			if(resource != lastResource){
+				lastResource = resource;
+				buf.bindDescriptorSets(VkPipelineBindPoint.GRAPHICS, 0, dsSetConst, resource.dsSet);
+			}
+			
+			buf.drawIndirect(resource.indirectInstances, token.drawOffset, token.drawCount);
+		}
 	}
 	
 	private void ensureRequiredMemory(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
