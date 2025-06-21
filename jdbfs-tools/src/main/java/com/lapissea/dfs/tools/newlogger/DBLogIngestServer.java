@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -13,7 +14,6 @@ import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -73,6 +73,11 @@ public final class DBLogIngestServer{
 		
 		private void handleRequest() throws IOException{
 			var name = IPC.readString(in);
+			if(listSessionNames().contains(name)){
+				Log.warn("SERVER: Session named {}#red requested but already exists!", name);
+				IPC.writeEnum(out, IPC.MSGConnection.NACK, true);
+				return;
+			}
 			Log.info("SERVER: Session named {}#green requested", name);
 			IPC.writeEnum(out, IPC.MSGConnection.ACK, true);
 			
@@ -229,7 +234,7 @@ public final class DBLogIngestServer{
 	}
 	
 	private       boolean                  run         = true;
-	private final Map<Integer, Connection> connections = Collections.synchronizedMap(new LinkedHashMap<>());
+	private final Map<Integer, Connection> connections = new LinkedHashMap<>();
 	
 	private final    UnsafeSupplier<FrameDB, IOException> frameDBInit;
 	private volatile FrameDB                              db;
@@ -280,8 +285,10 @@ public final class DBLogIngestServer{
 			while(run){
 				listenForConnection(soc);
 			}
-			for(Connection value : connections.values()){
-				value.close();
+			synchronized(connections){
+				for(var value : connections.values()){
+					value.close();
+				}
 			}
 		}
 	}
@@ -294,7 +301,9 @@ public final class DBLogIngestServer{
 			try(ss; var managementSocket = ss.accept()){
 				
 				var con = new Connection(managementSocket);
-				connections.put(ss.getLocalPort(), con);
+				synchronized(connections){
+					connections.put(ss.getLocalPort(), con);
+				}
 				
 				while(true){
 					var toClose = con.processConnection();
@@ -304,10 +313,18 @@ public final class DBLogIngestServer{
 			}catch(Throwable e){
 				e.printStackTrace();
 			}finally{
-				connections.remove(ss.getLocalPort());
+				synchronized(connections){
+					connections.remove(ss.getLocalPort());
+				}
 				UtilL.closeSilently(ss);
 			}
 		}, Thread.ofVirtual()::start);
+	}
+	
+	public Set<String> listSessionNames(){
+		synchronized(connections){
+			return Iters.values(connections).flatMap(e -> e.sessions.values()).map(e -> e.name).toModSet();
+		}
 	}
 	
 }
