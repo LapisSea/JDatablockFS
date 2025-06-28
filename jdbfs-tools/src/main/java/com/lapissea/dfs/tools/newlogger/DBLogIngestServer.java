@@ -1,7 +1,11 @@
 package com.lapissea.dfs.tools.newlogger;
 
+import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -18,13 +22,56 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 public final class DBLogIngestServer{
+	
+	private static final class StoredSession{
+		
+		final String  name;
+		final FrameDB frameDB;
+		
+		final SessionSetView.SessionView view = new SessionSetView.SessionView(){
+			@Override
+			public String name(){
+				return name;
+			}
+			@Override
+			public int frameCount(){
+				try{
+					var count = frameDB.sequenceInfo(name).frameCount();
+					return Math.toIntExact(count);//TODO
+				}catch(IOException e){
+					throw new RuntimeException(e);//TODO
+				}
+			}
+			@Override
+			public IOInterface getFrameData(int id){
+				try{
+					var frame = frameDB.resolve(name, id);
+					if(frame == null){
+						LogUtil.println("INVALID FRAME DATA:", name, id);
+						return MemoryData.empty();
+					}
+					return MemoryData.viewOf(frame.data());
+				}catch(IOException e){
+					throw new RuntimeException(e);//TODO
+				}
+			}
+		};
+		
+		private StoredSession(String name, FrameDB frameDB){
+			this.name = name;
+			this.frameDB = frameDB;
+		}
+		
+	}
 	
 	private final class Connection implements Closeable{
 		private final Map<String, Session> sessions = new HashMap<>();
@@ -86,15 +133,27 @@ public final class DBLogIngestServer{
 			IPC.writePortNum(out, sessionReceiver.getLocalPort(), true);
 			
 			CompletableFuture.runAsync(() -> {
+				StoredSession storedSession;
+				
 				try(var socket = sessionReceiver.accept();
-				    var session = new Session(name, getDB(), socket)){
+				    var session = new Session(storedSession = new StoredSession(name, getDB()), socket)){
 					
-					sessions.put(name, session);
+					lock.lock();
+					try{
+						sessions.put(name, session);
+					}finally{
+						lock.unlock();
+					}
+					synchronized(storedSessions){
+						storedSessions.put(name, storedSession);
+					}
+					modId.incrementAndGet();
 					
 					Log.info("SERVER: Session {}#green connected! Ready for commands.", name);
 					
 					while(true){
 						var close = session.process();
+						modId.incrementAndGet();
 						if(close) break;
 					}
 					
@@ -108,6 +167,8 @@ public final class DBLogIngestServer{
 					}finally{
 						lock.unlock();
 					}
+					modId.incrementAndGet();
+					
 					Log.info("SERVER: [{}#yellow] Session ended", name);
 				}
 			}, Thread.ofVirtual().name("Session: " + name)::start);
@@ -136,8 +197,7 @@ public final class DBLogIngestServer{
 	
 	private static final class Session implements Closeable{
 		
-		public final String  name;
-		public final FrameDB frameDB;
+		public final StoredSession storedSession;
 		
 		private final Socket           socket;
 		private final DataInputStream  in;
@@ -145,12 +205,26 @@ public final class DBLogIngestServer{
 		
 		private Thread processThread;
 		
-		private Session(String name, FrameDB frameDB, Socket socket) throws IOException{
-			this.name = name;
-			this.frameDB = frameDB;
+		private final SessionSetView.SessionView view;
+		
+		private Session(StoredSession storedSession, Socket socket) throws IOException{
+			this.storedSession = storedSession;
 			this.socket = socket;
 			in = new DataInputStream(socket.getInputStream());
 			out = new DataOutputStream(socket.getOutputStream());
+			
+			view = new SessionSetView.SessionView(){
+				@Override
+				public String name(){ return storedSession.name; }
+				@Override
+				public int frameCount(){
+					throw NotImplementedException.infer();//TODO: implement .frameCount()
+				}
+				@Override
+				public IOInterface getFrameData(int id){
+					throw NotImplementedException.infer();//TODO: implement .getFrameData()
+				}
+			};
 		}
 		
 		private boolean process() throws IOException{
@@ -158,6 +232,9 @@ public final class DBLogIngestServer{
 			if(processThread.isInterrupted()){
 				return true;
 			}
+			
+			var name    = storedSession.name;
+			var frameDB = storedSession.frameDB;
 			
 			IPC.MSGSession cmd;
 			try{
@@ -240,8 +317,15 @@ public final class DBLogIngestServer{
 	private volatile FrameDB                              db;
 	private          ServerSocket                         serverSocket;
 	
+	private final Map<String, StoredSession> storedSessions = new HashMap<>();
+	
+	private final AtomicLong     modId = new AtomicLong();
+	public final  SessionSetView view;
+	
 	public DBLogIngestServer(UnsafeSupplier<FrameDB, IOException> frameDBInit){
 		this.frameDBInit = frameDBInit;
+		
+		view = makeView();
 		
 		//lazy init db
 		Thread.ofVirtual().start(() -> {
@@ -252,6 +336,44 @@ public final class DBLogIngestServer{
 				e.printStackTrace();
 			}
 		});
+	}
+	
+	private SessionSetView makeView(){
+		return new SessionSetView(){
+			
+			private long seenId;
+			
+			@Override
+			public boolean isDirty(){ return seenId != modId.get(); }
+			@Override
+			public void clearDirty(){ seenId = modId.get(); }
+			
+			@Override
+			public Set<String> getSessionNames(){ return listSessionNames(); }
+			
+			@Override
+			public Optional<SessionView> getAnySession(){
+				synchronized(storedSessions){
+					var name = Iters.keys(storedSessions).findFirst();
+					if(name.isEmpty()) return Optional.empty();
+					return getSession(name.get());
+				}
+			}
+			
+			@Override
+			public Optional<SessionView> getSession(String name){
+				synchronized(storedSessions){
+					var session = storedSessions.get(name);
+					if(session == null) return Optional.empty();
+					return Optional.of(session.view);
+				}
+			}
+			
+			@Override
+			public String toString(){
+				return "IngestDBView" + listSessionNames();
+			}
+		};
 	}
 	
 	private FrameDB getDB() throws IOException{
@@ -305,6 +427,7 @@ public final class DBLogIngestServer{
 					connections.put(ss.getLocalPort(), con);
 				}
 				
+				modId.incrementAndGet();
 				while(true){
 					var toClose = con.processConnection();
 					if(toClose) break;
@@ -322,8 +445,8 @@ public final class DBLogIngestServer{
 	}
 	
 	public Set<String> listSessionNames(){
-		synchronized(connections){
-			return Iters.values(connections).flatMap(e -> e.sessions.values()).map(e -> e.name).toModSet();
+		synchronized(storedSessions){
+			return Set.copyOf(storedSessions.keySet());
 		}
 	}
 	

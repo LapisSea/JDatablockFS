@@ -50,13 +50,14 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	public ByteGridComponent(
 		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
-		MsdfFontRender fontRender, ByteGridRender byteGridRender, LineRenderer lineRenderer
+		MsdfFontRender fontRender, LineRenderer lineRenderer
 	) throws VulkanCodeException{
 		super(core, open, sampleEnumIndex);
 		
 		this.fontRender = fontRender;
-		this.byteGridRender = byteGridRender;
 		this.lineRenderer = lineRenderer;
+		
+		byteGridRender = new ByteGridRender(core);
 		
 		displayData = new DisplayData(MemoryData.empty().asReadOnly(), 0);
 		clearColor.set(0.4, 0.4, 0.4, 1);
@@ -86,18 +87,40 @@ public class ByteGridComponent extends BackbufferComponent{
 			try{
 				byteGridRender.record(
 					grid1Res, displayData.src.readAll(),
-					List.of(new ByteGridRender.DrawRange(0, (int)displayData.size, Color.BLUE.brighter())),
+					List.of(
+						new ByteGridRender.DrawRange(0, 8, Color.BLUE.darker()),
+						new ByteGridRender.DrawRange(8, (int)displayData.size, Color.GRAY.brighter())
+					),
 					List.of()
 				);
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
 		}
-		renderAutoSizeByteGrid(viewSize, cmdBuffer);
+		
+		long byteCount = displayData.size;
+		
+		var res      = ByteGridSize.compute(viewSize, byteCount);
+		var byteSize = res.byteSize;
+		
+		lineRenderer.record(lineRes, List.of(
+			new Geometry.PointsLine(List.of(
+				new Vector2f(0, 0),
+				new Vector2f(8*byteSize, 0),
+				new Vector2f(8*byteSize, 1*byteSize),
+				new Vector2f(0, 1*byteSize),
+				new Vector2f(0, 0)
+			), 3, Color.BLUE, true)
+		));
+		
+		
+		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow, grid1Res);
+		
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRes);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
-		
-		testFontWave(sd);
+
+//		testFontWave(sd);
 		
 		sd.add(new MsdfFontRender.StringDraw(
 			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
@@ -106,8 +129,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		var fontDraws = fontRender.record(fontRes, sd);
 		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
-		
-		renderDecimatedCurve(viewSize, cmdBuffer);
+
+//		renderDecimatedCurve(viewSize, cmdBuffer);
 	}
 	
 	private void renderNoData(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
@@ -216,6 +239,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		grid1Res.destroy();
 		lineRes.destroy();
 		fontRes.destroy();
+		byteGridRender.destroy();
 	}
 	
 	private static void testFontWave(List<MsdfFontRender.StringDraw> sd){
@@ -255,13 +279,6 @@ public class ByteGridComponent extends BackbufferComponent{
 		return new Matrix3x2f()
 			       .translate(-1, -1)
 			       .scale(2F/viewSize.width, 2F/viewSize.height);
-	}
-	
-	private void renderAutoSizeByteGrid(Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
-		long byteCount = displayData.size;
-		
-		var res = ByteGridSize.compute(viewSize, byteCount);
-		byteGridRender.submit(viewSize, buf, new Matrix4f().scale(res.byteSize), res.bytesPerRow, grid1Res);
 	}
 	
 	private record ByteGridSize(int bytesPerRow, float byteSize){

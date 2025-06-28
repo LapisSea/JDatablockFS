@@ -1,7 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
 import com.lapissea.dfs.tools.DisplayManager;
-import imgui.ImGui;
+import imgui.ImGuiIO;
 import imgui.ImGuiViewport;
 import imgui.ImVec2;
 import imgui.callback.ImPlatformFuncViewport;
@@ -201,9 +201,7 @@ public final class ImTools{
 		};
 	}
 	
-	public static void setupFont(String resourcePath){
-		var io = ImGui.getIO();
-		
+	public static void setupFont(ImGuiIO io, String resourcePath){
 		try{
 			var    f = io.getFonts();
 			byte[] bb;

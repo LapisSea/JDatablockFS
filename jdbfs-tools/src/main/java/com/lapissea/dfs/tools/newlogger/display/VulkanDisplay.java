@@ -1,10 +1,12 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ByteGridComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
-import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
@@ -19,10 +21,12 @@ import com.lapissea.util.UtilL;
 import imgui.ImGui;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
+import imgui.type.ImString;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -34,11 +38,12 @@ public class VulkanDisplay implements AutoCloseable{
 		Thread.ofVirtual().start(GlfwWindow::initGLFW);
 	}
 	
-	private static final class SettingsUI implements UIComponent{
+	private final class SettingsUI implements UIComponent{
 		
 		final ImBoolean imageViewerOpen         = new ImBoolean();
 		final ImBoolean byteGridOpen            = new ImBoolean(true);
 		final ImInt     byteGridSampleEnumIndex = new ImInt(2);
+		final ImString  currentSessionName      = new ImString();
 		
 		VkSampleCountFlag[] samplesSet;
 		
@@ -53,6 +58,18 @@ public class VulkanDisplay implements AutoCloseable{
 							var selected = byteGridSampleEnumIndex.get() == i;
 							if(ImGui.selectable(sampleName(i), selected)){
 								byteGridSampleEnumIndex.set(i);
+							}
+							if(selected) ImGui.setItemDefaultFocus();
+						}
+						ImGui.endCombo();
+					}
+					
+					if(ImGui.beginCombo("Current session count", currentSessionName.get())){
+						for(String name : sessionSetView.getSessionNames()){
+							var selected = currentSessionName.get().equals(name);
+							if(ImGui.selectable(name, selected)){
+								currentSessionName.set(name);
+								forceSessionUpdate = true;
 							}
 							if(selected) ImGui.setItemDefaultFocus();
 						}
@@ -82,7 +99,6 @@ public class VulkanDisplay implements AutoCloseable{
 	private final VulkanCore core;
 	
 	public final MsdfFontRender fontRender;
-	public final ByteGridRender byteGridRender;
 	public final LineRenderer   lineRenderer;
 	public final ImGUIRenderer  imGUIRenderer;
 	
@@ -90,26 +106,32 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final ImHandler imHandler;
 	
-	public VulkanDisplay(){
+	private final ByteGridComponent byteGridComponent;
+	
+	private       boolean        forceSessionUpdate;
+	private final SessionSetView sessionSetView;
+	private final SettingsUI     uiSettings;
+	
+	public VulkanDisplay(SessionSetView sessionSetView){
+		this.sessionSetView = sessionSetView;
 		try{
 			core = new VulkanCore("DFS debugger", VKPresentMode.IMMEDIATE);
 			
 			window = createMainWindow();
 			
 			fontRender = new MsdfFontRender(core);
-			byteGridRender = new ByteGridRender(core);
 			lineRenderer = new LineRenderer(core);
 			imGUIRenderer = new ImGUIRenderer(core);
 			
 			imHandler = new ImHandler(core, window, imGUIRenderer);
 			
-			var settings = new SettingsUI();
-			settings.setMaxSample(core.physicalDevice.samples);
+			uiSettings = new SettingsUI();
+			uiSettings.setMaxSample(core.physicalDevice.samples);
 			
-			imHandler.addComponent(settings);
-			imHandler.addComponent(new ImageViewerComp(settings.imageViewerOpen));
-			imHandler.addComponent(new ByteGridComponent(core, settings.byteGridOpen, settings.byteGridSampleEnumIndex,
-			                                             fontRender, byteGridRender, lineRenderer));
+			imHandler.addComponent(uiSettings);
+			imHandler.addComponent(new ImageViewerComp(uiSettings.imageViewerOpen));
+			imHandler.addComponent(byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex,
+			                                                                 fontRender, lineRenderer));
 			
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
@@ -175,6 +197,13 @@ public class VulkanDisplay implements AutoCloseable{
 		if(window.swapchain == null || window.getGlfwWindow().size.equals(0, 0)){
 			return;
 		}
+		
+		if(forceSessionUpdate || sessionSetView.isDirty()){
+			forceSessionUpdate = false;
+			sessionSetView.clearDirty();
+			updateData();
+		}
+		
 		try{
 			imHandler.newFrame();
 			render(this.window);
@@ -183,6 +212,30 @@ public class VulkanDisplay implements AutoCloseable{
 		}catch(VulkanCodeException e){
 			window.requestClose();
 			throw new RuntimeException("Failed to render", e);
+		}
+	}
+	
+	private void updateData(){
+		var sesName = uiSettings.currentSessionName.get();
+		var ses     = sessionSetView.getSession(sesName);
+		if(ses.isEmpty()){
+			var defSes = sessionSetView.getAnySession();
+			if(defSes.isPresent()){
+				ses = defSes;
+				uiSettings.currentSessionName.set(ses.get().name());
+			}
+		}
+		
+		IOInterface data;
+		if(ses.isEmpty()){
+			data = MemoryData.empty();
+		}else{
+			data = ses.get().getFrameData(1);
+		}
+		try{
+			byteGridComponent.setDisplayData(data.asReadOnly());
+		}catch(IOException e){
+			new RuntimeException("Failed to update data", e).printStackTrace();
 		}
 	}
 	
@@ -195,7 +248,6 @@ public class VulkanDisplay implements AutoCloseable{
 		imHandler.close();
 		
 		fontRender.destroy();
-		byteGridRender.destroy();
 		lineRenderer.destroy();
 		imGUIRenderer.destroy();
 		

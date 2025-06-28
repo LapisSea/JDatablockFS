@@ -32,10 +32,12 @@ public class ImHandler{
 		io.setConfigWindowsResizeFromEdges(true);
 		
 		
-		ImTools.setupFont("/CourierPrime/Regular/font.ttf");
+		ImTools.setupFont(io, "/CourierPrime/Regular/font.ttf");
 		
 		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
 		imGuiImpl.init(window, true);
+		
+		imGuiRenderer.checkFonts();
 	}
 	
 	public void addComponent(UIComponent component){
