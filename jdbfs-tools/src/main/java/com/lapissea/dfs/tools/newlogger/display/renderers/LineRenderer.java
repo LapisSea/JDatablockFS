@@ -4,13 +4,11 @@ import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.Std430;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
@@ -88,20 +86,10 @@ public class LineRenderer implements VulkanResource{
 		}
 	}
 	
-	public static class RenderResource implements VulkanResource{
-		
-		private BackedVkBuffer vbos;
-		private BackedVkBuffer ibos;
-		private int            indexCount;
-		private VkIndexType    indexType;
-		
-		@Override
-		public void destroy() throws VulkanCodeException{
-			if(vbos == null) return;
-			vbos.destroy();
-			vbos = null;
-			ibos.destroy();
-			ibos = null;
+	public record RToken(Renderer.IndexedMeshBuffer resource, VkIndexType indexType, long vboOffset, long iboOffset, int indexCount){
+		public void bind(CommandBuffer buf, int binding){
+			buf.bindVertexBuffer(resource.vbos().buffer, binding, vboOffset);
+			buf.bindIndexBuffer(resource.ibos().buffer, iboOffset, indexType);
 		}
 	}
 	
@@ -128,36 +116,19 @@ public class LineRenderer implements VulkanResource{
 		);
 	}
 	
-	public void record(RenderResource resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
+	public RToken record(Renderer.IndexedMeshBuffer resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
 		
 		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		
 		var size = Geometry.calculateMeshSize(lines);
-		if(size.vertCount() == 0) return;
+		if(size.vertCount() == 0) return null;
 		
-		resource.indexType = size.indexCount()<=Character.MAX_VALUE? VkIndexType.UINT16 : VkIndexType.UINT32;
-		resource.indexCount = size.indexCount();
+		var indexCount = size.indexCount();
+		var indexType  = indexCount<=Character.MAX_VALUE? VkIndexType.UINT16 : VkIndexType.UINT32;
 		
-		if(resource.vbos == null || resource.vbos.size()/Vert.SIZEOF<size.vertCount()){
-			device.waitIdle();
-			if(resource.vbos != null) resource.vbos.destroy();
-			resource.vbos = device.allocateHostBuffer(size.vertCount()*(long)Vert.SIZEOF, VkBufferUsageFlag.VERTEX_BUFFER);
-		}
-		var indexSize = switch(resource.indexType){
-			case UINT16 -> 2;
-			case UINT32 -> 4;
-			case UINT8 -> 1;
-		};
-		if(resource.ibos == null || resource.ibos.size()/indexSize<size.indexCount()){
-			device.waitIdle();
-			if(resource.ibos != null) resource.ibos.destroy();
-			resource.ibos = device.allocateHostBuffer(size.indexCount()*(long)indexSize, VkBufferUsageFlag.INDEX_BUFFER);
-		}
-		
-		try(var vertsSes = resource.vbos.updateAs(Vert.Buf::new);
-		    var indeciesSes = resource.ibos.update()){
-			var verts    = vertsSes.val;
-			var indecies = indeciesSes.getBuffer();
+		try(var mem = resource.requestMemory(device, size.vertCount()*(long)Vert.SIZEOF, indexCount*(long)indexType.byteSize)){
+			var verts    = new Vert.Buf(mem.vboMem().getBuffer());
+			var indecies = mem.iboMem().getBuffer();
 			
 			for(var mesh : Iters.from(lines).map(Geometry::generateThickLineMesh)){
 				var off = verts.position();
@@ -166,25 +137,24 @@ public class LineRenderer implements VulkanResource{
 				}
 				for(var i : mesh.indices()){
 					var v = off + i;
-					switch(resource.indexType){
+					switch(indexType){
 						case UINT16 -> indecies.putChar((char)v);
 						case UINT32 -> indecies.putInt(v);
 						case UINT8 -> indecies.put((byte)v);
 					}
 				}
 			}
+			return new RToken(resource, indexType, mem.vboMem().getMapOffset(), mem.iboMem().getMapOffset(), indexCount);
 		}
-		
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, RenderResource resource) throws VulkanCodeException{
+	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, RToken resource) throws VulkanCodeException{
 		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		
 		buf.setViewportScissor(new Rect2D(viewSize));
 		
-		buf.bindVertexBuffer(resource.vbos.buffer, 0, 0);
-		buf.bindIndexBuffer(resource.ibos.buffer, 0, resource.indexType);
+		resource.bind(buf, 0);
 		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(pvm));
 		buf.drawIndexed(resource.indexCount, 1, 0, 0, 0);
 	}

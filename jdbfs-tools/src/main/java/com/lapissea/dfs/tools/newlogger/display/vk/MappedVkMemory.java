@@ -54,6 +54,10 @@ public class MappedVkMemory implements AutoCloseable{
 		return ptr;
 	}
 	
+	public long getMapOffset(){
+		return mapOffset;
+	}
+	
 	@Override
 	public void close() throws VulkanCodeException{
 		if(memory.propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){

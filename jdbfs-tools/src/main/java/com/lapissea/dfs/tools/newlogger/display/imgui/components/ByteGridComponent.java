@@ -9,6 +9,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
+import com.lapissea.dfs.tools.newlogger.display.renderers.Renderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
@@ -39,7 +40,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	private final LineRenderer   lineRenderer;
 	
 	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
-	private final LineRenderer.RenderResource   lineRes  = new LineRenderer.RenderResource();
+	private final Renderer.IndexedMeshBuffer    lineRes  = new Renderer.IndexedMeshBuffer();
 	private final MsdfFontRender.RenderResource fontRes  = new MsdfFontRender.RenderResource();
 	
 	
@@ -76,6 +77,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	protected void renderBackbuffer(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
 		
 		fontRes.reset();
+		lineRes.reset();
 		
 		if(displayData.size == 0){
 			renderNoData(viewSize, cmdBuffer);
@@ -103,7 +105,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res      = ByteGridSize.compute(viewSize, byteCount);
 		var byteSize = res.byteSize;
 		
-		lineRenderer.record(lineRes, List.of(
+		var token = lineRenderer.record(lineRes, List.of(
 			new Geometry.PointsLine(List.of(
 				new Vector2f(0, 0),
 				new Vector2f(8*byteSize, 0),
@@ -116,7 +118,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow, grid1Res);
 		
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRes);
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
 
@@ -134,8 +136,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private void renderNoData(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
-		lineRenderer.record(lineRes, backgroundDots(viewSize, false));
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRes);
+		var token = lineRenderer.record(lineRes, backgroundDots(viewSize, false));
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		
 		var str = "No data!";
 		
@@ -265,7 +267,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
 		
-		lineRenderer.record(lineRes, Iters.concat1N(
+		var token = lineRenderer.record(lineRes, Iters.concat1N(
 			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
 			Iters.from(controlPoints)
 			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED, false))
@@ -273,7 +275,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		));
 		
-		lineRenderer.submit(viewSize, buf, viewMatrix(viewSize), lineRes);
+		lineRenderer.submit(viewSize, buf, viewMatrix(viewSize), token);
 	}
 	private static Matrix3x2f viewMatrix(Extent2D viewSize){
 		return new Matrix3x2f()

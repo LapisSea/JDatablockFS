@@ -10,7 +10,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
@@ -42,7 +41,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-public class MsdfFontRender implements VulkanResource{
+public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, MsdfFontRender.RenderToken>{
 	
 	private static final String TEXTURE_PATH = "/roboto/regular/atlas.png";
 	private static final String LAYOUT_PATH  = "/roboto/regular/atlas.json";
@@ -280,7 +279,7 @@ public class MsdfFontRender implements VulkanResource{
 		return Math.max(0, Math.min(1, (actual - start)/(end - start)));
 	}
 	
-	public static final class RenderResource implements VulkanResource{
+	public static final class RenderResource implements Renderer.ResourceBuffer{
 		private VkDescriptorSet dsSet;
 		
 		private BackedVkBuffer.Typed<Uniform> uniform;
@@ -347,7 +346,7 @@ public class MsdfFontRender implements VulkanResource{
 		}
 	}
 	
-	public static final class RenderToken{
+	public static final class RenderToken implements Renderer.RenderToken{
 		
 		private final RenderResource resource;
 		public final  int            drawOffset;

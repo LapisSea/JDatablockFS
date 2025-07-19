@@ -373,6 +373,8 @@ public class VulkanCore implements AutoCloseable{
 					err.addSuppressed(ctorInit);
 				}
 			}
+			err.printStackTrace();
+			System.exit(1);
 			throw err;
 		}else{
 			Log.log(msgFinal);

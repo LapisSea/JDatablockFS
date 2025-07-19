@@ -4,6 +4,7 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
@@ -141,8 +142,13 @@ public class BackedVkBuffer implements VulkanResource{
 	}
 	
 	public void transferTo(BackedVkBuffer dest) throws VulkanCodeException{
+		transferTo(dest, size());
+	}
+	public void transferTo(BackedVkBuffer dest, long limit) throws VulkanCodeException{
+		if(limit>size()) throw new IndexOutOfBoundsException("limit > size (" + limit + " > " + size() + ")");
+		if(limit>dest.size()) throw new IndexOutOfBoundsException("limit > dest.size (" + limit + " > " + dest.size() + ")");
 		try(var srcMem = update(); var dstMem = dest.update()){
-			dstMem.put(srcMem.getBuffer());
+			MemoryUtil.memCopy(srcMem.getAddress(), dstMem.getAddress(), limit);
 		}
 	}
 	

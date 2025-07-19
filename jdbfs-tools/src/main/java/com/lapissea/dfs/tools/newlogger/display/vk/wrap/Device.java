@@ -331,6 +331,20 @@ public class Device implements VulkanResource{
 		}
 	}
 	public BackedVkBuffer allocateBuffer(long size, Flags<VkBufferUsageFlag> usageFlags, Flags<VkMemoryPropertyFlag> memoryFlags) throws VulkanCodeException{
+		
+		if(memoryFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
+			var atoms   = Math.ceilDiv(size, physicalDevice.nonCoherentAtomSize);
+			var newSize = atoms*physicalDevice.nonCoherentAtomSize;
+			if(newSize != size && Log.TRACE){
+				Log.trace(
+					"Tried to allocated HOST_CACHED buffer with size of {}#yellow but need {}#green to comply with nonCoherentAtomSize = {}",
+					size, newSize, physicalDevice.nonCoherentAtomSize
+				);
+				assert newSize>size;
+				size = newSize;
+			}
+		}
+		
 		VkBuffer       buffer = null;
 		VkDeviceMemory memory = null;
 		try{

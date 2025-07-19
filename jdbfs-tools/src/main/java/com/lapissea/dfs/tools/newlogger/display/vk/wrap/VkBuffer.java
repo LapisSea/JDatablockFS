@@ -51,6 +51,6 @@ public class VkBuffer extends VulkanResource.DeviceHandleObj{
 	
 	@Override
 	public String toString(){
-		return "VkBuffer{" + size + "bytes, " + usageFlags + "}";
+		return "VkBuffer{" + size + " bytes, " + usageFlags + "}";
 	}
 }
