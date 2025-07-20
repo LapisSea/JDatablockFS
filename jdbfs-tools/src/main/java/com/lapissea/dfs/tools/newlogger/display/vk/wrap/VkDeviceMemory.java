@@ -14,20 +14,36 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 	
 	public final long                        allocationSize;
 	public final Flags<VkMemoryPropertyFlag> propertyFlags;
-	public final long                        nonCoherentAtomSize;
 	private      VkBuffer                    boundBuffer;
 	
 	public VkDeviceMemory(Device device, long handle, long allocationSize, Flags<VkMemoryPropertyFlag> propertyFlags){
 		super(device, handle);
 		this.allocationSize = allocationSize;
 		this.propertyFlags = propertyFlags;
-		nonCoherentAtomSize = device.physicalDevice.nonCoherentAtomSize;
 	}
 	
 	public MappedVkMemory map() throws VulkanCodeException{
 		return map(0, VK10.VK_WHOLE_SIZE);
 	}
 	public MappedVkMemory map(long offset, long size) throws VulkanCodeException{
+		
+		if(propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
+			var actualSize = size == VK10.VK_WHOLE_SIZE? boundBuffer.size - offset : size;
+			
+			var physicalDevice = device.physicalDevice;
+			
+			var alignedOffset = physicalDevice.alignToAtomSizeDown(offset);
+			var end           = actualSize + offset;
+			var alignedEnd    = physicalDevice.alignToAtomSizeUp(end);
+			var alignedSize   = alignedEnd - alignedOffset;
+			
+			var mapAligned = VKCalls.vkMapMemory(this, alignedOffset, alignedSize, 0);
+			
+			var offsetChange = offset - alignedOffset;
+			var flushInfo    = new MappedVkMemory.FlushInfo(alignedOffset, alignedSize);
+			return new MappedVkMemory(this, mapAligned.getAddress() + offsetChange, actualSize, offset, flushInfo);
+		}
+		
 		return VKCalls.vkMapMemory(this, offset, size, 0);
 	}
 	

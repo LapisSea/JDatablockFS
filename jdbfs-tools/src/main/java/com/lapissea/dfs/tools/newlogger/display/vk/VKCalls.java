@@ -220,7 +220,8 @@ public interface VKCalls{
 		try(var stack = MemoryStack.stackPush()){
 			var res = stack.mallocPointer(1);
 			check(VK10.vkMapMemory(memory.device.value, memory.handle, offset, size, flags, res), "vkMapMemory");
-			return new MappedVkMemory(memory, res.get(0), offset, size);
+			var actualSize = size == VK10.VK_WHOLE_SIZE? memory.getBoundBuffer().size - offset : size;
+			return new MappedVkMemory(memory, res.get(0), actualSize, offset, null);
 		}
 	}
 	static VkBuffer vkCreateBuffer(Device device, VkBufferCreateInfo info) throws VulkanCodeException{

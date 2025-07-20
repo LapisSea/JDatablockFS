@@ -278,6 +278,12 @@ public class PhysicalDevice{
 		VK10.vkGetPhysicalDeviceFormatProperties(pDevice, format.id, formatProps);
 		return formatProps;
 	}
+	public long alignToAtomSizeDown(long size){
+		return (size/nonCoherentAtomSize)*nonCoherentAtomSize;
+	}
+	public long alignToAtomSizeUp(long size){
+		return Math.ceilDiv(size, nonCoherentAtomSize)*nonCoherentAtomSize;
+	}
 	
 	@Override
 	public String toString(){

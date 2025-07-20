@@ -79,6 +79,11 @@ public class ByteGridComponent extends BackbufferComponent{
 		fontRes.reset();
 		lineRes.reset();
 		
+		{
+			var token = lineRenderer.record(lineRes, backgroundDots(viewSize, false));
+			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
+		}
+		
 		if(displayData.size == 0){
 			renderNoData(viewSize, cmdBuffer);
 			return;
@@ -136,9 +141,6 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private void renderNoData(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
-		var token = lineRenderer.record(lineRes, backgroundDots(viewSize, false));
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
-		
 		var str = "No data!";
 		
 		int w         = viewSize.width, h = viewSize.height;

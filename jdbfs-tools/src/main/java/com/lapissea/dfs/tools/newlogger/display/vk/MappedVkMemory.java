@@ -1,7 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkDeviceMemory;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.MemoryStack;
@@ -13,19 +12,20 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 public class MappedVkMemory implements AutoCloseable{
+	public record FlushInfo(long offset, long size){ }
+	
 	
 	private final VkDeviceMemory memory;
-	private final long           ptr, mapOffset, mapSize;
+	private final long           ptr, size, mapOffset;
+	private final FlushInfo flushInfo;
 	
-	public MappedVkMemory(VkDeviceMemory memory, long ptr, long mapOffset, long mapSize){
+	public MappedVkMemory(VkDeviceMemory memory, long ptr, long size, long mapOffset, FlushInfo flushInfo){
 		this.memory = Objects.requireNonNull(memory);
 		this.ptr = ptr;
+		this.size = size;
 		this.mapOffset = mapOffset;
-		this.mapSize = mapSize;
-	}
-	
-	private long getActualSize(){
-		return mapSize == VK10.VK_WHOLE_SIZE? memory.getBoundBuffer().size : mapSize;
+		this.flushInfo = flushInfo;
+		assert size>0 : size;
 	}
 	
 	public void put(ByteBuffer src){
@@ -35,7 +35,7 @@ public class MappedVkMemory implements AutoCloseable{
 		var toCopy = src.remaining();
 		
 		var offPtr    = ptr + dstOffset;
-		var remaining = getActualSize() - dstOffset;
+		var remaining = size - dstOffset;
 		if(remaining<0) throw new IndexOutOfBoundsException("Offset is larger than buffer size");
 		if(toCopy>remaining) throw new IndexOutOfBoundsException("Source is bigger than destination");
 		
@@ -48,7 +48,7 @@ public class MappedVkMemory implements AutoCloseable{
 		populator.accept(bb);
 	}
 	public ByteBuffer getBuffer(){
-		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(getActualSize()));
+		return MemoryUtil.memByteBuffer(ptr, Math.toIntExact(size));
 	}
 	public long getAddress(){
 		return ptr;
@@ -60,20 +60,14 @@ public class MappedVkMemory implements AutoCloseable{
 	
 	@Override
 	public void close() throws VulkanCodeException{
-		if(memory.propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
+		if(flushInfo != null){
 			try(var stack = MemoryStack.stackPush()){
-				long atomSize;
-				if(mapSize == VK10.VK_WHOLE_SIZE) atomSize = VK10.VK_WHOLE_SIZE;
-				else{
-					var cas = memory.nonCoherentAtomSize;
-					atomSize = Math.min(Math.ceilDiv(mapSize, cas)*cas, memory.getBoundBuffer().size - mapOffset);
-				}
 				var memoryRange = VkMappedMemoryRange.malloc(stack);
 				memoryRange.sType$Default()
 				           .pNext(0)
 				           .memory(memory.handle)
-				           .offset(mapOffset)
-				           .size(atomSize);
+				           .offset(flushInfo.offset)
+				           .size(flushInfo.size);
 				VKCalls.vkFlushMappedMemoryRanges(memory.device, memoryRange);
 			}
 		}
