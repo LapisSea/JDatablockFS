@@ -428,10 +428,6 @@ public class ImGuiImpl{
 	}
 	
 	public void shutdown(){
-		final ImGuiIO io = ImGui.getIO();
-		
-		ImGui.destroyPlatformWindows();
-		
 		if(cachedClosedWindow != null){
 			try{
 				cachedClosedWindow.close();
@@ -443,10 +439,23 @@ public class ImGuiImpl{
 			restoreCallbacks(data.window.getGlfwWindow().getHandle());
 		}
 		
+		var platformIO = ImGui.getPlatformIO();
+		for(int n = 0; n<platformIO.getViewportsSize(); n++){
+			var viewport = platformIO.getViewports(n);
+			if(viewport.getPlatformUserData() instanceof ViewportData data && data.windowOwned){
+				try{
+					data.window.close();
+				}catch(VulkanCodeException e){ throw new RuntimeException(e); }
+			}
+			viewport.setPlatformUserData(null);
+		}
+		ImGui.destroyPlatformWindows();
+		
 		for(int cursorN = 0; cursorN<ImGuiMouseCursor.COUNT; cursorN++){
 			glfwDestroyCursor(data.mouseCursors[cursorN]);
 		}
 		
+		var io = ImGui.getIO();
 		io.setBackendPlatformName(null);
 		data = null;
 		io.removeBackendFlags(ImGuiBackendFlags.HasMouseCursors|ImGuiBackendFlags.HasSetMousePos|ImGuiBackendFlags.HasGamepad
