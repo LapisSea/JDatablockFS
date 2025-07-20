@@ -115,12 +115,23 @@ public class Device implements VulkanResource{
 		color8bitFormat = hasArithmeticTypes? VkFormat.R8G8B8A8_UINT : VkFormat.R32_UINT;
 	}
 	
-	public Swapchain createSwapchain(Swapchain oldSwapchain, Surface surface, VKPresentMode preferredMode, Iterable<FormatColor> preferred) throws VulkanCodeException{
+	public Swapchain createSwapchain(
+		Swapchain oldSwapchain, Surface surface,
+		VKPresentMode preferredMode, Iterable<FormatColor> preferred,
+		Extent2D windowFallbackSize
+	) throws VulkanCodeException{
 		//if(oldSwapchain == null) Log.info(TextUtil.toTable("Available formats", physicalDevice.formats));
 		
 		SurfaceCapabilities surfaceCapabilities = surface.getCapabilities(physicalDevice);
 		if(surfaceCapabilities.currentExtent.width == 0 || surfaceCapabilities.currentExtent.height == 0){
 			return null;
+		}
+		var currentExtent = surfaceCapabilities.currentExtent;
+		if(currentExtent.width == -1){
+			currentExtent = new Extent2D(windowFallbackSize.width, currentExtent.height);
+		}
+		if(currentExtent.height == -1){
+			currentExtent = new Extent2D(currentExtent.width, windowFallbackSize.height);
 		}
 		
 		var presentModes = surface.getPresentModes(physicalDevice);
@@ -139,7 +150,7 @@ public class Device implements VulkanResource{
 			    .minImageCount(numOfImages)
 			    .imageFormat(format.format.id)
 			    .imageColorSpace(format.colorSpace.id)
-			    .imageExtent(surfaceCapabilities.currentExtent.toStack(mem))
+			    .imageExtent(currentExtent.toStack(mem))
 			    .imageArrayLayers(1)
 			    .imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
 			    .imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)

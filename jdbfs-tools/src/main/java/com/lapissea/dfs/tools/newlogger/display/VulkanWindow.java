@@ -13,6 +13,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.CommandPool;
+import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.FrameBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Surface;
@@ -141,7 +142,7 @@ public class VulkanWindow implements AutoCloseable{
 		var device = core.device;
 		
 		var oldSwapchain = swapchain;
-		swapchain = device.createSwapchain(oldSwapchain, surface, core.preferredPresentMode, VulkanCore.PREFERRED_SWAPCHAIN_FORMATS);
+		swapchain = device.createSwapchain(oldSwapchain, surface, core.preferredPresentMode, VulkanCore.PREFERRED_SWAPCHAIN_FORMATS, new Extent2D(window.size));
 		if(oldSwapchain != null) oldSwapchain.destroy();
 		if(swapchain == null){
 			return;

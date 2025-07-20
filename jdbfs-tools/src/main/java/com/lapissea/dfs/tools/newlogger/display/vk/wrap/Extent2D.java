@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
+import com.lapissea.vec.interf.IVec2iR;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkExtent2D;
 
@@ -7,6 +8,9 @@ public class Extent2D{
 	
 	public final int width, height;
 	
+	public Extent2D(IVec2iR size){
+		this(size.x(), size.y());
+	}
 	public Extent2D(VkExtent2D extent){
 		this(extent.width(), extent.height());
 	}
