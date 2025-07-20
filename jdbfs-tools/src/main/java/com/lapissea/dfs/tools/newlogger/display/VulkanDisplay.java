@@ -7,12 +7,14 @@ import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ByteGridComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
+import com.lapissea.dfs.tools.newlogger.display.imgui.components.StatsComponent;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
+import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
@@ -29,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
@@ -40,6 +43,8 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final class SettingsUI implements UIComponent{
 		
+		final ImInt     fpsLimit                = new ImInt(60);
+		final int[]     statsLevel              = {0};
 		final ImBoolean imageViewerOpen         = new ImBoolean();
 		final ImBoolean byteGridOpen            = new ImBoolean(true);
 		final ImInt     byteGridSampleEnumIndex = new ImInt(2);
@@ -50,8 +55,20 @@ public class VulkanDisplay implements AutoCloseable{
 		@Override
 		public void imRender(TextureRegistry.Scope tScope){
 			if(ImGui.begin("Settings")){
-				ImGui.checkbox("Image viewer", imageViewerOpen);
-				ImGui.checkbox("Byte grid viewer", byteGridOpen);
+				
+				ImGui.inputInt("FPS Limit", fpsLimit);
+				if(fpsLimit.get()<0) fpsLimit.set(0);
+				ImGui.sliderScalar("##FPS Limit", fpsLimit.getData(), 0, 300);
+				ImGui.separator();
+				
+				ImGui.sliderScalar("View Stats", statsLevel, 0, 2);
+				ImGui.separator();
+				
+				enableButton("Image viewer", imageViewerOpen);
+				ImGui.sameLine();
+				enableButton("Byte grid viewer", byteGridOpen);
+				
+				ImGui.separator();
 				if(byteGridOpen.get()){
 					if(ImGui.beginCombo("Sample count", sampleName(byteGridSampleEnumIndex.get()))){
 						for(int i = 0; i<samplesSet.length; i++){
@@ -64,7 +81,7 @@ public class VulkanDisplay implements AutoCloseable{
 						ImGui.endCombo();
 					}
 					
-					if(ImGui.beginCombo("Current session count", currentSessionName.get())){
+					if(ImGui.beginCombo("Session", currentSessionName.get())){
 						for(String name : sessionSetView.getSessionNames()){
 							var selected = currentSessionName.get().equals(name);
 							if(ImGui.selectable(name, selected)){
@@ -76,8 +93,16 @@ public class VulkanDisplay implements AutoCloseable{
 						ImGui.endCombo();
 					}
 				}
+				ImGui.separator();
 			}
 			ImGui.end();
+		}
+		private void enableButton(String label, ImBoolean value){
+			ImGui.beginDisabled(value.get());
+			if(ImGui.button(label)){
+				value.set(true);
+			}
+			ImGui.endDisabled();
 		}
 		
 		private void setMaxSample(VkSampleCountFlag max){
@@ -128,6 +153,7 @@ public class VulkanDisplay implements AutoCloseable{
 			uiSettings = new SettingsUI();
 			uiSettings.setMaxSample(core.physicalDevice.samples);
 			
+			imHandler.addComponent(new StatsComponent(uiSettings.statsLevel));
 			imHandler.addComponent(uiSettings);
 			imHandler.addComponent(new ImageViewerComp(uiSettings.imageViewerOpen));
 			imHandler.addComponent(byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex,
@@ -181,14 +207,23 @@ public class VulkanDisplay implements AutoCloseable{
 			renderAndSwap();
 		});
 		
-		var lastTime = Instant.now();
+		var lastTime = NanoClock.now();
 		while(!window.shouldClose()){
 			glfwPollEvents();
-			while(Duration.between(lastTime, Instant.now()).compareTo(Duration.ofMillis(6))<0){
-				glfwPollEvents();
-				UtilL.sleep(1);
+			int fpsLimit = uiSettings.fpsLimit.get();
+			if(fpsLimit>0){
+				Instant now, releaseTime = lastTime.plus(1000_000_000/fpsLimit, ChronoUnit.NANOS);
+				while((now = NanoClock.now()).isBefore(releaseTime)){
+					glfwPollEvents();
+					var remaning = Duration.between(now, releaseTime).toMillis()/2;
+					if(remaning>1){
+						UtilL.sleep(remaning);
+					}
+				}
+				lastTime = now;
 			}
-			lastTime = Instant.now();
+			
+			this.window.checkSwapchainSize();
 			renderAndSwap();
 		}
 	}

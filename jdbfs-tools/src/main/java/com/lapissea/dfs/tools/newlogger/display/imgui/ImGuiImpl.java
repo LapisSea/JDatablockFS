@@ -908,6 +908,7 @@ public class ImGuiImpl{
 	private void renderWindow(ImGuiViewport vp){
 		if(!(vp.getPlatformUserData() instanceof ViewportData vd)) return;
 		try{
+			vd.window.checkSwapchainSize();
 			core.pushSwap(vd.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 				try(var ignore = buf.beginRenderPass(
 					win.getSurfaceRenderPass(), fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))

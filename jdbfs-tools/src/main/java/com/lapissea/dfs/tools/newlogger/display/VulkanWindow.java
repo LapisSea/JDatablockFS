@@ -23,6 +23,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VulkanQueue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
 import org.joml.Matrix3x2f;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -207,5 +208,20 @@ public class VulkanWindow implements AutoCloseable{
 		
 		surface.destroy();
 		window.destroy();
+	}
+	
+	/**
+	 * Sometimes swapchain will not fire an out of date error. This is the fallback for that
+	 */
+	public void checkSwapchainSize() throws VulkanCodeException{
+		if(swapchain == null){
+			return;
+		}
+		int[] width = {-1}, height = {-1};
+		GLFW.glfwGetFramebufferSize(window.getHandle(), width, height);
+		if(swapchain.extent.equals(new Extent2D(width[0], height[0]))){
+			return;
+		}
+		recreateSwapchainContext();
 	}
 }
