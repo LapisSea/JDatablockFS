@@ -214,10 +214,12 @@ public class VulkanDisplay implements AutoCloseable{
 			if(fpsLimit>0){
 				Instant now, releaseTime = lastTime.plus(1000_000_000/fpsLimit, ChronoUnit.NANOS);
 				while((now = NanoClock.now()).isBefore(releaseTime)){
-					glfwPollEvents();
-					var remaning = Duration.between(now, releaseTime).toMillis()/2;
-					if(remaning>1){
-						UtilL.sleep(remaning);
+					var remaning = Duration.between(now, releaseTime).toMillis();
+					if(remaning>2){
+						glfwPollEvents();
+						UtilL.sleep(remaning/2);
+					}else{
+						Thread.yield();
 					}
 				}
 				lastTime = now;
