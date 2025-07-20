@@ -7,7 +7,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -217,7 +216,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	public Optional<FuzzFail<State, Action>> runSequence(RunMark mark, FuzzSequence sequence, FuzzProgress progress){
 		if(progress != null && progress.hasErr()) return none();
 		
-		var start = Instant.now();
+		var start = NanoClock.now();
 		var rand  = new SimpleRandom(sequence.seed());
 		
 		State state;
@@ -226,7 +225,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			Objects.requireNonNull(state, "State can not be null");
 		}catch(Throwable e){
 			FuzzFail.trimErr(e);
-			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, Instant.now())));
+			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, NanoClock.now())));
 		}
 		
 		var record = progress != null && progress.config.shouldLog()? new ProgressRecord(progress, sequence.iterations()) : null;
@@ -240,7 +239,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				FuzzFail.trimErr(e);
 				return Optional.of(new FuzzFail.Create<>(
 					e,
-					sequence, Duration.between(start, Instant.now())
+					sequence, Duration.between(start, NanoClock.now())
 				));
 			}
 			
@@ -251,7 +250,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 				stateEnv.applyAction(state, idx, action, mark);
 			}catch(Throwable e){
 				if(record != null) record.reportFinal(false);
-				var duration = Duration.between(start, Instant.now());
+				var duration = Duration.between(start, NanoClock.now());
 				FuzzFail.trimErr(e);
 				return Optional.of(new FuzzFail.Action<>(e, sequence, action, idx, duration, state));
 			}
@@ -544,14 +543,14 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		static RunType of(FuzzSequenceSource source, FuzzingStateEnv<?, ?, ?> stateEnv, RunMark mark, boolean alwaysFull){
 			instant:
 			{
-				var start = Instant.now();
+				var start = NanoClock.now();
 				var iter  = source.all().sequential().iterator();
 				
 				long sequencesToRun = 0, totalIterations = 0;
 				var  sequence       = (FuzzSequence)null;
 				long count          = 0;
 				while(iter.hasNext()){
-					if(!alwaysFull && ((++count)%5 == 0) && Duration.between(start, Instant.now()).toMillis()>100){
+					if(!alwaysFull && ((++count)%5 == 0) && Duration.between(start, NanoClock.now()).toMillis()>100){
 						break instant;
 					}
 					var seq = iter.next();
