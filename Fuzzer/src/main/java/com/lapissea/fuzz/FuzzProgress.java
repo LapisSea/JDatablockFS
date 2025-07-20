@@ -23,8 +23,8 @@ public final class FuzzProgress{
 	private final AtomicLong elapsedSumAcum = new AtomicLong();
 	private       BigInteger elapsedSum     = BigInteger.ZERO;
 	private       int        last           = -1;
-	private       Instant    lastLog        = Instant.now();
-	private       Instant    start          = Instant.now();
+	private       Instant    lastLog        = NanoClock.now();
+	private       Instant    start          = NanoClock.now();
 	private       boolean    hasErr;
 	private       boolean    errMark;
 	
@@ -108,13 +108,13 @@ public final class FuzzProgress{
 	
 	synchronized void reportStart(){
 		if(logger == null) return;
-		start = Instant.now();
+		start = NanoClock.now();
 		lastLog = start.plus(config.initialLogDelay()).minus(config.logTimeout());
 		logger.log(new LogMessage.Start(config.name()));
 	}
 	synchronized void reportDone(){
 		if(logger == null) return;
-		logger.log(makeLogState(Instant.now(), start, errMark, executedCount.get(), BigDecimal.ONE, calcElapsedWork()));
+		logger.log(makeLogState(NanoClock.now(), start, errMark, executedCount.get(), BigDecimal.ONE, calcElapsedWork()));
 		logger.log(new LogMessage.End());
 	}
 	synchronized void reportCusomMsg(String msg){
@@ -153,7 +153,7 @@ public final class FuzzProgress{
 	}
 	
 	private void logInc(long count, int progressI){
-		var now   = Instant.now();
+		var now   = NanoClock.now();
 		var ltout = config.logTimeout();
 		if(Duration.between(lastLog, now).compareTo(ltout)<=0) return;
 		
