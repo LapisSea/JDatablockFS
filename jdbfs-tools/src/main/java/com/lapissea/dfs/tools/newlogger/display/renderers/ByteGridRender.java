@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
@@ -385,7 +386,7 @@ public class ByteGridRender implements VulkanResource{
 		if(to>Character.MAX_VALUE) throw new IllegalArgumentException("To can not be greater than Character.MAX_VALUE");
 	}
 	
-	public void record(RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+	public void record(DeviceGC deviceGC, RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		var device = core.device;
 		if(resource.indirectDrawBuff == null){
 			resource.dsSet = dsLayout.createDescriptorSet();
@@ -426,8 +427,7 @@ public class ByteGridRender implements VulkanResource{
 		var cap = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
 		if(resource.bytesInfo == null || resource.bytesInfo.size()/GByte.SIZEOF<cap){
 			if(resource.bytesInfo != null){
-				device.waitIdle();
-				resource.bytesInfo.destroy();
+				deviceGC.destroyLater(resource.bytesInfo);
 			}
 			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
 			resource.updateDescriptor();

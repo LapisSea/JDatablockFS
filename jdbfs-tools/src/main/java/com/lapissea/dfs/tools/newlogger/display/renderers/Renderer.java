@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.MappedVkMemory;
@@ -41,7 +42,7 @@ public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Rendere
 			}
 		}
 		
-		public VBIBMem requestMemory(Device device, long vboMemory, long iboMemory) throws VulkanCodeException{
+		public VBIBMem requestMemory(DeviceGC deviceGC, Device device, long vboMemory, long iboMemory) throws VulkanCodeException{
 			var oldVboSize = vbos == null? 0 : vbos.size();
 			var oldIboSize = ibos == null? 0 : ibos.size();
 			
@@ -52,8 +53,7 @@ public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Rendere
 				var newBuff = device.allocateHostBuffer(newVboSize, VkBufferUsageFlag.VERTEX_BUFFER);
 				if(vbos != null){
 					vbos.transferTo(newBuff, vboPos);
-					device.waitIdle();
-					vbos.destroy();
+					deviceGC.destroyLater(vbos);
 				}
 				vbos = newBuff;
 			}
@@ -61,8 +61,7 @@ public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Rendere
 				var newBuff = device.allocateHostBuffer(newIboSize, VkBufferUsageFlag.INDEX_BUFFER);
 				if(ibos != null){
 					ibos.transferTo(newBuff, iboPos);
-					device.waitIdle();
-					ibos.destroy();
+					deviceGC.destroyLater(ibos);
 				}
 				ibos = newBuff;
 			}

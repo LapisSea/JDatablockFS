@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
@@ -288,19 +289,19 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		
 		private int drawStart, uniformPos, quadPos;
 		
-		private void ensureMemory(VkDescriptorSetLayout dsLayout, int quadCount, int uniformCount, int indirectInstanceCount) throws VulkanCodeException{
+		private void ensureMemory(DeviceGC deviceGC, VkDescriptorSetLayout dsLayout, int quadCount, int uniformCount, int indirectInstanceCount) throws VulkanCodeException{
 			var device = dsLayout.device;
 			
 			boolean update = dsSet == null;
 			if(quads == null || quads.elementCount()<quadCount){
 				var newBuff = device.allocateHostBuffer(quadCount*(long)Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
-				copyDestroy(quads, newBuff);
+				copyDestroy(deviceGC, quads, newBuff);
 				quads = newBuff;
 				update = true;
 			}
 			if(uniform == null || uniform.elementCount()<uniformCount){
 				var newBuff = device.allocateHostBuffer(uniformCount*(long)Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
-				copyDestroy(uniform, newBuff);
+				copyDestroy(deviceGC, uniform, newBuff);
 				uniform = newBuff;
 				update = true;
 			}
@@ -308,8 +309,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 				var newIBuff = device.allocateIndirectBuffer(indirectInstanceCount);
 				if(indirectInstances != null){
 					indirectInstances.buffer.transferTo(newIBuff.buffer);
-					device.waitIdle();
-					indirectInstances.destroy();
+					deviceGC.destroyLater(indirectInstances);
 				}
 				indirectInstances = newIBuff;
 			}
@@ -322,11 +322,10 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 				));
 			}
 		}
-		private void copyDestroy(BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
+		private void copyDestroy(DeviceGC deviceGC, BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
 			if(oldBuff == null) return;
 			oldBuff.transferTo(newBuff);
-			oldBuff.buffer.device.waitIdle();
-			oldBuff.destroy();
+			deviceGC.destroyLater(oldBuff);
 		}
 		
 		public void reset(){
@@ -364,11 +363,11 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		}
 	}
 	
-	public RenderToken record(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
+	public RenderToken record(DeviceGC deviceGC, RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
 		if(strs.isEmpty()) return null;
 		waitFullyCreated();
 		
-		ensureRequiredMemory(resource, strs);
+		ensureRequiredMemory(deviceGC, resource, strs);
 		
 		try(var quadMemWrap = resource.quads.updateMulti();
 		    var uniformMemWrap = resource.uniform.updateMulti();
@@ -456,7 +455,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		}
 	}
 	
-	private void ensureRequiredMemory(RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
+	private void ensureRequiredMemory(DeviceGC deviceGC, RenderResource resource, List<StringDraw> strs) throws VulkanCodeException{
 		int instanceCount = resource.uniformPos;
 		int quadCount     = resource.quadPos;
 		
@@ -481,7 +480,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			}
 		}
 		
-		resource.ensureMemory(dsLayout, quadCount, instanceCount, drawCallCount);
+		resource.ensureMemory(deviceGC, dsLayout, quadCount, instanceCount, drawCallCount);
 	}
 	
 	private static int putStr(StructBuffer<Quad, ?> b, Glyphs.Table table, String str){

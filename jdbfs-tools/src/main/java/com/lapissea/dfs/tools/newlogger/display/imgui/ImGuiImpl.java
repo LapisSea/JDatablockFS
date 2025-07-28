@@ -913,7 +913,7 @@ public class ImGuiImpl{
 				try(var ignore = buf.beginRenderPass(
 					win.getSurfaceRenderPass(), fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))
 				){
-					imGUIRenderer.submit(buf, win.imguiResource.get(frameID), vp.getDrawData());
+					imGUIRenderer.submit(win.frameGC, buf, win.imguiResource.get(frameID), vp.getDrawData());
 				}
 			}));
 		}catch(VulkanCodeException e){

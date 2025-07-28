@@ -82,37 +82,32 @@ public final class TextureRegistry{
 		
 		@Override
 		public void destroy() throws VulkanCodeException{
-			synchronized(textures){
-				for(var tx : Iters.from(textures.values()).filter(e -> e.scopes.contains(this)).toList()){
-					releaseTexture(tx);
-				}
-			}
-		}
-		
-		private void releaseTexture(TexNode tx){
-			if(!tx.scopes.remove(this) || !tx.scopes.isEmpty()) return;
-			if(tx.owning){
-				tx.texture.image.device.waitIdle();
-				tx.texture.destroy();
-			}
-			textures.remove(tx.id);
-			
-			var map = descriptorSets.remove(tx.id);
-			if(map != null){
-				for(var set : map.values()){
-					try{
-						set.destroy();
-					}catch(VulkanCodeException ex){
-						throw new RuntimeException(ex);
+			try(var gc = new DeviceGC.BatchGC()){
+				synchronized(textures){
+					for(var tx : Iters.from(textures.values()).filter(e -> e.scopes.contains(this)).toList()){
+						releaseTexture(gc, tx);
 					}
 				}
 			}
 		}
 		
-		public void releaseTexture(long textureID){
+		private void releaseTexture(DeviceGC deviceGC, TexNode tx){
+			if(!tx.scopes.remove(this) || !tx.scopes.isEmpty()) return;
+			if(tx.owning){
+				deviceGC.destroyLater(tx.texture);
+			}
+			textures.remove(tx.id);
+			
+			var map = descriptorSets.remove(tx.id);
+			if(map != null){
+				deviceGC.destroyLater(map.values());
+			}
+		}
+		
+		public void releaseTexture(DeviceGC deviceGC, long textureID){
 			if(getTex(textureID) instanceof TexNode tx){
 				synchronized(textures){
-					releaseTexture(tx);
+					releaseTexture(deviceGC, tx);
 				}
 			}
 		}

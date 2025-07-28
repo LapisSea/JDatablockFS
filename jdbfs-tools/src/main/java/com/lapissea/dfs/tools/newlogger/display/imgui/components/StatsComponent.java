@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import imgui.ImGui;
@@ -16,7 +17,7 @@ public class StatsComponent implements UIComponent{
 	}
 	
 	@Override
-	public void imRender(TextureRegistry.Scope tScope){
+	public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 		switch(level[0]){
 			case 1 -> renderFps();
 			case 2 -> {
@@ -46,5 +47,5 @@ public class StatsComponent implements UIComponent{
 	}
 	
 	@Override
-	public void unload(TextureRegistry.Scope tScope){ }
+	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){ }
 }

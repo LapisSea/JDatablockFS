@@ -1,11 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanTexture;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkImageAspectFlag;
@@ -33,7 +35,7 @@ import java.util.Map;
 
 public abstract class BackbufferComponent implements UIComponent{
 	
-	private static class RenderTarget{
+	private static class RenderTarget implements VulkanResource{
 		private final long          imageID;
 		private final VulkanTexture image;
 		private final VulkanTexture mssaImage;
@@ -90,10 +92,11 @@ public abstract class BackbufferComponent implements UIComponent{
 			       extent.width<=width*1.2 && extent.height<=height*1.2;
 		}
 		
+		@Override
 		public void destroy(){
 			fence.destroy();
 			cmdBuffer.destroy();
-			tScope.releaseTexture(imageID);
+			tScope.releaseTexture(DeviceGC.IMMEDIATE, imageID);
 			frameBuffer.destroy();
 			image.destroy();
 			if(mssaImage != null) mssaImage.destroy();
@@ -118,10 +121,10 @@ public abstract class BackbufferComponent implements UIComponent{
 	}
 	
 	protected abstract boolean needsRerender();
-	protected abstract void renderBackbuffer(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException;
+	protected abstract void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException;
 	
 	@Override
-	public void imRender(TextureRegistry.Scope tScope){
+	public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 		if(!open.get()) return;
 		
 		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
@@ -130,13 +133,12 @@ public abstract class BackbufferComponent implements UIComponent{
 			var height = (int)ImGui.getContentRegionAvailY();
 			
 			if(renderTarget != null && sampleEnumIndex.get() != renderTarget.getSamples().ordinal()){
-				renderTarget.fence.device.waitIdle();
-				renderTarget.destroy();
+				deviceGC.destroyLater(renderTarget);
 				renderTarget = null;
 			}
 			
 			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
-				drawFB(tScope, width, height);
+				drawFB(deviceGC, tScope, width, height);
 			}
 			
 			var renderArea = renderTarget.renderArea;
@@ -149,8 +151,8 @@ public abstract class BackbufferComponent implements UIComponent{
 		ImGui.popStyleVar();
 	}
 	
-	private void drawFB(TextureRegistry.Scope tScope, int width, int height){
-		ensureImage(tScope, width, height);
+	private void drawFB(DeviceGC deviceGC, TextureRegistry.Scope tScope, int width, int height){
+		ensureImage(deviceGC, tScope, width, height);
 		
 		try{
 			renderTarget.fence.waitReset();
@@ -161,7 +163,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			
 			renderTarget.renderArea = new Extent2D(width, height);
 			try(var ignore = renderTarget.beginRenderPass(buff, clearColor)){
-				renderBackbuffer(renderTarget.renderArea, buff);
+				renderBackbuffer(deviceGC, buff, renderTarget.renderArea);
 			}
 			buff.end();
 			
@@ -171,21 +173,20 @@ public abstract class BackbufferComponent implements UIComponent{
 		}
 	}
 	
-	private void ensureImage(TextureRegistry.Scope tScope, int width, int height){
+	private void ensureImage(DeviceGC deviceGC, TextureRegistry.Scope tScope, int width, int height){
 		if(renderTarget == null || !renderTarget.isSizeOptimal(width, height)){
-			recreateImage(tScope, (int)(width*1.1), (int)(height*1.1));
+			recreateImage(deviceGC, tScope, (int)(width*1.1), (int)(height*1.1));
 		}else{
 			var now          = Instant.now();
 			var recentResize = Duration.between(renderTarget.creationTime, now).compareTo(Duration.ofMillis(1000))<0;
 			if(!recentResize && !renderTarget.size().equals(width, height)){
-				recreateImage(tScope, width, height);
+				recreateImage(deviceGC, tScope, width, height);
 			}
 		}
 	}
 	
-	private void recreateImage(TextureRegistry.Scope tScope, int imgWidth, int imgHeight){
-		core.device.waitIdle();
-		if(renderTarget != null) renderTarget.destroy();
+	private void recreateImage(DeviceGC deviceGC, TextureRegistry.Scope tScope, int imgWidth, int imgHeight){
+		if(renderTarget != null) deviceGC.destroyLater(renderTarget);
 		try{
 			var samples = VkSampleCountFlag.values()[sampleEnumIndex.get()];
 			renderTarget = new RenderTarget(core, cmdPool, tScope, imgWidth, imgHeight, VkFormat.R8G8B8A8_UNORM, samples);
@@ -195,7 +196,7 @@ public abstract class BackbufferComponent implements UIComponent{
 	}
 	
 	@Override
-	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
+	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
 		if(renderTarget != null) renderTarget.destroy();
 		cmdPool.destroy();
 	}

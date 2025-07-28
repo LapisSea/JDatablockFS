@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
@@ -74,18 +75,18 @@ public class ByteGridComponent extends BackbufferComponent{
 	protected boolean needsRerender(){ return true; }
 	
 	@Override
-	protected void renderBackbuffer(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+	protected void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException{
 		
 		fontRes.reset();
 		lineRes.reset();
 		
 		{
-			var token = lineRenderer.record(lineRes, backgroundDots(viewSize, false));
+			var token = lineRenderer.record(deviceGC, lineRes, backgroundDots(viewSize, false));
 			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		}
 		
 		if(displayData.size == 0){
-			renderNoData(viewSize, cmdBuffer);
+			renderNoData(deviceGC, viewSize, cmdBuffer);
 			return;
 		}
 		
@@ -93,7 +94,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			uploadData = false;
 			try{
 				byteGridRender.record(
-					grid1Res, displayData.src.readAll(),
+					deviceGC, grid1Res, displayData.src.readAll(),
 					List.of(
 						new ByteGridRender.DrawRange(0, 8, Color.BLUE.darker()),
 						new ByteGridRender.DrawRange(8, (int)displayData.size, Color.GRAY.brighter())
@@ -110,7 +111,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res      = ByteGridSize.compute(viewSize, byteCount);
 		var byteSize = res.byteSize;
 		
-		var token = lineRenderer.record(lineRes, List.of(
+		var token = lineRenderer.record(deviceGC, lineRes, List.of(
 			new Geometry.PointsLine(List.of(
 				new Vector2f(0, 0),
 				new Vector2f(8*byteSize, 0),
@@ -134,13 +135,13 @@ public class ByteGridComponent extends BackbufferComponent{
 		sd.add(new MsdfFontRender.StringDraw(
 			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
 		
-		var fontDraws = fontRender.record(fontRes, sd);
+		var fontDraws = fontRender.record(deviceGC, fontRes, sd);
 		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
 
 //		renderDecimatedCurve(viewSize, cmdBuffer);
 	}
 	
-	private void renderNoData(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
 		var str = "No data!";
 		
 		int w         = viewSize.width, h = viewSize.height;
@@ -149,7 +150,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		List<MsdfFontRender.RenderToken> tokens = new ArrayList<>();
 		
 		if(stringDrawIn(str, new Rect2D(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
-			tokens.add(fontRender.record(fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
+			tokens.add(fontRender.record(deviceGC, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
 		}
 		
 		fontRender.submit(viewSize, cmdBuffer, tokens);
@@ -238,8 +239,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	@Override
-	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
-		super.unload(tScope);
+	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
+		super.unload(deviceGC, tScope);
 		grid1Res.destroy();
 		lineRes.destroy();
 		fontRes.destroy();
@@ -261,7 +262,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 	}
 	
-	private void renderDecimatedCurve(Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
+	private void renderDecimatedCurve(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
 		var t = (System.currentTimeMillis())/500D;
 		
 		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
@@ -269,7 +270,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
 		
-		var token = lineRenderer.record(lineRes, Iters.concat1N(
+		var token = lineRenderer.record(deviceGC, lineRes, Iters.concat1N(
 			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
 			Iters.from(controlPoints)
 			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED, false))

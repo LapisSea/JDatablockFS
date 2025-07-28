@@ -57,6 +57,8 @@ public class VulkanWindow implements AutoCloseable{
 	public final List<ImGUIRenderer.RenderResource> imguiResource
 		= Iters.rangeMap(0, VulkanCore.MAX_IN_FLIGHT_FRAMES, i -> new ImGUIRenderer.RenderResource()).toList();
 	
+	public final DeviceGC.FrameGC frameGC;
+	
 	public VulkanWindow(VulkanCore core, boolean decorated, boolean alwaysOnTop, VkSampleCountFlag renderSamples) throws VulkanCodeException{
 		this.core = core;
 		
@@ -77,7 +79,7 @@ public class VulkanWindow implements AutoCloseable{
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
 		renderQueue = core.renderQueue.withSwap();
-		
+		frameGC = new DeviceGC.FrameGC(swapchain.images.size());
 	}
 	
 	public interface FillBuffer{
@@ -87,6 +89,8 @@ public class VulkanWindow implements AutoCloseable{
 	public VulkanQueue.SwapSync.PresentFrame renderQueueNoSwap(FillBuffer fillBuffer) throws VulkanCodeException{
 		var frame = renderQueue.nextFrame();
 		renderQueue.waitForFrameDone(frame);
+		
+		frameGC.startNewFrame(frame);
 		
 		int index;
 		try{
@@ -129,10 +133,12 @@ public class VulkanWindow implements AutoCloseable{
 	}
 	
 	
-	private void destroySwapchainContext(boolean destroySwapchain){
+	private void destroySwapchainContext(boolean destroySwapchain) throws VulkanCodeException{
 		try{
 			renderQueue.resetSync();
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
+		
+		frameGC.destroyAllNow();
 		
 		frameBuffers.forEach(FrameBuffer::destroy);
 		if(mssaImages != null) mssaImages.forEach(VulkanTexture::destroy);

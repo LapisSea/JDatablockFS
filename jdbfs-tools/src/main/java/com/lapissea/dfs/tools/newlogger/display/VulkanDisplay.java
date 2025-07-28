@@ -53,7 +53,7 @@ public class VulkanDisplay implements AutoCloseable{
 		VkSampleCountFlag[] samplesSet;
 		
 		@Override
-		public void imRender(TextureRegistry.Scope tScope){
+		public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 			if(ImGui.begin("Settings")){
 				
 				ImGui.inputInt("FPS Limit", fpsLimit);
@@ -118,7 +118,7 @@ public class VulkanDisplay implements AutoCloseable{
 			return samplesSet[cid].name().substring(1) + " " + TextUtil.plural("sample", cid + 1);
 		}
 		@Override
-		public void unload(TextureRegistry.Scope tScope){ }
+		public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){ }
 	}
 	
 	private final VulkanCore core;
@@ -188,7 +188,7 @@ public class VulkanDisplay implements AutoCloseable{
 		core.pushSwap(window.renderQueueNoSwap((win, frameID, buf, fb) -> {
 			var renderPass = win.getSurfaceRenderPass();
 			try(var ignore = buf.beginRenderPass(renderPass, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1))){
-				imGUIRenderer.submit(buf, win.imguiResource.get(frameID), ImGui.getMainViewport().getDrawData());
+				imGUIRenderer.submit(win.frameGC, buf, win.imguiResource.get(frameID), ImGui.getMainViewport().getDrawData());
 			}
 		}));
 	}
@@ -242,7 +242,7 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 		
 		try{
-			imHandler.newFrame();
+			imHandler.newFrame(window.frameGC);
 			render(this.window);
 			ImGui.renderPlatformWindowsDefault();
 			core.executeSwaps();
@@ -282,7 +282,7 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		core.device.waitIdle();
 		
-		imHandler.close();
+		imHandler.close(window.frameGC);
 		
 		fontRender.destroy();
 		lineRenderer.destroy();

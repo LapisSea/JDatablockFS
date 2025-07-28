@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
@@ -116,7 +117,7 @@ public class LineRenderer implements VulkanResource{
 		);
 	}
 	
-	public RToken record(Renderer.IndexedMeshBuffer resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
+	public RToken record(DeviceGC deviceGC, Renderer.IndexedMeshBuffer resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
 		
 		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
 		
@@ -126,7 +127,7 @@ public class LineRenderer implements VulkanResource{
 		var indexCount = size.indexCount();
 		var indexType  = indexCount<=Character.MAX_VALUE? VkIndexType.UINT16 : VkIndexType.UINT32;
 		
-		try(var mem = resource.requestMemory(device, size.vertCount()*(long)Vert.SIZEOF, indexCount*(long)indexType.byteSize)){
+		try(var mem = resource.requestMemory(deviceGC, device, size.vertCount()*(long)Vert.SIZEOF, indexCount*(long)indexType.byteSize)){
 			var verts    = new Vert.Buf(mem.vboMem().getBuffer());
 			var indecies = mem.iboMem().getBuffer();
 			

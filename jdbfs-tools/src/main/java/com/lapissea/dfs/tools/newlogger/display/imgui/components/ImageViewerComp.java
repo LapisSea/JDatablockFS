@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
 import com.lapissea.dfs.tools.newlogger.display.ColorRGBA8;
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
@@ -33,9 +34,9 @@ public final class ImageViewerComp implements UIComponent{
 	}
 	
 	@Override
-	public void unload(TextureRegistry.Scope tScope){
+	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 		if(state instanceof State.Ok(var id)){
-			tScope.releaseTexture(id);
+			tScope.releaseTexture(deviceGC, id);
 		}
 		state = new State.Error("No file loaded");
 		file = null;
@@ -43,7 +44,7 @@ public final class ImageViewerComp implements UIComponent{
 	
 	@SuppressWarnings("DataFlowIssue")
 	@Override
-	public void imRender(TextureRegistry.Scope tScope){
+	public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 		if(!open.get()) return;
 		
 		ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0);
@@ -51,7 +52,7 @@ public final class ImageViewerComp implements UIComponent{
 			if(ImGui.inputText("Image path", imFile, ImGuiInputTextFlags.AutoSelectAll)){
 				var f = new File(imFile.get());
 				if(!f.equals(file)){
-					unload(tScope);
+					unload(deviceGC, tScope);
 					file = f;
 					try{
 						state = new State.Ok(load(f, tScope));

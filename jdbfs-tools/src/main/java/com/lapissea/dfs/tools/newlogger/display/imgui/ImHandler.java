@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanWindow;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
@@ -44,30 +45,30 @@ public class ImHandler{
 		components.add(component);
 	}
 	
-	public void newFrame(){
+	public void newFrame(DeviceGC deviceGC){
 		imGuiRenderer.checkFonts();
 		imGuiImpl.newFrame();
 		ImGui.newFrame();
-		renderImGUI();
+		renderImGUI(deviceGC);
 		ImGui.render();
 		ImGui.updatePlatformWindows();
 	}
 	
 	
-	private void renderImGUI(){
+	private void renderImGUI(DeviceGC deviceGC){
 		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
 		
 		for(UIComponent component : components){
-			component.imRender(imGuiRenderer.textureScope);
+			component.imRender(deviceGC, imGuiRenderer.textureScope);
 		}
 //		ImGui.showDemoWindow();
 //		ImGui.showMetricsWindow();
 	}
 	
 	
-	public void close() throws VulkanCodeException{
+	public void close(DeviceGC deviceGC) throws VulkanCodeException{
 		for(UIComponent component : components){
-			component.unload(imGuiRenderer.textureScope);
+			component.unload(deviceGC, imGuiRenderer.textureScope);
 		}
 		imGuiImpl.shutdown();
 	}

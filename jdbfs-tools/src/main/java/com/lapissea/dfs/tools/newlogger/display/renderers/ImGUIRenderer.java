@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
@@ -56,20 +57,14 @@ public class ImGUIRenderer implements VulkanResource{
 			vtxBuf.destroy();
 			idxBuf.destroy();
 		}
-		private void ensureBuffers(Device device, int vtxSize, int idxSize) throws VulkanCodeException{
+		private void ensureBuffers(DeviceGC deviceGC, Device device, int vtxSize, int idxSize) throws VulkanCodeException{
 			
 			if(vtxBuf == null || vtxBuf.size()<vtxSize){
-				if(vtxBuf != null){
-					device.waitIdle();
-					vtxBuf.destroy();
-				}
+				if(vtxBuf != null) deviceGC.destroyLater(vtxBuf);
 				vtxBuf = device.allocateHostBuffer(vtxSize, VkBufferUsageFlag.VERTEX_BUFFER);
 			}
 			if(idxBuf == null || idxBuf.size()<idxSize){
-				if(idxBuf != null){
-					device.waitIdle();
-					idxBuf.destroy();
-				}
+				if(idxBuf != null) deviceGC.destroyLater(idxBuf);
 				idxBuf = device.allocateHostBuffer(idxSize, VkBufferUsageFlag.INDEX_BUFFER);
 			}
 		}
@@ -112,7 +107,7 @@ public class ImGUIRenderer implements VulkanResource{
 		);
 	}
 	
-	public void submit(CommandBuffer buf, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
+	public void submit(DeviceGC deviceGC, CommandBuffer buf, RenderResource resource, ImDrawData drawData) throws VulkanCodeException{
 		if(drawData.isNotValidPtr()) return;
 		
 		var sizeOfVertex = ImDrawData.sizeOfImDrawVert();
@@ -126,7 +121,7 @@ public class ImGUIRenderer implements VulkanResource{
 		if(winSize.x == 0 && winSize.y == 0) return;
 		var winPos = drawData.getDisplayPos();
 		
-		resource.ensureBuffers(core.device, vtxSize, idxSize);
+		resource.ensureBuffers(deviceGC, core.device, vtxSize, idxSize);
 		
 		try(var vtxSes = resource.vtxBuf.update();
 		    var idxSes = resource.idxBuf.update()){
