@@ -368,12 +368,14 @@ public class VulkanCore implements AutoCloseable{
 					     .dropWhile(e -> e.getMethodName().startsWith("nvk") && e.getClassName().startsWith(VK10.class.getPackageName()))
 				).toArray(StackTraceElement[]::new)
 			);
-			if(messageIDName.equals("VUID-vkDestroyDevice-device-05137")){
-				for(var ctorInit : Iters.ofLongs(handles).box().map(device.debugVkObjects::get).nonNulls()){
-					err.addSuppressed(ctorInit);
+			switch(messageIDName){
+				case "VUID-vkDestroyDevice-device-05137", "VUID-vkCmdBindPipeline-commandBuffer-recording" -> {
+					for(var ctorInit : Iters.ofLongs(handles).box().map(device.debugVkObjects::get).nonNulls()){
+						err.addSuppressed(ctorInit);
+					}
 				}
 			}
-			
+			err.printStackTrace();
 			throw err;
 		}else{
 			Log.log(msgFinal);

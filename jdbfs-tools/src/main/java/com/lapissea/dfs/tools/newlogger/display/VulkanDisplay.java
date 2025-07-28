@@ -31,7 +31,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
@@ -207,12 +206,13 @@ public class VulkanDisplay implements AutoCloseable{
 			renderAndSwap();
 		});
 		
+		var second   = Duration.ofSeconds(1);
 		var lastTime = NanoClock.now();
 		while(!window.shouldClose()){
 			glfwPollEvents();
 			int fpsLimit = uiSettings.fpsLimit.get();
 			if(fpsLimit>0){
-				Instant now, releaseTime = lastTime.plus(1000_000_000/fpsLimit, ChronoUnit.NANOS);
+				Instant now, releaseTime = lastTime.plus(second.dividedBy(fpsLimit));
 				while((now = NanoClock.now()).isBefore(releaseTime)){
 					var remaning = Duration.between(now, releaseTime).toMillis();
 					if(remaning>2){
