@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
+import com.lapissea.dfs.MagicID;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.tools.DrawFont;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -127,13 +129,26 @@ public class ByteGridComponent extends BackbufferComponent{
 		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		
 		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
+		
+		try{
+			displayData.src.io(MagicID::read);
+			
+			var byteBae = new MsdfFontRender.StringDraw(
+				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 3, 3 + byteSize);
+			
+			sd.add(byteBae);
+			sd.add(byteBae.withOutline(Color.black, 1F));
+			
+		}catch(IOException ignore){ }
+
 
 //		testFontWave(sd);
 		
-		sd.add(new MsdfFontRender.StringDraw(
-			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200));
-		sd.add(new MsdfFontRender.StringDraw(
-			100, new Color(1, 1, 1F, 0.5F), "Hello world UwU", 100, 200, 1, 1.5F));
+		var helloWorldUwU = new MsdfFontRender.StringDraw(
+			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200);
+		
+		sd.add(helloWorldUwU);
+		sd.add(helloWorldUwU.withOutline(new Color(1, 1, 1F, 0.5F), 1.5F));
 		
 		var fontDraws = fontRender.record(deviceGC, fontRes, sd);
 		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));

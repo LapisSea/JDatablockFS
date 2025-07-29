@@ -113,25 +113,16 @@ public final class LogServerStart{
 				mem.roots().provide(69, "This is a test!!! :D");
 				UtilL.sleepWhile(() -> server == null);
 				
-				try(var remote = new DBLogConnection.OfRemote();
-				    var ses = remote.openSession("test")){
-					var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
-					mem.getSource().transferTo(dst, true);
+				try(var remote = new DBLogConnection.OfRemote()){
+					try(var ses = remote.openSession("test")){
+						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
+						mem.getSource().transferTo(dst, true);
+					}
+					LogUtil.println("======= Sent frame =======");
+					
+					remote.openSession("empty").close();
+					LogUtil.println("======= Sent empty frame =======");
 				}
-				LogUtil.println("======= Sent frame =======");
-			}catch(Throwable e){
-				new RuntimeException("Failed to send dummy data", e).printStackTrace();
-				System.exit(1);
-			}
-		});
-		Thread.ofVirtual().start(() -> {
-			try{
-				UtilL.sleepWhile(() -> server == null);
-				
-				try(var remote = new DBLogConnection.OfRemote();
-				    var ses = remote.openSession("empty")){
-				}
-				LogUtil.println("======= Sent empty frame =======");
 			}catch(Throwable e){
 				new RuntimeException("Failed to send dummy data", e).printStackTrace();
 				System.exit(1);
