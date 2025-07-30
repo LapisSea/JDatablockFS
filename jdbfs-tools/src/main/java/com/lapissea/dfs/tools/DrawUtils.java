@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
-class DrawUtils{
+public final class DrawUtils{
 	
 	public record Range(long from, long to){
 		

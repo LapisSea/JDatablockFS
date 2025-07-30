@@ -4,6 +4,7 @@ import com.lapissea.dfs.MagicID;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
@@ -15,7 +16,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.Renderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
-import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
@@ -46,6 +47,11 @@ public class ByteGridComponent extends BackbufferComponent{
 	private final Renderer.IndexedMeshBuffer    lineRes  = new Renderer.IndexedMeshBuffer();
 	private final MsdfFontRender.RenderResource fontRes  = new MsdfFontRender.RenderResource();
 	
+	private record Rect(float x, float y, float width, float height){
+		public Rect scale(float scale){
+			return new Rect(x*scale, y*scale, width*scale, height*scale);
+		}
+	}
 	
 	private record DisplayData(IOInterface src, long size){ }
 	
@@ -98,8 +104,8 @@ public class ByteGridComponent extends BackbufferComponent{
 				byteGridRender.record(
 					deviceGC, grid1Res, displayData.src.readAll(),
 					List.of(
-						new ByteGridRender.DrawRange(0, 8, Color.BLUE.darker()),
-						new ByteGridRender.DrawRange(8, (int)displayData.size, Color.GRAY.brighter())
+						new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
+						new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
 					),
 					List.of()
 				);
@@ -113,15 +119,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res      = ByteGridSize.compute(viewSize, byteCount);
 		var byteSize = res.byteSize;
 		
-		var token = lineRenderer.record(deviceGC, lineRes, List.of(
-			new Geometry.PointsLine(List.of(
-				new Vector2f(0, 0),
-				new Vector2f(8*byteSize, 0),
-				new Vector2f(8*byteSize, 1*byteSize),
-				new Vector2f(0, 1*byteSize),
-				new Vector2f(0, 0)
-			), 3, Color.BLUE, true)
-		));
+		var lines = outlineByteRange(Color.BLUE, res, new DrawUtils.Range(0, MagicID.size()), 3);
+		var token = lineRenderer.record(deviceGC, lineRes, lines);
 		
 		
 		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow, grid1Res);
@@ -134,26 +133,18 @@ public class ByteGridComponent extends BackbufferComponent{
 			displayData.src.io(MagicID::read);
 			
 			var byteBae = new MsdfFontRender.StringDraw(
-				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 3, 3 + byteSize);
+				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
+			);
 			
-			sd.add(byteBae);
-			sd.add(byteBae.withOutline(Color.black, 1F));
+			if(stringDrawIn(byteBae, new Rect(0, 0, MagicID.size(), 1).scale(byteSize), false) instanceof Some(var str)){
+				sd.add(str);
+				sd.add(str.withOutline(Color.black, 1F));
+			}
 			
 		}catch(IOException ignore){ }
-
-
-//		testFontWave(sd);
-		
-		var helloWorldUwU = new MsdfFontRender.StringDraw(
-			100, new Color(0.1F, 0.3F, 1, 1), "Hello world UwU", 100, 200);
-		
-		sd.add(helloWorldUwU);
-		sd.add(helloWorldUwU.withOutline(new Color(1, 1, 1F, 0.5F), 1.5F));
 		
 		var fontDraws = fontRender.record(deviceGC, fontRes, sd);
 		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
-
-//		renderDecimatedCurve(viewSize, cmdBuffer);
 	}
 	
 	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
@@ -164,7 +155,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		List<MsdfFontRender.RenderToken> tokens = new ArrayList<>();
 		
-		if(stringDrawIn(str, new Rect2D(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
+		if(stringDrawIn(str, new Rect(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
 			tokens.add(fontRender.record(deviceGC, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
 		}
 		
@@ -197,7 +188,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		return res;
 	}
 	
-	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, Rect2D area, Color color, float fontScale, boolean alignLeft){
+	private Match<MsdfFontRender.StringDraw> stringDrawIn(MsdfFontRender.StringDraw draw, Rect area, boolean alignLeft){
+		return stringDrawIn(draw.string(), area, draw.color(), draw.pixelHeight(), alignLeft);
+	}
+	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, Rect area, Color color, float fontScale, boolean alignLeft){
 		if(s.isEmpty()) return Match.empty();
 		
 		if(area.height<fontScale){
@@ -252,6 +246,86 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		return Match.of(new MsdfFontRender.StringDraw(fontScale, color, s, x, y, xScale, 0));
 	}
+	
+	private static List<Geometry.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
+		record Line(Vector2f a, Vector2f b){
+			Line(float xa, float ya, float xb, float yb){
+				this(new Vector2f(xa, ya), new Vector2f(xb, yb));
+			}
+		}
+		var lines = new ArrayList<Line>(){
+			@Override
+			public boolean add(Line line){
+				var dirLine = line.a.sub(line.b, new Vector2f()).normalize();
+				if(Iters.from(this).enumerate()
+				        .filter(e -> {
+					        var dist = e.val().b.distanceSquared(line.a);
+					        return dist<0.001;
+				        })
+				        .filter(e -> {
+					        var dirE = e.val().a.sub(e.val().b, new Vector2f()).normalize();
+					        return Math.abs(dirLine.dot(dirE) - 1)<0.0001;
+				        }).matchFirst() instanceof Some(IterablePP.Idx(var index, var val))){
+					this.set(index, new Line(val.a, line.b));
+					return true;
+				}
+				return super.add(line);
+			}
+		};
+		
+		var gridWidth = gridInfo.bytesPerRow;
+		for(var i = range.from(); i<range.to(); i++){
+			long x  = i%gridWidth, y = i/gridWidth;
+			long x1 = x, y1 = y;
+			long x2 = x1 + 1, y2 = y1 + 1;
+			
+			if(i - range.from()<gridWidth) lines.add(new Line(x1, y1, x2, y1));
+			if(range.to() - i<=gridWidth) lines.add(new Line(x1, y2, x2, y2));
+			if(x == 0 || i == range.from()) lines.add(new Line(x1, y1, x1, y2));
+			if(x2 == gridWidth || i == range.to() - 1) lines.add(new Line(x2, y1, x2, y2));
+		}
+		
+		
+		var chains = new ArrayList<List<Vector2f>>();
+		var points = new ArrayList<Vector2f>();
+		
+		while(!lines.isEmpty()){
+			if(points.isEmpty()){
+				var l = lines.removeLast();
+				points.add(l.a);
+				points.add(l.b);
+				continue;
+			}
+			var pointsIndexed = Iters.from(lines).enumerate().flatMap(e -> List.of(
+				new IterablePP.Idx<>(e.index(), e.val()),
+				new IterablePP.Idx<>(e.index(), new Line(e.val().b, e.val().a))
+			));
+			
+			var lastPt = points.getLast();
+			var en     = pointsIndexed.minByD(e -> e.val().a.distanceSquared(lastPt)).orElseThrow();
+			if(en.val().a.distanceSquared(lastPt)<0.0001){
+				lines.remove(en.index());
+				points.add(en.val().b);
+				continue;
+			}
+			var firstPt = points.getFirst();
+			en = pointsIndexed.minByD(e -> e.val().a.distanceSquared(firstPt)).orElseThrow();
+			if(firstPt.distanceSquared(en.val().a)<0.0001){
+				lines.remove(en.index());
+				points.add(en.val().b);
+				continue;
+			}
+			chains.add(List.copyOf(points));
+			points.clear();
+		}
+		if(!points.isEmpty()) chains.add(points);
+		
+		return Iters.from(chains).map(c -> {
+			for(Vector2f point : points) point.mul(gridInfo.byteSize);
+			return new Geometry.PointsLine(List.copyOf(points), lineWidth, color, true);
+		}).toList();
+	}
+	
 	
 	@Override
 	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
