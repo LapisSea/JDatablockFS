@@ -3,36 +3,27 @@ package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 import com.lapissea.dfs.MagicID;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.tools.DrawFont;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
-import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
+import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Renderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
-import imgui.ImGui;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
-import org.joml.SimplexNoise;
-import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.MathContext;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,15 +34,9 @@ public class ByteGridComponent extends BackbufferComponent{
 	private final ByteGridRender byteGridRender;
 	private final LineRenderer   lineRenderer;
 	
-	private final ByteGridRender.RenderResource grid1Res = new ByteGridRender.RenderResource();
-	private final Renderer.IndexedMeshBuffer    lineRes  = new Renderer.IndexedMeshBuffer();
-	private final MsdfFontRender.RenderResource fontRes  = new MsdfFontRender.RenderResource();
-	
-	private record Rect(float x, float y, float width, float height){
-		public Rect scale(float scale){
-			return new Rect(x*scale, y*scale, width*scale, height*scale);
-		}
-	}
+	private       ByteGridRender.RenderResource grid1Res;
+	private final Renderer.IndexedMeshBuffer    lineRes = new Renderer.IndexedMeshBuffer();
+	private final MsdfFontRender.RenderResource fontRes = new MsdfFontRender.RenderResource();
 	
 	private record DisplayData(IOInterface src, long size){ }
 	
@@ -89,13 +74,24 @@ public class ByteGridComponent extends BackbufferComponent{
 		lineRes.reset();
 		
 		{
-			var token = lineRenderer.record(deviceGC, lineRes, backgroundDots(viewSize, false));
+			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
+			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
+			
+			var token = lineRenderer.record(deviceGC, lineRes, GridUtils.backgroundDots(viewSize, color));
 			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		}
 		
 		if(displayData.size == 0){
+			if(grid1Res != null){
+				deviceGC.destroyLater(grid1Res);
+				grid1Res = null;
+			}
 			renderNoData(deviceGC, viewSize, cmdBuffer);
 			return;
+		}
+		
+		if(grid1Res == null){
+			grid1Res = new ByteGridRender.RenderResource();
 		}
 		
 		if(uploadData){
@@ -116,27 +112,25 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		long byteCount = displayData.size;
 		
-		var res      = ByteGridSize.compute(viewSize, byteCount);
-		var byteSize = res.byteSize;
+		var res      = GridUtils.ByteGridSize.compute(viewSize, byteCount);
+		var byteSize = res.byteSize();
 		
-		var lines = outlineByteRange(Color.BLUE, res, new DrawUtils.Range(0, MagicID.size()), 3);
+		var lines = GridUtils.outlineByteRange(Color.BLUE, res, new DrawUtils.Range(0, MagicID.size()), 3);
 		var token = lineRenderer.record(deviceGC, lineRes, lines);
 		
-		
-		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow, grid1Res);
-		
+		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow(), grid1Res);
 		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		
-		List<MsdfFontRender.StringDraw> sd = new ArrayList<>();
+		List<StringDraw> sd = new ArrayList<>();
 		
 		try{
 			displayData.src.io(MagicID::read);
 			
-			var byteBae = new MsdfFontRender.StringDraw(
+			var byteBae = new StringDraw(
 				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
 			);
 			
-			if(stringDrawIn(byteBae, new Rect(0, 0, MagicID.size(), 1).scale(byteSize), false) instanceof Some(var str)){
+			if(stringDrawIn(byteBae, new GridUtils.Rect(0, 0, MagicID.size(), 1).scale(byteSize), false) instanceof Some(var str)){
 				sd.add(str);
 				sd.add(str.withOutline(Color.black, 1F));
 			}
@@ -155,177 +149,19 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		List<MsdfFontRender.RenderToken> tokens = new ArrayList<>();
 		
-		if(stringDrawIn(str, new Rect(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
+		if(stringDrawIn(str, new GridUtils.Rect(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
 			tokens.add(fontRender.record(deviceGC, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
 		}
 		
 		fontRender.submit(viewSize, cmdBuffer, tokens);
 	}
 	
-	private List<Geometry.PointsLine> backgroundDots(Extent2D viewSize, boolean errorMode){
-		
-		var color = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
-		
-		float jitter     = 125;
-		int   step       = 25;
-		float randX      = (float)ImGui.getTime()/10f;
-		float randY      = randX + 10000;
-		float noiseScale = 175;
-		
-		var res = new ArrayList<Geometry.PointsLine>();
-		
-		for(int x = 0; x<viewSize.width + 2; x += step){
-			for(int y = (x/2)%step; y<viewSize.height + 2; y += step){
-				float xf = x/noiseScale, yf = y/noiseScale;
-				
-				var nOff = new Vector2f(SimplexNoise.noise(xf, yf, randX), SimplexNoise.noise(xf, yf, randY));
-				var pos  = new Vector2f(x, y).add(nOff.mul(jitter));
-				res.add(new Geometry.PointsLine(List.of(
-					pos, pos.add(2, 0, new Vector2f())
-				), 2F, color, false));
-			}
-		}
-		return res;
-	}
-	
-	private Match<MsdfFontRender.StringDraw> stringDrawIn(MsdfFontRender.StringDraw draw, Rect area, boolean alignLeft){
+	private Match<StringDraw> stringDrawIn(StringDraw draw, GridUtils.Rect area, boolean alignLeft){
 		return stringDrawIn(draw.string(), area, draw.color(), draw.pixelHeight(), alignLeft);
 	}
-	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, Rect area, Color color, float fontScale, boolean alignLeft){
-		if(s.isEmpty()) return Match.empty();
-		
-		if(area.height<fontScale){
-			fontScale = area.height;
-		}
-		
-		float w, h;
-		{
-			var rect = fontRender.getStringBounds(s, fontScale);
-			
-			w = rect.width();
-			h = rect.height();
-			
-			if(w>0){
-				double scale = (area.width - 1)/w;
-				if(scale<0.5){
-					float div = scale<0.25? 3 : 2;
-					fontScale /= div;
-					w = rect.width()/div;
-					h = rect.height()/div;
-				}
-				DrawFont.Bounds sbDots = null;
-				while((area.width - 1)/w<0.5){
-					if(s.isEmpty()) return Match.empty();
-					if(s.length() == 1){
-						break;
-					}
-					s = s.substring(0, s.length() - 1).trim();
-					rect = fontRender.getStringBounds(s, fontScale);
-					if(sbDots == null){
-						sbDots = fontRender.getStringBounds("...", fontScale);
-					}
-					w = rect.width() + sbDots.width();
-					h = Math.max(rect.height(), sbDots.height());
-				}
-			}
-		}
-		
-		float x = area.x;
-		float y = area.y;
-		
-		x += alignLeft? 0 : Math.max(0, area.width - w)/2F;
-		y += h + (area.height - h)/2;
-		
-		float xScale = 1;
-		if(w>0){
-			double scale = (area.width - 1)/w;
-			if(scale<1){
-				xScale = (float)scale;
-			}
-		}
-		
-		return Match.of(new MsdfFontRender.StringDraw(fontScale, color, s, x, y, xScale, 0));
+	private Match<StringDraw> stringDrawIn(String s, GridUtils.Rect area, Color color, float fontScale, boolean alignLeft){
+		return GridUtils.stringDrawIn(fontRender, s, area, color, fontScale, alignLeft);
 	}
-	
-	private static List<Geometry.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
-		record Line(Vector2f a, Vector2f b){
-			Line(float xa, float ya, float xb, float yb){
-				this(new Vector2f(xa, ya), new Vector2f(xb, yb));
-			}
-		}
-		var lines = new ArrayList<Line>(){
-			@Override
-			public boolean add(Line line){
-				var dirLine = line.a.sub(line.b, new Vector2f()).normalize();
-				if(Iters.from(this).enumerate()
-				        .filter(e -> {
-					        var dist = e.val().b.distanceSquared(line.a);
-					        return dist<0.001;
-				        })
-				        .filter(e -> {
-					        var dirE = e.val().a.sub(e.val().b, new Vector2f()).normalize();
-					        return Math.abs(dirLine.dot(dirE) - 1)<0.0001;
-				        }).matchFirst() instanceof Some(IterablePP.Idx(var index, var val))){
-					this.set(index, new Line(val.a, line.b));
-					return true;
-				}
-				return super.add(line);
-			}
-		};
-		
-		var gridWidth = gridInfo.bytesPerRow;
-		for(var i = range.from(); i<range.to(); i++){
-			long x  = i%gridWidth, y = i/gridWidth;
-			long x1 = x, y1 = y;
-			long x2 = x1 + 1, y2 = y1 + 1;
-			
-			if(i - range.from()<gridWidth) lines.add(new Line(x1, y1, x2, y1));
-			if(range.to() - i<=gridWidth) lines.add(new Line(x1, y2, x2, y2));
-			if(x == 0 || i == range.from()) lines.add(new Line(x1, y1, x1, y2));
-			if(x2 == gridWidth || i == range.to() - 1) lines.add(new Line(x2, y1, x2, y2));
-		}
-		
-		
-		var chains = new ArrayList<List<Vector2f>>();
-		var points = new ArrayList<Vector2f>();
-		
-		while(!lines.isEmpty()){
-			if(points.isEmpty()){
-				var l = lines.removeLast();
-				points.add(l.a);
-				points.add(l.b);
-				continue;
-			}
-			var pointsIndexed = Iters.from(lines).enumerate().flatMap(e -> List.of(
-				new IterablePP.Idx<>(e.index(), e.val()),
-				new IterablePP.Idx<>(e.index(), new Line(e.val().b, e.val().a))
-			));
-			
-			var lastPt = points.getLast();
-			var en     = pointsIndexed.minByD(e -> e.val().a.distanceSquared(lastPt)).orElseThrow();
-			if(en.val().a.distanceSquared(lastPt)<0.0001){
-				lines.remove(en.index());
-				points.add(en.val().b);
-				continue;
-			}
-			var firstPt = points.getFirst();
-			en = pointsIndexed.minByD(e -> e.val().a.distanceSquared(firstPt)).orElseThrow();
-			if(firstPt.distanceSquared(en.val().a)<0.0001){
-				lines.remove(en.index());
-				points.add(en.val().b);
-				continue;
-			}
-			chains.add(List.copyOf(points));
-			points.clear();
-		}
-		if(!points.isEmpty()) chains.add(points);
-		
-		return Iters.from(chains).map(c -> {
-			for(Vector2f point : points) point.mul(gridInfo.byteSize);
-			return new Geometry.PointsLine(List.copyOf(points), lineWidth, color, true);
-		}).toList();
-	}
-	
 	
 	@Override
 	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
@@ -336,68 +172,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		byteGridRender.destroy();
 	}
 	
-	private static void testFontWave(List<MsdfFontRender.StringDraw> sd){
-		var pos = 0F;
-		for(int i = 0; i<40; i++){
-			float size = 1 + (i*i)*0.2F;
-			
-			var t = (System.currentTimeMillis())/500D;
-			var h = (float)Math.sin(t + pos/(10 + i*3))*50;
-			sd.add(new MsdfFontRender.StringDraw(size, Color.GREEN.darker(),
-			                                     "a", 20 + pos, 70 + 360 - h));
-			sd.add(new MsdfFontRender.StringDraw(size, Color.WHITE,
-			                                     "a", 20 + pos, 70 + 360 - h, 1, 2F));
-			pos += size*0.4F + 2;
-		}
-	}
-	
-	private void renderDecimatedCurve(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer buf) throws VulkanCodeException{
-		var t = (System.currentTimeMillis())/500D;
-		
-		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
-			(float)Math.sin(t/s)*100 + 200*(i + 1),
-			(float)Math.cos(t/s)*100 + 200
-		)).toList();
-		
-		var token = lineRenderer.record(deviceGC, lineRes, Iters.concat1N(
-			new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3),
-			Iters.from(controlPoints)
-			     .map(p -> new Geometry.PointsLine(List.of(p, p.add(0, 2, new Vector2f())), 2, Color.RED, false))
-			     .toList()
-		
-		));
-		
-		lineRenderer.submit(viewSize, buf, viewMatrix(viewSize), token);
-	}
 	private static Matrix3x2f viewMatrix(Extent2D viewSize){
 		return new Matrix3x2f()
 			       .translate(-1, -1)
 			       .scale(2F/viewSize.width, 2F/viewSize.height);
 	}
 	
-	private record ByteGridSize(int bytesPerRow, float byteSize){
-		private static ByteGridSize compute(Extent2D windowSize, long byteCount){
-			if(byteCount == 0) return new ByteGridSize(1, 1);
-			var byteCountL = BigDecimal.valueOf(byteCount);
-			
-			var aspectRatio = windowSize.width/(double)windowSize.height;
-			int bytesPerRow = byteCountL.multiply(BigDecimal.valueOf(aspectRatio))
-			                            .sqrt(MathContext.DECIMAL64).setScale(0, RoundingMode.UP)
-			                            .intValue();
-			
-			float byteSize = windowSize.width/(float)bytesPerRow;
-			while(true){
-				int rows = byteCountL.divide(BigDecimal.valueOf(bytesPerRow), MathContext.DECIMAL32).setScale(0, RoundingMode.UP)
-				                     .intValue();
-				float totalHeight = rows*byteSize;
-				
-				if(totalHeight<=windowSize.height){
-					break;
-				}
-				bytesPerRow++;
-				byteSize = windowSize.width/(float)bytesPerRow;
-			}
-			return new ByteGridSize(bytesPerRow, byteSize);
-		}
-	}
 }
