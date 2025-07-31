@@ -196,7 +196,7 @@ public abstract class BackbufferComponent implements UIComponent{
 	}
 	
 	@Override
-	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
+	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
 		if(renderTarget != null) renderTarget.destroy();
 		cmdPool.destroy();
 	}

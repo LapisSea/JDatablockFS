@@ -164,8 +164,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	@Override
-	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException{
-		super.unload(deviceGC, tScope);
+	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
+		super.unload(tScope);
 		grid1Res.destroy();
 		lineRes.destroy();
 		fontRes.destroy();

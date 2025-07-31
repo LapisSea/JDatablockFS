@@ -68,7 +68,7 @@ public class ImHandler{
 	
 	public void close(DeviceGC deviceGC) throws VulkanCodeException{
 		for(UIComponent component : components){
-			component.unload(deviceGC, imGuiRenderer.textureScope);
+			component.unload(imGuiRenderer.textureScope);
 		}
 		imGuiImpl.shutdown();
 	}

@@ -47,5 +47,5 @@ public class StatsComponent implements UIComponent{
 	}
 	
 	@Override
-	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){ }
+	public void unload(TextureRegistry.Scope tScope){ }
 }

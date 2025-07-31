@@ -8,6 +8,6 @@ public interface UIComponent{
 	
 	void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope);
 	
-	void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope) throws VulkanCodeException;
+	void unload(TextureRegistry.Scope tScope) throws VulkanCodeException;
 	
 }

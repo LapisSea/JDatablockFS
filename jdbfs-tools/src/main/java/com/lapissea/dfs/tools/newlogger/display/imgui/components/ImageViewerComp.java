@@ -34,9 +34,9 @@ public final class ImageViewerComp implements UIComponent{
 	}
 	
 	@Override
-	public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){
+	public void unload(TextureRegistry.Scope tScope){
 		if(state instanceof State.Ok(var id)){
-			tScope.releaseTexture(deviceGC, id);
+			tScope.releaseTexture(DeviceGC.IMMEDIATE, id);
 		}
 		state = new State.Error("No file loaded");
 		file = null;
@@ -52,7 +52,7 @@ public final class ImageViewerComp implements UIComponent{
 			if(ImGui.inputText("Image path", imFile, ImGuiInputTextFlags.AutoSelectAll)){
 				var f = new File(imFile.get());
 				if(!f.equals(file)){
-					unload(deviceGC, tScope);
+					unload(tScope);
 					file = f;
 					try{
 						state = new State.Ok(load(f, tScope));

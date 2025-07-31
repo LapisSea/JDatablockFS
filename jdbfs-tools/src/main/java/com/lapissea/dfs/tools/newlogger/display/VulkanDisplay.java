@@ -117,7 +117,7 @@ public class VulkanDisplay implements AutoCloseable{
 			return samplesSet[cid].name().substring(1) + " " + TextUtil.plural("sample", cid + 1);
 		}
 		@Override
-		public void unload(DeviceGC deviceGC, TextureRegistry.Scope tScope){ }
+		public void unload(TextureRegistry.Scope tScope){ }
 	}
 	
 	private final VulkanCore core;
