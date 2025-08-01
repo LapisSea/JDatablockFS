@@ -1,9 +1,13 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
 import com.lapissea.dfs.MagicID;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.tools.DrawUtils;
+import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
@@ -40,12 +44,14 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private record DisplayData(IOInterface src, long size){ }
 	
+	private final List<String> messages;
+	
 	private DisplayData displayData;
 	private boolean     uploadData;
 	
 	public ByteGridComponent(
 		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
-		MsdfFontRender fontRender, LineRenderer lineRenderer
+		List<String> messages, LineRenderer lineRenderer, MsdfFontRender fontRender
 	) throws VulkanCodeException{
 		super(core, open, sampleEnumIndex);
 		
@@ -53,6 +59,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		this.lineRenderer = lineRenderer;
 		
 		byteGridRender = new ByteGridRender(core);
+		this.messages = messages;
 		
 		displayData = new DisplayData(MemoryData.empty().asReadOnly(), 0);
 		clearColor.set(0.4, 0.4, 0.4, 1);
@@ -115,11 +122,12 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res      = GridUtils.ByteGridSize.compute(viewSize, byteCount);
 		var byteSize = res.byteSize();
 		
-		var lines = GridUtils.outlineByteRange(Color.BLUE, res, new DrawUtils.Range(0, MagicID.size()), 3);
-		var token = lineRenderer.record(deviceGC, lineRes, lines);
+		var mousePos = GridUtils.calcByteIndex(viewSize, res, mouseX(), mouseY(), byteCount, 1);
 		
 		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow(), grid1Res);
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(deviceGC, lineRes,
+		                                                                                   GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3)
+		));
 		
 		List<StringDraw> sd = new ArrayList<>();
 		
@@ -135,10 +143,45 @@ public class ByteGridComponent extends BackbufferComponent{
 				sd.add(str.withOutline(Color.black, 1F));
 			}
 			
+			if(GridUtils.isRangeHovered(mousePos, 0, MagicID.size())){
+				messages.add("The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()));
+			}
 		}catch(IOException ignore){ }
+		
+		if(mousePos instanceof Some(var p)){
+			int b = -1;
+			try{
+				b = displayData.src.ioMapAt(p, ContentReader::readUnsignedInt1);
+			}catch(IOException e){ }
+			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
+			
+			if(findHoverChunk(displayData.src, p) instanceof Some(var chunk)){
+				lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
+					deviceGC, lineRes,
+					GridUtils.outlineByteRange(Color.CYAN.darker(), res, new Range(chunk.getPtr().getValue(), chunk.dataEnd()), 2)
+				));
+				messages.add("Hovered chunk: " + chunk);
+			}
+			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
+				deviceGC, lineRes,
+				GridUtils.outlineByteRange(Color.WHITE, res, new Range(p, p + 1), 1.5F)
+			));
+		}
 		
 		var fontDraws = fontRender.record(deviceGC, fontRes, sd);
 		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
+	}
+	
+	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){
+		try{
+			var prov = DataProvider.newVerySimpleProvider(data);
+			for(Chunk chunk : new PhysicalChunkWalker(prov.getFirstChunk())){
+				if(chunk.rangeIntersects(hoverPos)){
+					return Match.of(chunk);
+				}
+			}
+		}catch(IOException ignore){ }
+		return Match.empty();
 	}
 	
 	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{

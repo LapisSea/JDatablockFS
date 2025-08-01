@@ -7,6 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ByteGridComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
+import com.lapissea.dfs.tools.newlogger.display.imgui.components.MessagesComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.StatsComponent;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
@@ -31,6 +32,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
@@ -136,6 +139,8 @@ public class VulkanDisplay implements AutoCloseable{
 	private final SessionSetView sessionSetView;
 	private final SettingsUI     uiSettings;
 	
+	private final List<String> uiMessages = new ArrayList<>();
+	
 	public VulkanDisplay(SessionSetView sessionSetView){
 		this.sessionSetView = sessionSetView;
 		try{
@@ -155,9 +160,11 @@ public class VulkanDisplay implements AutoCloseable{
 			imHandler.addComponent(new StatsComponent(uiSettings.statsLevel));
 			imHandler.addComponent(uiSettings);
 			imHandler.addComponent(new ImageViewerComp(uiSettings.imageViewerOpen));
-			imHandler.addComponent(byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex,
-			                                                                 fontRender, lineRenderer));
-			
+			imHandler.addComponent(
+				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex, uiMessages,
+				                                          lineRenderer, fontRender)
+			);
+			imHandler.addComponent(new MessagesComponent(uiMessages));
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
@@ -240,7 +247,7 @@ public class VulkanDisplay implements AutoCloseable{
 			sessionSetView.clearDirty();
 			updateData();
 		}
-		
+		uiMessages.clear();
 		try{
 			imHandler.newFrame(window.frameGC);
 			render(this.window);

@@ -113,6 +113,8 @@ public abstract class BackbufferComponent implements UIComponent{
 	private final ImBoolean  open;
 	private final ImInt      sampleEnumIndex;
 	
+	private int mouseX, mouseY;
+	
 	public BackbufferComponent(VulkanCore core, ImBoolean open, ImInt sampleEnumIndex) throws VulkanCodeException{
 		this.core = core;
 		this.open = open;
@@ -122,6 +124,9 @@ public abstract class BackbufferComponent implements UIComponent{
 	
 	protected abstract boolean needsRerender();
 	protected abstract void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException;
+	
+	protected int mouseX(){ return mouseX; }
+	protected int mouseY(){ return mouseY; }
 	
 	@Override
 	public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
@@ -136,6 +141,13 @@ public abstract class BackbufferComponent implements UIComponent{
 				deviceGC.destroyLater(renderTarget);
 				renderTarget = null;
 			}
+			var pos = ImGui.getMousePos();
+			if(pos.x != 0 && pos.y != 0){
+				pos.x -= ImGui.getWindowPosX() + ImGui.getCursorPosX();
+				pos.y -= ImGui.getWindowPosY() + ImGui.getCursorPosY();
+			}
+			mouseX = (int)pos.x;
+			mouseY = (int)pos.y;
 			
 			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
 				drawFB(deviceGC, tScope, width, height);

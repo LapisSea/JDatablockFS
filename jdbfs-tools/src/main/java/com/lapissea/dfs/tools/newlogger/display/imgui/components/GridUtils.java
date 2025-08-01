@@ -214,4 +214,34 @@ public final class GridUtils{
 		
 		return Match.of(new StringDraw(fontScale, color, s, x, y, xScale, 0));
 	}
+	
+	
+	static Match<Long> calcByteIndex(Extent2D viewSize, ByteGridSize gridSize, int mouseX, int mouseY, long byteCount, float zoom){
+		if(mouseX<0 || mouseY<0) return Match.empty();
+		int xByte = calcX(viewSize, mouseX, gridSize.byteSize, zoom);
+		int yByte = calcY(viewSize, mouseY, gridSize.byteSize, zoom);
+		
+		int  width     = gridSize.bytesPerRow;
+		long byteIndex = yByte*(long)width + xByte;
+		
+		if(xByte>=width || byteIndex>=byteCount){
+			return Match.empty();
+		}
+		return Match.of(byteIndex);
+	}
+	private static int calcY(Extent2D viewSize, int mouseY, float pixelsPerByte, float zoom){
+		var h    = viewSize.height;
+		var offY = (h - h*zoom)*(mouseY/(float)h);
+		return (int)((mouseY - offY)/(pixelsPerByte*zoom));
+	}
+	private static int calcX(Extent2D viewSize, int mouseX, float pixelsPerByte, float zoom){
+		var w    = viewSize.width;
+		var offX = (w - w*zoom)*(mouseX/(float)w);
+		return (int)((mouseX - offX)/(pixelsPerByte*zoom));
+	}
+	
+	static boolean isRangeHovered(Match<Long> hover, long from, long to){
+		if(!(hover instanceof Match.Some(var hoverByteIndex))) return false;
+		return from<=hoverByteIndex && hoverByteIndex<to;
+	}
 }
