@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.tools.frame.FrameUtils;
 
 import java.io.Closeable;
 import java.io.DataInputStream;
@@ -11,8 +12,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -196,9 +195,12 @@ public interface DBLogConnection extends Closeable{
 					
 					var full = new IPC.FullFrame(uid, bytes, writeSet);
 					if(last != null){
-						var diff = makeDiff(last.data(), bytes, last.uid(), uid, writeSet);
+						var diff = FrameUtils.computeDiff(last.data(), bytes);
+						
 						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_DIFF, false);
-						IPC.writeDiffFrame(socketOut, diff);
+						IPC.writeDiffFrame(socketOut, new IPC.DiffFrame(
+							uid, last.uid(), diff.newSize().orElse(-1), diff.blocks(), writeSet
+						));
 					}else{
 						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_FULL, false);
 						IPC.writeFullFrame(socketOut, full);
@@ -206,8 +208,12 @@ public interface DBLogConnection extends Closeable{
 					last = full;
 					
 					socketOut.flush();
-					
-					requireAckResponse("writeEvent");
+					try{
+						requireAckResponse("writeEvent");
+					}catch(IOException e){
+						socket.close();
+						Log.warn("Failed to send frame because: {}#red", e);
+					}
 					Log.trace("CLIENT: [{}#green] frame {}#green acknowledged", name, uid);
 				}finally{
 					ioLock.unlock();
@@ -227,42 +233,6 @@ public interface DBLogConnection extends Closeable{
 			public String toString(){
 				return "RemoteSession{" + name + "}";
 			}
-		}
-		
-		private static IPC.DiffFrame makeDiff(byte[] last, byte[] current, long lastUid, long uid, IPC.RangeSet writes){
-			
-			final class Range{
-				private int from, to;
-				Range(int from, int to){
-					this.from = from;
-					this.to = to;
-				}
-			}
-			var   ranges    = new ArrayList<Range>();
-			Range lastRange = null;
-			for(int i = 0, len = Math.min(last.length, current.length); i<len; i++){
-				if(last[i] == current[i]) continue;
-				if(lastRange == null){
-					lastRange = new Range(i, i + 1);
-					ranges.add(lastRange);
-				}else if(lastRange.to == i){
-					lastRange.to++;
-				}else{
-					lastRange = new Range(i, i + 1);
-					ranges.add(lastRange);
-				}
-			}
-			var parts = new IPC.DiffPart[ranges.size() + (current.length>last.length? 1 : 0)];
-			for(int i = 0; i<ranges.size(); i++){
-				var range = ranges.get(i);
-				parts[i] = new IPC.DiffPart(range.from, Arrays.copyOfRange(current, range.from, range.to));
-			}
-			if(current.length>last.length){
-				parts[ranges.size()] = new IPC.DiffPart(last.length, Arrays.copyOfRange(current, last.length, current.length));
-			}
-			
-			
-			return new IPC.DiffFrame(uid, lastUid, last.length != current.length? current.length : -1, parts, writes);
 		}
 		
 		@Override

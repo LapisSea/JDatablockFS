@@ -2,10 +2,12 @@ package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
+import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
@@ -114,14 +116,26 @@ public final class LogServerStart{
 				UtilL.sleepWhile(() -> server == null);
 				
 				try(var remote = new DBLogConnection.OfRemote()){
-					try(var ses = remote.openSession("test")){
-						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
-						mem.getSource().transferTo(dst, true);
-					}
-					LogUtil.println("======= Sent frame =======");
+//					try(var ses = remote.openSession("test")){
+//						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
+//						mem.getSource().transferTo(dst, true);
+//					}
+//					LogUtil.println("======= Sent frame =======");
+//
+//					remote.openSession("empty").close();
+//					LogUtil.println("======= Sent empty frame =======");
 					
-					remote.openSession("empty").close();
-					LogUtil.println("======= Sent empty frame =======");
+					try(var ses = remote.openSession("bigMap")){
+						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
+						
+						var                    cluster = Cluster.init(dst);
+						IOMap<Integer, String> map     = cluster.roots().request(0, IOMap.class, Integer.class, String.class);
+						while(dst.getIOSize()<Character.MAX_VALUE - 4000){
+							var val = ("int(" + map.size() + ")").repeat(new RawRandom(dst.getIOSize() + map.size()).nextInt(20));
+							map.put((int)map.size(), val);
+						}
+						LogUtil.println("======= Sent frame =======");
+					}
 				}
 			}catch(Throwable e){
 				new RuntimeException("Failed to send dummy data", e).printStackTrace();

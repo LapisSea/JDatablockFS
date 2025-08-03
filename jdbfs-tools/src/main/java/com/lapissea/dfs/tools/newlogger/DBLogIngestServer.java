@@ -301,7 +301,11 @@ public final class DBLogIngestServer{
 			return false;
 		}
 		private static void ackNow(DataOutputStream out) throws IOException{
-			IPC.writeEnum(out, IPC.MSGSession.ACK, true);
+			try{
+				IPC.writeEnum(out, IPC.MSGSession.ACK, true);
+			}catch(IOException e){
+				throw new IOException("Failed to ack", e);
+			}
 		}
 		
 		public void close(){

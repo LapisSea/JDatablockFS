@@ -74,12 +74,12 @@ public sealed interface IOFrame{
 			}
 		}
 		
-		public final  List<Part> parts;
-		private final Blob       partsBuff;
-		public final  long       uid;
+		public final List<Part> parts;
+		public final Blob       partsBuff;
+		public final long       uid;
 		@IOValue.Unsigned
-		public final  long       previousID;
-		public final  int        newSize;
+		public final long       previousID;
+		public final int        newSize;
 		
 		private final List<Range> writes;
 		

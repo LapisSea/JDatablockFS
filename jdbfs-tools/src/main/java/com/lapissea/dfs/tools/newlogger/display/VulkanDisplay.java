@@ -51,6 +51,7 @@ public class VulkanDisplay implements AutoCloseable{
 		final ImBoolean byteGridOpen            = new ImBoolean(true);
 		final ImInt     byteGridSampleEnumIndex = new ImInt(2);
 		final ImString  currentSessionName      = new ImString();
+		final int[]     currentSessionFrame     = new int[1];
 		
 		VkSampleCountFlag[] samplesSet;
 		
@@ -93,6 +94,21 @@ public class VulkanDisplay implements AutoCloseable{
 							if(selected) ImGui.setItemDefaultFocus();
 						}
 						ImGui.endCombo();
+					}
+					ImGui.separator();
+					
+					var sesName = uiSettings.currentSessionName.get();
+					var sesV    = sessionSetView.getSession(sesName);
+					if(sesV.isPresent()){
+						var ses = sesV.get();
+						if(ImGui.sliderScalar("##Session frame", currentSessionFrame, 1, ses.frameCount())){
+							var data = ses.getFrameData(currentSessionFrame[0]);
+							try{
+								byteGridComponent.setDisplayData(data.asReadOnly());
+							}catch(IOException e){
+								new RuntimeException("Failed to update data", e).printStackTrace();
+							}
+						}
 					}
 				}
 				ImGui.separator();
@@ -203,7 +219,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var window = this.window.getGlfwWindow();
 		window.show();
 		
-		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), (window1, width, height) -> {
+		var event = GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), (window1, width, height) -> {
 			try{
 				this.window.recreateSwapchainContext();
 			}catch(VulkanCodeException e){
@@ -235,6 +251,8 @@ public class VulkanDisplay implements AutoCloseable{
 			this.window.checkSwapchainSize();
 			renderAndSwap();
 		}
+		
+		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), event);
 	}
 	
 	private void renderAndSwap(){
@@ -274,7 +292,9 @@ public class VulkanDisplay implements AutoCloseable{
 		if(ses.isEmpty()){
 			data = MemoryData.empty();
 		}else{
-			data = ses.get().getFrameData(1);
+			var session = ses.get();
+			data = session.getFrameData(session.frameCount() - 1);
+			uiSettings.currentSessionFrame[0] = session.frameCount() - 1;
 		}
 		try{
 			byteGridComponent.setDisplayData(data.asReadOnly());

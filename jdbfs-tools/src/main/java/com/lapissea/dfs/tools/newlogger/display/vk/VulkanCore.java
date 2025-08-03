@@ -369,7 +369,9 @@ public class VulkanCore implements AutoCloseable{
 				).toArray(StackTraceElement[]::new)
 			);
 			switch(messageIDName){
-				case "VUID-vkDestroyDevice-device-05137", "VUID-vkCmdBindPipeline-commandBuffer-recording" -> {
+				case "VUID-vkDestroyDevice-device-05137",
+				     "VUID-vkCmdBindPipeline-commandBuffer-recording",
+				     "VUID-vkDestroyFence-fence-parameter" -> {
 					for(var ctorInit : Iters.ofLongs(handles).box().map(device.debugVkObjects::get).nonNulls()){
 						err.addSuppressed(ctorInit);
 					}

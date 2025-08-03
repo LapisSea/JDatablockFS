@@ -349,8 +349,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	public record IOEvent(char from, char to, Type type){
 		public IOEvent(int from, int to, Type type){
-			this((char)from, (char)to, type);
-			validateCharRangeFromInt(from, to);
+			this(toCharExact(from, "from"), toCharExact(to, "to"), type);
 		}
 		public IOEvent{
 			if(from>to){
@@ -366,12 +365,9 @@ public class ByteGridRender implements VulkanResource{
 	}
 	
 	public record DrawRange(char from, char to, Color color){
-		
 		public DrawRange(int from, int to, Color color){
-			this((char)from, (char)to, color);
-			validateCharRangeFromInt(from, to);
+			this(toCharExact(from, "from"), toCharExact(to, "to"), color);
 		}
-		
 		public DrawRange{
 			if(from>to){
 				throw new IllegalArgumentException("From can not be larger than to");
@@ -379,17 +375,17 @@ public class ByteGridRender implements VulkanResource{
 			Objects.requireNonNull(color);
 		}
 	}
-	private static void validateCharRangeFromInt(int from, int to){
-		if(from<0) throw new IllegalArgumentException("From can not be negative");
-		if(to<0) throw new IllegalArgumentException("To can not be negative");
-		if(from>Character.MAX_VALUE) throw new IllegalArgumentException("From can not be greater than Character.MAX_VALUE");
-		if(to>Character.MAX_VALUE) throw new IllegalArgumentException("To can not be greater than Character.MAX_VALUE");
+	
+	private static char toCharExact(int value, String name){
+		if(value<0) throw new IllegalArgumentException(name + " can not be negative");
+		if(value>Character.MAX_VALUE)
+			throw new IllegalArgumentException(name + " can not be greater than unsigned 16 bit integer (" + Character.MAX_VALUE + ")");
+		return (char)value;
 	}
 	
 	public void record(DeviceGC deviceGC, RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		var device = core.device;
 		if(resource.indirectDrawBuff == null){
-			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.indirectDrawBuff = device.allocateIndirectBuffer(256);
 		}
 		
@@ -407,7 +403,7 @@ public class ByteGridRender implements VulkanResource{
 		GByte.Buf[] byteBuffers = new GByte.Buf[256];
 		
 		for(DrawRange range : ranges){
-			for(var i = range.from; i<range.to; i++){
+			for(char i = range.from; i<range.to; i++){
 				var b   = Byte.toUnsignedInt(data[i]);
 				var buf = byteBuffers[b];
 				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
@@ -428,8 +424,10 @@ public class ByteGridRender implements VulkanResource{
 		if(resource.bytesInfo == null || resource.bytesInfo.size()/GByte.SIZEOF<cap){
 			if(resource.bytesInfo != null){
 				deviceGC.destroyLater(resource.bytesInfo);
+				deviceGC.destroyLater(resource.dsSet);
 			}
 			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.updateDescriptor();
 		}
 		

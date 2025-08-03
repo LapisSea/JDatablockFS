@@ -6,12 +6,16 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
+import com.lapissea.dfs.tools.frame.FrameUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -22,7 +26,7 @@ public final class FrameDB{
 			try{
 				var db = new FrameDB(MemoryData.empty());
 				db.store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0])));
-				db.store("\0", new IPC.DiffFrame(1, 0, -1, new IPC.DiffPart[0], new IPC.RangeSet(new long[0])));
+				db.store("\0", new IPC.DiffFrame(1, 0, -1, new FrameUtils.DiffBlock[0], new IPC.RangeSet(new long[0])));
 				db.clear("\0");
 			}catch(IOException e){
 				e.printStackTrace();
@@ -44,22 +48,42 @@ public final class FrameDB{
 	public void store(String name, IPC.SendFrame frame) throws IOException{
 		var ioFrame = switch(frame){
 			case IPC.DiffFrame f -> {
-				var capacity = Iters.from(f.parts()).mapToLong(p -> p.data().length).sum();
-				var blob     = newSyncBlob(capacity);
-				
-				var parts = new ArrayList<IOFrame.Diff.Part>(f.parts().length);
-				try(var io = blob.io()){
-					for(var part : f.parts()){
-						var offset = io.getPos();
-						io.write(part.data());
+				lock.lock();
+				try{
+					var chainLength = computeChainLength(name, f, 50);
+					LogUtil.println(chainLength.length);
+					if(chainLength.stopFrame instanceof IOFrame.Diff stopFrame){
+						IOMap<Long, IOFrame> frames = getFrames(name);
 						
-						var start = part.offset();
-						var size  = part.data().length;
-						parts.add(new IOFrame.Diff.Part(offset, new IOFrame.Range(start, size)));
+						var prev = (IOFrame.Diff)frames.get(f.prevUid());
+						
+						var stopData = stopFrame.resolve(frames::get);
+						var prevData = prev.resolve(frames::get);
+						var diff     = FrameUtils.computeDiff(stopData, prevData);
+						
+						var partsBlob = storeParts(diff.blocks());
+						LogUtil.println(partsBlob.blob.getIOSize());
+						
+						var d = new IOFrame.Diff(
+							partsBlob.parts, partsBlob.blob, prev.uid, stopFrame.uid, diff.newSize().orElse(-1), prev.writes()
+						);
+						
+						var test = d.resolve(frames::get);
+						
+						if(!Arrays.equals(test, prevData)){
+							new ShouldNeverHappenError("Failed to squash diff").printStackTrace();
+							System.exit(1);
+						}
+						
+						frames.put(prev.uid, d);
+						prev.partsBuff.free();//TODO: this is a memory leak fix. Map should delete the blob
 					}
-					assert io.getPos() == capacity;
+				}finally{
+					lock.unlock();
 				}
-				yield new IOFrame.Diff(parts, blob, f.uid(), f.prevUid(), f.newSize(), rangeSetToIO(f.writes()));
+				
+				var partsBlob = storeParts(f.parts());
+				yield new IOFrame.Diff(partsBlob.parts(), partsBlob.blob(), f.uid(), f.prevUid(), f.newSize(), rangeSetToIO(f.writes()));
 			}
 			case IPC.FullFrame f -> {
 				var blob = newSyncBlob(f.data().length);
@@ -69,6 +93,50 @@ public final class FrameDB{
 		};
 		store(name, ioFrame);
 	}
+	
+	private record PartsBlob(Blob blob, ArrayList<IOFrame.Diff.Part> parts){ }
+	private PartsBlob storeParts(FrameUtils.DiffBlock[] diffParts) throws IOException{
+		var capacity = Iters.from(diffParts).mapToLong(p -> p.data().length).sum();
+		var blob     = newSyncBlob(capacity);
+		
+		var parts = new ArrayList<IOFrame.Diff.Part>(diffParts.length);
+		try(var io = blob.io()){
+			for(var part : diffParts){
+				var offset = io.getPos();
+				io.write(part.data());
+				
+				var start = part.offset();
+				var size  = part.data().length;
+				parts.add(new IOFrame.Diff.Part(offset, new IOFrame.Range(start, size)));
+			}
+			assert io.getPos() == capacity;
+		}
+		return new PartsBlob(blob, parts);
+	}
+	
+	record ChainInfo(IOFrame stopFrame, int length){ }
+	private ChainInfo computeChainLength(String name, IPC.DiffFrame f, int limit) throws IOException{
+		int                  chainLength = 1;
+		IOFrame              prev        = null;
+		IOMap<Long, IOFrame> frames      = getFrames(name);
+		
+		while(chainLength<limit){
+			long prevId;
+			switch(prev){
+				case null -> prevId = f.prevUid();
+				case IOFrame.Diff diff -> prevId = diff.previousID;
+				case IOFrame.Full ignore -> {
+					return new ChainInfo(prev, chainLength);
+				}
+			}
+			
+			var mapPrev = Objects.requireNonNull(frames.get(prevId));
+			chainLength++;
+			prev = mapPrev;
+		}
+		return new ChainInfo(prev, chainLength);
+	}
+	
 	private Blob newSyncBlob(long capacity) throws IOException{
 		Blob blob;
 		lock.lock();

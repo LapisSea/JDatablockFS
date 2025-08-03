@@ -5,6 +5,7 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.tools.frame.FrameUtils.DiffBlock;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.DataInputStream;
@@ -196,24 +197,14 @@ public final class IPC{
 		}
 	}
 	
-	public record DiffPart(int offset, byte[] data){
-		@Override
-		public String toString(){
-			return "DiffPart{" +
-			       "offset=" + offset +
-			       ", data=" + Arrays.toString(data) +
-			       '}';
-		}
-	}
-	
-	public record DiffFrame(long uid, long prevUid, int newSize, DiffPart[] parts, RangeSet writes) implements SendFrame{
+	public record DiffFrame(long uid, long prevUid, int newSize, DiffBlock[] parts, RangeSet writes) implements SendFrame{
 		@Override
 		public String toString(){
 			return "DiffFrame{" +
 			       "uid=" + uid +
 			       ", prevUid=" + prevUid +
 			       (newSize == -1? "" : ", newSize=" + newSize) +
-			       ", parts=" + Iters.of(parts).joinAsStr(", ", "[", "]", p -> "{" + p.offset + " -> " + Arrays.toString(p.data) + "}") +
+			       ", parts=" + Iters.of(parts).joinAsStr(", ", "[", "]", p -> "{" + p.offset() + " -> " + Arrays.toString(p.data()) + "}") +
 			       ", writes=" + writes +
 			       '}';
 		}
@@ -224,9 +215,9 @@ public final class IPC{
 		dest.writeLong(frame.prevUid);
 		dest.writeInt(frame.newSize);
 		dest.writeInt(frame.parts.length);
-		for(DiffPart part : frame.parts){
-			dest.writeInt(part.offset);
-			writeBytes(dest, part.data, false);
+		for(DiffBlock part : frame.parts){
+			dest.writeInt(part.offset());
+			writeBytes(dest, part.data(), false);
 		}
 		writeLongs(dest, frame.writes.startsSizes);
 	}
@@ -236,11 +227,11 @@ public final class IPC{
 		var prevUid  = src.readLong();
 		var newSize  = src.readInt();
 		var partsLen = src.readInt();
-		var parts    = new DiffPart[partsLen];
+		var parts    = new DiffBlock[partsLen];
 		for(int i = 0; i<partsLen; i++){
 			var offset = src.readInt();
 			var bytes  = readBytes(src);
-			parts[i] = new DiffPart(offset, bytes);
+			parts[i] = new DiffBlock(offset, bytes);
 		}
 		long[] ids = readLongs(src);
 		return new DiffFrame(uid, prevUid, newSize, parts, new RangeSet(ids));
