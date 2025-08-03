@@ -21,9 +21,60 @@ import java.util.StringJoiner;
 import java.util.function.LongConsumer;
 import java.util.stream.LongStream;
 
+import static com.lapissea.dfs.config.ConfigUtils.configBoolean;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public final class IPC{
+	
+	public static final class Logger{
+		private final String  name;
+		private final boolean enabled;
+		public Logger(String name, boolean enabled){
+			this.name = name;
+			this.enabled = enabled;
+		}
+		
+		public void trace(String msg, Object arg1){
+			if(!enabled || !Log.TRACE) return;
+			Log.trace("{}#grayBright: " + msg, name, arg1);
+		}
+		public void trace(String msg, Object arg1, Object arg2){
+			if(!enabled || !Log.TRACE) return;
+			Log.trace("{}#grayBright: " + msg, name, arg1, arg2);
+		}
+		public void trace(String msg, Object arg1, Object arg2, Object arg3){
+			if(!enabled || !Log.TRACE) return;
+			Log.trace("{}#grayBright: " + msg, name, arg1, arg2, arg3);
+		}
+		
+		public void info(String msg, Object arg1){
+			if(!enabled || !Log.INFO) return;
+			Log.info("{}#grayBright: " + msg, name, arg1);
+		}
+		public void info(String msg, Object arg1, Object arg2){
+			if(!enabled || !Log.INFO) return;
+			Log.info("{}#grayBright: " + msg, name, arg1, arg2);
+		}
+		
+		public void warn(String msg, Object arg1){
+			if(!enabled || !Log.WARN) return;
+			Log.warn("{}#grayBright: " + msg, name, arg1);
+		}
+		public void warn(String msg, Object arg1, Object arg2){
+			if(!enabled || !Log.WARN) return;
+			Log.warn("{}#grayBright: " + msg, name, arg1, arg2);
+		}
+		
+		public void log(String msg){
+			if(!enabled || !Log.INFO) return;
+			Log.log("{}#grayBright: {}", msg);
+		}
+	}
+	
+	public static final Logger CLIENT =
+		new Logger("CLIENT", configBoolean("ipcChatter.client", configBoolean("ipcChatter", true)));
+	public static final Logger SERVER =
+		new Logger("SERVER", configBoolean("ipcChatter.server", configBoolean("ipcChatter", true)));
 	
 	public static final int TIMEOUT      = 500;
 	public static final int DEFAULT_PORT = 56786;//No meaning, just a random number in the private port space
@@ -44,7 +95,7 @@ public final class IPC{
 	public static HandshakeRes clientHandshake(InetSocketAddress serverAddress) throws IOException{
 		try(var socket = new Socket()){
 			socket.connect(serverAddress, TIMEOUT);
-			Log.trace("CLIENT: Connected to {}#yellow", serverAddress);
+			CLIENT.trace("Connected to {}#yellow", serverAddress);
 			
 			var output = new DataOutputStream(socket.getOutputStream());
 			writeEnum(output, MSGConnection.CONNECT, true);
@@ -54,7 +105,7 @@ public final class IPC{
 			switch(response){
 				case ACK -> {
 					var newPort = readPortNum(input);
-					Log.trace("CLIENT: Received session management port on {}#green", newPort);
+					CLIENT.trace("Received session management port on {}#green", newPort);
 					return new HandshakeRes(newPort);
 				}
 				case NACK -> throw new IOException("Handshake NACK!");
@@ -64,26 +115,26 @@ public final class IPC{
 	}
 	
 	public static ServerSocket recieveHandshake(ServerSocket ss) throws IOException{
-		Log.log("SERVER: Waiting for handshake...");
+		SERVER.log("Waiting for handshake...");
 		try(var socket = ss.accept()){
 			var output = new DataOutputStream(socket.getOutputStream());
 			var input  = new DataInputStream(socket.getInputStream());
 			
-			Log.trace("SERVER: Waiting on init message on {}#yellow", socket);
+			SERVER.trace("Waiting on init message on {}#yellow", socket);
 			var response = readEnum(input, MSGConnection.class);
 			if(response != MSGConnection.CONNECT){
 				writeEnum(output, MSGConnection.NACK, true);
-				Log.warn("SERVER: Unexpected handshake init message: {}#red", response);
+				SERVER.warn("Unexpected handshake init message: {}#red", response);
 				
 				return null;
 			}
-			Log.trace("SERVER: Acknowledging connection on {}#yellow", socket);
+			SERVER.trace("Acknowledging connection on {}#yellow", socket);
 			writeEnum(output, MSGConnection.ACK, true);
 			
 			var connectionSocket = new ServerSocket(0);
 			writePortNum(output, connectionSocket.getLocalPort(), true);
 			
-			Log.trace("SERVER: Opened session management port on {}#green", connectionSocket.getLocalPort());
+			SERVER.trace("Opened session management port on {}#green", connectionSocket.getLocalPort());
 			return connectionSocket;
 		}catch(SocketException e){
 			if(e.getMessage().equals("Socket closed")){

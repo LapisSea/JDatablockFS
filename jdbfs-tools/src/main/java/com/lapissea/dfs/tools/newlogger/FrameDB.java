@@ -14,7 +14,9 @@ import com.lapissea.util.ShouldNeverHappenError;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -51,7 +53,6 @@ public final class FrameDB{
 				lock.lock();
 				try{
 					var chainLength = computeChainLength(name, f, 50);
-					LogUtil.println(chainLength.length);
 					if(chainLength.stopFrame instanceof IOFrame.Diff stopFrame){
 						IOMap<Long, IOFrame> frames = getFrames(name);
 						
@@ -62,7 +63,6 @@ public final class FrameDB{
 						var diff     = FrameUtils.computeDiff(stopData, prevData);
 						
 						var partsBlob = storeParts(diff.blocks());
-						LogUtil.println(partsBlob.blob.getIOSize());
 						
 						var d = new IOFrame.Diff(
 							partsBlob.parts, partsBlob.blob, prev.uid, stopFrame.uid, diff.newSize().orElse(-1), prev.writes()
@@ -74,7 +74,7 @@ public final class FrameDB{
 							new ShouldNeverHappenError("Failed to squash diff").printStackTrace();
 							System.exit(1);
 						}
-						
+						cache.clear();
 						frames.put(prev.uid, d);
 						prev.partsBuff.free();//TODO: this is a memory leak fix. Map should delete the blob
 					}
@@ -115,6 +115,8 @@ public final class FrameDB{
 	}
 	
 	record ChainInfo(IOFrame stopFrame, int length){ }
+	
+	private Map<String, IOFrame> cache = new HashMap<>();
 	private ChainInfo computeChainLength(String name, IPC.DiffFrame f, int limit) throws IOException{
 		int                  chainLength = 1;
 		IOFrame              prev        = null;
@@ -130,7 +132,11 @@ public final class FrameDB{
 				}
 			}
 			
-			var mapPrev = Objects.requireNonNull(frames.get(prevId));
+			IOFrame mapPrev = cache.get(name + "@" + prevId);
+			if(mapPrev == null){
+				mapPrev = Objects.requireNonNull(frames.get(prevId));
+				cache.put(name + "@" + prevId, mapPrev);
+			}
 			chainLength++;
 			prev = mapPrev;
 		}

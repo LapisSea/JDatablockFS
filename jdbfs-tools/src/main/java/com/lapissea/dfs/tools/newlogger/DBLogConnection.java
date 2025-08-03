@@ -19,6 +19,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
 
+import static com.lapissea.dfs.tools.newlogger.IPC.CLIENT;
 import static com.lapissea.dfs.tools.newlogger.IPC.DEFAULT_PORT;
 import static com.lapissea.dfs.tools.newlogger.IPC.writeEnum;
 
@@ -59,7 +60,7 @@ public interface DBLogConnection extends Closeable{
 			
 			sessionManagementSocket = new Socket();
 			sessionManagementSocket.connect(communicationAddress);
-			Log.trace("CLIENT: Opened session handler on {}#green", communicationAddress);
+			CLIENT.trace("Opened session handler on {}#green", communicationAddress);
 		}
 		
 		private final Lock sessionLock = new ReentrantLock();
@@ -69,7 +70,7 @@ public interface DBLogConnection extends Closeable{
 			sessionLock.lock();
 			try{
 				if(sessionManagementSocket.isClosed()) return;
-				Log.info("CLIENT: Closing log connection on {}#yellow", sessionManagementSocket);
+				CLIENT.info("Closing log connection on {}#yellow", sessionManagementSocket);
 				
 				for(Session value : sessions.values()){
 					value.close();
@@ -162,7 +163,7 @@ public interface DBLogConnection extends Closeable{
 				ioLock.lock();
 				try{
 					if(socket.isClosed()) return;
-					Log.trace("CLIENT: Closing log session {}#yellow", name);
+					CLIENT.trace("Closing log session {}#yellow", name);
 					sessionLock.lock();
 					try{
 						sessions.remove(name, this);
@@ -214,7 +215,7 @@ public interface DBLogConnection extends Closeable{
 						socket.close();
 						Log.warn("Failed to send frame because: {}#red", e);
 					}
-					Log.trace("CLIENT: [{}#green] frame {}#green acknowledged", name, uid);
+					CLIENT.trace("[{}#green] frame {}#green acknowledged", name, uid);
 				}finally{
 					ioLock.unlock();
 				}
@@ -247,9 +248,9 @@ public interface DBLogConnection extends Closeable{
 					return existing;
 				}
 				
-				Log.trace("CLIENT: Requesting session {}#yellow", name);
+				CLIENT.trace("Requesting session {}#yellow", name);
 				var sessionSocket = IPC.requestSession(sessionManagementSocket, name);
-				Log.info("CLIENT: Opened session {}#green on port: {}#green", name, sessionSocket.getPort());
+				CLIENT.info("Opened session {}#green on port: {}#green", name, sessionSocket.getPort());
 				
 				var ses = new IPCSession(name, sessionSocket);
 				

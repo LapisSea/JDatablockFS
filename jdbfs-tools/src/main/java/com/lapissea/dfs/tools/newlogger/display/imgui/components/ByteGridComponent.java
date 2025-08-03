@@ -6,7 +6,6 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
-import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
@@ -21,7 +20,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
-import com.lapissea.util.LogUtil;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import org.joml.Matrix3x2f;
@@ -47,8 +45,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private final List<String> messages;
 	
+	private DisplayData toDisplayData;
 	private DisplayData displayData;
-	private DisplayData renderedData;
 	
 	public ByteGridComponent(
 		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
@@ -62,14 +60,12 @@ public class ByteGridComponent extends BackbufferComponent{
 		byteGridRender = new ByteGridRender(core);
 		this.messages = messages;
 		
-		displayData = new DisplayData(MemoryData.empty().asReadOnly(), 0);
 		clearColor.set(0.4, 0.4, 0.4, 1);
 	}
 	
 	public void setDisplayData(IOInterface src) throws IOException{
 		assert src.isReadOnly();
-		displayData = new DisplayData(src, src.getIOSize());
-		LogUtil.println(displayData);
+		toDisplayData = new DisplayData(src, src.getIOSize());
 	}
 	
 	@Override
@@ -89,7 +85,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
 		}
 		
-		if(displayData.size == 0){
+		if(toDisplayData == null || toDisplayData.size == 0){
 			if(grid1Res != null){
 				deviceGC.destroyLater(grid1Res);
 				grid1Res = null;
@@ -102,14 +98,14 @@ public class ByteGridComponent extends BackbufferComponent{
 			grid1Res = new ByteGridRender.RenderResource();
 		}
 		
-		if(renderedData != displayData){
-			renderedData = displayData;
+		if(displayData != toDisplayData){
+			displayData = toDisplayData;
 			try{
 				byteGridRender.record(
-					deviceGC, grid1Res, renderedData.src.readAll(),
+					deviceGC, grid1Res, displayData.src.readAll(),
 					List.of(
 						new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
-						new ByteGridRender.DrawRange(MagicID.size(), (int)renderedData.size, Color.GRAY.brighter())
+						new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
 					),
 					List.of()
 				);
@@ -118,7 +114,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			}
 		}
 		
-		long byteCount = renderedData.size;
+		long byteCount = displayData.size;
 		
 		var res      = GridUtils.ByteGridSize.compute(viewSize, byteCount);
 		var byteSize = res.byteSize();
@@ -133,7 +129,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		List<StringDraw> sd = new ArrayList<>();
 		
 		try{
-			renderedData.src.io(MagicID::read);
+			displayData.src.io(MagicID::read);
 			
 			var byteBae = new StringDraw(
 				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
@@ -152,11 +148,11 @@ public class ByteGridComponent extends BackbufferComponent{
 		if(mousePos instanceof Some(var p)){
 			int b = -1;
 			try{
-				b = renderedData.src.ioMapAt(p, ContentReader::readUnsignedInt1);
+				b = displayData.src.ioMapAt(p, ContentReader::readUnsignedInt1);
 			}catch(IOException e){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
-			if(findHoverChunk(renderedData.src, p) instanceof Some(var chunk)){
+			if(findHoverChunk(displayData.src, p) instanceof Some(var chunk)){
 				lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
 					deviceGC, lineRes,
 					GridUtils.outlineByteRange(Color.CYAN.darker(), res, new Range(chunk.getPtr().getValue(), chunk.dataEnd()), 2)

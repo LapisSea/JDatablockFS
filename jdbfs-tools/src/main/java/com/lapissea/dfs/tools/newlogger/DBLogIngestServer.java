@@ -2,7 +2,6 @@ package com.lapissea.dfs.tools.newlogger;
 
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
@@ -29,6 +28,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+
+import static com.lapissea.dfs.tools.newlogger.IPC.SERVER;
 
 public final class DBLogIngestServer{
 	
@@ -96,13 +97,13 @@ public final class DBLogIngestServer{
 			try{
 				command = IPC.readEnum(in, IPC.MSGConnection.class);
 			}catch(EOFException|SocketException e){
-				Log.info("SERVER: Ending connection with port {}#yellow because the stream ended", managementSocket.getPort());
+				SERVER.info("Ending connection with port {}#yellow because the stream ended", managementSocket.getPort());
 				return true;
 			}
 			
 			switch(command){
 				case END -> {
-					Log.info("SERVER: Ending connection with port {}#green as requested", managementSocket.getPort());
+					SERVER.info("Ending connection with port {}#green as requested", managementSocket.getPort());
 					return true;
 				}
 				case REQUEST_SESSION -> {
@@ -121,11 +122,11 @@ public final class DBLogIngestServer{
 		private void handleRequest() throws IOException{
 			var name = IPC.readString(in);
 			if(listSessionNames().contains(name)){
-				Log.warn("SERVER: Session named {}#red requested but already exists!", name);
+				SERVER.warn("Session named {}#red requested but already exists!", name);
 				IPC.writeEnum(out, IPC.MSGConnection.NACK, true);
 				return;
 			}
-			Log.info("SERVER: Session named {}#green requested", name);
+			SERVER.info("Session named {}#green requested", name);
 			IPC.writeEnum(out, IPC.MSGConnection.ACK, true);
 			
 			//noinspection resource
@@ -149,7 +150,7 @@ public final class DBLogIngestServer{
 					}
 					modId.incrementAndGet();
 					
-					Log.info("SERVER: Session {}#green connected! Ready for commands.", name);
+					SERVER.info("Session {}#green connected! Ready for commands.", name);
 					
 					while(true){
 						var close = session.process();
@@ -169,7 +170,7 @@ public final class DBLogIngestServer{
 					}
 					modId.incrementAndGet();
 					
-					Log.info("SERVER: [{}#yellow] Session ended", name);
+					SERVER.info("[{}#yellow] Session ended", name);
 				}
 			}, Thread.ofVirtual().name("Session: " + name)::start);
 		}
@@ -240,20 +241,21 @@ public final class DBLogIngestServer{
 			try{
 				cmd = IPC.readEnum(in, IPC.MSGSession.class);
 			}catch(EOFException|SocketException e){
-				Log.info("SERVER: [{}#red] Ending session because the stream ended", name);
+				SERVER.info("[{}#red] Ending session because the stream ended", name);
 				return true;
 			}
 			
 			switch(cmd){
 				case FRAME_FULL -> {
 					var frame = IPC.readFullFrame(in);
-					Log.trace("SERVER: [{}#green] Frame received: {}#green", name, frame);
-					frameDB.store(name, frame);
 					ackNow(out);
+					SERVER.trace("[{}#green] Frame received: {}#green", name, frame);
+					frameDB.store(name, frame);
 				}
 				case FRAME_DIFF -> {
 					var frame = IPC.readDiffFrame(in);
-					Log.trace("SERVER: [{}#green] Frame received: {}#green\n  as: {}#blue", name, frame, (Supplier<Object>)() -> {
+					ackNow(out);
+					SERVER.trace("[{}#green] Frame received: {}#green\n  as: {}#blue", name, frame, (Supplier<Object>)() -> {
 						try{
 							return frameDB.resolve(name, frame.uid());
 						}catch(IOException e){
@@ -261,14 +263,13 @@ public final class DBLogIngestServer{
 						}
 					});
 					frameDB.store(name, frame);
-					ackNow(out);
 				}
 				case END -> {
-					Log.info("SERVER: [{}#green] Ending session as requested", name);
+					SERVER.info("[{}#green] Ending session as requested", name);
 					return true;
 				}
 				case CLEAR -> {
-					Log.trace("SERVER: [{}#green] Clearing session", name);
+					SERVER.trace("[{}#green] Clearing session", name);
 					frameDB.clear(name);
 					ackNow(out);
 				}
@@ -276,11 +277,11 @@ public final class DBLogIngestServer{
 					long uid = in.readLong();
 					var  sf  = frameDB.resolve(name, uid);
 					if(sf == null){
-						Log.info("SERVER: [{}#green] Requested to read frame of ID: {}#red", name, uid);
+						SERVER.info("[{}#green] Requested to read frame of ID: {}#red", name, uid);
 						IPC.writeEnum(out, IPC.MSGSession.NACK, true);
 						return true;
 					}
-					Log.trace("SERVER: [{}#green] Sending full frame of ID: {}#green", name, uid);
+					SERVER.trace("[{}#green] Sending full frame of ID: {}#green", name, uid);
 					
 					IPC.writeEnum(out, IPC.MSGSession.FRAME_FULL, false);
 					IPC.writeFullFrame(out, sf);
@@ -293,7 +294,7 @@ public final class DBLogIngestServer{
 					out.flush();
 				}
 				default -> {
-					Log.warn("SERVER: [{}#green] Unrecognized frame type: {}", name, cmd);
+					SERVER.warn("[{}#green] Unrecognized frame type: {}", name, cmd);
 					IPC.writeEnum(out, IPC.MSGSession.NACK, true);
 					return true;
 				}
