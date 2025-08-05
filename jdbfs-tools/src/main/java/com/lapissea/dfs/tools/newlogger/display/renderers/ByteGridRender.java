@@ -420,13 +420,14 @@ public class ByteGridRender implements VulkanResource{
 			}
 		}
 		
-		var cap = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
-		if(resource.bytesInfo == null || resource.bytesInfo.size()/GByte.SIZEOF<cap){
+		var cap    = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
+		var oldCap = resource.bytesInfo == null? 0 : resource.bytesInfo.size()/GByte.SIZEOF;
+		if(resource.bytesInfo == null || oldCap<cap){
 			if(resource.bytesInfo != null){
 				deviceGC.destroyLater(resource.bytesInfo);
 				deviceGC.destroyLater(resource.dsSet);
 			}
-			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*(long)cap, VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
 			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.updateDescriptor();
 		}
