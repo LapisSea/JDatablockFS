@@ -9,6 +9,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import org.joml.SimplexNoise;
 import org.joml.Vector2f;
@@ -19,20 +20,36 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public final class GridUtils{
 	
-	public record ByteGridSize(int bytesPerRow, float byteSize){
-		public static ByteGridSize compute(Extent2D windowSize, long byteCount){
-			if(byteCount == 0) return new ByteGridSize(1, 1);
+	public record ByteGridSize(int bytesPerRow, float byteSize, Extent2D windowSize){
+		public ByteGridSize{
+			if(bytesPerRow<=0) throw new IllegalArgumentException("bytesPerRow can't be negative or zero");
+			if(byteSize<=0) throw new IllegalArgumentException("byteSize can't be negative or zero");
+			Objects.requireNonNull(windowSize, "windowSize can't be null");
+		}
+		
+		public static ByteGridSize compute(Extent2D windowSize, long byteCount, Match<ByteGridSize> previous){
+			if(byteCount == 0) return new ByteGridSize(1, 1, windowSize);
 			var byteCountL = BigDecimal.valueOf(byteCount);
 			
-			var aspectRatio = windowSize.width/(double)windowSize.height;
-			int bytesPerRow = byteCountL.multiply(BigDecimal.valueOf(aspectRatio))
-			                            .sqrt(MathContext.DECIMAL64).setScale(0, RoundingMode.UP)
-			                            .intValue();
 			
-			float byteSize = windowSize.width/(float)bytesPerRow;
+			int   bytesPerRow;
+			float byteSize;
+			if(previous instanceof Some(var prev) && prev.windowSize.equals(windowSize)){
+				bytesPerRow = prev.bytesPerRow;
+				byteSize = prev.byteSize;
+			}else{
+				var aspectRatio = windowSize.width/(double)windowSize.height;
+				bytesPerRow = byteCountL.multiply(BigDecimal.valueOf(aspectRatio))
+				                        .sqrt(MathContext.DECIMAL64).setScale(0, RoundingMode.UP)
+				                        .intValue();
+				
+				byteSize = windowSize.width/(float)bytesPerRow;
+			}
+			
 			while(true){
 				int rows = byteCountL.divide(BigDecimal.valueOf(bytesPerRow), MathContext.DECIMAL32).setScale(0, RoundingMode.UP)
 				                     .intValue();
@@ -44,7 +61,7 @@ public final class GridUtils{
 				bytesPerRow++;
 				byteSize = windowSize.width/(float)bytesPerRow;
 			}
-			return new ByteGridSize(bytesPerRow, byteSize);
+			return new ByteGridSize(bytesPerRow, byteSize, windowSize);
 		}
 	}
 	
@@ -72,7 +89,7 @@ public final class GridUtils{
 				        .filter(e -> {
 					        var dirE = e.val().a.sub(e.val().b, new Vector2f()).normalize();
 					        return Math.abs(dirLine.dot(dirE) - 1)<0.0001;
-				        }).matchFirst() instanceof Match.Some(IterablePP.Idx(var index, var val))){
+				        }).matchFirst() instanceof Some(IterablePP.Idx(var index, var val))){
 					this.set(index, new Line(val.a, line.b));
 					return true;
 				}
@@ -241,7 +258,7 @@ public final class GridUtils{
 	}
 	
 	static boolean isRangeHovered(Match<Long> hover, long from, long to){
-		if(!(hover instanceof Match.Some(var hoverByteIndex))) return false;
+		if(!(hover instanceof Some(var hoverByteIndex))) return false;
 		return from<=hoverByteIndex && hoverByteIndex<to;
 	}
 }

@@ -20,6 +20,8 @@ import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import imgui.ImGui;
+import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import org.joml.Matrix3x2f;
@@ -47,6 +49,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private DisplayData toDisplayData;
 	private DisplayData displayData;
+	
+	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
 	public ByteGridComponent(
 		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
@@ -116,14 +120,21 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		long byteCount = displayData.size;
 		
-		var res      = GridUtils.ByteGridSize.compute(viewSize, byteCount);
+		if(ImGui.isKeyPressed(ImGuiKey.R)){
+			lastGridSize = Match.empty();
+		}
+		
+		var res = GridUtils.ByteGridSize.compute(viewSize, byteCount, lastGridSize);
+		lastGridSize = Match.of(res);
+		
 		var byteSize = res.byteSize();
 		
 		var mousePos = GridUtils.calcByteIndex(viewSize, res, mouseX(), mouseY(), byteCount, 1);
 		
 		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow(), grid1Res);
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(deviceGC, lineRes,
-		                                                                                   GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3)
+		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
+			deviceGC, lineRes,
+			GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3)
 		));
 		
 		List<StringDraw> sd = new ArrayList<>();
