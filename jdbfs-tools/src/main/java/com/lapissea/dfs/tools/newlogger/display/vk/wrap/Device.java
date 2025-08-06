@@ -345,7 +345,7 @@ public class Device implements VulkanResource{
 		
 		if(memoryFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
 			var newSize = physicalDevice.alignToAtomSizeUp(size);
-			if(newSize != size && Log.TRACE){
+			if(newSize != size){
 				Log.trace(
 					"Tried to allocated HOST_CACHED buffer with size of {}#yellow but need {}#green to comply with nonCoherentAtomSize = {}",
 					size, newSize, physicalDevice.nonCoherentAtomSize

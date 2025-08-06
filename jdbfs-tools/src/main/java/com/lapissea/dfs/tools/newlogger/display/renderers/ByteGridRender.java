@@ -11,7 +11,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.Std430;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkDynamicState;
@@ -41,7 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class ByteGridRender implements VulkanResource{
+public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, ByteGridRender.RenderToken>{
 	
 	record Theme(Color none, Color write, Color read, Color readWrite){ }
 	
@@ -181,7 +180,7 @@ public class ByteGridRender implements VulkanResource{
 	
 	private record MeshInfo(int vertPos, int vertCount){ }
 	
-	public static final class RenderResource implements VulkanResource{
+	public static final class RenderResource implements ResourceBuffer{
 		
 		private VkDescriptorSet dsSet;
 		private BackedVkBuffer  bytesInfo;
@@ -190,12 +189,8 @@ public class ByteGridRender implements VulkanResource{
 		
 		private int instanceCount;
 		
-		private boolean checkSmallBytes(Matrix4f mat){
-			var scale3 = new Vector3f();
-			mat.getScale(scale3);
-			var scale = scale3.x;
-			
-			return scale<5;
+		public void reset(){
+			instanceCount = 0;
 		}
 		
 		private void updateDescriptor(){
@@ -213,6 +208,20 @@ public class ByteGridRender implements VulkanResource{
 				indirectDrawBuff.destroy();
 				indirectDrawBuff = null;
 			}
+		}
+	}
+	
+	public static final class RenderToken implements Renderer.RenderToken{
+		
+		private final RenderResource resource;
+		
+		private final int firstInstance;
+		private final int instanceCount;
+		
+		public RenderToken(RenderResource resource, int firstInstance, int instanceCount){
+			this.resource = resource;
+			this.firstInstance = firstInstance;
+			this.instanceCount = instanceCount;
 		}
 	}
 	
@@ -383,7 +392,7 @@ public class ByteGridRender implements VulkanResource{
 		return (char)value;
 	}
 	
-	public void record(DeviceGC deviceGC, RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+	public RenderToken record(DeviceGC deviceGC, RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		var device = core.device;
 		if(resource.indirectDrawBuff == null){
 			resource.indirectDrawBuff = device.allocateIndirectBuffer(256);
@@ -420,7 +429,17 @@ public class ByteGridRender implements VulkanResource{
 			}
 		}
 		
-		var cap    = Iters.from(byteBuffers).nonNulls().map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
+		var nonNullBuffers = Iters.from(byteBuffers).nonNulls();
+		
+		var neededCommandCapacity = resource.instanceCount + nonNullBuffers.count();
+		if(resource.indirectDrawBuff.instanceCapacity()<neededCommandCapacity){
+			var newBuff = device.allocateIndirectBuffer(256);
+			resource.indirectDrawBuff.buffer.transferTo(newBuff.buffer);
+			resource.indirectDrawBuff = newBuff;
+			deviceGC.destroyLater(resource.indirectDrawBuff);
+		}
+		
+		var cap    = nonNullBuffers.map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
 		var oldCap = resource.bytesInfo == null? 0 : resource.bytesInfo.size()/GByte.SIZEOF;
 		if(resource.bytesInfo == null || oldCap<cap){
 			if(resource.bytesInfo != null){
@@ -432,10 +451,12 @@ public class ByteGridRender implements VulkanResource{
 			resource.updateDescriptor();
 		}
 		
+		var start = resource.instanceCount;
+		
 		try(var draws = resource.indirectDrawBuff.update();
 		    var ses = resource.bytesInfo.updateAs(GByte.Buf::new)){
 			var instancesBuff = ses.val;
-			draws.clear();
+			draws.setPos(start);
 			
 			for(int i = 0; i<byteBuffers.length; i++){
 				var buf = byteBuffers[i];
@@ -447,12 +468,25 @@ public class ByteGridRender implements VulkanResource{
 				buf.free();
 			}
 			
-			resource.instanceCount = draws.buffer.position();
+			var end = resource.instanceCount = draws.buffer.position();
+			
+			return new RenderToken(resource, start, end - start);
 		}
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix4f transform, int tileWidth, RenderResource resource) throws VulkanCodeException{
-		var small = resource.checkSmallBytes(transform);
+	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix4f transform, int tileWidth, List<RenderToken> tokens) throws VulkanCodeException{
+		if(tokens.isEmpty()) return;
+		
+		if(Iters.from(tokens).map(e -> e.resource).distinct().count() != 1){
+			throw new NotImplementedException("No multi resources");//TODO
+		}
+		
+		var resource = tokens.getFirst().resource;
+		var scale3   = new Vector3f();
+		transform.getScale(scale3);
+		var scale = scale3.x;
+		
+		var small = scale<5;
 		
 		var pipeline = (small? pipelinesSimple : pipelines).get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
@@ -467,8 +501,9 @@ public class ByteGridRender implements VulkanResource{
 		var data = ByteBuffer.allocateDirect(PushConstant.SIZEOF);
 		new PushConstant(data).set(mat, tileWidth, theme);
 		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, data);
-		
-		buf.drawIndirect(resource.indirectDrawBuff, 0, resource.instanceCount);
+		for(RenderToken token : tokens){
+			buf.drawIndirect(resource.indirectDrawBuff, token.firstInstance, token.instanceCount);
+		}
 	}
 	
 	

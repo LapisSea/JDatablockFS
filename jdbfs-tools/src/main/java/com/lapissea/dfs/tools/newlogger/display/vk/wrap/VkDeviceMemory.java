@@ -37,6 +37,11 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 			var alignedEnd    = physicalDevice.alignToAtomSizeUp(end);
 			var alignedSize   = alignedEnd - alignedOffset;
 			
+			if(alignedOffset + alignedSize>boundBuffer.size){
+				throw new AssertionError(alignedOffset + "+" + alignedSize + ">" + boundBuffer.size +
+				                         " (" + alignedOffset + alignedSize + ">" + boundBuffer.size + ")");
+			}
+			
 			var mapAligned = VKCalls.vkMapMemory(this, alignedOffset, alignedSize, 0);
 			
 			var offsetChange = offset - alignedOffset;

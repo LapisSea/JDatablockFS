@@ -50,6 +50,9 @@ public class IndirectDrawBuffer implements VulkanResource{
 		
 		@Override
 		public void close() throws VulkanCodeException{ mem.close(); }
+		public void setPos(int pos){
+			buffer.position(pos);
+		}
 	}
 	
 	public final BackedVkBuffer buffer;

@@ -2,22 +2,27 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.imgui.components.GridUtils;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import org.joml.Matrix3x2f;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 public class MultiRendererBuffer implements VulkanResource{
 	
 	private sealed interface TokenSet{
-		record Lines(List<LineRenderer.RToken> tokens) implements TokenSet{ }
+		record Lines(List<Geometry.Path> paths) implements TokenSet{ }
 		
-		record Strings(List<MsdfFontRender.RenderToken> tokens) implements TokenSet{ }
+		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{ }
+		
+		record ByteEvents(List<ByteGridRender.RenderToken> tokens) implements TokenSet{ }
 	}
 	
 	
@@ -61,35 +66,48 @@ public class MultiRendererBuffer implements VulkanResource{
 		}
 	}
 	
-	public void renderLines(DeviceGC deviceGC, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
-		var token = lineRenderer.record(deviceGC, lineRes, paths);
-		getTokenSet(TokenSet.Lines.class).tokens.add(token);
+	public void renderLines(Iterable<? extends Geometry.Path> paths){
+		var p = getTokenSet(TokenSet.Lines.class).paths;
+		if(paths instanceof Collection<? extends Geometry.Path> collection){
+			p.addAll(collection);
+		}else{
+			for(var path : paths){
+				p.add(path);
+			}
+		}
 	}
 	
-	public void renderFont(DeviceGC deviceGC, MsdfFontRender.StringDraw... paths) throws VulkanCodeException{ renderFont(deviceGC, Arrays.asList(paths)); }
-	public void renderFont(DeviceGC deviceGC, List<MsdfFontRender.StringDraw> strings) throws VulkanCodeException{
-		var token = fontRender.record(deviceGC, fontRes, strings);
-		getTokenSet(TokenSet.Strings.class).tokens.add(token);
+	public void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }
+	public void renderFont(List<MsdfFontRender.StringDraw> strings){
+		getTokenSet(TokenSet.Strings.class).strings.addAll(strings);
 	}
 	
-	public void renderBytes(DeviceGC deviceGC, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){
-	
+	public void renderBytes(DeviceGC deviceGC, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
+		var token = byteGridRender.record(deviceGC, gridRes, data, ranges, ioEvents);
+		getTokenSet(TokenSet.ByteEvents.class).tokens.add(token);
 	}
 	
 	public void reset(){
 		sets.clear();
+		gridRes.reset();
 		lineRes.reset();
 		fontRes.reset();
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+	public void submit(DeviceGC deviceGC, GridUtils.ByteGridSize gridSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+		var viewSize = gridSize.windowSize();
 		for(TokenSet set : sets){
 			switch(set){
-				case TokenSet.Lines(var tokens) -> {
-					lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), tokens);
+				case TokenSet.Lines(var paths) -> {
+					var token = lineRenderer.record(deviceGC, lineRes, paths);
+					lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
 				}
-				case TokenSet.Strings(var tokens) -> {
-					fontRender.submit(viewSize, cmdBuffer, tokens);
+				case TokenSet.Strings(var strings) -> {
+					var token = fontRender.record(deviceGC, fontRes, strings);
+					fontRender.submit(viewSize, cmdBuffer, List.of(token));
+				}
+				case TokenSet.ByteEvents(var tokens) -> {
+					byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), tokens);
 				}
 			}
 		}

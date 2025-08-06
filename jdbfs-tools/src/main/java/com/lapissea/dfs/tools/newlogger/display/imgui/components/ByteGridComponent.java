@@ -63,7 +63,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	protected void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException{
 		multiRenderer.reset();
 		recordBackbuffer(deviceGC, viewSize);
-		multiRenderer.submit(viewSize, cmdBuffer);
+		multiRenderer.submit(deviceGC, lastGridSize.orElse(new GridUtils.ByteGridSize(1, 1, viewSize)), cmdBuffer);
 	}
 	protected void recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException{
 		
@@ -71,11 +71,11 @@ public class ByteGridComponent extends BackbufferComponent{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
 			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
 			
-			multiRenderer.renderLines(deviceGC, GridUtils.backgroundDots(viewSize, color));
+			multiRenderer.renderLines(GridUtils.backgroundDots(viewSize, color));
 		}
 		
 		if(displayData == null || displayData.size == 0){
-			renderNoData(deviceGC, viewSize);
+			renderNoData(viewSize);
 			return;
 		}
 		
@@ -105,7 +105,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			throw new RuntimeException(e);
 		}
 		
-		multiRenderer.renderLines(deviceGC, GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3));
+		multiRenderer.renderLines(GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3));
 		
 		List<StringDraw> sd = new ArrayList<>();
 		
@@ -136,18 +136,16 @@ public class ByteGridComponent extends BackbufferComponent{
 			if(findHoverChunk(displayData.src, p) instanceof Some(var chunk)){
 				var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
 				multiRenderer.renderLines(
-					deviceGC,
 					GridUtils.outlineByteRange(Color.CYAN.darker(), res, chRange, 2)
 				);
 				messages.add("Hovered chunk: " + chunk);
 			}
 			multiRenderer.renderLines(
-				deviceGC,
 				GridUtils.outlineByteRange(Color.WHITE, res, new Range(p, p + 1), 1.5F)
 			);
 		}
 		
-		multiRenderer.renderFont(deviceGC, sd);
+		multiRenderer.renderFont(sd);
 	}
 	
 	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){
@@ -162,14 +160,14 @@ public class ByteGridComponent extends BackbufferComponent{
 		return Match.empty();
 	}
 	
-	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException{
+	private void renderNoData(Extent2D viewSize){
 		var str = "No data!";
 		
 		int w         = viewSize.width, h = viewSize.height;
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
 		if(stringDrawIn(str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
-			multiRenderer.renderFont(deviceGC, draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
+			multiRenderer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
 	}
 	
