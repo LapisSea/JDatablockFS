@@ -149,15 +149,17 @@ public class LineRenderer implements VulkanResource{
 		}
 	}
 	
-	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, RToken resource) throws VulkanCodeException{
+	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, Iterable<RToken> tokens) throws VulkanCodeException{
 		var pipeline = pipelines.get(buf.getCurrentRenderPass());
 		buf.bindPipeline(pipeline);
 		
 		buf.setViewportScissor(new Rect2D(viewSize));
-		
-		resource.bind(buf, 0);
 		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, PushConstant.make(pvm));
-		buf.drawIndexed(resource.indexCount, 1, 0, 0, 0);
+		
+		for(var resource : tokens){
+			resource.bind(buf, 0);
+			buf.drawIndexed(resource.indexCount, 1, 0, 0, 0);
+		}
 	}
 	
 	@Override

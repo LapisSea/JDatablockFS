@@ -66,6 +66,9 @@ public final class GridUtils{
 	}
 	
 	public record Rect(float x, float y, float width, float height){
+		public Rect(float width, float height){
+			this(0, 0, width, height);
+		}
 		public Rect scale(float scale){
 			return new Rect(x*scale, y*scale, width*scale, height*scale);
 		}

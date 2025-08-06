@@ -11,10 +11,8 @@ import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
-import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
-import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
-import com.lapissea.dfs.tools.newlogger.display.renderers.Renderer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
@@ -24,8 +22,6 @@ import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
-import org.joml.Matrix3x2f;
-import org.joml.Matrix4f;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -35,41 +31,29 @@ import java.util.List;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
-	private final MsdfFontRender fontRender;
-	private final ByteGridRender byteGridRender;
-	private final LineRenderer   lineRenderer;
-	
-	private       ByteGridRender.RenderResource grid1Res;
-	private final Renderer.IndexedMeshBuffer    lineRes = new Renderer.IndexedMeshBuffer();
-	private final MsdfFontRender.RenderResource fontRes = new MsdfFontRender.RenderResource();
+	private final MultiRendererBuffer multiRenderer;
 	
 	private record DisplayData(IOInterface src, long size){ }
 	
 	private final List<String> messages;
 	
-	private DisplayData toDisplayData;
 	private DisplayData displayData;
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
-	public ByteGridComponent(
-		VulkanCore core, ImBoolean open, ImInt sampleEnumIndex,
-		List<String> messages, LineRenderer lineRenderer, MsdfFontRender fontRender
-	) throws VulkanCodeException{
+	public ByteGridComponent(VulkanCore core, ImBoolean open, ImInt sampleEnumIndex, List<String> messages) throws VulkanCodeException{
 		super(core, open, sampleEnumIndex);
 		
-		this.fontRender = fontRender;
-		this.lineRenderer = lineRenderer;
-		
-		byteGridRender = new ByteGridRender(core);
 		this.messages = messages;
 		
 		clearColor.set(0.4, 0.4, 0.4, 1);
+		
+		multiRenderer = new MultiRendererBuffer(core);
 	}
 	
 	public void setDisplayData(IOInterface src) throws IOException{
 		assert src.isReadOnly();
-		toDisplayData = new DisplayData(src, src.getIOSize());
+		displayData = new DisplayData(src, src.getIOSize());
 	}
 	
 	@Override
@@ -77,45 +61,22 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	@Override
 	protected void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException{
-		
-		fontRes.reset();
-		lineRes.reset();
+		multiRenderer.reset();
+		recordBackbuffer(deviceGC, viewSize);
+		multiRenderer.submit(viewSize, cmdBuffer);
+	}
+	protected void recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
 			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
 			
-			var token = lineRenderer.record(deviceGC, lineRes, GridUtils.backgroundDots(viewSize, color));
-			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), token);
+			multiRenderer.renderLines(deviceGC, GridUtils.backgroundDots(viewSize, color));
 		}
 		
-		if(toDisplayData == null || toDisplayData.size == 0){
-			if(grid1Res != null){
-				deviceGC.destroyLater(grid1Res);
-				grid1Res = null;
-			}
-			renderNoData(deviceGC, viewSize, cmdBuffer);
+		if(displayData == null || displayData.size == 0){
+			renderNoData(deviceGC, viewSize);
 			return;
-		}
-		
-		if(grid1Res == null){
-			grid1Res = new ByteGridRender.RenderResource();
-		}
-		
-		if(displayData != toDisplayData){
-			displayData = toDisplayData;
-			try{
-				byteGridRender.record(
-					deviceGC, grid1Res, displayData.src.readAll(),
-					List.of(
-						new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
-						new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
-					),
-					List.of()
-				);
-			}catch(IOException e){
-				throw new RuntimeException(e);
-			}
 		}
 		
 		long byteCount = displayData.size;
@@ -131,11 +92,20 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		var mousePos = GridUtils.calcByteIndex(viewSize, res, mouseX(), mouseY(), byteCount, 1);
 		
-		byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(byteSize), res.bytesPerRow(), grid1Res);
-		lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
-			deviceGC, lineRes,
-			GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3)
-		));
+		try{
+			multiRenderer.renderBytes(
+				deviceGC, displayData.src.readAll(),
+				List.of(
+					new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
+					new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
+				),
+				List.of()
+			);
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+		
+		multiRenderer.renderLines(deviceGC, GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3));
 		
 		List<StringDraw> sd = new ArrayList<>();
 		
@@ -164,20 +134,20 @@ public class ByteGridComponent extends BackbufferComponent{
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
 			if(findHoverChunk(displayData.src, p) instanceof Some(var chunk)){
-				lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
-					deviceGC, lineRes,
-					GridUtils.outlineByteRange(Color.CYAN.darker(), res, new Range(chunk.getPtr().getValue(), chunk.dataEnd()), 2)
-				));
+				var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
+				multiRenderer.renderLines(
+					deviceGC,
+					GridUtils.outlineByteRange(Color.CYAN.darker(), res, chRange, 2)
+				);
 				messages.add("Hovered chunk: " + chunk);
 			}
-			lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), lineRenderer.record(
-				deviceGC, lineRes,
+			multiRenderer.renderLines(
+				deviceGC,
 				GridUtils.outlineByteRange(Color.WHITE, res, new Range(p, p + 1), 1.5F)
-			));
+			);
 		}
 		
-		var fontDraws = fontRender.record(deviceGC, fontRes, sd);
-		fontRender.submit(viewSize, cmdBuffer, List.of(fontDraws));
+		multiRenderer.renderFont(deviceGC, sd);
 	}
 	
 	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){
@@ -192,41 +162,28 @@ public class ByteGridComponent extends BackbufferComponent{
 		return Match.empty();
 	}
 	
-	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+	private void renderNoData(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException{
 		var str = "No data!";
 		
 		int w         = viewSize.width, h = viewSize.height;
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
-		List<MsdfFontRender.RenderToken> tokens = new ArrayList<>();
-		
-		if(stringDrawIn(str, new GridUtils.Rect(0, 0, w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
-			tokens.add(fontRender.record(deviceGC, fontRes, List.of(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F))));
+		if(stringDrawIn(str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
+			multiRenderer.renderFont(deviceGC, draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
-		
-		fontRender.submit(viewSize, cmdBuffer, tokens);
 	}
 	
 	private Match<StringDraw> stringDrawIn(StringDraw draw, GridUtils.Rect area, boolean alignLeft){
 		return stringDrawIn(draw.string(), area, draw.color(), draw.pixelHeight(), alignLeft);
 	}
 	private Match<StringDraw> stringDrawIn(String s, GridUtils.Rect area, Color color, float fontScale, boolean alignLeft){
-		return GridUtils.stringDrawIn(fontRender, s, area, color, fontScale, alignLeft);
+		return GridUtils.stringDrawIn(multiRenderer.getFontRender(), s, area, color, fontScale, alignLeft);
 	}
 	
 	@Override
 	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
 		super.unload(tScope);
-		grid1Res.destroy();
-		lineRes.destroy();
-		fontRes.destroy();
-		byteGridRender.destroy();
-	}
-	
-	private static Matrix3x2f viewMatrix(Extent2D viewSize){
-		return new Matrix3x2f()
-			       .translate(-1, -1)
-			       .scale(2F/viewSize.width, 2F/viewSize.height);
+		multiRenderer.destroy();
 	}
 	
 }

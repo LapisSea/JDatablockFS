@@ -10,8 +10,6 @@ import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.MessagesComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.StatsComponent;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
-import com.lapissea.dfs.tools.newlogger.display.renderers.LineRenderer;
-import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
@@ -141,9 +139,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final VulkanCore core;
 	
-	public final MsdfFontRender fontRender;
-	public final LineRenderer   lineRenderer;
-	public final ImGUIRenderer  imGUIRenderer;
+	public final ImGUIRenderer imGUIRenderer;
 	
 	private final VulkanWindow window;
 	
@@ -164,8 +160,6 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			window = createMainWindow();
 			
-			fontRender = new MsdfFontRender(core);
-			lineRenderer = new LineRenderer(core);
 			imGUIRenderer = new ImGUIRenderer(core);
 			
 			imHandler = new ImHandler(core, window, imGUIRenderer);
@@ -177,8 +171,7 @@ public class VulkanDisplay implements AutoCloseable{
 			imHandler.addComponent(uiSettings);
 			imHandler.addComponent(new ImageViewerComp(uiSettings.imageViewerOpen));
 			imHandler.addComponent(
-				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex, uiMessages,
-				                                          lineRenderer, fontRender)
+				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex, uiMessages)
 			);
 			imHandler.addComponent(new MessagesComponent(uiMessages));
 		}catch(VulkanCodeException e){
@@ -311,8 +304,6 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		imHandler.close(window.frameGC);
 		
-		fontRender.destroy();
-		lineRenderer.destroy();
 		imGUIRenderer.destroy();
 		
 		window.close();
