@@ -138,9 +138,6 @@ public final class TextureRegistry{
 		var texture = core.uploadTexture(width, height, pixels, format, mipLevels);
 		return registerTexture(texture, true);
 	}
-	public long loadTextureAsID(int width, int height, ByteBuffer pixels, VkFormat format, int mipLevels) throws VulkanCodeException{
-		return loadTexture(width, height, pixels, format, mipLevels).id;
-	}
 	
 	private TexNode registerTexture(VulkanTexture texture, boolean owning){
 		TexNode node;

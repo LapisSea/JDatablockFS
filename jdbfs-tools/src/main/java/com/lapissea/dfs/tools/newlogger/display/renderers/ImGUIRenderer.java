@@ -211,7 +211,7 @@ public class ImGUIRenderer implements VulkanResource{
 		ImInt width  = new ImInt(), height = new ImInt();
 		var   pixels = fontAtlas.getTexDataAsAlpha8(width, height);
 		try{
-			var id = core.textureRegistry.loadTextureAsID(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
+			var id = textureScope.loadTextureAsID(width.get(), height.get(), pixels, VkFormat.R8_UNORM, 1);
 			fontAtlas.setTexID(id);
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to load font atlas texture", e);
