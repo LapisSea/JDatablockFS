@@ -1,10 +1,8 @@
 package com.lapissea.dfs.tools.newlogger;
 
-import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -53,14 +51,14 @@ public final class DBLogIngestServer{
 				}
 			}
 			@Override
-			public IOInterface getFrameData(int id){
+			public SessionSetView.FrameData getFrameData(int id){
 				try{
 					var frame = frameDB.resolve(name, id);
 					if(frame == null){
 						LogUtil.println("INVALID FRAME DATA:", name, id);
-						return MemoryData.empty();
+						return SessionSetView.FrameData.EMPTY;
 					}
-					return MemoryData.viewOf(frame.data());
+					return new SessionSetView.FrameData(MemoryData.viewOf(frame.data()), frame.writes());
 				}catch(IOException e){
 					throw new RuntimeException(e);//TODO
 				}
@@ -206,26 +204,11 @@ public final class DBLogIngestServer{
 		
 		private Thread processThread;
 		
-		private final SessionSetView.SessionView view;
-		
 		private Session(StoredSession storedSession, Socket socket) throws IOException{
 			this.storedSession = storedSession;
 			this.socket = socket;
 			in = new DataInputStream(socket.getInputStream());
 			out = new DataOutputStream(socket.getOutputStream());
-			
-			view = new SessionSetView.SessionView(){
-				@Override
-				public String name(){ return storedSession.name; }
-				@Override
-				public int frameCount(){
-					throw NotImplementedException.infer();//TODO: implement .frameCount()
-				}
-				@Override
-				public IOInterface getFrameData(int id){
-					throw NotImplementedException.infer();//TODO: implement .getFrameData()
-				}
-			};
 		}
 		
 		private boolean process() throws IOException{

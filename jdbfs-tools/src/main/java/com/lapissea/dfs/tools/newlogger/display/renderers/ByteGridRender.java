@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.IOFrame;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
@@ -357,6 +358,9 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	}
 	
 	public record IOEvent(char from, char to, Type type){
+		public IOEvent(IOFrame.Range range, Type type){
+			this(toCharExact((int)range.start, "from"), toCharExact((int)(range.start + range.size), "to"), type);
+		}
 		public IOEvent(int from, int to, Type type){
 			this(toCharExact(from, "from"), toCharExact(to, "to"), type);
 		}

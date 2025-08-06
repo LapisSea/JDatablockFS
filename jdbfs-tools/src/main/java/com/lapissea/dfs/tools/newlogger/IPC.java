@@ -6,6 +6,7 @@ import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.tools.frame.FrameUtils.DiffBlock;
+import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
 import java.io.DataInputStream;
@@ -17,6 +18,8 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.OptionalInt;
 import java.util.StringJoiner;
 import java.util.function.LongConsumer;
 import java.util.stream.LongStream;
@@ -163,7 +166,9 @@ public final class IPC{
 		return socket;
 	}
 	
-	public record RangeSet(long[] startsSizes){
+	public record RangeSet(long[] startsSizes) implements IterablePPSource<IOFrame.Range>{
+		
+		public static final RangeSet EMPTY = new RangeSet(new long[0]);
 		
 		public static RangeSet from(LongStream stream){
 			final class Range{
@@ -230,6 +235,18 @@ public final class IPC{
 				else joiner.add(start + "..." + (start + size));
 			}
 			return joiner.toString();
+		}
+		
+		@Override
+		public Iterator<IOFrame.Range> iterator(){
+			return Iters.rangeMap(
+				0, startsSizes.length/2,
+				i -> new IOFrame.Range(startsSizes[i*2], startsSizes[i*2 + 1])
+			).iterator();
+		}
+		@Override
+		public OptionalInt tryGetSize(){
+			return OptionalInt.of(startsSizes.length/2);
 		}
 	}
 	

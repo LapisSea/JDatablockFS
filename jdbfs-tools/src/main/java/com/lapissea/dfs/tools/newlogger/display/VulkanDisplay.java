@@ -1,7 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.io.IOInterface;
-import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
 import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
@@ -20,6 +18,7 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import imgui.ImGui;
+import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import imgui.type.ImString;
@@ -98,11 +97,25 @@ public class VulkanDisplay implements AutoCloseable{
 					var sesName = uiSettings.currentSessionName.get();
 					var sesV    = sessionSetView.getSession(sesName);
 					if(sesV.isPresent()){
-						var ses = sesV.get();
+						var ses     = sesV.get();
+						var updated = false;
 						if(ImGui.sliderScalar("##Session frame", currentSessionFrame, 1, ses.frameCount())){
+							updated = true;
+						}
+						if(ImGui.isItemFocused()){
+							if(ImGui.isKeyPressed(ImGuiKey.LeftArrow, true) && currentSessionFrame[0]>0){
+								currentSessionFrame[0]--;
+								updated = true;
+							}
+							if(ImGui.isKeyPressed(ImGuiKey.RightArrow, true) && currentSessionFrame[0]<ses.frameCount() - 1){
+								currentSessionFrame[0]++;
+								updated = true;
+							}
+						}
+						if(updated){
 							var data = ses.getFrameData(currentSessionFrame[0]);
 							try{
-								byteGridComponent.setDisplayData(data.asReadOnly());
+								byteGridComponent.setDisplayData(data);
 							}catch(IOException e){
 								new RuntimeException("Failed to update data", e).printStackTrace();
 							}
@@ -281,16 +294,16 @@ public class VulkanDisplay implements AutoCloseable{
 			}
 		}
 		
-		IOInterface data;
+		SessionSetView.FrameData data;
 		if(ses.isEmpty()){
-			data = MemoryData.empty();
+			data = SessionSetView.FrameData.EMPTY;
 		}else{
 			var session = ses.get();
 			data = session.getFrameData(session.frameCount() - 1);
 			uiSettings.currentSessionFrame[0] = session.frameCount() - 1;
 		}
 		try{
-			byteGridComponent.setDisplayData(data.asReadOnly());
+			byteGridComponent.setDisplayData(data);
 		}catch(IOException e){
 			new RuntimeException("Failed to update data", e).printStackTrace();
 		}

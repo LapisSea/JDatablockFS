@@ -7,6 +7,7 @@ import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.tools.DrawUtils.Range;
+import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
@@ -33,7 +34,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private final MultiRendererBuffer multiRenderer;
 	
-	private record DisplayData(IOInterface src, long size){ }
+	private record DisplayData(SessionSetView.FrameData frameData, long size){ }
 	
 	private final List<String> messages;
 	
@@ -51,9 +52,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer = new MultiRendererBuffer(core);
 	}
 	
-	public void setDisplayData(IOInterface src) throws IOException{
-		assert src.isReadOnly();
-		displayData = new DisplayData(src, src.getIOSize());
+	public void setDisplayData(SessionSetView.FrameData src) throws IOException{
+		displayData = new DisplayData(src, src.contents().getIOSize());
 	}
 	
 	@Override
@@ -79,6 +79,9 @@ public class ByteGridComponent extends BackbufferComponent{
 			return;
 		}
 		
+		
+		var frameData = displayData.frameData;
+		
 		long byteCount = displayData.size;
 		
 		if(ImGui.isKeyPressed(ImGuiKey.R)){
@@ -94,12 +97,12 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		try{
 			multiRenderer.renderBytes(
-				deviceGC, displayData.src.readAll(),
+				deviceGC, frameData.contents().readAll(),
 				List.of(
 					new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
 					new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
 				),
-				List.of()
+				frameData.writes().mapped(r -> new ByteGridRender.IOEvent(r, ByteGridRender.IOEvent.Type.WRITE))
 			);
 		}catch(IOException e){
 			throw new RuntimeException(e);
@@ -110,7 +113,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		List<StringDraw> sd = new ArrayList<>();
 		
 		try{
-			displayData.src.io(MagicID::read);
+			frameData.contents().io(MagicID::read);
 			
 			var byteBae = new StringDraw(
 				byteSize, new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
@@ -129,11 +132,11 @@ public class ByteGridComponent extends BackbufferComponent{
 		if(mousePos instanceof Some(var p)){
 			int b = -1;
 			try{
-				b = displayData.src.ioMapAt(p, ContentReader::readUnsignedInt1);
+				b = frameData.contents().ioMapAt(p, ContentReader::readUnsignedInt1);
 			}catch(IOException e){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
-			if(findHoverChunk(displayData.src, p) instanceof Some(var chunk)){
+			if(findHoverChunk(frameData.contents(), p) instanceof Some(var chunk)){
 				var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
 				multiRenderer.renderLines(
 					GridUtils.outlineByteRange(Color.CYAN.darker(), res, chRange, 2)
