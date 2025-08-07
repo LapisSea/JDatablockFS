@@ -2,26 +2,20 @@ package com.lapissea.dfs.tools.newlogger.display;
 
 import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.imgui.ImHandler;
-import com.lapissea.dfs.tools.newlogger.display.imgui.UIComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ByteGridComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.ImageViewerComp;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.MessagesComponent;
+import com.lapissea.dfs.tools.newlogger.display.imgui.components.SettingsUIComponent;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.StatsComponent;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ImGUIRenderer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.tools.utils.NanoClock;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwWindow;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import imgui.ImGui;
-import imgui.flag.ImGuiKey;
-import imgui.type.ImBoolean;
-import imgui.type.ImInt;
-import imgui.type.ImString;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 
@@ -40,116 +34,6 @@ public class VulkanDisplay implements AutoCloseable{
 		Thread.ofVirtual().start(GlfwWindow::initGLFW);
 	}
 	
-	private final class SettingsUI implements UIComponent{
-		
-		final ImInt     fpsLimit                = new ImInt(60);
-		final int[]     statsLevel              = {0};
-		final ImBoolean imageViewerOpen         = new ImBoolean();
-		final ImBoolean byteGridOpen            = new ImBoolean(true);
-		final ImInt     byteGridSampleEnumIndex = new ImInt(2);
-		final ImString  currentSessionName      = new ImString();
-		final int[]     currentSessionFrame     = new int[1];
-		
-		VkSampleCountFlag[] samplesSet;
-		
-		@Override
-		public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
-			if(ImGui.begin("Settings")){
-				
-				ImGui.inputInt("FPS Limit", fpsLimit);
-				if(fpsLimit.get()<0) fpsLimit.set(0);
-				ImGui.sliderScalar("##FPS Limit", fpsLimit.getData(), 0, 300);
-				ImGui.separator();
-				
-				ImGui.sliderScalar("View Stats", statsLevel, 0, 2);
-				ImGui.separator();
-				
-				enableButton("Image viewer", imageViewerOpen);
-				ImGui.sameLine();
-				enableButton("Byte grid viewer", byteGridOpen);
-				
-				ImGui.separator();
-				if(byteGridOpen.get()){
-					if(ImGui.beginCombo("Sample count", sampleName(byteGridSampleEnumIndex.get()))){
-						for(int i = 0; i<samplesSet.length; i++){
-							var selected = byteGridSampleEnumIndex.get() == i;
-							if(ImGui.selectable(sampleName(i), selected)){
-								byteGridSampleEnumIndex.set(i);
-							}
-							if(selected) ImGui.setItemDefaultFocus();
-						}
-						ImGui.endCombo();
-					}
-					
-					if(ImGui.beginCombo("Session", currentSessionName.get())){
-						for(String name : sessionSetView.getSessionNames()){
-							var selected = currentSessionName.get().equals(name);
-							if(ImGui.selectable(name, selected)){
-								currentSessionName.set(name);
-								forceSessionUpdate = true;
-							}
-							if(selected) ImGui.setItemDefaultFocus();
-						}
-						ImGui.endCombo();
-					}
-					ImGui.separator();
-					
-					var sesName = uiSettings.currentSessionName.get();
-					var sesV    = sessionSetView.getSession(sesName);
-					if(sesV.isPresent()){
-						var ses     = sesV.get();
-						var updated = false;
-						if(ImGui.sliderScalar("##Session frame", currentSessionFrame, 1, ses.frameCount())){
-							updated = true;
-						}
-						if(ImGui.isItemFocused()){
-							if(ImGui.isKeyPressed(ImGuiKey.LeftArrow, true) && currentSessionFrame[0]>0){
-								currentSessionFrame[0]--;
-								updated = true;
-							}
-							if(ImGui.isKeyPressed(ImGuiKey.RightArrow, true) && currentSessionFrame[0]<ses.frameCount() - 1){
-								currentSessionFrame[0]++;
-								updated = true;
-							}
-						}
-						if(updated){
-							var data = ses.getFrameData(currentSessionFrame[0]);
-							try{
-								byteGridComponent.setDisplayData(data);
-							}catch(IOException e){
-								new RuntimeException("Failed to update data", e).printStackTrace();
-							}
-						}
-					}
-				}
-				ImGui.separator();
-			}
-			ImGui.end();
-		}
-		private void enableButton(String label, ImBoolean value){
-			ImGui.beginDisabled(value.get());
-			if(ImGui.button(label)){
-				value.set(true);
-			}
-			ImGui.endDisabled();
-		}
-		
-		private void setMaxSample(VkSampleCountFlag max){
-			
-			samplesSet = Iters.from(VkSampleCountFlag.class)
-			                  .takeWhile(e -> e.ordinal()<=max.ordinal())
-			                  .toArray(VkSampleCountFlag[]::new);
-			
-			byteGridSampleEnumIndex.set(Math.min(byteGridSampleEnumIndex.get(), samplesSet.length - 1));
-		}
-		
-		private String sampleName(int cid){
-			return samplesSet[cid].name().substring(1) + " " + TextUtil.plural("sample", cid + 1);
-		}
-		@Override
-		public void unload(TextureRegistry.Scope tScope){ }
-	}
-	
 	private final VulkanCore core;
 	
 	public final ImGUIRenderer imGUIRenderer;
@@ -160,9 +44,10 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private final ByteGridComponent byteGridComponent;
 	
-	private       boolean        forceSessionUpdate;
-	private final SessionSetView sessionSetView;
-	private final SettingsUI     uiSettings;
+	public boolean forceSessionUpdate;
+	
+	public final  SessionSetView      sessionSetView;
+	private final SettingsUIComponent uiSettings;
 	
 	private final List<String> uiMessages = new ArrayList<>();
 	
@@ -177,7 +62,7 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			imHandler = new ImHandler(core, window, imGUIRenderer);
 			
-			uiSettings = new SettingsUI();
+			uiSettings = new SettingsUIComponent(this);
 			uiSettings.setMaxSample(core.physicalDevice.samples);
 			
 			imHandler.addComponent(new StatsComponent(uiSettings.statsLevel));
@@ -269,7 +154,9 @@ public class VulkanDisplay implements AutoCloseable{
 		if(forceSessionUpdate || sessionSetView.isDirty()){
 			forceSessionUpdate = false;
 			sessionSetView.clearDirty();
-			updateData();
+			if(forceSessionUpdate || uiSettings.lastFrame){
+				updateData();
+			}
 		}
 		uiMessages.clear();
 		try{
@@ -294,14 +181,17 @@ public class VulkanDisplay implements AutoCloseable{
 			}
 		}
 		
-		SessionSetView.FrameData data;
 		if(ses.isEmpty()){
-			data = SessionSetView.FrameData.EMPTY;
+			setFrameData(SessionSetView.FrameData.EMPTY);
 		}else{
 			var session = ses.get();
-			data = session.getFrameData(session.frameCount() - 1);
+			var data    = session.getFrameData(session.frameCount() - 1);
 			uiSettings.currentSessionFrame[0] = session.frameCount() - 1;
+			setFrameData(data);
 		}
+	}
+	
+	public void setFrameData(SessionSetView.FrameData data){
 		try{
 			byteGridComponent.setDisplayData(data);
 		}catch(IOException e){
