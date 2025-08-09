@@ -1,6 +1,8 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
 import com.lapissea.dfs.tools.DisplayManager;
+import com.lapissea.util.LogUtil;
+import imgui.ImFontConfig;
 import imgui.ImGuiIO;
 import imgui.ImGuiViewport;
 import imgui.ImVec2;
@@ -13,6 +15,7 @@ import imgui.callback.ImPlatformFuncViewportSuppFloat;
 import imgui.callback.ImPlatformFuncViewportSuppImVec2;
 import imgui.flag.ImGuiKey;
 
+import java.util.List;
 import java.util.Objects;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -201,7 +204,7 @@ public final class ImTools{
 		};
 	}
 	
-	public static void setupFont(ImGuiIO io, String resourcePath){
+	public static List<byte[]> setupFont(ImGuiIO io, String resourcePath){
 		try{
 			var    f = io.getFonts();
 			byte[] bb;
@@ -209,7 +212,12 @@ public final class ImTools{
 				bb = t.readAllBytes();
 			}
 			f.clearFonts();
-			f.addFontFromMemoryTTF(bb, 16);
+			var conf = new ImFontConfig();
+			conf.setOversampleH(2);
+			conf.setOversampleV(2);
+			var font = f.addFontFromMemoryTTF(bb, 16, conf);
+			LogUtil.println(font.getScale());
+			return List.of(bb);
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to load imgui font");
 		}

@@ -119,6 +119,7 @@ public class VulkanDisplay implements AutoCloseable{
 			}
 			renderAndSwap();
 		});
+		window.pos.register(this::renderAndSwap);
 		
 		var second   = Duration.ofSeconds(1);
 		var lastTime = NanoClock.now();

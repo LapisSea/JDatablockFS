@@ -19,21 +19,23 @@ public class ImHandler{
 	
 	private final List<UIComponent> components = new ArrayList<>();
 	
+	private final List<byte[]> rawFontResources = new ArrayList<>();
+	
 	public ImHandler(VulkanCore core, VulkanWindow window, ImGUIRenderer imGuiRenderer){
 		this.imGuiRenderer = imGuiRenderer;
 		
 		ImGui.setCurrentContext(ImGui.createContext());
 		
 		ImGuiIO io = ImGui.getIO();
-		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos);
+		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos|ImGuiConfigFlags.DpiEnableScaleFonts);
 		if(ImGuiImpl.supportsViewports()){
-			io.addConfigFlags(ImGuiConfigFlags.ViewportsEnable);
+			io.addConfigFlags(ImGuiConfigFlags.ViewportsEnable|ImGuiConfigFlags.DpiEnableScaleViewports);
 		}
 		io.setConfigDockingTransparentPayload(true);
 		io.setConfigWindowsResizeFromEdges(true);
 		
 		
-		ImTools.setupFont(io, "/CourierPrime/Regular/font.ttf");
+		rawFontResources.addAll(ImTools.setupFont(io, "/CourierPrime/Regular/font.ttf"));
 		
 		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
 		imGuiImpl.init(window, true);
@@ -47,6 +49,7 @@ public class ImHandler{
 	
 	public void newFrame(DeviceGC deviceGC){
 		imGuiRenderer.checkFonts();
+		rawFontResources.clear();
 		imGuiImpl.newFrame();
 		ImGui.newFrame();
 		renderImGUI(deviceGC);

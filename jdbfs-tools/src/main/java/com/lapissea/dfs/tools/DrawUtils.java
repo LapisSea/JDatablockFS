@@ -4,6 +4,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.render.RenderBackend;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
@@ -62,6 +63,32 @@ public final class DrawUtils{
 			});
 			
 			return rangesBuild.stream().map(r -> new Range(r.start, r.end)).collect(Collectors.toList());
+		}
+		public static List<Range> fromInts(IterableIntPP indexes){
+			List<Builder> rangesBuild = new ArrayList<>();
+			
+			var iter = indexes.iterator();
+			wh:
+			while(iter.hasNext()){
+				var i = iter.nextInt();
+				
+				for(var rowRange : rangesBuild){
+					if(rowRange.end == i){
+						rowRange.end++;
+						continue wh;
+					}
+					if(rowRange.start - 1 == i){
+						rowRange.start--;
+						continue wh;
+					}
+				}
+				var r = new Builder();
+				r.start = i;
+				r.end = i + 1;
+				rangesBuild.add(r);
+			}
+			
+			return Iters.from(rangesBuild).map(r -> new Range(r.start, r.end)).toModList();
 		}
 		public static List<Range> filterRanges(List<Range> ranges, LongPredicate filter){
 			List<Range> actualRanges = new ArrayList<>();

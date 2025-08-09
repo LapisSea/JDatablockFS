@@ -6,6 +6,8 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
+import com.lapissea.dfs.tools.ColorUtils;
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
@@ -17,30 +19,77 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
+import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.awt.Color;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.IntPredicate;
+import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
 	private final MultiRendererBuffer multiRenderer;
 	
-	private record DisplayData(SessionSetView.FrameData frameData, long size){ }
 	
 	private final List<String> messages;
 	
-	private DisplayData displayData;
+	private SessionSetView.FrameData frameData;
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
+	
+	private static final class RenderContext{
+		private final Roaring64Bitmap          filled    = new Roaring64Bitmap();
+		final         SessionSetView.FrameData frameData;
+		private       long                     sizeCache = -1;
+		
+		private RenderContext(SessionSetView.FrameData frameData){ this.frameData = frameData; }
+		
+		long getDataSize(){
+			if(sizeCache != -1) return sizeCache;
+			try{
+				return sizeCache = (frameData == null? 0 : frameData.contents().getIOSize());
+			}catch(IOException e){
+				throw new RuntimeException("Failed to get data size", e);
+			}
+		}
+		
+		boolean checkMagicID(){
+			try{
+				frameData.contents().io(MagicID::read);
+				return true;
+			}catch(IOException ignore){
+				return false;
+			}
+		}
+		
+		boolean isNotFilled(long idx){
+			return filled.contains(idx);
+		}
+		boolean isFilled(long idx){
+			return filled.contains(idx);
+		}
+		void fill(long idx){
+			filled.addLong(idx);
+		}
+		void fill(long start, long end){
+			filled.addRange(start, end);
+		}
+		
+	}
 	
 	public ByteGridComponent(VulkanCore core, ImBoolean open, ImInt sampleEnumIndex, List<String> messages) throws VulkanCodeException{
 		super(core, open, sampleEnumIndex);
@@ -53,7 +102,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	public void setDisplayData(SessionSetView.FrameData src) throws IOException{
-		displayData = new DisplayData(src, src.contents().getIOSize());
+		frameData = src;
 	}
 	
 	@Override
@@ -74,15 +123,14 @@ public class ByteGridComponent extends BackbufferComponent{
 			multiRenderer.renderLines(GridUtils.backgroundDots(viewSize, color));
 		}
 		
-		if(displayData == null || displayData.size == 0){
+		var ctx = new RenderContext(frameData);
+		
+		long byteCount = ctx.getDataSize();
+		
+		if(byteCount == 0){
 			renderNoData(viewSize);
 			return;
 		}
-		
-		
-		var frameData = displayData.frameData;
-		
-		long byteCount = displayData.size;
 		
 		if(ImGui.isKeyPressed(ImGuiKey.R)){
 			lastGridSize = Match.empty();
@@ -100,7 +148,7 @@ public class ByteGridComponent extends BackbufferComponent{
 				deviceGC, frameData.contents().readAll(),
 				List.of(
 					new ByteGridRender.DrawRange(0, MagicID.size(), Color.BLUE.darker()),
-					new ByteGridRender.DrawRange(MagicID.size(), (int)displayData.size, Color.GRAY.brighter())
+					new ByteGridRender.DrawRange(MagicID.size(), (int)byteCount, Color.GRAY.brighter())
 				),
 				frameData.writes().mapped(r -> new ByteGridRender.IOEvent(r, ByteGridRender.IOEvent.Type.WRITE))
 			);
@@ -111,6 +159,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.renderLines(GridUtils.outlineByteRange(Color.BLUE, res, new Range(0, MagicID.size()), 3));
 		
 		List<StringDraw> sd = new ArrayList<>();
+		
+		var hasMagic = ctx.checkMagicID();
+		
+		annotateMagicID(hasMagic, ctx);
 		
 		try{
 			frameData.contents().io(MagicID::read);
@@ -126,6 +178,11 @@ public class ByteGridComponent extends BackbufferComponent{
 			
 			if(GridUtils.isRangeHovered(mousePos, 0, MagicID.size())){
 				messages.add("The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()));
+			}
+			
+			var vsp = DataProvider.newVerySimpleProvider(frameData.contents());
+			for(Chunk chunk : vsp.getFirstChunk().chunksAhead()){
+				annotateChunk(chunk);
 			}
 		}catch(IOException ignore){ }
 		
@@ -149,6 +206,63 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 		
 		multiRenderer.renderFont(sd);
+	}
+	
+	private void annotateMagicID(boolean hasMagic, RenderContext ctx){
+		var byteSize = ctx.getDataSize();
+		if(hasMagic){
+			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
+			return;
+		}
+		
+		var bytes = new byte[(int)Math.min(byteSize, MagicID.size())];
+		try{
+			ctx.frameData.contents().read(0, bytes);
+			
+			IntPredicate isValidMagicByte = i -> byteSize>i && MagicID.get(i) == bytes[i];
+			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
+			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
+		}catch(IOException e){
+			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.RED, false, true);
+		}
+	}
+	
+	private void drawBytes(RenderContext ctx, IterableIntPP stream, Color color, boolean withChar, boolean force){
+		drawByteRanges(ctx, DrawUtils.Range.fromInts(stream), color, withChar, force);
+	}
+	
+	private void drawByteRanges(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar, boolean force){
+		List<DrawUtils.Range> actualRanges;
+		if(force) actualRanges = ranges;
+		else actualRanges = DrawUtils.Range.filterRanges(ranges, ctx::isNotFilled);
+		
+		drawByteRangesForced(ctx, actualRanges, color, withChar);
+	}
+	
+	private void drawByteRangesForced(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar){
+		var col        = ColorUtils.mul(color, 0.8F);
+		var bitColor   = col;
+		var background = ColorUtils.mul(col, 0.6F);
+		
+		Consumer<IterablePP<Range>> drawIndex = r -> {
+			for(Range range : r){
+//				DrawUtils.fillByteRange(ctx, range);
+			}
+		};
+		
+		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
+		
+		Supplier<IntStream> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
+		
+		
+	}
+	
+	private void annotateChunk(Chunk chunk){
+		annotateStruct(chunk);
+	}
+	
+	private void annotateStruct(Chunk chunk){
+	
 	}
 	
 	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){

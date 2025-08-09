@@ -386,43 +386,42 @@ public class VulkanCore implements AutoCloseable{
 	}
 	
 	private VkInstance createInstance() throws VulkanCodeException{
-		try(var stack = MemoryStack.stackPush()){
-			
-			List<String> layerNames          = new ArrayList<>();
-			List<String> extraExtensionNames = new ArrayList<>();
-			
-			if(VK_DEBUG){
-				if(getAvailableLayerNames().contains("VK_LAYER_KHRONOS_validation")){
-					layerNames.add("VK_LAYER_KHRONOS_validation");
-				}else{
-					Log.warn("Could not find VK_LAYER_KHRONOS_validation layer! Make sure SDK is installed");
-				}
-				extraExtensionNames.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		var stack = MemoryStack.create(128*1024);
+		
+		List<String> layerNames          = new ArrayList<>();
+		List<String> extraExtensionNames = new ArrayList<>();
+		
+		if(VK_DEBUG){
+			if(getAvailableLayerNames().contains("VK_LAYER_KHRONOS_validation")){
+				layerNames.add("VK_LAYER_KHRONOS_validation");
+			}else{
+				Log.warn("Could not find VK_LAYER_KHRONOS_validation layer! Make sure SDK is installed");
 			}
-			
-			GlfwWindow.initGLFW();
-			var requiredExtensions = VUtils.UTF8ArrayToJava(glfwGetRequiredInstanceExtensions());
-			if(requiredExtensions == null){
-				throw new IllegalStateException("glfwGetRequiredInstanceExtensions failed to find the platform surface extensions.");
-			}
-			
-			var extensionNames = Iters.concat(requiredExtensions, extraExtensionNames).distinct().toList();
-			
-			if(VK_DEBUG){
-				validateExtensionsLayers(extensionNames, layerNames);
-			}
-			
-			var appInfo = VkApplicationInfo.calloc(stack).sType$Default()
-			                               .apiVersion(VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0))
-			                               .pApplicationName(stack.UTF8(name));
-			
-			var info = VkInstanceCreateInfo.calloc(stack).sType$Default()
-			                               .pApplicationInfo(appInfo)
-			                               .ppEnabledLayerNames(VUtils.UTF8ArrayOnStack(stack, layerNames))
-			                               .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames));
-			
-			return VKCalls.vkCreateInstance(stack, info);
+			extraExtensionNames.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
+		
+		GlfwWindow.initGLFW();
+		var requiredExtensions = VUtils.UTF8ArrayToJava(glfwGetRequiredInstanceExtensions());
+		if(requiredExtensions == null){
+			throw new IllegalStateException("glfwGetRequiredInstanceExtensions failed to find the platform surface extensions.");
+		}
+		
+		var extensionNames = Iters.concat(requiredExtensions, extraExtensionNames).distinct().toList();
+		
+		if(VK_DEBUG){
+			validateExtensionsLayers(extensionNames, layerNames);
+		}
+		
+		var appInfo = VkApplicationInfo.calloc(stack).sType$Default()
+		                               .apiVersion(VK_MAKE_API_VERSION(0, API_VERSION_MAJOR, API_VERSION_MINOR, 0))
+		                               .pApplicationName(stack.UTF8(name));
+		
+		var info = VkInstanceCreateInfo.calloc(stack).sType$Default()
+		                               .pApplicationInfo(appInfo)
+		                               .ppEnabledLayerNames(VUtils.UTF8ArrayOnStack(stack, layerNames))
+		                               .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames));
+		
+		return VKCalls.vkCreateInstance(stack, info);
 	}
 	
 	private static void validateExtensionsLayers(List<String> extensions, List<String> layerNames) throws VulkanCodeException{

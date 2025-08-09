@@ -4,7 +4,6 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.VulkanDisplay;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.utils.RawRandom;
@@ -96,7 +95,7 @@ public final class LogServerStart{
 			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
 			sem.release();
 			display.run();
-		}catch(VulkanCodeException e){
+		}catch(Throwable e){
 			e.printStackTrace();
 		}finally{
 			do{

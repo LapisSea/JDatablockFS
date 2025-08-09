@@ -74,10 +74,11 @@ public class PhysicalDevice{
 		try(var stack = MemoryStack.stackPush()){
 			var count = stack.mallocInt(1);
 			VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, null);
-			var props = VkExtensionProperties.malloc(count.get(0), stack);
-			VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, props);
-			
-			names = Iters.from(props).map(VkExtensionProperties::extensionNameString).toSet();
+			try(var props = VkExtensionProperties.malloc(count.get(0))){
+				VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, props);
+				
+				names = Iters.from(props).map(VkExtensionProperties::extensionNameString).toSet();
+			}
 		}
 		return names;
 	}

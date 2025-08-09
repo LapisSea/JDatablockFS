@@ -96,9 +96,12 @@ public class Surface implements VulkanResource{
 			
 			var res = EnumSet.noneOf(VKPresentMode.class);
 			for(int i = 0; i<pPresentModes.capacity(); i++){
-				res.add(VKPresentMode.from(pPresentModes.get(i)));
+				try{
+					res.add(VKPresentMode.from(pPresentModes.get(i)));
+				}catch(IllegalArgumentException e){
+					Log.debug("Encountered unknown VKPresentMode of ID {}", pPresentModes.get(i));
+				}
 			}
-			if(res.size() != pPresentModes.capacity()) throw new AssertionError();
 			return res;
 		}
 	}
