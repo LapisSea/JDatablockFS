@@ -12,11 +12,14 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 public final class MagicID{
 	
-	private static final byte[]     BYTES    = "BYT-BAE".getBytes(US_ASCII);
-	private static final ByteBuffer MAGIC_ID = ByteBuffer.wrap(BYTES);
+	private static final byte[]     BYTES         = "BYT-BAE".getBytes(US_ASCII);
+	private static final ByteBuffer MAGIC_ID      = ByteBuffer.wrap(BYTES);
+	private static final int        MAGIC_ID_SIZE = BYTES.length;
 	
-	public static int size(){
-		return BYTES.length;
+	public static int size(){ return MAGIC_ID_SIZE; }
+	
+	public static byte get(int index){
+		return MAGIC_ID.get(index);
 	}
 	public static ByteBuffer get(){
 		return MAGIC_ID.asReadOnlyBuffer();

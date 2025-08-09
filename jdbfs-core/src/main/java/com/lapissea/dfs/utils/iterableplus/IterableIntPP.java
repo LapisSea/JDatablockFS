@@ -3,6 +3,7 @@ package com.lapissea.dfs.utils.iterableplus;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.utils.IntHashSet;
+import com.lapissea.util.IntHolder;
 import com.lapissea.util.ZeroArrays;
 
 import java.nio.IntBuffer;
@@ -232,6 +233,24 @@ public interface IterableIntPP{
 	}
 	
 	IntIterator iterator();
+	
+	default Iterable<IntHolder> holderIter(){
+		return () -> {
+			var data = IterableIntPP.this.iterator();
+			return new Iterator<>(){
+				private final IntHolder val = new IntHolder();
+				@Override
+				public boolean hasNext(){
+					return data.hasNext();
+				}
+				@Override
+				public IntHolder next(){
+					val.num = data.nextInt();
+					return val;
+				}
+			};
+		};
+	}
 	
 	default IterableLongPP addOverflowFiltered(long addend){
 		return mapToLong().addOverflowFiltered(addend);
