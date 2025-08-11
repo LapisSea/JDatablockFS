@@ -156,27 +156,54 @@ public final class GridUtils{
 		}).toList();
 	}
 	
-	static List<Geometry.PointsLine> backgroundDots(Extent2D viewSize, Color color){
-		float jitter     = 125;
-		int   step       = 25;
+	static Geometry.IndexedMesh backgroundDots(Extent2D viewSize, Color color, float contentScale){
+		float jitter     = 125*contentScale;
+		float step       = 25*contentScale;
 		float randX      = (float)ImGui.getTime()/10f;
 		float randY      = randX + 10000;
-		float noiseScale = 175;
+		float noiseScale = 175*contentScale;
+		float pointSize  = 2*contentScale;
 		
-		var res = new ArrayList<Geometry.PointsLine>();
+		int pointCount;
+		{
+			int numCols  = (int)Math.ceil(viewSize.width/step);
+			int rowsEven = (int)Math.ceil(viewSize.height/step);
+			int rowsOdd  = (int)Math.ceil((viewSize.height - step/2f)/step);
+			if(numCols%2 == 0){
+				pointCount = (numCols/2)*rowsEven + (numCols/2)*rowsOdd;
+			}else{
+				pointCount = ((numCols + 1)/2)*rowsEven + (numCols/2)*rowsOdd;
+			}
+		}
 		
-		for(int x = 0; x<viewSize.width + 2; x += step){
-			for(int y = (x/2)%step; y<viewSize.height + 2; y += step){
+		var res  = new Geometry.Vertex[pointCount*4];
+		var resI = 0;
+		
+		for(float x = 0; x<viewSize.width; x += step){
+			for(float y = (x/2)%step; y<viewSize.height; y += step){
 				float xf = x/noiseScale, yf = y/noiseScale;
 				
 				var nOff = new Vector2f(SimplexNoise.noise(xf, yf, randX), SimplexNoise.noise(xf, yf, randY));
 				var pos  = new Vector2f(x, y).add(nOff.mul(jitter));
-				res.add(new Geometry.PointsLine(List.of(
-					pos, pos.add(2, 0, new Vector2f())
-				), 2F, color, false));
+				
+				res[resI++] = new Geometry.Vertex(pos, color);
+				res[resI++] = new Geometry.Vertex(pos.add(pointSize, 0, new Vector2f()), color);
+				res[resI++] = new Geometry.Vertex(pos.add(pointSize, pointSize, new Vector2f()), color);
+				res[resI++] = new Geometry.Vertex(pos.add(0, pointSize, new Vector2f()), color);
 			}
 		}
-		return res;
+		
+		var indecies = new int[pointCount*6];
+		var quad     = new int[]{0, 2, 1, 0, 3, 2};
+		for(int i = 0; i<pointCount; i++){
+			var iPos = i*6;
+			var vOff = i*4;
+			for(int j = 0; j<quad.length; j++){
+				indecies[iPos + j] = quad[j] + vOff;
+			}
+		}
+		
+		return new Geometry.IndexedMesh(res, indecies);
 	}
 	
 	static Match<StringDraw> stringDrawIn(MsdfFontRender fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){

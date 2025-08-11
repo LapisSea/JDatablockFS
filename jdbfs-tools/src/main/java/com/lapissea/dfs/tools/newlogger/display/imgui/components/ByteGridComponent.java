@@ -120,7 +120,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
 			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
 			
-			multiRenderer.renderLines(GridUtils.backgroundDots(viewSize, color));
+			multiRenderer.renderMesh(GridUtils.backgroundDots(viewSize, color, ImGui.getWindowDpiScale()));
 		}
 		
 		var ctx = new RenderContext(frameData);

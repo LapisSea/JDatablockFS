@@ -20,26 +20,30 @@ public class MultiRendererBuffer implements VulkanResource{
 	private sealed interface TokenSet{
 		record Lines(List<Geometry.Path> paths) implements TokenSet{ }
 		
+		record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{ }
+		
 		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{ }
 		
 		record ByteEvents(List<ByteGridRender.RenderToken> tokens) implements TokenSet{ }
 	}
 	
 	
-	private final MsdfFontRender fontRender;
-	private final ByteGridRender byteGridRender;
-	private final LineRenderer   lineRenderer;
+	private final MsdfFontRender      fontRender;
+	private final ByteGridRender      byteGridRender;
+	private final IndexedMeshRenderer indexedRenderer;
+	private final LineRenderer        lineRenderer;
 	
-	private final ByteGridRender.RenderResource gridRes = new ByteGridRender.RenderResource();
-	private final Renderer.IndexedMeshBuffer    lineRes = new Renderer.IndexedMeshBuffer();
-	private final MsdfFontRender.RenderResource fontRes = new MsdfFontRender.RenderResource();
+	private final ByteGridRender.RenderResource gridRes    = new ByteGridRender.RenderResource();
+	private final Renderer.IndexedMeshBuffer    indexedRes = new Renderer.IndexedMeshBuffer();
+	private final MsdfFontRender.RenderResource fontRes    = new MsdfFontRender.RenderResource();
 	
 	private final List<TokenSet> sets = new ArrayList<>();
 	
 	public MultiRendererBuffer(VulkanCore core) throws VulkanCodeException{
-		this.fontRender = new MsdfFontRender(core);
-		this.byteGridRender = new ByteGridRender(core);
-		this.lineRenderer = new LineRenderer(core);
+		fontRender = new MsdfFontRender(core);
+		byteGridRender = new ByteGridRender(core);
+		indexedRenderer = new IndexedMeshRenderer(core);
+		lineRenderer = new LineRenderer(indexedRenderer, false);
 	}
 	
 	private <T extends TokenSet> T getTokenSet(Class<T> type){
@@ -66,6 +70,10 @@ public class MultiRendererBuffer implements VulkanResource{
 		}
 	}
 	
+	public void renderMesh(Geometry.IndexedMesh mesh){
+		getTokenSet(TokenSet.Meshes.class).meshes.add(mesh);
+	}
+	
 	public void renderLines(Iterable<? extends Geometry.Path> paths){
 		var p = getTokenSet(TokenSet.Lines.class).paths;
 		if(paths instanceof Collection<? extends Geometry.Path> collection){
@@ -90,7 +98,7 @@ public class MultiRendererBuffer implements VulkanResource{
 	public void reset(){
 		sets.clear();
 		gridRes.reset();
-		lineRes.reset();
+		indexedRes.reset();
 		fontRes.reset();
 	}
 	
@@ -99,7 +107,7 @@ public class MultiRendererBuffer implements VulkanResource{
 		for(TokenSet set : sets){
 			switch(set){
 				case TokenSet.Lines(var paths) -> {
-					var token = lineRenderer.record(deviceGC, lineRes, paths);
+					var token = lineRenderer.record(deviceGC, indexedRes, paths);
 					lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
 				}
 				case TokenSet.Strings(var strings) -> {
@@ -109,6 +117,12 @@ public class MultiRendererBuffer implements VulkanResource{
 				case TokenSet.ByteEvents(var tokens) -> {
 					byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), tokens);
 				}
+				case TokenSet.Meshes(var meshes) -> {
+					for(Geometry.IndexedMesh mesh : meshes){
+						var token = indexedRenderer.record(deviceGC, indexedRes, mesh);
+						indexedRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
+					}
+				}
 			}
 		}
 	}
@@ -116,10 +130,11 @@ public class MultiRendererBuffer implements VulkanResource{
 	@Override
 	public void destroy() throws VulkanCodeException{
 		gridRes.destroy();
-		lineRes.destroy();
+		indexedRes.destroy();
 		fontRes.destroy();
 		fontRender.destroy();
 		byteGridRender.destroy();
+		indexedRenderer.destroy();
 		lineRenderer.destroy();
 	}
 	

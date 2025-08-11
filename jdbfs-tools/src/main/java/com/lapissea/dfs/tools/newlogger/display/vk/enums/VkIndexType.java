@@ -2,6 +2,8 @@ package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
+import java.nio.ByteBuffer;
+
 import static org.lwjgl.vulkan.VK10.VK_INDEX_TYPE_UINT16;
 import static org.lwjgl.vulkan.VK10.VK_INDEX_TYPE_UINT32;
 import static org.lwjgl.vulkan.VK14.VK_INDEX_TYPE_UINT8;
@@ -23,5 +25,17 @@ public enum VkIndexType implements VUtils.IDValue{
 	@Override
 	public int id(){ return id; }
 	
+	public void write(ByteBuffer indecies, int index){
+		switch(this){
+			case UINT16 -> indecies.putChar((char)index);
+			case UINT32 -> indecies.putInt(index);
+			case UINT8 -> indecies.put((byte)index);
+		}
+	}
+	
 	public static VkIndexType from(int id){ return VUtils.fromID(VkIndexType.class, id); }
+	
+	public static VkIndexType max(VkIndexType a, VkIndexType b){
+		return a.byteSize>b.byteSize? a : b;
+	}
 }

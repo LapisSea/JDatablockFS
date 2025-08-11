@@ -29,7 +29,7 @@ public final class Geometry{
 		}
 	}
 	
-	record Vertex(Vector2f pos, Color color){ }
+	public record Vertex(Vector2f pos, Color color){ }
 	
 	public record IndexedMesh(Vertex[] verts, int[] indices){ }
 	
