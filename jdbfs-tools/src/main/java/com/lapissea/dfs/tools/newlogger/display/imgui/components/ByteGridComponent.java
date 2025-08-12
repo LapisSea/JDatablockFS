@@ -190,7 +190,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			int b = -1;
 			try{
 				b = frameData.contents().ioMapAt(p, ContentReader::readUnsignedInt1);
-			}catch(IOException e){ }
+			}catch(IOException ignored){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
 			if(findHoverChunk(frameData.contents(), p) instanceof Some(var chunk)){

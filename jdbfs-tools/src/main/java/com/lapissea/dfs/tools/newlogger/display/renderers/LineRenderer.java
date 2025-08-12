@@ -28,8 +28,8 @@ public class LineRenderer implements VulkanResource{
 		var vertices    = new Geometry.Vertex[size.vertCount()];
 		var verticesPos = 0;
 		
-		int[] indecies    = new int[size.indexCount()];
-		int   indeciesPos = 0;
+		int[] indices    = new int[size.indexCount()];
+		int   indicesPos = 0;
 		
 		for(var mesh : Iters.from(lines).map(Geometry::generateThickLineMesh)){
 			var off = verticesPos;
@@ -37,13 +37,13 @@ public class LineRenderer implements VulkanResource{
 				vertices[verticesPos++] = new Geometry.Vertex(vert.pos(), vert.color());
 			}
 			for(var i : mesh.indices()){
-				indecies[indeciesPos++] = off + i;
+				indices[indicesPos++] = off + i;
 			}
 		}
 		
-		assert indeciesPos == indecies.length;
+		assert indicesPos == indices.length;
 		
-		return meshRenderer.record(deviceGC, resource, new Geometry.IndexedMesh(vertices, indecies));
+		return meshRenderer.record(deviceGC, resource, new Geometry.IndexedMesh(vertices, indices));
 	}
 	
 	public void submit(Extent2D viewSize, CommandBuffer buf, Matrix3x2f pvm, Iterable<IndexedMeshRenderer.RToken> tokens) throws VulkanCodeException{
