@@ -19,6 +19,7 @@ public class ImHandler{
 	
 	private final List<UIComponent> components = new ArrayList<>();
 	
+	@SuppressWarnings("MismatchedQueryAndUpdateOfCollection") //Delay GC of buffer as ImGUI is using it
 	private final List<byte[]> rawFontResources = new ArrayList<>();
 	
 	public ImHandler(VulkanCore core, VulkanWindow window, ImGUIRenderer imGuiRenderer){
@@ -27,7 +28,7 @@ public class ImHandler{
 		ImGui.setCurrentContext(ImGui.createContext());
 		
 		ImGuiIO io = ImGui.getIO();
-		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.NavEnableSetMousePos|ImGuiConfigFlags.DpiEnableScaleFonts);
+		io.addConfigFlags(ImGuiConfigFlags.DockingEnable|ImGuiConfigFlags.NavEnableKeyboard|ImGuiConfigFlags.DpiEnableScaleFonts);
 		if(ImGuiImpl.supportsViewports()){
 			io.addConfigFlags(ImGuiConfigFlags.ViewportsEnable|ImGuiConfigFlags.DpiEnableScaleViewports);
 		}
