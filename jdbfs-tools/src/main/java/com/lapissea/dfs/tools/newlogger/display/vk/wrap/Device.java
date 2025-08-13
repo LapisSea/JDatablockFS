@@ -70,6 +70,7 @@ public class Device implements VulkanResource{
 	
 	public final Map<Long, Throwable> debugVkObjects = new ConcurrentHashMap<>();
 	public final boolean              hasArithmeticTypes;
+	public final boolean              hasIndexTypeUint8;
 	
 	public final VkPipelineCache pipelineCache;
 	
@@ -77,11 +78,15 @@ public class Device implements VulkanResource{
 	
 	public final VkFormat color8bitFormat;
 	
-	public Device(VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies, boolean hasArithmeticTypes, File pipelineCacheFile) throws VulkanCodeException{
+	public Device(
+		VkDevice value, PhysicalDevice physicalDevice, List<QueueFamilyProps> queueFamilies,
+		boolean hasArithmeticTypes, File pipelineCacheFile, boolean hasIndexTypeUint8
+	) throws VulkanCodeException{
 		this.value = value;
 		this.physicalDevice = physicalDevice;
 		this.familyAllocIndexes = Iters.from(queueFamilies).toModMap(e -> e, e -> -1);
 		this.hasArithmeticTypes = hasArithmeticTypes;
+		this.hasIndexTypeUint8 = hasIndexTypeUint8;
 		this.pipelineCacheFile = pipelineCacheFile;
 		if(!physicalDevice.pDevice.equals(value.getPhysicalDevice())){
 			throw new IllegalArgumentException("physical device is not the argument");

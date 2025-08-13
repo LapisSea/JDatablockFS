@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
 import com.lapissea.dfs.tools.DrawFont;
 import com.lapissea.dfs.tools.DrawUtils;
+import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
@@ -193,17 +194,14 @@ public final class GridUtils{
 			}
 		}
 		
-		var indecies = new int[pointCount*6];
-		var quad     = new int[]{0, 2, 1, 0, 3, 2};
+		var index = new IndexBuilder(pointCount*6, IndexBuilder.findType(pointCount*4)).noResize();
+		
+		var quad = new int[]{0, 2, 1, 0, 3, 2};
 		for(int i = 0; i<pointCount; i++){
-			var iPos = i*6;
-			var vOff = i*4;
-			for(int j = 0; j<quad.length; j++){
-				indecies[iPos + j] = quad[j] + vOff;
-			}
+			index.addOffset(quad, i*4);
 		}
 		
-		return new Geometry.IndexedMesh(res, indecies);
+		return new Geometry.IndexedMesh(res, index);
 	}
 	
 	static Match<StringDraw> stringDrawIn(MsdfFontRender fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){

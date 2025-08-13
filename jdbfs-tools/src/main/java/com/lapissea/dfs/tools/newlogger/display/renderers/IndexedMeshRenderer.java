@@ -19,7 +19,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Device;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.VkPipeline;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import org.joml.Matrix3x2f;
 import org.joml.Vector2f;
@@ -121,22 +120,24 @@ public class IndexedMeshRenderer implements VulkanResource{
 		var verts   = mesh.verts();
 		var indexes = mesh.indices();
 		
-		var size = new Geometry.MeshSize(verts.length, indexes.length);
+		var size = new Geometry.MeshSize(verts.length, indexes.elementSize());
 		if(size.vertCount() == 0) return null;
 		
-		var indexType = Iters.ofInts(indexes).max(0)<=Character.MAX_VALUE? VkIndexType.UINT16 : VkIndexType.UINT32;
+		var indexType = indexes.getType();
+		if(indexType == VkIndexType.UINT8 && !device.hasIndexTypeUint8){
+			indexType = VkIndexType.UINT16;
+		}
 		
-		try(var mem = resource.requestMemory(deviceGC, device, size.vertCount()*(long)GpuVert.SIZEOF, size.indexCount()*(long)indexType.byteSize)){
+		try(var mem = resource.requestMemory(deviceGC, device, size.vertCount()*(long)GpuVert.SIZEOF, indexes.byteSize())){
 			var vertsBuf = new GpuVert.Buf(mem.vboMem().getBuffer());
-			var indecies = mem.iboMem().getBuffer();
+			var iboBuff  = mem.iboMem().getBuffer();
 			
 			var off = vertsBuf.position();
 			for(Geometry.Vertex vert : verts){
 				vertsBuf.put(vert.pos(), vert.color());
 			}
-			for(int index : indexes){
-				indexType.write(indecies, off + index);
-			}
+			indexes.transferTo(iboBuff, indexType, off);
+			
 			return new RToken(resource, indexType, mem.vboMem().getMapOffset(), mem.iboMem().getMapOffset(), size.indexCount());
 		}
 	}

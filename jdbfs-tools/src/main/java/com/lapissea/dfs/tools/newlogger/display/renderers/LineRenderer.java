@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
+import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -28,20 +29,15 @@ public class LineRenderer implements VulkanResource{
 		var vertices    = new Geometry.Vertex[size.vertCount()];
 		var verticesPos = 0;
 		
-		int[] indices    = new int[size.indexCount()];
-		int   indicesPos = 0;
+		var indices = new IndexBuilder(size).noResize();
 		
 		for(var mesh : Iters.from(lines).map(Geometry::generateThickLineMesh)){
 			var off = verticesPos;
 			for(Geometry.Vertex vert : mesh.verts()){
 				vertices[verticesPos++] = new Geometry.Vertex(vert.pos(), vert.color());
 			}
-			for(var i : mesh.indices()){
-				indices[indicesPos++] = off + i;
-			}
+			indices.addOffset(mesh.indices(), off);
 		}
-		
-		assert indicesPos == indices.length;
 		
 		return meshRenderer.record(deviceGC, resource, new Geometry.IndexedMesh(vertices, indices));
 	}

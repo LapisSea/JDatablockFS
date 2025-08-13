@@ -32,6 +32,13 @@ public enum VkIndexType implements VUtils.IDValue{
 			case UINT8 -> indecies.put((byte)index);
 		}
 	}
+	public int read(ByteBuffer indecies, int offset){
+		return switch(this){
+			case UINT16 -> indecies.getChar((char)offset);
+			case UINT32 -> indecies.getInt(offset);
+			case UINT8 -> Byte.toUnsignedInt(indecies.get((byte)offset));
+		};
+	}
 	
 	public static VkIndexType from(int id){ return VUtils.fromID(VkIndexType.class, id); }
 	

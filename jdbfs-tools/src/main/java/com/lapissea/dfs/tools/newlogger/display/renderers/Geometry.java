@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import org.joml.Intersectionf;
 import org.joml.Matrix2f;
 import org.joml.Vector2f;
@@ -31,7 +32,7 @@ public final class Geometry{
 	
 	public record Vertex(Vector2f pos, Color color){ }
 	
-	public record IndexedMesh(Vertex[] verts, int[] indices){ }
+	public record IndexedMesh(Vertex[] verts, IndexBuilder indices){ }
 	
 	public record MeshSize(int vertCount, int indexCount){ }
 	static MeshSize calculateMeshSize(PointsLine line){
@@ -50,15 +51,13 @@ public final class Geometry{
 	}
 	static IndexedMesh generateThickLineMesh(PointsLine line){
 		
-		var      size    = calculateMeshSize(line);
-		Vertex[] verts   = new Vertex[size.vertCount];
-		int[]    indices = new int[size.indexCount];
+		var      size  = calculateMeshSize(line);
+		Vertex[] verts = new Vertex[size.vertCount];
 		
 		var pts = line.points();
-		if(pts.size()<2) return new IndexedMesh(verts, indices);
+		if(pts.size()<2) return new IndexedMesh(verts, new IndexBuilder());
 		
 		int vertPos = 0;
-		int idxPos  = 0;
 		
 		float halfWidth = line.width()*0.5f;
 		Color color     = line.color();
@@ -104,6 +103,7 @@ public final class Geometry{
 		int[] quad2 = {0, 1, 3,
 		               0, 3, 2};
 		
+		var indices = new IndexBuilder(size).noResize();
 		
 		for(int idx = 0; idx<size.vertCount - 2; idx += 2){
 			int i0 = idx, i1 = idx + 1, i2 = idx + 2, i3 = idx + 3;
@@ -112,12 +112,9 @@ public final class Geometry{
 			var len2 = verts[i1].pos.distance(verts[i2].pos);
 			
 			var quad = len1>len2? quad1 : quad2;
-			for(int i = 0; i<6; i++){
-				indices[idxPos++] = idx + quad[i];
-			}
+			indices.addOffset(quad, idx);
 		}
 		assert vertPos == verts.length;
-		assert idxPos == indices.length;
 		
 		return new IndexedMesh(verts, indices);
 	}

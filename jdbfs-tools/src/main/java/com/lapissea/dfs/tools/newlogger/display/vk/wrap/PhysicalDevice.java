@@ -14,7 +14,9 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.EXTIndexTypeUint8;
 import org.lwjgl.vulkan.KHR8bitStorage;
+import org.lwjgl.vulkan.KHRIndexTypeUint8;
 import org.lwjgl.vulkan.KHRShaderDrawParameters;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK10;
@@ -27,17 +29,22 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDevice16BitStorageFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
+import org.lwjgl.vulkan.VkPhysicalDeviceIndexTypeUint8Features;
+import org.lwjgl.vulkan.VkPhysicalDeviceIndexTypeUint8FeaturesEXT;
+import org.lwjgl.vulkan.VkPhysicalDeviceIndexTypeUint8FeaturesKHR;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceVulkan12Features;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 public class PhysicalDevice{
 	
@@ -69,7 +76,13 @@ public class PhysicalDevice{
 		memoryProperties = getMemoryProperties();
 		
 	}
+	
+	private WeakReference<Set<String>> nameCache = new WeakReference<>(null);
+	
 	public Set<String> getDeviceExtensionNames(){
+		if(nameCache.get() instanceof Set<String> cached){
+			return cached;
+		}
 		Set<String> names;
 		try(var stack = MemoryStack.stackPush()){
 			var count = stack.mallocInt(1);
@@ -78,6 +91,7 @@ public class PhysicalDevice{
 				VK10.vkEnumerateDeviceExtensionProperties(pDevice, (ByteBuffer)null, count, props);
 				
 				names = Iters.from(props).map(VkExtensionProperties::extensionNameString).toSet();
+				nameCache = new WeakReference<>(names);
 			}
 		}
 		return names;
@@ -142,6 +156,8 @@ public class PhysicalDevice{
 			var optionalFeatures = checkFeatures(Set.of());
 			optionalFeatures.arithmeticTypesError.ifPresent(e -> Log.warn("Using GPU without arithmetic types! Reason:\n  {}#red", e));
 			
+			if(optionalFeatures.indexTypeUint8().isEmpty()) Log.warn("Using GPU without 8 bit indices");
+			
 			boolean hasArithmeticTypes = optionalFeatures.arithmeticTypesError.isEmpty();
 			
 			var features16bit = VkPhysicalDevice16BitStorageFeatures.calloc(stack).sType$Default();
@@ -172,6 +188,8 @@ public class PhysicalDevice{
 				extensionNames.add(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
 			}
 			
+			optionalFeatures.indexTypeUint8.ifPresent(e -> extensionNames.add(e.extension));
+			
 			var info = VkDeviceCreateInfo.calloc(stack);
 			info.sType$Default()
 			    .pNext(features16bit)
@@ -180,14 +198,24 @@ public class PhysicalDevice{
 			    .ppEnabledExtensionNames(VUtils.UTF8ArrayOnStack(stack, extensionNames))
 			    .pEnabledFeatures(features);
 			
+			optionalFeatures.indexTypeUint8.ifPresent(e -> {
+				var feature = e.feature.apply(stack).sType$Default();
+				feature.indexTypeUint8(true);
+				info.pNext(feature);
+			});
 			
 			var vkd = VKCalls.vkCreateDevice(pDevice, info);
 			
-			return new Device(vkd, this, queueFamilies, hasArithmeticTypes, pipelineCacheFile);
+			return new Device(
+				vkd, this, queueFamilies, hasArithmeticTypes,
+				pipelineCacheFile, optionalFeatures.indexTypeUint8().isPresent()
+			);
 		}
 	}
 	
-	public record OptionalFeatures(Optional<String> arithmeticTypesError){ }
+	public record IndexTypeUInt8Support(String extension, Function<MemoryStack, VkPhysicalDeviceIndexTypeUint8Features> feature){ }
+	
+	public record OptionalFeatures(Optional<String> arithmeticTypesError, Optional<IndexTypeUInt8Support> indexTypeUint8){ }
 	
 	public OptionalFeatures checkFeatures(Set<VkQueueFlag> requiredCapabilities){
 		
@@ -256,7 +284,30 @@ public class PhysicalDevice{
 				arithmeticTypesError.add(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
 			}
 			
-			return new OptionalFeatures(toErr(arithmeticTypesError));
+			Optional<IndexTypeUInt8Support> indexTypeUInt8Support =
+				Iters.of(new IndexTypeUInt8Support(KHRIndexTypeUint8.VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME, VkPhysicalDeviceIndexTypeUint8FeaturesKHR::calloc),
+				         new IndexTypeUInt8Support(EXTIndexTypeUint8.VK_EXT_INDEX_TYPE_UINT8_EXTENSION_NAME, VkPhysicalDeviceIndexTypeUint8FeaturesEXT::calloc)
+				     ).filter(s -> extensions.contains(s.extension))
+				     .firstMatching(s -> {
+					     try(var stacc = MemoryStack.stackPush()){
+						     var feature = s.feature.apply(stacc).sType$Default();
+						     VK11.vkGetPhysicalDeviceFeatures2(
+							     pDevice,
+							     VkPhysicalDeviceFeatures2.calloc(stacc).sType$Default().pNext(feature)
+						     );
+						     return feature.indexTypeUint8();
+					     }
+				     });
+			
+			
+			if(!extensions.contains(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME)){
+				arithmeticTypesError.add(KHR8bitStorage.VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+			}
+			
+			return new OptionalFeatures(
+				toErr(arithmeticTypesError),
+				indexTypeUInt8Support
+			);
 		}
 	}
 	
