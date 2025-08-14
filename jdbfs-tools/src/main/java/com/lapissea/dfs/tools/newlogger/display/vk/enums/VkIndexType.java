@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 
+import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
 import java.nio.ByteBuffer;
@@ -38,6 +39,14 @@ public enum VkIndexType implements VUtils.IDValue{
 			case UINT32 -> indecies.getInt(offset);
 			case UINT8 -> Byte.toUnsignedInt(indecies.get((byte)offset));
 		};
+	}
+	
+	public int getMaxSize(){
+		return (switch(this){
+			case UINT8 -> NumberSize.BYTE;
+			case UINT16 -> NumberSize.SHORT;
+			case UINT32 -> NumberSize.INT;
+		}).maxSizeI;
 	}
 	
 	public static VkIndexType from(int id){ return VUtils.fromID(VkIndexType.class, id); }

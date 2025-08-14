@@ -1,6 +1,5 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
-import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.utils.iterableplus.IntIterator;
@@ -212,7 +211,7 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		return findNewType(index, VkIndexType.UINT8);
 	}
 	private static VkIndexType findNewType(int index, VkIndexType newType){
-		while(index>getMaxSize(newType)){
+		while(index>newType.getMaxSize()){
 			newType = switch(newType){
 				case UINT8 -> VkIndexType.UINT16;
 				case UINT16 -> VkIndexType.UINT32;
@@ -224,14 +223,7 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 	
 	private void setType(VkIndexType type){
 		this.type = type;
-		maxTypeValue = getMaxSize(type);
-	}
-	private static int getMaxSize(VkIndexType type){
-		return (switch(type){
-			case UINT8 -> NumberSize.BYTE;
-			case UINT16 -> NumberSize.SHORT;
-			case UINT32 -> NumberSize.INT;
-		}).maxSizeI;
+		maxTypeValue = type.getMaxSize();
 	}
 	public VkIndexType getType(){
 		return type;
@@ -273,7 +265,7 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 	public void transferTo(ByteBuffer iboBuff, VkIndexType destType, int off){
 		assert iboBuff.order() == ByteOrder.nativeOrder();
 		
-		var size = getMaxSize(destType);
+		var size = destType.getMaxSize();
 		if(maxValue + off>size){
 			throw new IllegalStateException("Can't fit " + size + " in to " + (off + maxValue));
 		}
