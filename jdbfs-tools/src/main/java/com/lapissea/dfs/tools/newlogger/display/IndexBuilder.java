@@ -10,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.OptionalInt;
 
 public class IndexBuilder implements IterableIntPP.SizedPP{
@@ -21,11 +20,13 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		void add(IterableIntPP indices);
 	}
 	
-	private final List<ByteBuffer> buffers = new ArrayList<>();
+	private final List<byte[]> buffers = new ArrayList<>();
 	
-	private       ByteBuffer buffer;
-	private final int        initialCapacity;
-	private       int        elementSize;
+	private byte[] buffer;
+	private int    bufferPos;
+	
+	private final int initialCapacity;
+	private       int elementSize;
 	
 	private VkIndexType type;
 	private int         maxTypeValue;
@@ -45,18 +46,11 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		if(initialCapacity<2) throw new IllegalArgumentException("initial capacity should be greater than 1");
 		setType(type);
 	}
-	public IndexBuilder(ByteBuffer data, VkIndexType type){
-		assert data.order() == ByteOrder.nativeOrder();
-		this.initialCapacity = -1;
-		setType(type);
-		buffer = Objects.requireNonNull(data);
-		elementSize = data.limit()/type.byteSize;
-	}
 	
 	public IndexBuilder noResize(){
 		noResize = true;
 		if(buffer == null){
-			buffer = allocate(initialCapacity*type.byteSize);
+			buffer = new byte[initialCapacity*type.byteSize];
 		}
 		return this;
 	}
@@ -76,10 +70,11 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		var actualIndex = indexOffset + index;
 		ensureTypeFits(actualIndex);
 		
-		if(buffer == null || !buffer.hasRemaining()){
-			grow(1);
+		if(buffer == null || bufferPos == buffer.length){
+			grow(type.byteSize);
 		}
-		type.write(buffer, actualIndex);
+		type.write(buffer, bufferPos, actualIndex);
+		bufferPos += type.byteSize;
 		elementSize++;
 	}
 	
@@ -88,26 +83,37 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		for(int index : indices) max = Math.max(max, index);
 		ensureTypeFits(max + indexOffset);
 		
-		var neededMem   = indices.length*type.byteSize;
+		var siz         = type.byteSize;
+		var neededMem   = indices.length*siz;
 		int transferred = noResize? 0 : growCheckPartialTransfer(indices, indexOffset, neededMem);
 		
 		for(int i = transferred; i<indices.length; i++){
-			type.write(buffer, indices[i] + indexOffset);
+			type.write(buffer, bufferPos + i*siz, indices[i] + indexOffset);
 		}
+		bufferPos += indices.length*siz;
 		elementSize += indices.length;
 	}
 	private int growCheckPartialTransfer(int[] indices, int indexOffset, int neededMem){
+		if(buffer == null){
+			grow(neededMem);
+			return 0;
+		}
+		
 		int transferred = 0;
-		if(buffer == null || buffer.remaining()<neededMem){
-			if(buffer != null){
-				transferred = buffer.remaining()/type.byteSize;
-				for(int i = 0; i<transferred; i++){
-					type.write(buffer, indices[i] + indexOffset);
-				}
+		var remaining   = bufferRemaining();
+		if(remaining<neededMem){
+			var siz = type.byteSize;
+			transferred = remaining/siz;
+			for(int i = 0; i<transferred; i++){
+				type.write(buffer, bufferPos + i*siz, indices[i] + indexOffset);
 			}
+			bufferPos += transferred*siz;
 			grow(neededMem - transferred*type.byteSize);
 		}
 		return transferred;
+	}
+	private int bufferRemaining(){
+		return buffer.length - bufferPos;
 	}
 	
 	public void addOffset(IterableIntPP indices, int indexOffset){
@@ -128,12 +134,13 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		var iter = indices.iterator();
 		
 		var neededMem = count*type.byteSize;
-		if(buffer == null || buffer.remaining()<neededMem){
+		if(buffer == null || bufferRemaining()<neededMem){
 			if(buffer != null){
-				neededMem -= buffer.remaining();
-				while(buffer.hasRemaining()){
+				neededMem -= bufferRemaining();
+				while(bufferRemaining() != 0){
 					var index = iter.nextInt();
-					type.write(buffer, index + indexOffset);
+					type.write(buffer, bufferPos, index + indexOffset);
+					bufferPos += type.byteSize;
 				}
 			}
 			grow(neededMem);
@@ -141,7 +148,8 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		
 		while(iter.hasNext()){
 			var index = iter.nextInt();
-			type.write(buffer, index + indexOffset);
+			type.write(buffer, bufferPos, index + indexOffset);
+			bufferPos += type.byteSize;
 		}
 		elementSize += count;
 	}
@@ -162,18 +170,21 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		if(buffer == null){
 			growCapacity = initialCapacity*type.byteSize;
 		}else{
-			var cap = buffer.capacity();
+			var cap = buffer.length;
 			growCapacity = Math.toIntExact(Math.ceilDiv(cap + cap/2L, type.byteSize)*type.byteSize);
-			buffers.add(buffer.flip());
+			buffers.add(buffer);
 		}
-		buffer = allocate(Math.max(growCapacity, bytesToAdd));
+		setBuffer(new byte[Math.max(growCapacity, bytesToAdd)]);
 	}
 	
 	private void ensureTypeFits(int maxIndex){
+		if(maxIndex<=maxValue){
+			return;
+		}
+		maxValue = maxIndex;
 		if(maxIndex>maxTypeValue){
 			growType(maxIndex);
 		}
-		maxValue = Math.max(maxValue, maxIndex);
 	}
 	
 	private void growType(int index){
@@ -189,22 +200,25 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 			throw new UnsupportedOperationException("Should not resize, initial type was insufficient");
 		}
 		
-		
-		buffer.flip();
-		
 		var oldByteSize = oldType.byteSize;
+		var newByteSize = newType.byteSize;
 		
-		var totalElementCapacity = Iters.concatN1(buffers, buffer).mapToInt(ByteBuffer::capacity).sum()/oldByteSize;
+		var totalElementCapacity = Iters.concatN1(buffers, buffer).mapToInt(e -> e.length).sum()/oldByteSize;
 		
-		var newBuffer = allocate(totalElementCapacity*newType.byteSize);
+		var newBuffer = new byte[totalElementCapacity*newByteSize];
 		for(var bb : Iters.concatN1(buffers, buffer)){
-			for(int i = 0, lim = bb.limit(); i<lim; i += oldByteSize){
-				newType.write(newBuffer, oldType.read(bb, i));
+			for(int i = 0, lim = bb.length; i<lim; i += oldByteSize){
+				newType.write(newBuffer, i*newByteSize, oldType.read(bb, i*oldByteSize));
 			}
 		}
 		buffers.clear();
-		buffer = newBuffer;
+		setBuffer(newBuffer);
 		setType(newType);
+	}
+	
+	private void setBuffer(byte[] newBuffer){
+		buffer = newBuffer;
+		bufferPos = 0;
 	}
 	
 	public static VkIndexType findType(int index){
@@ -235,8 +249,8 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 			return Iters.ofInts().iterator();
 		}
 		
-		return Iters.concatN1(buffers, flipNewCursor(buffer))
-		            .flatMapToInt(b -> Iters.range(0, b.limit(), type.byteSize).map(off -> {
+		return Iters.concatN1(buffers, buffer)
+		            .flatMapToInt(b -> Iters.range(0, b == buffer? bufferPos : b.length, type.byteSize).map(off -> {
 			            return type.read(b, off);
 		            }))
 		            .iterator();
@@ -277,26 +291,19 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		if(destType == type && off == 0){
 			for(var bb : buffers){
 				iboBuff.put(bb);
-				bb.position(0);
 			}
-			iboBuff.put(flipNewCursor(buffer));
+			iboBuff.put(buffer, 0, bufferPos);
 		}else{
 			var byteSize = type.byteSize;
 			for(var bb : buffers){
-				for(int i = 0; i<bb.limit(); i += byteSize){
-					destType.write(iboBuff, off + type.read(bb, i));
+				for(int i = 0; i<bb.length; i += byteSize){
+					destType.write(iboBuff, off + type.read(bb, i*byteSize));
 				}
 			}
-			for(int i = 0; i<buffer.position(); i += byteSize){
-				destType.write(iboBuff, off + type.read(buffer, i));
+			for(int i = 0; i<bufferPos; i += byteSize){
+				destType.write(iboBuff, off + type.read(buffer, i*byteSize));
 			}
 		}
 	}
 	
-	private static ByteBuffer flipNewCursor(ByteBuffer buffer){
-		return buffer.asReadOnlyBuffer().order(ByteOrder.nativeOrder()).flip();
-	}
-	private static ByteBuffer allocate(int siz){
-		return ByteBuffer.allocate(siz).order(ByteOrder.nativeOrder());
-	}
 }

@@ -3,8 +3,11 @@ package com.lapissea.dfs.tools.newlogger.display.vk.enums;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
+import static java.lang.invoke.MethodHandles.byteArrayViewVarHandle;
 import static org.lwjgl.vulkan.VK10.VK_INDEX_TYPE_UINT16;
 import static org.lwjgl.vulkan.VK10.VK_INDEX_TYPE_UINT32;
 import static org.lwjgl.vulkan.VK14.VK_INDEX_TYPE_UINT8;
@@ -26,6 +29,11 @@ public enum VkIndexType implements VUtils.IDValue{
 	@Override
 	public int id(){ return id; }
 	
+	private static final VarHandle CHAR_VIEW = var(char.class);
+	private static final VarHandle INT_VIEW  = var(int.class);
+	
+	private static VarHandle var(Class<?> c){ return byteArrayViewVarHandle(c.arrayType(), ByteOrder.nativeOrder()).withInvokeExactBehavior(); }
+	
 	public void write(ByteBuffer indecies, int index){
 		switch(this){
 			case UINT16 -> indecies.putChar((char)index);
@@ -33,11 +41,18 @@ public enum VkIndexType implements VUtils.IDValue{
 			case UINT8 -> indecies.put((byte)index);
 		}
 	}
-	public int read(ByteBuffer indecies, int offset){
+	public void write(byte[] indecies, int offset, int index){
+		switch(this){
+			case UINT16 -> CHAR_VIEW.set(indecies, offset, (char)index);
+			case UINT32 -> INT_VIEW.set(indecies, offset, index);
+			case UINT8 -> indecies[offset] = (byte)index;
+		}
+	}
+	public int read(byte[] indecies, int offset){
 		return switch(this){
-			case UINT16 -> indecies.getChar((char)offset);
-			case UINT32 -> indecies.getInt(offset);
-			case UINT8 -> Byte.toUnsignedInt(indecies.get((byte)offset));
+			case UINT16 -> (char)CHAR_VIEW.get(indecies, offset);
+			case UINT32 -> (int)INT_VIEW.get(indecies, offset);
+			case UINT8 -> indecies[offset];
 		};
 	}
 	

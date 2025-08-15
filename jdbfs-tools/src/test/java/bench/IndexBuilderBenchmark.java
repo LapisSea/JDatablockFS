@@ -29,13 +29,18 @@ public class IndexBuilderBenchmark{
 	
 	public static void main(String[] args) throws RunnerException{
 		var options = new OptionsBuilder().include(IndexBuilderBenchmark.class.getSimpleName());
+//		options.forks(0);
 		new Runner(options.build()).run();
 	}
 	
 	@State(Scope.Thread)
 	public static class BenchmarkParams{
 		
-		@Param({"UINT8", "UINT16", "UINT32"})
+		@Param({
+			"UINT8",
+			"UINT16",
+			"UINT32"
+		})
 		public VkIndexType indexType;
 		
 		@Param({"true", "false"})
