@@ -155,6 +155,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				destSet.deltaCount(inc);
 				deltaCount(-inc);
 			}
+			
+			if(data.size()>8 && data.getCapacity()>data.size()*2){
+				data.releaseFreeCapacity();
+			}
+			
 			return moveNodes.size();
 		}
 		private boolean replace(int keyHash, BucketEntry<K, V> entry) throws IOException{
