@@ -15,6 +15,7 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
 import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
@@ -63,6 +64,7 @@ import java.util.RandomAccess;
 import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
@@ -770,6 +772,44 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	private void notifySingleFree(RandomIO io, boolean dereferenceWrite) throws IOException{
 		getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval(io, dereferenceWrite));
+	}
+	
+	/**
+	 * This force releases the free capacity. This is useful when it is known that data is being released without adding any new data and the list is
+	 * stored in one big contiguous chunk that can not be automatically released.
+	 */
+	public void releaseFreeCapacity() throws IOException{
+		var siz = size();
+		var cap = calcElementOffset(siz);
+		try(var ignore = getDataProvider().getSource().openIOTransaction(); var io = selfIO()){
+			io.setCapacity(cap);
+			io.setPos(cap);
+			var last            = io.getCursor();
+			var freeSpace       = last.getCapacity() - last.getSize();
+			var newLastCapacity = last.getCapacity() - freeSpace;
+			if(freeSpace>=Chunk.minSafeSize() && newLastCapacity>=Chunk.minSafeSize()){
+				var ptr      = ChunkPointer.of(last.dataEnd() - freeSpace);
+				var builder  = new ChunkBuilder(getDataProvider(), ptr).withCapacity(freeSpace);
+				var tmpSplit = builder.create();
+				var splitOne = builder.withExplicitBodyNumSize(tmpSplit.getBodyNumSize()).withCapacity(freeSpace - tmpSplit.getHeaderSize()).create();
+				if(splitOne.dataEnd() != last.dataEnd()){
+					if(DEBUG_VALIDATION){
+						throw new IllegalStateException("Illegal list capacity free split");
+					}
+					Log.debug("Illegal list capacity free split");
+					return;
+				}
+				splitOne.writeHeader();
+				try{
+					last.setCapacity(last.getCapacity() - freeSpace);
+					last.syncStruct();
+				}catch(OutOfBitDepth e){
+					throw new ShouldNeverHappenError("Free space negative??", e);
+				}
+				getDataProvider().getMemoryManager().free(splitOne);
+			}
+		}
+		
 	}
 	
 	@Override
