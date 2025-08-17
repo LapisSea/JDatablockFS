@@ -274,6 +274,11 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		return width*table.fsScale;
 	}
 	
+	public boolean canDisplay(char c){
+		var i = table.index.getOrDefault(c, -1);
+		return i != -1 && !table.empty.get(i);
+	}
+	
 	private static final int outlineCutoff = 5;
 	
 	private static float mapToRange(float actual, float start, float end){

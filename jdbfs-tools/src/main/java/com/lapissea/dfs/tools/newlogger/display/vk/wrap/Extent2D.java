@@ -4,7 +4,7 @@ import com.lapissea.vec.interf.IVec2iR;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkExtent2D;
 
-public class Extent2D{
+public final class Extent2D{
 	
 	public final int width, height;
 	

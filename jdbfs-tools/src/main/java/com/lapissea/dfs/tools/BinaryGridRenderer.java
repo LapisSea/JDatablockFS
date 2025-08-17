@@ -48,6 +48,7 @@ import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ArrayViewList;
@@ -978,7 +979,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.bytes.length);
 		
-		Supplier<IntStream> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
+		Supplier<IterableIntPP> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow).mapToIntExact();
 		
 		
 		ctx.renderer.setColor(background);

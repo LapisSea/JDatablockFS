@@ -9,17 +9,22 @@ import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
+import com.lapissea.dfs.tools.DrawUtilsVK;
 import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
+import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
+import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
+import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
@@ -32,13 +37,13 @@ import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
@@ -51,12 +56,19 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
-	private static final class RenderContext{
-		private final Roaring64Bitmap          filled    = new Roaring64Bitmap();
+	public static final class RenderContext{
+		private final Roaring64Bitmap          filled = new Roaring64Bitmap();
 		final         SessionSetView.FrameData frameData;
-		private       long                     sizeCache = -1;
+		public        GridUtils.ByteGridSize   gridSize;
+		public final  DeviceGC                 deviceGC;
 		
-		private RenderContext(SessionSetView.FrameData frameData){ this.frameData = frameData; }
+		private long sizeCache = -1;
+		
+		
+		private RenderContext(SessionSetView.FrameData frameData, DeviceGC deviceGC){
+			this.frameData = frameData;
+			this.deviceGC = deviceGC;
+		}
 		
 		long getDataSize(){
 			if(sizeCache != -1) return sizeCache;
@@ -85,6 +97,9 @@ public class ByteGridComponent extends BackbufferComponent{
 		void fill(long idx){
 			filled.addLong(idx);
 		}
+		void fill(DrawUtils.Range range){
+			fill(range.from(), range.to());
+		}
 		void fill(long start, long end){
 			filled.addRange(start, end);
 		}
@@ -111,10 +126,14 @@ public class ByteGridComponent extends BackbufferComponent{
 	@Override
 	protected void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException{
 		multiRenderer.reset();
-		recordBackbuffer(deviceGC, viewSize);
+		try{
+			recordBackbuffer(deviceGC, viewSize);
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
 		multiRenderer.submit(deviceGC, lastGridSize.orElse(new GridUtils.ByteGridSize(1, 1, viewSize)), cmdBuffer);
 	}
-	protected void recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException{
+	protected void recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
@@ -123,7 +142,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			multiRenderer.renderMesh(GridUtils.backgroundDots(viewSize, color, ImGui.getWindowDpiScale()));
 		}
 		
-		var ctx = new RenderContext(frameData);
+		var ctx = new RenderContext(frameData, deviceGC);
 		
 		long byteCount = ctx.getDataSize();
 		
@@ -139,9 +158,11 @@ public class ByteGridComponent extends BackbufferComponent{
 		var res = GridUtils.ByteGridSize.compute(viewSize, byteCount, lastGridSize);
 		lastGridSize = Match.of(res);
 		
+		ctx.gridSize = res;
+		
 		var byteSize = res.byteSize();
 		
-		var mousePos = GridUtils.calcByteIndex(viewSize, res, mouseX(), mouseY(), byteCount, 1);
+		var mousePos = GridUtils.calcByteIndex(res, mouseX(), mouseY(), byteCount, 1);
 		
 		try{
 			multiRenderer.renderBytes(
@@ -162,7 +183,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		var hasMagic = ctx.checkMagicID();
 		
-		annotateMagicID(hasMagic, ctx);
+		annotateMagicID(hasMagic, ctx, res);
 		
 		try{
 			frameData.contents().io(MagicID::read);
@@ -208,10 +229,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.renderFont(sd);
 	}
 	
-	private void annotateMagicID(boolean hasMagic, RenderContext ctx){
+	private void annotateMagicID(boolean hasMagic, RenderContext ctx, GridUtils.ByteGridSize gridSize) throws IOException, VulkanCodeException{
 		var byteSize = ctx.getDataSize();
 		if(hasMagic){
-			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
+			drawByteRanges(ctx, gridSize, List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
 			return;
 		}
 		
@@ -220,41 +241,96 @@ public class ByteGridComponent extends BackbufferComponent{
 			ctx.frameData.contents().read(0, bytes);
 			
 			IntPredicate isValidMagicByte = i -> byteSize>i && MagicID.get(i) == bytes[i];
-			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
-			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
+			drawBytes(ctx, gridSize, Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
+			drawBytes(ctx, gridSize, Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
 		}catch(IOException e){
-			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.RED, false, true);
+			drawByteRanges(ctx, gridSize, List.of(new Range(0, MagicID.size())), Color.RED, false, true);
 		}
 	}
 	
-	private void drawBytes(RenderContext ctx, IterableIntPP stream, Color color, boolean withChar, boolean force){
-		drawByteRanges(ctx, DrawUtils.Range.fromInts(stream), color, withChar, force);
+	private void drawBytes(RenderContext ctx, GridUtils.ByteGridSize gridSize, IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException, VulkanCodeException{
+		drawByteRanges(ctx, gridSize, DrawUtils.Range.fromInts(stream), color, withChar, force);
 	}
 	
-	private void drawByteRanges(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar, boolean force){
+	private void drawByteRanges(RenderContext ctx, GridUtils.ByteGridSize gridSize, List<Range> ranges, Color color, boolean withChar, boolean force) throws IOException, VulkanCodeException{
 		List<DrawUtils.Range> actualRanges;
 		if(force) actualRanges = ranges;
 		else actualRanges = DrawUtils.Range.filterRanges(ranges, ctx::isNotFilled);
 		
-		drawByteRangesForced(ctx, actualRanges, color, withChar);
+		drawByteRangesForced(ctx, gridSize, actualRanges, color, withChar);
 	}
 	
-	private void drawByteRangesForced(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar){
+	private void drawByteRangesForced(RenderContext ctx, GridUtils.ByteGridSize gridSize, List<DrawUtils.Range> ranges, Color color, boolean withChar) throws IOException, VulkanCodeException{
 		var col        = ColorUtils.mul(color, 0.8F);
 		var bitColor   = col;
 		var background = ColorUtils.mul(col, 0.6F);
 		
-		Consumer<IterablePP<Range>> drawIndex = r -> {
-			for(Range range : r){
-//				DrawUtils.fillByteRange(ctx, range);
-			}
+		BiConsumer<IterablePP<Range>, Color> drawIndex = (r, cl) -> {
+			fillByteRange(gridSize, r, cl);
 		};
 		
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
 		
-		Supplier<IntStream> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
+		Supplier<IterableLongPP> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
 		
+		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
 		
+		fillByteRange(
+			gridSize,
+			Iters.from(ranges).map(r -> {
+				if(r.to()<ctx.getDataSize()) return null;
+				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
+				return r;
+			}).nonNulls(),
+			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
+		);
+		
+		for(var range : clampedOverflow){
+			var sizeI = Math.toIntExact(range.size());
+			var bytes = ctx.frameData.contents().read(range.from(), sizeI);
+			
+			multiRenderer.renderBytes(ctx.deviceGC, bytes, List.of(new ByteGridRender.DrawRange(0, sizeI, bitColor)), List.of());
+		}
+		
+		if(withChar){
+			var c = new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F);
+			
+			var fr       = multiRenderer.getFontRender();
+			var width    = gridSize.windowSize().width;
+			var byteSize = gridSize.byteSize();
+			List<StringDraw> chars =
+				clampedInts.get().filter(i -> {
+					int ub = getUint8(ctx, i);
+					return fr.canDisplay((char)ub);
+				}).box().flatOptionalsM(i -> {
+					int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
+					float xF = byteSize*xi, yF = byteSize*yi;
+					
+					return stringDrawIn(Character.toString((char)getUint8(ctx, i)), new GridUtils.Rect(xF, yF, byteSize, byteSize), c, byteSize, false);
+				}).toList();
+			multiRenderer.renderFont(chars);
+		}
+		for(var range : clampedOverflow){
+			ctx.fill(range);
+		}
+	}
+	
+	private void fillByteRange(GridUtils.ByteGridSize gridSize, IterablePP<Range> ranges, Color color){
+		var count = IterablePP.SizedPP.tryGet(ranges).orElse(4);
+		var mesh  = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
+		for(var range : ranges){
+			DrawUtilsVK.fillByteRange(gridSize, mesh, color, range);
+		}
+		multiRenderer.renderMesh(mesh);
+	}
+	private static int getUint8(RenderContext ctx, long i){
+		int ub;
+		try{
+			ub = ctx.frameData.contents().ioMapAt(i, ContentReader::readUnsignedInt1);
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
+		return ub;
 	}
 	
 	private void annotateChunk(Chunk chunk){

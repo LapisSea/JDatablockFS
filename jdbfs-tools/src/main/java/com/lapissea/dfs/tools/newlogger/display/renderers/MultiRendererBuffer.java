@@ -87,6 +87,7 @@ public class MultiRendererBuffer implements VulkanResource{
 	
 	public void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }
 	public void renderFont(List<MsdfFontRender.StringDraw> strings){
+		if(strings.isEmpty()) return;
 		getTokenSet(TokenSet.Strings.class).strings.addAll(strings);
 	}
 	
@@ -120,6 +121,7 @@ public class MultiRendererBuffer implements VulkanResource{
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
 						var token = indexedRenderer.record(deviceGC, indexedRes, mesh);
+						if(token == null) continue;
 						indexedRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
 					}
 				}

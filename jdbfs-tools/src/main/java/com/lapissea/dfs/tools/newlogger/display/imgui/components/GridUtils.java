@@ -3,6 +3,8 @@ package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 import com.lapissea.dfs.tools.DrawFont;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
+import com.lapissea.dfs.tools.newlogger.display.VUtils;
+import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
@@ -177,8 +179,8 @@ public final class GridUtils{
 			}
 		}
 		
-		var res  = new Geometry.Vertex[pointCount*4];
-		var resI = 0;
+		var colorI = VUtils.toRGBAi4(color);
+		var res    = new VertexBuilder(pointCount*4);
 		
 		for(float x = 0; x<viewSize.width; x += step){
 			for(float y = (x/2)%step; y<viewSize.height; y += step){
@@ -187,10 +189,10 @@ public final class GridUtils{
 				var nOff = new Vector2f(SimplexNoise.noise(xf, yf, randX), SimplexNoise.noise(xf, yf, randY));
 				var pos  = new Vector2f(x, y).add(nOff.mul(jitter));
 				
-				res[resI++] = new Geometry.Vertex(pos, color);
-				res[resI++] = new Geometry.Vertex(pos.add(pointSize, 0, new Vector2f()), color);
-				res[resI++] = new Geometry.Vertex(pos.add(pointSize, pointSize, new Vector2f()), color);
-				res[resI++] = new Geometry.Vertex(pos.add(0, pointSize, new Vector2f()), color);
+				res.add(pos, colorI);
+				res.add(pos.x + pointSize, pos.y, colorI);
+				res.add(pos.x + pointSize, pos.y + pointSize, colorI);
+				res.add(pos.x, pos.y + pointSize, colorI);
 			}
 		}
 		
@@ -261,10 +263,10 @@ public final class GridUtils{
 	}
 	
 	
-	static Match<Long> calcByteIndex(Extent2D viewSize, ByteGridSize gridSize, int mouseX, int mouseY, long byteCount, float zoom){
+	static Match<Long> calcByteIndex(ByteGridSize gridSize, int mouseX, int mouseY, long byteCount, float zoom){
 		if(mouseX<0 || mouseY<0) return Match.empty();
-		int xByte = calcX(viewSize, mouseX, gridSize.byteSize, zoom);
-		int yByte = calcY(viewSize, mouseY, gridSize.byteSize, zoom);
+		int xByte = calcX(gridSize.windowSize, mouseX, gridSize.byteSize, zoom);
+		int yByte = calcY(gridSize.windowSize, mouseY, gridSize.byteSize, zoom);
 		
 		int  width     = gridSize.bytesPerRow;
 		long byteIndex = yByte*(long)width + xByte;

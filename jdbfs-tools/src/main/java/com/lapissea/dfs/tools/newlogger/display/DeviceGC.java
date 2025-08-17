@@ -54,11 +54,9 @@ public sealed interface DeviceGC{
 		}
 		
 		public void destroyAllNow() throws VulkanCodeException{
-			for(Set<VulkanResource> queuedSet : queuedSets){
-				for(VulkanResource res : queuedSet){
-//					LogUtil.println("yeeting immediately", res, "at frame", currentFrame);
-					res.destroy();
-				}
+			for(var res : Iters.from(queuedSets).flatMap(e -> e).toSet()){
+//				LogUtil.println("yeeting immediately", res, "at frame", currentFrame);
+				res.destroy();
 			}
 			for(int i = 0; i<queuedSets.length; i++){
 				queuedSets[i] = new LinkedHashSet<>();

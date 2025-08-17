@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
+import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import org.joml.Intersectionf;
 import org.joml.Matrix2f;
 import org.joml.Vector2f;
@@ -32,7 +33,7 @@ public final class Geometry{
 	
 	public record Vertex(Vector2f pos, Color color){ }
 	
-	public record IndexedMesh(Vertex[] verts, IndexBuilder indices){ }
+	public record IndexedMesh(VertexBuilder verts, IndexBuilder indices){ }
 	
 	public record MeshSize(int vertCount, int indexCount){ }
 	static MeshSize calculateMeshSize(PointsLine line){
@@ -51,13 +52,11 @@ public final class Geometry{
 	}
 	static IndexedMesh generateThickLineMesh(PointsLine line){
 		
-		var      size  = calculateMeshSize(line);
-		Vertex[] verts = new Vertex[size.vertCount];
+		var size  = calculateMeshSize(line);
+		var verts = new VertexBuilder(size.vertCount);
 		
 		var pts = line.points();
 		if(pts.size()<2) return new IndexedMesh(verts, new IndexBuilder());
-		
-		int vertPos = 0;
 		
 		float halfWidth = line.width()*0.5f;
 		Color color     = line.color();
@@ -66,8 +65,8 @@ public final class Geometry{
 			Vector2f p1    = pts.get(0), p2 = pts.get(1);
 			double   angle = -Math.atan2(p1.y - p2.y, p1.x - p2.x);
 			Vector2f mx    = new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
-			verts[vertPos++] = new Vertex(p1.add(mx, new Vector2f()), color);
-			verts[vertPos++] = new Vertex(p1.sub(mx, new Vector2f()), color);
+			verts.add(p1.add(mx, new Vector2f()), color);
+			verts.add(p1.sub(mx, new Vector2f()), color);
 		}
 		
 		var intersect = new Vector2f();
@@ -80,12 +79,12 @@ public final class Geometry{
 				var intersect1 = new Vector2f(intersect);
 				var intersect2 = new Vector2f(intersect).add(current.sub(intersect, new Vector2f()).mul(2));
 				
-				verts[vertPos++] = new Vertex(intersect1, color);
-				verts[vertPos++] = new Vertex(intersect2, color);
+				verts.add(intersect1, color);
+				verts.add(intersect2, color);
 			}else{
 				var mx = computeAvgAngleOff(prev, current, next, halfWidth);
-				verts[vertPos++] = new Vertex(current.add(mx, new Vector2f()), color);
-				verts[vertPos++] = new Vertex(current.sub(mx, new Vector2f()), color);
+				verts.add(current.add(mx, new Vector2f()), color);
+				verts.add(current.sub(mx, new Vector2f()), color);
 			}
 		}
 		
@@ -94,8 +93,8 @@ public final class Geometry{
 			Vector2f p1    = pts.get(i), p2 = pts.get(i - 1);
 			double   angle = -Math.atan2(p2.y - p1.y, p2.x - p1.x);
 			Vector2f mx    = new Vector2f((float)Math.sin(angle), (float)Math.cos(angle)).mul(halfWidth);
-			verts[vertPos++] = new Vertex(p1.add(mx, new Vector2f()), color);
-			verts[vertPos++] = new Vertex(p1.sub(mx, new Vector2f()), color);
+			verts.add(p1.add(mx, new Vector2f()), color);
+			verts.add(p1.sub(mx, new Vector2f()), color);
 		}
 		
 		int[] quad1 = {0, 1, 2,
@@ -108,13 +107,13 @@ public final class Geometry{
 		for(int idx = 0; idx<size.vertCount - 2; idx += 2){
 			int i0 = idx, i1 = idx + 1, i2 = idx + 2, i3 = idx + 3;
 			
-			var len1 = verts[i0].pos.distance(verts[i3].pos);
-			var len2 = verts[i1].pos.distance(verts[i2].pos);
+			var len1 = verts.getPos(i0).distance(verts.getPos(i3));
+			var len2 = verts.getPos(i1).distance(verts.getPos(i2));
 			
 			var quad = len1>len2? quad1 : quad2;
 			indices.addOffset(quad, idx);
 		}
-		assert vertPos == verts.length;
+		assert verts.size() == size.vertCount : verts.size() + " != " + size.vertCount;
 		
 		return new IndexedMesh(verts, indices);
 	}

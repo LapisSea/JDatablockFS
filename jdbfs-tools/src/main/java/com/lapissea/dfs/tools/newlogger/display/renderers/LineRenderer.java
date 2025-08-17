@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
+import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -26,16 +27,21 @@ public class LineRenderer implements VulkanResource{
 		var size = Geometry.calculateMeshSize(lines);
 		if(size.vertCount() == 0) return null;
 		
-		var vertices    = new Geometry.Vertex[size.vertCount()];
+		var vertices    = new VertexBuilder(size.vertCount());
 		var verticesPos = 0;
 		
 		var indices = new IndexBuilder(size).noResize();
 		
 		for(var mesh : Iters.from(lines).map(Geometry::generateThickLineMesh)){
 			var off = verticesPos;
-			for(Geometry.Vertex vert : mesh.verts()){
-				vertices[verticesPos++] = new Geometry.Vertex(vert.pos(), vert.color());
+			
+			var siz   = mesh.verts().size();
+			var xy    = mesh.verts().getXy();
+			var color = mesh.verts().getColor();
+			for(int i = 0; i<siz; i++){
+				vertices.add(xy[i*2], xy[i*2 + 1], color[i]);
 			}
+			verticesPos += siz;
 			indices.addOffset(mesh.indices(), off);
 		}
 		

@@ -437,10 +437,10 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		var neededCommandCapacity = resource.instanceCount + nonNullBuffers.count();
 		if(resource.indirectDrawBuff.instanceCapacity()<neededCommandCapacity){
-			var newBuff = device.allocateIndirectBuffer(256);
+			var newBuff = device.allocateIndirectBuffer(neededCommandCapacity);
 			resource.indirectDrawBuff.buffer.transferTo(newBuff.buffer);
-			resource.indirectDrawBuff = newBuff;
 			deviceGC.destroyLater(resource.indirectDrawBuff);
+			resource.indirectDrawBuff = newBuff;
 		}
 		
 		var cap    = nonNullBuffers.map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();

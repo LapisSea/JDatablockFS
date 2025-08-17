@@ -54,11 +54,11 @@ public class IndexedMeshRenderer implements VulkanResource{
 			COLOR = layout.offsetof(1);
 		}
 		
-		void set(float x, float y, Color color){
+		void set(float x, float y, int color){
 			var address = this.address;
 			MemoryUtil.memPutFloat(address + XY, x);
 			MemoryUtil.memPutFloat(address + XY + Float.BYTES, y);
-			MemoryUtil.memPutInt(address + COLOR, VUtils.toRGBAi4(color));
+			MemoryUtil.memPutInt(address + COLOR, color);
 		}
 		
 		protected GpuVert(ByteBuffer buff){ super(MemoryUtil.memAddress(buff), buff); }
@@ -81,7 +81,10 @@ public class IndexedMeshRenderer implements VulkanResource{
 				throw NotImplementedException.infer();//TODO: implement Buf.create()
 			}
 			void put(Vector2f pos, Color color){
-				get().set(pos.x, pos.y, color);
+				get().set(pos.x, pos.y, VUtils.toRGBAi4(color));
+			}
+			void put(float x, float y, int color){
+				get().set(x, y, color);
 			}
 		}
 	}
@@ -120,7 +123,7 @@ public class IndexedMeshRenderer implements VulkanResource{
 		var verts   = mesh.verts();
 		var indexes = mesh.indices();
 		
-		var size = new Geometry.MeshSize(verts.length, indexes.elementSize());
+		var size = new Geometry.MeshSize(verts.size(), indexes.elementSize());
 		if(size.vertCount() == 0) return null;
 		
 		var indexType = indexes.getType();
@@ -133,9 +136,14 @@ public class IndexedMeshRenderer implements VulkanResource{
 			var iboBuff  = mem.iboMem().getBuffer();
 			
 			var off = vertsBuf.position();
-			for(Geometry.Vertex vert : verts){
-				vertsBuf.put(vert.pos(), vert.color());
+			
+			var siz   = verts.size();
+			var xy    = verts.getXy();
+			var color = verts.getColor();
+			for(int i = 0; i<siz; i++){
+				vertsBuf.put(xy[i*2], xy[i*2 + 1], color[i]);
 			}
+			
 			indexes.transferTo(iboBuff, indexType, off);
 			
 			return new RToken(resource, indexType, mem.vboMem().getMapOffset(), mem.iboMem().getMapOffset(), size.indexCount());

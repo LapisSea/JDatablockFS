@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.render.RenderBackend;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
@@ -146,8 +147,8 @@ public final class DrawUtils{
 			}
 			return build;
 		}
-		public static IntStream toInts(List<Range> ranges){
-			return ranges.stream().flatMapToInt(Range::ints);
+		public static IterableLongPP toInts(List<Range> ranges){
+			return Iters.from(ranges).flatMapToLong(Range::longsI);
 		}
 		
 		public long size(){
@@ -169,6 +170,9 @@ public final class DrawUtils{
 		}
 		public LongStream longs(){
 			return LongStream.range(from, to);
+		}
+		public IterableLongPP longsI(){
+			return Iters.range(from, to);
 		}
 	}
 	
