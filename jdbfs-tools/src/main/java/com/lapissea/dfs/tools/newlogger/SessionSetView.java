@@ -8,8 +8,8 @@ import java.util.Set;
 
 public abstract class SessionSetView{
 	
-	public record FrameData(IOInterface contents, IPC.RangeSet writes){
-		public static final FrameData EMPTY = new SessionSetView.FrameData(MemoryData.viewOf(new byte[0]), IPC.RangeSet.EMPTY);
+	public record FrameData(IOInterface contents, IPC.RangeSet writes, String stacktrace){
+		public static final FrameData EMPTY = new SessionSetView.FrameData(MemoryData.viewOf(new byte[0]), IPC.RangeSet.EMPTY, "");
 	}
 	
 	public interface SessionView{

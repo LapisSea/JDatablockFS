@@ -252,9 +252,10 @@ public final class IPC{
 	
 	public sealed interface SendFrame{
 		long uid();
+		String stacktrace();
 	}
 	
-	public record FullFrame(long uid, byte[] data, RangeSet writes) implements SendFrame{
+	public record FullFrame(long uid, byte[] data, RangeSet writes, String stacktrace) implements SendFrame{
 		@Override
 		public String toString(){
 			return "FullFrame{" +
@@ -265,7 +266,7 @@ public final class IPC{
 		}
 	}
 	
-	public record DiffFrame(long uid, long prevUid, int newSize, DiffBlock[] parts, RangeSet writes) implements SendFrame{
+	public record DiffFrame(long uid, long prevUid, int newSize, DiffBlock[] parts, RangeSet writes, String stacktrace) implements SendFrame{
 		@Override
 		public String toString(){
 			return "DiffFrame{" +
@@ -288,6 +289,7 @@ public final class IPC{
 			writeBytes(dest, part.data(), false);
 		}
 		writeLongs(dest, frame.writes.startsSizes);
+		dest.writeUTF(frame.stacktrace());
 	}
 	
 	public static DiffFrame readDiffFrame(DataInputStream src) throws IOException{
@@ -301,8 +303,9 @@ public final class IPC{
 			var bytes  = readBytes(src);
 			parts[i] = new DiffBlock(offset, bytes);
 		}
-		long[] ids = readLongs(src);
-		return new DiffFrame(uid, prevUid, newSize, parts, new RangeSet(ids));
+		long[] ids        = readLongs(src);
+		var    stacktrace = src.readUTF();
+		return new DiffFrame(uid, prevUid, newSize, parts, new RangeSet(ids), stacktrace);
 	}
 	
 	public static void writeStats(DataOutputStream dest, DBLogConnection.Session.SessionStats stats) throws IOException{
@@ -320,13 +323,15 @@ public final class IPC{
 		dest.writeLong(frame.uid);
 		writeBytes(dest, frame.data, false);
 		writeLongs(dest, frame.writes.startsSizes);
+		dest.writeUTF(frame.stacktrace());
 	}
 	
 	public static FullFrame readFullFrame(DataInputStream src) throws IOException{
-		var uid    = src.readLong();
-		var data   = readBytes(src);
-		var writes = readLongs(src);
-		return new FullFrame(uid, data, new RangeSet(writes));
+		var uid        = src.readLong();
+		var data       = readBytes(src);
+		var writes     = readLongs(src);
+		var stacktrace = src.readUTF();
+		return new FullFrame(uid, data, new RangeSet(writes), stacktrace);
 	}
 	
 	private static void writeLongs(DataOutputStream dest, long[] ids) throws IOException{

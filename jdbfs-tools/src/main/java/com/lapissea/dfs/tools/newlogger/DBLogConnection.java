@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.logging.Log;
@@ -183,8 +184,9 @@ public interface DBLogConnection extends Closeable{
 					return;
 				}
 				
-				var bytes    = data.readAll();
-				var writeSet = IPC.RangeSet.from(writeIds);
+				var stacktrace = Utils.errToStackTrace(new Throwable("writeEvent"));
+				var bytes      = data.readAll();
+				var writeSet   = IPC.RangeSet.from(writeIds);
 				
 				ioLock.lock();
 				try{
@@ -194,13 +196,13 @@ public interface DBLogConnection extends Closeable{
 					
 					var uid = ++this.uid;
 					
-					var full = new IPC.FullFrame(uid, bytes, writeSet);
+					var full = new IPC.FullFrame(uid, bytes, writeSet, stacktrace);
 					if(last != null){
 						var diff = FrameUtils.computeDiff(last.data(), bytes);
 						
 						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_DIFF, false);
 						IPC.writeDiffFrame(socketOut, new IPC.DiffFrame(
-							uid, last.uid(), diff.newSize().orElse(-1), diff.blocks(), writeSet
+							uid, last.uid(), diff.newSize().orElse(-1), diff.blocks(), writeSet, stacktrace
 						));
 					}else{
 						IPC.writeEnum(socketOut, IPC.MSGSession.FRAME_FULL, false);

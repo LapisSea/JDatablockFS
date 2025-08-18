@@ -58,7 +58,7 @@ public final class DBLogIngestServer{
 						LogUtil.println("INVALID FRAME DATA:", name, id);
 						return SessionSetView.FrameData.EMPTY;
 					}
-					return new SessionSetView.FrameData(MemoryData.viewOf(frame.data()), frame.writes());
+					return new SessionSetView.FrameData(MemoryData.viewOf(frame.data()), frame.writes(), frame.stacktrace());
 				}catch(IOException e){
 					throw new RuntimeException(e);//TODO
 				}

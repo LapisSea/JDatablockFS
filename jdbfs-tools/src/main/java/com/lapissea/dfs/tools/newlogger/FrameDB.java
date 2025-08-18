@@ -27,8 +27,8 @@ public final class FrameDB{
 		Thread.ofVirtual().start(() -> {
 			try{
 				var db = new FrameDB(MemoryData.empty());
-				db.store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0])));
-				db.store("\0", new IPC.DiffFrame(1, 0, -1, new FrameUtils.DiffBlock[0], new IPC.RangeSet(new long[0])));
+				db.store("\0", new IPC.FullFrame(0, new byte[0], new IPC.RangeSet(new long[0]), "foo.bar(String):123"));
+				db.store("\0", new IPC.DiffFrame(1, 0, -1, new FrameUtils.DiffBlock[0], new IPC.RangeSet(new long[0]), ""));
 				db.clear("\0");
 			}catch(IOException e){
 				e.printStackTrace();
@@ -65,7 +65,7 @@ public final class FrameDB{
 						var partsBlob = storeParts(diff.blocks());
 						
 						var d = new IOFrame.Diff(
-							partsBlob.parts, partsBlob.blob, prev.uid, stopFrame.uid, diff.newSize().orElse(-1), prev.writes()
+							partsBlob.parts, partsBlob.blob, prev.uid, stopFrame.uid, diff.newSize().orElse(-1), prev.writes(), f.stacktrace()
 						);
 						
 						var test = d.resolve(frames::get);
@@ -83,12 +83,12 @@ public final class FrameDB{
 				}
 				
 				var partsBlob = storeParts(f.parts());
-				yield new IOFrame.Diff(partsBlob.parts(), partsBlob.blob(), f.uid(), f.prevUid(), f.newSize(), rangeSetToIO(f.writes()));
+				yield new IOFrame.Diff(partsBlob.parts(), partsBlob.blob(), f.uid(), f.prevUid(), f.newSize(), rangeSetToIO(f.writes()), f.stacktrace());
 			}
 			case IPC.FullFrame f -> {
 				var blob = newSyncBlob(f.data().length);
 				blob.set(f.data());
-				yield new IOFrame.Full(f.uid(), blob, rangeSetToIO(f.writes()));
+				yield new IOFrame.Full(f.uid(), blob, rangeSetToIO(f.writes()), f.stacktrace());
 			}
 		};
 		store(name, ioFrame);
@@ -206,7 +206,7 @@ public final class FrameDB{
 				startsSizes[i*2 + 1] = r.size;
 			}
 			
-			return new IPC.FullFrame(frame.uid(), data, new IPC.RangeSet(startsSizes));
+			return new IPC.FullFrame(frame.uid(), data, new IPC.RangeSet(startsSizes), frame.stacktrace());
 		}finally{
 			lock.unlock();
 		}

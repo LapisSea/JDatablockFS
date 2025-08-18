@@ -39,12 +39,17 @@ public sealed interface IOFrame{
 		private final long        uid;
 		private final Blob        data;
 		private final List<Range> writes;
+		private final String      stacktrace;
 		
-		public Full(long uid, Blob data, List<Range> writes){
+		public Full(long uid, Blob data, List<Range> writes, String stacktrace){
 			this.uid = uid;
 			this.data = data;
 			this.writes = List.copyOf(writes);
+			this.stacktrace = stacktrace;
 		}
+		
+		public String stacktrace(){ return stacktrace; }
+		
 		@Override
 		public byte[] resolve(UnsafeLongFunction<IOFrame, IOException> frames) throws IOException{
 			return data.readAll();
@@ -57,7 +62,7 @@ public sealed interface IOFrame{
 	}
 	
 	@IOValue
-	@IOInstance.Order({"parts", "partsBuff", "uid", "previousID", "newSize", "writes"})
+	@IOInstance.Order({"parts", "partsBuff", "uid", "previousID", "newSize", "writes", "stacktrace"})
 	final class Diff extends IOInstance.Managed<Diff> implements IOFrame{
 		static{ allowFullAccess(MethodHandles.lookup()); }
 		
@@ -82,15 +87,19 @@ public sealed interface IOFrame{
 		public final int        newSize;
 		
 		private final List<Range> writes;
+		private final String      stacktrace;
 		
-		public Diff(List<Part> parts, Blob partsBuff, long uid, long previousID, int newSize, List<Range> writes){
+		public Diff(List<Part> parts, Blob partsBuff, long uid, long previousID, int newSize, List<Range> writes, String stacktrace){
 			this.parts = List.copyOf(parts);
 			this.partsBuff = partsBuff;
 			this.uid = uid;
 			this.previousID = previousID;
 			this.newSize = newSize;
 			this.writes = writes;
+			this.stacktrace = stacktrace;
 		}
+		
+		public String stacktrace(){ return stacktrace; }
 		
 		@Override
 		public byte[] resolve(UnsafeLongFunction<IOFrame, IOException> frameGet) throws IOException{
@@ -119,4 +128,5 @@ public sealed interface IOFrame{
 	
 	List<Range> writes();
 	long uid();
+	String stacktrace();
 }

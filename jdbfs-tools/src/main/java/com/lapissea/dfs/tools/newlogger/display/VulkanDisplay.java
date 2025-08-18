@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
@@ -156,7 +157,7 @@ public class VulkanDisplay implements AutoCloseable{
 			forceSessionUpdate = false;
 			sessionSetView.clearDirty();
 			if(forceSessionUpdate || uiSettings.lastFrame){
-				updateData();
+				setLastFrameData();
 			}
 		}
 		uiMessages.clear();
@@ -171,7 +172,23 @@ public class VulkanDisplay implements AutoCloseable{
 		}
 	}
 	
-	private void updateData(){
+	private void setLastFrameData(){
+		var ses = getSessionView();
+		setFrameData(ses, ses.map(e -> e.frameCount() - 1).orElse(-1));
+	}
+	public void setFrameData(Optional<SessionSetView.SessionView> sessionView, int frame){
+		if(sessionView.isEmpty()){
+			setFrameData0(SessionSetView.FrameData.EMPTY);
+			return;
+		}
+		
+		var session = sessionView.get();
+		var data    = session.getFrameData(frame);
+		uiSettings.currentSessionFrame[0] = frame;
+		setFrameData0(data);
+	}
+	
+	public Optional<SessionSetView.SessionView> getSessionView(){
 		var sesName = uiSettings.currentSessionName.get();
 		var ses     = sessionSetView.getSession(sesName);
 		if(ses.isEmpty()){
@@ -181,23 +198,16 @@ public class VulkanDisplay implements AutoCloseable{
 				uiSettings.currentSessionName.set(ses.get().name());
 			}
 		}
-		
-		if(ses.isEmpty()){
-			setFrameData(SessionSetView.FrameData.EMPTY);
-		}else{
-			var session = ses.get();
-			var data    = session.getFrameData(session.frameCount() - 1);
-			uiSettings.currentSessionFrame[0] = session.frameCount() - 1;
-			setFrameData(data);
-		}
+		return ses;
 	}
 	
-	public void setFrameData(SessionSetView.FrameData data){
+	private void setFrameData0(SessionSetView.FrameData data){
 		try{
 			byteGridComponent.setDisplayData(data);
 		}catch(IOException e){
 			new RuntimeException("Failed to update data", e).printStackTrace();
 		}
+		uiSettings.frameStacktrace = data.stacktrace();
 	}
 	
 	@Override
