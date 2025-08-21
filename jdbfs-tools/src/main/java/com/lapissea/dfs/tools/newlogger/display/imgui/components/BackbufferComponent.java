@@ -128,6 +128,10 @@ public abstract class BackbufferComponent implements UIComponent{
 	protected int mouseX(){ return mouseX; }
 	protected int mouseY(){ return mouseY; }
 	
+	protected boolean mouseOver(){
+		return ImGui.isWindowHovered();
+	}
+	
 	@Override
 	public void imRender(DeviceGC deviceGC, TextureRegistry.Scope tScope){
 		if(!open.get()) return;

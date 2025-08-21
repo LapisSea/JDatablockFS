@@ -70,7 +70,7 @@ public class VulkanDisplay implements AutoCloseable{
 			imHandler.addComponent(uiSettings);
 			imHandler.addComponent(new ImageViewerComp(uiSettings.imageViewerOpen));
 			imHandler.addComponent(
-				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings.byteGridSampleEnumIndex, uiMessages)
+				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings, uiMessages)
 			);
 			imHandler.addComponent(new MessagesComponent(uiMessages));
 		}catch(VulkanCodeException e){
@@ -184,7 +184,7 @@ public class VulkanDisplay implements AutoCloseable{
 		
 		var session = sessionView.get();
 		var data    = session.getFrameData(frame);
-		uiSettings.currentSessionFrame[0] = frame;
+		uiSettings.currentSessionRange.setCurrentFrame(frame);
 		setFrameData0(data);
 	}
 	

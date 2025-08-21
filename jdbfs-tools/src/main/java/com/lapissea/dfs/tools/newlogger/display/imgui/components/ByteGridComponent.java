@@ -32,7 +32,6 @@ import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
-import imgui.type.ImInt;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.awt.Color;
@@ -41,7 +40,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
@@ -52,7 +50,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private final List<String> messages;
 	
-	private SessionSetView.FrameData frameData;
+	private       SessionSetView.FrameData frameData;
+	private final SettingsUIComponent      uiSettings;
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
@@ -106,9 +105,9 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 	}
 	
-	public ByteGridComponent(VulkanCore core, ImBoolean open, ImInt sampleEnumIndex, List<String> messages) throws VulkanCodeException{
-		super(core, open, sampleEnumIndex);
-		
+	public ByteGridComponent(VulkanCore core, ImBoolean open, SettingsUIComponent uiSettings, List<String> messages) throws VulkanCodeException{
+		super(core, open, uiSettings.byteGridSampleEnumIndex);
+		this.uiSettings = uiSettings;
 		this.messages = messages;
 		
 		clearColor.set(0.4, 0.4, 0.4, 1);
@@ -125,6 +124,21 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	@Override
 	protected void renderBackbuffer(DeviceGC deviceGC, CommandBuffer cmdBuffer, Extent2D viewSize) throws VulkanCodeException{
+		
+		if(mouseOver()){
+			var delta = 0;
+			if(ImGui.getIO().getMouseWheel()>0) delta--;
+			if(ImGui.getIO().getMouseWheel()<0) delta++;
+			
+			if(delta != 0){
+				var ses = uiSettings.currentSessionView();
+				if(ses.isPresent()){
+					uiSettings.currentSessionRange.frameDelta(ses.get().frameCount(), delta);
+					uiSettings.vulkanDisplay.setFrameData(ses, uiSettings.currentSessionRange.getCurrentFrame());
+				}
+			}
+		}
+		
 		multiRenderer.reset();
 		try{
 			recordBackbuffer(deviceGC, viewSize);
@@ -262,12 +276,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private void drawByteRangesForced(RenderContext ctx, GridUtils.ByteGridSize gridSize, List<DrawUtils.Range> ranges, Color color, boolean withChar) throws IOException, VulkanCodeException{
 		var col        = ColorUtils.mul(color, 0.8F);
-		var bitColor   = col;
 		var background = ColorUtils.mul(col, 0.6F);
-		
-		BiConsumer<IterablePP<Range>, Color> drawIndex = (r, cl) -> {
-			fillByteRange(gridSize, r, cl);
-		};
 		
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
 		
@@ -289,11 +298,11 @@ public class ByteGridComponent extends BackbufferComponent{
 			var sizeI = Math.toIntExact(range.size());
 			var bytes = ctx.frameData.contents().read(range.from(), sizeI);
 			
-			multiRenderer.renderBytes(ctx.deviceGC, bytes, List.of(new ByteGridRender.DrawRange(0, sizeI, bitColor)), List.of());
+			multiRenderer.renderBytes(ctx.deviceGC, bytes, List.of(new ByteGridRender.DrawRange(0, sizeI, col)), List.of());
 		}
 		
 		if(withChar){
-			var c = new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F);
+			var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
 			
 			var fr       = multiRenderer.getFontRender();
 			var width    = gridSize.windowSize().width;

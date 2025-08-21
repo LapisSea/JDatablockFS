@@ -18,16 +18,44 @@ import java.util.Optional;
 
 public final class SettingsUIComponent implements UIComponent{
 	
-	private final VulkanDisplay vulkanDisplay;
-	public final  ImInt         fpsLimit                = new ImInt(60);
-	public final  int[]         statsLevel              = {0};
-	public final  ImBoolean     imageViewerOpen         = new ImBoolean();
-	public final  ImBoolean     byteGridOpen            = new ImBoolean(true);
-	public final  ImInt         byteGridSampleEnumIndex = new ImInt(2);
-	public final  ImString      currentSessionName      = new ImString();
-	public final  int[]         currentSessionFrame     = new int[1];
-	public final  ImInt         rangeStart              = new ImInt(-1);
-	public final  ImInt         rangeEnd                = new ImInt(-1);
+	public record SessionRange(int[] currentFrame, ImInt start, ImInt end){
+		
+		public int getEnd(int frameCount){
+			var rEnd = end.get();
+			if(rEnd == -1) rEnd = frameCount;
+			return rEnd;
+		}
+		public int getStart(){
+			var rStart = start.get();
+			if(rStart == -1) rStart = 1;
+			return rStart;
+		}
+		public int getCurrentFrame(){
+			return currentFrame[0];
+		}
+		public void setCurrentFrame(int currentFrame){
+			this.currentFrame[0] = currentFrame;
+		}
+		public void frameDelta(int totalFrameCount, int delta){
+			var rStart        = getStart();
+			var rEnd          = getEnd(totalFrameCount);
+			var newFrameIndex = getCurrentFrame() + delta;
+			if(delta>0){
+				setCurrentFrame(Math.min(newFrameIndex, rEnd));
+			}else{
+				setCurrentFrame(Math.max(newFrameIndex, rStart));
+			}
+		}
+	}
+	
+	public final VulkanDisplay vulkanDisplay;
+	public final ImInt         fpsLimit                = new ImInt(60);
+	public final int[]         statsLevel              = {0};
+	public final ImBoolean     imageViewerOpen         = new ImBoolean();
+	public final ImBoolean     byteGridOpen            = new ImBoolean(true);
+	public final ImInt         byteGridSampleEnumIndex = new ImInt(2);
+	public final ImString      currentSessionName      = new ImString();
+	public final SessionRange  currentSessionRange     = new SessionRange(new int[1], new ImInt(-1), new ImInt(-1));
 	
 	public boolean lastFrame = true;
 	
@@ -76,29 +104,25 @@ public final class SettingsUIComponent implements UIComponent{
 			ImGui.endCombo();
 		}
 		
-		var sesName    = currentSessionName.get();
-		var optSession = vulkanDisplay.sessionSetView.getSession(sesName);
+		var optSession = currentSessionView();
 		if(optSession.isPresent()){
 			ImGui.separator();
 			sessionRangeUI(optSession.get());
 			
-			if(frameStacktrace != null && !frameStacktrace.isBlank() && ImGui.begin("Frame Stacktrace")){
-				ImGui.text(frameStacktrace);
+			if(frameStacktrace != null && !frameStacktrace.isBlank()){
+				if(ImGui.begin("Frame Stacktrace")){
+					ImGui.text(frameStacktrace);
+				}
+				ImGui.end();
 			}
-			ImGui.end();
 		}
 	}
 	
-	private int getRangeEnd(int frameCount){
-		var rEnd = rangeEnd.get();
-		if(rEnd == -1) rEnd = frameCount;
-		return rEnd;
+	public Optional<SessionSetView.SessionView> currentSessionView(){
+		var sesName = currentSessionName.get();
+		return vulkanDisplay.sessionSetView.getSession(sesName);
 	}
-	private int getRangeStart(){
-		var rStart = rangeStart.get();
-		if(rStart == -1) rStart = 1;
-		return rStart;
-	}
+	
 	private void generalSettingsUI(){
 		ImGui.text("General settings:");
 		ImGui.inputInt("FPS Limit", fpsLimit);
@@ -118,27 +142,16 @@ public final class SettingsUIComponent implements UIComponent{
 		}
 	}
 	
-	public void sessionFrameDelta(int totalFrameCount, int delta){
-		var rStart        = getRangeStart();
-		var rEnd          = getRangeEnd(totalFrameCount);
-		var newFrameIndex = currentSessionFrame[0] + delta;
-		if(delta>0){
-			currentSessionFrame[0] = Math.min(newFrameIndex, rEnd);
-		}else{
-			currentSessionFrame[0] = Math.max(newFrameIndex, rStart);
-		}
-	}
-	
 	private void sessionRangeUI(SessionSetView.SessionView ses){
 		ImGui.text("Session range:");
 		
 		var updated    = false;
 		var frameCount = ses.frameCount();
 		
-		var rStart = getRangeStart();
-		var rEnd   = getRangeEnd(frameCount);
+		var rStart = currentSessionRange.getStart();
+		var rEnd   = currentSessionRange.getEnd(frameCount);
 		
-		if(ImGui.sliderScalar("Frame", currentSessionFrame, rStart, rEnd, (lastFrame? "*" : "") + "%d")){
+		if(ImGui.sliderScalar("Frame", currentSessionRange.currentFrame, rStart, rEnd, (lastFrame? "*" : "") + "%d")){
 			updated = true;
 		}
 		
@@ -147,13 +160,15 @@ public final class SettingsUIComponent implements UIComponent{
 			if(ImGui.isKeyPressed(ImGuiKey.LeftArrow, true)) delta--;
 			if(ImGui.isKeyPressed(ImGuiKey.RightArrow, true)) delta++;
 		}
-		if(ImGui.getIO().getMouseWheel()<0) delta--;
-		if(ImGui.getIO().getMouseWheel()>0) delta++;
 		
 		if(delta != 0){
 			updated = true;
-			sessionFrameDelta(frameCount, delta);
+			currentSessionRange.frameDelta(frameCount, delta);
 		}
+		
+		var rangeStart          = currentSessionRange.start;
+		var rangeEnd            = currentSessionRange.end;
+		var currentSessionFrame = currentSessionRange.currentFrame;
 		
 		if(frameCount>1){
 			var snap = rangeStart.get() == currentSessionFrame[0];
