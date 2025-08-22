@@ -101,15 +101,17 @@ public final class DrawUtils{
 				for(long i = range.from(); i<range.to(); i++){
 					if(filter.test(i)){
 						b.end = i + 1;
-					}else{
-						actualRanges.add(b.build());
-						for(; i<range.to(); i++){
-							if(filter.test(i)) break;
-						}
-						if(i == range.to()) return actualRanges;
-						b.start = i;
-						b.end = i + 1;
+						continue;
 					}
+					if(b.start != b.end){
+						actualRanges.add(b.build());
+					}
+					for(; i<range.to(); i++){
+						if(filter.test(i)) break;
+					}
+					if(i == range.to()) return actualRanges;
+					b.start = i;
+					b.end = i + 1;
 				}
 				if(b.start != b.end){
 					if(b.start == range.from() && b.end == range.to()){
