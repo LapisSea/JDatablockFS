@@ -84,6 +84,9 @@ public sealed interface DeviceGC{
 		public void close() throws VulkanCodeException{
 			destroyAllNow();
 		}
+		public boolean isEmpty(){
+			return buffer.isEmpty();
+		}
 	}
 	
 	final class ImmediateGC implements DeviceGC{

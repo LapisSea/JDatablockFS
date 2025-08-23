@@ -189,9 +189,11 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		private IndirectDrawBuffer indirectDrawBuff;
 		
 		private int instanceCount;
+		private int byteCount;
 		
 		public void reset(){
 			instanceCount = 0;
+			byteCount = 0;
 		}
 		
 		private void updateDescriptor(){
@@ -396,7 +398,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		return (char)value;
 	}
 	
-	public RenderToken record(DeviceGC deviceGC, RenderResource resource, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+	public RenderToken record(DeviceGC deviceGC, RenderResource resource, long dataOffset, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
 		var device = core.device;
 		if(resource.indirectDrawBuff == null){
 			resource.indirectDrawBuff = device.allocateIndirectBuffer(256);
@@ -417,8 +419,9 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		for(DrawRange range : ranges){
 			for(char i = range.from; i<range.to; i++){
-				var b   = Byte.toUnsignedInt(data[i]);
-				var buf = byteBuffers[b];
+				var dataI = (int)(i - dataOffset);
+				var b     = Byte.toUnsignedInt(data[dataI]);
+				var buf   = byteBuffers[b];
 				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
 				else if(!buf.hasRemaining()){
 					var nb = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*buf.capacity()*2));
@@ -429,7 +432,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				var flags = (byte)0;
 				if(writes.contains(i)) flags |= 0b01;
 				if(reads.contains(i)) flags |= 0b10;
-				buf.put(i, flags, data[i], range.color);
+				buf.put(i, flags, data[dataI], range.color);
 			}
 		}
 		
@@ -443,14 +446,18 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			resource.indirectDrawBuff = newBuff;
 		}
 		
-		var cap    = nonNullBuffers.map(CustomBuffer::flip).mapToInt(CustomBuffer::remaining).sum();
+		for(var buff : nonNullBuffers) buff.flip();
+		
+		var cap    = nonNullBuffers.mapToInt(CustomBuffer::remaining).sum() + resource.byteCount;
 		var oldCap = resource.bytesInfo == null? 0 : resource.bytesInfo.size()/GByte.SIZEOF;
 		if(resource.bytesInfo == null || oldCap<cap){
+			var newBuff = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
 			if(resource.bytesInfo != null){
+				resource.bytesInfo.transferTo(newBuff);
 				deviceGC.destroyLater(resource.bytesInfo);
 				deviceGC.destroyLater(resource.dsSet);
 			}
-			resource.bytesInfo = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
+			resource.bytesInfo = newBuff;
 			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.updateDescriptor();
 		}
@@ -460,6 +467,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		try(var draws = resource.indirectDrawBuff.update();
 		    var ses = resource.bytesInfo.updateAs(GByte.Buf::new)){
 			var instancesBuff = ses.val;
+			instancesBuff.position(resource.byteCount);
 			draws.setPos(start);
 			
 			for(int i = 0; i<byteBuffers.length; i++){
@@ -471,7 +479,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				instancesBuff.put(buf);
 				buf.free();
 			}
-			
+			resource.byteCount = instancesBuff.position();
 			var end = resource.instanceCount = draws.buffer.position();
 			
 			return new RenderToken(resource, start, end - start);

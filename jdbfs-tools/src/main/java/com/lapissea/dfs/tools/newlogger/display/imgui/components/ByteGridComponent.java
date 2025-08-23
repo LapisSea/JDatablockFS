@@ -167,7 +167,6 @@ public class ByteGridComponent extends BackbufferComponent{
 		var hasMagic = ctx.checkMagicID();
 		
 		annotateMagicID(ctx, hasMagic);
-		
 		try{
 			frameData.contents().io(MagicID::read);
 			
@@ -182,7 +181,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			if(GridUtils.isRangeHovered(mouseHoverIndex, 0, MagicID.size())){
 				messages.add("The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()));
 				
-				multiRenderer.renderLines(GridUtils.outlineByteRange(Color.BLUE, gridSize, new Range(0, MagicID.size()), 3));
+				outlineByteRange(gridSize, Color.BLUE, new Range(0, MagicID.size()), 3);
 			}
 			
 			var vsp = DataProvider.newVerySimpleProvider(frameData.contents());
@@ -195,7 +194,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		
 		try{
-			drawByteRanges(ctx, List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, false, false);
+			drawByteRanges(ctx, List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -209,15 +208,17 @@ public class ByteGridComponent extends BackbufferComponent{
 			
 			if(findHoverChunk(frameData.contents(), p) instanceof Some(var chunk)){
 				var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
-				multiRenderer.renderLines(
-					GridUtils.outlineByteRange(Color.CYAN.darker(), gridSize, chRange, 2)
-				);
+				outlineByteRange(gridSize, Color.CYAN.darker(), chRange, 2);
 				messages.add("Hovered chunk: " + chunk);
 			}
 			multiRenderer.renderLines(
 				GridUtils.outlineByteRange(Color.WHITE, gridSize, new Range(p, p + 1), 1.5F)
 			);
 		}
+	}
+	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
+		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
+		multiRenderer.renderLines(lines);
 	}
 	
 	private void annotateMagicID(RenderContext ctx, boolean hasMagic) throws IOException, VulkanCodeException{
@@ -260,24 +261,26 @@ public class ByteGridComponent extends BackbufferComponent{
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
 		
 		Supplier<IterableLongPP> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
-		
-		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
-		
-		fillByteRange(
-			gridSize,
-			Iters.from(ranges).map(r -> {
-				if(r.to()<ctx.getDataSize()) return null;
-				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
-				return r;
-			}).nonNulls(),
-			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
-		);
+
+//		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
+//
+//		fillByteRange(
+//			gridSize,
+//			Iters.from(ranges).map(r -> {
+//				if(r.to()<ctx.getDataSize()) return null;
+//				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
+//				return r;
+//			}).nonNulls(),
+//			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
+//		);
 		
 		for(var range : clampedOverflow){
-			var sizeI = Math.toIntExact(range.size());
+			var from  = Math.toIntExact(range.from());
+			var to    = Math.toIntExact(range.to());
+			var sizeI = to - from;
 			var bytes = ctx.frameData.contents().read(range.from(), sizeI);
 			
-			multiRenderer.renderBytes(ctx.deviceGC, bytes, List.of(new ByteGridRender.DrawRange(0, sizeI, col)), List.of());
+			multiRenderer.renderBytes(ctx.deviceGC, range.from(), bytes, List.of(new ByteGridRender.DrawRange(from, to, col)), List.of());
 		}
 		
 		if(withChar){

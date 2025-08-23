@@ -18,13 +18,33 @@ import java.util.List;
 public class MultiRendererBuffer implements VulkanResource{
 	
 	private sealed interface TokenSet{
-		record Lines(List<Geometry.Path> paths) implements TokenSet{ }
+		record Lines(List<Geometry.Path> paths) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
+			}
+		}
 		
-		record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{ }
+		record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Meshes{meshes = " + meshes.size() + ", verts = " + meshes.stream().mapToInt(e -> e.verts().size()).sum() + '}';
+			}
+		}
 		
-		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{ }
+		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Strings{strings = " + strings.size() + ", chars = " + strings.stream().mapToInt(e -> e.string().length()).sum() + '}';
+			}
+		}
 		
-		record ByteEvents(List<ByteGridRender.RenderToken> tokens) implements TokenSet{ }
+		record ByteEvents(List<ByteGridRender.RenderToken> tokens) implements TokenSet{
+			@Override
+			public String toString(){
+				return "ByteEvents{tokens = " + tokens.size() + '}';
+			}
+		}
 	}
 	
 	
@@ -91,8 +111,8 @@ public class MultiRendererBuffer implements VulkanResource{
 		getTokenSet(TokenSet.Strings.class).strings.addAll(strings);
 	}
 	
-	public void renderBytes(DeviceGC deviceGC, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
-		var token = byteGridRender.record(deviceGC, gridRes, data, ranges, ioEvents);
+	public void renderBytes(DeviceGC deviceGC, long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
+		var token = byteGridRender.record(deviceGC, gridRes, dataOffset, data, ranges, ioEvents);
 		getTokenSet(TokenSet.ByteEvents.class).tokens.add(token);
 	}
 	
@@ -105,6 +125,9 @@ public class MultiRendererBuffer implements VulkanResource{
 	
 	public void submit(DeviceGC deviceGC, GridUtils.ByteGridSize gridSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
 		var viewSize = gridSize.windowSize();
+
+//		LogUtil.println(Iters.concat1N("=========== FRAME TOKENS ===========", Iters.from(sets).map(Object::toString)).joinAsStr("\n"));
+		
 		for(TokenSet set : sets){
 			switch(set){
 				case TokenSet.Lines(var paths) -> {

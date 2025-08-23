@@ -49,6 +49,8 @@ public abstract class BackbufferComponent implements UIComponent{
 		private final TextureRegistry.Scope tScope;
 		private       Extent2D              renderArea;
 		
+		private final DeviceGC.BatchGC onFenceGC = new DeviceGC.BatchGC();
+		
 		RenderTarget(VulkanCore core, CommandPool cmdPool, TextureRegistry.Scope tScope, int width, int height, VkFormat format, VkSampleCountFlag samples) throws VulkanCodeException{
 			this.tScope = tScope;
 			image = createTexture(core, width, height, format, Flags.of(VkImageUsageFlag.COLOR_ATTACHMENT, VkImageUsageFlag.SAMPLED), VkSampleCountFlag.N1);
@@ -93,7 +95,8 @@ public abstract class BackbufferComponent implements UIComponent{
 		}
 		
 		@Override
-		public void destroy(){
+		public void destroy() throws VulkanCodeException{
+			onFenceGC.destroyAllNow();
 			fence.destroy();
 			cmdBuffer.destroy();
 			tScope.releaseTexture(DeviceGC.IMMEDIATE, imageID);
@@ -155,6 +158,14 @@ public abstract class BackbufferComponent implements UIComponent{
 			
 			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
 				drawFB(deviceGC, tScope, width, height);
+			}else{
+				try{
+					if(!renderTarget.onFenceGC.isEmpty() && renderTarget.fence.isSignaled()){
+						renderTarget.onFenceGC.destroyAllNow();
+					}
+				}catch(VulkanCodeException e){
+					throw new RuntimeException("Failed to flush unused resources", e);
+				}
 			}
 			
 			var renderArea = renderTarget.renderArea;
@@ -172,6 +183,7 @@ public abstract class BackbufferComponent implements UIComponent{
 		
 		try{
 			renderTarget.fence.waitReset();
+			renderTarget.onFenceGC.destroyAllNow();
 			
 			var buff = renderTarget.cmdBuffer;
 			buff.reset();
@@ -179,7 +191,7 @@ public abstract class BackbufferComponent implements UIComponent{
 			
 			renderTarget.renderArea = new Extent2D(width, height);
 			try(var ignore = renderTarget.beginRenderPass(buff, clearColor)){
-				renderBackbuffer(deviceGC, buff, renderTarget.renderArea);
+				renderBackbuffer(renderTarget.onFenceGC, buff, renderTarget.renderArea);
 			}
 			buff.end();
 			

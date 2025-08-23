@@ -320,7 +320,8 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			}
 			
 			if(update){
-				if(dsSet == null) dsSet = dsLayout.createDescriptorSet();
+				if(dsSet != null) deviceGC.destroyLater(dsSet);
+				dsSet = dsLayout.createDescriptorSet();
 				dsSet.update(List.of(
 					new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, uniform.buffer),
 					new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, quads.buffer)

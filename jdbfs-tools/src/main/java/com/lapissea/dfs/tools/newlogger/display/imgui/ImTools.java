@@ -1,7 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui;
 
 import com.lapissea.dfs.tools.DisplayManager;
-import com.lapissea.util.LogUtil;
 import imgui.ImFontConfig;
 import imgui.ImGuiIO;
 import imgui.ImGuiViewport;
@@ -215,8 +214,6 @@ public final class ImTools{
 			var conf = new ImFontConfig();
 			conf.setOversampleH(2);
 			conf.setOversampleV(2);
-			var font = f.addFontFromMemoryTTF(bb, 16, conf);
-			LogUtil.println(font.getScale());
 			return List.of(bb);
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to load imgui font");
