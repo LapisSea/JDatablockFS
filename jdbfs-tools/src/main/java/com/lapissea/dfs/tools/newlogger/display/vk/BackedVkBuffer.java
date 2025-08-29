@@ -53,6 +53,15 @@ public class BackedVkBuffer implements VulkanResource{
 		
 	}
 	
+	public static long size(BackedVkBuffer buff, int elementSize){
+		if(buff == null) return 0;
+		return buff.size()/elementSize;
+	}
+	public static long size(BackedVkBuffer buff){
+		if(buff == null) return 0;
+		return buff.size();
+	}
+	
 	public final  VkBuffer       buffer;
 	private final VkDeviceMemory memory;
 	

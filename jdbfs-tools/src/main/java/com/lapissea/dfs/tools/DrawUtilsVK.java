@@ -11,21 +11,21 @@ public final class DrawUtilsVK{
 		long from = range.from();
 		long to   = range.to();
 		
-		var viewSize = gridSize.windowSize();
+		var viewSize = gridSize.bytesPerRow();
 		
 		//tail
-		long fromX      = from%viewSize.width;
-		long rightSpace = Math.min(viewSize.width - fromX, to - from);
+		long fromX      = from%viewSize;
+		long rightSpace = Math.min(viewSize - fromX, to - from);
 		if(rightSpace>0){
 			fillByteRect(gridSize, dest, color, from, rightSpace, 1);
 			from += rightSpace;
 		}
 		
 		//bulk
-		long bulkColumns = (to - from)/viewSize.width;
+		long bulkColumns = (to - from)/viewSize;
 		if(bulkColumns>0){
-			fillByteRect(gridSize, dest, color, from, viewSize.width, bulkColumns);
-			from += bulkColumns*viewSize.width;
+			fillByteRect(gridSize, dest, color, from, viewSize, bulkColumns);
+			from += bulkColumns*viewSize;
 		}
 		
 		//head
@@ -35,9 +35,9 @@ public final class DrawUtilsVK{
 	}
 	
 	public static void fillByteRect(GridUtils.ByteGridSize gridSize, Geometry.IndexedMesh dest, Color color, long start, long width, long columnCount){
-		var viewSize = gridSize.windowSize();
-		var xi       = (int)(start%viewSize.width);
-		var yStart   = (int)(start/viewSize.width);
+		var bytesPerRow = gridSize.bytesPerRow();
+		var xi          = (int)(start%bytesPerRow);
+		var yStart      = (int)(start/bytesPerRow);
 		
 		fillQuad(
 			dest, color,

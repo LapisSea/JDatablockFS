@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.newlogger.IOFrame;
+import com.lapissea.dfs.tools.newlogger.display.ColorU8;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
@@ -33,57 +34,52 @@ import org.lwjgl.system.CustomBuffer;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
+import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, ByteGridRender.RenderToken>{
 	
-	record Theme(Color none, Color write, Color read, Color readWrite){ }
-	
 	private static final class Vert{
-		static final int SIZE = (2)*4 + 4;
+		static final int SIZE = (2)*4;
 		
-		static final int T_BACK = 0;
-		static final int T_SET  = 1;
-		static final int T_MARK = 2;
-		
-		private static void putQuad(ByteBuffer bb, int x, int y, int w, int h, int type){
-			put(bb, x/3F, y/3F, type);
-			put(bb, x/3F, (y + h)/3F, type);
-			put(bb, (x + w)/3F, (y + h)/3F, type);
+		private static void putQuad(ByteBuffer bb, int x, int y, int w, int h){
+			put(bb, x/3F, y/3F);
+			put(bb, x/3F, (y + h)/3F);
+			put(bb, (x + w)/3F, (y + h)/3F);
 			
-			put(bb, x/3F, y/3F, type);
-			put(bb, (x + w)/3F, (y + h)/3F, type);
-			put(bb, (x + w)/3F, y/3F, type);
+			put(bb, x/3F, y/3F);
+			put(bb, (x + w)/3F, (y + h)/3F);
+			put(bb, (x + w)/3F, y/3F);
 		}
 		
-		static void put(ByteBuffer buffer, float x, float y, int type){
-			buffer.putFloat(x).putFloat(y).putInt(type);
+		static void put(ByteBuffer buffer, float x, float y){
+			buffer.putFloat(x).putFloat(y);
 		}
 	}
 	
 	private static class PushConstant extends Struct<PushConstant>{
 		private static final int SIZEOF;
 		private static final int MAT;
-		private static final int FLAG_COLORS;
 		private static final int TILE_WIDTH;
 		
 		static{
 			var layout = __struct(
 				Std430.__mat4(),
-				Std430.__vec4(),
 				Std430.__int()
 			);
 			
 			SIZEOF = layout.getSize();
 			MAT = layout.offsetof(0);
-			FLAG_COLORS = layout.offsetof(1);
-			TILE_WIDTH = layout.offsetof(2);
+			TILE_WIDTH = layout.offsetof(1);
 		}
 		
 		Matrix4f mat(){ return new Matrix4f().setFromAddress(address + MAT); }
@@ -96,22 +92,10 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			MemoryUtil.memPutInt(address + TILE_WIDTH, tileWidth);
 			return this;
 		}
-		PushConstant flagColors(Theme theme){
-			flagColor(0, theme.none);
-			flagColor(1, theme.write);
-			flagColor(2, theme.read);
-			flagColor(3, theme.readWrite);
-			return this;
-		}
-		private void flagColor(int i, Color none){
-			var ptr = address + FLAG_COLORS + i*Float.BYTES;
-			MemoryUtil.memPutInt(ptr, VUtils.toRGBAi4(none));
-		}
 		
-		PushConstant set(Matrix4f mat, int tileWidth, Theme theme){
+		PushConstant set(Matrix4f mat, int tileWidth){
 			mat(mat);
 			tileWidth(tileWidth);
-			flagColors(theme);
 			return this;
 		}
 		
@@ -126,24 +110,21 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	private static class GByte extends Struct<GByte>{
 		private static final int SIZEOF;
 		private static final int INDEX;
-		private static final int FLAG;
 		private static final int VALUE;
-		private static final int COLOR;
+		private static final int COLOR_INDEX;
 		
 		static{
 			Layout layout = __struct(
 				Std430.__uint16_t(),
 				Std430.__uint8_t(),
-				Std430.__uint8_t(),
-				Std430.__u8vec4()
+				Std430.__uint8_t()
 			);
 			
 			SIZEOF = layout.getSize();
 			
 			INDEX = layout.offsetof(0);
-			FLAG = layout.offsetof(1);
+			COLOR_INDEX = layout.offsetof(1);
 			VALUE = layout.offsetof(2);
-			COLOR = layout.offsetof(3);
 		}
 		
 		static class Buf extends StructBuffer<GByte, Buf>{
@@ -157,19 +138,19 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			protected Buf create(long address, ByteBuffer container, int mark, int position, int limit, int capacity){
 				throw NotImplementedException.infer();//TODO: implement Buf.create()
 			}
-			void put(char index, byte flag, byte value, Color color){
-				get().set(index, flag, value, color);
+			void put(char index, byte value, int byteIndex){
+				if(byteIndex>255) throw new IllegalArgumentException("byteIndex can't be larger than 255");
+				get().set(index, value, byteIndex);
 			}
 		}
 		
 		char index(){ return (char)MemoryUtil.memGetShort(address() + INDEX); }
 		
-		void set(char index, byte flag, byte value, Color color){
+		void set(char index, byte value, int byteIndex){
 			var address = address();
 			MemoryUtil.memPutShort(address + INDEX, (short)index);
-			MemoryUtil.memPutByte(address + FLAG, flag);
+			MemoryUtil.memPutByte(address + COLOR_INDEX, (byte)byteIndex);
 			MemoryUtil.memPutByte(address + VALUE, value);
-			MemoryUtil.memPutInt(address + COLOR, VUtils.toRGBAi4(color));
 		}
 		
 		protected GByte(long address){ super(address, null); }
@@ -185,20 +166,24 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		private VkDescriptorSet dsSet;
 		private BackedVkBuffer  bytesInfo;
+		private BackedVkBuffer  colors;
 		
 		private IndirectDrawBuffer indirectDrawBuff;
 		
 		private int instanceCount;
+		private int colorCount;
 		private int byteCount;
 		
 		public void reset(){
 			instanceCount = 0;
+			colorCount = 0;
 			byteCount = 0;
 		}
 		
 		private void updateDescriptor(){
 			dsSet.update(List.of(
-				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer)
+				new Descriptor.LayoutDescription.TypeBuff(0, VkDescriptorType.STORAGE_BUFFER, bytesInfo.buffer),
+				new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, colors.buffer)
 			), -1);
 		}
 		@Override
@@ -210,6 +195,8 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				bytesInfo = null;
 				indirectDrawBuff.destroy();
 				indirectDrawBuff = null;
+				colors.destroy();
+				colors = null;
 			}
 		}
 	}
@@ -229,13 +216,6 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	}
 	
 	private final ShaderModuleSet shader;
-	
-	private final Theme theme = new Theme(
-		new Color(0, 0, 0, 0F),
-		new Color(1, 1, 0, 1F),
-		new Color(0, 1, 1, 1F),
-		new Color(1, 1, 1, 1F)
-	);
 	
 	private final VulkanCore     core;
 	private final MeshInfo[]     meshInfos;
@@ -267,7 +247,8 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		
 		dsLayout = core.globalDescriptorPool.createDescriptorSetLayout(
-			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
+			new Descriptor.LayoutBinding(0, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER),
+			new Descriptor.LayoutBinding(1, VkShaderStageFlag.VERTEX, VkDescriptorType.STORAGE_BUFFER)
 		);
 		pipelines = new VkPipelineSet(rp -> basePipeline(rp).build());
 		pipelinesSimple = new VkPipelineSet(rp -> {
@@ -290,13 +271,13 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	private ByteVerts computeByteVerts(VulkanCore core) throws VulkanCodeException{
 		record SetBitsQuad(int x, int y, int w, int h){ }
 		
-		List<List<SetBitsQuad>> setQuadsSet = new ArrayList<>(256);
-		for(int val = 0; val<256; val++){
+		List<List<SetBitsQuad>> setQuadsSet = new ArrayList<>(257);
+		for(int val = 0; val<257; val++){
 			List<SetBitsQuad> quads = new ArrayList<>(8);
 			setQuadsSet.add(quads);
-			for(int bit = 0; bit<8; bit++){
-				if(UtilL.checkFlag(val, 1<<bit)){
-					quads.add(new SetBitsQuad(bit%3, bit/3, 1, 1));
+			for(int gridIndex = 0; gridIndex<9; gridIndex++){
+				if(UtilL.checkFlag(val, 1<<gridIndex)){
+					quads.add(new SetBitsQuad(gridIndex%3, gridIndex/3, 1, 1));
 				}
 			}
 			boolean change;
@@ -336,12 +317,12 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			}while(change);
 		}
 		
-		var meshInfos  = new MeshInfo[256];
+		var meshInfos  = new MeshInfo[257];
 		int vertsTotal = 0;
 		for(int i = 0; i<meshInfos.length; i++){
 			var quads = setQuadsSet.get(i);
 			
-			int verts   = (quads.size() + 2)*6;
+			int verts   = Math.max(quads.size(), 1)*6;
 			int vertPos = vertsTotal;
 			vertsTotal += verts;
 			meshInfos[i] = new MeshInfo(vertPos, verts);
@@ -349,11 +330,13 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		var verts = core.allocateDeviceLocalBuffer((long)vertsTotal*Vert.SIZE, bb -> {
 			for(List<SetBitsQuad> quads : setQuadsSet){
-				Vert.putQuad(bb, 0, 0, 3, 3, Vert.T_BACK);
-				for(var quad : quads){
-					Vert.putQuad(bb, quad.x, quad.y, quad.w, quad.h, Vert.T_SET);
+				if(quads.isEmpty()){
+					Vert.putQuad(bb, 0, 0, 0, 0);
+				}else{
+					for(var quad : quads){
+						Vert.putQuad(bb, quad.x, quad.y, quad.w, quad.h);
+					}
 				}
-				Vert.putQuad(bb, 2, 2, 1, 1, Vert.T_MARK);
 			}
 		});
 		return new ByteVerts(meshInfos, verts);
@@ -398,30 +381,57 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		return (char)value;
 	}
 	
-	public RenderToken record(DeviceGC deviceGC, RenderResource resource, long dataOffset, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
-		var device = core.device;
-		if(resource.indirectDrawBuff == null){
-			resource.indirectDrawBuff = device.allocateIndirectBuffer(256);
-		}
+	private interface EventType{
+		boolean hasRead(char off);
+		boolean hasWrite(char off);
 		
-		var reads  = new RoaringBitmap();
-		var writes = new RoaringBitmap();
-		for(var e : ioEvents){
-			for(var i = e.from; i<e.to; i++){
-				switch(e.type){
-					case READ -> reads.add(i);
-					case WRITE -> writes.add(i);
+		static EventType of(Iterable<IOEvent> ioEvents){
+			var types = Iters.from(ioEvents).map(IOEvent::type).toModSet();
+			if(types.size()>1){
+				var reads  = new RoaringBitmap();
+				var writes = new RoaringBitmap();
+				for(var e : ioEvents){
+					for(var i = e.from; i<e.to; i++){
+						switch(e.type){
+							case READ -> reads.add(i);
+							case WRITE -> writes.add(i);
+						}
+					}
 				}
+				return new EventType(){
+					@Override
+					public boolean hasRead(char off){ return reads.contains(off); }
+					@Override
+					public boolean hasWrite(char off){ return writes.contains(off); }
+				};
+			}else{
+				var read  = types.contains(IOEvent.Type.READ);
+				var write = types.contains(IOEvent.Type.WRITE);
+				return new EventType(){
+					@Override
+					public boolean hasRead(char off){ return read; }
+					@Override
+					public boolean hasWrite(char off){ return write; }
+				};
 			}
 		}
 		
-		GByte.Buf[] byteBuffers = new GByte.Buf[256];
+	}
+	
+	public RenderToken record(DeviceGC deviceGC, RenderResource resource, long dataOffset, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+		GByte.Buf[]         byteBuffers = new GByte.Buf[257];
+		Map<Color, Integer> colorIndex  = new HashMap<>();
+		Function<Color, Integer> colorToIndex = color -> colorIndex.computeIfAbsent(color, c -> {
+			return resource.colorCount + colorIndex.size();
+		});
 		
 		for(DrawRange range : ranges){
 			for(char i = range.from; i<range.to; i++){
 				var dataI = (int)(i - dataOffset);
 				var b     = Byte.toUnsignedInt(data[dataI]);
-				var buf   = byteBuffers[b];
+				if(b == 0) continue;
+				
+				var buf = byteBuffers[b];
 				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
 				else if(!buf.hasRemaining()){
 					var nb = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*buf.capacity()*2));
@@ -429,35 +439,67 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 					buf.free();
 					buf = byteBuffers[b] = nb;
 				}
-				var flags = (byte)0;
-				if(writes.contains(i)) flags |= 0b01;
-				if(reads.contains(i)) flags |= 0b10;
-				buf.put(i, flags, data[dataI], range.color);
+				buf.put(i, data[dataI], colorToIndex.apply(range.color));
 			}
 		}
 		
+		if(ioEvents.iterator().hasNext()){
+			var allEvents = new RoaringBitmap();
+			int count     = 0;
+			for(var e : ioEvents){
+				for(var i = e.from; i<e.to; i++){
+					allEvents.add(i);
+					count++;
+				}
+			}
+			var ioBuff    = byteBuffers[256] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*count));
+			var eventType = EventType.of(ioEvents);
+			allEvents.forEach((IntConsumer)i -> {
+				var offset  = (char)i;
+				var read    = eventType.hasRead(offset);
+				var write   = eventType.hasWrite(offset);
+				var colorID = colorToIndex.apply(new Color(write? 255 : 0, 255, read? 255 : 0));
+				ioBuff.put(offset, (byte)0, colorID);
+			});
+		}
+		
+		var device = core.device;
+		
 		var nonNullBuffers = Iters.from(byteBuffers).nonNulls();
+		nonNullBuffers.forEach(CustomBuffer::flip);
 		
 		var neededCommandCapacity = resource.instanceCount + nonNullBuffers.count();
-		if(resource.indirectDrawBuff.instanceCapacity()<neededCommandCapacity){
+		if(resource.indirectDrawBuff == null || resource.indirectDrawBuff.instanceCapacity()<neededCommandCapacity){
 			var newBuff = device.allocateIndirectBuffer(neededCommandCapacity);
-			resource.indirectDrawBuff.buffer.transferTo(newBuff.buffer);
-			deviceGC.destroyLater(resource.indirectDrawBuff);
+			if(resource.indirectDrawBuff != null) VUtils.copyDestroy(deviceGC, resource.indirectDrawBuff.buffer, newBuff.buffer);
 			resource.indirectDrawBuff = newBuff;
 		}
 		
-		for(var buff : nonNullBuffers) buff.flip();
+		boolean updateSet = false;
 		
-		var cap    = nonNullBuffers.mapToInt(CustomBuffer::remaining).sum() + resource.byteCount;
-		var oldCap = resource.bytesInfo == null? 0 : resource.bytesInfo.size()/GByte.SIZEOF;
-		if(resource.bytesInfo == null || oldCap<cap){
-			var newBuff = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
-			if(resource.bytesInfo != null){
-				resource.bytesInfo.transferTo(newBuff);
-				deviceGC.destroyLater(resource.bytesInfo);
-				deviceGC.destroyLater(resource.dsSet);
+		{
+			var cap    = nonNullBuffers.mapToInt(CustomBuffer::remaining).sum() + resource.byteCount;
+			var oldCap = BackedVkBuffer.size(resource.bytesInfo, GByte.SIZEOF);
+			if(resource.bytesInfo == null || oldCap<cap){
+				var newBuff = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
+				VUtils.copyDestroy(deviceGC, resource.bytesInfo, newBuff);
+				resource.bytesInfo = newBuff;
+				updateSet = true;
 			}
-			resource.bytesInfo = newBuff;
+		}
+		{
+			var cap    = resource.colorCount + colorIndex.size();
+			var oldCap = BackedVkBuffer.size(resource.colors, ColorU8.SIZEOF);
+			if(resource.colors == null || oldCap<cap){
+				var newBuff = device.allocateHostBuffer(ColorU8.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
+				VUtils.copyDestroy(deviceGC, resource.colors, newBuff);
+				resource.colors = newBuff;
+				updateSet = true;
+			}
+		}
+		
+		if(updateSet){
+			deviceGC.destroyLater(resource.dsSet);
 			resource.dsSet = dsLayout.createDescriptorSet();
 			resource.updateDescriptor();
 		}
@@ -465,8 +507,11 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		var start = resource.instanceCount;
 		
 		try(var draws = resource.indirectDrawBuff.update();
-		    var ses = resource.bytesInfo.updateAs(GByte.Buf::new)){
+		    var ses = resource.bytesInfo.updateAs(GByte.Buf::new);
+		    var colSes = resource.colors.updateAs(ColorU8.Buf::new)){
 			var instancesBuff = ses.val;
+			var colorBuff     = colSes.val;
+			
 			instancesBuff.position(resource.byteCount);
 			draws.setPos(start);
 			
@@ -479,7 +524,15 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				instancesBuff.put(buf);
 				buf.free();
 			}
+			
+			for(var e : colorIndex.entrySet()){
+				var color = e.getKey();
+				var index = e.getValue();
+				colorBuff.position(index).put(color);
+			}
+			
 			resource.byteCount = instancesBuff.position();
+			resource.colorCount += colorIndex.size();
 			var end = resource.instanceCount = draws.buffer.position();
 			
 			return new RenderToken(resource, start, end - start);
@@ -511,7 +564,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		                        .mul(transform);
 		
 		var data = ByteBuffer.allocateDirect(PushConstant.SIZEOF);
-		new PushConstant(data).set(mat, tileWidth, theme);
+		new PushConstant(data).set(mat, tileWidth);
 		buf.pushConstants(pipeline.layout, VkShaderStageFlag.VERTEX, 0, data);
 		for(RenderToken token : tokens){
 			buf.drawIndirect(resource.indirectDrawBuff, token.firstInstance, token.instanceCount);

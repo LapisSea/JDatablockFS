@@ -45,6 +45,7 @@ public sealed interface DeviceGC{
 		}
 		
 		public void destroyLater(VulkanResource resource){
+			if(resource == null) return;
 			var queuedSet = queuedSets[currentFrame];
 			synchronized(queuedSet){
 				if(!queuedSet.add(resource)){
@@ -70,6 +71,7 @@ public sealed interface DeviceGC{
 		
 		@Override
 		public void destroyLater(VulkanResource resource){
+			if(resource == null) return;
 			buffer.add(resource);
 		}
 		@Override
@@ -92,6 +94,7 @@ public sealed interface DeviceGC{
 	final class ImmediateGC implements DeviceGC{
 		@Override
 		public void destroyLater(VulkanResource resource){
+			if(resource == null) return;
 //			LogUtil.println("yeeting RIGHT NOW", resource);
 			try{
 				resource.destroy();

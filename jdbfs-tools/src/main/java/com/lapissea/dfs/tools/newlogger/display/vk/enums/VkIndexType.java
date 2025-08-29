@@ -52,7 +52,7 @@ public enum VkIndexType implements VUtils.IDValue{
 		return switch(this){
 			case UINT16 -> (char)CHAR_VIEW.get(indecies, offset);
 			case UINT32 -> (int)INT_VIEW.get(indecies, offset);
-			case UINT8 -> indecies[offset];
+			case UINT8 -> Byte.toUnsignedInt(indecies[offset]);
 		};
 	}
 	

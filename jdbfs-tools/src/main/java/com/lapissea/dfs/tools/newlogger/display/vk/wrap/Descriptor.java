@@ -109,11 +109,16 @@ public final class Descriptor{
 			private final int              binding;
 			private final VkDescriptorType type;
 			private final VkBuffer         buffer;
+			private final int              offset;
 			
 			public TypeBuff(int binding, VkDescriptorType type, VkBuffer buffer){
+				this(binding, type, buffer, 0);
+			}
+			public TypeBuff(int binding, VkDescriptorType type, VkBuffer buffer, int offset){
 				this.binding = binding;
 				this.type = type;
 				this.buffer = buffer;
+				this.offset = offset;
 			}
 			
 			@Override
@@ -121,7 +126,7 @@ public final class Descriptor{
 				
 				var info = VkDescriptorBufferInfo.calloc(stack);
 				info.buffer(buffer.handle)
-				    .offset(0)
+				    .offset(offset)
 				    .range(buffer.size);
 				var write = VkWriteDescriptorSet.calloc(stack);
 				write.dstBinding(binding)

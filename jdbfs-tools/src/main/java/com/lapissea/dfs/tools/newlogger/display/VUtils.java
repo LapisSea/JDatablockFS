@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display;
 
+import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.Flags;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkFormat;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkResult;
@@ -263,7 +264,14 @@ public final class VUtils{
 			default -> Float.intBitsToFloat(((half&0x8000)<<16)|(((half&0x7c00) + 0x1C000)<<13)|((half&0x03FF)<<13));
 		};
 	}
+	
 	public static int toRGBAi4(Color color){
 		return color.getRed()|(color.getGreen()<<8)|(color.getBlue()<<16)|(color.getAlpha()<<24);
+	}
+	
+	public static void copyDestroy(DeviceGC deviceGC, BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
+		if(oldBuff == null) return;
+		oldBuff.transferTo(newBuff);
+		deviceGC.destroyLater(oldBuff);
 	}
 }

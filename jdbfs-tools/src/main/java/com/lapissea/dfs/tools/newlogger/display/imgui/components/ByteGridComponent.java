@@ -195,6 +195,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		try{
 			drawByteRanges(ctx, List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
+			multiRenderer.renderBytes(ctx.deviceGC, 0, null, List.of(), Iters.from(frameData.writes()).map(r -> new ByteGridRender.IOEvent((int)r.start, (int)r.end(), ByteGridRender.IOEvent.Type.WRITE)));
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -261,18 +262,18 @@ public class ByteGridComponent extends BackbufferComponent{
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
 		
 		Supplier<IterableLongPP> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
-
-//		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
-//
-//		fillByteRange(
-//			gridSize,
-//			Iters.from(ranges).map(r -> {
-//				if(r.to()<ctx.getDataSize()) return null;
-//				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
-//				return r;
-//			}).nonNulls(),
-//			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
-//		);
+		
+		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
+		
+		fillByteRange(
+			gridSize,
+			Iters.from(ranges).map(r -> {
+				if(r.to()<ctx.getDataSize()) return null;
+				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
+				return r;
+			}).nonNulls(),
+			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
+		);
 		
 		for(var range : clampedOverflow){
 			var from  = Math.toIntExact(range.from());

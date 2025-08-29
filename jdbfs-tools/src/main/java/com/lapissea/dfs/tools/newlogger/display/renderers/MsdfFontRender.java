@@ -300,13 +300,13 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			boolean update = dsSet == null;
 			if(quads == null || quads.elementCount()<quadCount){
 				var newBuff = device.allocateHostBuffer(quadCount*(long)Quad.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Quad::new);
-				copyDestroy(deviceGC, quads, newBuff);
+				VUtils.copyDestroy(deviceGC, quads, newBuff);
 				quads = newBuff;
 				update = true;
 			}
 			if(uniform == null || uniform.elementCount()<uniformCount){
 				var newBuff = device.allocateHostBuffer(uniformCount*(long)Uniform.SIZEOF, VkBufferUsageFlag.STORAGE_BUFFER).asTyped(Uniform::new);
-				copyDestroy(deviceGC, uniform, newBuff);
+				VUtils.copyDestroy(deviceGC, uniform, newBuff);
 				uniform = newBuff;
 				update = true;
 			}
@@ -327,11 +327,6 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 					new Descriptor.LayoutDescription.TypeBuff(1, VkDescriptorType.STORAGE_BUFFER, quads.buffer)
 				));
 			}
-		}
-		private void copyDestroy(DeviceGC deviceGC, BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
-			if(oldBuff == null) return;
-			oldBuff.transferTo(newBuff);
-			deviceGC.destroyLater(oldBuff);
 		}
 		
 		public void reset(){
