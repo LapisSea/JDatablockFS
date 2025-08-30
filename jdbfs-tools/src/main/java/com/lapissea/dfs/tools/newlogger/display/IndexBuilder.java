@@ -43,7 +43,9 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 	}
 	public IndexBuilder(int initialCapacity, VkIndexType type){
 		this.initialCapacity = initialCapacity;
-		if(initialCapacity<2) throw new IllegalArgumentException("initial capacity should be greater than 1");
+		if(initialCapacity<2){
+			throw new IllegalArgumentException("initial capacity should be greater than 1");
+		}
 		setType(type);
 	}
 	
@@ -87,10 +89,11 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		var neededMem   = indices.length*siz;
 		int transferred = noResize? 0 : growCheckPartialTransfer(indices, indexOffset, neededMem);
 		
-		for(int i = transferred; i<indices.length; i++){
-			type.write(buffer, bufferPos + i*siz, indices[i] + indexOffset);
+		var count = indices.length - transferred;
+		for(int i = 0; i<count; i++){
+			type.write(buffer, bufferPos + i*siz, indices[i + transferred] + indexOffset);
 		}
-		bufferPos += indices.length*siz;
+		bufferPos += count*siz;
 		elementSize += indices.length;
 	}
 	private int growCheckPartialTransfer(int[] indices, int indexOffset, int neededMem){
@@ -205,15 +208,19 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		
 		var totalElementCapacity = Iters.concatN1(buffers, buffer).mapToInt(e -> e.length).sum()/oldByteSize;
 		
-		var newBuffer = new byte[totalElementCapacity*newByteSize];
-		for(var bb : Iters.concatN1(buffers, buffer)){
-			for(int i = 0, lim = bb.length; i<lim; i += oldByteSize){
-				newType.write(newBuffer, i*newByteSize, oldType.read(bb, i*oldByteSize));
+		var newBuffer  = new byte[totalElementCapacity*newByteSize];
+		var oldBuff    = buffer;
+		var oldBuffPos = bufferPos;
+		bufferPos = 0;
+		setBuffer(newBuffer);
+		for(var bb : Iters.concatN1(buffers, oldBuff)){
+			var byteCount = bb == oldBuff? oldBuffPos : bb.length;
+			for(int i = 0; i<byteCount; i += oldByteSize){
+				newType.write(newBuffer, bufferPos + i*newByteSize, oldType.read(bb, i*oldByteSize));
 			}
+			bufferPos += (byteCount/oldByteSize)*newByteSize;
 		}
 		buffers.clear();
-		setBuffer(newBuffer);
-		setType(newType);
 	}
 	
 	private void setBuffer(byte[] newBuffer){
@@ -304,6 +311,18 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 				destType.write(iboBuff, off + type.read(buffer, i*byteSize));
 			}
 		}
+	}
+	
+	public void clear(){
+		buffers.clear();
+		buffer = null;
+		
+		bufferPos = 0;
+		
+		elementSize = 0;
+		
+		setType(VkIndexType.UINT8);
+		maxValue = -1;
 	}
 	
 }

@@ -27,8 +27,11 @@ import com.lapissea.dfs.run.checked.CheckMap;
 import com.lapissea.dfs.run.checked.CheckSet;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
+import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzSequence;
 import com.lapissea.fuzz.FuzzSequenceSource;
@@ -43,6 +46,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
+import org.assertj.core.api.Assertions;
 import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
@@ -58,6 +62,8 @@ import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -646,6 +652,104 @@ public class SlowTests{
 		stableRun(
 			Plan.start(runner, 69, 200_000, 2000),
 			"fuzzHashMap"
+		);
+	}
+	
+	
+	sealed interface IndexBuilderAction{
+		record Clear() implements IndexBuilderAction{ }
+		
+		record AddOne(int offset, int i) implements IndexBuilderAction{ }
+		
+		record AddManyArr(int offset, int[] is) implements IndexBuilderAction{
+			@Override
+			public boolean equals(Object obj){
+				return obj instanceof AddManyArr(int offset1, int[] is1) && this.offset == offset1 && Arrays.equals(is, is1);
+			}
+		}
+		
+		record AddManyIter(int offset, IterableIntPP is) implements IndexBuilderAction{
+			@Override
+			public boolean equals(Object obj){
+				return obj instanceof AddManyIter(int offset1, var is1) && this.offset == offset1 && Arrays.equals(is.toArray(), is1.toArray());
+			}
+		}
+	}
+	@Test
+	void fuzzIndexBuilder(){
+		
+		record State(IndexBuilder ib, List<Integer> reference){ }
+		var rnr = new FuzzingStateEnv.Marked<State, IndexBuilderAction, IOException>(){
+			@Override
+			public void applyAction(State state, long actionIndex, IndexBuilderAction action, RunMark mark) throws IOException{
+				boolean deb;
+				deb = mark.hasAction()? mark.action(actionIndex) : mark.hasSequence();
+				if(deb){
+					LogUtil.println(action);
+					LogUtil.println(state.reference);
+					int a = 0;//for breakpoint
+				}
+				
+				switch(action){
+					case IndexBuilderAction.Clear() -> {
+						state.ib.clear();
+						state.reference.clear();
+					}
+					case IndexBuilderAction.AddOne(var off, var i) -> {
+						state.ib.addOffset(i, off);
+						state.reference.add(off + i);
+					}
+					case IndexBuilderAction.AddManyArr(var off, var is) -> {
+						state.ib.addOffset(is, off);
+						for(int i : is) state.reference.add(off + i);
+					}
+					case IndexBuilderAction.AddManyIter(var off, var is) -> {
+						state.ib.addOffset(is, off);
+						is.forEach(i -> { state.reference.add(off + i); });
+					}
+				}
+				
+				Assertions.assertThat(state.ib.elementSize()).isEqualTo(state.reference.size());
+				
+				var bb = ByteBuffer.allocate(state.ib.elementSize()*state.ib.getType().byteSize).order(ByteOrder.nativeOrder());
+				state.ib.transferTo(bb, state.ib.getType(), 0);
+				Assertions.assertThat(bb.capacity()).isEqualTo(bb.position());
+				
+				var expected = Iters.from(state.reference).mapToInt().toArray();
+				var actual   = state.ib.toArray();
+				Assertions.assertThat(actual).isEqualTo(expected);
+			}
+			
+			@Override
+			public State create(RandomGenerator random, long sequenceIndex, RunMark mark){
+				IndexBuilder ib;
+				if(random.nextBoolean()){
+					ib = new IndexBuilder();
+				}else{
+					ib = new IndexBuilder(random.nextInt(200) + 2);
+				}
+				return new State(ib, new ArrayList<>());
+			}
+		};
+		
+		var runner = new FuzzingRunner<>(rnr, RNGType.<IndexBuilderAction>of(List.of(
+			r -> new IndexBuilderAction.Clear()
+			, r -> new IndexBuilderAction.AddOne(
+				(int)(Math.pow(r.nextFloat(), 2)*500), r.nextInt(200)
+			)
+			, r -> new IndexBuilderAction.AddManyArr(
+				(int)(Math.pow(r.nextFloat(), 2)*500),
+				Iters.range(0, r.nextInt(10) + 1).map(i -> r.nextInt(200)).toArray()
+			)
+			, r -> new IndexBuilderAction.AddManyIter(
+				(int)(Math.pow(r.nextFloat(), 2)*500),
+				Iters.ofInts(Iters.range(0, r.nextInt(10) + 1).map(i -> r.nextInt(200)).toArray())
+			)
+		)).chanceFor(IndexBuilderAction.Clear.class, 1F/1000));
+		
+		stableRun(
+			Plan.start(runner, 69, 2_000_000, 2000),
+			"fuzzIndexBuilder"
 		);
 	}
 	
