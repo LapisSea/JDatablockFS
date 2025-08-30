@@ -24,7 +24,6 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
@@ -38,9 +37,9 @@ import java.awt.Color;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntPredicate;
-import java.util.function.Supplier;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
@@ -261,17 +260,14 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
 		
-		Supplier<IterableLongPP> clampedInts = () -> DrawUtils.Range.toInts(clampedOverflow);
-		
 		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
 		
 		fillByteRange(
 			gridSize,
-			Iters.from(ranges).map(r -> {
-				if(r.to()<ctx.getDataSize()) return null;
+			Iters.from(ranges).filter(r -> r.to()>=ctx.getDataSize()).map(r -> {
 				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
 				return r;
-			}).nonNulls(),
+			}),
 			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
 		);
 		
@@ -288,18 +284,29 @@ public class ByteGridComponent extends BackbufferComponent{
 			var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
 			
 			var fr       = multiRenderer.getFontRender();
-			var width    = gridSize.windowSize().width;
+			var width    = gridSize.bytesPerRow();
 			var byteSize = gridSize.byteSize();
-			List<StringDraw> chars =
-				clampedInts.get().filter(i -> {
-					int ub = getUint8(ctx, i);
-					return fr.canDisplay((char)ub);
-				}).box().flatOptionalsM(i -> {
-					int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
-					float xF = byteSize*xi, yF = byteSize*yi;
-					
-					return stringDrawIn(Character.toString((char)getUint8(ctx, i)), new GridUtils.Rect(xF, yF, byteSize, byteSize), c, byteSize, false);
-				}).toList();
+			
+			List<StringDraw> chars = new ArrayList<>();
+			
+			var it = DrawUtils.Range.toInts(clampedOverflow).iterator();
+			
+			while(it.hasNext()){
+				var  i  = it.nextLong();
+				char ub = (char)getUint8(ctx, i);
+				
+				if(!fr.canDisplay(ub)){
+					continue;
+				}
+				
+				int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
+				float xF = byteSize*xi, yF = byteSize*yi;
+				
+				if(stringDrawIn(Character.toString(ub), new GridUtils.Rect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Some(var sd)){
+					chars.add(sd);
+				}
+			}
+			
 			multiRenderer.renderFont(chars);
 		}
 		for(var range : clampedOverflow){
@@ -317,8 +324,9 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	private static int getUint8(RenderContext ctx, long i){
 		int ub;
-		try{
-			ub = ctx.frameData.contents().ioMapAt(i, ContentReader::readUnsignedInt1);
+		var contents = ctx.frameData.contents();
+		try(var io = contents.ioAt(i)){
+			ub = io.readUnsignedInt1();
 		}catch(IOException e){
 			throw new UncheckedIOException(e);
 		}

@@ -91,6 +91,7 @@ public class MultiRendererBuffer implements VulkanResource{
 	}
 	
 	public void renderMesh(Geometry.IndexedMesh mesh){
+		if(mesh.verts().size() == 0) return;
 		getTokenSet(TokenSet.Meshes.class).meshes.add(mesh);
 	}
 	

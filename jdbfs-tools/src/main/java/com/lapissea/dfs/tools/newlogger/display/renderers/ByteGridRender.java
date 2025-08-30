@@ -478,7 +478,10 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		boolean updateSet = false;
 		
 		{
-			var cap    = nonNullBuffers.mapToInt(CustomBuffer::remaining).sum() + resource.byteCount;
+			int cap = resource.byteCount;
+			for(var buff : nonNullBuffers){
+				cap += buff.remaining();
+			}
 			var oldCap = BackedVkBuffer.size(resource.bytesInfo, GByte.SIZEOF);
 			if(resource.bytesInfo == null || oldCap<cap){
 				var newBuff = device.allocateHostBuffer(GByte.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);

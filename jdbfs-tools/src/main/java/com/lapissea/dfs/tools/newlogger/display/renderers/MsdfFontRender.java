@@ -1,5 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.carrotsearch.hppc.CharObjectHashMap;
+import com.carrotsearch.hppc.CharObjectMap;
 import com.lapissea.dfs.tools.DrawFont;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
@@ -34,12 +36,11 @@ import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, MsdfFontRender.RenderToken>{
@@ -382,9 +383,30 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 				int vertPos()  { return quadPos*6; }
 				int vertCount(){ return quadCount*6; }
 			}
-			Map<String, InstancePos> instanceMap = HashMap.newHashMap(strs.size());
-			int                      quadCounter = resource.quadPos;
-			int                      instance    = resource.uniformPos;
+			CharObjectMap<InstancePos> charInstanceMap = new CharObjectHashMap<>(128);
+			var instanceMap = new HashMap<String, InstancePos>((int)Math.ceil(strs.size()/0.75)){
+				@Override
+				public InstancePos put(String key, InstancePos value){
+					if(key.length() == 1){
+						var c = key.charAt(0);
+						return charInstanceMap.put(c, value);
+					}
+					return super.put(key, value);
+				}
+				public InstancePos get(String key){
+					if(key.length() == 1){
+						var c = key.charAt(0);
+						return charInstanceMap.get(c);
+					}
+					return super.get(key);
+				}
+				@Override
+				public InstancePos get(Object key){
+					return get((String)key);
+				}
+			};
+			int quadCounter = resource.quadPos;
+			int instance    = resource.uniformPos;
 			
 			VkDrawIndirectCommand drawCall = null;
 			
@@ -460,9 +482,21 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		int instanceCount = resource.uniformPos;
 		int quadCount     = resource.quadPos;
 		
-		Set<String> uniqueStrings = HashSet.newHashSet(strs.size());
-		int         drawCallCount = resource.drawStart;
-		String      lastStr       = null;
+		BitSet uniqueChars = new BitSet(255);
+		var uniqueStrings = new HashSet<String>((int)Math.ceil(strs.size()/0.75)){
+			@Override
+			public boolean add(String s){
+				if(s.length() == 1){
+					var c     = s.charAt(0);
+					var empty = !uniqueChars.get(c);
+					if(empty) uniqueChars.set(c);
+					return empty;
+				}
+				return super.add(s);
+			}
+		};
+		int    drawCallCount = resource.drawStart;
+		String lastStr       = null;
 		for(StringDraw str : strs){
 			if(str.outline>0 && str.pixelHeight<outlineCutoff) continue;
 			var s = str.string;

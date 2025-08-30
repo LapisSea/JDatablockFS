@@ -209,6 +209,17 @@ public final class GridUtils{
 	static Match<StringDraw> stringDrawIn(MsdfFontRender fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){
 		if(s.isEmpty()) return Match.empty();
 		
+		noneCanRender:
+		{
+			for(int i = 0, j = s.length(); i<j; i++){
+				var c = s.charAt(i);
+				if(fontRender.canDisplay(c)){
+					break noneCanRender;
+				}
+			}
+			return Match.empty();
+		}
+		
 		if(area.height<fontScale){
 			fontScale = area.height;
 		}

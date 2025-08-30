@@ -53,6 +53,8 @@ public final class SettingsUIComponent implements UIComponent{
 	public final int[]         statsLevel              = {0};
 	public final ImBoolean     imageViewerOpen         = new ImBoolean();
 	public final ImBoolean     byteGridOpen            = new ImBoolean(true);
+	public final ImBoolean     messagesOpen            = new ImBoolean(true);
+	public final ImBoolean     frameStacktraceOpen     = new ImBoolean(true);
 	public final ImInt         byteGridSampleEnumIndex = new ImInt(2);
 	public final ImString      currentSessionName      = new ImString();
 	public final SessionRange  currentSessionRange     = new SessionRange(new int[1], new ImInt(-1), new ImInt(-1));
@@ -109,8 +111,13 @@ public final class SettingsUIComponent implements UIComponent{
 			ImGui.separator();
 			sessionRangeUI(optSession.get());
 			
-			if(frameStacktrace != null && !frameStacktrace.isBlank()){
-				if(ImGui.begin("Frame Stacktrace")){
+			ImGui.separator();
+			
+			if(enableButton("Frame stacktrace", frameStacktraceOpen.get())){
+				frameStacktraceOpen.set(true);
+			}
+			if(frameStacktrace != null && !frameStacktrace.isBlank() && frameStacktraceOpen.get()){
+				if(ImGui.begin("Frame Stacktrace", frameStacktraceOpen)){
 					ImGui.text(frameStacktrace);
 				}
 				ImGui.end();
@@ -139,6 +146,10 @@ public final class SettingsUIComponent implements UIComponent{
 		ImGui.sameLine();
 		if(enableButton("Byte grid viewer", byteGridOpen.get())){
 			byteGridOpen.set(true);
+		}
+		ImGui.sameLine();
+		if(enableButton("Messages", messagesOpen.get())){
+			messagesOpen.set(true);
 		}
 	}
 	

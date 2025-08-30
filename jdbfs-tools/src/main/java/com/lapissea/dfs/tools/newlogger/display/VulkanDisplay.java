@@ -72,7 +72,7 @@ public class VulkanDisplay implements AutoCloseable{
 			imHandler.addComponent(
 				byteGridComponent = new ByteGridComponent(core, uiSettings.byteGridOpen, uiSettings, uiMessages)
 			);
-			imHandler.addComponent(new MessagesComponent(uiMessages));
+			imHandler.addComponent(new MessagesComponent(uiMessages, "Messages", uiSettings.messagesOpen));
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
