@@ -73,9 +73,27 @@ public class ColorU8 extends Struct<ColorU8>{
 		MemoryUtil.memPutInt(address(), r|(g<<8)|(b<<16)|(a<<24));
 	}
 	
+	public byte getR()  { return MemoryUtil.memGetByte(address() + R); }
+	public byte getG()  { return MemoryUtil.memGetByte(address() + G); }
+	public byte getB()  { return MemoryUtil.memGetByte(address() + B); }
+	public byte getA()  { return MemoryUtil.memGetByte(address() + A); }
+	public int getRGBA(){ return MemoryUtil.memGetInt(address()); }
+	public Color getColor(){
+		return new Color(Byte.toUnsignedInt(getR()), Byte.toUnsignedInt(getG()), Byte.toUnsignedInt(getB()), Byte.toUnsignedInt(getA()));
+	}
+	
 	public ColorU8(long address){ super(address, null); }
 	@Override
 	public ColorU8 create(long address, ByteBuffer container){ return new ColorU8(address); }
 	@Override
 	public int sizeof(){ return SIZEOF; }
+	
+	@Override
+	public String toString(){
+		return "#" +
+		       Integer.toHexString(Byte.toUnsignedInt(getR())) +
+		       Integer.toHexString(Byte.toUnsignedInt(getG())) +
+		       Integer.toHexString(Byte.toUnsignedInt(getB())) +
+		       Integer.toHexString(Byte.toUnsignedInt(getA()));
+	}
 }

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.carrotsearch.hppc.IntIntHashMap;
 import com.lapissea.dfs.tools.newlogger.IOFrame;
 import com.lapissea.dfs.tools.newlogger.display.ColorU8;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
@@ -40,11 +41,9 @@ import org.roaringbitmap.RoaringBitmap;
 import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 
 public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, ByteGridRender.RenderToken>{
 	
@@ -144,7 +143,11 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			}
 		}
 		
-		char index(){ return (char)MemoryUtil.memGetShort(address() + INDEX); }
+		char index()    { return (char)MemoryUtil.memGetShort(address() + INDEX); }
+		
+		byte value()    { return MemoryUtil.memGetByte(address() + VALUE); }
+		
+		int colorIndex(){ return Byte.toUnsignedInt(MemoryUtil.memGetByte(address() + COLOR_INDEX)); }
 		
 		void set(char index, byte value, int byteIndex){
 			var address = address();
@@ -158,9 +161,16 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		protected GByte create(long address, ByteBuffer container){ return new GByte(address); }
 		@Override
 		public int sizeof(){ return SIZEOF; }
+		
+		@Override
+		public String toString(){
+			return "GByte{index=" + (int)index() + ", value=0x" + Integer.toHexString(Byte.toUnsignedInt(value())) + ",  colorIndex=" + colorIndex() + "}";
+		}
 	}
 	
 	private record MeshInfo(int vertPos, int vertCount){ }
+	
+	private record IndexedColor(int rgba, int index){ }
 	
 	public static final class RenderResource implements ResourceBuffer{
 		
@@ -170,14 +180,26 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 		private IndirectDrawBuffer indirectDrawBuff;
 		
+		private final IntIntHashMap colorIndex = new IntIntHashMap();
+		
 		private int instanceCount;
-		private int colorCount;
 		private int byteCount;
 		
 		public void reset(){
 			instanceCount = 0;
-			colorCount = 0;
 			byteCount = 0;
+			colorIndex.clear();
+		}
+		
+		private int colorToIndex(Color color, List<IndexedColor> toUpdate){
+			var ic    = VUtils.toRGBAi4(color);
+			var map   = colorIndex;
+			var index = map.indexOf(ic);
+			if(index>=0) return map.indexGet(index);
+			var i = map.size();
+			map.put(ic, i);
+			toUpdate.add(new IndexedColor(ic, i));
+			return i;
 		}
 		
 		private void updateDescriptor(){
@@ -419,13 +441,11 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	}
 	
 	public RenderToken record(DeviceGC deviceGC, RenderResource resource, long dataOffset, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
-		GByte.Buf[]         byteBuffers = new GByte.Buf[257];
-		Map<Color, Integer> colorIndex  = new HashMap<>();
-		Function<Color, Integer> colorToIndex = color -> colorIndex.computeIfAbsent(color, c -> {
-			return resource.colorCount + colorIndex.size();
-		});
+		GByte.Buf[]        byteBuffers = new GByte.Buf[257];
+		List<IndexedColor> toUpdate    = new ArrayList<>();
 		
 		for(DrawRange range : ranges){
+			var colorIndex = resource.colorToIndex(range.color, toUpdate);
 			for(char i = range.from; i<range.to; i++){
 				var dataI = (int)(i - dataOffset);
 				var b     = Byte.toUnsignedInt(data[dataI]);
@@ -439,7 +459,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 					buf.free();
 					buf = byteBuffers[b] = nb;
 				}
-				buf.put(i, data[dataI], colorToIndex.apply(range.color));
+				buf.put(i, data[dataI], colorIndex);
 			}
 		}
 		
@@ -454,11 +474,17 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			}
 			var ioBuff    = byteBuffers[256] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*count));
 			var eventType = EventType.of(ioEvents);
+			
+			int[] colorIds = new int[4];
+			Arrays.fill(colorIds, -1);
+			
 			allEvents.forEach((IntConsumer)i -> {
 				var offset  = (char)i;
 				var read    = eventType.hasRead(offset);
 				var write   = eventType.hasWrite(offset);
-				var colorID = colorToIndex.apply(new Color(write? 255 : 0, 255, read? 255 : 0));
+				var pos     = (read? 0b01 : 0)|(write? 0b10 : 0);
+				var colorID = colorIds[pos];
+				if(colorID == -1) colorID = colorIds[pos] = resource.colorToIndex(new Color(write? 255 : 0, 255, read? 255 : 0), toUpdate);
 				ioBuff.put(offset, (byte)0, colorID);
 			});
 		}
@@ -491,7 +517,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			}
 		}
 		{
-			var cap    = resource.colorCount + colorIndex.size();
+			var cap    = resource.colorIndex.size();
 			var oldCap = BackedVkBuffer.size(resource.colors, ColorU8.SIZEOF);
 			if(resource.colors == null || oldCap<cap){
 				var newBuff = device.allocateHostBuffer(ColorU8.SIZEOF*Math.max(cap, (long)(oldCap*1.5)), VkBufferUsageFlag.STORAGE_BUFFER);
@@ -528,14 +554,11 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				buf.free();
 			}
 			
-			for(var e : colorIndex.entrySet()){
-				var color = e.getKey();
-				var index = e.getValue();
-				colorBuff.position(index).put(color);
+			for(IndexedColor ic : toUpdate){
+				colorBuff.position(ic.index).put(ic.rgba);
 			}
 			
 			resource.byteCount = instancesBuff.position();
-			resource.colorCount += colorIndex.size();
 			var end = resource.instanceCount = draws.buffer.position();
 			
 			return new RenderToken(resource, start, end - start);

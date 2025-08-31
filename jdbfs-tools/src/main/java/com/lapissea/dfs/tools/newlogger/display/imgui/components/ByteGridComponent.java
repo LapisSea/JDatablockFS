@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
@@ -23,6 +24,8 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
+import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -31,13 +34,13 @@ import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
-import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.awt.Color;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.function.IntPredicate;
 
@@ -54,7 +57,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
 	public static final class RenderContext{
-		private final Roaring64Bitmap          filled = new Roaring64Bitmap();
+		private final BitSet                   filled;
 		private final SessionSetView.FrameData frameData;
 		public final  GridUtils.ByteGridSize   gridSize;
 		public final  DeviceGC                 deviceGC;
@@ -66,6 +69,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			this.frameData = frameData;
 			this.gridSize = gridSize;
 			this.deviceGC = deviceGC;
+			filled = new BitSet(Math.toIntExact(getDataSize()));
 		}
 		
 		long getDataSize(){
@@ -86,11 +90,15 @@ public class ByteGridComponent extends BackbufferComponent{
 			}
 		}
 		
-		boolean isNotFilled(long idx)   { return !filled.contains(idx); }
-		boolean isFilled(long idx)      { return filled.contains(idx); }
-		void fill(long idx)             { filled.addLong(idx); }
+		boolean isNotFilled(long idx)   { return !filled.get(Math.toIntExact(idx)); }
+		boolean isFilled(long idx)      { return filled.get(Math.toIntExact(idx)); }
+		void fill(long idx)             { filled.set(Math.toIntExact(idx)); }
 		void fill(DrawUtils.Range range){ fill(range.from(), range.to()); }
-		void fill(long start, long end) { filled.addRange(start, end); }
+		void fill(long start, long end){
+			for(long i = start; i<end; i++){
+				filled.set(Math.toIntExact(i));
+			}
+		}
 		
 	}
 	
@@ -185,7 +193,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			
 			var vsp = DataProvider.newVerySimpleProvider(frameData.contents());
 			for(Chunk chunk : vsp.getFirstChunk().chunksAhead()){
-				annotateChunk(chunk);
+				annotateChunk(ctx, chunk);
 			}
 		}catch(IOException ignore){
 			messages.add("Does not have valid magic ID");
@@ -333,12 +341,15 @@ public class ByteGridComponent extends BackbufferComponent{
 		return ub;
 	}
 	
-	private void annotateChunk(Chunk chunk){
-		annotateStruct(chunk);
+	private void annotateChunk(RenderContext ctx, Chunk chunk) throws VulkanCodeException, IOException{
+		annotateStruct(ctx, chunk, Chunk.PIPE, chunk.getPtr().getValue());
 	}
 	
-	private void annotateStruct(Chunk chunk){
-	
+	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx, T instance, StructPipe<T> pipe, long offset) throws VulkanCodeException, IOException{
+		
+		var size = pipe.calcUnknownSize(null, instance, WordSpace.BYTE);
+		drawByteRanges(ctx, List.of(new Range(offset, offset + size)), Color.cyan, false, true);
+		
 	}
 	
 	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){

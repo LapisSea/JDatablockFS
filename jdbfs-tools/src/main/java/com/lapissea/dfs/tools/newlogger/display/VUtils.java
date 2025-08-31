@@ -91,7 +91,13 @@ public final class VUtils{
 	}
 	public static String vkObjToString(Pointer obj, boolean typeName){
 		if(obj == null) return "null";
-		var cls   = obj.getClass();
+		var cls = obj.getClass();
+		if(cls.getPackage().getName().startsWith("com.lapissea.dfs.")){
+			try{
+				cls.getDeclaredMethod("toString");
+				return obj.toString();
+			}catch(NoSuchMethodException ignored){ }
+		}
 		var stack = STR_STACK.get();
 		var fieldMethods = Iters.from(cls.getDeclaredMethods()).sortedBy(Method::getName).filter(
 			e -> e.getParameterCount() == 0 && !Modifier.isStatic(e.getModifiers()) && Modifier.isPublic(e.getModifiers()) &&
