@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import org.joml.Intersectionf;
@@ -15,11 +16,29 @@ public final class Geometry{
 	
 	public interface Path{
 		PointsLine toPoints();
+		DrawUtils.Rect boundingBox();
 	}
 	
 	public record PointsLine(List<Vector2f> points, float width, Color color, boolean miterJoints) implements Path{
 		@Override
 		public PointsLine toPoints(){ return this; }
+		@Override
+		public DrawUtils.Rect boundingBox(){
+			if(points.isEmpty()){
+				return new DrawUtils.Rect(0, 0, 0, 0);
+			}
+			var min = new Vector2f(points.getFirst());
+			var max = new Vector2f(points.getFirst());
+			
+			for(Vector2f point : points){
+				min.min(point);
+				max.max(point);
+			}
+			var rad = width/2;
+			min.sub(width, rad);
+			max.add(width, rad);
+			return new DrawUtils.Rect(min.x, min.y, max.x - min.x, max.y - min.y);
+		}
 	}
 	
 	public record BezierCurve(List<Vector2f> controlPoints, float width, Color color, int resolution, double epsilon) implements Path{
@@ -29,6 +48,11 @@ public final class Geometry{
 			var reduced = epsilon>0? douglasPeuckerReduce(points, epsilon) : points;
 			return new PointsLine(reduced, width, color, false);
 		}
+		@Override
+		public DrawUtils.Rect boundingBox(){
+			return catmullRomBounds(controlPoints, width/2);
+		}
+		
 	}
 	
 	public record Vertex(Vector2f pos, Color color){ }
@@ -276,10 +300,7 @@ public final class Geometry{
 		return result;
 	}
 	
-	public static List<Vector2f> interpolateBezier(Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3, int steps){
-		return interpolateBezier(new ArrayList<>(steps + 1), p0, p1, p2, p3, steps, 0);
-	}
-	public static List<Vector2f> interpolateBezier(List<Vector2f> dest, Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3, int steps, int start){
+	public static void interpolateBezier(List<Vector2f> dest, Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3, int steps, int start){
 		for(int i = start; i<=steps; i++){
 			double t = i/(double)steps;
 			double x = Math.pow(1 - t, 3)*p0.x +
@@ -292,7 +313,98 @@ public final class Geometry{
 			           Math.pow(t, 3)*p3.y;
 			dest.add(new Vector2f((float)x, (float)y));
 		}
-		return dest;
 	}
+	
+	public static DrawUtils.Rect catmullRomBounds(List<Vector2f> points, float rad){
+		if(points.size()<2) return new DrawUtils.Rect(0, 0, 0, 0);
+		
+		float minX = Float.POSITIVE_INFINITY;
+		float minY = Float.POSITIVE_INFINITY;
+		float maxX = Float.NEGATIVE_INFINITY;
+		float maxY = Float.NEGATIVE_INFINITY;
+		
+		for(int i = 0; i<points.size() - 1; i++){
+			var p0 = i>0? points.get(i - 1) : points.get(i);
+			var p1 = points.get(i);
+			var p2 = points.get(i + 1);
+			var p3 = (i + 2<points.size())? points.get(i + 2) : p2;
+			
+			Vector2f c1 = new Vector2f(
+				(float)(p1.x + (p2.x - p0.x)/6.0),
+				(float)(p1.y + (p2.y - p0.y)/6.0)
+			);
+			Vector2f c2 = new Vector2f(
+				(float)(p2.x - (p3.x - p1.x)/6.0),
+				(float)(p2.y - (p3.y - p1.y)/6.0)
+			);
+			
+			// check extrema for this cubic
+			float[] xs = bezierExtrema(p1.x, c1.x, c2.x, p2.x);
+			float[] ys = bezierExtrema(p1.y, c1.y, c2.y, p2.y);
+			
+			for(float t : xs){
+				Vector2f pt = cubicPoint(p1, c1, c2, p2, t);
+				minX = Math.min(minX, pt.x);
+				maxX = Math.max(maxX, pt.x);
+				minY = Math.min(minY, pt.y);
+				maxY = Math.max(maxY, pt.y);
+			}
+			for(float t : ys){
+				Vector2f pt = cubicPoint(p1, c1, c2, p2, t);
+				minX = Math.min(minX, pt.x);
+				maxX = Math.max(maxX, pt.x);
+				minY = Math.min(minY, pt.y);
+				maxY = Math.max(maxY, pt.y);
+			}
+		}
+		
+		minX -= rad;
+		maxX += rad;
+		minY -= rad;
+		maxY += rad;
+		
+		return new DrawUtils.Rect(minX, minY, maxX - minX, maxY - minY);
+	}
+	
+	private static float[] bezierExtrema(float p0, float p1, float p2, float p3){
+		float a = -p0 + 3*p1 - 3*p2 + p3;
+		float b = 2*(p0 - 2*p1 + p2);
+		float c = -p0 + p1;
+		
+		float[] result = new float[4];
+		int     count  = 0;
+		
+		result[count++] = 0f;
+		result[count++] = 1f;
+		
+		float discriminant = b*b - 4*a*c;
+		if(Math.abs(a)<1e-8){
+			if(Math.abs(b)>1e-8){
+				float t = -c/b;
+				if(t>0 && t<1) result[count++] = t;
+			}
+		}else if(discriminant>=0){
+			float sqrtD = (float)Math.sqrt(discriminant);
+			float t1    = (-b + sqrtD)/(2*a);
+			float t2    = (-b - sqrtD)/(2*a);
+			if(t1>0 && t1<1) result[count++] = t1;
+			if(t2>0 && t2<1) result[count++] = t2;
+		}
+		
+		return Arrays.copyOf(result, count);
+	}
+	
+	private static Vector2f cubicPoint(Vector2f p0, Vector2f p1, Vector2f p2, Vector2f p3, float t){
+		float u   = 1 - t;
+		float tt  = t*t;
+		float uu  = u*u;
+		float uuu = uu*u;
+		float ttt = tt*t;
+		
+		float x = uuu*p0.x + 3*uu*t*p1.x + 3*u*tt*p2.x + ttt*p3.x;
+		float y = uuu*p0.y + 3*uu*t*p1.y + 3*u*tt*p2.y + ttt*p3.y;
+		return new Vector2f(x, y);
+	}
+	
 	
 }

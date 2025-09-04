@@ -34,6 +34,7 @@ import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
+import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -396,4 +397,13 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.destroy();
 	}
 	
+	private void testCurve(){
+		var t = (System.currentTimeMillis())/500D;
+		
+		var controlPoints = Iters.of(3D, 2D, 1D, 4D, 5D).enumerate((i, s) -> new Vector2f(
+			(float)Math.sin(t/s)*100 + 200*(i + 1),
+			(float)Math.cos(t/s)*100 + 200
+		)).toList();
+		multiRenderer.renderLines(List.of(new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3)));
+	}
 }
