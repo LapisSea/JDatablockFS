@@ -1,15 +1,25 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TypeGenTests{
+	
+	static class JustAnInt extends IOInstance.Managed<JustAnInt>{
+		@IOValue
+		int theValue;
+	}
 	
 	interface DefaultImplType extends IOInstance.Def<DefaultImplType>{
 		@IONullability(IONullability.Mode.NULLABLE)
@@ -30,6 +40,15 @@ public class TypeGenTests{
 		assertThat(IOList.class).hasAnnotation(IOValue.OverrideType.DefaultImpl.class);
 		var struct = Struct.of(DefaultImplType.class, Struct.STATE_DONE);
 		struct.emptyConstructor().make();
+	}
+	
+	@Test
+	void justAnInt() throws IOException{
+		var val = new JustAnInt();
+		val.theValue = 69;
+		var struct = StandardStructPipe.of(JustAnInt.class, StagedInit.STATE_DONE);
+		assertThat(struct).isInstanceOf(StructPipe.SpecializedImplementation.class);
+		TestUtils.checkPipeInOutEquality(struct, val);
 	}
 	
 	@Test

@@ -1,19 +1,25 @@
 package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
+import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.jorth.Jorth;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -246,6 +252,92 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				case SKIP -> skip.fields.get(f).skip(pool, provider, src, inst, genericContext);
 				default -> throw new IllegalStateException();
 			}
+		}
+	}
+	
+	@Override
+	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
+		List<IOField.SpecializedGenerator> generators = new ArrayList<>(getSpecificFields().size());
+		for(IOField<T, ?> field : getSpecificFields()){
+			if(FieldCompiler.getGenerator(field) instanceof Match.Some(var val)){
+				generators.add(val);
+				continue;
+			}
+			Log.info("No specialized implementation for {}#yellow because {}#red does not have a SpecializedGenerator", this, field);
+			return Match.empty();
+		}
+		
+		return Match.of(generate(generators));
+	}
+	
+	private StructPipe<T> generate(List<IOField.SpecializedGenerator> generators){
+		var type = getType().getType();
+		try{
+			var className = type.getName() + "Generated_STD_" + type.getSimpleName();
+			var bytecode = Jorth.generateClass(getClass().getClassLoader(), className, writer -> {
+				writer.addImport(Struct.class);
+				writer.write(
+					"""
+						extends {}
+						implements {}
+						type-arg T {}
+						public class {} start
+						""",
+					StandardStructPipe.class,
+					SpecializedImplementation.class,
+					type,
+					className
+				);
+				writer.write(
+					"""
+						public function <init> start
+							super start
+								static call #Struct of start
+									class {!}
+								end
+								{!}
+							end
+						end
+						""",
+					type.getName(),
+					StructPipe.STATE_DONE
+				);
+				
+				writer.addImports(VarPool.class, DataProvider.class, ContentReader.class, GenericContext.class);
+				writer.write(
+					"""
+						@ #Override
+						protected function doRead
+							arg ioPool #VarPool<T>
+							arg provider #DataProvider
+							arg src #ContentReader
+							arg instance T
+							arg genericContext #GenericContext
+							returns T
+						start
+							get #arg instance
+						"""
+				);
+				for(int i = 0; i<generators.size(); i++){
+					IOField.SpecializedGenerator generator = generators.get(i);
+					generator.injectReadField(getSpecificFields().get(i), writer);
+				}
+				writer.write(
+					"""
+							 return
+						end
+						"""
+				);
+				
+				
+				writer.wEnd();
+			}, JorthLogger.make(JorthLogger.CodeLog.LIVE));
+			
+			var cls = Access.defineClass(type, bytecode);
+			//noinspection unchecked
+			return (StructPipe<T>)cls.getConstructor().newInstance();
+		}catch(Throwable e){
+			throw new RuntimeException(e);
 		}
 	}
 }

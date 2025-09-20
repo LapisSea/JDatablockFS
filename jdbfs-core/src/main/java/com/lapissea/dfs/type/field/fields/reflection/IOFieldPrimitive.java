@@ -25,7 +25,10 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -73,6 +76,15 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
 			return Set.of(FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FShort.class, FByte.class, FBoolean.class);
+		}
+		
+		@SuppressWarnings("rawtypes")
+		@Override
+		public Match<SpecializedGenerator> getSpecializedGenerator(Class<IOField<?, ?>> fieldType){
+			if((Class)fieldType == FInt.class){
+				return Match.of(FInt.GENERATOR);
+			}
+			return Match.empty();
 		}
 	}
 	
@@ -349,6 +361,21 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
+		
+		private static final SpecializedGenerator GENERATOR = new SpecializedGenerator(){
+			@Override
+			public <T extends IOInstance<T>> void injectReadField(IOField<T, ?> field, CodeStream writer) throws MalformedJorth{
+				writer.write(
+					"""
+						dup
+						get #arg src
+						call readInt4
+						set {} {}
+						""",
+					field.declaringStruct().getType().getName(), field.getName()
+				);
+			}
+		};
 		
 		private final boolean unsigned;
 		

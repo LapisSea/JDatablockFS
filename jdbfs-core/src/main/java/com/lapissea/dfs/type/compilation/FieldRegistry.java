@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -379,5 +380,19 @@ final class FieldRegistry{
 	
 	private static IllegalField fail(String typeName){
 		throw new IllegalField("fmt", "Unable to find implementation of {}#yellow from {}#red", IOField.class.getSimpleName(), typeName);
+	}
+	
+	static Match<IOField.SpecializedGenerator> getGenerator(IOField<?, ?> field){
+		var usages = findUsages(field);
+		if(usages == null) return Match.empty();
+		//noinspection unchecked
+		var type = (Class<IOField<?, ?>>)field.getClass();
+		for(FieldUsage usage : usages){
+			var gen = usage.getSpecializedGenerator(type);
+			if(gen instanceof Some){
+				return gen;
+			}
+		}
+		return Match.empty();
 	}
 }

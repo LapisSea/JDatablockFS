@@ -29,6 +29,8 @@ import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -106,6 +108,10 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field);
 		@SuppressWarnings("rawtypes")
 		Set<Class<? extends IOField>> listFieldTypes();
+		
+		default Match<SpecializedGenerator> getSpecializedGenerator(Class<IOField<?, ?>> fieldType){
+			return Match.empty();
+		}
 		
 		record BehaviourRes<T extends IOInstance<T>>(List<VirtualFieldDefinition<T, ?>> fields, Set<Class<? extends Annotation>> touchedAnnotations){
 			public BehaviourRes(VirtualFieldDefinition<T, ?> field)       { this(List.of(field)); }
@@ -186,6 +192,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		}
 		
 		<T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType);
+	}
+	
+	public interface SpecializedGenerator{
+		
+		<T extends IOInstance<T>> void injectReadField(IOField<T, ?> field, CodeStream writer) throws MalformedJorth;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

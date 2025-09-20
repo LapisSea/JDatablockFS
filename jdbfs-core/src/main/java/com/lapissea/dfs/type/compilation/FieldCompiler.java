@@ -492,4 +492,8 @@ public final class FieldCompiler{
 	public static SequencedSet<Class<?>> getWrapperTypes(){
 		return FieldRegistry.getWrappers();
 	}
+	
+	public static Match<IOField.SpecializedGenerator> getGenerator(IOField<?, ?> field){
+		return FieldRegistry.getGenerator(field);
+	}
 }

@@ -112,7 +112,7 @@ public final class Jorth extends CodeDestination{
 			return Optional.of(jorthClass);
 		}
 		
-		var argType = typeArgs.get(name.dotted());
+		var argType = typeArgs.get(name);
 		if(argType != null){
 			return typeSource.maybeByType(argType);
 		}
