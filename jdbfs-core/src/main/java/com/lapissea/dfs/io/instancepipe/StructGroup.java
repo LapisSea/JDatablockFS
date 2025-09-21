@@ -161,6 +161,9 @@ final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		if(!ConfigDefs.OPTIMIZED_PIPE.resolveVal()){
 			return pipe;
 		}
+		if(!struct.getType().isAnnotationPresent(StructPipe.Special.class)){
+			return pipe;
+		}
 		if(!(pipe.buildSpecializedImplementation(syncStage) instanceof Match.Some(var specializedImplementation))){
 			return pipe;
 		}

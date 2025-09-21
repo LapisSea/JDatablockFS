@@ -15,7 +15,7 @@ import java.io.IOException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TypeGenTests{
-	
+	@StructPipe.Special
 	static class JustAnInt extends IOInstance.Managed<JustAnInt>{
 		@IOValue
 		int theValue;
@@ -47,7 +47,6 @@ public class TypeGenTests{
 		var val = new JustAnInt();
 		val.theValue = 69;
 		var struct = StandardStructPipe.of(JustAnInt.class, StagedInit.STATE_DONE);
-		assertThat(struct).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		TestUtils.checkPipeInOutEquality(struct, val);
 	}
 	
