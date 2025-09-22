@@ -24,7 +24,7 @@ public interface TokenSource{
 	static TokenSource of(UnsafeSupplier<Token, MalformedJorth> tokenStream){
 		return new TokenSource(){
 			private MalformedJorth e;
-			private Token next;
+			private Token          next;
 			
 			private void readNext(){
 				if(next != null) return;
@@ -150,6 +150,9 @@ public interface TokenSource{
 	
 	boolean hasMore();
 	
+	default boolean consumeTokenIfIsKeyword(Keyword keyword) throws MalformedJorth{
+		return consumeTokenIf(Token.KWord.class, w -> w.is(keyword));
+	}
 	default boolean consumeTokenIfIsText(char c) throws MalformedJorth{
 		return consumeTokenIf(Token.SmolWord.class, w -> w.is(c));
 	}

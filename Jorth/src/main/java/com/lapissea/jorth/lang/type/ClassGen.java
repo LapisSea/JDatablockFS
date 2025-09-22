@@ -320,6 +320,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	public boolean isPrimitive(){
 		return false;
 	}
+	@Override
+	public boolean isInterface(){
+		return type == ClassType.INTERFACE;
+	}
 	
 	@Override
 	public boolean isFinal(){

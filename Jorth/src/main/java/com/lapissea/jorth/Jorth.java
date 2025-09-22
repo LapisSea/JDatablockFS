@@ -25,6 +25,7 @@ import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.objectweb.asm.Type;
 
 import java.lang.reflect.Array;
 import java.util.ArrayDeque;
@@ -564,6 +565,71 @@ public final class Jorth extends CodeDestination{
 				
 				var funName = source.readWord();
 				doCall(source, staticOwner, funName);
+			}
+			case CALL_VIRTUAL -> {
+				FunctionGen.VirtualCallInfo info = new FunctionGen.VirtualCallInfo();
+				
+				while(true){
+					if(source.consumeTokenIfIsKeyword(Keyword.BOOTSTRAP_FUNCTION)){
+						if(info.bootstrapClass != null){
+							throw new MalformedJorth("Already defined bootstrap-fn");
+						}
+						info.bootstrapClass = getReadClassName(source);
+						info.bootstrapMethod = source.readWord();
+						while(source.consumeTokenIfIsKeyword(Keyword.ARG)){
+							var type = readType(source, typeArgs).asGeneric();
+							var val  = readValue(type, source);
+							if(val instanceof ClassName cls){
+								val = Type.getType(new GenericType(cls).jvmDescriptorStr());
+							}
+							info.bootstrapStaticArgs.add(new FunctionGen.VirtualCallInfo.SType(type, val));
+						}
+						continue;
+					}
+					if(source.consumeTokenIfIsKeyword(Keyword.CALLING_FUNCTION)){
+						if(info.callingMethod != null){
+							throw new MalformedJorth("Already defined calling-fn");
+						}
+						info.callingMethod = source.readWord();
+						source.requireKeyword(Keyword.START);
+						wh:
+						while(true){
+							var k = source.readKeyword();
+							switch(k){
+								case ARG -> {
+									var type = readType(source, typeArgs);
+									info.callingMethodArgs.add(type);
+								}
+								case RETURNS -> {
+									if(info.callingMethodReturnType != null){
+										throw new MalformedJorth("Already defined return type");
+									}
+									info.callingMethodReturnType = readType(source, typeArgs);
+								}
+								default -> { break wh; }
+							}
+						}
+						continue;
+					}
+					
+					if(info.bootstrapMethod == null){
+						throw new MalformedJorth("Did not define bootstrap-fn");
+					}
+					if(info.callingMethod == null){
+						throw new MalformedJorth("Did not define calling-fn");
+					}
+					
+					var hasStart = optionalStart(source);
+					var call     = currentFunction.startVirutalCall(info);
+					if(hasStart){
+						endStack.add(call);
+					}else{
+						call.end();
+					}
+					break;
+				}
+				
+				
 			}
 			case SUPER -> {
 				currentFunction.loadThisIns();

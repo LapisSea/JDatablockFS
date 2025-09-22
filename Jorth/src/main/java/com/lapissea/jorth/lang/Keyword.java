@@ -27,6 +27,9 @@ public enum Keyword implements KeyedEnum{
 	DUP, POP,
 	AT("@"),
 	TYPE_ARG("type-arg"),
+	CALL_VIRTUAL("call-virtual"),
+	CALLING_FUNCTION("calling-fn"),
+	BOOTSTRAP_FUNCTION("bootstrap-fn"),
 	WHAT_THE_STACK("???");
 	
 	public static final Lookup<Keyword> LOOKUP = KeyedEnum.getLookup(Keyword.class);

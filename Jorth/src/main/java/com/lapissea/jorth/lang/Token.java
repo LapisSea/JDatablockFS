@@ -13,6 +13,9 @@ import java.util.stream.Collectors;
 public sealed interface Token{
 	
 	record KWord(int line, Keyword keyword) implements Token{
+		public boolean is(Keyword check){
+			return keyword.equals(check);
+		}
 		public void require(Keyword keyword) throws MalformedJorth{
 			if(this.keyword != keyword) throw new MalformedJorth("Required keyword is " + keyword + " but got " + this.keyword);
 		}

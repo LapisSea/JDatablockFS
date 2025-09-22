@@ -5,9 +5,14 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -430,6 +437,109 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitMethodInsn(callOp, ownerName, name, signature, ownerType == ClassType.INTERFACE);
 	}
 	
+	public static final class VirtualCallInfo{
+		public record SType(JType type, Object value){ }
+		
+		public ClassName   bootstrapClass      = null;
+		public String      bootstrapMethod     = null;
+		public List<SType> bootstrapStaticArgs = new ArrayList<>();
+		
+		public String      callingMethod           = null;
+		public List<JType> callingMethodArgs       = new ArrayList<>();
+		public JType       callingMethodReturnType = null;
+	}
+	
+	public Endable startVirutalCall(VirtualCallInfo info){
+		var mark = code().stack.size();
+		return () -> {
+			var args = readCallStack(mark);
+			if(args.size() != info.callingMethodArgs.size()){
+				throw new MalformedJorth(
+					"Call args size mismatch:\n\t" +
+					"Requested: " + info.callingMethodArgs + "\n\t" +
+					"But got:   " + args
+				);
+			}
+			for(int i = 0; i<args.size(); i++){
+				var argType = args.get(i);
+				var defType = info.callingMethodArgs.get(i);
+				if(!argType.asGeneric().instanceOf(typeSource, defType.asGeneric())){
+					throw new MalformedJorth(
+						"Argument " + i + " does not satisfy type of argument. Is " + argType.asGeneric() + " but " + defType.asGeneric() + " is required"
+					);
+				}
+			}
+			
+			var bArgs = Stream.concat(
+				Stream.of(
+					JType.of(MethodHandles.Lookup.class),
+					JType.of(String.class),
+					JType.of(MethodType.class)
+				),
+				info.bootstrapStaticArgs.stream().map(VirtualCallInfo.SType::type)
+			).toList();
+			
+			var bc = typeSource.byName(info.bootstrapClass);
+			var fns = bc.getFunctionsByName(info.bootstrapMethod).filter(e -> {
+				if(!e.returnType().equals(JType.of(CallSite.class))){
+					return false;
+				}
+				var argTypes = e.argumentTypes();
+				if(argTypes.size() != bArgs.size()){
+					return false;
+				}
+				for(int i = 0; i<bArgs.size(); i++){
+					var argType = bArgs.get(i).asGeneric();
+					var fnType  = argTypes.get(i).asGeneric();
+					try{
+						if(!argType.instanceOf(typeSource, fnType)){
+							return false;
+						}
+					}catch(MalformedJorth ex){
+						throw UtilL.uncheckedThrow(ex);
+					}
+				}
+				return true;
+			}).toList();
+			var fn = switch(fns.size()){
+				case 0 -> {
+					throw new MalformedJorth(
+						"No valid boostrap function found for " + info.bootstrapClass + "." +
+						info.bootstrapMethod + bArgs.stream()
+						                            .map(Object::toString)
+						                            .collect(Collectors.joining(", ", "(", ")"))
+					);
+				}
+				case 1 -> fns.getFirst();
+				default -> {
+					throw new MalformedJorth("Ambiguous boostrap function found for " + info.bootstrapClass + "#" + info.bootstrapMethod);
+				}
+			};
+			Handle bsmh = new Handle(
+				H_INVOKESTATIC,
+				info.bootstrapClass.slashed(),
+				info.bootstrapMethod,
+				makeFunSig(fn.returnType(), fn.argumentTypes(), false),
+				bc.isInterface()
+			);
+			
+			for(int i = 0; i<args.size(); i++){
+				code().stack.pop();
+			}
+			
+			if(info.callingMethodReturnType != null){
+				code().stack.push(info.callingMethodReturnType.asGeneric());
+			}
+			
+			writer.visitInvokeDynamicInsn(
+				info.callingMethod,
+				makeFunSig(info.callingMethodReturnType, info.callingMethodArgs, false),
+				bsmh,
+				info.bootstrapStaticArgs.stream().map(VirtualCallInfo.SType::value).toArray()
+			);
+		};
+	}
+	
 	public Endable startCall(ClassName staticOwner, String functionName) throws MalformedJorth{
 		ClassInfo cInfo;
 		if(staticOwner != null){
@@ -447,13 +557,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	public Endable startCallRaw(ClassInfo cInfo, String functionName, boolean superCall){
 		var mark = code().stack.size();
 		return () -> {
-			var stack    = code().stack;
-			var argCount = stack.size() - mark;
-			if(argCount<0) throw new MalformedJorth("Negative stack delta inside arg block");
-			var args = new ArrayList<JType>(argCount);
-			for(int i = 0; i<argCount; i++){
-				args.add(stack.peek(mark + i));
-			}
+			var args = readCallStack(mark);
 			
 			FunctionInfo info;
 			try{
@@ -479,6 +583,16 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			
 			invokeOp(info, superCall);
 		};
+	}
+	private List<JType> readCallStack(int mark) throws MalformedJorth{
+		var stack    = code().stack;
+		var argCount = stack.size() - mark;
+		if(argCount<0) throw new MalformedJorth("Negative stack delta inside arg block");
+		var args = new ArrayList<JType>(argCount);
+		for(int i = 0; i<argCount; i++){
+			args.add(stack.peek(mark + i));
+		}
+		return args;
 	}
 	
 	public void compareEqualOp(boolean checkFor) throws MalformedJorth{

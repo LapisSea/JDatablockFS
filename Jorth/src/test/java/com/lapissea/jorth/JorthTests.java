@@ -6,6 +6,11 @@ import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -16,6 +21,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
@@ -824,5 +831,97 @@ public class JorthTests{
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName)).containsExactlyInAnyOrderElementsOf(names);
+	}
+	
+	public static final class TestBootstrap{
+		public static CallSite bootstrap(MethodHandles.Lookup lookup,
+		                                 String name,
+		                                 MethodType type,
+		                                 Class<?> passType) throws Throwable{
+			var cname = lookup.lookupClass().getName() + "&_" + name;
+			
+			var tokenStr = new StringJoiner(" ");
+			var jorth    = new Jorth(null, tokenStr::add);
+			
+			try(var writer = jorth.writer()){
+				writer.write(
+					"""
+						class {} start
+						
+						public static function {}
+							arg num int
+							returns #String
+						start
+							new #StringBuilder start
+								'{} '
+							end
+							dup
+							call append start
+								get #arg num
+							end
+							call toString
+							return
+						end
+						
+						end
+						""",
+					cname,
+					name,
+					passType.getName()
+				);
+			}finally{
+				LogUtil.println(tokenStr.toString());
+			}
+			
+			var          bb        = jorth.getClassFile(cname);
+			var          implClass = lookup.defineHiddenClass(bb, true);
+			MethodHandle target    = implClass.unreflect(implClass.lookupClass().getMethod(name, int.class));
+			return new ConstantCallSite(target);
+		}
+		
+	}
+	
+	@Test
+	void virtualCall() throws Exception{
+		var name = "VCall";
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(IntFunction.class);
+			writer.addImportAs(TestBootstrap.class, "TestBootstrap");
+			
+			// calling function is the final function that is returned from boostrap
+			writer.write(
+				"""
+					implements #IntFunction<#String>
+					class {0} start
+						@ #Override
+						public function apply
+							arg num int
+							returns #Object
+						start
+							call-virtual
+								bootstrap-fn #TestBootstrap bootstrap
+									arg #Class {0}
+								calling-fn makeString start
+									arg int
+									returns #String
+								end
+							start
+								get #arg num
+							end
+							return
+						end
+					end
+					""",
+				name
+			);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntFunction.class);
+		//noinspection unchecked
+		IntFunction<String> inst = (IntFunction<String>)instO;
+		assertThat(inst.apply(1)).isEqualTo(name + " 1");
+		assertThat(inst.apply(69)).isEqualTo(name + " 69");
 	}
 }
