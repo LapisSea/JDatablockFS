@@ -12,7 +12,6 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.type.compilation.FieldCompiler;
 import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
@@ -20,8 +19,6 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
@@ -31,7 +28,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
@@ -260,40 +256,54 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static Match<List<IOField.SpecializedGenerator>> collectGenerators(StructPipe<?> pipe){
-		var                                fields     = pipe.getSpecificFields();
-		List<IOField.SpecializedGenerator> generators = new ArrayList<>(fields.size());
-		for(IOField<?, ?> field : fields){
-			if(FieldCompiler.getGenerator(field) instanceof Match.Some(var val)){
-				generators.add(val);
-				continue;
-			}
-			Log.info("No specialized implementation for {}#yellow because {}#red does not have a SpecializedGenerator", pipe, field);
-			return Match.empty();
+	private static MethodHandle genericDoRead;
+	private static synchronized MethodHandle getGenericDoRead() throws IllegalAccessException, NoSuchMethodException{
+		if(genericDoRead == null){
+			var mt = StandardStructPipe.class.getDeclaredMethod(
+				"genericDoRead",
+				VarPool.class, DataProvider.class, ContentReader.class, IOInstance.class, GenericContext.class
+			);
+			genericDoRead = MethodHandles.lookup().unreflect(mt);
 		}
-		return Match.of(generators);
+		return genericDoRead;
 	}
-	
 	
 	public static <T extends IOInstance<T>>
 	CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType type, Class<T> objType) throws Throwable{
+		MethodHandle target;
 		try{
-			return bootstrapDoRead0(lookup, name, type, objType);
+			target = bootstrapDoReadImpl(lookup, name, type, objType);
 		}catch(Throwable t){
-			t.printStackTrace();
-			throw t;
+			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+			target = getGenericDoRead();
 		}
+		return new ConstantCallSite(target);
 	}
 	public static <T extends IOInstance<T>>
-	CallSite bootstrapDoRead0(MethodHandles.Lookup lookup, String name, MethodType type, Class<T> objType) throws Throwable{
+	MethodHandle bootstrapDoReadImpl(MethodHandles.Lookup lookup, String name, MethodType type, Class<T> objType) throws Throwable{
 		var struct = Struct.of(objType, Struct.STATE_FIELD_MAKE);
 		var pipe   = new StandardStructPipe<>(struct, StructPipe.STATE_IO_FIELD);
 		
+		var                                fields     = pipe.getSpecificFields();
+		List<IOField.SpecializedGenerator> generators = new ArrayList<>(fields.size());
+		
+		for(IOField<?, ?> field : fields){
+			if(field instanceof IOField.SpecializedGenerator sg){
+				generators.add(sg);
+				continue;
+			}
+			throw new UnsupportedOperationException(
+				Log.fmt("""
+					        Not all fields support code generation:
+					          Type:  {}#red
+					          Field: {}#red
+					        """, objType.getTypeName(), field));
+		}
 		
 		var cname = lookup.lookupClass().getName() + "&_" + name;
 		
-		var tokenStr = new StringJoiner(" ");
-		var jorth    = new Jorth(null, tokenStr::add);
+		var log   = JorthLogger.make();
+		var jorth = new Jorth(lookup.lookupClass().getClassLoader(), log);
 		
 		try(var writer = jorth.writer()){
 			writer.addImportAs(objType, "ObjType");
@@ -302,45 +312,35 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				GenericContext.class, StandardStructPipe.class, IOInstance.class
 			);
 			
-			if(!(collectGenerators(pipe) instanceof Match.Some(var generators))){
-				throw new NotImplementedException();
-			}else{
-				writer.write(
-					"""
-						class {} start
-						
-						public static function doRead
-							arg pipe #StandardStructPipe
-							arg ioPool #VarPool<#ObjType>
-							arg provider #DataProvider
-							arg src #ContentReader
-							arg instance #ObjType
-							arg genericContext #GenericContext
-							returns #ObjType
-						start
-							get #arg instance
-						""",
-					cname
-				);
-				
-				for(int i = 0; i<generators.size(); i++){
-					var generator = generators.get(i);
-					var field     = pipe.getSpecificFields().get(i);
+			writer.write(
+				"""
+					class {} start
 					
-					generator.injectReadField(field, writer);
-				}
-				
-				writer.write(
-					"""
-							return
-						end
-						end
-						"""
-				);
+					public static function doRead
+						arg ioPool #VarPool<#ObjType>
+						arg provider #DataProvider
+						arg src #ContentReader
+						arg instance #ObjType
+						arg genericContext #GenericContext
+						returns #ObjType
+					start
+						get #arg instance
+					""",
+				cname
+			);
+			
+			for(IOField.SpecializedGenerator generator : generators){
+				generator.injectReadField(writer);
 			}
 			
-		}finally{
-			LogUtil.println(tokenStr.toString());
+			writer.write(
+				"""
+						return
+					end
+					end
+					"""
+			);
+			
 		}
 		
 		var bb        = jorth.getClassFile(cname);
@@ -348,8 +348,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var method = Iters.from(implClass.lookupClass().getMethods())
 		                  .filter(e -> e.getName().equals(name))
 		                  .getFirst();
-		MethodHandle target = implClass.unreflect(method);
-		return new ConstantCallSite(target);
+		return implClass.unreflect(method);
 	}
 	
 	@Override
@@ -410,7 +409,6 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						 		bootstrap-fn #StandardStructPipe bootstrapDoRead
 						 			arg #Class {0}
 						 		calling-fn doRead start
-						 		    arg #StandardStructPipe
 									arg #VarPool<#ObjType>
 									arg #DataProvider
 									arg #ContentReader
@@ -419,7 +417,6 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 									returns #ObjType
 						 		end
 						 	start
-						 	    get this this
 								get #arg ioPool
 								get #arg provider
 								get #arg src

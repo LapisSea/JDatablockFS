@@ -109,10 +109,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		@SuppressWarnings("rawtypes")
 		Set<Class<? extends IOField>> listFieldTypes();
 		
-		default Match<SpecializedGenerator> getSpecializedGenerator(Class<IOField<?, ?>> fieldType){
-			return Match.empty();
-		}
-		
 		record BehaviourRes<T extends IOInstance<T>>(List<VirtualFieldDefinition<T, ?>> fields, Set<Class<? extends Annotation>> touchedAnnotations){
 			public BehaviourRes(VirtualFieldDefinition<T, ?> field)       { this(List.of(field)); }
 			public BehaviourRes(List<VirtualFieldDefinition<T, ?>> fields){ this(fields, Set.of()); }
@@ -195,8 +191,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface SpecializedGenerator{
-		
-		<T extends IOInstance<T>> void injectReadField(IOField<T, ?> field, CodeStream writer) throws MalformedJorth;
+		void injectReadField(CodeStream writer) throws MalformedJorth;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

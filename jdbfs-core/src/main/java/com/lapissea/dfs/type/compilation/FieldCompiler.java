@@ -493,7 +493,4 @@ public final class FieldCompiler{
 		return FieldRegistry.getWrappers();
 	}
 	
-	public static Match<IOField.SpecializedGenerator> getGenerator(IOField<?, ?> field){
-		return FieldRegistry.getGenerator(field);
-	}
 }
