@@ -170,12 +170,56 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		public void cast(GenericType type) throws MalformedJorth{
 			var stackType = stack.pop();
 			
+			if(type.equals(stackType)){
+				stack.push(type);
+				return;
+			}
+			
+			if(stackType.getBaseType() != BaseType.OBJ && type.getBaseType() != BaseType.OBJ){
+				emitPrimitiveCast(stackType, type);
+				stack.push(type);
+				return;
+			}
+			
 			if(!type.instanceOf(typeSource, stackType)){
 				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
 			}
 			stack.push(type);
 			writer.visitTypeInsn(CHECKCAST, type.dims() == 0? type.raw().slashed() : type.jvmDescriptorStr());
 		}
+		
+		private void emitPrimitiveCast(GenericType from, GenericType to){
+			if(from.equals(GenericType.LONG) && to.equals(GenericType.INT)){
+				writer.visitInsn(L2I);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.LONG)){
+				writer.visitInsn(I2L);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BYTE)){
+				writer.visitInsn(I2B);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.CHAR)){
+				writer.visitInsn(I2C);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.SHORT)){
+				writer.visitInsn(I2S);
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.FLOAT)){
+				writer.visitInsn(L2F);
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.DOUBLE)){
+				writer.visitInsn(L2D);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.INT)){
+				writer.visitInsn(F2I);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.LONG)){
+				writer.visitInsn(F2L);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.DOUBLE)){
+				writer.visitInsn(F2D);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.INT)){
+				writer.visitInsn(D2I);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.LONG)){
+				writer.visitInsn(D2L);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.FLOAT)){
+				writer.visitInsn(D2F);
+			}else{
+				throw new IllegalArgumentException("Unsupported primitive cast: " + from + " -> " + to);
+			}
+		}
+		
 	}
 	
 	private final ClassGen        owner;

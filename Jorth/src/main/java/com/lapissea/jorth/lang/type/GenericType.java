@@ -22,9 +22,14 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	
 	public static final GenericType OBJECT = new GenericType(ClassName.of(Object.class));
 	public static final GenericType STRING = new GenericType(ClassName.of(String.class));
+	public static final GenericType BYTE   = new GenericType(ClassName.of(byte.class));
+	public static final GenericType CHAR   = new GenericType(ClassName.of(char.class));
+	public static final GenericType SHORT  = new GenericType(ClassName.of(short.class));
 	public static final GenericType INT    = new GenericType(ClassName.of(int.class));
+	public static final GenericType LONG   = new GenericType(ClassName.of(long.class));
 	public static final GenericType BOOL   = new GenericType(ClassName.of(boolean.class));
 	public static final GenericType FLOAT  = new GenericType(ClassName.of(float.class));
+	public static final GenericType DOUBLE = new GenericType(ClassName.of(double.class));
 	
 	public static GenericType of(Type type){
 		return of0(null, type);

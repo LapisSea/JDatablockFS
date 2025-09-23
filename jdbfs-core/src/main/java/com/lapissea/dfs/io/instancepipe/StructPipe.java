@@ -72,7 +72,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.config.GlobalConfig.TYPE_VALIDATION;
@@ -125,11 +124,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw Utils.interceptClInit(e);
 		}
 	}
-	
-	public static <T extends IOInstance<T>, P extends StructPipe<T>> void registerSpecialImpl(Struct<T> struct, Class<P> oldType, Supplier<P> newType){
-		Log.warn("NOOP: {} {}", struct, oldType);
-	}
-	
 	
 	private final Struct<T>           type;
 	private       SizeDescriptor<T>   sizeDescription;

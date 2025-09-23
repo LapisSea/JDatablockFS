@@ -20,11 +20,18 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.jorth.Jorth;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
+import java.util.StringJoiner;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
@@ -64,11 +71,6 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return of(StandardStructPipe.class, struct, minRequestedStage);
 	}
 	
-	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance<T>, P extends StandardStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
-		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
-	}
-	
 	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, int syncStage){
 		super(type, compiler, syncStage);
 	}
@@ -92,6 +94,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 //			skipCheck(ioPool, provider, instance, src, genericContext);
 //		}
 		
+		return genericDoRead(ioPool, provider, src, instance, genericContext);
+	}
+	private T genericDoRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		FieldSet<T> fields = getSpecificFields();
 		for(IOField<T, ?> field : fields){
 			readField(ioPool, provider, src, instance, genericContext, field);
@@ -255,37 +260,118 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	@Override
-	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
-		List<IOField.SpecializedGenerator> generators = new ArrayList<>(getSpecificFields().size());
-		for(IOField<T, ?> field : getSpecificFields()){
+	private static Match<List<IOField.SpecializedGenerator>> collectGenerators(StructPipe<?> pipe){
+		var                                fields     = pipe.getSpecificFields();
+		List<IOField.SpecializedGenerator> generators = new ArrayList<>(fields.size());
+		for(IOField<?, ?> field : fields){
 			if(FieldCompiler.getGenerator(field) instanceof Match.Some(var val)){
 				generators.add(val);
 				continue;
 			}
-			Log.info("No specialized implementation for {}#yellow because {}#red does not have a SpecializedGenerator", this, field);
+			Log.info("No specialized implementation for {}#yellow because {}#red does not have a SpecializedGenerator", pipe, field);
 			return Match.empty();
 		}
-		
-		return Match.of(generate(generators));
+		return Match.of(generators);
 	}
 	
-	private StructPipe<T> generate(List<IOField.SpecializedGenerator> generators){
+	
+	public static <T extends IOInstance<T>>
+	CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType type, Class<T> objType) throws Throwable{
+		try{
+			return bootstrapDoRead0(lookup, name, type, objType);
+		}catch(Throwable t){
+			t.printStackTrace();
+			throw t;
+		}
+	}
+	public static <T extends IOInstance<T>>
+	CallSite bootstrapDoRead0(MethodHandles.Lookup lookup, String name, MethodType type, Class<T> objType) throws Throwable{
+		var struct = Struct.of(objType, Struct.STATE_FIELD_MAKE);
+		var pipe   = new StandardStructPipe<>(struct, StructPipe.STATE_IO_FIELD);
+		
+		
+		var cname = lookup.lookupClass().getName() + "&_" + name;
+		
+		var tokenStr = new StringJoiner(" ");
+		var jorth    = new Jorth(null, tokenStr::add);
+		
+		try(var writer = jorth.writer()){
+			writer.addImportAs(objType, "ObjType");
+			writer.addImports(
+				VarPool.class, DataProvider.class, ContentReader.class,
+				GenericContext.class, StandardStructPipe.class, IOInstance.class
+			);
+			
+			if(!(collectGenerators(pipe) instanceof Match.Some(var generators))){
+				throw new NotImplementedException();
+			}else{
+				writer.write(
+					"""
+						class {} start
+						
+						public static function doRead
+							arg pipe #StandardStructPipe
+							arg ioPool #VarPool<#ObjType>
+							arg provider #DataProvider
+							arg src #ContentReader
+							arg instance #ObjType
+							arg genericContext #GenericContext
+							returns #ObjType
+						start
+							get #arg instance
+						""",
+					cname
+				);
+				
+				for(int i = 0; i<generators.size(); i++){
+					var generator = generators.get(i);
+					var field     = pipe.getSpecificFields().get(i);
+					
+					generator.injectReadField(field, writer);
+				}
+				
+				writer.write(
+					"""
+							return
+						end
+						end
+						"""
+				);
+			}
+			
+		}finally{
+			LogUtil.println(tokenStr.toString());
+		}
+		
+		var bb        = jorth.getClassFile(cname);
+		var implClass = lookup.defineHiddenClass(bb, true);
+		var method = Iters.from(implClass.lookupClass().getMethods())
+		                  .filter(e -> e.getName().equals(name))
+		                  .getFirst();
+		MethodHandle target = implClass.unreflect(method);
+		return new ConstantCallSite(target);
+	}
+	
+	@Override
+	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
+		return Match.of(generate());
+	}
+	
+	private StructPipe<T> generate(){
 		var type = getType().getType();
 		try{
 			var className = type.getName() + "Generated_STD_" + type.getSimpleName();
 			var bytecode = Jorth.generateClass(getClass().getClassLoader(), className, writer -> {
 				writer.addImport(Struct.class);
+				writer.addImportAs(type, "ObjType");
 				writer.write(
 					"""
-						extends {}
+						extends {}<#ObjType>
 						implements {}
-						type-arg T {}
 						public class {} start
 						""",
 					StandardStructPipe.class,
 					SpecializedImplementation.class,
-					type,
 					className
 				);
 				writer.write(
@@ -303,35 +389,53 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					StructPipe.STATE_DONE
 				);
 				
-				writer.addImports(VarPool.class, DataProvider.class, ContentReader.class, GenericContext.class);
+				writer.addImports(
+					VarPool.class, DataProvider.class, ContentReader.class,
+					GenericContext.class, StandardStructPipe.class, IOInstance.class
+				);
 				writer.write(
 					"""
 						@ #Override
 						protected function doRead
-							arg ioPool #VarPool<T>
+							arg ioPool #VarPool<#ObjType>
 							arg provider #DataProvider
 							arg src #ContentReader
-							arg instance T
+							arg instance #IOInstance
 							arg genericContext #GenericContext
-							returns T
+							returns #IOInstance
 						start
 							get #arg instance
-						"""
-				);
-				for(int i = 0; i<generators.size(); i++){
-					IOField.SpecializedGenerator generator = generators.get(i);
-					generator.injectReadField(getSpecificFields().get(i), writer);
-				}
-				writer.write(
-					"""
-							 return
+						
+						 	call-virtual
+						 		bootstrap-fn #StandardStructPipe bootstrapDoRead
+						 			arg #Class {0}
+						 		calling-fn doRead start
+						 		    arg #StandardStructPipe
+									arg #VarPool<#ObjType>
+									arg #DataProvider
+									arg #ContentReader
+									arg #ObjType
+									arg #GenericContext
+									returns #ObjType
+						 		end
+						 	start
+						 	    get this this
+								get #arg ioPool
+								get #arg provider
+								get #arg src
+								get #arg instance cast #ObjType
+								get #arg genericContext
+						 	end
+						
+							return
 						end
-						"""
+						""",
+					type
 				);
 				
 				
 				writer.wEnd();
-			}, JorthLogger.make(JorthLogger.CodeLog.LIVE));
+			}, JorthLogger.make());
 			
 			var cls = Access.defineClass(type, bytecode);
 			//noinspection unchecked

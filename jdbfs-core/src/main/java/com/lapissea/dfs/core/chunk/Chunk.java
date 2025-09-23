@@ -1,6 +1,5 @@
 package com.lapissea.dfs.core.chunk;
 
-import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.MalformedObject;
@@ -11,28 +10,21 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.io.instancepipe.PipeFieldCompiler;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -40,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.function.Predicate;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -110,97 +101,8 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 @StructPipe.Special
 public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
-	/**
-	 * Internal implementation of the {@link StandardStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized
-	 */
-	private static class OptimizedChunkPipe extends StandardStructPipe<Chunk>{
-		
-		static{
-			if(DEBUG_VALIDATION){
-				var check = "bodyNumSize + nextSize 1 byte capacity NS(bodyNumSize): 0-8 bytes size NS(bodyNumSize): 0-8 bytes nextPtr NS(nextSize): 0-8 bytes ";
-				var sb    = new StringBuilder(check.length());
-				var p     = StandardStructPipe.of(STRUCT, STATE_DONE);
-				for(IOField<Chunk, ?> specificField : p.getSpecificFields()){
-					sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
-				}
-				var res = sb.toString();
-				if(!check.equals(res)){
-					throw UtilL.exitWithErrorMsg(check + "\n" + res);
-				}
-			}
-		}
-		
-		public OptimizedChunkPipe(){
-			super(STRUCT, (type, f, testRun) -> {
-				var fields = List.of(
-					BitFieldMerger.of(List.of(
-						(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
-						(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
-					)),
-					f.requireExact(long.class, "capacity"),
-					f.requireExact(long.class, "size"),
-					f.requireExact(ChunkPointer.class, "nextPtr")
-				);
-				return new PipeFieldCompiler.Result<>(fields);
-			}, STATE_NOT_STARTED);
-		}
-		
-		@Override
-		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Chunk> ioPool, Chunk instance) throws IOException{
-			dest.write(instance.writeHeaderToBB());
-		}
-		
-		@Override
-		protected Chunk doRead(VarPool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
-			instance.forbidReadOnly();
-			
-			var raw = src.readUnsignedInt1();
-			var bns = NumberSize.ordinal(raw&0b111);
-			var nns = NumberSize.ordinal((raw >>> 3)&0b111);
-			BitFieldMerger.readIntegrityBits(raw, 8, 6);
-			
-			instance.bodyNumSize = bns;
-			instance.nextSize = nns;
-			
-			var cap = bns.read(src);
-			var siz = bns.read(src);
-			if(siz>cap){
-				throw new MalformedObject("Size bigger than capacity");
-			}
-			var nextPtr = ChunkPointer.read(nns, src);
-			
-			try{
-				instance.capacity = cap;
-				instance.size = siz;
-				instance.setNextPtr(nextPtr);
-			}catch(OutOfBitDepth e){
-				throw new MalformedObject(e);
-			}
-			return instance;
-		}
-		
-		@Override
-		protected SizeDescriptor<Chunk> createSizeDescriptor(){
-			return SizeDescriptor.Unknown.of(
-				WordSpace.BYTE, 1, OptionalLong.of(1 + NumberSize.LARGEST.bytes*3L),
-				(ioPool, prov, value) -> {
-					return value.calcHeaderSize0();
-				}
-			);
-		}
-	}
-	
-	
-	public static final Struct<Chunk>     STRUCT;
-	public static final StructPipe<Chunk> PIPE;
-	
-	static{
-		STRUCT = Struct.of(Chunk.class);
-		if(ConfigDefs.OPTIMIZED_PIPE_USE_CHUNK.resolveValLocking()){
-			StandardStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
-		}
-		PIPE = StandardStructPipe.of(STRUCT);
-	}
+	public static final Struct<Chunk>     STRUCT = Struct.of(Chunk.class);
+	public static final StructPipe<Chunk> PIPE   = StandardStructPipe.of(STRUCT);
 	
 	public static final byte FLAGS_SIZE = 1;
 	

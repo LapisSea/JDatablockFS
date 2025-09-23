@@ -364,19 +364,31 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private static final SpecializedGenerator GENERATOR = new SpecializedGenerator(){
 			@Override
-			public <T extends IOInstance<T>> void injectReadField(IOField<T, ?> field, CodeStream writer) throws MalformedJorth{
+			public <T extends IOInstance<T>> void injectReadField(IOField<T, ?> fieldG, CodeStream writer) throws MalformedJorth{
+				((FInt<T>)fieldG).injectReadField(writer);
+			}
+		};
+		
+		private void injectReadField(CodeStream writer) throws MalformedJorth{
+			var typeName = declaringStruct().getType().getName();
+			if(this.sizeDescriptorSafe().hasFixed()){
+				var caller = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
+				if(unsigned && maxSize.size == INT){
+					caller += " cast int";
+				}
 				writer.write(
 					"""
 						dup
 						get #arg src
-						call readInt4
+						call {}
 						set {} {}
 						""",
-					field.declaringStruct().getType().getName(), field.getName()
+					caller, typeName, getName()
 				);
+			}else{
+				throw new UnsupportedOperationException(this + "");
 			}
-		};
-		
+		}
 		private final boolean unsigned;
 		
 		private FInt(FieldAccessor<T> field, VaryingSize size){

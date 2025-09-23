@@ -13,7 +13,6 @@ import com.lapissea.dfs.type.field.IOField;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.function.Supplier;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -38,11 +37,6 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	}
 	public static <T extends IOInstance<T>> FixedStructPipe<T> of(Struct<T> struct, int minRequestedStage){
 		return of(FixedStructPipe.class, struct, minRequestedStage);
-	}
-	
-	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance<T>, P extends FixedStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
-		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)FixedStructPipe.class, newType);
 	}
 	
 	private Map<IOField<T, NumberSize>, NumberSize> maxValues;

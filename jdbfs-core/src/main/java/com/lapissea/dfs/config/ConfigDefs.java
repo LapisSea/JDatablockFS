@@ -69,9 +69,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool             COSTLY_STACK_TRACE  = flagB("tweaks.costlyStackTrace", deb());
 	Flag.FDur              DELAY_COMP_OBJ_GC   = flagDur("tweaks.delayCompilationObjGC", RELEASE_MODE.boolMap(Duration.ZERO, Duration.ofSeconds(5))).positive();
 	
-	Flag.FBool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);
-	Flag.FBool OPTIMIZED_PIPE_USE_CHUNK     = flagB("optimizedPipe.chunk", OPTIMIZED_PIPE);
-	Flag.FBool OPTIMIZED_PIPE_USE_REFERENCE = flagB("optimizedPipe.reference", OPTIMIZED_PIPE);
+	Flag.FBool OPTIMIZED_PIPE = flagB("optimizedPipe", true);
 	
 	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE("purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	

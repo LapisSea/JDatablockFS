@@ -18,6 +18,7 @@ public class TypeGenTests{
 	@StructPipe.Special
 	static class JustAnInt extends IOInstance.Managed<JustAnInt>{
 		@IOValue
+		@IOValue.Unsigned
 		int theValue;
 	}
 	
