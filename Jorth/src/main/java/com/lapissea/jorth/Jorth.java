@@ -539,6 +539,22 @@ public final class Jorth extends CodeDestination{
 					currentFunction.setStaticOp(owner, member);
 				}
 			}
+			case INC -> {
+				Number value = null;
+				var    token = source.readToken();
+				var    str   = token.as(Token.Word.class).orElseThrow().value();
+				
+				try{
+					value = Long.parseLong(str);
+				}catch(NumberFormatException ignore){ }
+				if(value == null) try{
+					value = Double.parseDouble(str);
+				}catch(NumberFormatException ignore){ }
+				if(value == null){
+					throw new MalformedJorth("Expected a numeric value but got " + token);
+				}
+				currentFunction.stackIncrement(value);
+			}
 			case CAST -> {
 				var clazz = getReadClassName(source);
 				currentFunction.castOp(new GenericType(clazz));

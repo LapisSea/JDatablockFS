@@ -69,7 +69,7 @@ public sealed interface Token{
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type == ClassWord.class){
-				return Optional.of(type.cast(new ClassWord(line, ClassName.dotted(value))));
+				return Optional.of(type.cast(new ClassWord(line, ClassName.dotted(value.replace("/", "\\/")))));
 			}
 			if(type == SmolWord.class){
 				if(value.length() == 1){

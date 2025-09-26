@@ -714,12 +714,19 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	
 	public void loadStringOp(String str){
-		writer.visitLdcInsn(str);
 		code().stack.push(GenericType.STRING);
+		emitStackString(str);
+	}
+	private void emitStackString(String str){
+		writer.visitLdcInsn(str);
 	}
 	
 	public void loadIntOp(int value){
 		code().stack.push(GenericType.INT);
+		emitStackInt(value);
+	}
+	
+	private void emitStackInt(int value){
 		switch(value){
 			case 0 -> writer.visitInsn(ICONST_0);
 			case 1 -> writer.visitInsn(ICONST_1);
@@ -730,9 +737,23 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			default -> writer.visitIntInsn(SIPUSH, value);
 		}
 	}
+	public void loadLongOp(long value){
+		code().stack.push(GenericType.LONG);
+		emitStackLong(value);
+	}
+	private void emitStackLong(long value){
+		switch((int)value){
+			case 0 -> writer.visitInsn(LCONST_0);
+			case 1 -> writer.visitInsn(LCONST_1);
+			default -> writer.visitLdcInsn(value);
+		}
+	}
 	
 	public void loadBooleanOp(boolean value){
 		code().stack.push(GenericType.BOOL);
+		emitStackBoolean(value);
+	}
+	private void emitStackBoolean(boolean value){
 		if(value){
 			writer.visitInsn(ICONST_1);
 		}else{
@@ -742,8 +763,44 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	public void loadFloatOp(float value){
 		code().stack.push(GenericType.FLOAT);
-		writer.visitLdcInsn(value);
+		emitStackFloat(value);
 	}
+	private void emitStackFloat(float value){
+		if(value == 0.0f) writer.visitInsn(FCONST_0);
+		else if(value == 1.0f) writer.visitInsn(FCONST_1);
+		else if(value == 2.0f) writer.visitInsn(FCONST_2);
+		else writer.visitLdcInsn(value);
+	}
+	public void loadDoubleOp(double value){
+		code().stack.push(GenericType.FLOAT);
+		emitStackDouble(value);
+	}
+	private void emitStackDouble(double value){
+		if(value == 0.0d) writer.visitInsn(DCONST_0);
+		else if(value == 1.0d) writer.visitInsn(DCONST_1);
+		else writer.visitLdcInsn(value);
+	}
+	public void stackIncrement(Number increment){
+		var type = code().stack.peekLast();
+		if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
+		   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
+			// pop top int, add constant
+			emitStackInt(increment.intValue());
+			writer.visitInsn(IADD);
+		}else if(type.equals(GenericType.LONG)){
+			emitStackLong(increment.longValue());
+			writer.visitInsn(LADD);
+		}else if(type.equals(GenericType.FLOAT)){
+			emitStackFloat(increment.floatValue());
+			writer.visitInsn(FADD);
+		}else if(type.equals(GenericType.DOUBLE)){
+			emitStackDouble(increment.doubleValue());
+			writer.visitInsn(DADD);
+		}else{
+			throw new IllegalArgumentException("Cannot increment stack value of type: " + type);
+		}
+	}
+	
 	
 	@Override
 	public boolean isStatic(){

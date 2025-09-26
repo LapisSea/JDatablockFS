@@ -52,4 +52,10 @@ public class WTFIsMyBytecode<ARG>{
 		var c = (List<String>)o;
 		return a;
 	}
+	public void plusplus(int v){
+		v++;
+	}
+	public void plusplus(long v){
+		v++;
+	}
 }

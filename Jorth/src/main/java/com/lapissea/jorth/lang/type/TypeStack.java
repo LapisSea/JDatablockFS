@@ -50,7 +50,9 @@ public class TypeStack{
 		if(stack.size()>=count) return;
 		throw new MalformedJorth("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
 	}
-	
+	public GenericType peekLast(){
+		return stack.getLast();
+	}
 	public GenericType peek(int pos){
 		if(parent == null){
 			return stack.get(pos);

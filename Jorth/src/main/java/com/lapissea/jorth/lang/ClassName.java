@@ -12,12 +12,24 @@ public final class ClassName{
 	}
 	
 	public static ClassName dotted(String s){
-		if(s.indexOf('/') != -1) throw new IllegalArgumentException(s);
+		checkValid(s, '/');
 		return new ClassName(s, null);
+	}
+	private static void checkValid(String s, char c){
+		int index = 0;
+		while(true){
+			int i = s.indexOf(c, index);
+			if(i == -1) break;
+			if(i>0 && s.charAt(i - 1) == '\\'){
+				index = i;
+				continue;//Ok nvm, it's escaped
+			}
+			throw new IllegalArgumentException(s);
+		}
 	}
 	
 	public static ClassName slashed(String s){
-		if(s.indexOf('.') != -1) throw new IllegalArgumentException(s);
+		checkValid(s, '.');
 		return new ClassName(null, s);
 	}
 	

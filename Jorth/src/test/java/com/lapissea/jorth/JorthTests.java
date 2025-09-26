@@ -22,7 +22,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntFunction;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
@@ -923,5 +925,67 @@ public class JorthTests{
 		IntFunction<String> inst = (IntFunction<String>)instO;
 		assertThat(inst.apply(1)).isEqualTo(name + " 1");
 		assertThat(inst.apply(69)).isEqualTo(name + " 69");
+	}
+	@Test
+	void incrementInt() throws Exception{
+		var name = "incrementTest";
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(IntUnaryOperator.class);
+			writer.write(
+				"""
+					implements #IntUnaryOperator
+					class {0} start
+						@ #Override
+						public function applyAsInt
+							arg num int
+							returns int
+						start
+							get #arg num
+							inc 2
+							return
+						end
+					end
+					""",
+				name
+			);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntUnaryOperator.class);
+		var inst = (IntUnaryOperator)instO;
+		assertThat(inst.applyAsInt(10)).isEqualTo(12);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(0);
+	}
+	@Test
+	void incrementDouble() throws Exception{
+		var name = "incrementTestDouble";
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(DoubleUnaryOperator.class);
+			writer.write(
+				"""
+					implements #DoubleUnaryOperator
+					class {0} start
+						@ #Override
+						public function applyAsDouble
+							arg num double
+							returns double
+						start
+							get #arg num
+							inc 2.125
+							return
+						end
+					end
+					""",
+				name
+			);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(DoubleUnaryOperator.class);
+		var inst = (DoubleUnaryOperator)instO;
+		assertThat(inst.applyAsDouble(10)).isEqualTo(12.125);
+		assertThat(inst.applyAsDouble(-2)).isEqualTo(0.125);
 	}
 }
