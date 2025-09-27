@@ -1,6 +1,8 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.compilation.JorthUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
@@ -132,7 +134,8 @@ public final class TempClassGen{
 	}
 	private static byte[] makeClass(ClassLoader cl, ClassGen classGen){
 		try{
-			return Jorth.generateClass(cl, classGen.name, code -> {
+			var log = JorthLogger.make();
+			var clazzBytes = Jorth.generateClass(cl, classGen.name, code -> {
 				JorthUtils.writeAnnotations(code, classGen.annotations);
 				if(classGen.parent != null){
 					code.write("extends {}", classGen.parent);
@@ -155,7 +158,7 @@ public final class TempClassGen{
 				
 				for(var ctor : classGen.constructors){
 					switch(ctor){
-						case CtorType.All all -> {
+						case CtorType.All ignored -> {
 							code.write(
 								"""
 									public function <init>
@@ -199,7 +202,11 @@ public final class TempClassGen{
 				}
 				
 				code.wEnd();
-			});
+			}, log);
+			if(log != null){
+				Log.log("Jorth code for TempClassGen:\n" + log.output());
+			}
+			return clazzBytes;
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class", e);
 		}

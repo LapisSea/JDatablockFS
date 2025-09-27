@@ -27,6 +27,10 @@ public sealed interface CheckedPipe{
 			this.test = test;
 		}
 		
+		public StandardStructPipe<T> getUncheckedPipe(){
+			return test;
+		}
+		
 		@Override
 		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 			doWriteC(check, test, count, provider, dest, ioPool, instance);

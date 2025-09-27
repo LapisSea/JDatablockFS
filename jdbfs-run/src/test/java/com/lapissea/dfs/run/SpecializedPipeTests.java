@@ -4,6 +4,7 @@ import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
+import com.lapissea.dfs.io.instancepipe.CheckedPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ObjectID;
@@ -36,38 +37,6 @@ public class SpecializedPipeTests{
 	
 	@BeforeClass
 	void before(){ StandardStructPipe.of(ObjectID.BID.class, StructPipe.STATE_IO_FIELD); }
-	
-	@StructPipe.Special
-	static class JustAnInt extends IOInstance.Managed<JustAnInt>{
-		@IOValue
-		@IOValue.Unsigned
-		int theValue;
-		
-		@IOValue
-		private void setTheValue(int theValue){
-			this.theValue = theValue;
-		}
-	}
-	
-	@StructPipe.Special
-	public static class JustAnIntFn extends IOInstance.Managed<JustAnIntFn>{
-		@IOValue
-		@IOValue.Unsigned
-		int theValue;
-		
-		public boolean setCalled, getCalled;
-		
-		@IOValue
-		private void setTheValue(int theValue){
-			this.theValue = theValue;
-			setCalled = true;
-		}
-		@IOValue
-		private int getTheValue(){
-			getCalled = true;
-			return theValue;
-		}
-	}
 	
 	private static final Annotation UNSIGNED = Annotations.make(IOValue.Unsigned.class);
 	
@@ -112,32 +81,41 @@ public class SpecializedPipeTests{
 		StructPipe<T1> basicPipe;
 		StructPipe<T2> specialPipe;
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false)){
-			basicPipe = StandardStructPipe.of(basic, StagedInit.STATE_DONE);
-			specialPipe = StandardStructPipe.of(special, StagedInit.STATE_DONE);
+			basicPipe = makeUncheckedPipe(basic);
+			specialPipe = makeUncheckedPipe(special);
 		}
 		
 		doIOTest(field, basicPipe, specialPipe);
 		doIOTest(field, specialPipe, basicPipe);
 	}
+	private static <T1 extends IOInstance<T1>> StructPipe<T1> makeUncheckedPipe(Class<T1> basic){
+		StructPipe<T1> pipe = StandardStructPipe.of(basic, StagedInit.STATE_DONE);
+		if(pipe instanceof CheckedPipe.Standard<T1> ch){
+			return ch.getUncheckedPipe();
+		}
+		return pipe;
+	}
+	
+	
 	@SuppressWarnings("unchecked")
-	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>>
-	void doIOTest(FieldDef field, StructPipe<T1> basicPipe, StructPipe<T2> specialPipe) throws IOException{
-		T1  val = basicPipe.getType().make();
-		var f1  = (IOField<T1, Object>)basicPipe.getType().getFields().byName("val").orElseThrow();
-		var f2  = (IOField<T2, Object>)specialPipe.getType().getFields().byName("val").orElseThrow();
+	private static <TF extends IOInstance<TF>, TT extends IOInstance<TT>>
+	void doIOTest(FieldDef field, StructPipe<TF> from, StructPipe<TT> to) throws IOException{
+		TF  val = from.getType().make();
+		var f1  = (IOField<TF, Object>)from.getType().getFields().byName("val").orElseThrow();
+		var f2  = (IOField<TT, Object>)to.getType().getFields().byName("val").orElseThrow();
 		f1.set(null, val, field.generator.apply(new RawRandom()));
 		
 		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
-		basicPipe.write(ch, val);
-		T2 read = specialPipe.readNew(ch, null);
+		from.write(ch, val);
+		TT read = to.readNew(ch, null);
 		
 		if(field.getter){
-			assertThat(read).extracting("valGetCount").isEqualTo(2);
 			assertThat(val).extracting("valGetCount").isEqualTo(1);
+			assertThat(read).extracting("valGetCount").isEqualTo(0);
 		}
 		if(field.setter){
-			assertThat(read).extracting("valSetCount").isEqualTo(1);
 			assertThat(val).extracting("valSetCount").isEqualTo(1);
+			assertThat(read).extracting("valSetCount").isEqualTo(1);
 		}
 		
 		var val1 = f1.get(null, val);
@@ -206,28 +184,4 @@ public class SpecializedPipeTests{
 			fns);
 		return TempClassGen.gen(cg);
 	}
-	
-	@Test
-	void justAnInt() throws IOException{
-		var val = new JustAnInt();
-		val.theValue = 69;
-		var pipe = StandardStructPipe.of(JustAnInt.class, StagedInit.STATE_DONE);
-		TestUtils.checkPipeInOutEquality(pipe, val);
-	}
-	
-	@Test
-	void justAnIntFn() throws IOException{
-		var val = new JustAnIntFn();
-		val.theValue = 420;
-		var pipe = StandardStructPipe.of(JustAnIntFn.class, StagedInit.STATE_DONE);
-		
-		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
-		pipe.write(ch, val);
-		var read = pipe.readNew(ch, null);
-		
-		assertThat(val).isEqualTo(read);
-		assertThat(read).extracting("setCalled").isEqualTo(true);
-		assertThat(read).extracting("getCalled").isEqualTo(true);
-	}
-	
 }

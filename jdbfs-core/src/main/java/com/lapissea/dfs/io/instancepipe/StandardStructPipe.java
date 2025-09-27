@@ -423,6 +423,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var type = getType().getType();
 		try{
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
+			var log       = JorthLogger.make();
 			var bytecode = Jorth.generateClass(type.getClassLoader(), className, writer -> {
 				writer.addImport(Struct.class);
 				writer.addImportAs(type, "ObjType");
@@ -519,7 +520,13 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				
 				
 				writer.wEnd();
-			}, JorthLogger.make());
+			}, log);
+			
+			
+			if(log != null){
+				Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
+			}
+			
 			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 			var cls    = access.defineClass(type, bytecode, true);
 			//noinspection unchecked
