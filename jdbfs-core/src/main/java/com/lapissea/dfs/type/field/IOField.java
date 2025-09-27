@@ -32,6 +32,7 @@ import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -191,7 +192,53 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface SpecializedGenerator{
-		void injectReadField(CodeStream writer) throws MalformedJorth;
+		record ValueAccess(){ }
+		
+		final class AccessMap{
+			
+			private final boolean hasIOPool;
+			public AccessMap(boolean hasIOPool){ this.hasIOPool = hasIOPool; }
+			
+			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
+				switch(field){
+					case FieldAccessor.FieldOrMethod fom -> {
+						switch(fom.setter()){
+							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> { }
+							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
+								writer.write("call {!} start", name);
+							}
+						}
+					}
+					case VirtualAccessor<?> virutal -> {
+						throw new NotImplementedException("Virtual accessors not yet implemented");
+					}
+					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
+				}
+			}
+			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
+				switch(field){
+					case FieldAccessor.FieldOrMethod fom -> {
+						switch(fom.setter()){
+							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> {
+								writer.write("set {} {!}", field.getDeclaringStruct().getType(), name);
+							}
+							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
+								writer.write("end");
+							}
+						}
+					}
+					case VirtualAccessor<?> virutal -> {
+						throw new NotImplementedException("Virtual accessors not yet implemented");
+					}
+					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
+				}
+			}
+			public void get(IOField<?, ?> field, CodeStream writer){
+			
+			}
+		}
+		
+		void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

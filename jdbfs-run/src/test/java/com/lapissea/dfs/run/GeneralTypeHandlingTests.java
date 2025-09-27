@@ -639,8 +639,8 @@ public class GeneralTypeHandlingTests{
 			List.of(new TempClassGen.FieldGen("hi", TempClassGen.VisiblityGen.PUBLIC, false, int.class, List.of(Annotations.make(IOValue.class)), null)),
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of()
-		);
+			List.of(),
+			List.of());
 		//noinspection unchecked
 		var typ = (Class<T>)TempClassGen.gen(def);
 		

@@ -2,6 +2,7 @@ package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.internal.Access;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -20,6 +21,8 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -306,8 +309,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					name
 				);
 				
+				var accessMap = new IOField.SpecializedGenerator.AccessMap(true);
 				for(IOField.SpecializedGenerator generator : generators){
-					generator.injectReadField(writer);
+					generator.injectReadField(writer, accessMap);
 				}
 				
 				writer.write(
@@ -318,6 +322,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				);
 			});
 		}catch(Throwable t){
+			if(true) throw t;
 			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
 			target = getGenericDoRead();
 		}
@@ -351,8 +356,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					name
 				);
 				
+				var accessMap = new IOField.SpecializedGenerator.AccessMap(false);
 				for(IOField.SpecializedGenerator generator : generators){
-					generator.injectReadField(writer);
+					generator.injectReadField(writer, accessMap);
 				}
 				
 				writer.write(
@@ -363,6 +369,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				);
 			});
 		}catch(Throwable t){
+			if(true) throw t;
 			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
 			target = getGenericReadNew();
 		}
@@ -375,7 +382,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var jorth = new Jorth(lookup.lookupClass().getClassLoader(), JorthLogger.make());
 		
 		try(var writer = jorth.writer()){
-			writer.write("class {} start", cname);
+			writer.write("class {!} start", cname);
 			generateFn.accept(writer);
 			writer.wEnd();
 		}
@@ -415,8 +422,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
 		var type = getType().getType();
 		try{
-			var className = type.getName() + "Generated_STD_" + type.getSimpleName();
-			var bytecode = Jorth.generateClass(getClass().getClassLoader(), className, writer -> {
+			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
+			var bytecode = Jorth.generateClass(type.getClassLoader(), className, writer -> {
 				writer.addImport(Struct.class);
 				writer.addImportAs(type, "ObjType");
 				writer.write(
@@ -513,12 +520,16 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				
 				writer.wEnd();
 			}, JorthLogger.make());
-			
-			var cls = Access.defineClass(type, bytecode);
+			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
+			var cls    = access.defineClass(type, bytecode, true);
 			//noinspection unchecked
 			return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
-		}catch(Throwable e){
-			throw new RuntimeException(e);
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to generate specialized pipe for type: " + type.getTypeName(), e);
+		}catch(AccessProvider.Defunct e){
+			throw new ShouldNeverHappenError(e);
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException("Failed to instantiate specialized pipe for type: " + type.getTypeName(), e);
 		}
 	}
 	

@@ -74,7 +74,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.dfs.config.GlobalConfig.TYPE_VALIDATION;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
@@ -89,13 +88,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
-	public @interface Special{
-		/**
-		 * Rarely, a thread deadlock can be caused by this class.
-		 * This can be mitigated by using a dummy class to register the optimized pipe
-		 */
-		Class<?> registerClass() default void.class;
-	}
+	public @interface Special{ }
 	
 	public interface SpecializedImplementation{
 	
@@ -236,7 +229,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected void postValidate(){
-		if(TYPE_VALIDATION) doPostValidate();
+		if(ConfigDefs.DO_INTEGRITY_CHECK.resolveVal()) doPostValidate();
 	}
 	private void doPostValidate(){
 		var type = getType();

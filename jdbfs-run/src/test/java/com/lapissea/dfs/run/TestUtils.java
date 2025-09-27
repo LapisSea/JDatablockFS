@@ -237,8 +237,8 @@ public final class TestUtils{
 			)).toList(),
 			Set.of(new TempClassGen.CtorType.Empty(Iters.from(props).nonNullProps(Prop::val).toMap(Prop::name, Prop::val))),
 			IOInstance.Managed.class,
-			List.of()
-		));
+			List.of(),
+			List.of()));
 	}
 	
 	public static <T> T callWithClassLoader(ClassLoader classLoader, String sesName) throws ReflectiveOperationException{

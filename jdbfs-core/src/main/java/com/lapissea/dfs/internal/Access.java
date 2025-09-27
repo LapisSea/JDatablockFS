@@ -123,9 +123,6 @@ public final class Access{
 	public static MethodHandle makeMethodHandle(@NotNull Method method) throws IllegalAccessException{
 		return access(AccessProvider::unreflect, method, "failed to create MethodHandle\n  Method: {}#red", true);
 	}
-	public static Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException{
-		return access(AccessProvider::defineClass, target, bytecode, "failed to define class\n  Target: {}#red", true);
-	}
 	public static AccessProvider findAccess(Class<?> target, Mode... modes) throws IllegalAccessException{
 		return access(AccessProvider::adapt, target, modes, "failed to find AccessProvider\n  Target: {}#red", true);
 	}

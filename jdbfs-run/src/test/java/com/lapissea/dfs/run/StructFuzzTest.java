@@ -194,8 +194,8 @@ public final class StructFuzzTest{
 			List.of(new TempClassGen.FieldGen("f1", visiblity, isFinal, int.class, anns(IOVal), RandomGenerator::nextInt)),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of()
-		);
+			List.of(),
+			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
 	}
@@ -211,8 +211,8 @@ public final class StructFuzzTest{
 			),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of(Annotations.make(IOInstance.Order.class, Map.of("value", new String[]{"s1", "s2"})))
-		);
+			List.of(Annotations.make(IOInstance.Order.class, Map.of("value", new String[]{"s1", "s2"}))),
+			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
 	}
@@ -227,8 +227,8 @@ public final class StructFuzzTest{
 			),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of()
-		);
+			List.of(),
+			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
 	}
@@ -353,7 +353,7 @@ public final class StructFuzzTest{
 			fields,
 			constructors,
 			IOInstance.Managed.class,
-			annotations
-		);
+			annotations,
+			List.of());
 	}
 }

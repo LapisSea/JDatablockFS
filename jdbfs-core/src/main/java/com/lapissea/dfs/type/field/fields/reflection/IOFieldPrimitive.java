@@ -354,22 +354,22 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
 		
 		@Override
-		public void injectReadField(CodeStream writer) throws MalformedJorth{
-			var typeName = declaringStruct().getType().getName();
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
 			if(this.sizeDescriptorSafe().hasFixed()){
-				var caller = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
+				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
 				if(unsigned && maxSize.size == INT){
-					caller += " cast int";
+					readIntName += " cast int";
 				}
+				writer.write("dup");
+				accessMap.preSet(getAccessor(), writer);
 				writer.write(
 					"""
-						dup
 						get #arg src
 						call {}
-						set {} {}
 						""",
-					caller, typeName, getName()
+					readIntName
 				);
+				accessMap.set(getAccessor(), writer);
 			}else{
 				throw new UnsupportedOperationException(this + "");
 			}

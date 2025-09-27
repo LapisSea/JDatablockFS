@@ -385,7 +385,17 @@ public final class FieldCompiler{
 				
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
-					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+					case VAR_HANDLE -> {
+						try{
+							yield VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+						}catch(IllegalAccessException e){
+							Log.warn(
+								"Failed to create optimized field accessor for {}#yellow -> {}#red.\n  Reason: {}\n  Attempting to use reflection...",
+								struct.getType(), fieldName, e
+							);
+							yield ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+						}
+					}
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){

@@ -36,6 +36,9 @@ public interface AccessProvider{
 	
 	ReferenceQueue<Object> DEFUNCT_REF_QUEUE = new ReferenceQueue<>();
 	
+	/**
+	 * Thrown when an access provider has expired. For example, the underlying class has been unloded
+	 */
 	class Defunct extends Exception{ }
 	
 	class UnoptimizedAccessProvider implements AccessProvider{
@@ -57,7 +60,7 @@ public interface AccessProvider{
 		}
 		
 		@Override
-		public Class<?> defineClass(Class<?> target, byte[] bytecode){ throw new UnsupportedOperationException(); }
+		public Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden){ throw new UnsupportedOperationException(); }
 		@Override
 		public AccessProvider adapt(Class<?> target, Mode[] modes) throws IllegalAccessException{
 			if(AccessUtils.isPublicMode(modes)) return this;
@@ -141,7 +144,11 @@ public interface AccessProvider{
 			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
 		}
 		@Override
-		public Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct{
+		public Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException, Defunct{
+			if(hidden){
+				var lookup = getLookup(target, true, Mode.PRIVATE, Mode.MODULE);
+				return lookup.defineHiddenClass(bytecode, true).lookupClass();
+			}
 			var lookup = getLookup(target, true, Mode.PACKAGE);
 			return lookup.defineClass(bytecode);
 		}
@@ -335,7 +342,10 @@ public interface AccessProvider{
 	<InterfType, T extends InterfType> T makeLambda(Constructor<?> constructor, Class<InterfType> functionalInterface)
 		throws IllegalAccessException, Defunct;
 	
-	Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct;
+	default Class<?> defineClass(Class<?> target, byte[] bytecode) throws IllegalAccessException, Defunct{
+		return defineClass(target, bytecode, false);
+	}
+	Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException, Defunct;
 	
 	AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException, Defunct;
 	

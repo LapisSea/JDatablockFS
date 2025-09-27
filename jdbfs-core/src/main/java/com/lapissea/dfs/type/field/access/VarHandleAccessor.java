@@ -15,12 +15,15 @@ import java.lang.reflect.Type;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
+public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp> implements FieldAccessor.FieldOrMethod{
 	
 	public static final class Funct<CTyp extends IOInstance<CTyp>> extends VarHandleAccessor<CTyp>{
 		
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
+		
+		private final String getterName;
+		private final String setterName;
 		
 		private Funct(Struct<CTyp> struct, Field field, @Nullable Method getter, @Nullable Method setter, String name, Type genericType) throws IllegalAccessException{
 			super(struct, field, name, genericType);
@@ -30,6 +33,20 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 			
 			this.getter = getter != null? makeGetter(findParent(getter)) : null;
 			this.setter = setter != null? makeSetter(findParent(setter)) : null;
+			
+			getterName = getter != null? getter.getName() : name;
+			setterName = setter != null? setter.getName() : name;
+		}
+		
+		@Override
+		public AccessType getter(){
+			if(getterName != null) return new AccessType.Method(getterName);
+			return super.getter();
+		}
+		@Override
+		public AccessType setter(){
+			if(setterName != null) return new AccessType.Method(setterName);
+			return super.setter();
 		}
 		
 		@Override
@@ -140,10 +157,21 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	}
 	
 	private final VarHandle handle;
+	private final String    fieldName;
 	
 	private VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		handle = Access.makeVarHandle(field);
+		fieldName = field.getName();
+	}
+	
+	@Override
+	public AccessType getter(){
+		return new AccessType.Field(fieldName);
+	}
+	@Override
+	public AccessType setter(){
+		return new AccessType.Field(fieldName);
 	}
 	
 	@Override

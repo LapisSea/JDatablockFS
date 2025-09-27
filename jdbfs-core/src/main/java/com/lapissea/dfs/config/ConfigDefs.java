@@ -51,10 +51,11 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
-	Flag.FBool STRICT_FLAGS    = flagB("strictFlags", false);
-	Flag.FBool RELEASE_MODE    = flagB("releaseMode", () -> !deb() && isInJar());
-	Flag.FBool TYPE_VALIDATION = flagB("typeValidation", deb());
-	Flag.FInt  BATCH_BYTES     = flagI("batchBytes", 8192).natural();
+	Flag.FBool STRICT_FLAGS       = flagB("strictFlags", false);
+	Flag.FBool RELEASE_MODE       = flagB("releaseMode", () -> !deb() && isInJar());
+	Flag.FBool TYPE_VALIDATION    = flagB("typeValidation", deb());
+	Flag.FBool DO_INTEGRITY_CHECK = flagB("typeValidation.doIntegrityCheck", TYPE_VALIDATION);
+	Flag.FInt  BATCH_BYTES        = flagI("batchBytes", 8192).natural();
 	
 	Flag.FEnum<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
 	Flag.FBool               PRINT_FLAGS       = flagB("log.printFlags", () -> deb() && LOG_LEVEL.resolve().isWithin(INFO));

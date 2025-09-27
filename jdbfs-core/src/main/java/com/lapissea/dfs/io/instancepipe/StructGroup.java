@@ -96,17 +96,6 @@ final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
 		P created;
 		try{
-			var typ = struct.getType();
-			//Special types must be statically initialized as they may add new special implementations.
-			if(typ.isAnnotationPresent(StructPipe.Special.class)){
-				var ann = typ.getAnnotation(StructPipe.Special.class);
-				if(ann.registerClass() == void.class){
-					Utils.ensureClassLoaded(typ);
-				}else{
-					Utils.ensureClassLoaded(ann.registerClass());
-				}
-			}
-			
 			created = newPipe(struct, syncStage);
 		}catch(InvocationTargetException|ExceptionInInitializerError outerError){
 			var cause = outerError.getCause();

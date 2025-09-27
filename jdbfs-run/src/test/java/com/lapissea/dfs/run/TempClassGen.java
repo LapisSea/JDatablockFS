@@ -6,6 +6,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
@@ -70,12 +71,20 @@ public final class TempClassGen{
 		}
 	}
 	
-	public record ClassGen(String name, List<FieldGen> fields, Set<CtorType> constructors, Class<?> parent, List<Annotation> annotations){
+	public record ClassGen(
+		String name,
+		List<FieldGen> fields,
+		Set<CtorType> constructors,
+		Class<?> parent,
+		List<Annotation> annotations,
+		List<UnsafeConsumer<CodeStream, MalformedJorth>> extras
+	){
 		public ClassGen{
 			Objects.requireNonNull(name);
 			Objects.requireNonNull(fields);
 			Objects.requireNonNull(constructors);
 			Objects.requireNonNull(annotations);
+			Objects.requireNonNull(extras);
 		}
 		
 		@Override
@@ -92,7 +101,7 @@ public final class TempClassGen{
 			       "\n}";
 		}
 		public ClassGen withName(String name){
-			return new ClassGen(name, fields, constructors, parent, annotations);
+			return new ClassGen(name, fields, constructors, parent, annotations, List.of());
 		}
 	}
 	
@@ -183,6 +192,9 @@ public final class TempClassGen{
 							}
 							code.wEnd();
 						}
+					}
+					for(var extra : classGen.extras){
+						extra.accept(code);
 					}
 				}
 				
