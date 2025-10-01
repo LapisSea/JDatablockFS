@@ -21,7 +21,7 @@ public final class ClassName{
 			int i = s.indexOf(c, index);
 			if(i == -1) break;
 			if(i>0 && s.charAt(i - 1) == '\\'){
-				index = i;
+				index = i + 1;
 				continue;//Ok nvm, it's escaped
 			}
 			throw new IllegalArgumentException(s);

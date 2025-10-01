@@ -800,7 +800,7 @@ public final class Jorth extends CodeDestination{
 		return classes.keySet().stream().map(ClassName::dotted).collect(Collectors.toSet());
 	}
 	public byte[] getClassFile(String name){
-		var cls = classes.get(ClassName.dotted(name));
+		var cls = classes.get(ClassName.dotted(Tokenizer.escape(name)));
 		if(cls == null){
 			throw new IllegalArgumentException(name + " is not defined");
 		}
