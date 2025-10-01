@@ -159,7 +159,8 @@ final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 		
 		if(DEBUG_VALIDATION){
 			checkPipe(specializedImplementation, pipe);
-			return makeCheckedSpecialPipe(struct, syncStage, pipe);
+			//noinspection unchecked
+			return makeCheckedSpecialPipe(struct, syncStage, (P)specializedImplementation);
 		}
 		//noinspection unchecked
 		return (P)specializedImplementation;
