@@ -556,7 +556,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var msg = e.getLocalizedMessage();
 			sj.add("INVALID: " + (msg == null? e.getClass().getSimpleName() : msg));
 		}
-		var state = getEstimatedState();
+		var state = getInitializationState();
 		if(state != STATE_DONE){
 			if(e == null) sj.add("init-state: " + stateToString(state));
 		}

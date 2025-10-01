@@ -374,7 +374,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var s = thisStruct;
 			if(s == null){
 				s = fetchStruct(false);
-				if(s.getEstimatedState() == StagedInit.STATE_DONE){
+				if(s.getInitializationState() == StagedInit.STATE_DONE){
 					s = getThisStruct();
 				}
 			}

@@ -168,10 +168,10 @@ public abstract class StagedInit implements Stringify{
 	public final Timing waitForStateTimed(int state){
 		if(this.state>=state) return null;
 		var t1   = System.nanoTime();
-		var from = getEstimatedState();
+		var from = getInitializationState();
 		actuallyWaitForState(state);
 		var t2 = System.nanoTime();
-		var to = getEstimatedState();
+		var to = getInitializationState();
 		return new Timing(this, (t2 - t1)/1000000D, from, to);
 	}
 	
@@ -207,7 +207,7 @@ public abstract class StagedInit implements Stringify{
 		}
 	}
 	
-	protected int getEstimatedState(){
+	public int getInitializationState(){
 		return state;
 	}
 	
