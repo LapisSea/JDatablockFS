@@ -98,7 +98,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
  * </table>
  */
 @Struct.NoDefaultConstructor
-@StructPipe.Special
+//@StructPipe.Special
 public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	public static final Struct<Chunk>     STRUCT = Struct.of(Chunk.class);

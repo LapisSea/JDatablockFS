@@ -34,8 +34,8 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 			this.getter = getter != null? makeGetter(findParent(getter)) : null;
 			this.setter = setter != null? makeSetter(findParent(setter)) : null;
 			
-			getterName = getter != null? getter.getName() : name;
-			setterName = setter != null? setter.getName() : name;
+			getterName = getter != null? getter.getName() : null;
+			setterName = setter != null? setter.getName() : null;
 		}
 		
 		@Override

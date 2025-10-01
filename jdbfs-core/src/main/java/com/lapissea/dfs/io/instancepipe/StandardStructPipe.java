@@ -1,5 +1,6 @@
 package com.lapissea.dfs.io.instancepipe;
 
+import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.AccessProvider;
@@ -280,8 +281,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		return super.readNew(provider, src, genericContext);
 	}
-	public static <T extends IOInstance<T>>
-	CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
+	
+	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
 		MethodHandle target;
 		try{
@@ -294,43 +295,46 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					GenericContext.class, StandardStructPipe.class, IOInstance.class
 				);
 				
-				writer.write(
-					"""
-						public static function {0}
-							arg ioPool #VarPool<#ObjType>
-							arg provider #DataProvider
-							arg src #ContentReader
-							arg instance #ObjType
-							arg genericContext #GenericContext
-							returns #ObjType
-						start
-							get #arg instance
-						""",
-					name
-				);
-				
-				var accessMap = new IOField.SpecializedGenerator.AccessMap(true);
-				for(IOField.SpecializedGenerator generator : generators){
-					generator.injectReadField(writer, accessMap);
-				}
-				
-				writer.write(
-					"""
-							return
-						end
-						"""
-				);
+				generateFunction_doRead(name, writer, generators);
 			});
 		}catch(Throwable t){
-			if(true) throw t;
 			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+			if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
 			target = getGenericDoRead();
 		}
 		return new ConstantCallSite(target);
 	}
 	
-	public static <T extends IOInstance<T>>
-	CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
+	private static void generateFunction_doRead(String name, CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+		writer.write(
+			"""
+				public static function {0}
+					arg ioPool #VarPool<#ObjType>
+					arg provider #DataProvider
+					arg src #ContentReader
+					arg instance #ObjType
+					arg genericContext #GenericContext
+					returns #ObjType
+				start
+					get #arg instance
+				""",
+			name
+		);
+		
+		var accessMap = new IOField.SpecializedGenerator.AccessMap(true);
+		for(IOField.SpecializedGenerator generator : generators){
+			generator.injectReadField(writer, accessMap);
+		}
+		
+		writer.write(
+			"""
+					return
+				end
+				"""
+		);
+	}
+	
+	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
 		MethodHandle target;
 		try{
@@ -342,38 +346,41 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					VarPool.class, DataProvider.class, ContentReader.class,
 					GenericContext.class, StandardStructPipe.class, IOInstance.class
 				);
-				
-				writer.write(
-					"""
-						public static function {0}
-							arg provider #DataProvider
-							arg src #ContentReader
-							arg genericContext #GenericContext
-							returns #ObjType
-						start
-							new #ObjType
-						""",
-					name
-				);
-				
-				var accessMap = new IOField.SpecializedGenerator.AccessMap(false);
-				for(IOField.SpecializedGenerator generator : generators){
-					generator.injectReadField(writer, accessMap);
-				}
-				
-				writer.write(
-					"""
-							return
-						end
-						"""
-				);
+				generateFunction_readNew(name, writer, generators);
 			});
 		}catch(Throwable t){
-			if(true) throw t;
 			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+			if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
 			target = getGenericReadNew();
 		}
 		return new ConstantCallSite(target);
+	}
+	
+	private static void generateFunction_readNew(String functionName, CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+		writer.write(
+			"""
+				public static function {0}
+					arg provider #DataProvider
+					arg src #ContentReader
+					arg genericContext #GenericContext
+					returns #ObjType
+				start
+					new #ObjType
+				""",
+			functionName
+		);
+		
+		var accessMap = new IOField.SpecializedGenerator.AccessMap(false);
+		for(IOField.SpecializedGenerator generator : generators){
+			generator.injectReadField(writer, accessMap);
+		}
+		
+		writer.write(
+			"""
+					return
+				end
+				"""
+		);
 	}
 	
 	private static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<CodeStream, Throwable> generateFn) throws Throwable{
@@ -421,21 +428,39 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	@Override
 	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
 		var type = getType().getType();
+		
+		List<IOField.SpecializedGenerator> generators;
+		if(getType().getInitializationState()>=StructPipe.STATE_IO_FIELD){
+			List<IOField.SpecializedGenerator> generatorsTmp = null;
+			try{
+				generatorsTmp = getSpecializedGenerators(type);
+			}catch(UnsupportedOperationException t){
+				new RuntimeException("Failed to get specialized generators", t).printStackTrace();
+				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+			}
+			generators = generatorsTmp;
+		}else generators = null;
+		
+		var log = JorthLogger.make();
 		try{
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
-			var log       = JorthLogger.make();
 			var bytecode = Jorth.generateClass(type.getClassLoader(), className, writer -> {
-				writer.addImport(Struct.class);
+				
 				writer.addImportAs(type, "ObjType");
+				writer.addImportAs(className, "ThisClass");
+				writer.addImports(
+					Struct.class,
+					VarPool.class, DataProvider.class, ContentReader.class,
+					GenericContext.class, StandardStructPipe.class, IOInstance.class
+				);
+				
 				writer.write(
 					"""
-						extends {}<#ObjType>
+						extends #StandardStructPipe<#ObjType>
 						implements {}
-						public class {} start
+						public class #ThisClass start
 						""",
-					StandardStructPipe.class,
-					SpecializedImplementation.class,
-					className
+					SpecializedImplementation.class
 				);
 				writer.write(
 					"""
@@ -452,10 +477,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					StructPipe.STATE_DONE
 				);
 				
-				writer.addImports(
-					VarPool.class, DataProvider.class, ContentReader.class,
-					GenericContext.class, StandardStructPipe.class, IOInstance.class
-				);
+				if(generators != null){
+					generateFunction_readNew("specialized_readNew", writer, generators);
+					generateFunction_doRead("specialized_doRead", writer, generators);
+				}
+				
 				writer.write(
 					"""
 						@ #Override
@@ -467,27 +493,15 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 							arg genericContext #GenericContext
 							returns #IOInstance
 						start
-							get #arg instance
-						
-						 	call-virtual
-						 		bootstrap-fn #StandardStructPipe bootstrapDoRead
-						 			arg #Class #ObjType
-						 		calling-fn doRead start
-									arg #VarPool<#ObjType>
-									arg #DataProvider
-									arg #ContentReader
-									arg #ObjType
-									arg #GenericContext
-									returns #ObjType
-						 		end
-						 	start
-								get #arg ioPool
-								get #arg provider
-								get #arg src
-								get #arg instance cast #ObjType
-								get #arg genericContext
-						 	end
-						
+						"""
+				);
+				if(generators != null){
+					directCall_doRead(writer);
+				}else{
+					virtualCall_doRead(writer);
+				}
+				writer.write(
+					"""
 							return
 						end
 						
@@ -498,34 +512,22 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 							arg genericContext #GenericContext
 							returns #IOInstance
 						start
-						 	call-virtual
-						 		bootstrap-fn #StandardStructPipe bootstrapReadNew
-						 			arg #Class #ObjType
-						 		calling-fn readNew start
-									arg #DataProvider
-									arg #ContentReader
-									arg #GenericContext
-									returns #ObjType
-						 		end
-						 	start
-								get #arg provider
-								get #arg src
-								get #arg genericContext
-						 	end
-						
+						"""
+				);
+				if(generators != null){
+					directCall_readNew(writer);
+				}else{
+					virtualCall_readNew(writer);
+				}
+				writer.write(
+					"""
 							return
 						end
 						"""
 				);
 				
-				
 				writer.wEnd();
 			}, log);
-			
-			
-			if(log != null){
-				Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
-			}
 			
 			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 			var cls    = access.defineClass(type, bytecode, true);
@@ -537,7 +539,83 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			throw new ShouldNeverHappenError(e);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException("Failed to instantiate specialized pipe for type: " + type.getTypeName(), e);
+		}finally{
+			if(log != null){
+				Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
+			}
 		}
+	}
+	
+	private static void directCall_readNew(CodeStream writer) throws MalformedJorth{
+		writer.write(
+			"""
+				static call #ThisClass specialized_readNew start
+					get #arg provider
+					get #arg src
+					get #arg genericContext
+				end
+				"""
+		);
+	}
+	private static void directCall_doRead(CodeStream writer) throws MalformedJorth{
+		writer.write(
+			"""
+				static call #ThisClass specialized_doRead start
+					get #arg ioPool
+					get #arg provider
+					get #arg src
+					get #arg instance cast #ObjType
+					get #arg genericContext
+				end
+				"""
+		);
+	}
+	
+	private static void virtualCall_readNew(CodeStream writer) throws MalformedJorth{
+		writer.write(
+			"""
+					call-virtual
+						bootstrap-fn #StandardStructPipe bootstrapReadNew
+							arg #Class #ObjType
+						calling-fn readNew start
+							arg #DataProvider
+							arg #ContentReader
+							arg #GenericContext
+							returns #ObjType
+						end
+					start
+						get #arg provider
+						get #arg src
+						get #arg genericContext
+					end
+				
+				"""
+		);
+	}
+	private static void virtualCall_doRead(CodeStream writer) throws MalformedJorth{
+		writer.write(
+			"""
+					call-virtual
+						bootstrap-fn #StandardStructPipe bootstrapDoRead
+							arg #Class #ObjType
+						calling-fn doRead start
+							arg #VarPool<#ObjType>
+							arg #DataProvider
+							arg #ContentReader
+							arg #ObjType
+							arg #GenericContext
+							returns #ObjType
+						end
+					start
+						get #arg ioPool
+						get #arg provider
+						get #arg src
+						get #arg instance cast #ObjType
+						get #arg genericContext
+					end
+				
+				"""
+		);
 	}
 	
 }
