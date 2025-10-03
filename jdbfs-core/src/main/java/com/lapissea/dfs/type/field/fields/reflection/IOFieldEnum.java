@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.bit.BitReader;
+import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.type.IOInstance;
@@ -13,6 +14,9 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,7 +25,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
+public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage extends FieldUsage.InstanceOf<Enum>{
@@ -89,5 +93,49 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	@Override
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		return get(ioPool1, inst1) == get(ioPool2, inst2);
+	}
+	
+	public static <E extends Enum<E>> E rawToEnum(int rawInt, int bits, Class<E> enumType) throws IOException{
+		var bytes     = BitUtils.bitsToBytes(bits);
+		var oneBits   = bytes*8 - bits;
+		var oneMask   = (int)BitUtils.makeMask(oneBits);
+		var valueMask = (int)BitUtils.makeMask(bits);
+		
+		var rawOnes = rawInt >>> bits;
+		if(rawOnes != oneMask){
+			throw new IOException("Illegal one bits");
+		}
+		var index = rawInt&valueMask;
+		return EnumUniverse.of(enumType).get(index);
+	}
+	
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
+		if(nullable()) throw new NotImplementedException("Nullable enum not implemented yet");
+		
+		var bits  = enumUniverse.getBitSize(nullable());
+		var bytes = BitUtils.bitsToBytes(bits);
+		var readInt = switch(bytes){
+			case 0, 1, 2, 3 -> "call readUnsignedInt" + bytes;
+			case 4 -> "call readUnsignedInt4 cast int";
+			default -> throw new UnsupportedOperationException();
+		};
+		
+		var oneBits   = bytes*8 - bits;
+		var oneMask   = BitUtils.makeMask(oneBits);
+		var valueMask = BitUtils.makeMask(bits);
+		writer.write("dup");
+		accessMap.preSet(getAccessor(), writer);
+		writer.write(
+			"""
+				static call com.lapissea.dfs.type.field.fields.reflection rawToEnum start
+					get #arg src
+					{}
+					{}
+					{}
+				end
+				""", readInt, bits, enumUniverse.type
+		);
+		accessMap.set(getAccessor(), writer);
 	}
 }

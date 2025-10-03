@@ -419,8 +419,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				Log.fmt("""
 					        Not all fields support code generation:
 					          Type:  {}#red
-					          Field: {}#red
-					        """, objType.getTypeName(), field));
+					          Field: {}#red - {}#red
+					        """, objType.getTypeName(), field, field.getClass().getTypeName()));
 		}
 		return generators;
 	}
