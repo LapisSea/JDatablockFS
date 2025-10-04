@@ -630,18 +630,17 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var s = size();
 		deltaSize(-s);
 		
-		if(storage.needsRemoval()){
-			List<ChunkPointer> toFree = new ArrayList<>();
-			try(var io = selfIO()){
+		//Open early to lock the chain in case of move
+		try(var io = selfIO()){
+			if(storage.needsRemoval()){
+				List<ChunkPointer> toFree = new ArrayList<>();
 				for(long i = 0; i<s; i++){
 					io.setPos(calcElementOffset(i));
 					toFree.addAll(storage.notifyRemoval(io, false));
 				}
+				var man = getDataProvider().getMemoryManager();
+				man.freeChains(toFree);
 			}
-			var man = getDataProvider().getMemoryManager();
-			man.freeChains(toFree);
-		}
-		try(var io = selfIO()){
 			io.setCapacity(calcElementOffset(0));
 		}
 	}
