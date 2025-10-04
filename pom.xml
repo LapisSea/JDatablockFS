@@ -37,6 +37,7 @@
 		<module>Fuzzer</module>
 		<module>demos/Photos</module>
 		<module>demos/World</module>
+		<module>demos/LightControl</module>
 	</modules>
 	
 	<dependencyManagement>
