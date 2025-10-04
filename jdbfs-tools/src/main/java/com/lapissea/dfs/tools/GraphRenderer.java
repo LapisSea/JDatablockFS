@@ -161,7 +161,7 @@ public class GraphRenderer implements DataRenderer{
 		frameTimes.add(now);
 		frameTimes.removeIf(l -> now - l>1000_000_000);
 		
-		var min = 0.01;
+		var min = 0.03/zoom;
 		if(maxDist>min) markDirty();
 		var format = NumberFormat.getInstance();
 		format.setMaximumFractionDigits(4);
@@ -306,11 +306,11 @@ public class GraphRenderer implements DataRenderer{
 		
 		double maxDist = updateWorld();
 		
-		var min = 0.01;
+		var min = 0.03/zoom;
 		if(maxDist<min*10 && undead.isEmpty()){
 			while(maxDist>min){
 				var t = System.nanoTime();
-				if(t - start>1000000*16*3) break;
+				if(t - start>1000000*26*3) break;
 				maxDist = updateWorld();
 			}
 		}
