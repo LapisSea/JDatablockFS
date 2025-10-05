@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.BufferedWriter;
 import java.io.FileOutputStream;
@@ -26,13 +27,11 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.StringJoiner;
 import java.util.stream.LongStream;
 
 public final class RunLog{
@@ -41,7 +40,15 @@ public final class RunLog{
 		@IOValue
 		final class Lux extends IOInstance.Managed<Lux> implements LightValue{
 			public final float lux;
-			public Lux(float lux){ this.lux = lux; }
+			public Lux(float lux){
+				this.lux = lux;
+				if(lux<0){
+					throw new IllegalArgumentException("Lux can not be negative");
+				}
+			}
+			public float getDisplayLux(){
+				return Math.min(lux + 190, (float)mapping.luxMax);
+			}
 		}
 		
 		@IOValue
@@ -69,6 +76,10 @@ public final class RunLog{
 	}
 	
 	static String command;
+	static float  monitorLux;
+	static float  monitorLuxTarget;
+	
+	static final Duration poolFrequency = Duration.ofMillis(500);
 	
 	public static void main(String[] args) throws IOException, InterruptedException{
 		
@@ -83,10 +94,25 @@ public final class RunLog{
 		
 		IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
 		
+		if(!stamps.isEmpty()){
+			var iter = stamps.listIterator(stamps.size());
+			while(iter.hasPrevious()){
+				var val = iter.ioPrevious().value;
+				if(val instanceof LightValue.Lux v){
+					monitorLuxTarget = v.getDisplayLux();
+					monitorLux = monitorLuxTarget - 3;
+					break;
+				}
+			}
+		}
+		
 		var iArgs = Iters.of(args);
 		if(iArgs.anyEquals("export")){
 			export(stamps);
 			return;
+		}
+		if(iArgs.noneEquals("singleReport")){
+			startMonitorControl();
 		}
 		
 		var serverURI     = URI.create("http://192.168.0.16:42069");
@@ -108,7 +134,7 @@ public final class RunLog{
 			LogUtil.println("Starting logging...");
 			Instant last = Instant.now();
 			while(true){
-				while(last.plusSeconds(1).isAfter(Instant.now())){
+				while(last.plus(poolFrequency).isAfter(Instant.now())){
 					Thread.sleep(10);
 				}
 				
@@ -120,40 +146,32 @@ public final class RunLog{
 					command = null;
 				}
 				
-				LightValue value = null;
-				getVal:
-				try{
-					var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-					var body     = response.body();
-					if(response.statusCode() != 200){
-						value = new LightValue.ServerError(response + " " + body);
-						break getVal;
-					}
-					//noinspection unchecked
-					Map<String, Object> data = new GsonBuilder().create().fromJson(body, HashMap.class);
-					if(data.containsKey("lux")){
-						value = new LightValue.Lux(((Number)data.get("lux")).floatValue());
-					}else if(data.containsKey("error")){
-						value = new LightValue.ServerError((String)data.get("error"));
-						LogUtil.println(value);
-					}
-				}catch(Exception e){
-					value = new LightValue.GetError(e.toString());
-					e.printStackTrace();
+				LightValue value = requestValue(client, request);
+				
+				if(iArgs.anyEquals("singleReport")){
+					LogUtil.println(value);
+					return;
 				}
+				
+				if(value instanceof LightValue.Lux val){
+					monitorLuxTarget = val.getDisplayLux();
+				}
+				
 				var stamp = new LightStamp(last = Instant.now(), value);
 				stamps.add(stamp);
 				
 				if(stamps.size()%10 == 0){
 					//TODO: Implement an contiguous dequeue structure
-					while(olderThan(stamps.getFirst().time, 40)){
-						stamps.remove(0);
+					if(olderThan(stamps.getFirst().time, (int)(24*2.5))){
+						while(!stamps.isEmpty() && olderThan(stamps.getFirst().time, 24*2)){
+							stamps.remove(0);
+						}
 					}
 					
 					//TODO: improve memory usage patterns, implement transparent defragmentation maybe?
 					if(cluster.getMemoryManager().getFreeChunks().size()>=100){
 						LogUtil.println("Reformating file...");
-						var values = stamps.iter().filter(e -> !olderThan(e.time, 40)).toList();
+						var values = stamps.iter().filter(e -> !olderThan(e.time, 24*2)).toList();
 						stamps.clear();
 						stamps.addAll(values);
 						LogUtil.println("reformatted " + values.size() + " records");
@@ -164,8 +182,95 @@ public final class RunLog{
 				}
 			}
 		}
+	}
+	
+	private static LightValue requestValue(HttpClient client, HttpRequest request){
+		LightValue value = null;
+		getVal:
+		try{
+			var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+			var body     = response.body();
+			if(response.statusCode() != 200){
+				value = new LightValue.ServerError(response + " " + body);
+				break getVal;
+			}
+			//noinspection unchecked
+			Map<String, Object> data = new GsonBuilder().create().fromJson(body, HashMap.class);
+			if(data.containsKey("lux")){
+				value = new LightValue.Lux(((Number)data.get("lux")).floatValue());
+			}else if(data.containsKey("error")){
+				value = new LightValue.ServerError((String)data.get("error"));
+				LogUtil.println(value);
+			}
+		}catch(Exception e){
+			value = new LightValue.GetError(e.toString());
+			e.printStackTrace();
+		}
+		return value;
+	}
+	
+	static final BrightnessMapping mapping = new BrightnessMapping(
+		new double[]{0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 78, 80, 81, 82, 83, 85, 86, 89, 90, 91, 92, 95, 100},
+		new double[]{190, 199, 207, 215, 221, 234, 242, 250, 266, 272, 278, 291, 298, 305, 320, 325, 331, 339, 383, 435, 480, 572, 620, 746, 794, 804, 819, 863, 932}
+	);
+	
+	private static void startMonitorControl(){
+		Thread.startVirtualThread(() -> {
+			while(true){
+				UtilL.sleep(250);
+				runMonitorcontrol();
+			}
+		});
+	}
+	private static void runMonitorcontrol(){
+		boolean needsUpdate;
+		if(monitorLuxTarget<=1 + mapping.luxMin || monitorLuxTarget>=mapping.luxMax - 1){
+			needsUpdate = monitorLux != monitorLuxTarget;
+		}else{
+			needsUpdate = Math.abs(monitorLux - monitorLuxTarget)>2;
+		}
+		if(!needsUpdate){
+			return;
+		}
 		
+		if(Math.abs(monitorLux - monitorLuxTarget)<1){
+			monitorLux = monitorLuxTarget;
+		}else{
+			if(monitorLux>monitorLuxTarget){
+				monitorLux -= 1;
+			}else{
+				monitorLux += 1;
+			}
+			monitorLux = (monitorLux*10.0F + monitorLuxTarget)/11;
+		}
+		LogUtil.println(monitorLux);
+		var percent = mapping.luxToPercent(monitorLux);
+		setMonitorPercent((int)Math.round(percent));
+	}
+	
+	private static int lastPercent = -1;
+	private static void setMonitorPercent(int percent){
+		if(lastPercent == percent){
+			return;
+		}
+		if(percent != 0 && percent != 100 && Math.abs(percent - lastPercent)<=1){
+			return;
+		}
+		lastPercent = percent;
 		
+		LogUtil.println("Setting new monitor percent: " + percent);
+		ProcessBuilder pb = new ProcessBuilder(
+			"C:\\Program Files\\WindowsApps\\38002AlexanderFrangos.TwinkleTray_2025.10823.10157.0_x64__m7qx9dzpwqaze\\app\\Twinkle Tray.exe",
+			"--All",
+			"--Set=" + percent
+		);
+		pb.redirectErrorStream(true);
+		try{
+			pb.start().waitFor();
+		}catch(Throwable e){
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 	private static IOHook makeHook(){
 		var    logger = LoggedMemoryUtils.createLoggerFromConfig().get();
@@ -185,26 +290,28 @@ public final class RunLog{
 	private static void export(IOList<LightStamp> stamps) throws IOException{
 		LogUtil.println("start export");
 		try(var out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("graph.csv")))){
-			out.write("Time, Lux, Error\n");
+			out.write("Time,Lux,Display Lux,Error\n");
 			for(LightStamp stamp : stamps){
-				var lux = switch(stamp.value){
+				var row = new StringJoiner(",");
+				row.add(toExcelDate(stamp.time) + "");
+				row.add(switch(stamp.value){
 					case LightValue.Lux v -> v.lux + "";
 					default -> "";
-				};
-				var error = switch(stamp.value){
+				});
+				row.add(switch(stamp.value){
+					case LightValue.Lux v -> v.getDisplayLux() + "";
+					default -> "";
+				});
+				row.add(switch(stamp.value){
 					case LightValue.GetError v -> v.error;
 					case LightValue.ServerError v -> v.error;
 					default -> "";
-				};
+				});
 				
-				out.write(toExcelDate(stamp.time) + "," + lux + "," + error + "\n");
+				out.write(row + "\n");
 			}
 		}
 		LogUtil.println("Ok");
-	}
-	public static String toExcelDateHuman(Instant instant){
-		LocalDateTime ldt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
-		return DateTimeFormatter.ofPattern("HH:mm:ss").format(ldt);
 	}
 	public static double toExcelDate(Instant instant){
 		// Excel epoch: 1899-12-31T00:00:00Z
