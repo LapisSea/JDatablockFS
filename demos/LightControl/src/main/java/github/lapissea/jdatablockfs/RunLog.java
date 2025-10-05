@@ -4,6 +4,8 @@ import com.google.gson.GsonBuilder;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
+import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
@@ -15,6 +17,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -27,12 +30,17 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.StringJoiner;
 import java.util.stream.LongStream;
+
+import static com.lapissea.dfs.query.Query.Test.fieldGr;
 
 public final class RunLog{
 	
@@ -73,13 +81,21 @@ public final class RunLog{
 			this.time = time;
 			this.value = value;
 		}
+		
+		@IOValue
+		public Instant time(){
+			return time;
+		}
 	}
+	
+	private static final String TWINKLE_TRAY = "C:\\Program Files\\WindowsApps\\38002AlexanderFrangos.TwinkleTray_2025.10823.10157.0_x64__m7qx9dzpwqaze\\app\\Twinkle Tray.exe";
 	
 	static String command;
 	static float  monitorLux;
 	static float  monitorLuxTarget;
 	
 	static final Duration poolFrequency = Duration.ofMillis(500);
+	static final Duration maxRecordAge  = Duration.ofHours(24*2);
 	
 	public static void main(String[] args) throws IOException, InterruptedException{
 		
@@ -90,7 +106,8 @@ public final class RunLog{
 			}
 		});
 		
-		var cluster = Cluster.initOrOpen(IOInterface.build().withFile("./sensorInfo.db").withHook(makeHook()).build());
+		var dbFile  = IOInterface.build().withFile("./sensorInfo.db").withHook(makeHook()).build();
+		var cluster = Cluster.initOrOpen(dbFile);
 		
 		IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
 		
@@ -137,11 +154,16 @@ public final class RunLog{
 				while(last.plus(poolFrequency).isAfter(Instant.now())){
 					Thread.sleep(10);
 				}
-				
+				boolean rebuild = false;
 				if(command != null){
 					switch(command.trim()){
-						case "export" -> export(stamps);
+						case "export" -> {
+							export(stamps);
+							System.gc();
+						}
 						case "exit" -> { return; }
+						case "rebuild" -> rebuild = true;
+						default -> LogUtil.println("Warning: Unknown command: " + command.trim());
 					}
 					command = null;
 				}
@@ -160,28 +182,70 @@ public final class RunLog{
 				var stamp = new LightStamp(last = Instant.now(), value);
 				stamps.add(stamp);
 				
-				if(stamps.size()%10 == 0){
+				if(stamps.size()%10 == 0 || rebuild){
 					//TODO: Implement an contiguous dequeue structure
-					if(olderThan(stamps.getFirst().time, (int)(24*2.5))){
-						while(!stamps.isEmpty() && olderThan(stamps.getFirst().time, 24*2)){
-							stamps.remove(0);
+					var cutoff = Instant.now().minus(maxRecordAge);
+					if(!stamps.isEmpty() && stamps.getFirst().time.isBefore(cutoff.minus(Duration.ofHours(12)))){
+						LogUtil.println("Removing old data...");
+						long count = 0;
+						try(var ignore = dbFile.openIOTransaction()){
+							while(!stamps.isEmpty() && stamps.getFirst().time.isBefore(cutoff)){
+								stamps.remove(0);
+								count++;
+							}
 						}
+						LogUtil.println("Removed " + count + " records");
 					}
 					
 					//TODO: improve memory usage patterns, implement transparent defragmentation maybe?
-					if(cluster.getMemoryManager().getFreeChunks().size()>=100){
+					if(cluster.getMemoryManager().getFreeChunks().size()>=256 || rebuild){
 						LogUtil.println("Reformating file...");
-						var values = stamps.iter().filter(e -> !olderThan(e.time, 24*2)).toList();
-						stamps.clear();
-						stamps.addAll(values);
-						LogUtil.println("reformatted " + values.size() + " records");
+						var tmpFile = MemoryData.empty();
+						
+						try(var cleanData = stamps.query().where(fieldGr(LightStamp::time, cutoff)).open()){
+							Cluster            newCluster = Cluster.init(tmpFile);
+							IOList<LightStamp> newStamps  = newCluster.roots().request("lightLog", IOList.class, LightStamp.class);
+							
+							List<LightStamp> chunk;
+							while(!(chunk = cleanData.nextFullEntries(4096)).isEmpty()){
+								newStamps.addAll(chunk);
+								LogUtil.println("Moved chunk: " + chunk.size());
+							}
+						}
+						
+						LogUtil.println("Writing...");
+						
+						File backups = new File("backups");
+						backups.mkdirs();
+						File newBackup = new File(backups, "sensorInfo_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".db");
+						try(var io = new FileOutputStream(newBackup)){
+							dbFile.transferTo(io);
+						}
+						
+						dbFile.set(tmpFile);
+						cluster = new Cluster(dbFile);
+						stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
+						System.gc();
+						LogUtil.println("reformatted " + stamps.size() + " records");
 					}
-					LogUtil.println("Record count: " + stamps.size() + "," +
-					                "\tdbSize: " + cluster.getSource().getIOSize() + "," +
-					                "\tfreeChunks: " + cluster.getMemoryManager().getFreeChunks().size());
+					
+					log(cluster, stamps);
 				}
 			}
 		}
+	}
+	
+	private static void log(Cluster cluster, IOList<LightStamp> stamps) throws IOException{
+		long sum = 0;
+		for(ChunkPointer freeChunk : cluster.getMemoryManager().getFreeChunks()){
+			sum += freeChunk.dereference(cluster).getCapacity();
+		}
+		
+		LogUtil.println("Record count: " + stamps.size() + "," +
+		                "\tdbSize: " + cluster.getSource().getIOSize() + "," +
+		                "\tfreeChunks: " + cluster.getMemoryManager().getFreeChunks().size() + "," +
+		                "\tfreeSpace: " + sum
+		);
 	}
 	
 	private static LightValue requestValue(HttpClient client, HttpRequest request){
@@ -243,7 +307,7 @@ public final class RunLog{
 			}
 			monitorLux = (monitorLux*10.0F + monitorLuxTarget)/11;
 		}
-		LogUtil.println(monitorLux);
+		
 		var percent = mapping.luxToPercent(monitorLux);
 		setMonitorPercent((int)Math.round(percent));
 	}
@@ -253,17 +317,10 @@ public final class RunLog{
 		if(lastPercent == percent){
 			return;
 		}
-		if(percent != 0 && percent != 100 && Math.abs(percent - lastPercent)<=1){
-			return;
-		}
 		lastPercent = percent;
 		
 		LogUtil.println("Setting new monitor percent: " + percent);
-		ProcessBuilder pb = new ProcessBuilder(
-			"C:\\Program Files\\WindowsApps\\38002AlexanderFrangos.TwinkleTray_2025.10823.10157.0_x64__m7qx9dzpwqaze\\app\\Twinkle Tray.exe",
-			"--All",
-			"--Set=" + percent
-		);
+		ProcessBuilder pb = new ProcessBuilder(TWINKLE_TRAY, "--All", "--Set=" + percent);
 		pb.redirectErrorStream(true);
 		try{
 			pb.start().waitFor();
@@ -299,7 +356,7 @@ public final class RunLog{
 					default -> "";
 				});
 				row.add(switch(stamp.value){
-					case LightValue.Lux v -> v.getDisplayLux() + "";
+					case LightValue.Lux v -> mapping.luxToPercent(v.getDisplayLux()) + "";
 					default -> "";
 				});
 				row.add(switch(stamp.value){
