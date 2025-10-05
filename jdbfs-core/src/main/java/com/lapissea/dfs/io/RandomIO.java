@@ -158,6 +158,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
+		default void set(IOInterface data) throws IOException{
+			try(var dest = io();
+			    var src = data.io()){
+				src.transferTo(dest);
+				dest.trim();
+			}
+		}
+		
 		default void set(ByteBuffer data) throws IOException                                { write(0, true, data); }
 		
 		default void set(byte[] data) throws IOException                                    { write(0, true, data); }
