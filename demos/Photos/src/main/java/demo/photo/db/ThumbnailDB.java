@@ -19,10 +19,8 @@ public class ThumbnailDB{
 	public ThumbnailDB(){
 		try{
 			LogUtil.println("Icon database: ", new File("./icons.dfs").getAbsoluteFile().toPath().normalize());
-			var data = new FileMemoryMappedData("./icons.dfs");
-			if(data.getIOSize() == 0) Cluster.init(data);
-			var db = new Cluster(data);
 			
+			var db = Cluster.initOrOpen(new FileMemoryMappedData("./icons.dfs"));
 			icons = db.roots().request("icons", IOMap.class, String.class, IconData.class);
 		}catch(IOException e){
 			throw new RuntimeException("Failed to initialize database", e);

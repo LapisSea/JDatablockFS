@@ -16,8 +16,8 @@ public final class MyUnsafe{
 		int field;
 	}
 	
-	public static final  Unsafe           UNSAFE;
-	private static final Optional<Method> objectFieldOffset_METHOD;
+	public static final Unsafe           UNSAFE;
+	private static      Optional<Method> objectFieldOffset_METHOD;
 	
 	static{
 		try{
@@ -28,6 +28,11 @@ public final class MyUnsafe{
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
+	}
+	
+	private static Optional<Method> objectFieldOffset_METHOD(){
+		//noinspection OptionalAssignedToNull
+		if(objectFieldOffset_METHOD != null) return objectFieldOffset_METHOD;
 		
 		Optional<Method> om;
 		try{
@@ -38,7 +43,7 @@ public final class MyUnsafe{
 			om = Optional.empty();
 		}
 		
-		int lastCheckedJVMVersion = 24;
+		int lastCheckedJVMVersion = 25;
 		if(Runtime.version().feature()>lastCheckedJVMVersion && om.isPresent()){
 			Field dummyField;
 			try{
@@ -48,20 +53,24 @@ public final class MyUnsafe{
 			}
 			
 			try{
-				om.get().invoke(UNSAFE, dummyField);
+				var res = (long)om.get().invoke(UNSAFE, dummyField);
+				if(res<=0){
+					Log.trace("Unsafe#objectFieldOffset exists but may be a noop. Disabling unsafe access.");
+					om = Optional.empty();
+				}
 			}catch(Throwable e){
 				Log.trace("Unsafe#objectFieldOffset exists but is failing. Disabling unsafe access.");
 				om = Optional.empty();
 			}
 		}
-		
-		objectFieldOffset_METHOD = om;
+		return objectFieldOffset_METHOD = om;
 	}
 	
 	public static boolean hasNoObjectFieldOffset(){
-		return objectFieldOffset_METHOD.isEmpty();
+		return objectFieldOffset_METHOD().isEmpty();
 	}
 	public static long objectFieldOffset(Field field) throws IllegalAccessException{
+		var objectFieldOffset_METHOD = objectFieldOffset_METHOD();
 		if(objectFieldOffset_METHOD.isEmpty()){
 			throw new IllegalAccessException("No objectFieldOffset");
 		}

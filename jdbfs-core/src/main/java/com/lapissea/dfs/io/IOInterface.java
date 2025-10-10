@@ -1,10 +1,14 @@
 package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.io.impl.FileMemoryMappedData;
+import com.lapissea.dfs.io.impl.FileRandomAccessData;
+import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.util.function.UnsafeRunnable;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.File;
 import java.io.IOException;
 
 
@@ -12,6 +16,49 @@ import java.io.IOException;
  * This interface is a container or accessor of binary data that can provide a way to write/read contents in a random or sequential manner.
  */
 public interface IOInterface extends RandomIO.Creator{
+	
+	final class Builder{
+		private File    file;
+		private boolean readOnly;
+		private boolean noMap;
+		private IOHook  hook;
+		
+		public Builder withFile(String fileName){ return withFile(new File(fileName)); }
+		public Builder withFile(File file){
+			this.file = file;
+			return this;
+		}
+		
+		public Builder asReadOnly(){ return withReadOnly(true); }
+		public Builder withReadOnly(boolean readOnly){
+			this.readOnly = readOnly;
+			return this;
+		}
+		public Builder withHook(IOHook hook){
+			this.hook = hook;
+			return this;
+		}
+		
+		public Builder noMap(){
+			noMap = true;
+			return this;
+		}
+		
+		public IOInterface build() throws IOException{
+			if(file == null){
+				var b = MemoryData.builder();
+				if(readOnly) throw new IOException("Can not make new empty read only data");
+				b.withOnWrite(hook);
+				return b.build();
+			}
+			if(noMap){
+				return new FileRandomAccessData(hook, file, readOnly);
+			}
+			return new FileMemoryMappedData(hook, file, readOnly);
+		}
+	}
+	
+	static Builder build(){ return new Builder(); }
 	
 	default void setIOSize(long requestedSize) throws IOException{
 		try(var io = io()){

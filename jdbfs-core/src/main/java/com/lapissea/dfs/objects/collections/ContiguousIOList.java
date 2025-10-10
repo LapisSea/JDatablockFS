@@ -630,18 +630,17 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var s = size();
 		deltaSize(-s);
 		
-		if(storage.needsRemoval()){
-			List<ChunkPointer> toFree = new ArrayList<>();
-			try(var io = selfIO()){
+		//Open early to lock the chain in case of move
+		try(var io = selfIO()){
+			if(storage.needsRemoval()){
+				List<ChunkPointer> toFree = new ArrayList<>();
 				for(long i = 0; i<s; i++){
 					io.setPos(calcElementOffset(i));
 					toFree.addAll(storage.notifyRemoval(io, false));
 				}
+				var man = getDataProvider().getMemoryManager();
+				man.freeChains(toFree);
 			}
-			var man = getDataProvider().getMemoryManager();
-			man.freeChains(toFree);
-		}
-		try(var io = selfIO()){
 			io.setCapacity(calcElementOffset(0));
 		}
 	}
@@ -746,7 +745,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		try(var io = selfIO()){
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
-				notifySingleFree(io, false);
+				getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval((RandomIO)io, true));
 			}
 			
 			long sm1 = size - 1;
@@ -769,9 +768,6 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				io.write(buff, 0, buffSize);
 			}
 		}
-	}
-	private void notifySingleFree(RandomIO io, boolean dereferenceWrite) throws IOException{
-		getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval(io, dereferenceWrite));
 	}
 	
 	/**
@@ -886,7 +882,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		if(!storage.needsRemoval()) return;
 		
 		try(var io = ioAtElement(index)){
-			notifySingleFree(io, true);
+			getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval((RandomIO)io, true));
 		}
 	}
 	
