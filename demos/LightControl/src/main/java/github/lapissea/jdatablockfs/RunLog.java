@@ -2,14 +2,10 @@ package github.lapissea.jdatablockfs;
 
 import com.google.gson.GsonBuilder;
 import com.lapissea.dfs.core.Cluster;
-import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.tools.logging.DataLogger;
-import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.dfs.tools.logging.MemFrame;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -38,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.StringJoiner;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.query.Query.Test.fieldGr;
 
@@ -106,7 +101,7 @@ public final class RunLog{
 			}
 		});
 		
-		var dbFile  = IOInterface.build().withFile("./sensorInfo.db").withHook(makeHook()).build();
+		var dbFile  = IOInterface.build().withFile("./sensorInfo.db").build();
 		var cluster = Cluster.initOrOpen(dbFile);
 		
 		IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
@@ -329,21 +324,6 @@ public final class RunLog{
 			System.exit(1);
 		}
 	}
-	private static IOHook makeHook(){
-		var    logger = LoggedMemoryUtils.createLoggerFromConfig().get();
-		IOHook hook   = null;
-		if(logger != DataLogger.Blank.INSTANCE){
-			var ses = logger.getSession("test");
-			hook = new IOHook(){
-				int id = 0;
-				@Override
-				public void writeEvent(IOInterface data, LongStream changeIds) throws IOException{
-					ses.log(new MemFrame(id++, 0, data.readAll(), changeIds.toArray(), new Throwable()));
-				}
-			};
-		}
-		return hook;
-	}
 	private static void export(IOList<LightStamp> stamps) throws IOException{
 		LogUtil.println("start export");
 		try(var out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("graph.csv")))){
@@ -356,7 +336,7 @@ public final class RunLog{
 					default -> "";
 				});
 				row.add(switch(stamp.value){
-					case LightValue.Lux v -> mapping.luxToPercent(v.getDisplayLux()) + "";
+					case LightValue.Lux v -> (int)Math.round(mapping.luxToPercent(v.getDisplayLux())) + "";
 					default -> "";
 				});
 				row.add(switch(stamp.value){
