@@ -569,6 +569,7 @@ public final class Jorth extends CodeDestination{
 				}
 				currentFunction.stackIncrement(value);
 			}
+			case BIT_AND -> currentFunction.bitAndOp();
 			case CAST -> {
 				var clazz = getReadClassName(source);
 				currentFunction.castOp(new GenericType(clazz));

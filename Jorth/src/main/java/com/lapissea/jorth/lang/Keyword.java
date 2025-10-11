@@ -16,6 +16,7 @@ public enum Keyword implements KeyedEnum{
 	SET,
 	ARRAY_GET("array-get"),
 	INC,
+	BIT_AND("bit-and"),
 	CAST,
 	EXTENDS,
 	IMPLEMENTS,
