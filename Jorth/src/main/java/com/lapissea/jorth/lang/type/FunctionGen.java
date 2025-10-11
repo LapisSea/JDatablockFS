@@ -17,8 +17,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -43,9 +45,16 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			this.stack = stack;
 		}
 		
-		public void loadThisIns(){
-			writer.visitVarInsn(ALOAD, 0);
-			stack.push(new GenericType(owner.name));
+		public void loadLocalFieldIns(LocalFieldInfo info){
+			writer.visitVarInsn(info.type.getBaseType().loadOp, info.index);
+			stack.push(info.type);
+		}
+		public void storeLocalFieldIns(LocalFieldInfo info) throws MalformedJorth{
+			var type = stack.pop();
+			if(!type.instanceOf(typeSource, info.type)){
+				throw new MalformedJorth("Tried to set local field of type " + info.type + " to " + type);
+			}
+			writer.visitVarInsn(info.type.getBaseType().storeOp, info.index);
 		}
 		
 		public void getFieldIns(FieldInfo field) throws MalformedJorth{
@@ -235,6 +244,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private final ArrayDeque<CodePath> codeInfo = new ArrayDeque<>();
 	
+	private record LocalFieldInfo(int index, GenericType type){ }
+	
+	private final Map<String, LocalFieldInfo> localFields = new HashMap<>();
+	
 	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, JType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		this.owner = owner;
 		this.name = name;
@@ -242,6 +255,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		this.returnType = returnType;
 		this.typeSource = owner.typeSource;
 		this.visibility = visibility;
+		
+		
+		if(!isStatic()){
+			localFields.put("this", new LocalFieldInfo(0, new GenericType(owner.name)));
+		}
 		
 		if(returnType != null) typeSource.byType(returnType.asGeneric());
 		for(ArgInfo value : args){
@@ -325,9 +343,23 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public void getThisOp(String member) throws MalformedJorth{
-		loadThisIns();
+		getLocalFieldOp("this");
 		if(member.equals("this")) return;
 		doGet(member, owner);
+	}
+	public void getLocalFieldOp(String member) throws MalformedJorth{
+		var info = localFields.get(member);
+		if(info == null){
+			throw new MalformedJorth("Local field " + member + " does not exist");
+		}
+		code().loadLocalFieldIns(info);
+	}
+	public void setLocalFieldOp(String member) throws MalformedJorth{
+		var info = localFields.get(member);
+		if(info == null){
+			throw new MalformedJorth("Local field " + member + " does not exist");
+		}
+		code().storeLocalFieldIns(info);
 	}
 	
 	private void doGet(String member, ClassInfo owner) throws MalformedJorth{
@@ -422,8 +454,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		stack.push(type);
 	}
 	
-	public void loadThisIns(){
-		code().loadThisIns();
+	public void loadThisIns() throws MalformedJorth{
+		loadLocalFieldIns("this");
+	}
+	public void loadLocalFieldIns(String name) throws MalformedJorth{
+		var field = localFields.get(name);
+		if(field == null){
+			throw new MalformedJorth("Missing local field " + name);
+		}
+		code().loadLocalFieldIns(field);
 	}
 	
 	public void invokeOp(FunctionInfo function, boolean superCall) throws MalformedJorth{
@@ -859,5 +898,13 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitLdcInsn(org.objectweb.asm.Type.getType(typ.jvmSignatureStr()));
 		
 		stack.push(new GenericType(ClassName.of(Class.class), Optional.empty(), 0, List.of(typ)));
+	}
+	
+	public void defineField(String name, GenericType type) throws MalformedJorth{
+		if(localFields.containsKey(name)){
+			throw new MalformedJorth("The field named " + name + " already exists");
+		}
+		var index = localFields.values().stream().mapToInt(i -> i.index() + 1).max().orElse(0);
+		localFields.put(name, new LocalFieldInfo(index, type));
 	}
 }

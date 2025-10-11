@@ -297,9 +297,8 @@ public final class Jorth extends CodeDestination{
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case FIELD -> {
-				var name = source.readWord();
-				var type = readType(source, typeArgs);
-				currentClass.defineField(popVisibility(), popAccessSet(), popAnnotations(), type, name);
+				var def = readFieldDef(source);
+				currentClass.defineField(popVisibility(), popAccessSet(), popAnnotations(), def.type(), def.name());
 				memberFlag = true;
 			}
 			case FUNCTION -> {
@@ -383,6 +382,12 @@ public final class Jorth extends CodeDestination{
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
 	}
+	private FieldDef readFieldDef(TokenSource source) throws MalformedJorth{
+		var name = source.readWord();
+		var type = readType(source, typeArgs);
+		return new FieldDef(name, type);
+	}
+	private record FieldDef(String name, JType type){ }
 	
 	private JType readType(TokenSource source, Map<ClassName, GenericType> typeArgs) throws MalformedJorth{
 		var type = source.readType(importsFun, typeArgs);
@@ -521,6 +526,9 @@ public final class Jorth extends CodeDestination{
 				}else if(source.consumeTokenIfIsText("#arg")){
 					var member = source.readWord();
 					currentFunction.getArgOp(member);
+				}else if(source.consumeTokenIfIsText("#field")){
+					var member = source.readWord();
+					currentFunction.getLocalFieldOp(member);
 				}else{
 					var owner  = source.readClassName(importsFun);
 					var member = source.readWord();
@@ -533,6 +541,9 @@ public final class Jorth extends CodeDestination{
 					currentFunction.loadThisIns();
 					currentFunction.swapOp();
 					currentFunction.setInstanceOp(member);
+				}else if(source.consumeTokenIfIsText("#field")){
+					var member = source.readWord();
+					currentFunction.setLocalFieldOp(member);
 				}else{
 					var owner  = source.readClassName(importsFun);
 					var member = source.readWord();
@@ -664,6 +675,10 @@ public final class Jorth extends CodeDestination{
 			}
 			case WHAT_THE_STACK -> {
 				throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
+			}
+			case FIELD -> {
+				var def = readFieldDef(source);
+				currentFunction.defineField(def.name, def.type.asGeneric());
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in function " + currentFunction);
 		}

@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
@@ -987,5 +988,44 @@ public class JorthTests{
 		var inst = (DoubleUnaryOperator)instO;
 		assertThat(inst.applyAsDouble(10)).isEqualTo(12.125);
 		assertThat(inst.applyAsDouble(-2)).isEqualTo(0.125);
+	}
+	
+	@Test
+	void variables() throws Exception{
+		var name = "variables";
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(IntSupplier.class);
+			writer.write(
+				"""
+					implements #IntSupplier
+					class {0} start
+						@ #Override
+						public function getAsInt
+							returns int
+						start
+							field a int
+							field b int
+					
+							1
+							set #field a
+					
+							2
+							set #field b
+					
+							get #field a
+							inc 4
+							return
+						end
+					end
+					""",
+				name
+			);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntSupplier.class);
+		var inst = (IntSupplier)instO;
+		assertThat(inst.getAsInt()).isEqualTo(5);
 	}
 }

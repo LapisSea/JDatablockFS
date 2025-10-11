@@ -6,16 +6,16 @@ import static org.objectweb.asm.Opcodes.*;
 
 public enum BaseType{
 	//@formatter:off
-		OBJ    ("O", Object.class,  ARETURN, ALOAD, 1, false, AASTORE),
-		VOID   ("V", void.class,    RETURN,  -1,    0, false, -1),
-		CHAR   ("C", char.class,    IRETURN, ILOAD, 1, false, CASTORE),
-		BYTE   ("B", byte.class,    IRETURN, ILOAD, 1, true,  BASTORE),
-		SHORT  ("S", short.class,   IRETURN, ILOAD, 1, true,  SASTORE),
-		INT    ("I", int.class,     IRETURN, ILOAD, 1, true,  IASTORE),
-		LONG   ("J", long.class,    LRETURN, LLOAD, 2, false, LASTORE),
-		FLOAT  ("F", float.class,   FRETURN, FLOAD, 1, false, FASTORE),
-		DOUBLE ("D", double.class,  DRETURN, DLOAD, 2, false, DASTORE),
-		BOOLEAN("Z", boolean.class, IRETURN, ILOAD, 1, false, BASTORE)
+		OBJ    ("O", Object.class,  ARETURN, ALOAD, ASTORE, 1, false, AASTORE),
+		VOID   ("V", void.class,    RETURN,  -1,    -1, 0, false, -1),
+		CHAR   ("C", char.class,    IRETURN, ILOAD, ISTORE, 1, false, CASTORE),
+		BYTE   ("B", byte.class,    IRETURN, ILOAD, ISTORE, 1, true,  BASTORE),
+		SHORT  ("S", short.class,   IRETURN, ILOAD, ISTORE, 1, true,  SASTORE),
+		INT    ("I", int.class,     IRETURN, ILOAD, ISTORE, 1, true,  IASTORE),
+		LONG   ("J", long.class,    LRETURN, LLOAD, LSTORE, 2, false, LASTORE),
+		FLOAT  ("F", float.class,   FRETURN, FLOAD, FSTORE, 1, false, FASTORE),
+		DOUBLE ("D", double.class,  DRETURN, DLOAD, DSTORE, 2, false, DASTORE),
+		BOOLEAN("Z", boolean.class, IRETURN, ILOAD, ISTORE, 1, false, BASTORE)
 	;
 	//@formatter:on
 	
@@ -23,15 +23,17 @@ public enum BaseType{
 	public final Class<?> type;
 	public final int      returnOp;
 	public final int      loadOp;
+	public final int      storeOp;
 	public final int      slots;
 	public final boolean  arrayIndexCompatible;
 	public final int      arrayStoreOP;
 	
-	BaseType(String jvmStr, Class<?> type, int returnOp, int loadOp, int slots, boolean arrayIndexCompatible, int arrayStoreOP){
+	BaseType(String jvmStr, Class<?> type, int returnOp, int loadOp, int storeOp, int slots, boolean arrayIndexCompatible, int arrayStoreOP){
 		this.jvmStr = jvmStr;
 		this.type = type;
 		this.returnOp = returnOp;
 		this.loadOp = loadOp;
+		this.storeOp = storeOp;
 		this.slots = slots;
 		this.arrayIndexCompatible = arrayIndexCompatible;
 		this.arrayStoreOP = arrayStoreOP;
