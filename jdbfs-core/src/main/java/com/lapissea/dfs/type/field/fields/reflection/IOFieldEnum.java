@@ -128,12 +128,13 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		accessMap.preSet(getAccessor(), writer);
 		writer.write(
 			"""
-				static call com.lapissea.dfs.type.field.fields.reflection rawToEnum start
+				static call com.lapissea.dfs.type.field.fields.reflection.IOFieldEnum rawToEnum start
 					get #arg src
 					{}
 					{}
-					{}
+					class {}
 				end
+				cast {2}
 				""", readInt, bits, enumUniverse.type
 		);
 		accessMap.set(getAccessor(), writer);

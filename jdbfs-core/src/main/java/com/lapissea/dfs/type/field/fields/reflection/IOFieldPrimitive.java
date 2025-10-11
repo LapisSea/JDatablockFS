@@ -353,27 +353,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
 		
-		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
-			if(this.sizeDescriptorSafe().hasFixed()){
-				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
-				if(unsigned && maxSize.size == INT){
-					readIntName += " cast int";
-				}
-				writer.write("dup");
-				accessMap.preSet(getAccessor(), writer);
-				writer.write(
-					"""
-						get #arg src
-						call {}
-						""",
-					readIntName
-				);
-				accessMap.set(getAccessor(), writer);
-			}else{
-				throw new UnsupportedOperationException(this + "");
-			}
-		}
 		private final boolean unsigned;
 		
 		private FInt(FieldAccessor<T> field, VaryingSize size){
@@ -431,6 +410,38 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				val = size.readIntSigned(src);
 			}
 			setValue(ioPool, instance, val);
+		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
+			var dynamicSize = getDynamicSize();
+			if(dynamicSize == null){
+				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
+				if(unsigned && maxSize.size == INT){
+					readIntName += " cast int";
+				}
+				writer.write("dup");
+				accessMap.preSet(getAccessor(), writer);
+				writer.write(
+					"""
+						get #arg src
+						call {}
+						""",
+					readIntName
+				);
+				accessMap.set(getAccessor(), writer);
+			}else{
+				accessMap.preSet(getAccessor(), writer);
+				accessMap.get(dynamicSize.field.getAccessor(), writer);
+				var fnName = unsigned? "readInt" : "readIntSigned";
+				writer.write(
+					"""
+						call {} start
+							get #arg src
+						end
+						""", fnName);
+				accessMap.set(getAccessor(), writer);
+			}
 		}
 		
 		@Override
@@ -650,9 +661,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	private final   boolean                               forceFixed;
-	protected final VaryingSize                           maxSize;
-	private         BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	private final   boolean          forceFixed;
+	protected final VaryingSize      maxSize;
+	private         DynamicFieldSize dynamicSize;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
@@ -664,6 +675,28 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed, -1);
 	}
 	
+	protected final class DynamicFieldSize implements BiFunction<VarPool<T>, T, NumberSize>{
+		protected final IOField<T, NumberSize> field;
+		private final   EnumSet<NumberSize>    allowed;
+		private DynamicFieldSize(IOField<T, NumberSize> field, EnumSet<NumberSize> allowed){
+			this.field = field;
+			this.allowed = allowed;
+		}
+		@Override
+		public NumberSize apply(VarPool<T> ioPool, T instance){
+			var val = field.get(ioPool, instance);
+			if(!allowed.contains(val)) failSize(val);
+			return val;
+		}
+		private void failSize(NumberSize val){
+			throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + IOFieldPrimitive.this + " with dynamic size " + field);
+		}
+	}
+	
+	protected DynamicFieldSize getDynamicSize(){
+		return dynamicSize;
+	}
+	
 	@Override
 	public void init(FieldSet<T> fields){
 		super.init(fields);
@@ -671,12 +704,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		if(!forceFixed && IOFieldTools.getDynamicSize(getAccessor()) instanceof Some(var field)){
 			var allowed = allowedSizes();
 			allowed.removeIf(s -> s.greaterThan(maxSize.size));
-			dynamicSize = (ioPool, instance) -> {
-				var val = field.get(ioPool, instance);
-				if(!allowed.contains(val))
-					throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
-				return val;
-			};
+			dynamicSize = new DynamicFieldSize(field, allowed);
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				Iters.from(allowed).min().orElse(VOID),
 				Iters.from(allowed).max().opt(),

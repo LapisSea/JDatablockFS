@@ -295,7 +295,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					GenericContext.class, StandardStructPipe.class, IOInstance.class
 				);
 				
-				generateFunction_doRead(name, writer, generators);
+				generateFunction_doRead(name, writer, generators, true);
 			});
 		}catch(Throwable t){
 			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
@@ -305,7 +305,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return new ConstantCallSite(target);
 	}
 	
-	private static void generateFunction_doRead(String name, CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+	private static void generateFunction_doRead(String name, CodeStream writer, List<IOField.SpecializedGenerator> generators, boolean hasIOPool) throws MalformedJorth{
 		writer.write(
 			"""
 				public static function {0}
@@ -321,7 +321,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			name
 		);
 		
-		var accessMap = new IOField.SpecializedGenerator.AccessMap(true);
+		var accessMap = new IOField.SpecializedGenerator.AccessMap(hasIOPool);
 		for(IOField.SpecializedGenerator generator : generators){
 			generator.injectReadField(writer, accessMap);
 		}
@@ -479,7 +479,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				
 				if(generators != null){
 					generateFunction_readNew("specialized_readNew", writer, generators);
-					generateFunction_doRead("specialized_doRead", writer, generators);
+					generateFunction_doRead("specialized_doRead", writer, generators, false);
 				}
 				
 				writer.write(

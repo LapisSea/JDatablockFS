@@ -47,6 +47,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -196,6 +197,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		
 		final class AccessMap{
 			
+			private final Map<FieldAccessor<?>, String> localFields = new HashMap<>();
+			
 			private final boolean hasIOPool;
 			public AccessMap(boolean hasIOPool){ this.hasIOPool = hasIOPool; }
 			
@@ -210,7 +213,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						}
 					}
 					case VirtualAccessor<?> virutal -> {
-						throw new NotImplementedException("Virtual accessors not yet implemented");
+						if(!localFields.containsKey(field)){
+							var name = field.getName().replaceAll("[^A-Za-z]", "") + "_" + localFields.size();
+							localFields.put(field, name);
+							writer.write("field {} {}", name, field.getType());
+						}
 					}
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
@@ -228,13 +235,33 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						}
 					}
 					case VirtualAccessor<?> virutal -> {
-						throw new NotImplementedException("Virtual accessors not yet implemented");
+						var name = localFields.get(field);
+						writer.write("set #field {}", name);
+						if(hasIOPool){
+							throw new NotImplementedException("Implement io pool storing");
+						}
 					}
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
-			public void get(IOField<?, ?> field, CodeStream writer){
-			
+			public void get(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
+				switch(field){
+					case FieldAccessor.FieldOrMethod fom -> {
+						switch(fom.setter()){
+							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> {
+								throw new NotImplementedException("get real field");
+							}
+							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
+								throw new NotImplementedException("call method");
+							}
+						}
+					}
+					case VirtualAccessor<?> virutal -> {
+						var name = localFields.get(field);
+						writer.write("get #field {}", name);
+					}
+					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
+				}
 			}
 		}
 		
