@@ -550,9 +550,7 @@ public final class Jorth extends CodeDestination{
 					currentFunction.setStaticOp(owner, member);
 				}
 			}
-			case ARRAY_GET -> {
-				currentFunction.arrayGetOp();
-			}
+			case ARRAY_GET -> currentFunction.arrayGetOp();
 			case INC -> {
 				Number value = null;
 				var    token = source.readToken();

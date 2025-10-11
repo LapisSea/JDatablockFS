@@ -950,7 +950,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	public void arrayGetOp() throws MalformedJorth{
 		var stack = code().stack;
 		var index = stack.pop();
+		if(!index.equals(GenericType.INT)){
+			throw new MalformedJorth("The index of the array element must be an integer but is: " + index);
+		}
 		var array = stack.pop();
-		throw new NotImplementedException();
+		if(array.dims() == 0){
+			throw new MalformedJorth("The array element type must have at least one dimension but is: " + array);
+		}
+		var elementType = array.withDims(array.dims() - 1);
+		writer.visitInsn(elementType.getBaseType().arrayLoadOP);
+		stack.push(elementType);
 	}
 }
