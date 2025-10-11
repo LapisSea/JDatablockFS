@@ -14,7 +14,6 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.type.field.access.VirtualAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.field.fields.NoIOField;
@@ -197,7 +196,15 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		
 		final class AccessMap{
 			
-			private final Map<FieldAccessor<?>, String> localFields = new HashMap<>();
+			public static final class AccessorNeeded extends Exception{
+				public final FieldAccessor<?> accessor;
+				public AccessorNeeded(FieldAccessor<?> accessor){ this.accessor = accessor; }
+			}
+			
+			private record AccessorGetInfo(String className, String fieldName){ }
+			
+			private final Map<FieldAccessor<?>, String>          localFields    = new HashMap<>();
+			private final Map<FieldAccessor<?>, AccessorGetInfo> accessorFields = new HashMap<>();
 			
 			private final boolean hasIOPool;
 			public AccessMap(boolean hasIOPool){ this.hasIOPool = hasIOPool; }
@@ -222,7 +229,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
-			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
+			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth, AccessorNeeded{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
@@ -235,10 +242,29 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						}
 					}
 					case VirtualAccessor<?> virutal -> {
-						var name = localFields.get(field);
-						writer.write("set #field {}", name);
+						var localFieldName = localFields.get(field);
+						writer.write("set #field {}", localFieldName);
 						if(hasIOPool){
-							throw new NotImplementedException("Implement io pool storing");
+							var info = accessorFields.get(field);
+							if(info == null){
+								throw new AccessorNeeded(field);
+							}
+							String fnName;
+							if(field.getType() == long.class) fnName = "setLong";
+							else if(field.getType() == int.class) fnName = "setInt";
+							else if(field.getType() == boolean.class) fnName = "setBoolean";
+							else if(field.getType() == byte.class) fnName = "setByte";
+							else fnName = "set";
+							
+							writer.write(
+								"""
+									get #arg ioPool
+									call {} start
+										get {!} {!}
+										get #field {}
+									end
+									""",
+								fnName, info.className, info.fieldName, localFieldName);
 						}
 					}
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
@@ -263,9 +289,12 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
+			public void addAccessorField(FieldAccessor<?> accessor, String className, String fieldName){
+				accessorFields.put(accessor, new AccessorGetInfo(className, fieldName));
+			}
 		}
 		
-		void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth;
+		void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.AccessorNeeded;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

@@ -3,8 +3,8 @@ package com.lapissea.dfs.type;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.type.field.access.VirtualAccessor;
-import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
+import com.lapissea.dfs.type.field.VirtualAccessor;
+import com.lapissea.dfs.type.field.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 

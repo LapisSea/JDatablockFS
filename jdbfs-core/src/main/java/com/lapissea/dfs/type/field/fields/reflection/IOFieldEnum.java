@@ -110,7 +110,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.AccessorNeeded{
 		if(nullable()) throw new NotImplementedException("Nullable enum not implemented yet");
 		
 		var bits  = enumUniverse.getBitSize(nullable());

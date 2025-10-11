@@ -478,8 +478,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			//https://stackoverflow.com/a/13764338
 			if(superCall ||
 			   name.equals("<init>") ||
-			   function.visibility() == Visibility.PRIVATE ||
-			   function.isFinal()
+			   function.visibility() == Visibility.PRIVATE
 			){
 				callOp = INVOKESPECIAL;
 			}else{

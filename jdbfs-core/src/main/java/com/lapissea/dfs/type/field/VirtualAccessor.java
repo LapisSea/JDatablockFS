@@ -1,13 +1,11 @@
-package com.lapissea.dfs.type.field.access;
+package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition.GetterFilter;
+import com.lapissea.dfs.type.field.access.ExactFieldAccessor;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.util.Objects;
