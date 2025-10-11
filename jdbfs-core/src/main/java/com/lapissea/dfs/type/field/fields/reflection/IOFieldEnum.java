@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.List;
@@ -95,47 +96,50 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		return get(ioPool1, inst1) == get(ioPool2, inst2);
 	}
 	
-	public static <E extends Enum<E>> E rawToEnum(int rawInt, int bits, Class<E> enumType) throws IOException{
-		var bytes     = BitUtils.bitsToBytes(bits);
-		var oneBits   = bytes*8 - bits;
-		var oneMask   = (int)BitUtils.makeMask(oneBits);
-		var valueMask = (int)BitUtils.makeMask(bits);
-		
-		var rawOnes = rawInt >>> bits;
-		if(rawOnes != oneMask){
-			throw new IOException("Illegal one bits");
-		}
-		var index = rawInt&valueMask;
-		return EnumUniverse.of(enumType).get(index);
-	}
-	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.AccessorNeeded{
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		if(nullable()) throw new NotImplementedException("Nullable enum not implemented yet");
 		
 		var bits  = enumUniverse.getBitSize(nullable());
 		var bytes = BitUtils.bitsToBytes(bits);
-		var readInt = switch(bytes){
+		var srcReadInt = switch(bytes){
 			case 0, 1, 2, 3 -> "call readUnsignedInt" + bytes;
 			case 4 -> "call readUnsignedInt4 cast int";
 			default -> throw new UnsupportedOperationException();
 		};
 		
-		var oneBits   = bytes*8 - bits;
-		var oneMask   = BitUtils.makeMask(oneBits);
-		var valueMask = BitUtils.makeMask(bits);
 		writer.write("dup");
 		accessMap.preSet(getAccessor(), writer);
+		accessMap.getEnumArray(enumUniverse.type, writer);
+		
+		writer.write("get #arg src");
+		writer.write(srcReadInt);
+		
+		//Check integrity bits
+		var oneBits = bytes*8 - bits;
+		if(oneBits>0){
+			var checkBits = BitUtils.makeMask(oneBits)<<bits;
+			writer.write(
+				"""
+					static call {} checkFlag start
+						dup
+						{}
+					end
+					if not start
+						new {} start 'Illegal enum integrity bits' end
+						throw
+					end
+					""", UtilL.class, checkBits, IOException.class
+			);
+		}
+		var valueMask = BitUtils.makeMask(bits);
+		
 		writer.write(
 			"""
-				static call com.lapissea.dfs.type.field.fields.reflection.IOFieldEnum rawToEnum start
-					get #arg src
-					{}
-					{}
-					class {}
-				end
-				cast {2}
-				""", readInt, bits, enumUniverse.type
+				{}
+				bit-and
+				array-get
+				""", valueMask
 		);
 		accessMap.set(getAccessor(), writer);
 	}

@@ -196,18 +196,29 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		
 		final class AccessMap{
 			
-			public static final class AccessorNeeded extends Exception{
-				public final FieldAccessor<?> accessor;
-				public AccessorNeeded(FieldAccessor<?> accessor){ this.accessor = accessor; }
+			public sealed interface ConstantRequest{
+				record FieldAcc(FieldAccessor<?> val) implements ConstantRequest{ }
+				
+				record EnumArr(Class<? extends Enum<?>> type) implements ConstantRequest{ }
 			}
 			
-			private record AccessorGetInfo(String className, String fieldName){ }
+			public static final class ConstantNeeded extends Exception{
+				public final ConstantRequest constant;
+				public ConstantNeeded(ConstantRequest constant){ this.constant = constant; }
+			}
 			
-			private final Map<FieldAccessor<?>, String>          localFields    = new HashMap<>();
-			private final Map<FieldAccessor<?>, AccessorGetInfo> accessorFields = new HashMap<>();
+			private record GetInfo(String className, String fieldName){ }
 			
-			private final boolean hasIOPool;
-			public AccessMap(boolean hasIOPool){ this.hasIOPool = hasIOPool; }
+			private final Map<FieldAccessor<?>, String>  localFields    = new HashMap<>();
+			private final Map<FieldAccessor<?>, GetInfo> accessorFields = new HashMap<>();
+			private final Map<Class<?>, GetInfo>         enumArrays     = new HashMap<>();
+			
+			private boolean hasIOPool;
+			
+			public void setup(boolean hasIOPool){
+				this.hasIOPool = hasIOPool;
+				localFields.clear();
+			}
 			
 			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
 				switch(field){
@@ -229,7 +240,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
-			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth, AccessorNeeded{
+			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth, ConstantNeeded{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
@@ -247,7 +258,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						if(hasIOPool){
 							var info = accessorFields.get(field);
 							if(info == null){
-								throw new AccessorNeeded(field);
+								throw new ConstantNeeded(new ConstantRequest.FieldAcc(field));
 							}
 							String fnName;
 							if(field.getType() == long.class) fnName = "setLong";
@@ -270,6 +281,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
+			public <E extends Enum<E>> void getEnumArray(Class<E> type, CodeStream writer) throws MalformedJorth, ConstantNeeded{
+				var info = enumArrays.get(type);
+				if(info == null){
+					throw new ConstantNeeded(new ConstantRequest.EnumArr(type));
+				}
+				writer.write("get {} {}", info.className, info.fieldName);
+			}
 			public void get(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
@@ -290,11 +308,14 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				}
 			}
 			public void addAccessorField(FieldAccessor<?> accessor, String className, String fieldName){
-				accessorFields.put(accessor, new AccessorGetInfo(className, fieldName));
+				accessorFields.put(accessor, new GetInfo(className, fieldName));
+			}
+			public void addEnumArray(Class<?> type, String className, String fieldName){
+				enumArrays.put(type, new GetInfo(className, fieldName));
 			}
 		}
 		
-		void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.AccessorNeeded;
+		void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

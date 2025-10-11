@@ -413,7 +413,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.AccessorNeeded{
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			var dynamicSize = getDynamicSize();
 			if(dynamicSize == null){
 				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;

@@ -17,6 +17,8 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.IOField.SpecializedGenerator.AccessMap;
+import com.lapissea.dfs.type.field.IOField.SpecializedGenerator.AccessMap.ConstantRequest;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.VirtualAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -37,7 +39,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -290,8 +291,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
-		MethodHandle          target;
-		Set<FieldAccessor<?>> accessorFields = new HashSet<>();
+		MethodHandle         target;
+		Set<ConstantRequest> constants = new HashSet<>();
 		while(true){
 			try{
 				List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
@@ -303,10 +304,15 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						GenericContext.class, StandardStructPipe.class, IOInstance.class
 					);
 					
-					generateFunction_doRead(name, writer, generators, accessorFields);
+					var accessMap = new AccessMap();
+					accessMap.setup(true);
+					
+					writeConstants(writer, constants, accessMap);
+					
+					generateFunction_doRead(name, writer, generators, accessMap);
 				});
-			}catch(IOField.SpecializedGenerator.AccessMap.AccessorNeeded e){
-				accessorFields.add(e.accessor);
+			}catch(AccessMap.ConstantNeeded e){
+				constants.add(e.constant);
 				continue;
 			}catch(Throwable t){
 				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
@@ -317,38 +323,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static void generateFunction_doRead(String name, CodeStream writer, List<IOField.SpecializedGenerator> generators, Set<FieldAccessor<?>> accessorFields) throws MalformedJorth, IOField.SpecializedGenerator.AccessMap.AccessorNeeded{
-		var accessMap = new IOField.SpecializedGenerator.AccessMap(true);
-		if(!accessorFields.isEmpty()){
-			int i = 0;
-			for(FieldAccessor<?> accessorField : accessorFields){
-				var accName = "acc_" + (i++) + "_" + accessorField.getName().replaceAll("[^A-Za-z]", "");
-				writer.write("private static final field {} {}<#ObjType>", accName, VirtualAccessor.class);
-				accessMap.addAccessorField(accessorField, "#ThisClass", accName);
-			}
-			writer.write(
-				"""
-					public static function <clinit> start
-						static call #Struct of start
-							class #ObjType
-							{}
-						end
-						call getFields
-					""", Struct.STATE_FIELD_MAKE);
-			i = 0;
-			for(Iterator<FieldAccessor<?>> it = accessorFields.iterator(); it.hasNext(); ){
-				FieldAccessor<?> accessorField = it.next();
-				if(it.hasNext()){
-					writer.write("dup");
-				}
-				var accName = "acc_" + (i++) + "_" + accessorField.getName().replaceAll("[^A-Za-z]", "");
-				writer.write("call requireByName start '{}' end", accessorField.getName());
-				writer.write("call getAccessor cast {}", VirtualAccessor.class);
-				writer.write("set #ThisClass {}", accName);
-			}
-			writer.wEnd();
-		}
-		
+	private static void generateFunction_doRead(String name, CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				public static function {0}
@@ -379,26 +354,35 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
 		MethodHandle target;
-		try{
-			List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
-			
-			target = makeImpl(lookup, name, writer -> {
-				writer.addImportAs(objType, "ObjType");
-				writer.addImports(
-					VarPool.class, DataProvider.class, ContentReader.class,
-					GenericContext.class, StandardStructPipe.class, IOInstance.class
-				);
-				generateFunction_readNew(name, writer, generators);
-			});
-		}catch(Throwable t){
-			new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
-			if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-			target = getGenericReadNew();
+		
+		Set<ConstantRequest>               constants  = new HashSet<>();
+		List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
+		
+		while(true){
+			try{
+				target = makeImpl(lookup, name, writer -> {
+					writer.addImportAs(objType, "ObjType");
+					writer.addImports(
+						VarPool.class, DataProvider.class, ContentReader.class,
+						GenericContext.class, StandardStructPipe.class, IOInstance.class
+					);
+					var accessMap = new AccessMap();
+					writeConstants(writer, constants, accessMap);
+					generateFunction_readNew(name, writer, generators, accessMap);
+				});
+			}catch(AccessMap.ConstantNeeded e){
+				constants.add(e.constant);
+				continue;
+			}catch(Throwable t){
+				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+				target = getGenericReadNew();
+			}
+			return new ConstantCallSite(target);
 		}
-		return new ConstantCallSite(target);
 	}
 	
-	private static void generateFunction_readNew(String functionName, CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth, IOField.SpecializedGenerator.AccessMap.AccessorNeeded{
+	private static void generateFunction_readNew(String functionName, CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				public static function {0}
@@ -412,7 +396,6 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			functionName
 		);
 		
-		var accessMap = new IOField.SpecializedGenerator.AccessMap(false);
 		for(IOField.SpecializedGenerator generator : generators){
 			generator.injectReadField(writer, accessMap);
 		}
@@ -423,6 +406,67 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				end
 				"""
 		);
+	}
+	
+	private static void writeConstants(CodeStream writer, Set<ConstantRequest> constants, AccessMap accessMap) throws MalformedJorth{
+		record Acc(FieldAccessor<?> accessor, String name){ }
+		record EArr(Class<?> type, String name){ }
+		List<Acc>  accessors = new ArrayList<>();
+		List<EArr> enumArrs  = new ArrayList<>();
+		
+		int i = -1;
+		for(ConstantRequest constant : constants){
+			i++;
+			switch(constant){
+				case ConstantRequest.EnumArr(var type) -> {
+					var name = "eArr_" + i + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
+					enumArrs.add(new EArr(type, name));
+					writer.write("private static final field {} {}", name, type.arrayType());
+					accessMap.addEnumArray(type, "#ThisClass", name);
+				}
+				case ConstantRequest.FieldAcc(var accessor) -> {
+					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
+					accessors.add(new Acc(accessor, name));
+					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
+					accessMap.addAccessorField(accessor, "#ThisClass", name);
+				}
+			}
+		}
+		
+		writer.write("public static function <clinit> start");
+		
+		if(!accessors.isEmpty()){
+			writer.write(
+				"""
+						static call #Struct of start
+							class #ObjType
+							{}
+						end
+						call getFields
+					""", Struct.STATE_FIELD_MAKE);
+			for(var it = accessors.iterator(); it.hasNext(); ){
+				var acc = it.next();
+				if(it.hasNext()){
+					writer.write("dup");
+				}
+				writer.write("call requireByName start '{}' end", acc.accessor.getName());
+				writer.write("call getAccessor cast {}", VirtualAccessor.class);
+				writer.write("set #ThisClass {}", acc.name);
+			}
+		}
+		
+		
+		for(EArr enumArr : enumArrs){
+			writer.write(
+				"""
+					static call {} values
+					set #ThisClass {}
+					""",
+				enumArr.type, enumArr.name
+			);
+		}
+		
+		writer.wEnd();
 	}
 	
 	private static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<CodeStream, Throwable> generateFn) throws Throwable{
@@ -487,7 +531,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			generators = generatorsTmp;
 		}else generators = null;
 		
-		Set<FieldAccessor<?>> accessorFields = new HashSet<>();
+		Set<ConstantRequest> constants = new HashSet<>();
 		
 		while(true){
 			var log = JorthLogger.make();
@@ -529,8 +573,14 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					);
 					
 					if(generators != null){
-						generateFunction_readNew("specialized_readNew", writer, generators);
-						generateFunction_doRead("specialized_doRead", writer, generators, accessorFields);
+						var accessMap = new AccessMap();
+						writeConstants(writer, constants, accessMap);
+						
+						accessMap.setup(false);
+						generateFunction_readNew("specialized_readNew", writer, generators, accessMap);
+						
+						accessMap.setup(true);
+						generateFunction_doRead("specialized_doRead", writer, generators, accessMap);
 					}
 					
 					writer.write(
@@ -587,8 +637,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				var cls    = access.defineClass(type, bytecode, true);
 				//noinspection unchecked
 				return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
-			}catch(IOField.SpecializedGenerator.AccessMap.AccessorNeeded e){
-				var added = accessorFields.add(e.accessor);
+			}catch(AccessMap.ConstantNeeded e){
+				var added = constants.add(e.constant);
 				if(!added){
 					throw new IllegalStateException("Accessor already added");
 				}

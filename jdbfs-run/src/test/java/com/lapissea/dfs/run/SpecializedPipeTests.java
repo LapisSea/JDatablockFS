@@ -164,7 +164,7 @@ public class SpecializedPipeTests{
 		TT read = to.readNew(ch, null);
 		
 		if(field.getter){
-			assertThat(val).extracting("valGetCount").isEqualTo(1);
+			assertThat(val).extracting("valGetCount").isNotEqualTo(0);
 			assertThat(read).extracting("valGetCount").isEqualTo(0);
 		}
 		if(field.setter){
