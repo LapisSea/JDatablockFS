@@ -14,6 +14,7 @@ public enum Keyword implements KeyedEnum{
 	RETURNS,
 	GET,
 	SET,
+	ARRAY_GET("array-get"),
 	INC,
 	CAST,
 	EXTENDS,

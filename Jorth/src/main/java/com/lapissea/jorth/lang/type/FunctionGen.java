@@ -906,4 +906,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var index = localFields.values().stream().mapToInt(i -> i.index() + 1).max().orElse(0);
 		localFields.put(name, new LocalFieldInfo(index, type));
 	}
+	public void arrayGetOp() throws MalformedJorth{
+		var stack = code().stack;
+		var index = stack.pop();
+		var array = stack.pop();
+		throw new NotImplementedException();
+	}
 }
