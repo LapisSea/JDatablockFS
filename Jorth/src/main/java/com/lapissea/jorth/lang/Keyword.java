@@ -24,6 +24,7 @@ public enum Keyword implements KeyedEnum{
 	NEW,
 	CALL,
 	IF,
+	NOT,
 	RETURN,
 	THROW,
 	DUP, POP,

@@ -702,23 +702,46 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 	}
 	
-	public void pushIfBool() throws MalformedJorth{
+	public void negateBool() throws MalformedJorth{
+		var stack = code().stack;
+		var last  = stack.pop();
+		if(!last.equals(GenericType.BOOL)){
+			throw new MalformedJorth("Expected boolean but got " + last);
+		}
+		stack.push(GenericType.BOOL);
+		
+		Label labelTrue = new Label(), labelEnd = new Label();
+		
+		// stack: [..., bool]
+		writer.visitJumpInsn(IFNE, labelTrue); // if bool != 0 → jump (true branch)
+		
+		writer.visitInsn(ICONST_1);            // push true if original was false (0)
+		writer.visitJumpInsn(GOTO, labelEnd);
+		
+		writer.visitLabel(labelTrue);
+		writer.visitInsn(ICONST_0);            // push false if original was true
+		
+		writer.visitLabel(labelEnd);
+		// stack: [..., inverted bool]
+	}
+	
+	public void pushIfBool(boolean negated) throws MalformedJorth{
 		var stack = code().stack;
 		var typ   = stack.pop();
 		if(!typ.equals(GenericType.BOOL)){
 			throw new MalformedJorth("Got " + typ + " but need a boolean for if statement");
 		}
 		
-		var newPath = new CodePath(writer, stack);
+		var newPath = new CodePath(writer, new TypeStack(stack));
 		codeInfo.add(newPath);
 		
 		//Jump if false
-		writer.visitJumpInsn(IFEQ, newPath.endLabel);
+		writer.visitJumpInsn(negated? IFNE : IFEQ, newPath.endLabel);
 	}
 	
 	public void popIf() throws MalformedJorth{
 		var ifPath = codeInfo.removeLast();
-		if(!ifPath.stack.isEmpty()){
+		if(ifPath.stack.size() != ifPath.stack.getParent().size()){
 			throw new MalformedJorth("If ended but there is data left in if code block");
 		}
 		writer.visitLabel(ifPath.endLabel);

@@ -17,6 +17,10 @@ public class TypeStack{
 		this.parent = parent;
 	}
 	
+	public TypeStack getParent(){
+		return parent;
+	}
+	
 	@Override
 	public String toString(){
 		return totalStack().map(GenericType::toString).collect(Collectors.joining(", ", "[", "]"));

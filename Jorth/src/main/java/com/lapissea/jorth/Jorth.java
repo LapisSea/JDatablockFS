@@ -574,10 +574,12 @@ public final class Jorth extends CodeDestination{
 				currentFunction.castOp(new GenericType(clazz));
 			}
 			case IF -> {
+				var negated = source.consumeTokenIfIsKeyword(Keyword.NOT);
 				source.requireKeyword(Keyword.START);
-				currentFunction.pushIfBool();
+				currentFunction.pushIfBool(negated);
 				endStack.add(currentFunction::popIf);
 			}
+			case NOT -> currentFunction.negateBool();
 			case RETURN -> currentFunction.returnOp();
 			case THROW -> currentFunction.throwOp();
 			case NEW -> {
