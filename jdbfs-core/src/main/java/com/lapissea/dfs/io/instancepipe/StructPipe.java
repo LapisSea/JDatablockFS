@@ -88,7 +88,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
-	public @interface Special{ }
+	public @interface Special{
+		/**
+		 * Only used for testing
+		 *
+		 */
+		int debugStructDelay() default 0;
+	}
 	
 	public interface SpecializedImplementation{
 	

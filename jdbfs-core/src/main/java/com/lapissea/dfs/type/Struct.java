@@ -389,6 +389,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		init(syncStage, runStage -> {
 			switch(runStage){
 				case STATE_CONCRETE_TYPE -> {
+					if(DEBUG_VALIDATION){
+						debugStart();
+					}
 					calcHash();
 					
 					var idef = isDefinition = IOInstance.Def.isDefinition(type);
@@ -424,6 +427,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				default -> throw new NotImplementedException();
 			}
 		}, null);
+	}
+	
+	private void debugStart(){
+		if(getType().getAnnotation(StructPipe.Special.class) instanceof StructPipe.Special special){
+			var delay = special.debugStructDelay();
+			if(delay>0) UtilL.sleep(delay);
+		}
 	}
 	
 	
