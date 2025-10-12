@@ -137,6 +137,9 @@ public class SpecializedPipeTests{
 			specialPipe = makeUncheckedPipe(special, imidiate);
 		}
 		assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
+		if(!imidiate){
+			assertThat(specialPipe.getInitializationState()).isNotEqualTo(StagedInit.STATE_DONE);
+		}
 		for(int i = 0; i<50; i++){
 			doIOTest(field, basicPipe, specialPipe);
 			doIOTest(field, specialPipe, basicPipe);

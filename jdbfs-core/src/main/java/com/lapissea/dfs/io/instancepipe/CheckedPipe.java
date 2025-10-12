@@ -22,7 +22,7 @@ public sealed interface CheckedPipe{
 		private final StandardStructPipe<T> check, test;
 		
 		public Standard(StandardStructPipe<T> check, StandardStructPipe<T> test){
-			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), STATE_DONE);
+			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), STATE_NOT_STARTED);
 			this.check = check;
 			this.test = test;
 		}
@@ -55,7 +55,7 @@ public sealed interface CheckedPipe{
 		private final FixedStructPipe<T> check, test;
 		
 		public Fixed(FixedStructPipe<T> check, FixedStructPipe<T> test){
-			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), STATE_DONE);
+			super(check.getType(), (type, structFields, testRun) -> new PipeFieldCompiler.Result<>(check.getSpecificFields()), STATE_NOT_STARTED);
 			this.check = check;
 			this.test = test;
 		}
