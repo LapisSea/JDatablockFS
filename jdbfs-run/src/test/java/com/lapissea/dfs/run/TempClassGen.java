@@ -5,6 +5,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.compilation.JorthUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -205,6 +206,7 @@ public final class TempClassGen{
 			}, log);
 			if(log != null){
 				Log.log("Jorth code for TempClassGen:\n" + log.output());
+				BytecodeUtils.printClass(clazzBytes);
 			}
 			return clazzBytes;
 		}catch(MalformedJorth e){

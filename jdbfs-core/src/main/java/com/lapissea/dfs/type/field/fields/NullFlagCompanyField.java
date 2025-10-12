@@ -64,10 +64,12 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 	
 	protected final boolean getIsNull(VarPool<T> ioPool, T instance){
 		if(DEBUG_VALIDATION){
-			if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
+			badCallCheck();
 		}
-		
 		return isNull.getValue(ioPool, instance);
+	}
+	private void badCallCheck(){
+		if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
 	}
 	
 }

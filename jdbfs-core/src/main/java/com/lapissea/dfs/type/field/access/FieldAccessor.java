@@ -18,6 +18,9 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedT
 		AccessType setter();
 	}
 	
+	/**
+	 * @return integer that is an ID defined in {@link TypeFlag}. For example {@link TypeFlag#ID_INT}
+	 */
 	int getTypeID();
 	boolean genericTypeHasArgs();
 	

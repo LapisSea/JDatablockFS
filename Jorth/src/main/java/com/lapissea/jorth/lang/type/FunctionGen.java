@@ -225,7 +225,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.FLOAT)){
 				writer.visitInsn(D2F);
 			}else{
-				throw new IllegalArgumentException("Unsupported primitive cast: " + from + " -> " + to);
+				throw new MalformedJorth("Unsupported primitive cast: " + from + " -> " + to);
 			}
 		}
 		
