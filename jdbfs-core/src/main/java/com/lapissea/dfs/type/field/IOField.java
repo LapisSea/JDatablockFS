@@ -213,10 +213,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			private final Map<FieldAccessor<?>, GetInfo> accessorFields = new HashMap<>();
 			private final Map<Class<?>, GetInfo>         enumArrays     = new HashMap<>();
 			
+			private int tmpFieldCount = 0;
+			
 			private boolean hasIOPool;
 			
 			public void setup(boolean hasIOPool){
 				this.hasIOPool = hasIOPool;
+				tmpFieldCount = 0;
 				localFields.clear();
 			}
 			
@@ -249,7 +252,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 					}
 					case VirtualAccessor<?> virutal -> {
 						if(!localFields.containsKey(field)){
-							var name = field.getName().replaceAll("[^A-Za-z]", "") + "_" + localFields.size();
+							var name = "virt_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
 							localFields.put(field, name);
 							writer.write("field {} {}", name, field.getType());
 						}
@@ -289,6 +292,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				}
 				writer.write("get {} {}", info.className, info.fieldName);
 			}
+			public void get(IOField<?, ?> field, CodeStream writer) throws MalformedJorth{
+				get(field.getAccessor(), writer);
+			}
 			public void get(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
@@ -313,6 +319,15 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			}
 			public void addEnumArray(Class<?> type, String className, String fieldName){
 				enumArrays.put(type, new GetInfo(className, fieldName));
+			}
+			
+			public String temporaryLocalField(Class<?> type, CodeStream writer) throws MalformedJorth{
+				var name = "tmp_" + type.getSimpleName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
+				writer.write("field {} {}", name, type);
+				return name;
+			}
+			private int uniqueCounter(){
+				return localFields.size() + tmpFieldCount;
 			}
 		}
 		

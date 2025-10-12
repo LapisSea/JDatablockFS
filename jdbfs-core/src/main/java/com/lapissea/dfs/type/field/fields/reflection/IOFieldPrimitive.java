@@ -421,7 +421,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			if(nullable() && isNull.getValue(ioPool, instance)){
 				set(ioPool, instance, null);
-				src.skip(getSafeSize(ioPool, instance, VOID));
+				getSafeSize(ioPool, instance, VOID).skip(src);
 				return;
 			}
 			super.read(ioPool, provider, src, instance, genericContext);
@@ -444,45 +444,65 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			var dynamicSize = getDynamicSize();
-			if(dynamicSize == null){
-				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
-				if(unsigned && maxSize.size == INT){
-					readIntName += " cast int";
+			if(nullable()){
+				var tmpInt = accessMap.temporaryLocalField(Integer.class, writer);
+				if(getDynamicSize() == null){
+					accessMap.get(isNull, writer);
+					writer.write(
+						"""
+							if start
+								get #arg src
+								call skipExact start {} cast long end
+								null start #Integer end
+								set #field {}
+							end else start
+							""",
+						maxSize.size.bytes, tmpInt
+					);
+					writer.write("static call #Integer valueOf start");
+					readFixedInt(writer);
+					writer.write(
+						"""
+								end
+								set #field {}
+							end
+							""", tmpInt);
+				}else{
+					accessMap.get(isNull, writer);
+					writer.write("if start");
+					accessMap.get(getDynamicSize().field, writer);
+					writer.write(
+						"""
+								call skip start
+									get #arg src
+								end
+								null start #Integer end
+								set #field {}
+							end else start
+								static call #Integer valueOf start
+							""", tmpInt);
+					readIntWithDynamicSize(writer, accessMap);
+					writer.write(
+						"""
+								set #field {}
+							end""", tmpInt);
+					writer.wEnd();
 				}
 				accessMap.preSet(getAccessor(), writer);
-				writer.write(
-					"""
-						static call #Integer valueOf start
-							get #arg src
-							call {}
-						end
-						""",
-					readIntName
-				);
+				writer.write("get #field {}", tmpInt);
 				accessMap.set(getAccessor(), writer);
 			}else{
 				accessMap.preSet(getAccessor(), writer);
 				writer.write("static call #Integer valueOf start");
-				accessMap.get(dynamicSize.field.getAccessor(), writer);
-				var fnName = unsigned? "readInt" : "readIntSigned";
-				writer.write(
-					"""
-						call {} start
-							get #arg src
-						end
-						""", fnName);
+				if(getDynamicSize() == null){
+					readFixedInt(writer);
+				}else{
+					readIntWithDynamicSize(writer, accessMap);
+				}
 				writer.wEnd();
 				accessMap.set(getAccessor(), writer);
 			}
-			if(nullable()){
-				accessMap.get(isNull.getAccessor(), writer);
-				writer.write("if start");
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("null start #Integer end");
-				accessMap.set(getAccessor(), writer);
-				writer.wEnd();
-			}
+			
 		}
 	}
 	
@@ -545,35 +565,40 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			setValue(ioPool, instance, val);
 		}
 		
+		protected void readFixedInt(CodeStream writer) throws MalformedJorth{
+			var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
+			if(unsigned && maxSize.size == INT){
+				readIntName += " cast int";
+			}
+			writer.write(
+				"""
+					get #arg src
+					call {}
+					""",
+				readIntName
+			);
+		}
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			var dynamicSize = getDynamicSize();
-			if(dynamicSize == null){
-				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
-				if(unsigned && maxSize.size == INT){
-					readIntName += " cast int";
-				}
+			if(getDynamicSize() == null){
 				accessMap.preSet(getAccessor(), writer);
-				writer.write(
-					"""
-						get #arg src
-						call {}
-						""",
-					readIntName
-				);
+				readFixedInt(writer);
 				accessMap.set(getAccessor(), writer);
 			}else{
 				accessMap.preSet(getAccessor(), writer);
-				accessMap.get(dynamicSize.field.getAccessor(), writer);
-				var fnName = unsigned? "readInt" : "readIntSigned";
-				writer.write(
-					"""
-						call {} start
-							get #arg src
-						end
-						""", fnName);
+				readIntWithDynamicSize(writer, accessMap);
 				accessMap.set(getAccessor(), writer);
 			}
+		}
+		protected void readIntWithDynamicSize(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
+			accessMap.get(getDynamicSize().field.getAccessor(), writer);
+			var fnName = unsigned? "readInt" : "readIntSigned";
+			writer.write(
+				"""
+					call {} start
+						get #arg src
+					end
+					""", fnName);
 		}
 		
 		@Override
@@ -829,7 +854,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	private final   boolean          forceFixed;
 	protected final VaryingSize      maxSize;
 	private         DynamicFieldSize dynamicSize;
-	protected final boolean          boxed;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
@@ -839,7 +863,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		this.forceFixed = maxSize != null;
 		
 		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed, -1);
-		boxed = !field.getType().isPrimitive();
 	}
 	
 	protected final class DynamicFieldSize implements BiFunction<VarPool<T>, T, NumberSize>{

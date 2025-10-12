@@ -476,22 +476,28 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		cname = (c.isHidden()? cname.substring(0, cname.lastIndexOf('/')) : cname) + "&_" + fnName;
 		
-		var jorth = new Jorth(lookup.lookupClass().getClassLoader(), JorthLogger.make());
+		var log   = JorthLogger.make();
+		var jorth = new Jorth(lookup.lookupClass().getClassLoader(), log);
 		jorth.addImportAs(cname, "ThisClass");
-		
-		try(var writer = jorth.writer()){
-			writer.write("class #ThisClass start");
-			generateFn.accept(writer);
-			writer.wEnd();
+		try{
+			try(var writer = jorth.writer()){
+				writer.write("class #ThisClass start");
+				generateFn.accept(writer);
+				writer.wEnd();
+			}
+			
+			var bb        = jorth.getClassFile(cname);
+			var implClass = lookup.defineHiddenClass(bb, true);
+			var method = Iters.from(implClass.lookupClass().getMethods())
+			                  .filter(e -> e.getName().equals(fnName))
+			                  .getFirst();
+			
+			return implClass.unreflect(method);
+		}finally{
+			if(log != null){
+				Log.log("Generated jorth for bootstrap implementation:\n" + log.output());
+			}
 		}
-		
-		var bb        = jorth.getClassFile(cname);
-		var implClass = lookup.defineHiddenClass(bb, true);
-		var method = Iters.from(implClass.lookupClass().getMethods())
-		                  .filter(e -> e.getName().equals(fnName))
-		                  .getFirst();
-		
-		return implClass.unreflect(method);
 	}
 	
 	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> getSpecializedGenerators(Class<T> objType){
