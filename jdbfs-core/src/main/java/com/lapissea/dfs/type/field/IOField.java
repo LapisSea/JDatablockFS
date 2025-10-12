@@ -221,6 +221,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			}
 			
 			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
+				writer.write("dup");
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
@@ -230,13 +231,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 							}
 						}
 					}
-					case VirtualAccessor<?> virutal -> {
-						if(!localFields.containsKey(field)){
-							var name = field.getName().replaceAll("[^A-Za-z]", "") + "_" + localFields.size();
-							localFields.put(field, name);
-							writer.write("field {} {}", name, field.getType());
-						}
-					}
+					case VirtualAccessor<?> virutal -> { }
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 				}
 			}
@@ -253,11 +248,17 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 						}
 					}
 					case VirtualAccessor<?> virutal -> {
+						if(!localFields.containsKey(field)){
+							var name = field.getName().replaceAll("[^A-Za-z]", "") + "_" + localFields.size();
+							localFields.put(field, name);
+							writer.write("field {} {}", name, field.getType());
+						}
+						
 						var localFieldName = localFields.get(field);
 						writer.write("set #field {}", localFieldName);
 						if(hasIOPool){
-							var info = accessorFields.get(field);
-							if(info == null){
+							var accessorInfo = accessorFields.get(field);
+							if(accessorInfo == null){
 								throw new ConstantNeeded(new ConstantRequest.FieldAcc(field));
 							}
 							String fnName;
@@ -275,7 +276,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 										get #field {}
 									end
 									""",
-								fnName, info.className, info.fieldName, localFieldName);
+								fnName, accessorInfo.className, accessorInfo.fieldName, localFieldName);
 						}
 					}
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");

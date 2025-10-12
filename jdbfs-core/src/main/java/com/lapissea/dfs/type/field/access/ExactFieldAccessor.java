@@ -347,6 +347,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 			case Integer n -> n;
 			case Short n -> n;
 			case Byte n -> n;
+			case null -> 0;//TODO: boxed primitive variant has null... what to do?
 			default -> throw classCastThrow();
 		};
 	}

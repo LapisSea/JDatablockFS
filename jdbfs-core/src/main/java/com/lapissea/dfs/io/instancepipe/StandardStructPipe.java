@@ -301,7 +301,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					writer.addImportAs(objType, "ObjType");
 					writer.addImports(
 						VarPool.class, DataProvider.class, ContentReader.class,
-						GenericContext.class, StandardStructPipe.class, IOInstance.class
+						GenericContext.class, StandardStructPipe.class, IOInstance.class,
+						Struct.class
 					);
 					
 					var accessMap = new AccessMap();

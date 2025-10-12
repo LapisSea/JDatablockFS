@@ -1,8 +1,11 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.bit.BitReader;
+import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -13,6 +16,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.BehaviourSupport;
+import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -21,6 +25,7 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
+import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
@@ -28,12 +33,14 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -57,7 +64,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			var res = new ArrayList<Behaviour<?, T>>(3);
 			
-			if(List.of(FLong.class, FInt.class, FShort.class).contains(fieldType)){
+			if(List.of(FIntBoxed.class).contains(fieldType)){
+				res.add(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
+			}
+			if(List.of(FLong.class, FInt.class, FIntBoxed.class, FShort.class).contains(fieldType)){
 				res.add(Behaviour.noop(IOValue.Unsigned.class));
 			}
 			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)){
@@ -74,7 +84,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
-			return Set.of(FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FShort.class, FByte.class, FBoolean.class);
+			return Set.of(FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FIntBoxed.class, FShort.class, FByte.class, FBoolean.class);
 		}
 		
 	}
@@ -85,7 +95,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			case CHAR -> new FChar<>(field, null);
 			case FLOAT -> new FFloat<>(field, null);
 			case LONG -> new FLong<>(field, null);
-			case INT -> new FInt<>(field, null);
+			case INT -> field.getType() == int.class? new FInt<>(field, null) : new FIntBoxed<>(field, null);
 			case SHORT -> new FShort<>(field, null);
 			case BYTE -> new FByte<>(field, null);
 			case BOOLEAN -> new FBoolean<>(field);
@@ -351,9 +361,134 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
+	@SuppressWarnings("deprecation")
+	public static final class FIntBoxed<T extends IOInstance<T>> extends FInt<T>{
 		
-		private final boolean unsigned;
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FIntBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FIntBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public Integer get(VarPool<T> ioPool, T instance){
+			return getNullable(ioPool, instance);
+		}
+		@Override
+		public void set(VarPool<T> ioPool, T instance, Integer value){
+			getAccessor().set(ioPool, instance, value);
+		}
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			super.write(ioPool, provider, dest, instance);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				src.skip(getSafeSize(ioPool, instance, VOID));
+				return;
+			}
+			super.read(ioPool, provider, src, instance, genericContext);
+		}
+		@Override
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
+		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			var dynamicSize = getDynamicSize();
+			if(dynamicSize == null){
+				var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
+				if(unsigned && maxSize.size == INT){
+					readIntName += " cast int";
+				}
+				accessMap.preSet(getAccessor(), writer);
+				writer.write(
+					"""
+						static call #Integer valueOf start
+							get #arg src
+							call {}
+						end
+						""",
+					readIntName
+				);
+				accessMap.set(getAccessor(), writer);
+			}else{
+				accessMap.preSet(getAccessor(), writer);
+				writer.write("static call #Integer valueOf start");
+				accessMap.get(dynamicSize.field.getAccessor(), writer);
+				var fnName = unsigned? "readInt" : "readIntSigned";
+				writer.write(
+					"""
+						call {} start
+							get #arg src
+						end
+						""", fnName);
+				writer.wEnd();
+				accessMap.set(getAccessor(), writer);
+			}
+			if(nullable()){
+				accessMap.get(isNull.getAccessor(), writer);
+				writer.write("if start");
+				accessMap.preSet(getAccessor(), writer);
+				writer.write("null start #Integer end");
+				accessMap.set(getAccessor(), writer);
+				writer.wEnd();
+			}
+		}
+	}
+	
+	public static sealed class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
+		
+		protected final boolean unsigned;
 		
 		private FInt(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
@@ -366,9 +501,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return all;
 		}
 		@Override
-		protected IOField<T, Integer> withVaryingSize(VaryingSize size){
-			return new FInt<>(getAccessor(), size);
-		}
+		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FInt<>(getAccessor(), size); }
 		
 		public int getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getInt(ioPool, instance);
@@ -420,7 +553,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				if(unsigned && maxSize.size == INT){
 					readIntName += " cast int";
 				}
-				writer.write("dup");
 				accessMap.preSet(getAccessor(), writer);
 				writer.write(
 					"""
@@ -599,7 +731,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
+	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator{
 		
 		private FBoolean(FieldAccessor<T> field){
 			super(field, SizeDescriptor.Fixed.of(BIT, 1));
@@ -659,11 +791,45 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Boolean.hashCode(getValue(ioPool, instance));
 		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			
+			accessMap.preSet(getAccessor(), writer);
+			writer.write(
+				"""
+					get #arg src
+					call readUnsignedInt1
+					""");
+			
+			//Check integrity bits
+			var checkBits = BitUtils.makeMask(7)<<1;
+			writer.write(
+				"""
+					static call {} checkFlag start
+						dup
+						{}
+					end
+					if not start
+						new {} start 'Illegal boolean integrity bits' end
+						throw
+					end
+					""", UtilL.class, checkBits, IOException.class
+			);
+			
+			writer.write(
+				"""
+					cast boolean
+					"""
+			);
+			accessMap.set(getAccessor(), writer);
+		}
 	}
 	
 	private final   boolean          forceFixed;
 	protected final VaryingSize      maxSize;
 	private         DynamicFieldSize dynamicSize;
+	protected final boolean          boxed;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
@@ -673,6 +839,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		this.forceFixed = maxSize != null;
 		
 		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed, -1);
+		boxed = !field.getType().isPrimitive();
 	}
 	
 	protected final class DynamicFieldSize implements BiFunction<VarPool<T>, T, NumberSize>{
