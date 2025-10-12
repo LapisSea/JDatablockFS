@@ -158,8 +158,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			}
 		}
 		public void dup() throws MalformedJorth{
-			var type = stack.pop();
-			stack.push(type);
+			var type = stack.peekLast();
 			stack.push(type);
 			var bt = type.getBaseType();
 			writer.visitInsn(switch(bt.slots){
@@ -197,7 +196,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			writer.visitTypeInsn(CHECKCAST, type.dims() == 0? type.raw().slashed() : type.jvmDescriptorStr());
 		}
 		
-		private void emitPrimitiveCast(GenericType from, GenericType to){
+		private void emitPrimitiveCast(GenericType from, GenericType to) throws MalformedJorth{
 			if(from.equals(GenericType.LONG) && to.equals(GenericType.INT)){
 				writer.visitInsn(L2I);
 			}else if(from.equals(GenericType.INT) && to.equals(GenericType.LONG)){
@@ -208,6 +207,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				writer.visitInsn(I2C);
 			}else if(from.equals(GenericType.INT) && to.equals(GenericType.SHORT)){
 				writer.visitInsn(I2S);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BOOL)){
+				// integer == 1
+				writer.visitInsn(ICONST_1);
+				writer.visitInsn(IAND);
 			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.FLOAT)){
 				writer.visitInsn(L2F);
 			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.DOUBLE)){
@@ -258,10 +261,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		
 		if(!isStatic()){
-			localFields.put("this", new LocalFieldInfo(0, new GenericType(owner.name)));
+			defineField("this", new GenericType(owner.name));
 		}
 		
 		if(returnType != null) typeSource.byType(returnType.asGeneric());
+		
 		for(ArgInfo value : args){
 			GenericType typ;
 			try{
@@ -270,6 +274,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				continue;
 			}
 			typeSource.byType(typ);
+			defineField(value.name, value.type.asGeneric());
 		}
 		
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
@@ -841,7 +846,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		else if(value == 1.0d) writer.visitInsn(DCONST_1);
 		else writer.visitLdcInsn(value);
 	}
-	public void stackIncrement(Number increment){
+	public void stackIncrement(Number increment) throws MalformedJorth{
 		var type = code().stack.peekLast();
 		if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
 		   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){

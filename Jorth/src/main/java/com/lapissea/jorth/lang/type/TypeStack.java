@@ -36,6 +36,9 @@ public class TypeStack{
 	}
 	public GenericType pop() throws MalformedJorth{
 		requireElements(1);
+		if(stack.isEmpty()){
+			throw new MalformedJorth("can not pop values outside the code path");
+		}
 		return stack.removeLast();
 	}
 	
@@ -52,9 +55,14 @@ public class TypeStack{
 	
 	public void requireElements(int count) throws MalformedJorth{
 		if(stack.size()>=count) return;
+		if(totalStack().count()>=count) return;
 		throw new MalformedJorth("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
 	}
-	public GenericType peekLast(){
+	public GenericType peekLast() throws MalformedJorth{
+		requireElements(1);
+		if(stack.isEmpty()){
+			return parent.peekLast();
+		}
 		return stack.getLast();
 	}
 	public GenericType peek(int pos){
