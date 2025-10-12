@@ -5,6 +5,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.CodeDestination;
 import com.lapissea.jorth.lang.Endable;
+import com.lapissea.jorth.lang.EndableCode;
 import com.lapissea.jorth.lang.Keyword;
 import com.lapissea.jorth.lang.Preload;
 import com.lapissea.jorth.lang.Token;
@@ -89,7 +90,7 @@ public final class Jorth extends CodeDestination{
 	private final Map<ClassName, ClassGen> classes = new HashMap<>();
 	
 	private final Function<ClassName, ClassName> importsFun = this::resolveImport;
-	private final Deque<Endable>                 endStack   = new ArrayDeque<>();
+	private final Deque<EndableCode>             endStack   = new ArrayDeque<>();
 	
 	private final Consumer<CharSequence> printBack;
 	
@@ -363,7 +364,7 @@ public final class Jorth extends CodeDestination{
 				if(noBody){
 					endFunction();
 				}else{
-					endStack.addLast(this::endFunction);
+					pushEndStack(this::endFunction);
 				}
 			}
 			case ENUM -> {
@@ -400,7 +401,7 @@ public final class Jorth extends CodeDestination{
 			case END -> {
 				if(endStack.isEmpty()) throw new MalformedJorth("Stray end");
 				var e = endStack.removeLast();
-				e.end();
+				e.end(source);
 			}
 			case AT -> {
 				var annType = getReadClassName(source);
@@ -575,7 +576,10 @@ public final class Jorth extends CodeDestination{
 				var negated = source.consumeTokenIfIsKeyword(Keyword.NOT);
 				source.requireKeyword(Keyword.START);
 				currentFunction.pushIfBool(negated);
-				endStack.add(currentFunction::popIf);
+				pushEndStackCode(code -> {
+					var opt = currentFunction.popIf(code);
+					opt.ifPresent(this::pushEndStack);
+				});
 			}
 			case NOT -> currentFunction.negateBool();
 			case RETURN -> currentFunction.returnOp();
@@ -652,7 +656,7 @@ public final class Jorth extends CodeDestination{
 					var hasStart = optionalStart(source);
 					var call     = currentFunction.startVirutalCall(info);
 					if(hasStart){
-						endStack.add(call);
+						pushEndStack(call);
 					}else{
 						call.end();
 					}
@@ -679,7 +683,7 @@ public final class Jorth extends CodeDestination{
 				
 				var parent = currentClass.superType();
 				var call   = currentFunction.startCallRaw(parent, "<init>", true);
-				if(hasStart) endStack.add(call);
+				if(hasStart) pushEndStack(call);
 				else call.end();
 			}
 			case DUP -> currentFunction.dupOp();
@@ -699,11 +703,18 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
+	private void pushEndStack(Endable call){
+		endStack.add(call);
+	}
+	private void pushEndStackCode(EndableCode call){
+		endStack.add(call);
+	}
+	
 	private void doCall(TokenSource source, ClassName staticOwner, String funName) throws MalformedJorth{
 		var hasStart = optionalStart(source);
 		var call     = currentFunction.startCall(staticOwner, funName);
 		if(hasStart){
-			endStack.add(call);
+			pushEndStack(call);
 		}else{
 			call.end();
 		}
@@ -746,7 +757,7 @@ public final class Jorth extends CodeDestination{
 				for(var interf : interfaces){
 					typeSource.validateType(interf);
 				}
-				endStack.addLast(this::endClass);
+				pushEndStack(this::endClass);
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");

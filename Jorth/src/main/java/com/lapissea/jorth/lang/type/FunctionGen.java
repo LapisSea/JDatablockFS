@@ -3,6 +3,8 @@ package com.lapissea.jorth.lang.type;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
+import com.lapissea.jorth.lang.Keyword;
+import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
@@ -41,7 +43,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		private final Label endLabel = new Label();
 		
-		public CodePath(MethodVisitor mv, TypeStack stack){
+		public CodePath(TypeStack stack){
 			this.stack = stack;
 		}
 		
@@ -313,7 +315,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		ClassGen.writeAnnotations(anns, writer::visitAnnotation);
 		
 		if(!this.access.contains(Access.ABSTRACT)){
-			codeInfo.add(new CodePath(writer, new TypeStack(null)));
+			codeInfo.add(new CodePath(new TypeStack(null)));
 		}
 	}
 	
@@ -737,19 +739,43 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			throw new MalformedJorth("Got " + typ + " but need a boolean for if statement");
 		}
 		
-		var newPath = new CodePath(writer, new TypeStack(stack));
+		var newPath = new CodePath(new TypeStack(stack));
 		codeInfo.add(newPath);
 		
 		//Jump if false
 		writer.visitJumpInsn(negated? IFNE : IFEQ, newPath.endLabel);
 	}
 	
-	public void popIf() throws MalformedJorth{
+	public Optional<Endable> popIf(TokenSource code) throws MalformedJorth{
 		var ifPath = codeInfo.removeLast();
 		if(ifPath.stack.size() != ifPath.stack.getParent().size()){
 			throw new MalformedJorth("If ended but there is data left in if code block");
 		}
-		writer.visitLabel(ifPath.endLabel);
+		
+		if(code.consumeTokenIfIsKeyword(Keyword.ELSE)){
+			code.requireKeyword(Keyword.START);
+			
+			var stack   = code().stack;
+			var newPath = new CodePath(new TypeStack(stack));
+			codeInfo.add(newPath);
+			
+			//inside if statement right now
+			writer.visitJumpInsn(GOTO, newPath.endLabel);//skip else
+			writer.visitLabel(ifPath.endLabel);//will jump to here if "if" fails and not jump to end of else
+			
+			return Optional.of(this::popElsePath);
+		}
+		
+		writer.visitLabel(ifPath.endLabel);//will jump to here if "if" fails
+		return Optional.empty();
+	}
+	
+	private void popElsePath() throws MalformedJorth{
+		var elsePath = codeInfo.removeLast();
+		if(elsePath.stack.size() != elsePath.stack.getParent().size()){
+			throw new MalformedJorth("Else ended but there is data left in if code block");
+		}
+		writer.visitLabel(elsePath.endLabel);
 	}
 	
 	public void returnOp() throws MalformedJorth{

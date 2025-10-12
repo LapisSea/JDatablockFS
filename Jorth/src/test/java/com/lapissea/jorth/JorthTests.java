@@ -16,6 +16,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -150,6 +151,66 @@ public class JorthTests{
 		assertThat(test.invoke(null, 0)).isEqualTo("lmao 0");
 		assertThat(test.invoke(null, 1)).isEqualTo("ay");
 		assertThat(test.invoke(null, 2)).isEqualTo("lmao 2");
+	}
+	
+	private static final List<String> ifElseCalls = new ArrayList<>();
+	private static void ifElseReport(String value){
+		ifElseCalls.add(value);
+	}
+	
+	@Test
+	void ifElseTest() throws ReflectiveOperationException{
+		
+		var className = "jorth.Gen$$IfElse";
+		
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
+			writer.addImportAs(className, "ThisClass");
+			writer.addImports(ArrayList.class, List.class);
+			writer.write(
+				"""
+					public static field list #List<#String>
+					
+					public static function <clinit> start
+						new #ArrayList
+						set #ThisClass list
+					end
+					
+					static function report
+						arg str #String
+					start
+						get #ThisClass list
+						call add start
+							get #arg str
+						end
+						pop
+					end
+					
+					static function test
+						arg index int
+					start
+						static call #ThisClass report start 'start' end
+						get #arg index 0 ==
+						if start
+							static call #ThisClass report start 'ay' end
+						end else start
+							static call #ThisClass report start 'lmao' end
+						end
+						static call #ThisClass report start 'end' end
+					end
+					""");
+		});
+		//noinspection unchecked
+		var list = (List<String>)cls.getField("list").get(null);
+		
+		var test = cls.getMethod("test", int.class);
+		
+		list.clear();
+		test.invoke(null, 0);
+		assertThat(list).containsExactly("start", "ay", "end");
+		
+		list.clear();
+		test.invoke(null, 1);
+		assertThat(list).containsExactly("start", "lmao", "end");
 	}
 	
 	@Test
