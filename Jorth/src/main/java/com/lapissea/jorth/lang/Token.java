@@ -186,17 +186,6 @@ public sealed interface Token{
 		}
 	}
 	
-	
-	record Null(int line) implements Token{
-		@Override
-		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type == Word.class){
-				return Optional.of(type.cast(new Word(line(), "null")));
-			}
-			return Token.super.as(type);
-		}
-	}
-	
 	record Bool(int line, boolean value) implements Token{
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){

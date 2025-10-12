@@ -961,4 +961,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitInsn(elementType.getBaseType().arrayLoadOP);
 		stack.push(elementType);
 	}
+	public void nullConstantOp(GenericType type){
+		var stack = code().stack;
+		stack.push(type);
+		writer.visitInsn(ACONST_NULL);
+	}
 }

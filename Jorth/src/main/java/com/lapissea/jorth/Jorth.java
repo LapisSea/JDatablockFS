@@ -202,7 +202,6 @@ public final class Jorth extends CodeDestination{
 				}
 				case Token.SmolWord w -> w.value() + "";
 				case Token.NumToken t -> BLUE_BRIGHT + t.getNum();
-				case Token.Null ignored -> BLUE_BRIGHT + "null";
 				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
 				case Token.BracketedSet bracketedSet -> throw new IllegalStateException();
@@ -661,6 +660,18 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				
+			}
+			case NULL -> {
+				var hasStart = optionalStart(source);
+				var type     = GenericType.OBJECT;
+				if(hasStart){
+					type = readType(source, typeArgs).asGeneric();
+					if(type.getBaseType() != BaseType.OBJ){
+						throw new MalformedJorth("Only object types can be null. Illegal type: " + type);
+					}
+					source.requireKeyword(Keyword.END);
+				}
+				currentFunction.nullConstantOp(type);
 			}
 			case SUPER -> {
 				currentFunction.loadThisIns();

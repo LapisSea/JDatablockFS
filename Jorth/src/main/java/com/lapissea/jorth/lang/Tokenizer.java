@@ -302,7 +302,6 @@ public class Tokenizer implements CodeStream, TokenSource{
 		
 		
 		switch(word){
-			case "null" -> { return new Token.Null(lastLine); }
 			case "true" -> { return new Token.Bool(lastLine, true); }
 			case "false" -> { return new Token.Bool(lastLine, false); }
 		}

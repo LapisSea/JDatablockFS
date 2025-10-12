@@ -34,7 +34,8 @@ public enum Keyword implements KeyedEnum{
 	CALL_VIRTUAL("call-virtual"),
 	CALLING_FUNCTION("calling-fn"),
 	BOOTSTRAP_FUNCTION("bootstrap-fn"),
-	WHAT_THE_STACK("???");
+	WHAT_THE_STACK("???"),
+	NULL;
 	
 	public static final Lookup<Keyword> LOOKUP = KeyedEnum.getLookup(Keyword.class);
 	
