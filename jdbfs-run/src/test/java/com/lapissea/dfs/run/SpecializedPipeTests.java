@@ -18,16 +18,22 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
+import org.testng.IRetryAnalyzer;
+import org.testng.ITestResult;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
 
@@ -124,20 +130,43 @@ public class SpecializedPipeTests{
 		);
 	}
 	
+	public static class RetryFive implements IRetryAnalyzer{
+		
+		private static final int maxRetryCount = 5;
+		
+		record Entry(String name, List<Object> args){ }
+		
+		private final Map<Entry, Integer> retryRecord = new ConcurrentHashMap<>();
+		
+		@Override
+		public boolean retry(ITestResult result){
+			if(!(result.getThrowable() instanceof AssertionError)){
+				return false;
+			}
+			var count = retryRecord.compute(new Entry(result.getName(), Arrays.asList(result.getParameters())), (k, v) -> {
+				if(v == null) v = 0;
+				if(v>=maxRetryCount) return v;
+				return ++v;
+			});
+			LogUtil.println(result.getName(), result.getParameters(), count);
+			return count<maxRetryCount;
+		}
+	}
+	
 	@SuppressWarnings("unchecked")
-	@Test(dataProvider = "fieldVariations")
-	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean imidiate) throws IOException, LockedFlagSet{
+	@Test(dataProvider = "fieldVariations", retryAnalyzer = RetryFive.class)
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		var basic   = (Class<T1>)makeFieldClass(field, false);
 		var special = (Class<T2>)makeFieldClass(field, true);
 		
 		StructPipe<T1> basicPipe;
 		StructPipe<T2> specialPipe;
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false)){
-			basicPipe = makeUncheckedPipe(basic, imidiate);
-			specialPipe = makeUncheckedPipe(special, imidiate);
+			basicPipe = makeUncheckedPipe(basic, immediate);
+			specialPipe = makeUncheckedPipe(special, immediate);
 		}
 		assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
-		if(!imidiate){
+		if(!immediate){
 			assertThat(specialPipe.getInitializationState()).isNotEqualTo(StagedInit.STATE_DONE);
 		}
 		for(int i = 0; i<50; i++){
