@@ -10,6 +10,8 @@ import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -180,6 +182,17 @@ public enum NumberSize{
 		};
 	}
 	
+	/**
+	 * Stack: pops ContentReader, pushes long or int
+	 */
+	public void readConst(CodeStream target) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.write("drop 0");
+			case BYTE, SHORT, SMALL_INT, INT, BIG_INT, SMALL_LONG -> target.write("call readUnsignedInt" + bytes);
+			case LONG -> target.write("call readInt8");
+		}
+	}
+	
 	public int readInt(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;
@@ -189,6 +202,38 @@ public enum NumberSize{
 			case INT -> (int)in.readUnsignedInt4();
 			case BIG_INT, SMALL_LONG, LONG -> throw new IOException("Attempted to read too large of a number");
 		};
+	}
+	
+	/**
+	 * Stack: pops ContentReader, pushes int
+	 */
+	public void readIntConst(CodeStream target, String getContentReader, boolean signed) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.write("0");
+			case BYTE, SHORT, SMALL_INT -> {
+				target.write("{} call {}", getContentReader, (signed? "readInt" : "readUnsignedInt") + bytes);
+			}
+			case INT -> {
+				if(signed) target.write("{} call readInt4", getContentReader);
+				else target.write("{} call readUnsignedInt4 cast int", getContentReader);
+			}
+			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		}
+	}
+	
+	/**
+	 * Stack: pops NumberSize, pushes int
+	 */
+	public static void readIntDyn(CodeStream target, String getContentReader, boolean signed) throws MalformedJorth{
+		target.write(
+			"""
+				call {} start
+					{}
+				end
+				""",
+			signed? "readInt" : "readIntSigned",
+			getContentReader
+		);
 	}
 	
 	public void skip(ContentReader in) throws IOException{

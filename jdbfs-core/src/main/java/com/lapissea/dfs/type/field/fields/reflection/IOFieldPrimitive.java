@@ -460,7 +460,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						maxSize.size.bytes, tmpInt
 					);
 					writer.write("static call #Integer valueOf start");
-					readFixedInt(writer);
+					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
 					writer.write(
 						"""
 								end
@@ -481,7 +481,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 							end else start
 								static call #Integer valueOf start
 							""", tmpInt);
-					readIntWithDynamicSize(writer, accessMap);
+					accessMap.get(getDynamicSize().field.getAccessor(), writer);
+					readIntDyn(writer, "get #arg src", !unsigned);
 					writer.write(
 						"""
 								set #field {}
@@ -495,9 +496,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				accessMap.preSet(getAccessor(), writer);
 				writer.write("static call #Integer valueOf start");
 				if(getDynamicSize() == null){
-					readFixedInt(writer);
+					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
 				}else{
-					readIntWithDynamicSize(writer, accessMap);
+					accessMap.get(getDynamicSize().field.getAccessor(), writer);
+					readIntDyn(writer, "get #arg src", !unsigned);
 				}
 				writer.wEnd();
 				accessMap.set(getAccessor(), writer);
@@ -565,40 +567,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			setValue(ioPool, instance, val);
 		}
 		
-		protected void readFixedInt(CodeStream writer) throws MalformedJorth{
-			var readIntName = "read" + (unsigned? "UnsignedInt" : "Int") + maxSize.size.bytes;
-			if(unsigned && maxSize.size == INT){
-				readIntName += " cast int";
-			}
-			writer.write(
-				"""
-					get #arg src
-					call {}
-					""",
-				readIntName
-			);
-		}
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			if(getDynamicSize() == null){
 				accessMap.preSet(getAccessor(), writer);
-				readFixedInt(writer);
+				maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
 				accessMap.set(getAccessor(), writer);
 			}else{
 				accessMap.preSet(getAccessor(), writer);
-				readIntWithDynamicSize(writer, accessMap);
+				accessMap.get(getDynamicSize().field.getAccessor(), writer);
+				readIntDyn(writer, "get #arg src", !unsigned);
 				accessMap.set(getAccessor(), writer);
 			}
-		}
-		protected void readIntWithDynamicSize(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
-			accessMap.get(getDynamicSize().field.getAccessor(), writer);
-			var fnName = unsigned? "readInt" : "readIntSigned";
-			writer.write(
-				"""
-					call {} start
-						get #arg src
-					end
-					""", fnName);
 		}
 		
 		@Override
