@@ -3,6 +3,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.bit.BitReader;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -29,10 +30,12 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -67,6 +70,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(List.of(FIntBoxed.class).contains(fieldType)){
 				res.add(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
 			}
+			if(fieldType.equals(FBooleanBoxed.class)){
+				res.add(Behaviour.noop(IONullability.class));
+			}
 			if(List.of(FLong.class, FInt.class, FIntBoxed.class, FShort.class).contains(fieldType)){
 				res.add(Behaviour.noop(IOValue.Unsigned.class));
 			}
@@ -84,7 +90,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
-			return Set.of(FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FIntBoxed.class, FShort.class, FByte.class, FBoolean.class);
+			return Set.of(
+				FDouble.class, FChar.class, FFloat.class, FLong.class, FInt.class, FIntBoxed.class, FShort.class, FByte.class,
+				FBoolean.class, FBooleanBoxed.class
+			);
 		}
 		
 	}
@@ -95,10 +104,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			case CHAR -> new FChar<>(field, null);
 			case FLOAT -> new FFloat<>(field, null);
 			case LONG -> new FLong<>(field, null);
-			case INT -> field.getType() == int.class? new FInt<>(field, null) : new FIntBoxed<>(field, null);
+			case INT -> field.getType().isPrimitive()? new FInt<>(field, null) : new FIntBoxed<>(field, null);
 			case SHORT -> new FShort<>(field, null);
 			case BYTE -> new FByte<>(field, null);
-			case BOOLEAN -> new FBoolean<>(field);
+			case BOOLEAN -> field.getType().isPrimitive()? new FBoolean<>(field) : new FBooleanBoxed<>(field);
 		}).orElseThrow(() -> new IllegalArgumentException(field.getType().getName() + " is not a primitive"));
 	}
 	
@@ -827,6 +836,138 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					cast boolean
 					"""
 			);
+			accessMap.set(getAccessor(), writer);
+		}
+	}
+	
+	public static final class FBooleanBoxed<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator{
+		
+		private FBooleanBoxed(FieldAccessor<T> field){
+			super(field);
+		}
+		
+		@Override
+		public void init(FieldSet<T> ioFields){
+			super.init(ioFields);
+			initSizeDescriptor(SizeDescriptor.Fixed.of(BIT, nullable()? 2 : 1));
+		}
+		
+		@Override
+		protected Set<TypeFlag> computeTypeFlags(){
+			return Set.of(TypeFlag.PRIMITIVE_OR_ENUM);
+		}
+		
+		@Override
+		public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+			var v = get(ioPool, instance);
+			int bits, bitCount;
+			if(nullable()){
+				if(v == null){
+					bits = 0b10;
+				}else{
+					bits = v? 1 : 0;
+				}
+				bitCount = 2;
+			}else{
+				if(v == null){
+					throw new FieldIsNull(this);
+				}else{
+					bits = v? 1 : 0;
+				}
+				bitCount = 1;
+			}
+			dest.writeBits(bits, bitCount);
+		}
+		
+		@Override
+		public void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException{
+			Boolean val;
+			if(nullable()){
+				var bits2 = (int)src.readBits(2);
+				val = switch(bits2){
+					case 0b00 -> false;
+					case 0b01 -> true;
+					case 0b10 -> null;
+					default -> fail(bits2);
+				};
+			}else{
+				val = src.readBoolBit();
+			}
+			set(ioPool, instance, val);
+		}
+		private Boolean fail(int bits2) throws IOException{
+			if(bits2 == 0b11){
+				throw new MalformedObject(this + " got a null true value. This is illegal and could point to a corrupted file");
+			}
+			throw new ShouldNeverHappenError(bits2 + "");
+		}
+		@Override
+		public void skipReadBits(BitReader src, T instance) throws IOException{
+			src.skip(nullable()? 2 : 1);
+		}
+		
+		@Override
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+			return instanceToString(ioPool, instance, settings.doShort());
+		}
+		@Override
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.of(String.valueOf(get(ioPool, instance)));
+		}
+		
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return get(ioPool1, inst1) == get(ioPool2, inst2);
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? 0 : val? 2 : 1;
+		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			
+			accessMap.preSet(getAccessor(), writer);
+			if(nullable()){
+				CodeUtils.readBytesFromSrc(writer, 1);
+				CodeUtils.rawBitsToValidatedBits(writer, 1, 2);
+				var name = accessMap.temporaryLocalField(Boolean.class, writer);
+				writer.write(
+					"""
+						dup
+						3 ==
+						if start
+							new {0} start 'Boolean field got a null true value. This is illegal and could point to a corrupted file' end
+							throw
+						end
+						
+						dup
+						2 ==
+						if start
+							null start #Boolean end
+							set #field {1}
+						end else start
+							static call #Boolean valueOf start
+								dup
+								cast boolean
+							end
+							set #field {1}
+						end
+						pop
+						get #field {1}
+						""", IOException.class, name
+				);
+			}else{
+				writer.write("static call #Boolean valueOf start");
+				CodeUtils.readBytesFromSrc(writer, 1);
+				CodeUtils.rawBitsToValidatedBits(writer, 1, 1);
+				writer.write(
+					"""
+							cast boolean
+						end
+						""");
+			}
 			accessMap.set(getAccessor(), writer);
 		}
 	}
