@@ -347,6 +347,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			public String temporaryLocalField(Class<?> type, CodeStream writer) throws MalformedJorth{
 				var name = "tmp_" + type.getSimpleName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
 				writer.write("field {} {}", name, type);
+				tmpFieldCount++;
 				return name;
 			}
 			private int uniqueCounter(){

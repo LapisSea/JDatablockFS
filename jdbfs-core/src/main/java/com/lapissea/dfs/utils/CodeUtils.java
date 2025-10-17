@@ -12,7 +12,10 @@ public interface CodeUtils{
 	
 	static void readBytesFromSrc(CodeStream writer, int bytes) throws MalformedJorth{
 		var ns = NumberSize.FLAG_INFO.filter(e -> e.bytes == bytes).findFirst().orElseThrow();
-		ns.readIntConst(writer, "get #arg src", false);
+		readBytesFromSrc(writer, ns);
+	}
+	static void readBytesFromSrc(CodeStream writer, NumberSize size) throws MalformedJorth{
+		size.readIntConst(writer, "get #arg src", false);
 	}
 	
 	static void rawBitsToValidatedBits(CodeStream writer, int bytes, int bits) throws MalformedJorth{

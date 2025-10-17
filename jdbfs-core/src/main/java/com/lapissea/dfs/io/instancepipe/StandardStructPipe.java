@@ -493,6 +493,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			                  .getFirst();
 			
 			return implClass.unreflect(method);
+		}catch(AccessMap.ConstantNeeded e){
+			log = null;
+			throw e;
 		}finally{
 			if(log != null){
 				Log.log("Generated jorth for bootstrap implementation:\n" + log.output());
