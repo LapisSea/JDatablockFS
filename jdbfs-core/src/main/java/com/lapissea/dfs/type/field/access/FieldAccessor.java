@@ -10,7 +10,7 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedT
 	
 	interface FieldOrMethod{
 		sealed interface AccessType{
-			record Field(String name) implements AccessType{ }
+			record Field(Class<?> declaringClass, String name) implements AccessType{ }
 			
 			record Method(String name) implements AccessType{ }
 		}

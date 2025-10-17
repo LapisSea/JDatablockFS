@@ -586,56 +586,20 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						var accessMap = new AccessMap();
 						writeConstants(writer, constants, accessMap);
 						
-						accessMap.setup(false);
-						generateFunction_readNew("specialized_readNew", writer, generators, accessMap);
-						
 						accessMap.setup(true);
 						generateFunction_doRead("specialized_doRead", writer, generators, accessMap);
+						
+						if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
+							accessMap.setup(false);
+							generateFunction_readNew("specialized_readNew", writer, generators, accessMap);
+						}
 					}
 					
-					writer.write(
-						"""
-							@ #Override
-							protected function doRead
-								arg ioPool #VarPool<#ObjType>
-								arg provider #DataProvider
-								arg src #ContentReader
-								arg instance #IOInstance
-								arg genericContext #GenericContext
-								returns #IOInstance
-							start
-							"""
-					);
-					if(generators != null){
-						directCall_doRead(writer);
-					}else{
-						virtualCall_doRead(writer);
+					overwrite_doRead(writer, generators);
+					
+					if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
+						overwrite_readNew(writer, generators);
 					}
-					writer.write(
-						"""
-								return
-							end
-							
-							@ #Override
-							protected function readNew
-								arg provider #DataProvider
-								arg src #ContentReader
-								arg genericContext #GenericContext
-								returns #IOInstance
-							start
-							"""
-					);
-					if(generators != null){
-						directCall_readNew(writer);
-					}else{
-						virtualCall_readNew(writer);
-					}
-					writer.write(
-						"""
-								return
-							end
-							"""
-					);
 					
 					writer.wEnd();
 				}
@@ -665,6 +629,57 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				}
 			}
 		}
+	}
+	
+	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+		writer.write(
+			"""
+				@ #Override
+				protected function readNew
+					arg provider #DataProvider
+					arg src #ContentReader
+					arg genericContext #GenericContext
+					returns #IOInstance
+				start
+				"""
+		);
+		if(generators != null){
+			directCall_readNew(writer);
+		}else{
+			virtualCall_readNew(writer);
+		}
+		writer.write(
+			"""
+					return
+				end
+				"""
+		);
+	}
+	private static void overwrite_doRead(CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+		writer.write(
+			"""
+				@ #Override
+				protected function doRead
+					arg ioPool #VarPool<#ObjType>
+					arg provider #DataProvider
+					arg src #ContentReader
+					arg instance #IOInstance
+					arg genericContext #GenericContext
+					returns #IOInstance
+				start
+				"""
+		);
+		if(generators != null){
+			directCall_doRead(writer);
+		}else{
+			virtualCall_doRead(writer);
+		}
+		writer.write(
+			"""
+					return
+				end
+				"""
+		);
 	}
 	
 	private static void directCall_readNew(CodeStream writer) throws MalformedJorth{

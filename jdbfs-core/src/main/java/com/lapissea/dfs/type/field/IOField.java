@@ -251,7 +251,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
-							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> { }
+							case FieldAccessor.FieldOrMethod.AccessType.Field ignore -> { }
 							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
 								writer.write("call {!} start", name);
 							}
@@ -265,8 +265,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
-							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> {
-								writer.write("set {} {!}", field.getDeclaringStruct().getType(), name);
+							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
+								writer.write("set {} {!}", declaringClass, name);
 							}
 							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
 								writer.write("end");
@@ -322,8 +322,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
 						switch(fom.setter()){
-							case FieldAccessor.FieldOrMethod.AccessType.Field(var name) -> {
-								throw new NotImplementedException("get real field");
+							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
+								writer.write("dup");
+								writer.write("get {} {!}", declaringClass, name);
 							}
 							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
 								throw new NotImplementedException("call method");

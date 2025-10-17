@@ -157,21 +157,21 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	}
 	
 	private final VarHandle handle;
-	private final String    fieldName;
+	private final Field     field;
 	
 	private VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		handle = Access.makeVarHandle(field);
-		fieldName = field.getName();
+		this.field = field;
 	}
 	
 	@Override
 	public AccessType getter(){
-		return new AccessType.Field(fieldName);
+		return new AccessType.Field(field.getDeclaringClass(), field.getName());
 	}
 	@Override
 	public AccessType setter(){
-		return new AccessType.Field(fieldName);
+		return new AccessType.Field(field.getDeclaringClass(), field.getName());
 	}
 	
 	@Override

@@ -102,8 +102,8 @@ public class SpecializedPipeTests{
 		shorts = withVirtualSize(shorts);
 		
 		var primitives = Iters.concat(
-			ints
-//			doubles, chars, floats, longs, ints, shorts, bytes, booleans
+//			longs
+			doubles, chars, floats, longs, ints, shorts, bytes, booleans
 		);
 		
 		IterablePP<FieldDef> boxed = primitives.map(e -> e.withType(SupportedPrimitive.get(e.type).orElseThrow().wrapper));
@@ -172,8 +172,13 @@ public class SpecializedPipeTests{
 		}
 	}
 	
+	@Test
+	void testChunk() throws IOException{
+		AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+	}
+	
 	@SuppressWarnings("unchecked")
-	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class)
+	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = "testChunk")
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		var basic   = (Class<T1>)makeFieldClass(field, false, immediate);
 		var special = (Class<T2>)makeFieldClass(field, true, immediate);
