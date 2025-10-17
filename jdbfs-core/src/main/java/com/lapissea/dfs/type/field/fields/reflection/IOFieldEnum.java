@@ -2,7 +2,6 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.bit.BitReader;
-import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.type.IOInstance;
@@ -14,7 +13,6 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
-import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
@@ -26,7 +24,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E> implements IOField.SpecializedGenerator{
+public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E> implements IOField.SpecializedGenerator.OnBitSpace<T>{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage extends FieldUsage.InstanceOf<Enum>{
@@ -97,17 +95,17 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
 		if(nullable()) throw new NotImplementedException("Nullable enum not implemented yet");
-		
-		var bits  = enumUniverse.getBitSize(nullable());
-		var bytes = BitUtils.bitsToBytes(bits);
 		
 		accessMap.preSet(getAccessor(), writer);
 		accessMap.getEnumArray(enumUniverse.type, writer);
-		CodeUtils.readBytesFromSrc(writer, bytes);
-		CodeUtils.rawBitsToValidatedBits(writer, bytes, bits);
-		writer.write("array-get");
+		writer.write(
+			"""
+				get #field {}
+				array-get
+				""",
+			bitsFieldName);
 		accessMap.set(getAccessor(), writer);
 	}
 }

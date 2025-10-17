@@ -6,7 +6,6 @@ import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.bit.BitReader;
-import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -30,13 +29,11 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -76,11 +73,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(List.of(FLong.class, FInt.class, FIntBoxed.class, FShort.class).contains(fieldType)){
 				res.add(Behaviour.noop(IOValue.Unsigned.class));
 			}
-			if(!List.of(FByte.class, FBoolean.class).contains(fieldType)){
+			if(!List.of(FByte.class, FBoolean.class, FBooleanBoxed.class).contains(fieldType)){
 				res.add(Behaviour.justDeps(IODependency.NumSize.class, a -> Set.of(a.value())));
 			}
 			res.add(Behaviour.of(VirtualNumSize.class, (field, ann) -> {
-				if(List.of(FByte.class, FBoolean.class).contains(fieldType)){
+				if(List.of(FByte.class, FBoolean.class, FBooleanBoxed.class).contains(fieldType)){
 					throw new MalformedStruct("fmt", "{}#yellow is not allowed on {}#red", VirtualNumSize.class.getName(), fieldType.getName());
 				}
 				return BehaviourSupport.virtualNumSize(field, ann);
@@ -492,11 +489,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 							""", tmpInt);
 					accessMap.get(getDynamicSize().field.getAccessor(), writer);
 					readIntDyn(writer, "get #arg src", !unsigned);
+					writer.wEnd();
 					writer.write(
 						"""
 								set #field {}
 							end""", tmpInt);
-					writer.wEnd();
 				}
 				accessMap.preSet(getAccessor(), writer);
 				writer.write("get #field {}", tmpInt);
@@ -745,7 +742,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator{
+	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
 		
 		private FBoolean(FieldAccessor<T> field){
 			super(field, SizeDescriptor.Fixed.of(BIT, 1));
@@ -807,40 +804,19 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			
+		public void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.preSet(getAccessor(), writer);
 			writer.write(
 				"""
-					get #arg src
-					call readUnsignedInt1
-					""");
-			
-			//Check integrity bits
-			var checkBits = BitUtils.makeMask(7)<<1;
-			writer.write(
-				"""
-					static call {} checkFlag start
-						dup
-						{}
-					end
-					if not start
-						new {} start 'Illegal boolean integrity bits' end
-						throw
-					end
-					""", UtilL.class, checkBits, IOException.class
-			);
-			
-			writer.write(
-				"""
+					get #field {}
 					cast boolean
-					"""
-			);
+					""",
+				bitsFieldName);
 			accessMap.set(getAccessor(), writer);
 		}
 	}
 	
-	public static final class FBooleanBoxed<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator{
+	public static final class FBooleanBoxed<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
 		
 		private FBooleanBoxed(FieldAccessor<T> field){
 			super(field);
@@ -926,47 +902,43 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
 			
 			accessMap.preSet(getAccessor(), writer);
 			if(nullable()){
-				CodeUtils.readBytesFromSrc(writer, 1);
-				CodeUtils.rawBitsToValidatedBits(writer, 1, 2);
 				var name = accessMap.temporaryLocalField(Boolean.class, writer);
 				writer.write(
 					"""
-						dup
+						get #field {2}
 						3 ==
 						if start
 							new {0} start 'Boolean field got a null true value. This is illegal and could point to a corrupted file' end
 							throw
 						end
 						
-						dup
+						get #field {2}
 						2 ==
 						if start
 							null start #Boolean end
 							set #field {1}
 						end else start
 							static call #Boolean valueOf start
-								dup
+								get #field {2}
 								cast boolean
 							end
 							set #field {1}
 						end
-						pop
 						get #field {1}
-						""", IOException.class, name
+						""", IOException.class, name, bitsFieldName
 				);
 			}else{
-				writer.write("static call #Boolean valueOf start");
-				CodeUtils.readBytesFromSrc(writer, 1);
-				CodeUtils.rawBitsToValidatedBits(writer, 1, 1);
 				writer.write(
 					"""
+						static call #Boolean valueOf start
+							get #field {}
 							cast boolean
 						end
-						""");
+						""", bitsFieldName);
 			}
 			accessMap.set(getAccessor(), writer);
 		}

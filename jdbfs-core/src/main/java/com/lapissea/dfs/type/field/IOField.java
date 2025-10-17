@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.dfs.io.IO;
+import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.GenericContext;
@@ -12,6 +13,7 @@ import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
+import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -25,6 +27,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
@@ -192,7 +195,27 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public interface SpecializedGenerator{
-		record ValueAccess(){ }
+		
+		interface OnBitSpace<T extends IOInstance<T>> extends SpecializedGenerator{
+			void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded;
+			
+			SizeDescriptor<T> getSizeDescriptor();
+			FieldAccessor<T> getAccessor();
+			
+			@Override
+			default void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+				var bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
+				var bytes = BitUtils.bitsToBytes(bits);
+				var name  = accessMap.temporaryLocalField(int.class, writer);
+				
+				CodeUtils.readBytesFromSrc(writer, bytes);
+				CodeUtils.rawBitsToValidatedBits(writer, bytes, bits);
+				writer.write("set #field {}", name);
+				
+				injectReadFieldFromBits(writer, accessMap, name);
+				
+			}
+		}
 		
 		final class AccessMap{
 			
