@@ -233,7 +233,7 @@ public enum NumberSize{
 					{}
 				end
 				""",
-			signed? "readInt" : "readIntSigned",
+			signed? "readIntSigned" : "readInt",
 			getContentReader
 		);
 	}
@@ -247,7 +247,7 @@ public enum NumberSize{
 					{}
 				end
 				""",
-			signed? "read" : "readSigned",
+			signed? "readSigned" : "read",
 			getContentReader
 		);
 	}
