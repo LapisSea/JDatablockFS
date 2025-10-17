@@ -20,8 +20,11 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -122,11 +125,11 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		
 	}
 	
-	private static final class SimpleMerger<T extends IOInstance<T>> extends BitFieldMerger<T>{
+	private static final class SimpleMerger<T extends IOInstance<T>> extends BitFieldMerger<T> implements SpecializedGenerator{
+		
 		private final long       bytes;
 		private final int        oneBits;
 		private final NumberSize numSize;
-		
 		
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
@@ -168,6 +171,36 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		@Override
 		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			src.skipExact(bytes);
+		}
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			var rawBits = accessMap.temporaryLocalField(int.class, writer);
+			CodeUtils.readBytesFromSrc(writer, numSize);
+			writer.write("set #field {}", rawBits);
+			
+			var field = accessMap.temporaryLocalField(int.class, writer);
+			
+			int bitOffset = 0;
+			
+			for(var fi : group){
+				if(!(fi instanceof SpecializedGenerator.OnBitSpace<?> special)){
+					throw new UnsupportedOperationException("Can not generate merged field because a field is not supported:\n  " + fi);
+				}
+				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
+				var mask = BitUtils.makeMask(bits);
+				writer.write(
+					"""
+						get #field {}
+						{} bit-shift-ll
+						{} bit-and
+						set #field {}
+						""",
+					rawBits, bitOffset, mask, field);
+				
+				bitOffset += bits;
+				
+				special.injectReadFieldFromBits(writer, accessMap, field);
+			}
 		}
 	}
 	
