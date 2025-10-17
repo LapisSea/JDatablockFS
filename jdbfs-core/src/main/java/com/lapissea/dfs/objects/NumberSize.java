@@ -185,11 +185,13 @@ public enum NumberSize{
 	/**
 	 * Stack: pops ContentReader, pushes long or int
 	 */
-	public void readConst(CodeStream target) throws MalformedJorth{
+	public void readConst(CodeStream target, String getContentReader, boolean signed) throws MalformedJorth{
 		switch(this){
-			case VOID -> target.write("drop 0");
-			case BYTE, SHORT, SMALL_INT, INT, BIG_INT, SMALL_LONG -> target.write("call readUnsignedInt" + bytes);
-			case LONG -> target.write("call readInt8");
+			case VOID -> target.write("0");
+			case BYTE, SHORT, SMALL_INT, INT, BIG_INT, SMALL_LONG -> {
+				target.write("{} call {}", getContentReader, (signed? "readInt" : "readUnsignedInt") + bytes);
+			}
+			case LONG -> target.write("{} call readInt8", getContentReader);
 		}
 	}
 	
@@ -232,6 +234,20 @@ public enum NumberSize{
 				end
 				""",
 			signed? "readInt" : "readIntSigned",
+			getContentReader
+		);
+	}
+	/**
+	 * Stack: pops NumberSize, pushes long
+	 */
+	public static void readDyn(CodeStream target, String getContentReader, boolean signed) throws MalformedJorth{
+		target.write(
+			"""
+				call {} start
+					{}
+				end
+				""",
+			signed? "read" : "readSigned",
 			getContentReader
 		);
 	}

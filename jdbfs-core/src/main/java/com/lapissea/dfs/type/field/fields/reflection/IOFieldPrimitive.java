@@ -290,7 +290,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
+	public static final class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long> implements SpecializedGenerator{
 		
 		private final boolean unsigned;
 		
@@ -348,6 +348,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				val = size.readSigned(src);
 			}
 			setValue(ioPool, instance, val);
+		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+			accessMap.preSet(getAccessor(), writer);
+			if(getDynamicSize() == null){
+				maxSize.size.readConst(writer, "get #arg src", !unsigned);
+			}else{
+				accessMap.get(getDynamicSize().field.getAccessor(), writer);
+				NumberSize.readDyn(writer, "get #arg src", !unsigned);
+			}
+			accessMap.set(getAccessor(), writer);
 		}
 		
 		@Override
@@ -575,16 +587,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			accessMap.preSet(getAccessor(), writer);
 			if(getDynamicSize() == null){
-				accessMap.preSet(getAccessor(), writer);
 				maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-				accessMap.set(getAccessor(), writer);
 			}else{
-				accessMap.preSet(getAccessor(), writer);
 				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				readIntDyn(writer, "get #arg src", !unsigned);
-				accessMap.set(getAccessor(), writer);
+				NumberSize.readIntDyn(writer, "get #arg src", !unsigned);
 			}
+			accessMap.set(getAccessor(), writer);
 		}
 		
 		@Override
