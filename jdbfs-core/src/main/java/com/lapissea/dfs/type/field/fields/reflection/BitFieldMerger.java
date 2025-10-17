@@ -175,7 +175,27 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			var rawBits = accessMap.temporaryLocalField(int.class, writer);
+			
+			int totalBits = 0;
+			for(var fi : group){
+				if(!(fi instanceof SpecializedGenerator.OnBitSpace<?>)){
+					throw new UnsupportedOperationException("Can not generate merged field because a field is not supported:\n  " + fi);
+				}
+				totalBits += Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
+			}
+			
 			CodeUtils.readBytesFromSrc(writer, numSize);
+			if(numSize.bits() != totalBits){
+				writer.write(
+					"""
+						static call {} readIntegrityBits start
+							dup cast long
+							{} {}
+						end
+						""",
+					CodeUtils.class, numSize.bits(), totalBits);
+			}
+			
 			writer.write("set #field {}", rawBits);
 			
 			var field = accessMap.temporaryLocalField(int.class, writer);
@@ -183,23 +203,23 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			int bitOffset = 0;
 			
 			for(var fi : group){
-				if(!(fi instanceof SpecializedGenerator.OnBitSpace<?> special)){
-					throw new UnsupportedOperationException("Can not generate merged field because a field is not supported:\n  " + fi);
-				}
 				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
 				var mask = BitUtils.makeMask(bits);
+				
+				writer.write("get #field {}", rawBits);
+				if(bitOffset>0){
+					writer.write("{} bit-shift-ll", bitOffset);
+				}
 				writer.write(
 					"""
-						get #field {}
-						{} bit-shift-ll
 						{} bit-and
 						set #field {}
 						""",
-					rawBits, bitOffset, mask, field);
+					mask, field);
 				
 				bitOffset += bits;
 				
-				special.injectReadFieldFromBits(writer, accessMap, field);
+				((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(writer, accessMap, field);
 			}
 		}
 	}

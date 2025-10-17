@@ -2,6 +2,7 @@ package com.lapissea.dfs.utils;
 
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
@@ -9,6 +10,10 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 
 public interface CodeUtils{
+	
+	static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
+		BitFieldMerger.readIntegrityBits(raw, totalBits, readBits);
+	}
 	
 	static void readBytesFromSrc(CodeStream writer, int bytes) throws MalformedJorth{
 		var ns = NumberSize.FLAG_INFO.filter(e -> e.bytes == bytes).findFirst().orElseThrow();
