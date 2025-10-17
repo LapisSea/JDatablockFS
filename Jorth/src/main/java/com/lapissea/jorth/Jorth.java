@@ -567,6 +567,8 @@ public final class Jorth extends CodeDestination{
 				}
 				currentFunction.stackIncrement(value);
 			}
+			case BIT_SHIFT_LEFT -> currentFunction.bitShiftLeft(false);
+			case BIT_SHIFT_LEFT_LOGICAL -> currentFunction.bitShiftLeft(true);
 			case BIT_AND -> currentFunction.bitAndOp();
 			case CAST -> {
 				var clazz = getReadClassName(source);

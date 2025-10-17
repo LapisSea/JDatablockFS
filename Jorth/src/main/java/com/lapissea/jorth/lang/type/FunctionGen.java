@@ -709,6 +709,23 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 	}
 	
+	public void bitShiftLeft(boolean logical) throws MalformedJorth{
+		var stack  = code().stack;
+		var offset = stack.pop();
+		if(!offset.equals(GenericType.INT)){
+			throw new MalformedJorth("The bit shift amount must be an int but is: " + offset);
+		}
+		var value = stack.pop();
+		if(value.equals(GenericType.INT)){
+			writer.visitInsn(logical? IUSHR : ISHR);
+		}else if(value.equals(GenericType.LONG)){
+			writer.visitInsn(logical? LUSHR : LSHR);
+		}else{
+			throw new MalformedJorth("The bit shift value must be an int or a long but is: " + value);
+		}
+		stack.push(value);
+	}
+	
 	public void negateBool() throws MalformedJorth{
 		var stack = code().stack;
 		var last  = stack.pop();

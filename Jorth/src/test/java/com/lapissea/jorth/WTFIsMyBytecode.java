@@ -61,6 +61,11 @@ public class WTFIsMyBytecode<ARG>{
 	public void plusplus(long v){
 		v++;
 	}
+	public void shift(int v){
+		var a = v >>> 1;
+		var b = v>>2;
+		var c = v<<3;
+	}
 	public void variable(){
 		List<Writer> thing = new ArrayList<>();
 		dummy++;

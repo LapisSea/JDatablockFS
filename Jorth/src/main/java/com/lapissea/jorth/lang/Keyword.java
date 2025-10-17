@@ -17,6 +17,8 @@ public enum Keyword implements KeyedEnum{
 	ARRAY_GET("array-get"),
 	INC,
 	BIT_AND("bit-and"),
+	BIT_SHIFT_LEFT("bit-shift-l"),
+	BIT_SHIFT_LEFT_LOGICAL("bit-shift-ll"),
 	CAST,
 	EXTENDS,
 	IMPLEMENTS,
