@@ -17,6 +17,8 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.util.List;
@@ -27,7 +29,7 @@ import java.util.function.BiFunction;
 import static com.lapissea.dfs.objects.NumberSize.LARGEST;
 import static com.lapissea.dfs.objects.NumberSize.VOID;
 
-public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer>{
+public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<ChunkPointer>{
@@ -45,9 +47,16 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 		}
 	}
 	
-	private final boolean                               forceFixed;
-	private final VaryingSize                           maxSize;
-	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	private record DynamicFieldSize<T extends IOInstance<T>>(IOField<T, NumberSize> field) implements BiFunction<VarPool<T>, T, NumberSize>{
+		@Override
+		public NumberSize apply(VarPool<T> ioPool, T instance){
+			return field.get(ioPool, instance);
+		}
+	}
+	
+	private final boolean             forceFixed;
+	private final VaryingSize         maxSize;
+	private       DynamicFieldSize<T> dynamicSize;
 	
 	public IOFieldChunkPointer(FieldAccessor<T> accessor){
 		this(accessor, null);
@@ -68,7 +77,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 		super.init(fields);
 		
 		if(!forceFixed && IOFieldTools.getDynamicSize(getAccessor()) instanceof Some(var field)){
-			dynamicSize = field::get;
+			dynamicSize = new DynamicFieldSize<>(field);
 			initSizeDescriptor(SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()));
 		}else{
 			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
@@ -108,5 +117,19 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size = getSize(ioPool, instance);
 		size.skip(src);
+	}
+	
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		accessMap.preSet(getAccessor(), writer);
+		writer.write("static call {} of start", ChunkPointer.class);
+		if(dynamicSize == null){
+			maxSize.size.readConst(writer, "get #arg src", false);
+		}else{
+			accessMap.get(dynamicSize.field.getAccessor(), writer);
+			NumberSize.readDyn(writer, "get #arg src", false);
+		}
+		writer.wEnd();
+		accessMap.set(getAccessor(), writer);
 	}
 }
