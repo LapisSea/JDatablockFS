@@ -582,23 +582,13 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						StructPipe.STATE_DONE
 					);
 					
-					if(generators != null){
-						var accessMap = new AccessMap();
-						writeConstants(writer, constants, accessMap);
-						
-						accessMap.setup(true);
-						generateFunction_doRead("specialized_doRead", writer, generators, accessMap);
-						
-						if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
-							accessMap.setup(false);
-							generateFunction_readNew("specialized_readNew", writer, generators, accessMap);
-						}
-					}
+					var accessMap = new AccessMap();
+					writeConstants(writer, constants, accessMap);
 					
-					overwrite_doRead(writer, generators);
+					overwrite_doRead(writer, generators, accessMap);
 					
 					if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
-						overwrite_readNew(writer, generators);
+						overwrite_readNew(writer, generators, accessMap);
 					}
 					
 					writer.wEnd();
@@ -631,7 +621,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
+	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				@ #Override
@@ -644,72 +634,15 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				"""
 		);
 		if(generators != null){
-			directCall_readNew(writer);
+			accessMap.setup(false);
+			writer.write("new #ObjType");
+			
+			for(IOField.SpecializedGenerator generator : generators){
+				generator.injectReadField(writer, accessMap);
+			}
 		}else{
-			virtualCall_readNew(writer);
-		}
-		writer.write(
-			"""
-					return
-				end
+			writer.write(
 				"""
-		);
-	}
-	private static void overwrite_doRead(CodeStream writer, List<IOField.SpecializedGenerator> generators) throws MalformedJorth{
-		writer.write(
-			"""
-				@ #Override
-				protected function doRead
-					arg ioPool #VarPool<#ObjType>
-					arg provider #DataProvider
-					arg src #ContentReader
-					arg instance #IOInstance
-					arg genericContext #GenericContext
-					returns #IOInstance
-				start
-				"""
-		);
-		if(generators != null){
-			directCall_doRead(writer);
-		}else{
-			virtualCall_doRead(writer);
-		}
-		writer.write(
-			"""
-					return
-				end
-				"""
-		);
-	}
-	
-	private static void directCall_readNew(CodeStream writer) throws MalformedJorth{
-		writer.write(
-			"""
-				static call #ThisClass specialized_readNew start
-					get #arg provider
-					get #arg src
-					get #arg genericContext
-				end
-				"""
-		);
-	}
-	private static void directCall_doRead(CodeStream writer) throws MalformedJorth{
-		writer.write(
-			"""
-				static call #ThisClass specialized_doRead start
-					get #arg ioPool
-					get #arg provider
-					get #arg src
-					get #arg instance cast #ObjType
-					get #arg genericContext
-				end
-				"""
-		);
-	}
-	
-	private static void virtualCall_readNew(CodeStream writer) throws MalformedJorth{
-		writer.write(
-			"""
 					call-virtual
 						bootstrap-fn #StandardStructPipe bootstrapReadNew
 							arg #Class #ObjType
@@ -724,13 +657,47 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						get #arg src
 						get #arg genericContext
 					end
-				
+					"""
+			);
+		}
+		writer.write(
+			"""
+					return
+				end
 				"""
 		);
 	}
-	private static void virtualCall_doRead(CodeStream writer) throws MalformedJorth{
+	private static void overwrite_doRead(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
+				@ #Override
+				protected function doRead
+					arg ioPool #VarPool<#ObjType>
+					arg provider #DataProvider
+					arg src #ContentReader
+					arg instance #IOInstance
+					arg genericContext #GenericContext
+					returns #IOInstance
+				start
+				"""
+		);
+		if(generators != null){
+			accessMap.setup(true);
+			
+			writer.write(
+				"""
+					get #arg instance
+					cast #ObjType
+					"""
+			);
+			
+			for(IOField.SpecializedGenerator generator : generators){
+				generator.injectReadField(writer, accessMap);
+			}
+			
+		}else{
+			writer.write(
+				"""
 					call-virtual
 						bootstrap-fn #StandardStructPipe bootstrapDoRead
 							arg #Class #ObjType
@@ -749,7 +716,13 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 						get #arg instance cast #ObjType
 						get #arg genericContext
 					end
-				
+					"""
+			);
+		}
+		writer.write(
+			"""
+					return
+				end
 				"""
 		);
 	}

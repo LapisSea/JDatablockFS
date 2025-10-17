@@ -160,7 +160,7 @@ public class SpecializedPipeTests{
 		
 		@Override
 		public boolean retry(ITestResult result){
-			if(!(result.getThrowable() instanceof AssertionError)){
+			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage().contains("State done check"))){
 				return false;
 			}
 			var count = retryRecord.compute(new Entry(result.getName(), Arrays.asList(result.getParameters())), (k, v) -> {
@@ -193,10 +193,11 @@ public class SpecializedPipeTests{
 		if(!immediate){
 			assertThat(specialPipe.getInitializationState()).as("State done check").isNotEqualTo(StagedInit.STATE_DONE);
 		}
+		var random = new RawRandom();//field.toString().hashCode()
 		for(int i = 0; i<50; i++){
-			doIOTest(field, basicPipe, basicPipe);
-			doIOTest(field, basicPipe, specialPipe);
-			doIOTest(field, specialPipe, basicPipe);
+			doIOTest(field, basicPipe, basicPipe, random);
+			doIOTest(field, basicPipe, specialPipe, random);
+			doIOTest(field, specialPipe, basicPipe, random);
 		}
 	}
 	private static <T1 extends IOInstance<T1>> StructPipe<T1> makeUncheckedPipe(Class<T1> basic, boolean imidiate){
@@ -209,11 +210,11 @@ public class SpecializedPipeTests{
 	
 	@SuppressWarnings("unchecked")
 	private static <TF extends IOInstance<TF>, TT extends IOInstance<TT>>
-	void doIOTest(FieldDef field, StructPipe<TF> from, StructPipe<TT> to) throws IOException{
+	void doIOTest(FieldDef field, StructPipe<TF> from, StructPipe<TT> to, RawRandom random) throws IOException{
 		TF  val = from.getType().make();
 		var f1  = (IOField<TF, Object>)from.getType().getFields().byName("val").orElseThrow();
 		var f2  = (IOField<TT, Object>)to.getType().getFields().byName("val").orElseThrow();
-		f1.set(null, val, field.generator.apply(new RawRandom()));
+		f1.set(null, val, field.generator.apply(random));
 		
 		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
 		from.write(ch, val);
