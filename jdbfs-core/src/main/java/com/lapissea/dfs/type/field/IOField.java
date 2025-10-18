@@ -247,9 +247,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			}
 			
 			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
-				writer.write("dup");
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
+						writer.write("dup");
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field ignore -> { }
 							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {

@@ -135,8 +135,7 @@ public class SpecializedPipeTests{
 	private static IterablePP<FieldDef> withVirtualSize(IterablePP<FieldDef> combinations){
 		return Iters.concat(
 			combinations,
-			combinations.map(e -> e.withNewAnnotations(Annotations.make(IODependency.VirtualNumSize.class))
-			                       .withGenerator(r -> r.nextInt(0, Integer.MAX_VALUE)))
+			combinations.map(e -> e.withNewAnnotations(Annotations.make(IODependency.VirtualNumSize.class)))
 		);
 	}
 	private static IterablePP<FieldDef> withNullable(IterablePP<FieldDef> combinations){
@@ -298,7 +297,7 @@ public class SpecializedPipeTests{
 			fields,
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 20))) : List.of(),
+			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 30))) : List.of(),
 			fns);
 		return TempClassGen.gen(cg);
 	}
