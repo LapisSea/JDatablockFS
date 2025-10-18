@@ -59,15 +59,9 @@ public class SpecializedPipeTests{
 		FieldDef withType(Class<?> type)                                    { return new FieldDef(type, getter, setter, annotations, generator); }
 		FieldDef withGetter(boolean getter)                                 { return new FieldDef(type, getter, setter, annotations, generator); }
 		FieldDef withSetter(boolean setter)                                 { return new FieldDef(type, getter, setter, annotations, generator); }
-		FieldDef withAnnotations(List<Annotation> ann){
-			return new FieldDef(type, getter, setter, ann, generator);
-		}
-		FieldDef withNewAnnotations(Annotation... ann){
-			return withAnnotations(Iters.concat(annotations, Iters.from(ann)).toList());
-		}
-		FieldDef withGenerator(Function<RandomGenerator, Object> generator){
-			return new FieldDef(type, getter, setter, annotations, generator);
-		}
+		FieldDef withAnnotations(List<Annotation> ann)                      { return new FieldDef(type, getter, setter, ann, generator); }
+		FieldDef withNewAnnotations(Annotation... ann)                      { return withAnnotations(Iters.concat(annotations, Iters.from(ann)).toList()); }
+		FieldDef withGenerator(Function<RandomGenerator, Object> generator) { return new FieldDef(type, getter, setter, annotations, generator); }
 		@Override
 		public String toString(){
 			var res = new StringJoiner(", ", type.getTypeName() + "{", "}");
