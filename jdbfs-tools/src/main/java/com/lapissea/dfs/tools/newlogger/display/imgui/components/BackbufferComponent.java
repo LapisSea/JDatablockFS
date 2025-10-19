@@ -157,7 +157,13 @@ public abstract class BackbufferComponent implements UIComponent{
 			mouseY = (int)pos.y;
 			
 			if(renderTarget == null || !renderTarget.renderArea.equals(width, height) || needsRerender()){
-				drawFB(deviceGC, tScope, width, height);
+				try{
+					drawFB(deviceGC, tScope, width, height);
+				}catch(Throwable e){
+					ImGui.end();
+					ImGui.popStyleVar();
+					throw e;
+				}
 			}else{
 				try{
 					if(!renderTarget.onFenceGC.isEmpty() && renderTarget.fence.isSignaled()){
@@ -192,12 +198,13 @@ public abstract class BackbufferComponent implements UIComponent{
 			renderTarget.renderArea = new Extent2D(width, height);
 			try(var ignore = renderTarget.beginRenderPass(buff, clearColor)){
 				renderBackbuffer(renderTarget.onFenceGC, buff, renderTarget.renderArea);
+			}finally{
+				buff.end();
 			}
-			buff.end();
 			
 			core.renderQueue.submit(buff, renderTarget.fence);
 		}catch(VulkanCodeException e){
-			throw new RuntimeException("Failed to render", e);
+			throw new RuntimeException("Failed to render back-buffer", e);
 		}
 	}
 	

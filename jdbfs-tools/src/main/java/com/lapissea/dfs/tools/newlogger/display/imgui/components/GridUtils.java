@@ -66,6 +66,44 @@ public final class GridUtils{
 			}
 			return new ByteGridSize(bytesPerRow, byteSize, windowSize);
 		}
+		
+		public Rect findBestRectScaled(long from, long to){
+			return findBestRect(from, to).scale(byteSize);
+		}
+		
+		public Rect findBestRect(long from, long to){
+			var fromRow = from/bytesPerRow;
+			var toRow   = to/bytesPerRow;
+			if(fromRow == toRow){
+				var fromX = from - fromRow*bytesPerRow;
+				var toX   = to - toRow*bytesPerRow;
+				return new Rect(fromX, fromRow, toX - fromX, 1);
+			}
+			
+			long fromRowEnd = (fromRow + 1)*bytesPerRow;
+			long toRowStart = toRow*bytesPerRow;
+			
+			long bulkFrom = fromRowEnd;
+			
+			if(from + bytesPerRow == bulkFrom){
+				bulkFrom = from;
+			}
+			
+			long bulkRows = Math.max(0, (toRowStart - bulkFrom)/bytesPerRow);
+			if(bulkRows>0){
+				var bulkFirstRow = bulkFrom/bytesPerRow;
+				return new Rect(0, bulkFirstRow, bytesPerRow, bulkRows);
+			}
+			
+			long headSize = fromRowEnd - from;
+			long tailSize = to - toRowStart;
+			
+			if(headSize>=tailSize){
+				return new Rect(from%bytesPerRow, fromRow, headSize, 1);
+			}else{
+				return new Rect(0, toRow, tailSize, 1);
+			}
+		}
 	}
 	
 	public record Rect(float x, float y, float width, float height){

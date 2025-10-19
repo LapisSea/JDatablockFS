@@ -7,7 +7,7 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
-import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.tools.ColorUtils;
@@ -190,8 +190,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			var byteBae = new StringDraw(
 				gridSize.byteSize(), new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
 			);
-			
-			if(stringDrawIn(byteBae, new GridUtils.Rect(0, 0, MagicID.size(), 1).scale(gridSize.byteSize()), false) instanceof Some(var str)){
+			if(stringDrawIn(byteBae, ctx.gridSize.findBestRectScaled(0, MagicID.size()), false) instanceof Some(var str)){
 				multiRenderer.renderFont(str, str.withOutline(Color.black, 1F));
 			}
 			
@@ -201,10 +200,15 @@ public class ByteGridComponent extends BackbufferComponent{
 				outlineByteRange(gridSize, Color.BLUE, new Range(0, MagicID.size()), 3);
 			}
 			
-			var vsp = DataProvider.newVerySimpleProvider(frameData.contents());
+			var vsp = new Cluster(frameData.contents());
 			for(Chunk chunk : vsp.getFirstChunk().chunksAhead()){
-				annotateChunk(ctx, chunk);
+				annotateStruct(ctx, Chunk.PIPE, chunk.getPtr().getValue());
 			}
+			
+			var rootWalk = vsp.rootWalker(null, false);
+			var root     = rootWalk.getRoot();
+			var rootPipe = FixedStructPipe.of(root.getClass());
+			annotateStruct(ctx, rootPipe, vsp.getFirstChunk().dataStart());
 		}catch(IOException ignore){
 			messages.add("Does not have valid magic ID");
 		}
@@ -351,10 +355,6 @@ public class ByteGridComponent extends BackbufferComponent{
 		return ub;
 	}
 	
-	private void annotateChunk(RenderContext ctx, Chunk chunk) throws VulkanCodeException, IOException{
-		annotateStruct(ctx, Chunk.PIPE, chunk.getPtr().getValue());
-	}
-	
 	record ReadField<T extends IOInstance<T>, V>(IOField<T, V> field, V value, long offset, long size){ }
 	
 	record ReadFields<T extends IOInstance<T>>(T value, List<ReadField<T, ?>> fields){ }
@@ -398,9 +398,10 @@ public class ByteGridComponent extends BackbufferComponent{
 					continue;
 				}
 				var value       = field.get(ioPool, inst);
-				var valueOffset = src.getPos();
-				var valueSize   = valueOffset - lastPos;
-				lastPos = valueOffset;
+				var valueOffset = lastPos;
+				var newPos      = src.getPos();
+				var valueSize   = newPos - lastPos;
+				lastPos = newPos;
 				
 				//noinspection unchecked
 				fields.add(new ReadField<>((IOField<T, ? super Object>)field, value, valueOffset, valueSize));
@@ -411,25 +412,29 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx, StructPipe<T> pipe, long offset) throws VulkanCodeException, IOException{
 		
-		if(pipe instanceof StandardStructPipe){
-			if(pipe.getType().needsBuilderObj()){
-				annotateStruct(ctx, pipe.getBuilderPipe(), offset);
-				return;
-			}
-			
-			var info = readFields(ctx, pipe, offset);
-			for(ReadField<T, ?> field : info.fields){
-				//noinspection unchecked
-				annotateByteField(ctx, (IOField<T, ? super Object>)field.field, field.value, field.offset, field.size);
-			}
+		if(pipe.getType().needsBuilderObj()){
+			annotateStruct(ctx, pipe.getBuilderPipe(), offset);
+			return;
+		}
+		
+		var info = readFields(ctx, pipe, offset);
+		for(ReadField<T, ?> field : info.fields){
+			if(field.size == 0) continue;
+			//noinspection unchecked
+			annotateByteField(ctx, (IOField<T, ? super Object>)field.field, field.value, field.offset, field.size);
 		}
 		
 	}
 	
 	private <T extends IOInstance<T>, V> void annotateByteField(RenderContext ctx, IOField<T, V> field, V value, long valueOffset, long valueSize) throws VulkanCodeException, IOException{
-		var rand = new RawRandom(field.hashCode());
+		var rand = new RawRandom(field.toString().hashCode());
 		var col  = new Color(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
 		drawByteRanges(ctx, List.of(new Range(valueOffset, valueOffset + valueSize)), col, false, true);
+		
+		var rect = ctx.gridSize.findBestRectScaled(valueOffset, valueOffset + valueSize);
+		if(stringDrawIn(field + " " + value, rect, col, ctx.gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
+			multiRenderer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
+		}
 	}
 	
 	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){

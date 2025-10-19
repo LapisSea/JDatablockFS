@@ -166,9 +166,9 @@ public class VulkanDisplay implements AutoCloseable{
 			render(this.window);
 			ImGui.renderPlatformWindowsDefault();
 			core.executeSwaps();
-		}catch(VulkanCodeException e){
+		}catch(Throwable e){
 			window.requestClose();
-			throw new RuntimeException("Failed to render", e);
+			new RuntimeException("Failed to render... closing", e).printStackTrace();
 		}
 	}
 	

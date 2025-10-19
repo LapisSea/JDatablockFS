@@ -53,9 +53,12 @@ public class ImHandler{
 		rawFontResources.clear();
 		imGuiImpl.newFrame();
 		ImGui.newFrame();
-		renderImGUI(deviceGC);
-		ImGui.render();
-		ImGui.updatePlatformWindows();
+		try{
+			renderImGUI(deviceGC);
+		}finally{
+			ImGui.render();
+			ImGui.updatePlatformWindows();
+		}
 	}
 	
 	
