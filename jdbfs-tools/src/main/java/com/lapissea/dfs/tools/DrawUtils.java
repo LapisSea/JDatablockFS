@@ -39,7 +39,7 @@ public final class DrawUtils{
 			}
 		}
 		
-		static Range fromSize(long start, long size){
+		public static Range fromSize(long start, long size){
 			return new Range(start, start + size);
 		}
 		
@@ -175,6 +175,10 @@ public final class DrawUtils{
 		}
 		public IterableLongPP longsI(){
 			return Iters.range(from, to);
+		}
+		
+		public boolean isWithin(Range range){
+			return range.from<=from && to<=range.to;
 		}
 	}
 	

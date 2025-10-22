@@ -8,6 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VkPipelineSet;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
+import com.lapissea.dfs.tools.newlogger.display.renderers.grid.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.IndirectDrawBuffer;
@@ -43,7 +44,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, MsdfFontRender.RenderToken>{
+public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, MsdfFontRender.RenderToken>, PrimitiveBuffer.FontRednerer{
 	
 	private static final String TEXTURE_PATH = "/roboto/regular/atlas.png";
 	private static final String LAYOUT_PATH  = "/roboto/regular/atlas.json";

@@ -1,39 +1,20 @@
 package com.lapissea.dfs.tools.newlogger.display.imgui.components;
 
-import com.lapissea.dfs.MagicID;
-import com.lapissea.dfs.core.Cluster;
-import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.core.chunk.Chunk;
-import com.lapissea.dfs.core.chunk.PhysicalChunkWalker;
-import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.ContentReader;
-import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
-import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.tools.ColorUtils;
-import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
-import com.lapissea.dfs.tools.DrawUtilsVK;
 import com.lapissea.dfs.tools.newlogger.SessionSetView;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
-import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
-import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
-import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
-import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
+import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.grid.GridScene;
+import com.lapissea.dfs.tools.newlogger.display.renderers.grid.PrimitiveBuffer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.grid.RangeMessageSpace;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
-import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
@@ -44,12 +25,10 @@ import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.List;
-import java.util.function.IntPredicate;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
@@ -63,53 +42,11 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
-	public static final class RenderContext{
-		private final BitSet                   filled;
-		private final SessionSetView.FrameData frameData;
-		public final  GridUtils.ByteGridSize   gridSize;
-		public final  DeviceGC                 deviceGC;
-		
-		public DataProvider dataProvider;
-		
-		private long sizeCache = -1;
-		
-		
-		private RenderContext(SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize, DeviceGC deviceGC){
-			this.frameData = frameData;
-			this.gridSize = gridSize;
-			this.deviceGC = deviceGC;
-			filled = new BitSet(Math.toIntExact(getDataSize()));
-		}
-		
-		long getDataSize(){
-			if(sizeCache != -1) return sizeCache;
-			try{
-				return sizeCache = (frameData == null? 0 : frameData.contents().getIOSize());
-			}catch(IOException e){
-				throw new RuntimeException("Failed to get data size", e);
-			}
-		}
-		
-		boolean checkMagicID(){
-			try{
-				frameData.contents().io(MagicID::read);
-				return true;
-			}catch(IOException ignore){
-				return false;
-			}
-		}
-		
-		boolean isNotFilled(long idx)   { return !filled.get(Math.toIntExact(idx)); }
-		boolean isFilled(long idx)      { return filled.get(Math.toIntExact(idx)); }
-		void fill(long idx)             { filled.set(Math.toIntExact(idx)); }
-		void fill(DrawUtils.Range range){ fill(range.from(), range.to()); }
-		void fill(long start, long end){
-			for(long i = start; i<end; i++){
-				filled.set(Math.toIntExact(i));
-			}
-		}
-		
-	}
+	private static final ExecutorService SCENE_BUILD_POOL = Executors.newSingleThreadExecutor();
+	
+	private CompletableFuture<GridScene> scene;
+	private GridScene                    oldScene;
+	
 	
 	public ByteGridComponent(VulkanCore core, ImBoolean open, SettingsUIComponent uiSettings, List<String> messages) throws VulkanCodeException{
 		super(core, open, uiSettings.byteGridSampleEnumIndex);
@@ -123,6 +60,10 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	public void setDisplayData(SessionSetView.FrameData src) throws IOException{
 		frameData = src;
+		if(scene != null){
+			oldScene = scene.isDone()? scene.join() : null;
+		}
+		scene = null;
 	}
 	
 	@Override
@@ -146,14 +87,16 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 		
 		multiRenderer.reset();
+		GridUtils.ByteGridSize size;
 		try{
-			recordBackbuffer(deviceGC, viewSize);
+			size = recordBackbuffer(deviceGC, viewSize);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
-		multiRenderer.submit(deviceGC, lastGridSize.orElse(new GridUtils.ByteGridSize(1, 1, viewSize)), cmdBuffer);
+		multiRenderer.submit(deviceGC, size, viewSize, cmdBuffer);
 	}
-	protected void recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
+	
+	protected GridUtils.ByteGridSize recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
@@ -165,9 +108,13 @@ public class ByteGridComponent extends BackbufferComponent{
 		long byteCount = getFrameSize(frameData);
 		
 		if(byteCount == 0){
-			renderNoData(viewSize);
-			return;
+			renderFullScreenMessage(viewSize, "No data!");
+			scene = null;
+			oldScene = null;
+			lastGridSize = Match.empty();
+			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
+		
 		
 		if(ImGui.isKeyPressed(ImGuiKey.R)){
 			lastGridSize = Match.empty();
@@ -176,295 +123,111 @@ public class ByteGridComponent extends BackbufferComponent{
 		var gridSize = GridUtils.ByteGridSize.compute(viewSize, byteCount, lastGridSize);
 		lastGridSize = Match.of(gridSize);
 		
-		var ctx = new RenderContext(frameData, gridSize, deviceGC);
+		if(scene == null){
+			var fd = frameData;
+			scene = CompletableFuture.supplyAsync(() -> {
+				if(fd != frameData){
+					return null;
+				}
+				var scene = new GridScene(new PrimitiveBuffer.SimpleBuffer(multiRenderer.getFontRender()), frameData, gridSize);
+				try{
+					scene.build();
+				}catch(IOException e){
+					throw new RuntimeException("Failed to build scene", e);
+				}
+				return scene;
+			}, SCENE_BUILD_POOL);
+			scene.thenRun(() -> oldScene = null);
+		}
 		
-		var mouseHoverIndex = GridUtils.calcByteIndex(gridSize, mouseX(), mouseY(), byteCount, 1);
+		if(!scene.isDone() && oldScene == null){
+			renderFullScreenMessage(viewSize, "Data building...");
+			return new GridUtils.ByteGridSize(1, 1, viewSize);
+		}
 		
-		var hasMagic = ctx.checkMagicID();
-		
-		annotateMagicID(ctx, hasMagic);
-		try{
-			frameData.contents().io(MagicID::read);
-			ctx.dataProvider = new Cluster(frameData.contents());
+		boolean   oldData = false;
+		GridScene scene;
+		if(this.scene.isDone()){
+			scene = this.scene.join();
 			
-			var byteBae = new StringDraw(
-				gridSize.byteSize(), new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
-			);
-			if(stringDrawIn(byteBae, ctx.gridSize.findBestRectScaled(0, MagicID.size()), false) instanceof Some(var str)){
-				multiRenderer.renderFont(str, str.withOutline(Color.black, 1F));
+			if(!gridSize.equals(scene.gridSize)){
+				oldScene = scene;
+				this.scene = null;
 			}
 			
-			if(GridUtils.isRangeHovered(mouseHoverIndex, 0, MagicID.size())){
-				messages.add("The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()));
-				
-				outlineByteRange(gridSize, Color.BLUE, new Range(0, MagicID.size()), 3);
-			}
-			
-			var vsp = new Cluster(frameData.contents());
-			for(Chunk chunk : vsp.getFirstChunk().chunksAhead()){
-				annotateStruct(ctx, Chunk.PIPE, chunk.getPtr().getValue());
-			}
-			
-			var rootWalk = vsp.rootWalker(null, false);
-			var root     = rootWalk.getRoot();
-			var rootPipe = FixedStructPipe.of(root.getClass());
-			annotateStruct(ctx, rootPipe, vsp.getFirstChunk().dataStart());
-		}catch(IOException ignore){
-			messages.add("Does not have valid magic ID");
+		}else if(oldScene != null){
+			scene = oldScene;
+			oldData = true;
+		}else{
+			renderFullScreenMessage(viewSize, "Data building...");
+			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
 		
-		try{
-			drawByteRanges(ctx, List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
-			multiRenderer.renderBytes(ctx.deviceGC, 0, null, List.of(), Iters.from(frameData.writes()).map(r -> new ByteGridRender.IOEvent((int)r.start, (int)r.end(), ByteGridRender.IOEvent.Type.WRITE)));
-		}catch(IOException e){
-			throw new RuntimeException(e);
+		for(PrimitiveBuffer.SimpleBuffer.TokenSet token : ((PrimitiveBuffer.SimpleBuffer)scene.buffer).tokens){
+			switch(token){
+				case PrimitiveBuffer.SimpleBuffer.TokenSet.ByteEvents(var tokens) -> {
+					for(PrimitiveBuffer.SimpleBuffer.ByteToken t : tokens){
+						multiRenderer.renderBytes(deviceGC, t.dataOffset(), t.data(), t.ranges(), t.ioEvents());
+					}
+				}
+				case PrimitiveBuffer.SimpleBuffer.TokenSet.Lines(var lines) -> {
+					multiRenderer.renderLines(lines);
+				}
+				case PrimitiveBuffer.SimpleBuffer.TokenSet.Meshes(var meshes) -> {
+					for(Geometry.IndexedMesh mesh : meshes){
+						multiRenderer.renderMesh(mesh);
+					}
+				}
+				case PrimitiveBuffer.SimpleBuffer.TokenSet.Strings(var strings) -> {
+					multiRenderer.renderFont(strings);
+				}
+			}
 		}
 		
-		if(mouseHoverIndex instanceof Some(var p)){
+		if(GridUtils.calcByteIndex(gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
+			for(var message : scene.messages.collect(p)){
+				switch(message.hoverEffect()){
+					case RangeMessageSpace.HoverEffect.None ignore -> { }
+					case RangeMessageSpace.HoverEffect.Outline(Color color, float lineWidth) -> {
+						outlineByteRange(scene.gridSize, color, message.range(), lineWidth);
+					}
+				}
+				messages.add(message.message());
+			}
+			
 			int b = -1;
 			try{
 				b = frameData.contents().ioMapAt(p, ContentReader::readUnsignedInt1);
 			}catch(IOException ignored){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
-			if(findHoverChunk(frameData.contents(), p) instanceof Some(var chunk)){
-				var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
-				outlineByteRange(gridSize, Color.CYAN.darker(), chRange, 2);
-				messages.add("Hovered chunk: " + chunk);
-			}
 			multiRenderer.renderLines(
 				GridUtils.outlineByteRange(Color.WHITE, gridSize, new Range(p, p + 1), 1.5F)
 			);
 		}
+		if(oldData) multiRenderer.renderFont(new MsdfFontRender.StringDraw(
+			20*ImGui.getWindowDpiScale(),
+			Color.DARK_GRAY, "Old data...",
+			2, viewSize.height - 2
+		));
+		
+		return scene.gridSize;
 	}
 	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
 		multiRenderer.renderLines(lines);
 	}
 	
-	private void annotateMagicID(RenderContext ctx, boolean hasMagic) throws IOException, VulkanCodeException{
-		var byteSize = ctx.getDataSize();
-		if(hasMagic){
-			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
-			return;
-		}
-		
-		var bytes = new byte[(int)Math.min(byteSize, MagicID.size())];
-		try{
-			ctx.frameData.contents().read(0, bytes);
-			
-			IntPredicate isValidMagicByte = i -> byteSize>i && MagicID.get(i) == bytes[i];
-			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
-			drawBytes(ctx, Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
-		}catch(IOException e){
-			drawByteRanges(ctx, List.of(new Range(0, MagicID.size())), Color.RED, false, true);
-		}
-	}
-	
-	private void drawBytes(RenderContext ctx, IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException, VulkanCodeException{
-		drawByteRanges(ctx, DrawUtils.Range.fromInts(stream), color, withChar, force);
-	}
-	
-	private void drawByteRanges(RenderContext ctx, List<Range> ranges, Color color, boolean withChar, boolean force) throws IOException, VulkanCodeException{
-		List<DrawUtils.Range> actualRanges;
-		if(force) actualRanges = ranges;
-		else actualRanges = DrawUtils.Range.filterRanges(ranges, ctx::isNotFilled);
-		
-		drawByteRangesForced(ctx, actualRanges, color, withChar);
-	}
-	
-	private void drawByteRangesForced(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar) throws IOException, VulkanCodeException{
-		GridUtils.ByteGridSize gridSize = ctx.gridSize;
-		
-		var col        = ColorUtils.mul(color, 0.8F);
-		var background = ColorUtils.mul(col, 0.6F);
-		
-		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, ctx.getDataSize());
-		
-		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
-		
-		fillByteRange(
-			gridSize,
-			Iters.from(ranges).filter(r -> r.to()>=ctx.getDataSize()).map(r -> {
-				if(r.from()<ctx.getDataSize()) return new DrawUtils.Range(ctx.getDataSize(), r.to());
-				return r;
-			}),
-			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
-		);
-		
-		for(var range : clampedOverflow){
-			var from  = Math.toIntExact(range.from());
-			var to    = Math.toIntExact(range.to());
-			var sizeI = to - from;
-			var bytes = ctx.frameData.contents().read(range.from(), sizeI);
-			
-			multiRenderer.renderBytes(ctx.deviceGC, range.from(), bytes, List.of(new ByteGridRender.DrawRange(from, to, col)), java.util.List.of());
-		}
-		
-		if(withChar){
-			var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
-			
-			var fr       = multiRenderer.getFontRender();
-			var width    = gridSize.bytesPerRow();
-			var byteSize = gridSize.byteSize();
-			
-			List<StringDraw> chars = new ArrayList<>();
-			
-			var it = DrawUtils.Range.toInts(clampedOverflow).iterator();
-			
-			while(it.hasNext()){
-				var  i  = it.nextLong();
-				char ub = (char)getUint8(ctx, i);
-				
-				if(!fr.canDisplay(ub)){
-					continue;
-				}
-				
-				int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
-				float xF = byteSize*xi, yF = byteSize*yi;
-				
-				if(stringDrawIn(Character.toString(ub), new GridUtils.Rect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Some(var sd)){
-					chars.add(sd);
-				}
-			}
-			
-			multiRenderer.renderFont(chars);
-		}
-		for(var range : clampedOverflow){
-			ctx.fill(range);
-		}
-	}
-	
-	private void fillByteRange(GridUtils.ByteGridSize gridSize, IterablePP<Range> ranges, Color color){
-		var count = IterablePP.SizedPP.tryGet(ranges).orElse(4);
-		var mesh  = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
-		for(var range : ranges){
-			DrawUtilsVK.fillByteRange(gridSize, mesh, color, range);
-		}
-		multiRenderer.renderMesh(mesh);
-	}
-	private static int getUint8(RenderContext ctx, long i){
-		int ub;
-		var contents = ctx.frameData.contents();
-		try(var io = contents.ioAt(i)){
-			ub = io.readUnsignedInt1();
-		}catch(IOException e){
-			throw new UncheckedIOException(e);
-		}
-		return ub;
-	}
-	
-	record ReadField<T extends IOInstance<T>, V>(IOField<T, V> field, V value, long offset, long size){ }
-	
-	record ReadFields<T extends IOInstance<T>>(T value, List<ReadField<T, ?>> fields){ }
-	
-	private <T extends IOInstance<T>> ReadFields<T> getChunkFields(RenderContext ctx, StructPipe<T> pipe, long offset) throws IOException{
-		var dataProvider = ctx.dataProvider;
-		var ch           = Chunk.readChunk(dataProvider, ChunkPointer.of(offset));
-		var ioPool       = Chunk.PIPE.makeIOPool();
-		var pos          = offset;
-		
-		List<ReadField<Chunk, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
-		for(var field : Chunk.PIPE.getSpecificFields()){
-			var valueSize   = field.getSizeDescriptor().calcUnknown(ioPool, dataProvider, ch, WordSpace.BYTE);
-			var valueOffset = pos;
-			pos += valueSize;
-			Object value = field instanceof BitFieldMerger? null : field.get(ioPool, ch);
-			
-			//noinspection unchecked
-			fields.add(new ReadField<>((IOField<Chunk, ? super Object>)field, value, valueOffset, valueSize));
-		}
-		//noinspection unchecked
-		return (ReadFields<T>)new ReadFields<>(ch, fields);
-	}
-	private <T extends IOInstance<T>> ReadFields<T> readFields(RenderContext ctx, StructPipe<T> pipe, long offset) throws IOException{
-		if(pipe.getType().getType() == Chunk.class){
-			return getChunkFields(ctx, pipe, offset);
-		}
-		
-		var dataProvider = ctx.dataProvider;
-		
-		List<ReadField<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
-		
-		try(var src = dataProvider.getSource().ioAt(offset)){
-			var ioPool  = pipe.makeIOPool();
-			T   inst    = pipe.getType().make();
-			var lastPos = src.getPos();
-			for(var field : pipe.getSpecificFields()){
-				field.read(ioPool, dataProvider, src, inst, null);
-				if(field instanceof BitFieldMerger<?>){
-					lastPos = src.getPos();
-					continue;
-				}
-				var value       = field.get(ioPool, inst);
-				var valueOffset = lastPos;
-				var newPos      = src.getPos();
-				var valueSize   = newPos - lastPos;
-				lastPos = newPos;
-				
-				//noinspection unchecked
-				fields.add(new ReadField<>((IOField<T, ? super Object>)field, value, valueOffset, valueSize));
-			}
-			return new ReadFields<>(inst, fields);
-		}
-	}
-	
-	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx, StructPipe<T> pipe, long offset) throws VulkanCodeException, IOException{
-		
-		if(pipe.getType().needsBuilderObj()){
-			annotateStruct(ctx, pipe.getBuilderPipe(), offset);
-			return;
-		}
-		
-		var info = readFields(ctx, pipe, offset);
-		for(ReadField<T, ?> field : info.fields){
-			if(field.size == 0) continue;
-			//noinspection unchecked
-			annotateByteField(ctx, (IOField<T, ? super Object>)field.field, field.value, field.offset, field.size);
-		}
-		
-	}
-	
-	private <T extends IOInstance<T>, V> void annotateByteField(RenderContext ctx, IOField<T, V> field, V value, long valueOffset, long valueSize) throws VulkanCodeException, IOException{
-		var rand = new RawRandom(field.toString().hashCode());
-		var col  = new Color(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
-		drawByteRanges(ctx, List.of(new Range(valueOffset, valueOffset + valueSize)), col, false, true);
-		
-		var rect = ctx.gridSize.findBestRectScaled(valueOffset, valueOffset + valueSize);
-		if(stringDrawIn(field + " " + value, rect, col, ctx.gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
-			multiRenderer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
-		}
-	}
-	
-	private Match<Chunk> findHoverChunk(IOInterface data, long hoverPos){
-		try{
-			var prov = DataProvider.newVerySimpleProvider(data);
-			for(Chunk chunk : new PhysicalChunkWalker(prov.getFirstChunk())){
-				if(chunk.rangeIntersects(hoverPos)){
-					return Match.of(chunk);
-				}
-			}
-		}catch(IOException ignore){ }
-		return Match.empty();
-	}
-	
-	private void renderNoData(Extent2D viewSize){
-		var str = "No data!";
-		
+	private void renderFullScreenMessage(Extent2D viewSize, String str){
 		int w         = viewSize.width, h = viewSize.height;
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
-		if(stringDrawIn(str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false) instanceof Some(var draw)){
+		if(GridUtils.stringDrawIn(
+			multiRenderer.getFontRender(), str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false
+		) instanceof Some(var draw)){
 			multiRenderer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
-	}
-	
-	private Match<StringDraw> stringDrawIn(StringDraw draw, GridUtils.Rect area, boolean alignLeft){
-		return stringDrawIn(draw.string(), area, draw.color(), draw.pixelHeight(), alignLeft);
-	}
-	private Match<StringDraw> stringDrawIn(String s, GridUtils.Rect area, Color color, float fontScale, boolean alignLeft){
-		return GridUtils.stringDrawIn(multiRenderer.getFontRender(), s, area, color, fontScale, alignLeft);
 	}
 	
 	private static long getFrameSize(SessionSetView.FrameData frameData){

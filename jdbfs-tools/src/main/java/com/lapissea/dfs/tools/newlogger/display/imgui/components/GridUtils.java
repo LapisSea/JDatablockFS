@@ -6,8 +6,8 @@ import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
-import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
+import com.lapissea.dfs.tools.newlogger.display.renderers.grid.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 
 public final class GridUtils{
+	
 	
 	public record ByteGridSize(int bytesPerRow, float byteSize, Extent2D windowSize){
 		public ByteGridSize{
@@ -67,11 +68,14 @@ public final class GridUtils{
 			return new ByteGridSize(bytesPerRow, byteSize, windowSize);
 		}
 		
-		public Rect findBestRectScaled(long from, long to){
-			return findBestRect(from, to).scale(byteSize);
+		public Rect findBestRectScaled(DrawUtils.Range range){
+			return findBestRect(range).scale(byteSize);
 		}
 		
-		public Rect findBestRect(long from, long to){
+		public Rect findBestRect(DrawUtils.Range range){
+			var from = range.from();
+			var to   = range.to();
+			
 			var fromRow = from/bytesPerRow;
 			var toRow   = to/bytesPerRow;
 			if(fromRow == toRow){
@@ -115,7 +119,7 @@ public final class GridUtils{
 		}
 	}
 	
-	static List<Geometry.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
+	public static List<Geometry.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
 		record Line(Vector2f a, Vector2f b){
 			Line(float xa, float ya, float xb, float yb){
 				this(new Vector2f(xa, ya), new Vector2f(xb, yb));
@@ -244,7 +248,7 @@ public final class GridUtils{
 		return new Geometry.IndexedMesh(res, index);
 	}
 	
-	static Match<StringDraw> stringDrawIn(MsdfFontRender fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){
+	public static Match<StringDraw> stringDrawIn(PrimitiveBuffer.FontRednerer fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){
 		if(s.isEmpty()) return Match.empty();
 		
 		noneCanRender:

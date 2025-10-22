@@ -124,7 +124,7 @@ public class MultiRendererBuffer implements VulkanResource{
 		fontRes.reset();
 	}
 	
-	public void submit(DeviceGC deviceGC, GridUtils.ByteGridSize gridSize, CommandBuffer cmdBuffer) throws VulkanCodeException{
+	public void submit(DeviceGC deviceGC, GridUtils.ByteGridSize gridSize, Extent2D viewSizeSc, CommandBuffer cmdBuffer) throws VulkanCodeException{
 		var viewSize = gridSize.windowSize();
 
 //		LogUtil.println(Iters.concat1N("=========== FRAME TOKENS ===========", Iters.from(sets).map(Object::toString)).joinAsStr("\n"));
@@ -133,20 +133,20 @@ public class MultiRendererBuffer implements VulkanResource{
 			switch(set){
 				case TokenSet.Lines(var paths) -> {
 					var token = lineRenderer.record(deviceGC, indexedRes, paths);
-					lineRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
+					lineRenderer.submit(viewSizeSc, cmdBuffer, viewMatrix(viewSize), List.of(token));
 				}
 				case TokenSet.Strings(var strings) -> {
 					var token = fontRender.record(deviceGC, fontRes, strings);
-					fontRender.submit(viewSize, cmdBuffer, List.of(token));
+					fontRender.submit(viewSizeSc, cmdBuffer, List.of(token));
 				}
 				case TokenSet.ByteEvents(var tokens) -> {
-					byteGridRender.submit(viewSize, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), tokens);
+					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), tokens);
 				}
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
 						var token = indexedRenderer.record(deviceGC, indexedRes, mesh);
 						if(token == null) continue;
-						indexedRenderer.submit(viewSize, cmdBuffer, viewMatrix(viewSize), List.of(token));
+						indexedRenderer.submit(viewSizeSc, cmdBuffer, viewMatrix(viewSize), List.of(token));
 					}
 				}
 			}
