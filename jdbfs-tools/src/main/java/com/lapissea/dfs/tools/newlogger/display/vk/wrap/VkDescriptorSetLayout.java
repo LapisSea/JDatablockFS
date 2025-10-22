@@ -36,7 +36,9 @@ public class VkDescriptorSetLayout extends VulkanResource.DeviceHandleObj{
 			                                               .descriptorPool(pool.handle)
 			                                               .pSetLayouts(layouts);
 			synchronized(pool){
-				return VKCalls.vkAllocateDescriptorSets(device, pAllocateInfo);
+				var res = VKCalls.vkAllocateDescriptorSets(device, pool, pAllocateInfo);
+				pool.count.addAndGet(count);
+				return res;
 			}
 		}
 	}

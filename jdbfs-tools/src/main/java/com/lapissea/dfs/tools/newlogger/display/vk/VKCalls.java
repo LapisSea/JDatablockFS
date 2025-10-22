@@ -252,11 +252,13 @@ public interface VKCalls{
 		check(VK10.vkCreateDescriptorPool(device.value, pCreateInfo, null, res), "vkCreateDescriptorPool");
 		return new VkDescriptorPool(device, res[0]);
 	}
-	static List<VkDescriptorSet> vkAllocateDescriptorSets(Device device, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
+	static List<VkDescriptorSet> vkAllocateDescriptorSets(Device device, VkDescriptorPool pool, VkDescriptorSetAllocateInfo pAllocateInfo) throws VulkanCodeException{
+		if(pAllocateInfo.descriptorPool() != pool.handle){
+			throw new IllegalArgumentException();
+		}
 		long[] arr = new long[pAllocateInfo.descriptorSetCount()];
 		check(VK10.vkAllocateDescriptorSets(device.value, pAllocateInfo, arr), "vkAllocateDescriptorSets");
-		var res  = new VkDescriptorSet[arr.length];
-		var pool = new VkDescriptorPool(device, pAllocateInfo.descriptorPool());
+		var res = new VkDescriptorSet[arr.length];
 		for(int i = 0; i<arr.length; i++){
 			res[i] = new VkDescriptorSet(device, arr[i], pool);
 		}

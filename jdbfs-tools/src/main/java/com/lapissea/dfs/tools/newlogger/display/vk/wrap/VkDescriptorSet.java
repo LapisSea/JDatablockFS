@@ -76,6 +76,9 @@ public class VkDescriptorSet extends VulkanResource.DeviceHandleObj{
 	
 	@Override
 	public void destroy() throws VulkanCodeException{
-		VKCalls.vkFreeDescriptorSets(device, pool, this);
+		synchronized(pool){
+			VKCalls.vkFreeDescriptorSets(device, pool, this);
+			pool.count.decrementAndGet();
+		}
 	}
 }

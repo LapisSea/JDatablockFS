@@ -10,10 +10,14 @@ import org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class VkDescriptorPool extends VulkanResource.DeviceHandleObj{
+	public final AtomicInteger count = new AtomicInteger();
 	
-	public VkDescriptorPool(Device device, long handle){ super(device, handle); }
+	public VkDescriptorPool(Device device, long handle){
+		super(device, handle);
+	}
 	
 	public VkDescriptorSetLayout createDescriptorSetLayout(Descriptor.LayoutBinding... bindings) throws VulkanCodeException{
 		return createDescriptorSetLayout(Arrays.asList(bindings));
