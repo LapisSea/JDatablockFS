@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers.grid;
 
 import com.lapissea.dfs.MagicID;
+import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -60,15 +61,54 @@ public class GridScene{
 		filled = new BitSet(Math.toIntExact(dataSize));
 	}
 	
+	private class FaultTolerantChunkWalker{
+		
+		long pointer    = MagicID.size();
+		long errorStart = -1, errorEnd = -1;
+		IOException error;
+		
+		private void run() throws IOException{
+			while(pointer<=dataSize){
+				try{
+					var chunk = dataProvider.getChunk(ChunkPointer.of(pointer));
+					flushError();
+					
+					annotateStruct(Chunk.PIPE, chunk.getPtr().getValue());
+					
+					var chRange = new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd());
+					messages.add("Hovered chunk: " + chunk, chRange, new RangeMessageSpace.HoverEffect.Outline(Color.CYAN.darker(), 2));
+					
+					if(chunk.checkLastPhysical()){
+						break;
+					}
+					pointer = chunk.dataEnd();
+				}catch(IOException e){
+					if(error == null){
+						error = e;
+						errorStart = errorEnd = pointer;
+					}
+					if(errorEnd + 1 == pointer) errorEnd++;
+					pointer++;
+				}
+			}
+			flushError();
+		}
+		
+		private void flushError() throws IOException{
+			if(errorStart == -1) return;
+			var range = new DrawUtils.Range(errorStart, errorEnd);
+			drawByteRangesForced(List.of(range), Color.RED.darker(), true);
+			messages.add(Utils.errToStackTrace(error), range, new RangeMessageSpace.HoverEffect.Outline(Color.ORANGE, 3));
+			errorStart = errorEnd = -1;
+			error = null;
+		}
+		
+	}
+	
 	public void build() throws IOException{
 		startDataProvider();
 		
-		for(Chunk chunk : dataProvider.getFirstChunk().chunksAhead()){
-			annotateStruct(Chunk.PIPE, chunk.getPtr().getValue());
-			
-			var chRange = new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd());
-			messages.add("Hovered chunk: " + chunk, chRange, new RangeMessageSpace.HoverEffect.Outline(Color.CYAN.darker(), 2));
-		}
+		new FaultTolerantChunkWalker().run();
 		
 		if(dataProvider instanceof Cluster cluster){
 			
@@ -220,10 +260,9 @@ public class GridScene{
 		
 		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, dataSize);
 		
-		fillByteRange(gridSize, Iters.from(clampedOverflow), background);
+		fillByteRange(Iters.from(clampedOverflow), background);
 		
 		fillByteRange(
-			gridSize,
 			Iters.from(ranges).filter(r -> r.to()>=dataSize).map(r -> {
 				if(r.from()<dataSize) return new DrawUtils.Range(dataSize, r.to());
 				return r;
@@ -276,7 +315,7 @@ public class GridScene{
 		}
 	}
 	
-	private void fillByteRange(GridUtils.ByteGridSize gridSize, IterablePP<DrawUtils.Range> ranges, Color color){
+	private void fillByteRange(IterablePP<DrawUtils.Range> ranges, Color color){
 		var count = IterablePP.SizedPP.tryGet(ranges).orElse(4);
 		var mesh  = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
 		for(var range : ranges){
