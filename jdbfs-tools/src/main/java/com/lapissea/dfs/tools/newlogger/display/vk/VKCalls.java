@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
+import com.lapissea.dfs.tools.newlogger.NativeThreadInfo;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.tools.newlogger.display.vk.enums.VkShaderStageFlag;
@@ -76,6 +77,12 @@ import java.util.List;
 
 public interface VKCalls{
 	
+	private static void fetchCurrentThreadInfo(){
+		if(VulkanCore.VK_DEBUG){
+			NativeThreadInfo.fetchCurrentThreadInfo();
+		}
+	}
+	
 	static void check(int errorCode, String action) throws VulkanCodeException{
 		if(errorCode == VK10.VK_SUCCESS){
 			return;
@@ -91,12 +98,15 @@ public interface VKCalls{
 		return index[0];
 	}
 	static void vkQueueSubmit(VkQueue queue, VkSubmitInfo info, VkFence fence) throws VulkanCodeException{
+		fetchCurrentThreadInfo();
 		check(VK10.vkQueueSubmit(queue, info, fence == null? 0 : fence.handle), "vkQueueSubmit");
 	}
 	static void vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR info) throws VulkanCodeException{
+		fetchCurrentThreadInfo();
 		check(KHRSwapchain.vkQueuePresentKHR(queue, info), "vkQueuePresentKHR");
 	}
 	static void vkQueueWaitIdle(VkQueue queue) throws VulkanCodeException{
+		fetchCurrentThreadInfo();
 		check(VK10.vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 	}
 	static VkInstance vkCreateInstance(MemoryStack stack, VkInstanceCreateInfo info) throws VulkanCodeException{
@@ -292,6 +302,7 @@ public interface VKCalls{
 		check(VK10.vkFreeDescriptorSets(device.value, pool.handle, set.handle), "vkFreeDescriptorSets");
 	}
 	static VkQueue vkGetDeviceQueue(VkDevice value, QueueFamilyProps queueFamily, int queueIndex){
+		fetchCurrentThreadInfo();
 		try(var stack = MemoryStack.stackPush()){
 			var ptrRef = stack.mallocPointer(1);
 			VK10.vkGetDeviceQueue(value, queueFamily.index, queueIndex, ptrRef);

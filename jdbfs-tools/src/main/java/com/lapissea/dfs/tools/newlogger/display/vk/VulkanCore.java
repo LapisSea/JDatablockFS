@@ -1,6 +1,7 @@
 package com.lapissea.dfs.tools.newlogger.display.vk;
 
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.tools.newlogger.NativeThreadInfo;
 import com.lapissea.dfs.tools.newlogger.display.ShaderCompiler;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
@@ -75,6 +76,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static org.lwjgl.glfw.GLFWVulkan.glfwGetRequiredInstanceExtensions;
 import static org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
@@ -355,19 +357,16 @@ public class VulkanCore implements AutoCloseable{
 		if(msgFinal.contains("\n")){
 			msgFinal = "\n" + msgFinal;
 		}
+		
+		if(messageIDName.equals("UNASSIGNED-Threading-MultipleThreads-Write")){
+			msgFinal = getThreadNames(msgFinal);
+		}
+		
 		msgFinal = Log.fmt("[{#purpleVK-Callback#}] [{}#cyan, {}] [{}#blue]: {}", type, severityS, messageIDName, msgFinal);
 		
 		if(severity == DebugLoggerEXT.Severity.ERROR){
 			var err = new RuntimeException(msgFinal);
-			err.setStackTrace(
-				Iters.concat1N(
-					err.getStackTrace()[0],
-					Iters.from(err.getStackTrace())
-					     .dropWhile(e -> !e.isNativeMethod())
-					     .skip(1)
-					     .dropWhile(e -> e.getMethodName().startsWith("nvk") && e.getClassName().startsWith(VK10.class.getPackageName()))
-				).toArray(StackTraceElement[]::new)
-			);
+			simplifyStacktrace(err);
 			switch(messageIDName){
 				case "VUID-vkDestroyDevice-device-05137",
 				     "VUID-vkCmdBindPipeline-commandBuffer-recording",
@@ -383,6 +382,32 @@ public class VulkanCore implements AutoCloseable{
 			Log.log(msgFinal);
 		}
 		return false;
+	}
+	
+	private String getThreadNames(String input){
+		var p  = Pattern.compile("thread (\\d+)");
+		var m  = p.matcher(input);
+		var sb = new StringBuilder();
+		
+		while(m.find()){
+			long   threadId = Long.parseLong(m.group(1));
+			String name     = NativeThreadInfo.getThreadById(threadId).map(t -> t.getName() + " (" + threadId + ")").orElse(threadId + " (unknown thread name)");
+			m.appendReplacement(sb, name);
+		}
+		m.appendTail(sb);
+		return sb.toString();
+	}
+	
+	private static void simplifyStacktrace(RuntimeException err){
+		err.setStackTrace(
+			Iters.concat1N(
+				err.getStackTrace()[0],
+				Iters.from(err.getStackTrace())
+				     .dropWhile(e -> !e.isNativeMethod())
+				     .skip(1)
+				     .dropWhile(e -> e.getMethodName().startsWith("nvk") && e.getClassName().startsWith(VK10.class.getPackageName()))
+			).toArray(StackTraceElement[]::new)
+		);
 	}
 	
 	private VkInstance createInstance() throws VulkanCodeException{

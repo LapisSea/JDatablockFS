@@ -17,6 +17,7 @@ module JDatablockFS.tools {
 	requires org.lwjgl.shaderc;
 	requires org.lwjgl.stb;
 	requires com.carrotsearch.hppc;
+	requires com.sun.jna;
 	
 	exports com.lapissea.dfs.tools;
 	exports com.lapissea.dfs.tools.logging;
