@@ -18,6 +18,7 @@ import com.lapissea.dfs.tools.newlogger.display.imgui.components.GridUtils;
 import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
+import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;

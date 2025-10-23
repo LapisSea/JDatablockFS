@@ -9,8 +9,8 @@ import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.GridScene;
-import com.lapissea.dfs.tools.newlogger.display.renderers.grid.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.RangeMessageSpace;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
@@ -89,14 +89,14 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.reset();
 		GridUtils.ByteGridSize size;
 		try{
-			size = recordBackbuffer(deviceGC, viewSize);
+			size = recordBackbuffer(viewSize);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
 		multiRenderer.submit(deviceGC, size, viewSize, cmdBuffer);
 	}
 	
-	protected GridUtils.ByteGridSize recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
+	protected GridUtils.ByteGridSize recordBackbuffer(Extent2D viewSize) throws VulkanCodeException, IOException{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
@@ -163,27 +163,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
-		
-		for(PrimitiveBuffer.SimpleBuffer.TokenSet token : ((PrimitiveBuffer.SimpleBuffer)scene.buffer).tokens){
-			switch(token){
-				case PrimitiveBuffer.SimpleBuffer.TokenSet.ByteEvents(var tokens) -> {
-					for(PrimitiveBuffer.SimpleBuffer.ByteToken t : tokens){
-						multiRenderer.renderBytes(deviceGC, t.dataOffset(), t.data(), t.ranges(), t.ioEvents());
-					}
-				}
-				case PrimitiveBuffer.SimpleBuffer.TokenSet.Lines(var lines) -> {
-					multiRenderer.renderLines(lines);
-				}
-				case PrimitiveBuffer.SimpleBuffer.TokenSet.Meshes(var meshes) -> {
-					for(Geometry.IndexedMesh mesh : meshes){
-						multiRenderer.renderMesh(mesh);
-					}
-				}
-				case PrimitiveBuffer.SimpleBuffer.TokenSet.Strings(var strings) -> {
-					multiRenderer.renderFont(strings);
-				}
-			}
-		}
+		multiRenderer.add(((PrimitiveBuffer.SimpleBuffer)scene.buffer).tokens);
 		
 		if(GridUtils.calcByteIndex(gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			for(var message : scene.messages.collect(p)){

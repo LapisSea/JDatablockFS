@@ -7,7 +7,7 @@ import com.lapissea.dfs.tools.newlogger.display.VUtils;
 import com.lapissea.dfs.tools.newlogger.display.VertexBuilder;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender.StringDraw;
-import com.lapissea.dfs.tools.newlogger.display.renderers.grid.PrimitiveBuffer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;

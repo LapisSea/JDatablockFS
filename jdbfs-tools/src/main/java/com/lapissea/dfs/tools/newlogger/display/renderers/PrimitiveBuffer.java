@@ -1,9 +1,6 @@
-package com.lapissea.dfs.tools.newlogger.display.renderers.grid;
+package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.DrawFont;
-import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
-import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
-import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,39 +14,55 @@ public interface PrimitiveBuffer{
 		DrawFont.Bounds getStringBounds(String string, float fontScale);
 	}
 	
-	final class SimpleBuffer implements PrimitiveBuffer{
-		
-		public record ByteToken(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){ }
-		
-		public sealed interface TokenSet{
-			record Lines(List<Geometry.Path> paths) implements TokenSet{
-				@Override
-				public String toString(){
-					return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
-				}
+	record ByteToken(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){ }
+	
+	sealed interface TokenSet{
+		record Lines(List<Geometry.Path> paths) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
 			}
-			
-			record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{
-				@Override
-				public String toString(){
-					return "Meshes{meshes = " + meshes.size() + ", verts = " + meshes.stream().mapToInt(e -> e.verts().size()).sum() + '}';
-				}
-			}
-			
-			record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{
-				@Override
-				public String toString(){
-					return "Strings{strings = " + strings.size() + ", chars = " + strings.stream().mapToInt(e -> e.string().length()).sum() + '}';
-				}
-			}
-			
-			record ByteEvents(List<ByteToken> tokens) implements TokenSet{
-				@Override
-				public String toString(){
-					return "ByteEvents{tokens = " + tokens.size() + '}';
-				}
+			public void add(Geometry.Path path){
+				paths.add(path);
 			}
 		}
+		
+		record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Meshes{meshes = " + meshes.size() + ", verts = " + meshes.stream().mapToInt(e -> e.verts().size()).sum() + '}';
+			}
+			public void add(Geometry.IndexedMesh mesh){
+				meshes.add(mesh);
+			}
+		}
+		
+		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{
+			@Override
+			public String toString(){
+				return "Strings{strings = " + strings.size() + ", chars = " + strings.stream().mapToInt(e -> e.string().length()).sum() + '}';
+			}
+			public void add(MsdfFontRender.StringDraw string){
+				strings.add(string);
+			}
+		}
+		
+		record ByteEvents(List<ByteToken> tokens) implements TokenSet{
+			@Override
+			public String toString(){
+				return "ByteEvents{tokens = " + tokens.size() + '}';
+			}
+			public void add(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){
+				tokens.add(new ByteToken(dataOffset, data, ranges, ioEvents));
+			}
+			public void add(ByteToken token){
+				tokens.add(token);
+			}
+		}
+	}
+	
+	final class SimpleBuffer implements PrimitiveBuffer{
+		
 		
 		public final  List<TokenSet> tokens = new ArrayList<>();
 		private final FontRednerer   fontRednerer;

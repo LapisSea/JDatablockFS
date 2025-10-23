@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.imgui.components.GridUtils;
+import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer.TokenSet;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
@@ -16,37 +17,6 @@ import java.util.Collection;
 import java.util.List;
 
 public class MultiRendererBuffer implements VulkanResource{
-	
-	private sealed interface TokenSet{
-		record Lines(List<Geometry.Path> paths) implements TokenSet{
-			@Override
-			public String toString(){
-				return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
-			}
-		}
-		
-		record Meshes(List<Geometry.IndexedMesh> meshes) implements TokenSet{
-			@Override
-			public String toString(){
-				return "Meshes{meshes = " + meshes.size() + ", verts = " + meshes.stream().mapToInt(e -> e.verts().size()).sum() + '}';
-			}
-		}
-		
-		record Strings(List<MsdfFontRender.StringDraw> strings) implements TokenSet{
-			@Override
-			public String toString(){
-				return "Strings{strings = " + strings.size() + ", chars = " + strings.stream().mapToInt(e -> e.string().length()).sum() + '}';
-			}
-		}
-		
-		record ByteEvents(List<ByteGridRender.RenderToken> tokens) implements TokenSet{
-			@Override
-			public String toString(){
-				return "ByteEvents{tokens = " + tokens.size() + '}';
-			}
-		}
-	}
-	
 	
 	private final MsdfFontRender      fontRender;
 	private final ByteGridRender      byteGridRender;
@@ -92,11 +62,11 @@ public class MultiRendererBuffer implements VulkanResource{
 	
 	public void renderMesh(Geometry.IndexedMesh mesh){
 		if(mesh.verts().size() == 0) return;
-		getTokenSet(TokenSet.Meshes.class).meshes.add(mesh);
+		getTokenSet(TokenSet.Meshes.class).add(mesh);
 	}
 	
 	public void renderLines(Iterable<? extends Geometry.Path> paths){
-		var p = getTokenSet(TokenSet.Lines.class).paths;
+		var p = getTokenSet(TokenSet.Lines.class).paths();
 		if(paths instanceof Collection<? extends Geometry.Path> collection){
 			p.addAll(collection);
 		}else{
@@ -109,12 +79,14 @@ public class MultiRendererBuffer implements VulkanResource{
 	public void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }
 	public void renderFont(List<MsdfFontRender.StringDraw> strings){
 		if(strings.isEmpty()) return;
-		getTokenSet(TokenSet.Strings.class).strings.addAll(strings);
+		getTokenSet(TokenSet.Strings.class).strings().addAll(strings);
 	}
 	
-	public void renderBytes(DeviceGC deviceGC, long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
-		var token = byteGridRender.record(deviceGC, gridRes, dataOffset, data, ranges, ioEvents);
-		getTokenSet(TokenSet.ByteEvents.class).tokens.add(token);
+	public void renderBytes(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
+		getTokenSet(TokenSet.ByteEvents.class).add(dataOffset, data, ranges, ioEvents);
+	}
+	public void add(List<TokenSet> tokens) throws VulkanCodeException{
+		sets.addAll(tokens);
 	}
 	
 	public void reset(){
@@ -140,7 +112,12 @@ public class MultiRendererBuffer implements VulkanResource{
 					fontRender.submit(viewSizeSc, cmdBuffer, List.of(token));
 				}
 				case TokenSet.ByteEvents(var tokens) -> {
-					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), tokens);
+					var gTokens = new ArrayList<ByteGridRender.RenderToken>(tokens.size());
+					for(PrimitiveBuffer.ByteToken t : tokens){
+						var token = byteGridRender.record(deviceGC, gridRes, t.dataOffset(), t.data(), t.ranges(), t.ioEvents());
+						gTokens.add(token);
+					}
+					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), gTokens);
 				}
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
