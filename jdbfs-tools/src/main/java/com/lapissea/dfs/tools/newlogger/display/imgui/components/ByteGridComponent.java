@@ -7,9 +7,9 @@ import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.TextureRegistry;
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
+import com.lapissea.dfs.tools.newlogger.display.renderers.MergingPrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
-import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.GridScene;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.RangeMessageSpace;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -96,6 +96,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.submit(deviceGC, size, viewSize, cmdBuffer);
 	}
 	
+	private ImBoolean merge = new ImBoolean(), showBoundingBoxes = new ImBoolean();
+	
 	protected GridUtils.ByteGridSize recordBackbuffer(Extent2D viewSize) throws VulkanCodeException, IOException{
 		
 		{
@@ -123,18 +125,31 @@ public class ByteGridComponent extends BackbufferComponent{
 		var gridSize = GridUtils.ByteGridSize.compute(viewSize, byteCount, lastGridSize);
 		lastGridSize = Match.of(gridSize);
 		
+		ImGui.begin("toggletest");
+		
+		ImGui.checkbox("Show bounding boxes", showBoundingBoxes);
+		if(ImGui.checkbox("toggle", merge)){
+			oldScene = scene != null? scene.join() : null;
+			scene = null;
+		}
+		
+		ImGui.end();
+		
 		if(scene == null){
 			var fd = frameData;
 			scene = CompletableFuture.supplyAsync(() -> {
 				if(fd != frameData){
 					return null;
 				}
-				var scene = new GridScene(new PrimitiveBuffer.SimpleBuffer(multiRenderer.getFontRender()), frameData, gridSize);
+				var buff  = new MergingPrimitiveBuffer(multiRenderer.getFontRender(), gridSize, merge.get());
+				var scene = new GridScene(buff, frameData, gridSize);
 				try{
 					scene.build();
 				}catch(IOException e){
 					throw new RuntimeException("Failed to build scene", e);
 				}
+//				LogUtil.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+//				LogUtil.println(buff.data());
 				return scene;
 			}, SCENE_BUILD_POOL);
 			scene.thenRun(() -> oldScene = null);
@@ -163,7 +178,10 @@ public class ByteGridComponent extends BackbufferComponent{
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
-		multiRenderer.add(((PrimitiveBuffer.SimpleBuffer)scene.buffer).tokens);
+		multiRenderer.add(((MergingPrimitiveBuffer)scene.buffer).tokens());
+		if(showBoundingBoxes.get()){
+			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths());
+		}
 		
 		if(GridUtils.calcByteIndex(gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			for(var message : scene.messages.collect(p)){

@@ -218,7 +218,7 @@ public class VulkanCore implements AutoCloseable{
 		this.transientGraphicsBuffs = transientGraphicsBuffs;
 		
 		
-		globalDescriptorPool = device.createDescriptorPool(50, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
+		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
 		defaultSampler = device.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		

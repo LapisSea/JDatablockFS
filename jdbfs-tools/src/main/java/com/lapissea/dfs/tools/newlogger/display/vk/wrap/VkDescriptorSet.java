@@ -2,6 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.vk.wrap;
 
 import com.lapissea.dfs.tools.newlogger.display.VulkanCodeException;
 import com.lapissea.dfs.tools.newlogger.display.vk.VKCalls;
+import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
@@ -74,11 +75,22 @@ public class VkDescriptorSet extends VulkanResource.DeviceHandleObj{
 		
 	}
 	
+	private Throwable destroyed;
 	@Override
 	public void destroy() throws VulkanCodeException{
 		synchronized(pool){
+			if(VulkanCore.VK_DEBUG) checkDestroyed();
+			
 			VKCalls.vkFreeDescriptorSets(device, pool, this);
 			pool.count.decrementAndGet();
 		}
+	}
+	private void checkDestroyed(){
+		if(destroyed != null){
+			var e = new RuntimeException("Already destroyed");
+			e.addSuppressed(destroyed);
+			throw e;
+		}
+		destroyed = new Throwable("destroyed on");
 	}
 }

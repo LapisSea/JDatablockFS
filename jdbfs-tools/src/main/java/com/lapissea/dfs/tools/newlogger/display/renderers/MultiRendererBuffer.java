@@ -85,8 +85,14 @@ public class MultiRendererBuffer implements VulkanResource{
 	public void renderBytes(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
 		getTokenSet(TokenSet.ByteEvents.class).add(dataOffset, data, ranges, ioEvents);
 	}
-	public void add(List<TokenSet> tokens) throws VulkanCodeException{
-		sets.addAll(tokens);
+	public void add(Iterable<TokenSet> tokens) throws VulkanCodeException{
+		if(tokens instanceof Collection<TokenSet> coll){
+			sets.addAll(coll);
+		}else{
+			for(TokenSet token : tokens){
+				sets.add(token);
+			}
+		}
 	}
 	
 	public void reset(){

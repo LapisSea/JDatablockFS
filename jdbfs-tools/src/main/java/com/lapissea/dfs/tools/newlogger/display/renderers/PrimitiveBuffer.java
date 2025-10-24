@@ -2,9 +2,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 
 import com.lapissea.dfs.tools.DrawFont;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 public interface PrimitiveBuffer{
@@ -58,71 +56,6 @@ public interface PrimitiveBuffer{
 			public void add(ByteToken token){
 				tokens.add(token);
 			}
-		}
-	}
-	
-	final class SimpleBuffer implements PrimitiveBuffer{
-		
-		
-		public final  List<TokenSet> tokens = new ArrayList<>();
-		private final FontRednerer   fontRednerer;
-		
-		public SimpleBuffer(FontRednerer fontRednerer){
-			this.fontRednerer = fontRednerer;
-		}
-		
-		private <T extends TokenSet> T getTokenSet(Class<T> type){
-			if(tokens.isEmpty()){
-				var tokenSet = newTokenSet(type);
-				tokens.add(tokenSet);
-				return tokenSet;
-			}
-			var last = tokens.getLast();
-			if(!type.isInstance(last)){
-				var tokenSet = newTokenSet(type);
-				tokens.add(tokenSet);
-				return tokenSet;
-			}
-			//noinspection unchecked
-			return (T)last;
-		}
-		
-		private <T extends TokenSet> T newTokenSet(Class<T> type){
-			try{
-				return type.getConstructor(List.class).newInstance(new ArrayList<>());
-			}catch(ReflectiveOperationException e){
-				throw new RuntimeException("Failed to instantiate TokenSet", e);
-			}
-		}
-		
-		@Override
-		public FontRednerer getFontRender(){
-			return fontRednerer;
-		}
-		
-		@Override
-		public void renderMeshes(List<Geometry.IndexedMesh> mesh){
-			getTokenSet(TokenSet.Meshes.class).meshes.addAll(mesh);
-		}
-		@Override
-		public void renderLines(Iterable<? extends Geometry.Path> paths){
-			var p = getTokenSet(TokenSet.Lines.class).paths;
-			if(paths instanceof Collection<? extends Geometry.Path> collection){
-				p.addAll(collection);
-			}else{
-				for(var path : paths){
-					p.add(path);
-				}
-			}
-		}
-		@Override
-		public void renderFont(List<MsdfFontRender.StringDraw> strings){
-			if(strings.isEmpty()) return;
-			getTokenSet(TokenSet.Strings.class).strings.addAll(strings);
-		}
-		@Override
-		public void renderBytes(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){
-			getTokenSet(TokenSet.ByteEvents.class).tokens.add(new ByteToken(dataOffset, data, ranges, ioEvents));
 		}
 	}
 	

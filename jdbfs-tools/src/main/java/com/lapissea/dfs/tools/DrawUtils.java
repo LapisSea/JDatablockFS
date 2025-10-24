@@ -9,6 +9,7 @@ import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
+import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -16,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.LongPredicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -63,7 +63,7 @@ public final class DrawUtils{
 				rangesBuild.add(r);
 			});
 			
-			return rangesBuild.stream().map(r -> new Range(r.start, r.end)).collect(Collectors.toList());
+			return Iters.from(rangesBuild).map(r -> new Range(r.start, r.end)).toList();
 		}
 		public static List<Range> fromInts(IterableIntPP indexes){
 			List<Builder> rangesBuild = new ArrayList<>();
@@ -185,12 +185,39 @@ public final class DrawUtils{
 	public static class Rect{
 		public float x, y, width, height;
 		
+		public static Rect ofFromTo(Vector2f from, Vector2f to){
+			return ofFromTo(from.x, from.y, to.x, to.y);
+		}
+		public static Rect ofFromTo(float xFrom, float yFrom, float xTo, float yTo){
+			return new Rect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
+		}
+		
 		public Rect(float x, float y, float width, float height){
 			this.x = x;
 			this.y = y;
 			this.width = width;
 			this.height = height;
 		}
+		public float xTo(){ return x + width; }
+		public float yTo(){ return y + height; }
+		
+		public Rect union(Rect other){
+			var minXFrom = Math.min(x, other.x);
+			var minYFrom = Math.min(y, other.y);
+			var maxXTo   = Math.max(xTo(), other.xTo());
+			var maxYTo   = Math.max(yTo(), other.yTo());
+			return ofFromTo(minXFrom, minYFrom, maxXTo, maxYTo);
+		}
+		
+		public boolean isWithin(Rect other){
+			return other.x<=x && xTo()<=other.xTo() &&
+			       other.y<=y && yTo()<=other.yTo();
+		}
+		public boolean overlaps(Rect other){
+			return x<other.xTo() && xTo()>other.x &&
+			       y<other.yTo() && yTo()>other.y;
+		}
+		
 	}
 	public static Rect makeBitRect(BinaryGridRenderer.RenderContext ctx, long trueOffset, int bitOffset, long siz){
 		var range    = findBestContiguousRange(3, new Range(bitOffset, bitOffset + siz));

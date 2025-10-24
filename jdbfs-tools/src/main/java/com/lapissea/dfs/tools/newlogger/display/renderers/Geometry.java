@@ -37,7 +37,7 @@ public final class Geometry{
 			var rad = width/2;
 			min.sub(width, rad);
 			max.add(width, rad);
-			return new DrawUtils.Rect(min.x, min.y, max.x - min.x, max.y - min.y);
+			return DrawUtils.Rect.ofFromTo(min, max);
 		}
 	}
 	
@@ -57,7 +57,21 @@ public final class Geometry{
 	
 	public record Vertex(Vector2f pos, Color color){ }
 	
-	public record IndexedMesh(VertexBuilder verts, IndexBuilder indices){ }
+	public record IndexedMesh(VertexBuilder verts, IndexBuilder indices){
+		public DrawUtils.Rect boundingBox(){
+			if(verts.size() == 0){
+				return new DrawUtils.Rect(0, 0, 0, 0);
+			}
+			var min = new Vector2f(verts.getPos(0));
+			var max = new Vector2f(verts.getPos(0));
+			for(int i = 0; i<verts.size(); i++){
+				var point = verts.getPos(i);
+				min.min(point);
+				max.max(point);
+			}
+			return DrawUtils.Rect.ofFromTo(min, max);
+		}
+	}
 	
 	public record MeshSize(int vertCount, int indexCount){ }
 	static MeshSize calculateMeshSize(PointsLine line){

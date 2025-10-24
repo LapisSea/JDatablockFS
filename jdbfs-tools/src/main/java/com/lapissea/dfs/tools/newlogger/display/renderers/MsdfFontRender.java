@@ -3,6 +3,7 @@ package com.lapissea.dfs.tools.newlogger.display.renderers;
 import com.carrotsearch.hppc.CharObjectHashMap;
 import com.carrotsearch.hppc.CharObjectMap;
 import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.newlogger.display.DeviceGC;
 import com.lapissea.dfs.tools.newlogger.display.ShaderType;
 import com.lapissea.dfs.tools.newlogger.display.VUtils;
@@ -256,6 +257,12 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		}
 		public StringDraw withOutline(Color color, float outline){
 			return new StringDraw(pixelHeight, color, string, x, y, xScale, outline);
+		}
+		public DrawUtils.Rect boundingBox(PrimitiveBuffer.FontRednerer fontRednerer){
+			var bounds = fontRednerer.getStringBounds(string, pixelHeight);
+			var w      = bounds.width()*xScale;
+			var h      = bounds.height();
+			return new DrawUtils.Rect(x, y - h, w, h);
 		}
 	}
 	

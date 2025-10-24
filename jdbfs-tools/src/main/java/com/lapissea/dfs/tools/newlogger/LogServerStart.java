@@ -20,7 +20,7 @@ public final class LogServerStart{
 	static{
 		//Eager init to reduce startup time
 		Thread.ofVirtual().start(VulkanCore::preload);
-//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD);
+//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	public static void main(String[] args) throws InterruptedException{
