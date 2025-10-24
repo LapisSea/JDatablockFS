@@ -440,29 +440,35 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		
 	}
 	
-	public RenderToken record(DeviceGC deviceGC, RenderResource resource, long dataOffset, byte[] data, Iterable<DrawRange> ranges, Iterable<IOEvent> ioEvents) throws VulkanCodeException{
+	public RenderToken record(DeviceGC deviceGC, RenderResource resource, List<PrimitiveBuffer.ByteToken> tokens) throws VulkanCodeException{
+		
 		GByte.Buf[]        byteBuffers = new GByte.Buf[257];
 		List<IndexedColor> toUpdate    = new ArrayList<>();
 		
-		for(DrawRange range : ranges){
-			var colorIndex = resource.colorToIndex(range.color, toUpdate);
-			for(char i = range.from; i<range.to; i++){
-				var dataI = (int)(i - dataOffset);
-				var b     = Byte.toUnsignedInt(data[dataI]);
-				if(b == 0) continue;
-				
-				var buf = byteBuffers[b];
-				if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
-				else if(!buf.hasRemaining()){
-					var nb = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*buf.capacity()*2));
-					nb.put(buf.flip());
-					buf.free();
-					buf = byteBuffers[b] = nb;
+		for(PrimitiveBuffer.ByteToken token : tokens){
+			long   dataOffset = token.dataOffset();
+			byte[] data       = token.data();
+			for(DrawRange range : token.ranges()){
+				var colorIndex = resource.colorToIndex(range.color, toUpdate);
+				for(char i = range.from; i<range.to; i++){
+					var dataI = (int)(i - dataOffset);
+					var b     = Byte.toUnsignedInt(data[dataI]);
+					if(b == 0) continue;
+					
+					var buf = byteBuffers[b];
+					if(buf == null) buf = byteBuffers[b] = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*8));
+					else if(!buf.hasRemaining()){
+						var nb = new GByte.Buf(MemoryUtil.memAlloc(GByte.SIZEOF*buf.capacity()*2));
+						nb.put(buf.flip());
+						buf.free();
+						buf = byteBuffers[b] = nb;
+					}
+					buf.put(i, data[dataI], colorIndex);
 				}
-				buf.put(i, data[dataI], colorIndex);
 			}
 		}
 		
+		var ioEvents = Iters.from(tokens).flatMap(PrimitiveBuffer.ByteToken::ioEvents).toModList();
 		if(ioEvents.iterator().hasNext()){
 			var allEvents = new RoaringBitmap();
 			int count     = 0;

@@ -118,12 +118,8 @@ public class MultiRendererBuffer implements VulkanResource{
 					fontRender.submit(viewSizeSc, cmdBuffer, List.of(token));
 				}
 				case TokenSet.ByteEvents(var tokens) -> {
-					var gTokens = new ArrayList<ByteGridRender.RenderToken>(tokens.size());
-					for(PrimitiveBuffer.ByteToken t : tokens){
-						var token = byteGridRender.record(deviceGC, gridRes, t.dataOffset(), t.data(), t.ranges(), t.ioEvents());
-						gTokens.add(token);
-					}
-					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), gTokens);
+					var token = byteGridRender.record(deviceGC, gridRes, tokens);
+					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), List.of(token));
 				}
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
