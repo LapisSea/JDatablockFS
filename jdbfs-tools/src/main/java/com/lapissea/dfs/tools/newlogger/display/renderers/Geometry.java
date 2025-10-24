@@ -71,6 +71,12 @@ public final class Geometry{
 			}
 			return DrawUtils.Rect.ofFromTo(min, max);
 		}
+		
+		public void add(IndexedMesh mesh){
+			var offset = verts.size();
+			verts.add(mesh.verts);
+			indices.addOffset(mesh.indices, offset);
+		}
 	}
 	
 	public record MeshSize(int vertCount, int indexCount){ }

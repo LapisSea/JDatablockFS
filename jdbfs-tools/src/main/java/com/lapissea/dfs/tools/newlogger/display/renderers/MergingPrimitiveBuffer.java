@@ -74,7 +74,15 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 		merge(
 			TokenSet.Meshes.class,
 			Iters.from(mesh).map(e -> new BoxPair<>(e, e.boundingBox())),
-			TokenSet.Meshes::add
+			(mTokens, m) -> {
+				var meshes = mTokens.meshes();
+				if(meshes.isEmpty() || !merge){
+					meshes.add(m);
+					return;
+				}
+				var lastM = meshes.getLast();
+				lastM.add(m);
+			}
 		);
 	}
 	

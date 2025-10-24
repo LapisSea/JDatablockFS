@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import org.joml.Vector2f;
 
 import java.awt.Color;
+import java.util.Arrays;
 
 public class VertexBuilder{
 	
@@ -39,6 +40,17 @@ public class VertexBuilder{
 		this.color[cursor] = color;
 		cursor++;
 	}
+	public void add(VertexBuilder nVerts){
+		var newSize = cursor + nVerts.size();
+		if(newSize>=this.color.length){
+			var growSize = Math.max(this.color.length*2, newSize);
+			xy = Arrays.copyOf(xy, growSize*2);
+			color = Arrays.copyOf(color, growSize);
+		}
+		System.arraycopy(nVerts.xy, 0, this.xy, cursor*2, nVerts.size()*2);
+		System.arraycopy(nVerts.color, 0, this.color, cursor, nVerts.size());
+		cursor = newSize;
+	}
 	
 	public Vector2f getPos(int index){
 		return new Vector2f(xy[index*2], xy[index*2 + 1]);
@@ -52,4 +64,5 @@ public class VertexBuilder{
 	public int[] getColor(){
 		return color;
 	}
+	
 }
