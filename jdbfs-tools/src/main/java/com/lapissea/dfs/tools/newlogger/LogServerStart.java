@@ -105,6 +105,7 @@ public final class LogServerStart{
 				}
 			}while(!ingestThread.join(Duration.ofMillis(10)));
 		}
+		System.exit(0);
 	}
 	
 	private void loadDummyData(){

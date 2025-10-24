@@ -399,7 +399,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 	private static char toCharExact(int value, String name){
 		if(value<0) throw new IllegalArgumentException(name + " can not be negative");
 		if(value>Character.MAX_VALUE)
-			throw new IllegalArgumentException(name + " can not be greater than unsigned 16 bit integer (" + Character.MAX_VALUE + ")");
+			throw new IllegalArgumentException(name + " can not be greater than unsigned 16 bit integer (" + (int)Character.MAX_VALUE + ")");
 		return (char)value;
 	}
 	

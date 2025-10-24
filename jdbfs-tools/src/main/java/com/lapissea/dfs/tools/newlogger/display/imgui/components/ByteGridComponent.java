@@ -152,7 +152,10 @@ public class ByteGridComponent extends BackbufferComponent{
 //				LogUtil.println(buff.data());
 				return scene;
 			}, SCENE_BUILD_POOL);
-			scene.thenRun(() -> oldScene = null);
+			scene.thenApply(e -> {
+				if(e != null) oldScene = null;
+				return e;
+			});
 		}
 		
 		if(!scene.isDone() && oldScene == null){
