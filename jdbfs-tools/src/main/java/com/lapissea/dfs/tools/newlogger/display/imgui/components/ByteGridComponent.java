@@ -34,6 +34,9 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private final MultiRendererBuffer multiRenderer;
 	
+	private final MultiRendererBuffer staticRenderer;
+	private       Object              shownSceneId;
+	
 	
 	private final List<String> messages;
 	
@@ -56,6 +59,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		clearColor.set(0.4, 0.4, 0.4, 1);
 		
 		multiRenderer = new MultiRendererBuffer(core);
+		staticRenderer = new MultiRendererBuffer(core);
 	}
 	
 	public void setDisplayData(SessionSetView.FrameData src) throws IOException{
@@ -89,16 +93,17 @@ public class ByteGridComponent extends BackbufferComponent{
 		multiRenderer.reset();
 		GridUtils.ByteGridSize size;
 		try{
-			size = recordBackbuffer(viewSize);
+			size = recordBackbuffer(deviceGC, viewSize);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
-		multiRenderer.submit(deviceGC, size, viewSize, cmdBuffer);
+		multiRenderer.upload(deviceGC);
+		multiRenderer.submit(size, viewSize, cmdBuffer);
 	}
 	
-	private ImBoolean merge = new ImBoolean(), showBoundingBoxes = new ImBoolean();
+	private final ImBoolean merge = new ImBoolean(true), showBoundingBoxes = new ImBoolean();
 	
-	protected GridUtils.ByteGridSize recordBackbuffer(Extent2D viewSize) throws VulkanCodeException, IOException{
+	protected GridUtils.ByteGridSize recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
@@ -159,6 +164,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 		
 		if(!scene.isDone() && oldScene == null){
+			shownSceneId = null;
+			staticRenderer.reset();
 			renderFullScreenMessage(viewSize, "Data building...");
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
@@ -177,11 +184,20 @@ public class ByteGridComponent extends BackbufferComponent{
 			scene = oldScene;
 			oldData = true;
 		}else{
+			shownSceneId = null;
+			staticRenderer.reset();
 			renderFullScreenMessage(viewSize, "Data building...");
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
-		multiRenderer.add(((MergingPrimitiveBuffer)scene.buffer).tokens());
+		if(shownSceneId != scene.id){
+			shownSceneId = scene.id;
+			staticRenderer.reset();
+			staticRenderer.add(((MergingPrimitiveBuffer)scene.buffer).tokens());
+			staticRenderer.upload(deviceGC);
+		}
+		multiRenderer.renderReady(staticRenderer);
+		
 		if(showBoundingBoxes.get()){
 			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths());
 		}
@@ -243,6 +259,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
 		super.unload(tScope);
 		multiRenderer.destroy();
+		staticRenderer.destroy();
 	}
 	
 	private void testCurve(){

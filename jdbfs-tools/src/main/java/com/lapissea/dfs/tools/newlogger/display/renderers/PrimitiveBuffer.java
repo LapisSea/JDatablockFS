@@ -15,6 +15,8 @@ public interface PrimitiveBuffer{
 	record ByteToken(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){ }
 	
 	sealed interface TokenSet{
+		record ReadyMulti(List<MultiRendererBuffer> readyBuffers) implements TokenSet{ }
+		
 		record Lines(List<Geometry.Path> paths) implements TokenSet{
 			@Override
 			public String toString(){

@@ -49,6 +49,8 @@ public class GridScene{
 	
 	private DataProvider dataProvider;
 	
+	public final Object id = new Object();
+	
 	public GridScene(PrimitiveBuffer buffer, SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize){
 		this.buffer = buffer;
 		this.frameData = frameData;

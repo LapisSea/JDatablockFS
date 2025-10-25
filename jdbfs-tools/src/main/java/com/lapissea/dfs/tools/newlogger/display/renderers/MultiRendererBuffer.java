@@ -8,6 +8,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.newlogger.display.vk.VulkanResource;
 import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
+import com.lapissea.util.NotImplementedException;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 
@@ -85,6 +86,9 @@ public class MultiRendererBuffer implements VulkanResource{
 	public void renderBytes(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents) throws VulkanCodeException{
 		getTokenSet(TokenSet.ByteEvents.class).add(dataOffset, data, ranges, ioEvents);
 	}
+	public void renderReady(MultiRendererBuffer buffer){
+		getTokenSet(TokenSet.ReadyMulti.class).readyBuffers().add(buffer);
+	}
 	public void add(Iterable<TokenSet> tokens) throws VulkanCodeException{
 		if(tokens instanceof Collection<TokenSet> coll){
 			sets.addAll(coll);
@@ -96,38 +100,62 @@ public class MultiRendererBuffer implements VulkanResource{
 	}
 	
 	public void reset(){
+		renderTokens.clear();
 		sets.clear();
 		gridRes.reset();
 		indexedRes.reset();
 		fontRes.reset();
 	}
 	
-	public void submit(DeviceGC deviceGC, GridUtils.ByteGridSize gridSize, Extent2D viewSizeSc, CommandBuffer cmdBuffer) throws VulkanCodeException{
-		var viewSize = gridSize.windowSize();
-
-//		LogUtil.println(Iters.concat1N("=========== FRAME TOKENS ===========", Iters.from(sets).map(Object::toString)).joinAsStr("\n"));
-		
+	private final List<Object> renderTokens = new ArrayList<>();
+	
+	public void upload(DeviceGC deviceGC) throws VulkanCodeException{
 		for(TokenSet set : sets){
 			switch(set){
 				case TokenSet.Lines(var paths) -> {
 					var token = lineRenderer.record(deviceGC, indexedRes, paths);
-					lineRenderer.submit(viewSizeSc, cmdBuffer, viewMatrix(viewSize), List.of(token));
+					renderTokens.add(token);
 				}
 				case TokenSet.Strings(var strings) -> {
 					var token = fontRender.record(deviceGC, fontRes, strings);
-					fontRender.submit(viewSizeSc, cmdBuffer, List.of(token));
+					renderTokens.add(token);
 				}
 				case TokenSet.ByteEvents(var tokens) -> {
 					var token = byteGridRender.record(deviceGC, gridRes, tokens);
-					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), List.of(token));
+					renderTokens.add(token);
 				}
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
 						var token = indexedRenderer.record(deviceGC, indexedRes, mesh);
 						if(token == null) continue;
-						indexedRenderer.submit(viewSizeSc, cmdBuffer, viewMatrix(viewSize), List.of(token));
+						renderTokens.add(token);
 					}
 				}
+				case TokenSet.ReadyMulti(var buffer) -> {
+					for(MultiRendererBuffer buff : buffer){
+						renderTokens.addAll(buff.renderTokens);
+					}
+				}
+			}
+		}
+	}
+	
+	public void submit(GridUtils.ByteGridSize gridSize, Extent2D viewSizeSc, CommandBuffer cmdBuffer) throws VulkanCodeException{
+		for(Object renderToken : renderTokens){
+			switch(renderToken){
+				case MsdfFontRender.RenderToken token -> {
+					fontRender.submit(viewSizeSc, cmdBuffer, List.of(token));
+				}
+				case ByteGridRender.RenderToken token -> {
+					byteGridRender.submit(viewSizeSc, cmdBuffer, new Matrix4f().scale(gridSize.byteSize()), gridSize.bytesPerRow(), List.of(token));
+				}
+				case IndexedMeshRenderer.RToken token -> {
+					indexedRenderer.submit(viewSizeSc, cmdBuffer, viewMatrix(gridSize.windowSize()), List.of(token));
+				}
+				case MultiRendererBuffer token -> {
+					token.submit(gridSize, viewSizeSc, cmdBuffer);
+				}
+				default -> throw new NotImplementedException(renderToken.getClass().getName());
 			}
 		}
 	}
