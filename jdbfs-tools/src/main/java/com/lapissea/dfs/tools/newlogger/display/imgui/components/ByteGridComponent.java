@@ -10,6 +10,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MergingPrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MultiRendererBuffer;
+import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.GridScene;
 import com.lapissea.dfs.tools.newlogger.display.renderers.grid.RangeMessageSpace;
 import com.lapissea.dfs.tools.newlogger.display.vk.CommandBuffer;
@@ -18,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.vk.wrap.Extent2D;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.util.UtilL;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
@@ -26,9 +28,10 @@ import org.joml.Vector2f;
 import java.awt.Color;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
@@ -45,11 +48,14 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private Match<GridUtils.ByteGridSize> lastGridSize = Match.empty();
 	
-	private static final ExecutorService SCENE_BUILD_POOL = Executors.newSingleThreadExecutor();
+	private static final ThreadPoolExecutor SCENE_BUILD_POOL = new ThreadPoolExecutor(
+		3, 3,
+		0L, TimeUnit.MILLISECONDS,
+		new LinkedBlockingQueue<>()
+	);
 	
-	private CompletableFuture<GridScene> scene;
-	private GridScene                    oldScene;
-	
+	private GridScene scene;
+	private GridScene oldScene;
 	
 	public ByteGridComponent(VulkanCore core, ImBoolean open, SettingsUIComponent uiSettings, List<String> messages) throws VulkanCodeException{
 		super(core, open, uiSettings.byteGridSampleEnumIndex);
@@ -62,12 +68,47 @@ public class ByteGridComponent extends BackbufferComponent{
 		staticRenderer = new MultiRendererBuffer(core);
 	}
 	
-	public void setDisplayData(SessionSetView.FrameData src) throws IOException{
-		frameData = src;
+	private record BuildTask(
+		SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize, boolean merge, PrimitiveBuffer.FontRednerer fontRednerer
+	) implements Supplier<GridScene>{
+		
+		@Override
+		public GridScene get(){
+			var buff  = new MergingPrimitiveBuffer(fontRednerer, gridSize, merge);
+			var scene = new GridScene(buff, frameData, gridSize);
+			try{
+				scene.build();
+			}catch(IOException e){
+				throw new RuntimeException("Failed to build scene", e);
+			}
+			return scene;
+		}
+	}
+	
+	private void clearStaticRenderer(){
+		staticRenderer.reset();
+		shownSceneId = null;
+	}
+	
+	private synchronized void clearScene(){
+		oldScene = null;
+		scene = null;
+		clearStaticRenderer();
+	}
+	private synchronized void retireScene(){
 		if(scene != null){
-			oldScene = scene.isDone()? scene.join() : null;
+			oldScene = scene;
 		}
 		scene = null;
+	}
+	private synchronized void pushScene(GridScene newScene){
+		oldScene = null;
+		scene = newScene;
+	}
+	
+	public synchronized void setDisplayData(SessionSetView.FrameData src) throws IOException{
+		frameData = src;
+		retireScene();
 	}
 	
 	@Override
@@ -134,60 +175,45 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		ImGui.checkbox("Show bounding boxes", showBoundingBoxes);
 		if(ImGui.checkbox("toggle", merge)){
-			oldScene = scene != null? scene.join() : null;
-			scene = null;
+			retireScene();
 		}
 		
 		ImGui.end();
 		
 		if(scene == null){
-			var fd = frameData;
-			scene = CompletableFuture.supplyAsync(() -> {
-				if(fd != frameData){
-					return null;
+			if(SCENE_BUILD_POOL.getQueue().size()>3) UtilL.sleep(20);
+			var task = new BuildTask(frameData, gridSize, merge.get(), staticRenderer.getFontRender());
+			var lock = this;
+			SCENE_BUILD_POOL.execute(() -> {
+				if(task.frameData != frameData){
+					return;
 				}
-				var buff  = new MergingPrimitiveBuffer(multiRenderer.getFontRender(), gridSize, merge.get());
-				var scene = new GridScene(buff, frameData, gridSize);
-				try{
-					scene.build();
-				}catch(IOException e){
-					throw new RuntimeException("Failed to build scene", e);
+				var scene = task.get();
+				synchronized(lock){
+					pushScene(scene);
+					if(task.frameData != frameData){
+						retireScene();
+					}
 				}
-//				LogUtil.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-//				LogUtil.println(buff.data());
-				return scene;
-			}, SCENE_BUILD_POOL);
-			scene.thenApply(e -> {
-				if(e != null) oldScene = null;
-				return e;
 			});
 		}
 		
-		if(!scene.isDone() && oldScene == null){
-			shownSceneId = null;
-			staticRenderer.reset();
+		if(scene == null && oldScene == null){
+			clearStaticRenderer();
 			renderFullScreenMessage(viewSize, "Data building...");
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
 		boolean   oldData = false;
 		GridScene scene;
-		if(this.scene.isDone()){
-			scene = this.scene.join();
-			
+		if(this.scene != null){
+			scene = this.scene;
 			if(!gridSize.equals(scene.gridSize)){
-				oldScene = scene;
-				this.scene = null;
+				retireScene();
 			}
-			
-		}else if(oldScene != null){
+		}else{
 			scene = oldScene;
 			oldData = true;
-		}else{
-			shownSceneId = null;
-			staticRenderer.reset();
-			renderFullScreenMessage(viewSize, "Data building...");
-			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
 		
 		if(shownSceneId != scene.id){
@@ -202,7 +228,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths());
 		}
 		
-		if(GridUtils.calcByteIndex(gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
+		if(GridUtils.calcByteIndex(scene.gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			for(var message : scene.messages.collect(p)){
 				switch(message.hoverEffect()){
 					case RangeMessageSpace.HoverEffect.None ignore -> { }
@@ -220,7 +246,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
 			multiRenderer.renderLines(
-				GridUtils.outlineByteRange(Color.WHITE, gridSize, new Range(p, p + 1), 1.5F)
+				GridUtils.outlineByteRange(Color.WHITE, scene.gridSize, new Range(p, p + 1), 1.5F)
 			);
 		}
 		if(oldData) multiRenderer.renderFont(new MsdfFontRender.StringDraw(
