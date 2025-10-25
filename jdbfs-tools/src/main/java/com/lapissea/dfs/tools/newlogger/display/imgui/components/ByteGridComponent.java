@@ -156,9 +156,8 @@ public class ByteGridComponent extends BackbufferComponent{
 		long byteCount = getFrameSize(frameData);
 		
 		if(byteCount == 0){
+			clearScene();
 			renderFullScreenMessage(viewSize, "No data!");
-			scene = null;
-			oldScene = null;
 			lastGridSize = Match.empty();
 			return new GridUtils.ByteGridSize(1, 1, viewSize);
 		}
@@ -188,9 +187,13 @@ public class ByteGridComponent extends BackbufferComponent{
 				if(task.frameData != frameData){
 					return;
 				}
-				var scene = task.get();
+				var builtScene = task.get();
 				synchronized(lock){
-					pushScene(scene);
+					var sceneCurrent = scene != null? scene : oldScene;
+					if(sceneCurrent != null && builtScene.createTime.isBefore(sceneCurrent.createTime)){
+						return;
+					}
+					pushScene(builtScene);
 					if(task.frameData != frameData){
 						retireScene();
 					}

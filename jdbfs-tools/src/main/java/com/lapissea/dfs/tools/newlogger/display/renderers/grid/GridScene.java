@@ -19,6 +19,7 @@ import com.lapissea.dfs.tools.newlogger.display.renderers.ByteGridRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.Geometry;
 import com.lapissea.dfs.tools.newlogger.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.tools.newlogger.display.renderers.PrimitiveBuffer;
+import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
@@ -33,6 +34,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -49,7 +51,8 @@ public class GridScene{
 	
 	private DataProvider dataProvider;
 	
-	public final Object id = new Object();
+	public final Instant createTime = NanoClock.now();
+	public final Object  id         = new Object();
 	
 	public GridScene(PrimitiveBuffer buffer, SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize){
 		this.buffer = buffer;
