@@ -25,7 +25,7 @@ public final class Geometry{
 		@Override
 		public DrawUtils.Rect boundingBox(){
 			if(points.isEmpty()){
-				return new DrawUtils.Rect(0, 0, 0, 0);
+				return DrawUtils.Rect.ofWH(0, 0, 0, 0);
 			}
 			var min = new Vector2f(points.getFirst());
 			var max = new Vector2f(points.getFirst());
@@ -60,7 +60,7 @@ public final class Geometry{
 	public record IndexedMesh(VertexBuilder verts, IndexBuilder indices){
 		public DrawUtils.Rect boundingBox(){
 			if(verts.size() == 0){
-				return new DrawUtils.Rect(0, 0, 0, 0);
+				return DrawUtils.Rect.ofWH(0, 0, 0, 0);
 			}
 			var min = new Vector2f(verts.getPos(0));
 			var max = new Vector2f(verts.getPos(0));
@@ -336,7 +336,7 @@ public final class Geometry{
 	}
 	
 	public static DrawUtils.Rect catmullRomBounds(List<Vector2f> points, float rad){
-		if(points.size()<2) return new DrawUtils.Rect(0, 0, 0, 0);
+		if(points.size()<2) return DrawUtils.Rect.ofWH(0, 0, 0, 0);
 		
 		float minX = Float.POSITIVE_INFINITY;
 		float minY = Float.POSITIVE_INFINITY;
@@ -383,7 +383,7 @@ public final class Geometry{
 		minY -= rad;
 		maxY += rad;
 		
-		return new DrawUtils.Rect(minX, minY, maxX - minX, maxY - minY);
+		return DrawUtils.Rect.ofFromTo(minX, minY, maxX, maxY);
 	}
 	
 	private static float[] bezierExtrema(float p0, float p1, float p2, float p3){

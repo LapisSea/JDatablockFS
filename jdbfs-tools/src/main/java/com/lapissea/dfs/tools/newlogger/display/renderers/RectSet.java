@@ -1,9 +1,9 @@
 package com.lapissea.dfs.tools.newlogger.display.renderers;
 
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Rect;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.PPCollection;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -12,37 +12,33 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalInt;
 import java.util.function.Consumer;
 
 public class RectSet{
 	
 	private static final int THRESHOLD = 16;
 	
-	private record Node(Rect rect, List<Node> fakes, List<Rect> leafs){
+	private record Node(Rect rect, ArrayList<Node> fakes, ArrayList<Rect> leafs){
 		@Override
 		public String toString(){
 			return "Node";
 		}
 		
+		private static final Comparator<Rect> X_COMPARE = Comparator.comparingDouble(r -> r.x() + r.width()/2);
+		private static final Comparator<Rect> Y_COMPARE = Comparator.comparingDouble(r -> r.y() + r.height()/2);
+		
 		private record Split(List<Rect> l1, List<Rect> l2){ }
 		private Split doSplit(Collection<Rect> elements){
-			return doSortSplit(elements);
-		}
-		private Split doSortSplit(Collection<Rect> elements){
 			var totalArea = union(elements);
 			
-			var all = elements instanceof List<Rect> r? r : new ArrayList<>(elements);
+			var all = elements instanceof ArrayList<Rect> r? r : new ArrayList<>(elements);
+			all.sort(totalArea.width()>totalArea.height()? X_COMPARE : Y_COMPARE);
 			
-			if(totalArea.width()>totalArea.height()){
-				all.sort(Comparator.comparingDouble(r -> r.x() + r.width()/2));
-			}else{
-				all.sort(Comparator.comparingDouble(r -> r.y() + r.height()/2));
-			}
 			int mid = elements.size()/2;
-			var l1  = new ArrayList<>(all.subList(0, mid));
-			var l2  = new ArrayList<>(all.subList(mid, elements.size()));
-			return new Split(l1, l2);
+			return new Split(
+				all.subList(0, mid),
+				all.subList(mid, elements.size())
+			);
 		}
 		
 		private static Rect union(Iterable<Rect> nodes){
@@ -54,7 +50,7 @@ public class RectSet{
 				maxX = Math.max(maxX, r.xTo());
 				maxY = Math.max(maxY, r.yTo());
 			}
-			return new Rect(minX, minY, maxX - minX, maxY - minY);
+			return DrawUtils.Rect.ofFromTo(minX, minY, maxX, maxY);
 		}
 		
 		public boolean overlaps(Rect test){
@@ -71,11 +67,9 @@ public class RectSet{
 			}
 			
 			if(leafs.size()>=THRESHOLD){
-				process();
-				for(Node fake : fakes){
-					if(fake.overlaps(test)){
-						return true;
-					}
+				var newFake = process();
+				if(newFake.overlaps(test)){
+					return true;
 				}
 			}
 			
@@ -100,16 +94,18 @@ public class RectSet{
 					}
 				}
 				if(count == 0) break leafy;
-				//noinspection unchecked
-				var flat = new PPCollection<Rect>(Iters.concat(leafsSet.toArray(List[]::new)), OptionalInt.of(count));
+				var flat = new ArrayList<Rect>(count);
+				for(var r : leafsSet) flat.addAll(r);
 				if(count<THRESHOLD){
-					fakes.add(toFake(flat.toModList()));
+					fakes.add(new Node(union(flat), new ArrayList<>(), flat));
 				}else{
 					var split = doSplit(flat);
 					fakes.add(toFake(split.l1));
 					fakes.add(toFake(split.l2));
 				}
-				for(Node fake : fakes) fake.leafs.clear();
+				for(Node fake : fakes){
+					fake.leafs.clear();
+				}
 			}
 			Map<Rect, Node> lookup = HashMap.newHashMap(fakes.size());
 			for(Node fake : fakes){
@@ -131,15 +127,14 @@ public class RectSet{
 			fakes.add(new Node(u2, l2, new ArrayList<>()));
 		}
 		
-		private void process(){
-			var split   = doSplit(leafs);
-			var f1      = toFake(split.l1);
-			var f2      = toFake(split.l2);
-			var newFake = new Node(f1.rect.union(f2.rect), new ArrayList<>(), new ArrayList<>());
-			newFake.fakes.add(f1);
-			newFake.fakes.add(f2);
-			fakes.add(newFake);
+		private Node process(){
+			var  split = doSplit(leafs);
+			Node f1    = toFake(split.l1);
+			Node f2    = toFake(split.l2);
+			var  res   = new Node(f1.rect.union(f2.rect), new ArrayList<>(List.of(f1, f2)), new ArrayList<>());
+			fakes.add(res);
 			leafs.clear();
+			return res;
 		}
 		private Node toFake(List<Rect> l){
 			return new Node(union(l), new ArrayList<>(), new ArrayList<>(l));
@@ -150,10 +145,8 @@ public class RectSet{
 				return false;
 			}
 			for(Node fake : fakes){
-				if(add.isWithin(fake.rect)){
-					if(fake.add(add)){
-						return true;
-					}
+				if(fake.add(add)){
+					return true;
 				}
 			}
 			leafs.add(add);

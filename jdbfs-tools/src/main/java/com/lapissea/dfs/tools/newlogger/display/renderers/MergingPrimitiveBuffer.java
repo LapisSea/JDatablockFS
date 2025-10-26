@@ -240,7 +240,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 			var r = new RawRandom(e.tokens.getClass().getName().hashCode() + 1);
 			var c = new Color(r.nextInt(255), r.nextInt(255), r.nextInt(255));
 			
-			return e.areas.all().filter(rect -> new Rect(x, y, 0, 0).isWithin(rect)).map(rect -> {
+			return e.areas.all().filter(rect -> Rect.ofWH(x, y, 0, 0).isWithin(rect)).map(rect -> {
 				
 				return new Geometry.PointsLine(
 					List.of(

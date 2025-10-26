@@ -164,7 +164,7 @@ public final class DrawUtils{
 			var yByteFrom = (from/width)*pixelsPerByte;
 			var xByteTo   = xByteFrom + pixelsPerByte*size();
 			var yByteTo   = yByteFrom + pixelsPerByte;
-			return new Rect(xByteFrom, yByteFrom, xByteTo - xByteFrom, yByteTo - yByteFrom);
+			return Rect.ofWH(xByteFrom, yByteFrom, xByteTo - xByteFrom, yByteTo - yByteFrom);
 		}
 		
 		public IntStream ints(){
@@ -182,19 +182,22 @@ public final class DrawUtils{
 		}
 	}
 	
-	public record Rect(float x, float y, float width, float height){
+	public record Rect(float x, float y, float xTo, float yTo){
 		public static Rect ofFromTo(Vector2f from, Vector2f to){
 			return ofFromTo(from.x, from.y, to.x, to.y);
 		}
 		public static Rect ofFromTo(float xFrom, float yFrom, float xTo, float yTo){
 			return new Rect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
 		}
+		public static Rect ofWH(float x, float y, float width, float height){
+			return new Rect(x, y, width, height);
+		}
 		
-		public float xTo()    { return x + width; }
-		public float yTo()    { return y + height; }
-		public float xCenter(){ return x + width/2; }
-		public float yCenter(){ return y + height/2; }
-		public float area()   { return width*height; }
+		public float width()  { return xTo - x; }
+		public float height() { return yTo - y; }
+		public float xCenter(){ return (x + xTo)/2; }
+		public float yCenter(){ return (y + yTo)/2; }
+		public float area()   { return width()*height(); }
 		
 		public Rect union(Rect other){
 			var minXFrom = Math.min(x, other.x);
@@ -214,20 +217,20 @@ public final class DrawUtils{
 		}
 		
 		public Rect addY(float y){
-			return new Rect(x, this.y + y, width, height);
+			return new Rect(x, this.y + y, x, yTo + y);
 		}
 		
 		@Override
 		public int hashCode(){
-			return Float.floatToIntBits(x + width + y + height);
+			return Float.floatToIntBits(x + xTo + y + yTo);
 		}
 		@Override
 		public String toString(){
 			return "{" +
 			       "x=" + x +
 			       ", y=" + y +
-			       ", width=" + width +
-			       ", height=" + height +
+			       ", width=" + width() +
+			       ", height=" + height() +
 			       '}';
 		}
 	}
@@ -238,7 +241,7 @@ public final class DrawUtils{
 		
 		var x = bitRect.x + byteRect.x;
 		var y = bitRect.y + byteRect.y;
-		return new Rect(x, y, bitRect.width, bitRect.height);
+		return Rect.ofWH(x, y, bitRect.width(), bitRect.height());
 	}
 	
 	public static Range findBestContiguousRange(int width, Range range){

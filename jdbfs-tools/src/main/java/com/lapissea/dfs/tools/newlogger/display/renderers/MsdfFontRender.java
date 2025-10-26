@@ -262,7 +262,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			var bounds = fontRednerer.getStringBounds(string, pixelHeight);
 			var w      = bounds.width()*xScale;
 			var h      = bounds.height();
-			return new DrawUtils.Rect(x, y - h, w, h);
+			return DrawUtils.Rect.ofWH(x, y - h, w, h);
 		}
 	}
 	

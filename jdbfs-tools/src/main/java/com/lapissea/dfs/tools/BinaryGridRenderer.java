@@ -748,7 +748,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		int w = renderer.getDisplay().getWidth(), h = renderer.getDisplay().getHeight();
 		renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
-		drawStringIn(renderer, Color.LIGHT_GRAY, str, new DrawUtils.Rect(0, 0, w, h), true);
+		drawStringIn(renderer, Color.LIGHT_GRAY, str, DrawUtils.Rect.ofWH(0, 0, w, h), true);
 	}
 	@Override
 	public void markDirty(){
@@ -779,7 +779,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		ctx.renderer.setLineWidth(2F);
 		outlineByteRange(Color.WHITE, ctx, new DrawUtils.Range(0, magic.limit()));
-		drawStringIn(ctx.renderer, Color.WHITE, new String(bytes, 0, Math.min(bytes.length, magic.limit())), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
+		drawStringIn(ctx.renderer, Color.WHITE, new String(bytes, 0, Math.min(bytes.length, magic.limit())), DrawUtils.Rect.ofWH(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
 		ctx.renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.5F));
 		
@@ -1030,7 +1030,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					if(ctx.renderer.getFont().canFontDisplay(ctx.bytes[i])){
 						int   xi   = i%ctx.width(), yi = i/ctx.width();
 						float xF   = ctx.pixelsPerByte()*xi, yF = ctx.pixelsPerByte()*yi;
-						var   info = drawStringInInfo(ctx.renderer, c, Character.toString((char)(ctx.bytes[i]&0xFF)), new DrawUtils.Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+						var   info = drawStringInInfo(ctx.renderer, c, Character.toString((char)(ctx.bytes[i]&0xFF)), DrawUtils.Rect.ofWH(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
 						if(info != null) chars = List.of(info);
 					}
 				}
@@ -1041,7 +1041,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					int   xi = i%ctx.width(), yi = i/ctx.width();
 					float xF = ctx.pixelsPerByte()*xi, yF = ctx.pixelsPerByte()*yi;
 					
-					return drawStringInInfo(ctx.renderer, c, Character.toString((char)(ctx.bytes[i]&0xFF)), new DrawUtils.Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+					return drawStringInInfo(ctx.renderer, c, Character.toString((char)(ctx.bytes[i]&0xFF)), DrawUtils.Rect.ofWH(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
 				}).filter(Objects::nonNull).toList();
 			}
 			if(!chars.isEmpty()){
@@ -1211,7 +1211,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				List<String> lines = msgWidth == 0? List.of(ptr.message()) : TextUtil.wrapLongString(ptr.message(), msgWidth);
 				y -= renderer.getLineWidth()/2F*lines.size();
 				for(String line : lines){
-					drawStringInInfo(renderer, col, line, new DrawUtils.Rect(x, y, space, ctx.pixelsPerByte()), true, strings);
+					drawStringInInfo(renderer, col, line, DrawUtils.Rect.ofWH(x, y, space, ctx.pixelsPerByte()), true, strings);
 					y += renderer.getLineWidth();
 				}
 			}
@@ -1238,14 +1238,14 @@ public class BinaryGridRenderer implements DataRenderer{
 		renderer.fillQuad(0, screenHeight - totalBound.height() - 25, totalBound.width() + 20, totalBound.height() + 20);
 		
 		var col  = ColorUtils.alpha(Color.WHITE, 0.8F);
-		var rect = new DrawUtils.Rect(10, screenHeight - totalBound.height() - 20, totalBound.width(), renderer.getLineWidth());
+		var rect = DrawUtils.Rect.ofWH(10, screenHeight - totalBound.height() - 20, totalBound.width(), renderer.getLineWidth());
 		
 		List<DrawFont.StringDraw> strings = new ArrayList<>(lines.length);
 		
 		for(int i = 0; i<lines.length; i++){
 			String line  = lines[i];
 			var    bound = bounds.get(i);
-			rect = new DrawUtils.Rect(
+			rect = DrawUtils.Rect.ofWH(
 				rect.x(),
 				(Math.round(screenHeight - totalBound.height() + bounds.stream().limit(i).mapToDouble(DrawFont.Bounds::height).sum()) - 15),
 				rect.width(),
