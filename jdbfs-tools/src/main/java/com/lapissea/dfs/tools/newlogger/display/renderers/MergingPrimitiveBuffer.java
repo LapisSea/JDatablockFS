@@ -88,11 +88,10 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 	
 	@Override
 	public void renderLines(Iterable<? extends Geometry.Path> paths){
-		merge(
-			TokenSet.Lines.class,
-			Iters.from(paths).map(e -> new BoxPair<>(e, e.boundingBox())),
-			TokenSet.Lines::add
-		);
+		for(Geometry.Path path : paths){
+			var mesh = Geometry.generateThickLineMesh(path.toPoints());
+			renderMesh(mesh);
+		}
 	}
 	
 	@Override
@@ -201,7 +200,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 				}
 				return Rect.ofFromTo(min, max);
 			})){
-				rects.add(Rect.ofFromTo(bb.x + gridSize.byteSize()*2/3, bb.y + gridSize.byteSize()*2/3, bb.xTo(), bb.yTo()));
+				rects.add(Rect.ofFromTo(bb.x() + gridSize.byteSize()*2/3, bb.y() + gridSize.byteSize()*2/3, bb.xTo(), bb.yTo()));
 			}
 		}
 		
@@ -233,19 +232,23 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 		return Iters.from(tokens).map(e -> e.tokens).joinAsStr("\n") + "\nSIZE: " + tokens.size();
 	}
 	
-	public List<Geometry.PointsLine> paths(){
+	public List<Geometry.PointsLine> paths(int x, int y){
 		return Iters.from(tokens).flatMap(e -> {
+			if(!(e.tokens instanceof TokenSet.Strings)){
+				return List.of();
+			}
 			var r = new RawRandom(e.tokens.getClass().getName().hashCode() + 1);
 			var c = new Color(r.nextInt(255), r.nextInt(255), r.nextInt(255));
 			
-			return Iters.from(e.areas.all()).map(rect -> {
+			return e.areas.all().filter(rect -> new Rect(x, y, 0, 0).isWithin(rect)).map(rect -> {
+				
 				return new Geometry.PointsLine(
 					List.of(
-						new Vector2f(rect.x, rect.y),
-						new Vector2f(rect.xTo(), rect.y),
+						new Vector2f(rect.x(), rect.y()),
+						new Vector2f(rect.xTo(), rect.y()),
 						new Vector2f(rect.xTo(), rect.yTo()),
-						new Vector2f(rect.x, rect.yTo()),
-						new Vector2f(rect.x, rect.y)
+						new Vector2f(rect.x(), rect.yTo()),
+						new Vector2f(rect.x(), rect.y())
 					),
 					2, c, true
 				);

@@ -227,10 +227,6 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 		multiRenderer.renderReady(staticRenderer);
 		
-		if(showBoundingBoxes.get()){
-			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths());
-		}
-		
 		if(GridUtils.calcByteIndex(scene.gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			for(var message : scene.messages.collect(p)){
 				switch(message.hoverEffect()){
@@ -252,6 +248,11 @@ public class ByteGridComponent extends BackbufferComponent{
 				GridUtils.outlineByteRange(Color.WHITE, scene.gridSize, new Range(p, p + 1), 1.5F)
 			);
 		}
+		
+		if(showBoundingBoxes.get()){
+			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths(mouseX(), mouseY()));
+		}
+		
 		if(oldData) multiRenderer.renderFont(new MsdfFontRender.StringDraw(
 			20*ImGui.getWindowDpiScale(),
 			Color.DARK_GRAY, "Old data...",

@@ -182,9 +182,7 @@ public final class DrawUtils{
 		}
 	}
 	
-	public static class Rect{
-		public float x, y, width, height;
-		
+	public record Rect(float x, float y, float width, float height){
 		public static Rect ofFromTo(Vector2f from, Vector2f to){
 			return ofFromTo(from.x, from.y, to.x, to.y);
 		}
@@ -192,14 +190,11 @@ public final class DrawUtils{
 			return new Rect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
 		}
 		
-		public Rect(float x, float y, float width, float height){
-			this.x = x;
-			this.y = y;
-			this.width = width;
-			this.height = height;
-		}
-		public float xTo(){ return x + width; }
-		public float yTo(){ return y + height; }
+		public float xTo()    { return x + width; }
+		public float yTo()    { return y + height; }
+		public float xCenter(){ return x + width/2; }
+		public float yCenter(){ return y + height/2; }
+		public float area()   { return width*height; }
 		
 		public Rect union(Rect other){
 			var minXFrom = Math.min(x, other.x);
@@ -218,15 +213,32 @@ public final class DrawUtils{
 			       y<other.yTo() && yTo()>other.y;
 		}
 		
+		public Rect addY(float y){
+			return new Rect(x, this.y + y, width, height);
+		}
+		
+		@Override
+		public int hashCode(){
+			return Float.floatToIntBits(x + width + y + height);
+		}
+		@Override
+		public String toString(){
+			return "{" +
+			       "x=" + x +
+			       ", y=" + y +
+			       ", width=" + width +
+			       ", height=" + height +
+			       '}';
+		}
 	}
 	public static Rect makeBitRect(BinaryGridRenderer.RenderContext ctx, long trueOffset, int bitOffset, long siz){
 		var range    = findBestContiguousRange(3, new Range(bitOffset, bitOffset + siz));
 		var byteRect = new Range(trueOffset, trueOffset).toRect(ctx);
 		var bitRect  = range.toRect(3, ctx.pixelsPerByte()/3);
 		
-		bitRect.x += byteRect.x;
-		bitRect.y += byteRect.y;
-		return bitRect;
+		var x = bitRect.x + byteRect.x;
+		var y = bitRect.y + byteRect.y;
+		return new Rect(x, y, bitRect.width, bitRect.height);
 	}
 	
 	public static Range findBestContiguousRange(int width, Range range){

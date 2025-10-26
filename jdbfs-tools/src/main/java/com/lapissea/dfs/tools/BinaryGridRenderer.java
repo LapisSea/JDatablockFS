@@ -309,7 +309,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		var renderCtx = ctx.renderCtx;
 		Consumer<DrawUtils.Rect> doSegment = bitRect -> {
 			renderCtx.renderer.setColor(ColorUtils.alpha(col, 0.8F).darker());
-			renderCtx.renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
+			renderCtx.renderer.fillQuad(bitRect.x(), bitRect.y(), bitRect.width(), bitRect.height());
 			Optional<String> str;
 			if(field instanceof IOFieldPrimitive.FBoolean<?> bf){
 				str = Optional.of(((IOFieldPrimitive.FBoolean<T>)bf).getValue(ioPool, instance)? "√" : "x");
@@ -395,7 +395,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		var color = ColorUtils.alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
 		
-		var rectWidth = bestRange.toRect(ctx.renderCtx).width;
+		var rectWidth = bestRange.toRect(ctx.renderCtx).width();
 		
 		var textData = ((Class<?>)field.getType()) == byte[].class && instance instanceof AutoText;
 		
@@ -433,7 +433,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				var font = renderCtx.renderer.getFontScale();
 				initFont(renderCtx, 0.4F);
 				var rect = bestRange.toRect(ctx.renderCtx);
-				rect.y += renderCtx.renderer.getFontScale()*-0.8;
+				rect = rect.addY((float)(renderCtx.renderer.getFontScale()*-0.8));
 				drawStringInInfo(renderCtx.renderer, color, fStr, rect, false, ctx.strings);
 				renderCtx.renderer.setFontScale(font);
 			}
@@ -442,8 +442,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				if(shortStr.isEmpty()) shortStr = field.instanceToString(ioPool, instance, true);
 				str = shortStr;
 			}
-			var r = bestRange.toRect(ctx.renderCtx);
-			r.y += ctx.renderCtx.pixelsPerByte*0.1F;
+			var r = bestRange.toRect(ctx.renderCtx).addY(ctx.renderCtx.pixelsPerByte*0.1F);
 			
 			str.ifPresent(s -> drawStringInInfo(renderCtx.renderer, color, s, r, false, ctx.strings, ctx.stringOutlines));
 		}else{
@@ -524,8 +523,8 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		float fontScale = renderer.getFontScale();
 		try{
-			if(area.height<fontScale){
-				renderer.setFontScale(area.height);
+			if(area.height()<fontScale){
+				renderer.setFontScale(area.height());
 			}
 			
 			float w, h;
@@ -536,7 +535,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				h = rect.height();
 				
 				if(w>0){
-					double scale = (area.width - 1)/w;
+					double scale = (area.width() - 1)/w;
 					if(scale<0.5){
 						float div = scale<0.25? 3 : 2;
 						renderer.setFontScale(renderer.getFontScale()/div);
@@ -544,7 +543,7 @@ public class BinaryGridRenderer implements DataRenderer{
 						h = rect.height()/div;
 					}
 					DrawFont.Bounds sbDots = null;
-					while((area.width - 1)/w<0.5){
+					while((area.width() - 1)/w<0.5){
 						if(s.isEmpty()) return null;
 						if(s.length() == 1){
 							break;
@@ -560,15 +559,15 @@ public class BinaryGridRenderer implements DataRenderer{
 				}
 			}
 			
-			float x = area.x;
-			float y = area.y;
+			float x = area.x();
+			float y = area.y();
 			
-			x += alignLeft? 0 : Math.max(0, area.width - w)/2D;
-			y += h + (area.height - h)/2;
+			x += alignLeft? 0 : Math.max(0, area.width() - w)/2D;
+			y += h + (area.height() - h)/2;
 			
 			float xScale = 1;
 			if(w>0){
-				double scale = (area.width - 1)/w;
+				double scale = (area.width() - 1)/w;
 				if(scale<1){
 					xScale = (float)scale;
 				}
@@ -1246,8 +1245,12 @@ public class BinaryGridRenderer implements DataRenderer{
 		for(int i = 0; i<lines.length; i++){
 			String line  = lines[i];
 			var    bound = bounds.get(i);
-			rect.height = bound.height();
-			rect.y = (Math.round(screenHeight - totalBound.height() + bounds.stream().limit(i).mapToDouble(DrawFont.Bounds::height).sum()) - 15);
+			rect = new DrawUtils.Rect(
+				rect.x(),
+				(Math.round(screenHeight - totalBound.height() + bounds.stream().limit(i).mapToDouble(DrawFont.Bounds::height).sum()) - 15),
+				rect.width(),
+				bound.height()
+			);
 			drawStringInInfo(renderer, col, line, rect, true, strings);
 		}
 		renderer.getFont().fillStrings(strings);
