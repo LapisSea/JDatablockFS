@@ -259,6 +259,10 @@ public class PhysicalDevice{
 				                         .pNext(features16bit)
 			);
 			
+			if(Boolean.getBoolean("disableArithmeticTypes")){
+				arithmeticTypesError.add("Configuration disabled this feature");
+			}
+			
 			if(!features16bit.storageBuffer16BitAccess()){
 				arithmeticTypesError.add("storageBuffer16BitAccess");
 			}
