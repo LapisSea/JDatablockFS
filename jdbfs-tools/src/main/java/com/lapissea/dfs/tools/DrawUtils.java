@@ -187,10 +187,10 @@ public final class DrawUtils{
 			return ofFromTo(from.x, from.y, to.x, to.y);
 		}
 		public static Rect ofFromTo(float xFrom, float yFrom, float xTo, float yTo){
-			return new Rect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
+			return new Rect(xFrom, yFrom, xTo, yTo);
 		}
 		public static Rect ofWH(float x, float y, float width, float height){
-			return new Rect(x, y, width, height);
+			return new Rect(x, y, x + width, y + height);
 		}
 		
 		public float width()  { return xTo - x; }
@@ -217,12 +217,12 @@ public final class DrawUtils{
 		}
 		
 		public Rect addY(float y){
-			return new Rect(x, this.y + y, x, yTo + y);
+			return Rect.ofFromTo(x, this.y + y, x, yTo() + y);
 		}
 		
 		@Override
 		public int hashCode(){
-			return Float.floatToIntBits(x + xTo + y + yTo);
+			return Float.floatToIntBits(x + xTo() + y + yTo());
 		}
 		@Override
 		public String toString(){
