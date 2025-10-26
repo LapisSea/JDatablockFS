@@ -114,21 +114,20 @@ public class MultiRendererBuffer implements VulkanResource{
 			switch(set){
 				case TokenSet.Lines(var paths) -> {
 					var token = lineRenderer.record(deviceGC, indexedRes, paths);
-					renderTokens.add(token);
+					if(token != null) renderTokens.add(token);
 				}
 				case TokenSet.Strings(var strings) -> {
 					var token = fontRender.record(deviceGC, fontRes, strings);
-					renderTokens.add(token);
+					if(token != null) renderTokens.add(token);
 				}
 				case TokenSet.ByteEvents(var tokens) -> {
 					var token = byteGridRender.record(deviceGC, gridRes, tokens);
-					renderTokens.add(token);
+					if(token != null) renderTokens.add(token);
 				}
 				case TokenSet.Meshes(var meshes) -> {
 					for(Geometry.IndexedMesh mesh : meshes){
 						var token = indexedRenderer.record(deviceGC, indexedRes, mesh);
-						if(token == null) continue;
-						renderTokens.add(token);
+						if(token != null) renderTokens.add(token);
 					}
 				}
 				case TokenSet.ReadyMulti(var buffer) -> {

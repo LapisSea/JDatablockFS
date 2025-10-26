@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
@@ -122,6 +123,9 @@ public class VulkanDisplay implements AutoCloseable{
 		});
 		window.pos.register(this::renderAndSwap);
 		
+		var mark = new AtomicBoolean();
+		window.mousePos.register(() -> mark.set(true));
+		
 		var second   = Duration.ofSeconds(1);
 		var lastTime = NanoClock.now();
 		while(!window.shouldClose()){
@@ -130,6 +134,10 @@ public class VulkanDisplay implements AutoCloseable{
 			if(fpsLimit>0){
 				Instant now, releaseTime = lastTime.plus(second.dividedBy(fpsLimit));
 				while((now = NanoClock.now()).isBefore(releaseTime)){
+					if(mark.get()){
+						mark.set(false);
+						break;
+					}
 					var remaning = Duration.between(now, releaseTime).toMillis();
 					if(remaning>2){
 						glfwPollEvents();
