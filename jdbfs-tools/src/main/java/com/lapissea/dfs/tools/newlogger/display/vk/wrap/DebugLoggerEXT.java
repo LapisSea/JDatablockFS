@@ -86,6 +86,7 @@ public class DebugLoggerEXT implements VulkanResource{
 			if(msg == null) msg = "";
 			
 			var idStr = data.pMessageIdNameString();
+			if(idStr == null) idStr = "null";
 			
 			var po = data.pObjects();
 			var handles = po == null? new long[0] :

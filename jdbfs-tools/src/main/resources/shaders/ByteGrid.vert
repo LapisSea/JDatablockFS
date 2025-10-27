@@ -15,7 +15,6 @@ struct Vert {
 #ifdef NO_ARITHMETIC_TYPES
 	struct Byte {
 		uint infoBytes;
-		vec4_u8 color;
 	};
 	uint byteIndex(Byte value){return value.infoBytes & 0xFFFF;}
 	uint colorIndex(Byte value){return (value.infoBytes >> 16) & 0xFF;}
