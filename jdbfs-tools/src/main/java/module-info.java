@@ -27,11 +27,15 @@ module JDatablockFS.tools {
 	
 	
 	opens com.lapissea.dfs.tools;
-	opens com.lapissea.dfs.tools.newlogger.display to com.google.gson;
-	exports com.lapissea.dfs.tools.newlogger.display.vk to jlapisutil;
-	exports com.lapissea.dfs.tools.newlogger.display.vk.enums to jlapisutil, JDatablockFS.run;
-	exports com.lapissea.dfs.tools.newlogger.display.vk.wrap to jlapisutil, JDatablockFS.run;
-	exports com.lapissea.dfs.tools.newlogger.display to jlapisutil, JDatablockFS.run;
-	exports com.lapissea.dfs.tools.newlogger.display.renderers to jlapisutil;
-	opens com.lapissea.dfs.tools.newlogger.display.renderers to com.google.gson;
+	opens com.lapissea.dfs.inspect.display to com.google.gson;
+	exports com.lapissea.dfs.inspect.display.vk.enums to jlapisutil, JDatablockFS.run;
+	exports com.lapissea.dfs.inspect.display.vk.wrap to jlapisutil, JDatablockFS.run;
+	exports com.lapissea.dfs.inspect.display to jlapisutil, JDatablockFS.run;
+	exports com.lapissea.dfs.inspect.display.renderers to jlapisutil;
+	opens com.lapissea.dfs.inspect.display.renderers to com.google.gson;
+	exports com.lapissea.dfs.inspect;
+	exports com.lapissea.dfs.inspect.display.vk;
+	opens com.lapissea.dfs.inspect.display.vk;
+	exports com.lapissea.dfs.inspect.display.grid to jlapisutil;
+	opens com.lapissea.dfs.inspect.display.grid to com.google.gson;
 }

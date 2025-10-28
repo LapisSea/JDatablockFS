@@ -27,7 +27,7 @@ import com.lapissea.dfs.run.checked.CheckMap;
 import com.lapissea.dfs.run.checked.CheckSet;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.dfs.tools.newlogger.display.IndexBuilder;
+import com.lapissea.dfs.inspect.display.IndexBuilder;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;

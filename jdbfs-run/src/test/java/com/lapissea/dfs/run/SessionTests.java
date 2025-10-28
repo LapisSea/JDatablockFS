@@ -1,11 +1,11 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.inspect.DBLogConnection;
+import com.lapissea.dfs.inspect.DBLogIngestServer;
+import com.lapissea.dfs.inspect.FrameDB;
 import com.lapissea.dfs.io.IOInterfaces;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.tools.newlogger.DBLogConnection;
-import com.lapissea.dfs.tools.newlogger.DBLogIngestServer;
-import com.lapissea.dfs.tools.newlogger.FrameDB;
 import com.lapissea.util.UtilL;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
