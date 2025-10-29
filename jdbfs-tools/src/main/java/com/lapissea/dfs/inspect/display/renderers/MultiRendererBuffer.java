@@ -61,7 +61,7 @@ public class MultiRendererBuffer implements VulkanResource{
 			getTokenSet(TokenSet.Meshes.class).add(meshes);
 		}
 		@Override
-		public void renderLines(Collection<? extends Geometry.Path> paths){
+		public void renderLines(List<? extends Geometry.Path> paths){
 			if(paths.isEmpty()) return;
 			getTokenSet(TokenSet.Lines.class).add(paths);
 		}

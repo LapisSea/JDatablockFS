@@ -82,7 +82,7 @@ public interface PrimitiveBuffer{
 	void renderMeshes(List<Geometry.IndexedMesh> mesh);
 	
 	default void renderLine(Geometry.Path path)                { renderLines(List.of(path)); }
-	void renderLines(Collection<? extends Geometry.Path> paths);
+	void renderLines(List<? extends Geometry.Path> paths);
 	
 	default void renderFont(MsdfFontRender.StringDraw path)    { renderFont(List.of(path)); }
 	default void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }

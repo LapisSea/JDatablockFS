@@ -7,6 +7,8 @@ import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.grid.GridScene;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.grid.RangeMessageSpace;
+import com.lapissea.dfs.inspect.display.renderers.CountingPrimitiveBuffer;
+import com.lapissea.dfs.inspect.display.renderers.CutoffPrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.renderers.Geometry;
 import com.lapissea.dfs.inspect.display.renderers.MergingPrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender;
@@ -70,12 +72,15 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private record BuildTask(
-		SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize, boolean merge, PrimitiveBuffer.FontRednerer fontRednerer
+		SessionSetView.FrameData frameData, GridUtils.ByteGridSize gridSize, boolean merge, PrimitiveBuffer.FontRednerer fontRednerer, long cutoff
 	) implements Supplier<GridScene>{
 		
 		@Override
 		public GridScene get(){
-			var buff  = new MergingPrimitiveBuffer(fontRednerer, gridSize, merge);
+			PrimitiveBuffer buff = new MergingPrimitiveBuffer(fontRednerer, gridSize, merge);
+			if(cutoff>0){
+				buff = new CutoffPrimitiveBuffer(buff, cutoff);
+			}
 			var scene = new GridScene(buff, frameData, gridSize);
 			try{
 				scene.build();
@@ -146,6 +151,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private final ImBoolean merge = new ImBoolean(true), showBoundingBoxes = new ImBoolean();
+	private final long[] cutoff = new long[1], cutoffMax = new long[1];
 	
 	protected GridUtils.ByteGridSize recordBackbuffer(DeviceGC deviceGC, Extent2D viewSize) throws VulkanCodeException, IOException{
 		
@@ -173,10 +179,24 @@ public class ByteGridComponent extends BackbufferComponent{
 		var gridSize = GridUtils.ByteGridSize.compute(viewSize, byteCount, lastGridSize);
 		lastGridSize = Match.of(gridSize);
 		
-		ImGui.begin("toggletest");
+		ImGui.begin("Grid debug");
 		
 		ImGui.checkbox("Show bounding boxes", showBoundingBoxes);
 		if(ImGui.checkbox("toggle", merge)){
+			retireScene();
+		}
+		
+		if(ImGui.button("Measure max elements")){
+			var buff = new CountingPrimitiveBuffer(renderer.getFontRender());
+			try{
+				new GridScene(buff, frameData, gridSize).build();
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+			cutoffMax[0] = buff.getCount();
+		}
+		
+		if(ImGui.dragScalar("Element count cutoff", this.cutoff, 0.5F/ImGui.getWindowDpiScale(), -1, cutoffMax[0])){
 			retireScene();
 		}
 		
@@ -184,7 +204,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		if(scene == null){
 			if(SCENE_BUILD_POOL.getQueue().size()>3) UtilL.sleep(20);
-			var task = new BuildTask(frameData, gridSize, merge.get(), dynamicTokens.getFontRender());
+			var task = new BuildTask(frameData, gridSize, merge.get(), dynamicTokens.getFontRender(), this.cutoff[0]);
 			var lock = this;
 			SCENE_BUILD_POOL.execute(() -> {
 				if(task.frameData != frameData){
