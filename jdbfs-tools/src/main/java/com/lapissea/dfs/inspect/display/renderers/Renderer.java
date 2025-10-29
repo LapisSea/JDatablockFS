@@ -11,7 +11,7 @@ import com.lapissea.dfs.inspect.display.vk.wrap.Device;
 public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Renderer.RenderToken> extends VulkanResource{
 	
 	
-	final class IndexedMeshBuffer implements VulkanResource{
+	final class IndexedMeshBuffer implements ResourceBuffer{
 		
 		private BackedVkBuffer vbos;
 		private BackedVkBuffer ibos;
@@ -30,6 +30,7 @@ public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Rendere
 		public BackedVkBuffer vbos(){ return vbos; }
 		public BackedVkBuffer ibos(){ return ibos; }
 		
+		@Override
 		public void reset(){
 			vboPos = iboPos = 0;
 		}
@@ -75,7 +76,9 @@ public interface Renderer<RB extends Renderer.ResourceBuffer, RT extends Rendere
 		
 	}
 	
-	interface ResourceBuffer extends VulkanResource{ }
+	interface ResourceBuffer extends VulkanResource{
+		void reset();
+	}
 	
 	interface RenderToken{ }
 	

@@ -2,8 +2,6 @@ package com.lapissea.dfs.inspect.display.renderers;
 
 import com.carrotsearch.hppc.CharObjectHashMap;
 import com.carrotsearch.hppc.CharObjectMap;
-import com.lapissea.dfs.tools.DrawFont;
-import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.ShaderType;
 import com.lapissea.dfs.inspect.display.VUtils;
@@ -28,6 +26,8 @@ import com.lapissea.dfs.inspect.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkPipeline;
+import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix3x2f;
 import org.lwjgl.system.MemoryUtil;
@@ -337,6 +337,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			}
 		}
 		
+		@Override
 		public void reset(){
 			drawStart = uniformPos = quadPos = 0;
 		}

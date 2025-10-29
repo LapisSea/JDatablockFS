@@ -185,6 +185,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		private int instanceCount;
 		private int byteCount;
 		
+		@Override
 		public void reset(){
 			instanceCount = 0;
 			byteCount = 0;

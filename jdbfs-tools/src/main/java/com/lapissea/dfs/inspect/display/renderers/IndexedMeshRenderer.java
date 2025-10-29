@@ -89,7 +89,10 @@ public class IndexedMeshRenderer implements VulkanResource{
 		}
 	}
 	
-	public record RToken(Renderer.IndexedMeshBuffer resource, VkIndexType indexType, long vboOffset, long iboOffset, int indexCount){
+	public record RToken(
+		Renderer.IndexedMeshBuffer resource, VkIndexType indexType,
+		long vboOffset, long iboOffset, int indexCount
+	) implements Renderer.RenderToken{
 		public void bind(CommandBuffer buf, int binding){
 			buf.bindVertexBuffer(resource.vbos().buffer, binding, vboOffset);
 			buf.bindIndexBuffer(resource.ibos().buffer, iboOffset, indexType);

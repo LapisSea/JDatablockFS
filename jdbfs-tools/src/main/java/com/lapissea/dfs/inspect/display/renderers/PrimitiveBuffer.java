@@ -3,6 +3,7 @@ package com.lapissea.dfs.inspect.display.renderers;
 import com.lapissea.dfs.tools.DrawFont;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 public interface PrimitiveBuffer{
@@ -15,12 +16,19 @@ public interface PrimitiveBuffer{
 	record ByteToken(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents){ }
 	
 	sealed interface TokenSet{
-		record ReadyMulti(List<MultiRendererBuffer> readyBuffers) implements TokenSet{ }
+		record ReadyMulti(List<MultiRendererBuffer.RenderToken> readyData) implements TokenSet{
+			public void add(MultiRendererBuffer.RenderToken path){
+				readyData.add(path);
+			}
+		}
 		
 		record Lines(List<Geometry.Path> paths) implements TokenSet{
 			@Override
 			public String toString(){
 				return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
+			}
+			public void add(Collection<? extends Geometry.Path> mesh){
+				paths.addAll(mesh);
 			}
 			public void add(Geometry.Path path){
 				paths.add(path);
@@ -32,6 +40,9 @@ public interface PrimitiveBuffer{
 			public String toString(){
 				return "Meshes{meshes = " + meshes.size() + ", verts = " + meshes.stream().mapToInt(e -> e.verts().size()).sum() + '}';
 			}
+			public void add(Collection<Geometry.IndexedMesh> mesh){
+				meshes.addAll(mesh);
+			}
 			public void add(Geometry.IndexedMesh mesh){
 				meshes.add(mesh);
 			}
@@ -41,6 +52,9 @@ public interface PrimitiveBuffer{
 			@Override
 			public String toString(){
 				return "Strings{strings = " + strings.size() + ", chars = " + strings.stream().mapToInt(e -> e.string().length()).sum() + '}';
+			}
+			public void add(Collection<MsdfFontRender.StringDraw> strings){
+				this.strings.addAll(strings);
 			}
 			public void add(MsdfFontRender.StringDraw string){
 				strings.add(string);
@@ -61,17 +75,21 @@ public interface PrimitiveBuffer{
 		}
 	}
 	
+	
 	FontRednerer getFontRender();
 	
 	default void renderMesh(Geometry.IndexedMesh mesh)         { renderMeshes(List.of(mesh)); }
 	void renderMeshes(List<Geometry.IndexedMesh> mesh);
 	
 	default void renderLine(Geometry.Path path)                { renderLines(List.of(path)); }
-	void renderLines(Iterable<? extends Geometry.Path> paths);
+	void renderLines(Collection<? extends Geometry.Path> paths);
 	
 	default void renderFont(MsdfFontRender.StringDraw path)    { renderFont(List.of(path)); }
 	default void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }
 	void renderFont(List<MsdfFontRender.StringDraw> strings);
 	
 	void renderBytes(long dataOffset, byte[] data, Iterable<ByteGridRender.DrawRange> ranges, Iterable<ByteGridRender.IOEvent> ioEvents);
+	
+	int tokenCount();
+	Iterable<TokenSet> tokens();
 }

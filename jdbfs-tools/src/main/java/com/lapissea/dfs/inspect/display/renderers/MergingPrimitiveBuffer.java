@@ -14,6 +14,7 @@ import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.BiConsumer;
 
@@ -64,6 +65,11 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 	}
 	
 	@Override
+	public int tokenCount(){
+		return tokens.size();
+	}
+	
+	@Override
 	public FontRednerer getFontRender(){
 		return fontRednerer;
 	}
@@ -88,7 +94,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 	}
 	
 	@Override
-	public void renderLines(Iterable<? extends Geometry.Path> paths){
+	public void renderLines(Collection<? extends Geometry.Path> paths){
 		for(Geometry.Path path : paths){
 			var mesh = Geometry.generateThickLineMesh(path.toPoints());
 			renderMesh(mesh);

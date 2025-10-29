@@ -36,11 +36,12 @@ import java.util.function.Supplier;
 
 public class ByteGridComponent extends BackbufferComponent{
 	
-	private final MultiRendererBuffer multiRenderer;
-	
-	private final MultiRendererBuffer staticRenderer;
-	private       Object              shownSceneId;
-	
+	private final MultiRendererBuffer                renderer;
+	private final MultiRendererBuffer.RenderResource staticRes  = new MultiRendererBuffer.RenderResource();
+	private       MultiRendererBuffer.RenderToken    staticGpuCall;
+	private final MultiRendererBuffer.RenderResource dynamicRes = new MultiRendererBuffer.RenderResource();
+	private       MultiRendererBuffer.TokenBuilder   dynamicTokens;
+	private       Object                             shownSceneId;
 	
 	private final List<String> messages;
 	
@@ -65,8 +66,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		clearColor.set(0.4, 0.4, 0.4, 1);
 		
-		multiRenderer = new MultiRendererBuffer(core);
-		staticRenderer = new MultiRendererBuffer(core);
+		renderer = new MultiRendererBuffer(core);
 	}
 	
 	private record BuildTask(
@@ -87,7 +87,8 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	
 	private void clearStaticRenderer(){
-		staticRenderer.reset();
+		staticRes.reset();
+		staticGpuCall = null;
 		shownSceneId = null;
 	}
 	
@@ -132,15 +133,16 @@ public class ByteGridComponent extends BackbufferComponent{
 			}
 		}
 		
-		multiRenderer.reset();
+		dynamicTokens = new MultiRendererBuffer.TokenBuilder(renderer.getFontRender());
 		GridUtils.ByteGridSize size;
 		try{
 			size = recordBackbuffer(deviceGC, viewSize);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
-		multiRenderer.upload(deviceGC);
-		multiRenderer.submit(size, viewSize, cmdBuffer);
+		dynamicRes.reset();
+		var rToken = renderer.upload(dynamicRes, dynamicTokens, deviceGC);
+		renderer.submit(size, viewSize, rToken, cmdBuffer);
 	}
 	
 	private final ImBoolean merge = new ImBoolean(true), showBoundingBoxes = new ImBoolean();
@@ -151,7 +153,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
 			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
 			
-			multiRenderer.renderMesh(GridUtils.backgroundDots(viewSize, color, ImGui.getWindowDpiScale()));
+			dynamicTokens.renderMesh(GridUtils.backgroundDots(viewSize, color, ImGui.getWindowDpiScale()));
 		}
 		
 		long byteCount = getFrameSize(frameData);
@@ -182,7 +184,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		if(scene == null){
 			if(SCENE_BUILD_POOL.getQueue().size()>3) UtilL.sleep(20);
-			var task = new BuildTask(frameData, gridSize, merge.get(), staticRenderer.getFontRender());
+			var task = new BuildTask(frameData, gridSize, merge.get(), dynamicTokens.getFontRender());
 			var lock = this;
 			SCENE_BUILD_POOL.execute(() -> {
 				if(task.frameData != frameData){
@@ -222,11 +224,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		if(shownSceneId != scene.id){
 			shownSceneId = scene.id;
-			staticRenderer.reset();
-			staticRenderer.add(((MergingPrimitiveBuffer)scene.buffer).tokens());
-			staticRenderer.upload(deviceGC);
+			staticRes.reset();
+			staticGpuCall = renderer.upload(staticRes, scene.buffer, deviceGC);
 		}
-		multiRenderer.renderReady(staticRenderer);
+		dynamicTokens.renderReady(staticGpuCall);
 		
 		if(GridUtils.calcByteIndex(scene.gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			for(var message : scene.messages.collect(p)){
@@ -245,16 +246,16 @@ public class ByteGridComponent extends BackbufferComponent{
 			}catch(IOException ignored){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
-			multiRenderer.renderLines(
+			dynamicTokens.renderLines(
 				GridUtils.outlineByteRange(Color.WHITE, scene.gridSize, new Range(p, p + 1), 1.5F)
 			);
 		}
 		
 		if(showBoundingBoxes.get()){
-			multiRenderer.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths(mouseX(), mouseY()));
+			dynamicTokens.renderLines(((MergingPrimitiveBuffer)scene.buffer).paths(mouseX(), mouseY()));
 		}
 		
-		if(oldData) multiRenderer.renderFont(new MsdfFontRender.StringDraw(
+		if(oldData) dynamicTokens.renderFont(new MsdfFontRender.StringDraw(
 			20*ImGui.getWindowDpiScale(),
 			Color.DARK_GRAY, "Old data...",
 			2, viewSize.height - 2
@@ -264,7 +265,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	}
 	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
-		multiRenderer.renderLines(lines);
+		dynamicTokens.renderLines(lines);
 	}
 	
 	private void renderFullScreenMessage(Extent2D viewSize, String str){
@@ -272,9 +273,9 @@ public class ByteGridComponent extends BackbufferComponent{
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
 		if(GridUtils.stringDrawIn(
-			multiRenderer.getFontRender(), str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false
+			dynamicTokens.getFontRender(), str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false
 		) instanceof Some(var draw)){
-			multiRenderer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
+			dynamicTokens.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
 	}
 	
@@ -289,8 +290,11 @@ public class ByteGridComponent extends BackbufferComponent{
 	@Override
 	public void unload(TextureRegistry.Scope tScope) throws VulkanCodeException{
 		super.unload(tScope);
-		multiRenderer.destroy();
-		staticRenderer.destroy();
+		staticRes.destroy();
+		dynamicRes.destroy();
+		shownSceneId = null;
+		dynamicTokens = null;
+		staticGpuCall = null;
 	}
 	
 	private void testCurve(){
@@ -300,6 +304,6 @@ public class ByteGridComponent extends BackbufferComponent{
 			(float)Math.sin(t/s)*100 + 200*(i + 1),
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
-		multiRenderer.renderLines(List.of(new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3)));
+		dynamicTokens.renderLines(List.of(new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3)));
 	}
 }
