@@ -196,7 +196,10 @@ public class ByteGridComponent extends BackbufferComponent{
 			cutoffMax[0] = buff.getCount();
 		}
 		
-		if(ImGui.dragScalar("Element count cutoff", this.cutoff, 0.5F/ImGui.getWindowDpiScale(), -1, cutoffMax[0])){
+		if(ImGui.dragScalar("Element count cutoff", this.cutoff, 0.2F/ImGui.getWindowDpiScale(), -1, cutoffMax[0])){
+			retireScene();
+		}
+		if(ImGui.sliderScalar("#eCOff", this.cutoff, -1, cutoffMax[0])){
 			retireScene();
 		}
 		
