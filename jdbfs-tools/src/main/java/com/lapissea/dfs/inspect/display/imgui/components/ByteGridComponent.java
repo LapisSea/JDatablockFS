@@ -320,6 +320,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		super.unload(tScope);
 		staticRes.destroy();
 		dynamicRes.destroy();
+		renderer.destroy();
 		shownSceneId = null;
 		dynamicTokens = null;
 		staticGpuCall = null;
