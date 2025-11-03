@@ -39,7 +39,7 @@ public class VkDeviceMemory extends VulkanResource.DeviceHandleObj{
 			
 			if(alignedOffset + alignedSize>boundBuffer.size){
 				throw new AssertionError(alignedOffset + "+" + alignedSize + ">" + boundBuffer.size +
-				                         " (" + alignedOffset + alignedSize + ">" + boundBuffer.size + ")");
+				                         " (" + (alignedOffset + alignedSize) + ">" + boundBuffer.size + ")");
 			}
 			
 			var mapAligned = VKCalls.vkMapMemory(this, alignedOffset, alignedSize, 0);

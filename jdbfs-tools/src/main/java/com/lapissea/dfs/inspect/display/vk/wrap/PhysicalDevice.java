@@ -127,15 +127,19 @@ public class PhysicalDevice{
 		return memoryProperties;
 	}
 	
+	public record MemoryTypeRes(int index, MemoryType type){ }
+	
 	public int getMemoryTypeIndex(int typeBits, Flags<VkMemoryPropertyFlag> requiredProperties){
+		return getMemoryType(typeBits, requiredProperties).index;
+	}
+	public MemoryTypeRes getMemoryType(int typeBits, Flags<VkMemoryPropertyFlag> requiredProperties){
 		return Iters.from(memoryProperties.memoryTypes())
-		            .enumerate()
-		            .filter(e -> {
-			            var typeSupported = UtilL.checkFlag(typeBits, 1<<e.index());
-			            var hasMemProps   = e.val().propertyFlags.containsAll(requiredProperties);
+		            .enumerate(MemoryTypeRes::new)
+		            .firstMatching(e -> {
+			            var typeSupported = UtilL.checkFlag(typeBits, 1<<e.index);
+			            var hasMemProps   = e.type.propertyFlags.containsAll(requiredProperties);
 			            return typeSupported && hasMemProps;
-		            }).map(IterablePP.Idx::index)
-		            .findFirst()
+		            })
 		            .orElseThrow(() -> new IllegalStateException("Could not find memory type for: " + typeBits + " & " + requiredProperties));
 	}
 	

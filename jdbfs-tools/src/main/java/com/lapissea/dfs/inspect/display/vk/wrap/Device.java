@@ -367,6 +367,15 @@ public class Device implements VulkanResource{
 			
 			var requirements = buffer.getRequirements();
 			var requiredSize = requirements.size();
+			
+			var actualProps = physicalDevice.getMemoryType(buffer.getRequirements().memoryTypeBits(), memoryFlags).type();
+			if(actualProps.propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
+				var newSize = physicalDevice.alignToAtomSizeUp(size);
+				if(newSize > requiredSize){
+					requiredSize=newSize;
+				}
+			}
+			
 			if(requiredSize<size){
 				throw new ShouldNeverHappenError("Required buffer size is too small");
 			}else if(requiredSize != size){
