@@ -63,7 +63,7 @@ public class ImHandler{
 	
 	
 	private void renderImGUI(DeviceGC deviceGC){
-		ImGui.dockSpaceOverViewport(ImGui.getMainViewport());
+		ImGui.dockSpaceOverViewport(ImGui.getMainViewport().getID());
 		
 		for(UIComponent component : components){
 			component.imRender(deviceGC, imGuiRenderer.textureScope);
