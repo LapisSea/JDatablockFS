@@ -6,6 +6,7 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -93,7 +94,7 @@ public class RangeMessageSpace{
 //		}
 	}
 	
-	public record Message(String message, Range range, HoverEffect hoverEffect) implements Comparable<Message>{
+	public record Message(String message, Range range, HoverEffect hoverEffect, long id) implements Comparable<Message>{
 		public Message{
 			Objects.requireNonNull(message);
 			Objects.requireNonNull(range);
@@ -105,19 +106,22 @@ public class RangeMessageSpace{
 		}
 	}
 	
+	private long idCounter;
+	
 	private final Node root = new Node(new Range(Long.MIN_VALUE, Long.MAX_VALUE), null);
 	
 	public void add(String message, Range range){
 		add(message, range, HoverEffect.NONE);
 	}
 	public void add(String message, Range range, HoverEffect hoverEffect){
-		var msg = new Message(message, range, hoverEffect);
+		var msg = new Message(message, range, hoverEffect, idCounter++);
 		root.children.add(new Node(range, msg));
 	}
 	
 	public List<Message> collect(long hoverIndex){
 		var result = new ArrayList<Message>();
 		var c      = root.collect(hoverIndex, result);
+		result.sort(Comparator.comparingLong(Message::id).reversed());
 //		LogUtil.println(root.toTreeString());
 //		LogUtil.println(c);
 		return result;

@@ -253,7 +253,12 @@ public class ByteGridComponent extends BackbufferComponent{
 		dynamicTokens.renderReady(staticGpuCall);
 		
 		if(GridUtils.calcByteIndex(scene.gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
+			boolean needsByteOutline = true;
+			var     hoverRange       = Range.fromSize(p, 1);
 			for(var message : scene.messages.collect(p)){
+				if(needsByteOutline && message.range().equals(hoverRange)){
+					needsByteOutline = false;
+				}
 				switch(message.hoverEffect()){
 					case RangeMessageSpace.HoverEffect.None ignore -> { }
 					case RangeMessageSpace.HoverEffect.Outline(Color color, float lineWidth) -> {
@@ -269,9 +274,9 @@ public class ByteGridComponent extends BackbufferComponent{
 			}catch(IOException ignored){ }
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
-			dynamicTokens.renderLines(
-				GridUtils.outlineByteRange(Color.WHITE, scene.gridSize, new Range(p, p + 1), 1.5F)
-			);
+			if(needsByteOutline){
+				outlineByteRange(scene.gridSize, Color.WHITE, hoverRange, 1.5F);
+			}
 		}
 		
 		if(showBoundingBoxes.get()){

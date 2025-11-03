@@ -160,7 +160,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 	}
 	
-	private record Pointer(long from, long to, int size, Color color, String message, float widthFactor){ }
+	public record Pointer(long from, long to, int size, Color color, String message, float widthFactor){ }
 	
 	private boolean errorMode;
 	private long    renderCount;

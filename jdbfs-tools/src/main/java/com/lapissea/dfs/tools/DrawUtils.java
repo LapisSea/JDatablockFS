@@ -423,7 +423,7 @@ public final class DrawUtils{
 	public static void drawPixelLine(RenderBackend renderer, float scale, double xFrom, double yFrom, double xTo, double yTo){
 		renderer.drawLine(xFrom*scale, yFrom*scale, xTo*scale, yTo*scale);
 	}
-	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
+	public static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
 		return Iters.nullTerminated(() -> new Supplier<>(){
 			long remaining = size;
 			final ChunkChainIO io;

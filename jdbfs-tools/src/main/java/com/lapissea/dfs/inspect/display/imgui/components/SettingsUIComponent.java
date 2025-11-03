@@ -49,7 +49,7 @@ public final class SettingsUIComponent implements UIComponent{
 	}
 	
 	public final VulkanDisplay vulkanDisplay;
-	public final ImInt         fpsLimit                = new ImInt(60);
+	public final ImInt         fpsLimit                = new ImInt(30);
 	public final int[]         statsLevel              = {0};
 	public final ImBoolean     imageViewerOpen         = new ImBoolean();
 	public final ImBoolean     byteGridOpen            = new ImBoolean(true);

@@ -13,9 +13,12 @@ import com.lapissea.dfs.inspect.display.renderers.Geometry;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.inspect.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
+import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.Reference;
+import com.lapissea.dfs.tools.BinaryGridRenderer.Pointer;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.utils.NanoClock;
@@ -78,7 +81,7 @@ public class GridScene{
 					var chunk = dataProvider.getChunk(ChunkPointer.of(pointer));
 					flushError();
 					
-					annotateStruct(Chunk.PIPE, chunk.getPtr().getValue());
+					annotateStruct(Chunk.PIPE, ChunkPointer.NULL, chunk.getPtr().getValue());
 					
 					var chRange = new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd());
 					messages.add("Hovered chunk: " + chunk, chRange, new RangeMessageSpace.HoverEffect.Outline(Color.CYAN.darker(), 2));
@@ -120,7 +123,7 @@ public class GridScene{
 			var rootWalk = cluster.rootWalker(null, false);
 			var root     = rootWalk.getRoot();
 			var rootPipe = FixedStructPipe.of(root.getClass());
-			annotateStruct(rootPipe, cluster.getFirstChunk().dataStart());
+			annotateStruct(rootPipe, cluster.getFirstChunk().getPtr(), 0);
 		}
 		
 		drawByteRanges(List.of(new DrawUtils.Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
@@ -169,7 +172,7 @@ public class GridScene{
 		}
 	}
 	
-	record ReadField<T extends IOInstance<T>, V>(IOField<T, V> field, V value, long offset, long size){ }
+	record ReadField<T extends IOInstance<T>, V>(IOField<T, V> field, V value, ChunkPointer block, DrawUtils.Range range){ }
 	
 	record ReadFields<T extends IOInstance<T>>(T value, List<ReadField<T, ?>> fields){ }
 	
@@ -186,19 +189,22 @@ public class GridScene{
 			Object value = field instanceof BitFieldMerger? null : field.get(ioPool, ch);
 			
 			//noinspection unchecked
-			fields.add(new ReadField<>((IOField<Chunk, ? super Object>)field, value, valueOffset, valueSize));
+			fields.add(new ReadField<>((IOField<Chunk, ? super Object>)field, value, ChunkPointer.NULL, DrawUtils.Range.fromSize(valueOffset, valueSize)));
 		}
 		//noinspection unchecked
 		return (ReadFields<T>)new ReadFields<>(ch, fields);
 	}
-	private <T extends IOInstance<T>> ReadFields<T> readFields(StructPipe<T> pipe, long offset) throws IOException{
+	private <T extends IOInstance<T>> ReadFields<T> readFields(StructPipe<T> pipe, ChunkPointer ptr, long offset) throws IOException{
 		if(pipe.getType().getType() == Chunk.class){
 			return getChunkFields(pipe, offset);
 		}
 		
 		List<ReadField<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
 		
-		try(var src = dataProvider.getSource().ioAt(offset)){
+		RandomIO src;
+		if(ptr.isNull()) src = dataProvider.getSource().ioAt(offset);
+		else src = ptr.dereference(dataProvider).ioAt(offset);
+		try(src){
 			var ioPool  = pipe.makeIOPool();
 			T   inst    = pipe.getType().make();
 			var lastPos = src.getPos();
@@ -208,43 +214,65 @@ public class GridScene{
 					lastPos = src.getPos();
 					continue;
 				}
-				var value       = field.get(ioPool, inst);
-				var valueOffset = lastPos;
-				var newPos      = src.getPos();
-				var valueSize   = newPos - lastPos;
-				lastPos = newPos;
-				
+				var value  = field.get(ioPool, inst);
+				var newPos = src.getPos();
 				//noinspection unchecked
-				fields.add(new ReadField<>((IOField<T, ? super Object>)field, value, valueOffset, valueSize));
+				fields.add(new ReadField<>((IOField<T, ? super Object>)field, value, ptr, new DrawUtils.Range(lastPos, newPos)));
+				lastPos = newPos;
 			}
 			return new ReadFields<>(inst, fields);
 		}
 	}
-	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, long offset) throws IOException{
+	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, ChunkPointer ptr, long offset) throws IOException{
 		
 		if(pipe.getType().needsBuilderObj()){
-			annotateStruct(pipe.getBuilderPipe(), offset);
+			annotateStruct(pipe.getBuilderPipe(), ptr, offset);
 			return;
 		}
 		
-		var info = readFields(pipe, offset);
-		for(ReadField<T, ?> field : info.fields){
-			if(field.size == 0) continue;
-			//noinspection unchecked
-			annotateByteField((IOField<T, ? super Object>)field.field, field.value, field.offset, field.size);
+		var info = readFields(pipe, ptr, offset);
+		for(ReadField<T, ?> rf : info.fields){
+			var rand = new RawRandom(rf.field.toString().hashCode());
+			var col  = new Color(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
+			annotateByteField(rf, col);
 		}
 		
 	}
 	
-	private <T extends IOInstance<T>, V> void annotateByteField(IOField<T, V> field, V value, long valueOffset, long valueSize) throws IOException{
-		var rand = new RawRandom(field.toString().hashCode());
-		var col  = new Color(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
-		drawByteRanges(List.of(DrawUtils.Range.fromSize(valueOffset, valueSize)), col, false, true);
+	private <T extends IOInstance<T>, V> void annotateByteField(ReadField<T, V> rf, Color col) throws IOException{
+		if(rf.range.size() == 0) return;
 		
-		var rect = gridSize.findBestRectScaled(DrawUtils.Range.fromSize(valueOffset, valueSize));
-		if(stringDrawIn(field + " " + value, rect, col, gridSize.byteSize()*0.8F, false) instanceof Match.Some(var draw)){
+		
+		DrawUtils.Range bestRange = new DrawUtils.Range(0, 0);
+		DrawUtils.Range lastRange = null;
+		var ranges = rf.block.isNull()?
+		             List.of(rf.range) :
+		             DrawUtils.chainRangeResolve(dataProvider, new Reference(rf.block, 0), rf.range.from(), rf.range.size());
+		
+		var message = rf.field.toString();
+		
+		for(DrawUtils.Range range : ranges){
+			messages.add(message, range, new RangeMessageSpace.HoverEffect.Outline(col.brighter(), 2));
+			if(bestRange.size()<gridSize.bytesPerRow()){
+				var contiguousRange = DrawUtils.findBestContiguousRange(gridSize.bytesPerRow(), range);
+				if(bestRange.size()<contiguousRange.size()) bestRange = contiguousRange;
+			}
+			if(lastRange != null) recordPointer(new Pointer(lastRange.to() - 1, range.from(), 0, col, rf.field.toString(), 0.2F));
+			lastRange = range;
+			drawByteRanges(List.of(range), ColorUtils.alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
+		}
+		
+		if(gridSize.bytesPerRow()<6){
+			return;
+		}
+		
+		var rect = gridSize.findBestRectScaled(rf.range);
+		if(stringDrawIn(rf.field + " " + rf.value, rect, col, gridSize.byteSize()*0.8F, false) instanceof Match.Some(var draw)){
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
+	}
+	private void recordPointer(Pointer pointer){
+	
 	}
 	
 	private void drawBytes(IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException{
