@@ -210,10 +210,15 @@ public final class ImTools{
 			try(var t = Objects.requireNonNull(DisplayManager.class.getResourceAsStream(resourcePath))){
 				bb = t.readAllBytes();
 			}
-			f.clearFonts();
+			f.setFreeTypeRenderer(true);
+			
 			var conf = new ImFontConfig();
-			conf.setOversampleH(2);
+			conf.setFontData(bb);
+			conf.setFontDataSize(bb.length);
 			conf.setOversampleV(2);
+			conf.setOversampleH(2);
+			conf.setSizePixels(15);
+			f.addFont(conf);
 			return List.of(bb);
 		}catch(Throwable e){
 			throw new RuntimeException("Failed to load imgui font");

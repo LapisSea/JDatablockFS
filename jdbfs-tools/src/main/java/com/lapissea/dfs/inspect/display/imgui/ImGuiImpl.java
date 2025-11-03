@@ -133,6 +133,8 @@ public class ImGuiImpl{
 	private final VulkanCore    core;
 	private final ImGUIRenderer imGUIRenderer;
 	
+	public static final float[] SCALE_MULTIPLIER = new float[]{1};
+	
 	public ImGuiImpl(VulkanCore core, ImGUIRenderer imGUIRenderer){
 		this.core = core;
 		this.imGUIRenderer = imGUIRenderer;
@@ -926,7 +928,7 @@ public class ImGuiImpl{
 		var     window = vd.window.getGlfwWindow().getHandle();
 		float[] x      = {1}, y = {1};
 		glfwGetWindowContentScale(window, x, y);
-		return (x[0] + y[0])/2;
+		return (x[0] + y[0])/2*SCALE_MULTIPLIER[0];
 	}
 	
 	protected void initPlatformInterface(){

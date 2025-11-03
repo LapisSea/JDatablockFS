@@ -4,12 +4,14 @@ import com.lapissea.dfs.inspect.SessionSetView;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.TextureRegistry;
 import com.lapissea.dfs.inspect.display.VulkanDisplay;
+import com.lapissea.dfs.inspect.display.imgui.ImGuiImpl;
 import com.lapissea.dfs.inspect.display.imgui.UIComponent;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;
+import imgui.flag.ImGuiSliderFlags;
 import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import imgui.type.ImString;
@@ -132,6 +134,10 @@ public final class SettingsUIComponent implements UIComponent{
 	
 	private void generalSettingsUI(){
 		ImGui.text("General settings:");
+		
+		ImGui.sliderScalar("UI scale", ImGuiImpl.SCALE_MULTIPLIER, 0.2F, 4, "%.2f", ImGuiSliderFlags.Logarithmic);
+		ImGui.separator();
+		
 		ImGui.inputInt("FPS Limit", fpsLimit);
 		if(fpsLimit.get()<0) fpsLimit.set(0);
 		ImGui.sliderScalar("##FPS Limit", fpsLimit.getData(), 0, 300);
