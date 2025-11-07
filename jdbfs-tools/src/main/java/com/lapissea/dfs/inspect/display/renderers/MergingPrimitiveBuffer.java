@@ -87,6 +87,16 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 					return;
 				}
 				var lastM = meshes.getLast();
+				if(lastM.indices().hasNoResize()){
+					meshes.removeLast();
+					var newMesh = new Geometry.IndexedMesh(
+						new VertexBuilder(lastM.verts().size() + m.verts().size()),
+						new IndexBuilder(lastM.indices().elementSize() + m.indices().elementSize())
+					);
+					newMesh.add(lastM);
+					meshes.add(newMesh);
+					lastM = newMesh;
+				}
 				lastM.add(m);
 			}
 		);

@@ -49,6 +49,9 @@ public class IndexBuilder implements IterableIntPP.SizedPP{
 		setType(type);
 	}
 	
+	public boolean hasNoResize(){
+		return noResize;
+	}
 	public IndexBuilder noResize(){
 		noResize = true;
 		if(buffer == null){
