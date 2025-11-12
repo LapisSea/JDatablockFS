@@ -1,8 +1,7 @@
-package com.lapissea.dfs.inspect.display.renderers;
+package com.lapissea.dfs.inspect.display.primitives;
 
+import com.lapissea.dfs.inspect.display.primitives.Path.PointsLine;
 import com.lapissea.dfs.tools.DrawUtils;
-import com.lapissea.dfs.inspect.display.IndexBuilder;
-import com.lapissea.dfs.inspect.display.VertexBuilder;
 import org.joml.Intersectionf;
 import org.joml.Matrix2f;
 import org.joml.Vector2f;
@@ -13,49 +12,6 @@ import java.util.Arrays;
 import java.util.List;
 
 public final class Geometry{
-	
-	public interface Path{
-		PointsLine toPoints();
-		DrawUtils.Rect boundingBox();
-	}
-	
-	public record PointsLine(List<Vector2f> points, float width, Color color, boolean miterJoints) implements Path{
-		@Override
-		public PointsLine toPoints(){ return this; }
-		@Override
-		public DrawUtils.Rect boundingBox(){
-			if(points.isEmpty()){
-				return DrawUtils.Rect.ofWH(0, 0, 0, 0);
-			}
-			var min = new Vector2f(points.getFirst());
-			var max = new Vector2f(points.getFirst());
-			
-			for(Vector2f point : points){
-				min.min(point);
-				max.max(point);
-			}
-			var rad = width/2;
-			min.sub(width, rad);
-			max.add(width, rad);
-			return DrawUtils.Rect.ofFromTo(min, max);
-		}
-	}
-	
-	public record BezierCurve(List<Vector2f> controlPoints, float width, Color color, int resolution, double epsilon) implements Path{
-		@Override
-		public PointsLine toPoints(){
-			var points  = catmullRomToInterpolated(controlPoints, resolution);
-			var reduced = epsilon>0? douglasPeuckerReduce(points, epsilon) : points;
-			return new PointsLine(reduced, width, color, false);
-		}
-		@Override
-		public DrawUtils.Rect boundingBox(){
-			return catmullRomBounds(controlPoints, width/2);
-		}
-		
-	}
-	
-	public record Vertex(Vector2f pos, Color color){ }
 	
 	public record IndexedMesh(VertexBuilder verts, IndexBuilder indices){
 		public DrawUtils.Rect boundingBox(){
@@ -79,24 +35,22 @@ public final class Geometry{
 		}
 	}
 	
-	public record MeshSize(int vertCount, int indexCount){ }
-	static MeshSize calculateMeshSize(PointsLine line){
-		int pointCount = line.points().size();
-		if(pointCount<2) return new MeshSize(0, 0);
-		return new MeshSize(2*pointCount, 6*(pointCount - 1));
-	}
-	static MeshSize calculateMeshSize(Iterable<PointsLine> lines){
-		int vertCount = 0, indexCount = 0;
-		for(PointsLine line : lines){
-			var s = calculateMeshSize(line);
-			vertCount += s.vertCount;
-			indexCount += s.indexCount;
-		}
-		return new MeshSize(vertCount, indexCount);
-	}
-	static IndexedMesh generateThickLineMesh(PointsLine line){
+	public record MeshSize(int vertCount, int indexCount){
 		
-		var size  = calculateMeshSize(line);
+		public static MeshSize calculate(Iterable<PointsLine> lines){
+			int vertCount = 0, indexCount = 0;
+			for(PointsLine line : lines){
+				var s = line.calculateMeshSize();
+				vertCount += s.vertCount;
+				indexCount += s.indexCount;
+			}
+			return new MeshSize(vertCount, indexCount);
+		}
+	}
+	
+	public static IndexedMesh generateThickLineMesh(PointsLine line){
+		
+		var size  = line.calculateMeshSize();
 		var verts = new VertexBuilder(size.vertCount);
 		
 		var pts = line.points();
@@ -119,7 +73,7 @@ public final class Geometry{
 			var current = pts.get(i);
 			var next    = pts.get(i + 1);
 			
-			if(line.miterJoints && computeMitterIntersect(prev, current, next, halfWidth, intersect)){
+			if(line.miterJoints() && computeMitterIntersect(prev, current, next, halfWidth, intersect)){
 				var intersect1 = new Vector2f(intersect);
 				var intersect2 = new Vector2f(intersect).add(current.sub(intersect, new Vector2f()).mul(2));
 				

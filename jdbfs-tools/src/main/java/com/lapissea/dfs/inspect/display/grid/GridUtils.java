@@ -1,14 +1,15 @@
 package com.lapissea.dfs.inspect.display.grid;
 
-import com.lapissea.dfs.tools.DrawFont;
-import com.lapissea.dfs.tools.DrawUtils;
-import com.lapissea.dfs.inspect.display.IndexBuilder;
 import com.lapissea.dfs.inspect.display.VUtils;
-import com.lapissea.dfs.inspect.display.VertexBuilder;
-import com.lapissea.dfs.inspect.display.renderers.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+import com.lapissea.dfs.inspect.display.primitives.VertexBuilder;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender.StringDraw;
 import com.lapissea.dfs.inspect.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.vk.wrap.Extent2D;
+import com.lapissea.dfs.tools.DrawFont;
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
@@ -119,7 +120,7 @@ public final class GridUtils{
 		}
 	}
 	
-	public static List<Geometry.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
+	public static List<Path.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
 		record Line(Vector2f a, Vector2f b){
 			Line(float xa, float ya, float xb, float yb){
 				this(new Vector2f(xa, ya), new Vector2f(xb, yb));
@@ -197,7 +198,7 @@ public final class GridUtils{
 		
 		return Iters.from(chains).map(c -> {
 			for(Vector2f point : c) point.mul(gridInfo.byteSize);
-			return new Geometry.PointsLine(List.copyOf(c), lineWidth, color, true);
+			return new Path.PointsLine(List.copyOf(c), lineWidth, color, true);
 		}).toList();
 	}
 	

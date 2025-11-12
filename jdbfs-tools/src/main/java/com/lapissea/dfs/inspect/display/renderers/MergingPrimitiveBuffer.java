@@ -1,9 +1,11 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
-import com.lapissea.dfs.inspect.display.IndexBuilder;
-import com.lapissea.dfs.inspect.display.VertexBuilder;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.grid.RectSet;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+import com.lapissea.dfs.inspect.display.primitives.VertexBuilder;
 import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.DrawUtils.Rect;
@@ -103,8 +105,8 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 	}
 	
 	@Override
-	public void renderLines(List<? extends Geometry.Path> paths){
-		for(Geometry.Path path : paths){
+	public void renderLines(List<? extends Path> paths){
+		for(Path path : paths){
 			var mesh = Geometry.generateThickLineMesh(path.toPoints());
 			renderMesh(mesh);
 		}
@@ -248,7 +250,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 		return Iters.from(tokens).map(e -> e.tokens).joinAsStr("\n") + "\nSIZE: " + tokens.size();
 	}
 	
-	public List<Geometry.PointsLine> paths(int x, int y){
+	public List<Path.PointsLine> paths(int x, int y){
 		return Iters.from(tokens).flatMap(e -> {
 			if(!(e.tokens instanceof TokenSet.Strings)){
 				return List.of();
@@ -258,7 +260,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 			
 			return e.areas.all().filter(rect -> Rect.ofWH(x, y, 0, 0).isWithin(rect)).map(rect -> {
 				
-				return new Geometry.PointsLine(
+				return new Path.PointsLine(
 					List.of(
 						new Vector2f(rect.x(), rect.y()),
 						new Vector2f(rect.xTo(), rect.y()),

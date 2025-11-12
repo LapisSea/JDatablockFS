@@ -1,7 +1,7 @@
 package com.lapissea.dfs.inspect.display.vk;
 
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
-import com.lapissea.dfs.inspect.display.renderers.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.tools.DrawUtils;
 
 import java.awt.Color;

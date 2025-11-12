@@ -5,6 +5,7 @@ import com.lapissea.dfs.inspect.display.ShaderType;
 import com.lapissea.dfs.inspect.display.VUtils;
 import com.lapissea.dfs.inspect.display.VkPipelineSet;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.inspect.display.vk.CommandBuffer;
 import com.lapissea.dfs.inspect.display.vk.ShaderModuleSet;
 import com.lapissea.dfs.inspect.display.vk.Std430;

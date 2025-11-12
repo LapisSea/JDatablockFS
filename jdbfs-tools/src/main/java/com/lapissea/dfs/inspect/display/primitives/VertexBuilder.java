@@ -1,6 +1,7 @@
-package com.lapissea.dfs.inspect.display;
+package com.lapissea.dfs.inspect.display.primitives;
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.inspect.display.VUtils;
 import org.joml.Vector2f;
 
 import java.awt.Color;

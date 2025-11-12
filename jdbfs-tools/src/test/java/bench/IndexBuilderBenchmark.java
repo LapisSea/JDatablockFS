@@ -1,6 +1,6 @@
 package bench;
 
-import com.lapissea.dfs.inspect.display.IndexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
 import com.lapissea.dfs.inspect.display.vk.enums.VkIndexType;
 import org.lwjgl.BufferUtils;
 import org.openjdk.jmh.annotations.Benchmark;

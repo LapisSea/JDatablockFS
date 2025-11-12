@@ -1,9 +1,11 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
 import com.lapissea.dfs.inspect.display.DeviceGC;
-import com.lapissea.dfs.inspect.display.IndexBuilder;
-import com.lapissea.dfs.inspect.display.VertexBuilder;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+import com.lapissea.dfs.inspect.display.primitives.VertexBuilder;
 import com.lapissea.dfs.inspect.display.vk.CommandBuffer;
 import com.lapissea.dfs.inspect.display.vk.VulkanResource;
 import com.lapissea.dfs.inspect.display.vk.wrap.Extent2D;
@@ -20,11 +22,11 @@ public class LineRenderer implements VulkanResource{
 		this.owningRenderer = owningRenderer;
 	}
 	
-	public IndexedMeshRenderer.RToken record(DeviceGC deviceGC, Renderer.IndexedMeshBuffer resource, Iterable<? extends Geometry.Path> paths) throws VulkanCodeException{
+	public IndexedMeshRenderer.RToken record(DeviceGC deviceGC, Renderer.IndexedMeshBuffer resource, Iterable<? extends Path> paths) throws VulkanCodeException{
 		
-		var lines = Iters.from(paths).map(Geometry.Path::toPoints).toList();
+		var lines = Iters.from(paths).map(Path::toPoints).toList();
 		
-		var size = Geometry.calculateMeshSize(lines);
+		var size = Geometry.MeshSize.calculate(lines);
 		if(size.vertCount() == 0) return null;
 		
 		var vertices    = new VertexBuilder(size.vertCount());

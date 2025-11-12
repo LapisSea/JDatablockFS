@@ -6,10 +6,11 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.inspect.SessionSetView;
-import com.lapissea.dfs.inspect.display.IndexBuilder;
-import com.lapissea.dfs.inspect.display.VertexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+import com.lapissea.dfs.inspect.display.primitives.VertexBuilder;
 import com.lapissea.dfs.inspect.display.renderers.ByteGridRender;
-import com.lapissea.dfs.inspect.display.renderers.Geometry;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.inspect.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
@@ -31,6 +32,7 @@ import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
+import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -132,7 +134,10 @@ public class GridScene{
 			List.of(),
 			Iters.from(frameData.writes()).map(r -> new ByteGridRender.IOEvent((int)r.start, (int)r.end(), ByteGridRender.IOEvent.Type.WRITE))
 		);
-		
+		for(int i = 0; i<10; i++){
+			recordPointer(new Pointer(i*2, 100, 0, Color.RED, "Hello" + i, 3));
+		}
+//		recordPointer(new Pointer(2, 100, 0, Color.RED, "Hello", 5));
 	}
 	
 	private void startDataProvider() throws IOException{
@@ -271,8 +276,70 @@ public class GridScene{
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
 	}
-	private void recordPointer(Pointer pointer){
 	
+	private void recordPointer(Pointer ptr){
+		
+		var start = ptr.from();
+		var end   = ptr.to();
+		var width = gridSize.bytesPerRow();
+		int pSiz  = ptr.size();
+		
+		long
+			xPosFrom = start%width,
+			yPosFrom = start/width,
+			xPosTo = end%width,
+			yPosTo = end/width;
+		
+		var direction = start<end;
+		var ySmall    = Math.abs(yPosFrom - yPosTo)>1;
+		var dirY      = direction? 1 : -1;
+		var dirX      = 0;
+		
+		float offScale = ySmall? Math.abs(yPosFrom - yPosTo)/6F : 2;
+		
+		var fromOff = new Vector2f(dirX, dirY).mul(offScale);
+		var toOff   = new Vector2f(-dirX, (ySmall? -1 : 1)*dirY).mul(offScale);
+		
+		var fromOrg = new Vector2f((xPosFrom + (pSiz == 0? 0 : 0.5F)), yPosFrom + 0.5F);
+		var toOrg   = new Vector2f(xPosTo + 0.5F, yPosTo + 0.5F);
+		
+		var from = new Vector2f(fromOrg).add(fromOff);
+		var to   = new Vector2f(toOrg).add(toOff);
+
+
+//		var mix       = 12;
+//		var fromMixed = from.mul(mix, new Vector2f()).add(to).div(mix + 1);
+//		var toMixed   = to.mul(mix, new Vector2f()).add(from).div(mix + 1);
+
+
+//		var screenHeight = gridSize.windowSize().height;
+//		var screenWidth  = gridSize.windowSize().width;
+//
+//		if(xFrom<0 || xFrom>screenWidth) xFrom = xFromOrg - xFromOff;
+//		if(yFrom<0 || yFrom>screenHeight) yFrom = yFromOrg - yFromOff;
+//		if(xTo<0 || xTo>screenWidth) xTo = xToOrg - xToOff;
+//		if(yTo<0 || yTo>screenHeight) yTo = yToOrg - yToOff;
+		
+		
+		var s = gridSize.byteSize();
+		var points = List.of(
+			fromOrg.mul(s),
+			from.mul(s),
+			to.mul(s),
+			toOrg.mul(s)
+		);
+		
+		
+		buffer.renderLine(new Path.BezierCurve(
+			points,
+			ptr.widthFactor(),
+			ptr.color(), 30
+		));
+
+//		buffer.renderLines(Iters.from(points).toList(e -> new Geometry.PointsLine(List.of(
+//			e, new Vector2f(e).add(0, 10)
+//		), 5, Color.green, false)));
+		
 	}
 	
 	private void drawBytes(IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException{

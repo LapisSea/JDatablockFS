@@ -1,5 +1,8 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+
 import java.util.List;
 
 public final class CountingPrimitiveBuffer implements PrimitiveBuffer{
@@ -21,7 +24,7 @@ public final class CountingPrimitiveBuffer implements PrimitiveBuffer{
 		count += mesh.size();
 	}
 	@Override
-	public void renderLines(List<? extends Geometry.Path> paths){
+	public void renderLines(List<? extends Path> paths){
 		count += paths.size();
 	}
 	@Override

@@ -7,9 +7,9 @@ import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.grid.GridScene;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.grid.RangeMessageSpace;
+import com.lapissea.dfs.inspect.display.primitives.Path;
 import com.lapissea.dfs.inspect.display.renderers.CountingPrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.renderers.CutoffPrimitiveBuffer;
-import com.lapissea.dfs.inspect.display.renderers.Geometry;
 import com.lapissea.dfs.inspect.display.renderers.MergingPrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.inspect.display.renderers.MultiRendererBuffer;
@@ -333,6 +333,6 @@ public class ByteGridComponent extends BackbufferComponent{
 			(float)Math.sin(t/s)*100 + 200*(i + 1),
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
-		dynamicTokens.renderLines(List.of(new Geometry.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30, 0.3)));
+		dynamicTokens.renderLines(List.of(new Path.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30)));
 	}
 }

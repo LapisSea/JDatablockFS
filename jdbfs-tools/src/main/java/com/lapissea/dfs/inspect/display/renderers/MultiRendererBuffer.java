@@ -3,6 +3,8 @@ package com.lapissea.dfs.inspect.display.renderers;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Path;
 import com.lapissea.dfs.inspect.display.renderers.PrimitiveBuffer.TokenSet;
 import com.lapissea.dfs.inspect.display.vk.CommandBuffer;
 import com.lapissea.dfs.inspect.display.vk.VulkanCore;
@@ -61,7 +63,7 @@ public class MultiRendererBuffer implements VulkanResource{
 			getTokenSet(TokenSet.Meshes.class).add(meshes);
 		}
 		@Override
-		public void renderLines(List<? extends Geometry.Path> paths){
+		public void renderLines(List<? extends Path> paths){
 			if(paths.isEmpty()) return;
 			getTokenSet(TokenSet.Lines.class).add(paths);
 		}

@@ -1,6 +1,5 @@
-package com.lapissea.dfs.inspect.display;
+package com.lapissea.dfs.inspect.display.primitives;
 
-import com.lapissea.dfs.inspect.display.renderers.Geometry;
 import com.lapissea.dfs.inspect.display.vk.enums.VkIndexType;
 import com.lapissea.dfs.utils.iterableplus.IntIterator;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;

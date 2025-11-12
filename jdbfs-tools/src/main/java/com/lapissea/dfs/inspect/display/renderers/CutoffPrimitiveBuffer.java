@@ -1,5 +1,8 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Path;
+
 import java.util.List;
 
 public final class CutoffPrimitiveBuffer implements PrimitiveBuffer{
@@ -31,7 +34,7 @@ public final class CutoffPrimitiveBuffer implements PrimitiveBuffer{
 		parent.renderMeshes(toAdd);
 	}
 	@Override
-	public void renderLines(List<? extends Geometry.Path> paths){
+	public void renderLines(List<? extends Path> paths){
 		var toAdd = trimElements(paths);
 		if(toAdd.isEmpty()) return;
 		parent.renderLines(toAdd);

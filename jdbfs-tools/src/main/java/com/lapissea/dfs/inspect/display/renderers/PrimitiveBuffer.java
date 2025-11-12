@@ -1,5 +1,7 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
+import com.lapissea.dfs.inspect.display.primitives.Geometry;
+import com.lapissea.dfs.inspect.display.primitives.Path;
 import com.lapissea.dfs.tools.DrawFont;
 
 import java.util.Arrays;
@@ -22,15 +24,15 @@ public interface PrimitiveBuffer{
 			}
 		}
 		
-		record Lines(List<Geometry.Path> paths) implements TokenSet{
+		record Lines(List<Path> paths) implements TokenSet{
 			@Override
 			public String toString(){
 				return "Lines{paths = " + paths.size() + ", points = " + paths.stream().mapToInt(e -> e.toPoints().points().size()).sum() + '}';
 			}
-			public void add(Collection<? extends Geometry.Path> mesh){
+			public void add(Collection<? extends Path> mesh){
 				paths.addAll(mesh);
 			}
-			public void add(Geometry.Path path){
+			public void add(Path path){
 				paths.add(path);
 			}
 		}
@@ -81,8 +83,8 @@ public interface PrimitiveBuffer{
 	default void renderMesh(Geometry.IndexedMesh mesh)         { renderMeshes(List.of(mesh)); }
 	void renderMeshes(List<Geometry.IndexedMesh> mesh);
 	
-	default void renderLine(Geometry.Path path)                { renderLines(List.of(path)); }
-	void renderLines(List<? extends Geometry.Path> paths);
+	default void renderLine(Path path)                         { renderLines(List.of(path)); }
+	void renderLines(List<? extends Path> paths);
 	
 	default void renderFont(MsdfFontRender.StringDraw path)    { renderFont(List.of(path)); }
 	default void renderFont(MsdfFontRender.StringDraw... paths){ renderFont(Arrays.asList(paths)); }
