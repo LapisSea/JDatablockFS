@@ -69,11 +69,11 @@ public final class GridUtils{
 			return new ByteGridSize(bytesPerRow, byteSize, windowSize);
 		}
 		
-		public Rect findBestRectScaled(DrawUtils.Range range){
+		public GridRect findBestRectScaled(DrawUtils.Range range){
 			return findBestRect(range).scale(byteSize);
 		}
 		
-		public Rect findBestRect(DrawUtils.Range range){
+		public GridRect findBestRect(DrawUtils.Range range){
 			var from = range.from();
 			var to   = range.to();
 			
@@ -82,7 +82,7 @@ public final class GridUtils{
 			if(fromRow == toRow){
 				var fromX = from - fromRow*bytesPerRow;
 				var toX   = to - toRow*bytesPerRow;
-				return new Rect(fromX, fromRow, toX - fromX, 1);
+				return new GridRect(fromX, fromRow, toX - fromX, 1);
 			}
 			
 			long fromRowEnd = (fromRow + 1)*bytesPerRow;
@@ -97,26 +97,17 @@ public final class GridUtils{
 			long bulkRows = Math.max(0, (toRowStart - bulkFrom)/bytesPerRow);
 			if(bulkRows>0){
 				var bulkFirstRow = bulkFrom/bytesPerRow;
-				return new Rect(0, bulkFirstRow, bytesPerRow, bulkRows);
+				return new GridRect(0, bulkFirstRow, bytesPerRow, bulkRows);
 			}
 			
 			long headSize = fromRowEnd - from;
 			long tailSize = to - toRowStart;
 			
 			if(headSize>=tailSize){
-				return new Rect(from%bytesPerRow, fromRow, headSize, 1);
+				return new GridRect(from%bytesPerRow, fromRow, headSize, 1);
 			}else{
-				return new Rect(0, toRow, tailSize, 1);
+				return new GridRect(0, toRow, tailSize, 1);
 			}
-		}
-	}
-	
-	public record Rect(float x, float y, float width, float height){
-		public Rect(float width, float height){
-			this(0, 0, width, height);
-		}
-		public Rect scale(float scale){
-			return new Rect(x*scale, y*scale, width*scale, height*scale);
 		}
 	}
 	
@@ -249,7 +240,7 @@ public final class GridUtils{
 		return new Geometry.IndexedMesh(res, index);
 	}
 	
-	public static Match<StringDraw> stringDrawIn(PrimitiveBuffer.FontRednerer fontRender, String s, Rect area, Color color, float fontScale, boolean alignLeft){
+	public static Match<StringDraw> stringDrawIn(PrimitiveBuffer.FontRednerer fontRender, String s, GridRect area, Color color, float fontScale, boolean alignLeft){
 		if(s.isEmpty()) return Match.empty();
 		
 		noneCanRender:
@@ -263,8 +254,8 @@ public final class GridUtils{
 			return Match.empty();
 		}
 		
-		if(area.height<fontScale){
-			fontScale = area.height;
+		if(area.height()<fontScale){
+			fontScale = area.height();
 		}
 		
 		float w, h;
@@ -275,7 +266,7 @@ public final class GridUtils{
 			h = rect.height();
 			
 			if(w>0){
-				double scale = (area.width - 1)/w;
+				double scale = (area.width() - 1)/w;
 				if(scale<0.5){
 					float div = scale<0.25? 3 : 2;
 					fontScale /= div;
@@ -283,7 +274,7 @@ public final class GridUtils{
 					h = rect.height()/div;
 				}
 				DrawFont.Bounds sbDots = null;
-				while((area.width - 1)/w<0.5){
+				while((area.width() - 1)/w<0.5){
 					if(s.isEmpty()) return Match.empty();
 					if(s.length() == 1){
 						break;
@@ -299,15 +290,15 @@ public final class GridUtils{
 			}
 		}
 		
-		float x = area.x;
-		float y = area.y;
+		float x = area.x();
+		float y = area.y();
 		
-		x += alignLeft? 0 : Math.max(0, area.width - w)/2F;
-		y += h + (area.height - h)/2;
+		x += alignLeft? 0 : Math.max(0, area.width() - w)/2F;
+		y += h + (area.height() - h)/2;
 		
 		float xScale = 1;
 		if(w>0){
-			double scale = (area.width - 1)/w;
+			double scale = (area.width() - 1)/w;
 			if(scale<1){
 				xScale = (float)scale;
 			}

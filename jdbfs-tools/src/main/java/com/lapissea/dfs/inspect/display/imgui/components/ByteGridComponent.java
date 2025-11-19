@@ -4,6 +4,7 @@ import com.lapissea.dfs.inspect.SessionSetView;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.TextureRegistry;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
+import com.lapissea.dfs.inspect.display.grid.GridRect;
 import com.lapissea.dfs.inspect.display.grid.GridScene;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.grid.RangeMessageSpace;
@@ -301,7 +302,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
 		if(GridUtils.stringDrawIn(
-			dynamicTokens.getFontRender(), str, new GridUtils.Rect(w, h), Color.LIGHT_GRAY, fontScale, false
+			dynamicTokens.getFontRender(), str, new GridRect(w, h), Color.LIGHT_GRAY, fontScale, false
 		) instanceof Some(var draw)){
 			dynamicTokens.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
