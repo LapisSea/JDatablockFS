@@ -39,38 +39,38 @@ public final class IPC{
 		
 		public void trace(String msg, Object arg1){
 			if(!enabled || !Log.TRACE) return;
-			Log.trace("{}#grayBright: " + msg, name, arg1);
+			Log.trace("{}#blackBright: " + msg, name, arg1);
 		}
 		public void trace(String msg, Object arg1, Object arg2){
 			if(!enabled || !Log.TRACE) return;
-			Log.trace("{}#grayBright: " + msg, name, arg1, arg2);
+			Log.trace("{}#blackBright: " + msg, name, arg1, arg2);
 		}
 		public void trace(String msg, Object arg1, Object arg2, Object arg3){
 			if(!enabled || !Log.TRACE) return;
-			Log.trace("{}#grayBright: " + msg, name, arg1, arg2, arg3);
+			Log.trace("{}#blackBright: " + msg, name, arg1, arg2, arg3);
 		}
 		
 		public void info(String msg, Object arg1){
 			if(!enabled || !Log.INFO) return;
-			Log.info("{}#grayBright: " + msg, name, arg1);
+			Log.info("{}#blackBright: " + msg, name, arg1);
 		}
 		public void info(String msg, Object arg1, Object arg2){
 			if(!enabled || !Log.INFO) return;
-			Log.info("{}#grayBright: " + msg, name, arg1, arg2);
+			Log.info("{}#blackBright: " + msg, name, arg1, arg2);
 		}
 		
 		public void warn(String msg, Object arg1){
 			if(!enabled || !Log.WARN) return;
-			Log.warn("{}#grayBright: " + msg, name, arg1);
+			Log.warn("{}#blackBright: " + msg, name, arg1);
 		}
 		public void warn(String msg, Object arg1, Object arg2){
 			if(!enabled || !Log.WARN) return;
-			Log.warn("{}#grayBright: " + msg, name, arg1, arg2);
+			Log.warn("{}#blackBright: " + msg, name, arg1, arg2);
 		}
 		
 		public void log(String msg){
 			if(!enabled || !Log.INFO) return;
-			Log.log("{}#grayBright: {}", msg);
+			Log.log("{}#blackBright: {}", name, msg);
 		}
 	}
 	
@@ -117,7 +117,7 @@ public final class IPC{
 		}
 	}
 	
-	public static ServerSocket recieveHandshake(ServerSocket ss) throws IOException{
+	public static ServerSocket receiveHandshake(ServerSocket ss) throws IOException{
 		SERVER.log("Waiting for handshake...");
 		try(var socket = ss.accept()){
 			var output = new DataOutputStream(socket.getOutputStream());

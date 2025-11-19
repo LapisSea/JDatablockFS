@@ -404,7 +404,7 @@ public final class DBLogIngestServer{
 	}
 	
 	private void listenForConnection(ServerSocket soc) throws IOException{
-		ServerSocket ss = IPC.recieveHandshake(soc);
+		ServerSocket ss = IPC.receiveHandshake(soc);
 		if(ss == null) return;
 		
 		CompletableFuture.runAsync(() -> {
