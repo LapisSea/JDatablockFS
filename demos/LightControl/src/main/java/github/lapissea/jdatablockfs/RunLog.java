@@ -39,6 +39,15 @@ import static com.lapissea.dfs.query.Query.Test.fieldGr;
 
 public final class RunLog{
 	
+	@IOValue
+	public static class ErrVal extends IOInstance.Managed<ErrVal>{
+		String val;
+		public ErrVal(){ }
+		public ErrVal(String val){
+			this.val = val;
+		}
+	}
+	
 	public sealed interface LightValue{
 		@IOValue
 		final class Lux extends IOInstance.Managed<Lux> implements LightValue{
@@ -56,14 +65,18 @@ public final class RunLog{
 		
 		@IOValue
 		final class ServerError extends IOInstance.Managed<GetError> implements LightValue{
-			public final String error;
-			public ServerError(String error){ this.error = error; }
+			@IOValue.Reference
+			public ErrVal error;
+			public ServerError(String error){ this.error = new ErrVal(error); }
+			public ServerError()            { }
 		}
 		
 		@IOValue
 		final class GetError extends IOInstance.Managed<GetError> implements LightValue{
-			public final String error;
-			public GetError(String error){ this.error = error; }
+			@IOValue.Reference
+			public ErrVal error;
+			public GetError(String error){ this.error = new ErrVal(error); }
+			public GetError()            { }
 		}
 	}
 	
@@ -346,8 +359,8 @@ public final class RunLog{
 					default -> "";
 				});
 				row.add(switch(stamp.value){
-					case LightValue.GetError v -> v.error;
-					case LightValue.ServerError v -> v.error;
+					case LightValue.GetError v -> v.error.val;
+					case LightValue.ServerError v -> v.error.val;
 					default -> "";
 				});
 				

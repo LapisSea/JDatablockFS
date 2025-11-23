@@ -3,9 +3,11 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
@@ -16,6 +18,8 @@ import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -55,7 +59,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		@Override
 		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field){
-			return new IOFieldInlineSealedObject<>(field);
+			return new IOFieldInlineSealedObject<>(field, null);
 		}
 		@Override
 		@SuppressWarnings("rawtypes")
@@ -78,9 +82,11 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	private final Map<Class<ValueType>, StructPipe<ValueType>> typeToPipe;
 	private final Class<ValueType>                             rootType;
 	private       IOFieldPrimitive.FInt<CTyp>                  universeID;
+	private final VaryingSize                                  maxSize;
 	
-	private IOFieldInlineSealedObject(FieldAccessor<CTyp> accessor){
+	private IOFieldInlineSealedObject(FieldAccessor<CTyp> accessor, VaryingSize maxSize){
 		super(accessor);
+		this.maxSize = maxSize;
 		//noinspection unchecked
 		rootType = (Class<ValueType>)accessor.getType();
 		var universe = SealedUtil.getSealedUniverse(rootType, false)
@@ -89,12 +95,22 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		var circularDep = !typeToPipe.containsKey(accessor.getDeclaringStruct().getType());
 		
-		initSizeDescriptor(universe.makeSizeDescriptor(
+		var dynamicDescriptor = universe.<CTyp>makeSizeDescriptor(
 			nullable(), circularDep,
-			(p, inst) -> get(null, inst))
+			(p, inst) -> get(null, inst)
 		);
+		
+		if(maxSize == null){
+			initSizeDescriptor(dynamicDescriptor);
+		}else{
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+		}
 	}
-	
+	@Override
+	protected IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
+		var size = varProvider.provide(NumberSize.LARGEST, null, false);
+		return new IOFieldInlineSealedObject<>(getAccessor(), size);
+	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
 		return Iters.of(
@@ -104,6 +120,9 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		).nonNulls().toModSet();
 	}
 	
+	public StructPipe<ValueType> typeToPipe(Class<ValueType> type){
+		return typeToPipe.get(type);
+	}
 	public Collection<StructPipe<ValueType>> getTypePipes(){
 		return typeToPipe.values();
 	}
@@ -180,8 +199,22 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		}
 		var instancePipe = typeToPipe.get(val.getClass());
-		
-		instancePipe.write(provider, dest, val);
+		if(maxSize != null){
+			writeFixed(provider, dest, instancePipe, val);
+		}else{
+			instancePipe.write(provider, dest, val);
+		}
+	}
+	
+	private void writeFixed(DataProvider provider, ContentWriter dest, StructPipe<ValueType> instancePipe, ValueType val) throws IOException{
+		var buf = new ContentOutputBuilder(maxSize.size.bytes);
+		instancePipe.write(provider, buf, val);
+		var rem = maxSize.size.bytes - buf.getCount();
+		if(rem>0) buf.writeInts1(new byte[rem]);
+		else if(rem<0){
+			maxSize.safeSize(NumberSize.byBytes(buf.getCount()));
+		}
+		buf.writeTo(dest);
 	}
 	
 	private ValueType readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
@@ -196,7 +229,13 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		var type         = provider.getTypeDb().fromID(rootType, id);
 		var instancePipe = typeToPipe.get(type);
 		
-		return instancePipe.readNew(provider, src, makeContext(genericContext));
+		var ctx = makeContext(genericContext);
+		if(maxSize != null){
+			var ticket = src.readTicket(maxSize.size.bytes).submit();
+			return instancePipe.readNew(provider, ticket, ctx);
+		}else{
+			return instancePipe.readNew(provider, src, ctx);
+		}
 	}
 	
 	

@@ -30,6 +30,9 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 		WordIO.setWord(v, buf, count, len);
 		count += len;
 	}
+	public int getCount(){
+		return count;
+	}
 	
 	@Override
 	public void write(byte[] b){
