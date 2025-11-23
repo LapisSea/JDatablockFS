@@ -43,6 +43,7 @@ import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
 import com.lapissea.dfs.type.string.StringifySettings;
@@ -1921,6 +1922,9 @@ public class BinaryGridRenderer implements DataRenderer{
 		}else{
 			if(field instanceof IOFieldInlineObject obj){
 				return obj.getInstancePipe();
+			}
+			if(field instanceof IOFieldInlineSealedObject t){
+				return t.typeToPipe(inst.getClass());
 			}
 			return StructPipe.of(pipe.getClass(), inst.getThisStruct());
 		}

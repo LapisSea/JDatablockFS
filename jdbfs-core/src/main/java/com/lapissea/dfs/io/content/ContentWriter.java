@@ -322,6 +322,9 @@ public interface ContentWriter extends AutoCloseable{
 					if(count>amount) throw UtilL.uncheckedThrow(errorOnMismatch.apply(this.size(), amount));
 				}
 			}
+			public int remaining(){
+				return amount - count;
+			}
 			
 			@Override
 			public synchronized String toString(){
