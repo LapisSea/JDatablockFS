@@ -148,7 +148,7 @@ public class ByteGridComponent extends BackbufferComponent{
 		}
 		dynamicRes.reset();
 		var rToken = renderer.upload(dynamicRes, dynamicTokens, deviceGC);
-		renderer.submit(size, viewSize, rToken, cmdBuffer);
+		renderer.submit(size, size.windowSize(), rToken, cmdBuffer);
 	}
 	
 	private final ImBoolean merge = new ImBoolean(true), showBoundingBoxes = new ImBoolean();

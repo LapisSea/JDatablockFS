@@ -25,7 +25,6 @@ import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -47,6 +46,8 @@ public class GridScene{
 	public final PrimitiveBuffer          buffer;
 	public final SessionSetView.FrameData frameData;
 	public final GridUtils.ByteGridSize   gridSize;
+	
+	private final ArrayList<Pointer> pointers = new ArrayList<>();
 	
 	private final long   dataSize;
 	private final BitSet filled;
@@ -132,6 +133,12 @@ public class GridScene{
 			List.of(),
 			Iters.from(frameData.writes()).map(r -> new ByteGridRender.IOEvent((int)r.start, (int)r.end(), ByteGridRender.IOEvent.Type.WRITE))
 		);
+		
+		for(Pointer pointer : pointers){
+			renderPointer(pointer);
+		}
+		pointers.clear();
+		pointers.trimToSize();
 	}
 	
 	private void startDataProvider() throws IOException{
@@ -178,10 +185,11 @@ public class GridScene{
 			return;
 		}
 		
+		var typeHash = pipe.getType().getFullName().hashCode();
+		
 		var info = FieldReader.readFields(dataProvider, pipe, ptr, offset);
 		for(var rf : info.fields()){
-			var rand = new RawRandom(rf.field().toString().hashCode());
-			var col  = new Color(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
+			var col = ColorUtils.makeCol(typeHash, rf.field());
 			annotateByteField(info.value(), rf, col);
 		}
 		
@@ -196,18 +204,13 @@ public class GridScene{
 		DrawUtils.Range bestRange  = new DrawUtils.Range(0, 0);
 		DrawUtils.Range firstRange = null, lastRange = null;
 		
-		var logicalRange = rf.range();
-		var ranges = block.isNull()?
-		             List.of(logicalRange) :
-		             DrawUtils.chainRangeResolve(dataProvider, new Reference(block, 0), logicalRange.from(), logicalRange.size()).toModList();
-		
 		var message = field + " " + rf.value();
 		
 		GridRect rect = null;
 		
 		boolean drawDetails = gridSize.bytesPerRow()>6;
 		
-		for(DrawUtils.Range rng : ranges){
+		for(DrawUtils.Range rng : makeLocalRanges(rf, block)){
 			messages.add(message, rng, new RangeMessageSpace.HoverEffect.Outline(col.brighter(), 2));
 			if(bestRange.size()<gridSize.bytesPerRow()){
 				var contiguousRange = DrawUtils.findBestContiguousRange(gridSize.bytesPerRow(), rng);
@@ -226,16 +229,18 @@ public class GridScene{
 			}
 		}
 		
-		if(!ranges.isEmpty()){
-			if(field instanceof RefField<T, V> refF){
-				var ref       = refF.getReference(instance);
-				var globalOff = ref.calcGlobalOffset(dataProvider);
-				recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-			}else if(field.getType() == Reference.class){
-				var ref       = (Reference)rf.value();
-				var globalOff = ref.calcGlobalOffset(dataProvider);
-				recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-			}
+		if(firstRange == null){
+			throw new IllegalStateException();
+		}
+		
+		if(field instanceof RefField<T, V> refF){
+			var ref       = refF.getReference(instance);
+			var globalOff = ref.calcGlobalOffset(dataProvider);
+			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
+		}else if(field.getType() == Reference.class){
+			var ref       = (Reference)rf.value();
+			var globalOff = ref.calcGlobalOffset(dataProvider);
+			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
 		}
 		
 		if(!drawDetails) return;
@@ -246,12 +251,22 @@ public class GridScene{
 		}
 		
 	}
+	private <T extends IOInstance<T>, V> IterablePP<DrawUtils.Range> makeLocalRanges(FieldReader.Res<T, V> rf, ChunkPointer block){
+		var logicalRange = rf.range();
+		var ranges = block.isNull()?
+		             Iters.of(logicalRange) :
+		             DrawUtils.chainRangeResolve(dataProvider, new Reference(block, 0), logicalRange.from(), logicalRange.size());
+		return ranges;
+	}
 	
 	private void recordPointer(long from, long to, int size, Color color, String message, float widthFactor){
 		recordPointer(new Pointer(from, to, size, color, message, widthFactor));
 	}
 	
 	private void recordPointer(Pointer ptr){
+		pointers.add(ptr);
+	}
+	private void renderPointer(Pointer ptr){
 		
 		var start = ptr.from();
 		var end   = ptr.to();
