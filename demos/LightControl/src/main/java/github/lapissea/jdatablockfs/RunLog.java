@@ -83,7 +83,13 @@ public final class RunLog{
 		}
 	}
 	
-	private static final String TWINKLE_TRAY = "C:\\Program Files\\WindowsApps\\38002AlexanderFrangos.TwinkleTray_2025.10823.10157.0_x64__m7qx9dzpwqaze\\app\\Twinkle Tray.exe";
+	private static final String TWINKLE_TRAY;
+	
+	static{
+		String localAppData = System.getenv("LocalAppData");
+		if(localAppData == null) throw new IllegalStateException("LocalAppData not found");
+		TWINKLE_TRAY = localAppData + "\\Programs\\twinkle-tray\\Twinkle Tray.exe";
+	}
 	
 	static String command;
 	static float  monitorLux;

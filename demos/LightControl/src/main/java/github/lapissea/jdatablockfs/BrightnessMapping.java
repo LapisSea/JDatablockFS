@@ -21,7 +21,7 @@ public class BrightnessMapping{
 	}
 	public double luxToPercent(double targetLux){
 		if(targetLux<=luxMin) return 0;
-		if(targetLux>=luxMax) return 1;
+		if(targetLux>=luxMax) return 100;
 		
 		// find interval where targetLux falls
 		for(int i = 0; i<measuredLux.length - 1; i++){
