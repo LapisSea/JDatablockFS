@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -28,14 +27,14 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	
 	private static final class ProviderReply<T extends IOInstance<T>>{
 		
-		private record Step(NumberSize max, boolean ptr){ }
+		private record Step(int max, boolean ptr){ }
 		
 		private final Struct<T> type;
 		
 		private List<Step> steps;
 		
-		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
-		private final ReadWriteClosableLock                            cacheLock = ReadWriteClosableLock.reentrant();
+		private final Map<List<Integer>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
+		private final ReadWriteClosableLock                         cacheLock = ReadWriteClosableLock.reentrant();
 		
 		private ProviderReply(Struct<T> type){
 			this.type = type;
@@ -47,7 +46,8 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				var intercept = VaryingSize.Provider.intercept(
 					rule, (max, ptr, actual, s) -> {
 						s.steps.add(new Step(max, ptr));
-						s.sb.append(actual.size.shortName);
+						if(actual.nSize != null) s.sb.append(actual.nSize.shortName);
+						else s.sb.append('N').append(actual.size);
 					},
 					new State(new ArrayList<>(), new StringBuilder()),
 					s -> new State(new ArrayList<>(s.steps), new StringBuilder(s.sb))
@@ -59,7 +59,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				return pipe;
 			}
 			
-			List<NumberSize> buff = new ArrayList<>(steps.size());
+			List<Integer> buff = new ArrayList<>(steps.size());
 			for(var step : steps){
 				buff.add(rule.provide(step.max, null, step.ptr).size);
 			}
@@ -77,13 +77,20 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				ConfigDefs.CompLogLevel.JUST_START.log("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
 				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
-				pipe.sizesStr = Iters.from(buff).map(NumberSize::shortName).joinAsStr();
+				pipe.sizesStr = sizesToShortStr(buff);
 				cache.put(buff, pipe);
 				
 				return pipe;
 			}
 		}
 		
+	}
+	private static String sizesToShortStr(List<Integer> buff){
+		return Iters.from(buff).joinAsStr(t -> {
+			var siz = VaryingSize.exactNumberSize(t);
+			if(siz != null) return siz.shortName + "";
+			else return "N" + t;
+		});
 	}
 	
 	private static final Map<Struct<?>, UnsupportedStructLayout> FAILS       = new ConcurrentHashMap<>();
@@ -124,7 +131,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			//noinspection rawtypes,unchecked
 			FieldSet<T> sizeFields = FieldSet.of((Iterable)sizeFieldStream(structFields));
 			
-			record State(List<NumberSize> ruleReply, boolean[] effectivelyAllMax){ }
+			record State(List<Integer> ruleReply, boolean[] effectivelyAllMax){ }
 			var snitchRule = VaryingSize.Provider.intercept(
 				rule, (max, ptr, actual, state) -> {
 					if(actual.size != max) state.effectivelyAllMax[0] = false;
@@ -157,13 +164,13 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	@Override
 	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
 		//noinspection unchecked
-		var ruleReply = (List<NumberSize>)builderMetadata;
+		var ruleReply = (List<Integer>)builderMetadata;
 		var struct    = getType().getBuilderObjType(true);
 		
 		FixedVaryingStructPipe<ProxyBuilder<T>> pipe;
 		try{
 			pipe = new FixedVaryingStructPipe<>(struct, VaryingSize.Provider.repeat(ruleReply));
-			pipe.sizesStr = Iters.from(ruleReply).map(NumberSize::shortName).joinAsStr();
+			pipe.sizesStr = sizesToShortStr(ruleReply);
 		}catch(UseFixed e){
 			throw new ShouldNeverHappenError(e);
 		}

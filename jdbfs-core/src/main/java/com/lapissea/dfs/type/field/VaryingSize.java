@@ -38,7 +38,7 @@ public final class VaryingSize implements Stringify{
 	}
 	
 	private static <T extends IOInstance<T>> TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
-		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
+		Map<VaryingSize, Integer> tooSmallIdMap = new HashMap<>();
 		
 		var provider = DataProvider.newVerySimpleProvider(makeFakeData());
 		try(var blackHole = new ContentWriter(){
@@ -54,7 +54,7 @@ public final class VaryingSize implements Stringify{
 					e.tooSmallIdMap.forEach((varying, size) -> {
 						var num = tooSmallIdMap.get(varying);
 						if(num == null) num = size;
-						else if(num.greaterThan(size)) return;
+						else if(num>size) return;
 						tooSmallIdMap.put(varying, num);
 					});
 				}catch(MalformedPointer badPtr){
@@ -107,10 +107,8 @@ public final class VaryingSize implements Stringify{
 		};
 	}
 	
-	public static final VaryingSize MAX = new VaryingSize(NumberSize.LARGEST, -1);
-	
-	private record UIDInfo(VaryingSize val, NumberSize max, boolean ptr){
-		void validate(NumberSize max, boolean ptr){
+	private record UIDInfo(VaryingSize val, int max, boolean ptr){
+		void validate(int max, boolean ptr){
 			if(this.max != max) throw new IllegalStateException("Differing shared max");
 			if(this.ptr != ptr) throw new IllegalStateException("Differing ptr");
 		}
@@ -121,13 +119,13 @@ public final class VaryingSize implements Stringify{
 		final class Recorder implements Provider{
 			
 			public interface Mapper{
-				NumberSize map(NumberSize max, boolean ptr, int id);
+				int map(int max, boolean ptr, int id);
 			}
 			
-			record Mark(List<NumberSize> data, Map<String, UIDInfo> uidMap){ }
+			record Mark(List<Integer> data, Map<String, UIDInfo> uidMap){ }
 			
-			private final List<NumberSize> data = new ArrayList<>();
-			private final Mapper           mapper;
+			private final List<Integer> data = new ArrayList<>();
+			private final Mapper        mapper;
 			
 			private final Map<Integer, Mark> marks = new HashMap<>();
 			private       int                markUID;
@@ -139,7 +137,7 @@ public final class VaryingSize implements Stringify{
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+			public VaryingSize provide(int max, String uid, boolean ptr){
 				var repeat = uidMap.get(uid);
 				if(repeat != null){
 					repeat.validate(max, ptr);
@@ -170,7 +168,7 @@ public final class VaryingSize implements Stringify{
 				uidMap.putAll(mark.uidMap);
 			}
 			
-			public List<NumberSize> export(){
+			public List<Integer> export(){
 				return List.copyOf(data);
 			}
 		}
@@ -179,20 +177,20 @@ public final class VaryingSize implements Stringify{
 			
 			private record Mark(int counter, Map<String, UIDInfo> uidMap){ }
 			
-			private final List<NumberSize> data;
-			private       int              counter;
+			private final List<Integer> data;
+			private       int           counter;
 			
 			private final Map<Integer, Mark> marks = new HashMap<>();
 			private       int                markIdCount;
 			
 			private final Map<String, UIDInfo> uidMap = new HashMap<>();
 			
-			public Repeater(List<NumberSize> data){
+			public Repeater(List<Integer> data){
 				this.data = List.copyOf(data);
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+			public VaryingSize provide(int max, String uid, boolean ptr){
 				var repeat = uidMap.get(uid);
 				if(repeat != null){
 					repeat.validate(max, ptr);
@@ -224,7 +222,7 @@ public final class VaryingSize implements Stringify{
 		
 		Provider ALL_MAX = new NoMark(){
 			@Override
-			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+			public VaryingSize provide(int max, String uid, boolean ptr){
 				return new VaryingSize(max, -1);
 			}
 			@Override
@@ -236,16 +234,15 @@ public final class VaryingSize implements Stringify{
 		static Recorder record(Recorder.Mapper mapper){
 			return new Recorder(mapper);
 		}
-		static Provider repeat(List<NumberSize> data){
+		static Provider repeat(List<Integer> data){
 			return new Repeater(data);
 		}
 		
-		static Provider constLimit(NumberSize size, int id){
-			if(size == NumberSize.LARGEST) return ALL_MAX;
+		static Provider constLimit(int size, int id){
 			return new NoMark(){
 				@Override
-				public VaryingSize provide(NumberSize max, String uid, boolean ptr){
-					return new VaryingSize(max.min(size), id);
+				public VaryingSize provide(int max, String uid, boolean ptr){
+					return new VaryingSize(Math.min(max, size), id);
 				}
 				@Override
 				public String toString(){
@@ -255,7 +252,7 @@ public final class VaryingSize implements Stringify{
 		}
 		
 		interface Intercept<T>{
-			void intercept(NumberSize max, boolean ptr, VaryingSize actual, T state);
+			void intercept(int max, boolean ptr, VaryingSize actual, T state);
 		}
 		
 		class InterceptProvider<T> implements Provider{
@@ -278,7 +275,7 @@ public final class VaryingSize implements Stringify{
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+			public VaryingSize provide(int max, String uid, boolean ptr){
 				var actual = src.provide(max, uid, ptr);
 				if(uid == null || uids.add(uid)){
 					intercept.intercept(max, ptr, actual, state);
@@ -308,7 +305,7 @@ public final class VaryingSize implements Stringify{
 		static <T> InterceptProvider<T> intercept(Provider src, Intercept<T> intercept, T interceptState, Function<T, T> cloneState){
 			return new InterceptProvider<>(src, intercept, interceptState, cloneState);
 		}
-		VaryingSize provide(NumberSize max, String uid, boolean ptr);
+		VaryingSize provide(int max, String uid, boolean ptr);
 		
 		interface NoMark extends Provider{
 			@Override
@@ -330,12 +327,12 @@ public final class VaryingSize implements Stringify{
 	}
 	
 	public static final class TooSmall extends RuntimeException{
-		public final Map<VaryingSize, NumberSize> tooSmallIdMap;
+		public final Map<VaryingSize, Integer> tooSmallIdMap;
 		
-		public TooSmall(Map<VaryingSize, NumberSize> tooSmallIdMap){
+		public TooSmall(Map<VaryingSize, Integer> tooSmallIdMap){
 			this.tooSmallIdMap = Map.copyOf(tooSmallIdMap);
 		}
-		public TooSmall(VaryingSize size, NumberSize neededSize){
+		public TooSmall(VaryingSize size, int neededSize){
 			this(Map.of(size, neededSize));
 		}
 		@Override
@@ -349,24 +346,45 @@ public final class VaryingSize implements Stringify{
 		}
 	}
 	
-	public final NumberSize size;
+	public final int        size;
+	public final NumberSize nSize;
 	public final int        id;
 	
-	public VaryingSize(NumberSize size, int id){
+	public VaryingSize(int size, int id){
 		if(id<0 && id != -1) throw new IllegalArgumentException();
-		this.size = Objects.requireNonNull(size);
+		this.size = size;
 		this.id = id;
+		
+		nSize = exactNumberSize(size);
+	}
+	
+	public static NumberSize exactNumberSize(int size){
+		NumberSize siz = null;
+		if(size<=8){
+			siz = NumberSize.byBytes(size);
+			if(siz.bytes != size) siz = null;
+		}
+		return siz;
+	}
+	
+	public void requireNumSize(){
+		if(nSize == null){
+			throw new IllegalArgumentException("not a num size");
+		}
 	}
 	
 	public NumberSize safeNumber(long neededNum){
 		return safeSize(NumberSize.bySize(neededNum));
 	}
 	public NumberSize safeSize(NumberSize neededSize){
-		if(neededSize.greaterThan(size)){
+		checkByteSize(neededSize.bytes);
+		return nSize;
+	}
+	public void checkByteSize(int neededSize){
+		if(size<neededSize){
 			if(id == -1) throw new UnsupportedOperationException();
 			throw new TooSmall(this, neededSize);
 		}
-		return size;
 	}
 	
 	@Override
@@ -385,6 +403,6 @@ public final class VaryingSize implements Stringify{
 	}
 	@Override
 	public int hashCode(){
-		return 31*size.hashCode() + id;
+		return 31*size + id;
 	}
 }
