@@ -568,48 +568,14 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				info.bootstrapStaticArgs.stream().map(VirtualCallInfo.SType::type)
 			).toList();
 			
-			var bc = typeSource.byName(info.bootstrapClass);
-			var fns = bc.getFunctionsByName(info.bootstrapMethod).filter(e -> {
-				if(!e.returnType().equals(JType.of(CallSite.class))){
-					return false;
-				}
-				var argTypes = e.argumentTypes();
-				if(argTypes.size() != bArgs.size()){
-					return false;
-				}
-				for(int i = 0; i<bArgs.size(); i++){
-					var argType = bArgs.get(i).asGeneric();
-					var fnType  = argTypes.get(i).asGeneric();
-					try{
-						if(!argType.instanceOf(typeSource, fnType)){
-							return false;
-						}
-					}catch(MalformedJorth ex){
-						throw UtilL.uncheckedThrow(ex);
-					}
-				}
-				return true;
-			}).toList();
-			var fn = switch(fns.size()){
-				case 0 -> {
-					throw new MalformedJorth(
-						"No valid boostrap function found for " + info.bootstrapClass + "." +
-						info.bootstrapMethod + bArgs.stream()
-						                            .map(Object::toString)
-						                            .collect(Collectors.joining(", ", "(", ")"))
-					);
-				}
-				case 1 -> fns.getFirst();
-				default -> {
-					throw new MalformedJorth("Ambiguous boostrap function found for " + info.bootstrapClass + "#" + info.bootstrapMethod);
-				}
-			};
+			ClassInfo    bootstrapClass = typeSource.byName(info.bootstrapClass);
+			FunctionInfo callingFn      = pickBootstrapFunction(info, bootstrapClass, bArgs);
 			Handle bsmh = new Handle(
 				H_INVOKESTATIC,
 				info.bootstrapClass.slashed(),
 				info.bootstrapMethod,
-				makeFunSig(fn.returnType(), fn.argumentTypes(), false),
-				bc.isInterface()
+				makeFunSig(callingFn.returnType(), callingFn.argumentTypes(), false),
+				bootstrapClass.isInterface()
 			);
 			
 			for(int i = 0; i<args.size(); i++){
@@ -627,6 +593,43 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				info.bootstrapStaticArgs.stream().map(VirtualCallInfo.SType::value).toArray()
 			);
 		};
+	}
+	
+	private FunctionInfo pickBootstrapFunction(VirtualCallInfo info, ClassInfo bc, List<JType> bArgs) throws MalformedJorth{
+		var fns = bc.getFunctionsByName(info.bootstrapMethod).filter(e -> {
+			if(!e.returnType().equals(JType.of(CallSite.class))){
+				return false;
+			}
+			var argTypes = e.argumentTypes();
+			if(argTypes.size() != bArgs.size()){
+				return false;
+			}
+			for(int i = 0; i<bArgs.size(); i++){
+				var argType = bArgs.get(i).asGeneric();
+				var fnType  = argTypes.get(i).asGeneric();
+				try{
+					if(!argType.instanceOf(typeSource, fnType)){
+						return false;
+					}
+				}catch(MalformedJorth ex){
+					throw UtilL.uncheckedThrow(ex);
+				}
+			}
+			return true;
+		}).toList();
+		
+		if(fns.isEmpty()){
+			throw new MalformedJorth(
+				"No valid boostrap function found for " + info.bootstrapClass + "." +
+				info.bootstrapMethod + bArgs.stream()
+				                            .map(Object::toString)
+				                            .collect(Collectors.joining(", ", "(", ")"))
+			);
+		}
+		if(fns.size() != 1){
+			throw new MalformedJorth("Ambiguous boostrap function found for " + info.bootstrapClass + "#" + info.bootstrapMethod);
+		}
+		return fns.getFirst();
 	}
 	
 	public Endable startCall(ClassName staticOwner, String functionName) throws MalformedJorth{
