@@ -178,27 +178,13 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(numSize, new ValueGenerator<>(){
-			@Override
-			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-				if(numSize.isNull(ioPool, instance)){
-					return true;
-				}
-				var col       = get(ioPool, instance);
-				var nSiz      = calcNumSize(col);
-				var actualSiz = getNumSize(ioPool, instance);
-				return nSiz != actualSiz;
-			}
+		return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(numSize, new ValueGenerator.NoCheck<>(){
 			@Override
 			public NumberSize generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
 				var arr = get(ioPool, instance);
-				return calcNumSize(arr);
-			}
-			
-			private NumberSize calcNumSize(CollectionType col){
-				if(col == null) return NumberSize.VOID;
+				if(arr == null) return NumberSize.VOID;
 				int min = 0, max = 0;
-				for(int i : addapters.get(NumberSize.VOID).asListView(col)){
+				for(int i : addapters.get(NumberSize.VOID).asListView(arr)){
 					min = Math.min(min, i);
 					max = Math.max(max, i);
 				}

@@ -99,8 +99,8 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 	}
 	
 	public static ObjectPipe.NoPool<ChunkPointer> varSizePipe(VaryingSize.Provider provider){
-		var size = provider.provide(NumberSize.LARGEST, null, true);
-		var desc = FIXED_PIPES.get(size.size).getSizeDescriptor();
+		var size = provider.provide(NumberSize.LARGEST.bytes, null, true);
+		var desc = FIXED_PIPES.get(size.nSize).getSizeDescriptor();
 		return new ObjectPipe.NoPool<>(){
 			@Override
 			public void write(DataProvider provider, ContentWriter dest, ChunkPointer instance) throws IOException{
@@ -109,11 +109,11 @@ public final class ChunkPointer implements Comparable<ChunkPointer>{
 			}
 			@Override
 			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				size.size.skip(src);
+				src.skip(size.size);
 			}
 			@Override
 			public ChunkPointer readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				return ChunkPointer.read(size.size, src);
+				return ChunkPointer.read(size.nSize, src);
 			}
 			@Override
 			public BasicSizeDescriptor<ChunkPointer, Void> getSizeDescriptor(){

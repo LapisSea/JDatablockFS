@@ -86,7 +86,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	private long size;
 	
 	@IOValue
-	private List<NumberSize> varyingBuffer;
+	private List<Integer> varyingBuffer;
 	
 	private ValueStorage<T> storage;
 	private int             headSize;
@@ -99,16 +99,16 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			readManagedFields();
 		}
 		
-		var ptrSize = NumberSize.bySize(getDataProvider().getSource().getIOSize());
+		var ptrSize = NumberSize.bySize(getDataProvider().getSource().getIOSize()).bytes;
 		
 		var rec = VaryingSize.Provider.record((max, ptr, id) -> {
-			NumberSize num;
+			int num;
 			if(varyingBuffer != null){
 				num = varyingBuffer.get(id);
 			}else{
-				num = ptr? ptrSize : NumberSize.VOID;
+				num = ptr? ptrSize : 1; //TODO: non ptr should be 0, this is just to avoid size change
 			}
-			return max.min(num);
+			return Math.min(max, num);
 		});
 		
 		this.storage = makeValueStorage(rec, IOType.getArg(typeDef, 0));
@@ -393,10 +393,21 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		}
 	}
 	
-	private <Inline> void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
+	private <Inline> void growVaryingSizes(Map<VaryingSize, Integer> tooSmallIdMap) throws IOException{
 		var newBuffer = new ArrayList<>(varyingBuffer);
 		tooSmallIdMap.forEach((v, s) -> newBuffer.set(v.id, s));
 		var newVarying = List.copyOf(newBuffer);
+		
+		//TODO: Separate header data and element data
+		{
+			var tmp = varyingBuffer;
+			varyingBuffer = newVarying;
+			var checkSize = (int)calcInstanceSize(WordSpace.BYTE);
+			varyingBuffer = tmp;
+			if(checkSize != headSize){
+				throw new NotImplementedException();
+			}
+		}
 		
 		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), IOType.getArg(getTypeDef(), 0));
 		

@@ -3,11 +3,11 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
@@ -84,6 +84,8 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	private       IOFieldPrimitive.FInt<CTyp>                  universeID;
 	private final VaryingSize                                  maxSize;
 	
+	private final int maxDynValue;
+	
 	private IOFieldInlineSealedObject(FieldAccessor<CTyp> accessor, VaryingSize maxSize){
 		super(accessor);
 		this.maxSize = maxSize;
@@ -99,16 +101,21 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			nullable(), circularDep,
 			(p, inst) -> get(null, inst)
 		);
-		
+		var siz = dynamicDescriptor.getMax(WordSpace.BYTE).orElse(-1);
+		if(siz>Integer.MAX_VALUE) siz = -1;
+		maxDynValue = (int)siz;
 		if(maxSize == null){
 			initSizeDescriptor(dynamicDescriptor);
 		}else{
-			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size));
 		}
 	}
 	@Override
 	protected IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
-		var size = varProvider.provide(NumberSize.LARGEST, null, false);
+		if(maxDynValue == -1){
+			throw new FixedFormatNotSupported(this, new UnsupportedOperationException("Can not make fixed field with objects with no max size"));
+		}
+		var size = varProvider.provide(maxDynValue, null, false);
 		return new IOFieldInlineSealedObject<>(getAccessor(), size);
 	}
 	@Override
@@ -207,12 +214,12 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	}
 	
 	private void writeFixed(DataProvider provider, ContentWriter dest, StructPipe<ValueType> instancePipe, ValueType val) throws IOException{
-		var buf = new ContentOutputBuilder(maxSize.size.bytes);
+		var buf = new ContentOutputBuilder(maxSize.size);
 		instancePipe.write(provider, buf, val);
-		var rem = maxSize.size.bytes - buf.getCount();
+		var rem = maxSize.size - buf.getCount();
 		if(rem>0) buf.writeInts1(new byte[rem]);
 		else if(rem<0){
-			maxSize.safeSize(NumberSize.byBytes(buf.getCount()));
+			maxSize.checkByteSize(buf.getCount());
 		}
 		buf.writeTo(dest);
 	}
@@ -231,7 +238,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		var ctx = makeContext(genericContext);
 		if(maxSize != null){
-			var ticket = src.readTicket(maxSize.size.bytes).submit();
+			var ticket = src.readTicket(maxSize.size).submit();
 			return instancePipe.readNew(provider, ticket, ctx);
 		}else{
 			return instancePipe.readNew(provider, src, ctx);

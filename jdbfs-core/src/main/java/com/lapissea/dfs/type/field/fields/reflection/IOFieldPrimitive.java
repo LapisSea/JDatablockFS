@@ -634,10 +634,15 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		super(field);
 		var maxAllowed = maxAllowed();
 		
-		if(maxSize != null && maxSize.size.greaterThan(maxAllowed)) throw new IllegalArgumentException(maxSize + " > " + maxAllowed);
+		if(maxSize != null){
+			maxSize.requireNumSize();
+			if(maxSize.nSize.greaterThan(maxAllowed)){
+				throw new IllegalArgumentException(maxSize + " > " + maxAllowed);
+			}
+		}
 		this.forceFixed = maxSize != null;
 		
-		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed, -1);
+		this.maxSize = maxSize != null? maxSize : new VaryingSize(maxAllowed.bytes, -1);
 	}
 	
 	@Override
@@ -646,7 +651,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		if(!forceFixed && IOFieldTools.getDynamicSize(getAccessor()) instanceof Some(var field)){
 			var allowed = allowedSizes();
-			allowed.removeIf(s -> s.greaterThan(maxSize.size));
+			allowed.removeIf(s -> s.greaterThan(maxSize.nSize));
 			dynamicSize = (ioPool, instance) -> {
 				var val = field.get(ioPool, instance);
 				if(!allowed.contains(val))
@@ -658,7 +663,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				Iters.from(allowed).max().opt(),
 				field.getAccessor()));
 		}else{
-			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size));
 		}
 	}
 	
@@ -683,13 +688,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	protected final NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
-		return maxSize.size;
+		return maxSize.nSize;
 	}
 	
 	@Override
 	public IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		String uid  = sizeDescriptorSafe() instanceof SizeDescriptor.UnknownNum<T> num? num.getAccessor().getName() : null;
-		var    size = varProvider.provide(maxAllowed(), uid, false);
+		var    size = varProvider.provide(maxAllowed().bytes, uid, false);
 		if(forceFixed && maxSize == size) return this;
 		return withVaryingSize(size);
 	}

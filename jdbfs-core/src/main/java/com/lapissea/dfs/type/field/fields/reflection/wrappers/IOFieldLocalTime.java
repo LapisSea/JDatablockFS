@@ -42,10 +42,11 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 	public IOFieldLocalTime(FieldAccessor<CTyp> accessor){ this(accessor, null); }
 	public IOFieldLocalTime(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.varSize = varProvider != null? varProvider.provide(NumberSize.LONG, null, false) : null;
+		varSize = varProvider != null? varProvider.provide(NumberSize.LONG.bytes, null, false) : null;
 		
 		if(varSize != null){
-			initSizeDescriptor(SizeDescriptor.Fixed.of(varSize.size.bytes));
+			initSizeDescriptor(SizeDescriptor.Fixed.of(varSize.size));
+			varSize.requireNumSize();
 		}else{
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				WordSpace.BYTE,
@@ -75,7 +76,7 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 	@Override
 	protected void writeValue(DataProvider provider, ContentWriter dest, LocalTime value) throws IOException{
 		if(varSize != null){
-			varSize.size.write(dest, value.toNanoOfDay());
+			varSize.nSize.write(dest, value.toNanoOfDay());
 		}else{
 			dest.writeInt8Dynamic(value.toNanoOfDay());
 		}
@@ -84,7 +85,7 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 	protected LocalTime readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		long nanos;
 		if(varSize != null){
-			nanos = varSize.size.read(src);
+			nanos = varSize.nSize.read(src);
 		}else{
 			nanos = src.readInt8Dynamic();
 		}
@@ -94,7 +95,7 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		NumberSize size;
 		if(varSize != null){
-			size = varSize.size;
+			size = varSize.nSize;
 		}else{
 			size = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 		}

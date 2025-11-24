@@ -42,10 +42,11 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends IOFie
 	public IOFieldLocalDate(FieldAccessor<CTyp> accessor){ this(accessor, null); }
 	public IOFieldLocalDate(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.varSize = varProvider != null? varProvider.provide(NumberSize.LONG, null, false) : null;
+		this.varSize = varProvider != null? varProvider.provide(NumberSize.LONG.bytes, null, false) : null;
 		
 		if(varSize != null){
-			initSizeDescriptor(SizeDescriptor.Fixed.of(varSize.size.bytes));
+			varSize.requireNumSize();
+			initSizeDescriptor(SizeDescriptor.Fixed.of(varSize.size));
 		}else{
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				WordSpace.BYTE,
@@ -74,17 +75,18 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends IOFie
 	
 	@Override
 	protected void writeValue(DataProvider provider, ContentWriter dest, LocalDate value) throws IOException{
+		var val = value.toEpochDay();
 		if(varSize != null){
-			varSize.size.write(dest, value.toEpochDay());
+			varSize.safeNumber(val).write(dest, val);
 		}else{
-			dest.writeInt8Dynamic(value.toEpochDay());
+			dest.writeInt8Dynamic(val);
 		}
 	}
 	@Override
 	protected LocalDate readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		long day;
 		if(varSize != null){
-			day = varSize.size.read(src);
+			day = varSize.nSize.read(src);
 		}else{
 			day = src.readInt8Dynamic();
 		}
@@ -94,7 +96,7 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends IOFie
 	protected void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		NumberSize size;
 		if(varSize != null){
-			size = varSize.size;
+			size = varSize.nSize;
 		}else{
 			size = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 		}

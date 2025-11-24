@@ -55,7 +55,8 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	private IOFieldChunkPointer(FieldAccessor<T> accessor, VaryingSize maxSize){
 		super(accessor);
 		this.forceFixed = maxSize != null;
-		this.maxSize = maxSize == null? VaryingSize.MAX : maxSize;
+		this.maxSize = maxSize == null? new VaryingSize(NumberSize.LONG.bytes, -1) : maxSize;
+		this.maxSize.requireNumSize();
 	}
 	
 	@Override
@@ -71,19 +72,19 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 			dynamicSize = field::get;
 			initSizeDescriptor(SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()));
 		}else{
-			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size));
 		}
 	}
 	@Override
 	public IOField<T, ChunkPointer> maxAsFixedSize(VaryingSize.Provider varProvider){
 		var    ptr = getType() == ChunkPointer.class;
 		String uid = sizeDescriptorSafe() instanceof SizeDescriptor.UnknownNum<T> num? num.getAccessor().getName() : null;
-		return new IOFieldChunkPointer<>(getAccessor(), varProvider.provide(LARGEST, uid, ptr));
+		return new IOFieldChunkPointer<>(getAccessor(), varProvider.provide(LARGEST.bytes, uid, ptr));
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
-		return maxSize.size;
+		return maxSize.nSize;
 	}
 	private NumberSize getSafeSize(VarPool<T> ioPool, T instance, long num){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
