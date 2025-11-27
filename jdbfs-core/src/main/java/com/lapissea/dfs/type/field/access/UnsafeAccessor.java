@@ -17,12 +17,15 @@ import java.util.function.Function;
 
 import static com.lapissea.dfs.internal.MyUnsafe.UNSAFE;
 
-public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp>{
+public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactFieldAccessor<CTyp> implements FieldAccessor.FieldOrMethod{
 	
 	public static final class Funct<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor<CTyp>{
 		
 		private final Function<CTyp, ?>        getter;
 		private final BiConsumer<CTyp, Object> setter;
+		
+		private final String getterName;
+		private final String setterName;
 		
 		private Funct(Struct<CTyp> struct, Field field, Method getter, Method setter, String name, Type genericType) throws IllegalAccessException{
 			super(struct, field, name, genericType);
@@ -32,6 +35,20 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 			
 			this.getter = getter != null? makeGetter(findParent(getter)) : null;
 			this.setter = setter != null? makeSetter(findParent(setter)) : null;
+			
+			getterName = getter != null? getter.getName() : null;
+			setterName = setter != null? setter.getName() : null;
+		}
+		
+		@Override
+		public AccessType getter(){
+			if(getterName != null) return new AccessType.Method(getterName);
+			return super.getter();
+		}
+		@Override
+		public AccessType setter(){
+			if(setterName != null) return new AccessType.Method(setterName);
+			return super.setter();
 		}
 		
 		@Override
@@ -149,12 +166,23 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	
 	private final Class<?> declaringClass;
 	private final long     fieldOffset;
+	private final String   fieldName;
 	
 	private UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType) throws IllegalAccessException{
 		super(struct, name, genericType, IOFieldTools.computeAnnotations(field), Modifier.isFinal(field.getModifiers()));
 		declaringClass = field.getDeclaringClass();
 		Access.findAccess(field.getDeclaringClass(), AccessUtils.modeFromModifiers(field.getModifiers()));
+		fieldName = field.getName();
 		fieldOffset = MyUnsafe.objectFieldOffset(field);
+	}
+	
+	@Override
+	public AccessType getter(){
+		return new AccessType.Field(declaringClass, fieldName);
+	}
+	@Override
+	public AccessType setter(){
+		return new AccessType.Field(declaringClass, fieldName);
 	}
 	
 	private void checkInstance(CTyp instance){
