@@ -3,6 +3,7 @@ package com.lapissea.dfs.io.content;
 import com.lapissea.dfs.BufferErrorSupplier;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.EOFException;
@@ -16,7 +17,7 @@ import java.util.OptionalLong;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-@SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
+@SuppressWarnings({"PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable{
 	
 	default void read(ByteBuffer buff) throws IOException{
@@ -323,9 +324,13 @@ public interface ContentReader extends AutoCloseable{
 		return result;
 	}
 	
+	default float readFloat2() throws IOException{
+		return IOUtils.shortBitsToFloat((int)readWord(2));
+	}
 	default float readFloat4() throws IOException{
 		return Float.intBitsToFloat((int)readWord(4));
 	}
+	
 	default float[] readFloats4(int count) throws IOException{
 		var buff = new float[count];
 		readFloats4(buff);
@@ -340,7 +345,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default double readFloat8() throws IOException{
-		return Double.longBitsToDouble(readWord(4));
+		return Double.longBitsToDouble(readWord(8));
 	}
 	default double[] readFloats8(int count) throws IOException{
 		var buff = new double[count];
