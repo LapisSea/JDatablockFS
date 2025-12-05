@@ -88,9 +88,7 @@ public class SpecializedPipeTests{
 		ints = withUnsigned(ints, r -> r.nextInt(0, Integer.MAX_VALUE));
 		shorts = withUnsigned(shorts, r -> (short)r.nextInt(0, Short.MAX_VALUE));
 		
-		doubles = withVirtualSize(doubles);
 		chars = withVirtualSize(chars);
-		floats = withVirtualSize(floats);
 		longs = withVirtualSize(longs);
 		ints = withVirtualSize(ints);
 		shorts = withVirtualSize(shorts);

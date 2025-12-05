@@ -186,6 +186,36 @@ public enum NumberSize{
 		}
 	}
 	
+	
+	/**
+	 * Stack: pops ContentReader, pushes float
+	 */
+	public void readFloatConst(CodeStream target, String getContentReader) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.write("0");
+			case SHORT -> {
+				target.write("{} call readFloat2", getContentReader);
+			}
+			case INT -> {
+				target.write("{} call readFloat4", getContentReader);
+			}
+			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		}
+	}
+	/**
+	 * Stack: pops NumberSize, pushes int
+	 */
+	public static void readFloatDyn(CodeStream target, String getContentReader) throws MalformedJorth{
+		target.write(
+			"""
+				call readFloat start
+					{}
+				end
+				""",
+			getContentReader
+		);
+	}
+	
 	public long read(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;

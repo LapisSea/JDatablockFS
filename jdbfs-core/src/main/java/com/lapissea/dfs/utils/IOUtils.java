@@ -6,7 +6,7 @@ import java.io.IOException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-public class IOUtils{
+public final class IOUtils{
 	
 	public interface ConsumerBaII{
 		void accept(byte[] bytes, int off, int len) throws IOException;
