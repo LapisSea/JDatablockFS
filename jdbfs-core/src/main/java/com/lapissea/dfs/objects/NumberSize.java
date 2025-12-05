@@ -6,7 +6,6 @@ import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
@@ -149,22 +148,40 @@ public enum NumberSize{
 		signedMaxValueI = (int)Math.min(signedMaxValue, Integer.MAX_VALUE);
 	}
 	
-	public double readFloating(ContentReader in) throws IOException{
+	public float readFloat(ContentReader in) throws IOException{
 		return switch(this){
-			case INT -> Float.intBitsToFloat(in.readInt4());
-			case LONG -> Double.longBitsToDouble(in.readInt8());
-			case SHORT -> IOUtils.shortBitsToFloat(in.readInt2());
 			case VOID -> 0;
+			case SHORT -> in.readFloat2();
+			case INT -> in.readFloat4();
+			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG, LONG -> throw new UnsupportedOperationException();
+		};
+	}
+	
+	public void writeFloat(ContentWriter out, float value) throws IOException{
+		switch(this){
+			case VOID -> { }
+			case SHORT -> out.writeFloat2(value);
+			case INT -> out.writeFloat4(value);
+			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG, LONG -> throw new UnsupportedOperationException();
+		}
+	}
+	
+	public double readDouble(ContentReader in) throws IOException{
+		return switch(this){
+			case VOID -> 0;
+			case SHORT -> in.readFloat2();
+			case INT -> in.readFloat4();
+			case LONG -> in.readFloat8();
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 		};
 	}
 	
-	public void writeFloating(ContentWriter out, double value) throws IOException{
+	public void writeDouble(ContentWriter out, double value) throws IOException{
 		switch(this){
-			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
-			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
-			case SHORT -> out.writeInt2(IOUtils.floatToShortBits((float)value));
 			case VOID -> { }
+			case SHORT -> out.writeFloat2((float)value);
+			case INT -> out.writeFloat4((float)value);
+			case LONG -> out.writeFloat8(value);
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 		}
 	}
@@ -282,7 +299,6 @@ public enum NumberSize{
 			case BIG_INT -> out.writeInt5(value);
 			case SMALL_LONG -> out.writeInt6(value);
 			case LONG -> out.writeInt8(value);
-			case null -> { }
 		}
 	}
 	
@@ -302,7 +318,6 @@ public enum NumberSize{
 			case BIG_INT -> BBView.writeInt5(out, off, value);
 			case SMALL_LONG -> BBView.writeInt6(out, off, value);
 			case LONG -> BBView.writeInt8(out, off, value);
-			case null -> { }
 		}
 	}
 	
@@ -324,7 +339,6 @@ public enum NumberSize{
 			case SMALL_INT -> out.writeInt3(value);
 			case INT -> out.writeInt4(value);
 			case BIG_INT, SMALL_LONG, LONG -> throw new IOException("Attempted to write int in to too wide of a value");
-			case null -> { }
 		}
 	}
 	
@@ -400,21 +414,21 @@ public enum NumberSize{
 	public OptionalPP<NumberSize> prev(){ return prev; }
 	public NumberSize next()            { return next; }
 	
-	///////////
+	/// ////////
 	
 	public boolean greaterThanOrEqual(NumberSize other){ return other == this || bytes>=other.bytes; }
-	public boolean lesserThanOrEqual(NumberSize other) { return other == this || bytes<=other.bytes; }
-	public boolean greaterThan(NumberSize other)       { return other != this && bytes>other.bytes; }
-	public boolean lesserThan(NumberSize other)        { return other != this && bytes<other.bytes; }
+	public boolean lesserThanOrEqual(NumberSize other){ return other == this || bytes<=other.bytes; }
+	public boolean greaterThan(NumberSize other)      { return other != this && bytes>other.bytes; }
+	public boolean lesserThan(NumberSize other)       { return other != this && bytes<other.bytes; }
 	
-	///////////
+	/// ////////
 	
 	public NumberSize max(NumberSize other){ return greaterThan(other)? this : other; }
 	public NumberSize min(NumberSize other){ return lesserThan(other)? this : other; }
 	
-	///////////
+	/// ////////
 	
-	public boolean canFit(ChunkPointer num)        { return canFit(num.getValue()); }
+	public boolean canFit(ChunkPointer num){ return canFit(num.getValue()); }
 	public boolean canFit(long num)                { return num<=maxSize; }
 	public boolean canFit(int num)                 { return num<=maxSize; }
 	public boolean canFitSigned(long num)          { return signedMinValue<=num && num<=signedMaxValue; }

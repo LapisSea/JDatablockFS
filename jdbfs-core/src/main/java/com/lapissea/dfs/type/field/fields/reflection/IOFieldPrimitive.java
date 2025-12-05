@@ -143,13 +143,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size = getSafeSize(ioPool, instance, LONG);
-			size.writeFloating(dest, getValue(ioPool, instance));
+			size.writeDouble(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size = getSize(ioPool, instance);
-			setValue(ioPool, instance, size.readFloating(src));
+			setValue(ioPool, instance, size.readDouble(src));
 		}
 		
 		@Override
@@ -264,13 +264,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size = getSafeSize(ioPool, instance, INT);
-			size.writeFloating(dest, getValue(ioPool, instance));
+			size.writeFloat(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size = getSize(ioPool, instance);
-			setValue(ioPool, instance, (float)size.readFloating(src));
+			setValue(ioPool, instance, size.readFloat(src));
 		}
 		
 		@Override

@@ -76,8 +76,8 @@ public abstract class DynamicSupport{
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
 			case Boolean v -> dest.writeBoolean(v);
 			case Character v -> dest.writeChar2(v);
-			case Float v -> NumberSize.INT.writeFloating(dest, v);
-			case Double v -> NumberSize.LONG.writeFloating(dest, v);
+			case Float v -> dest.writeFloat4(v);
+			case Double v -> dest.writeFloat8(v);
 			case Byte v -> dest.writeInt1(v);
 			case Short v -> dest.writeInt2(v);
 			case Number integer -> {
@@ -121,8 +121,8 @@ public abstract class DynamicSupport{
 		if(typ == Boolean.class) return src.readBoolean();
 		if(typ == Character.class) return src.readChar2();
 		if(UtilL.instanceOf(typ, Number.class)){
-			if(typ == Float.class) return (float)NumberSize.INT.readFloating(src);
-			if(typ == Double.class) return NumberSize.LONG.readFloating(src);
+			if(typ == Float.class) return src.readFloat4();
+			if(typ == Double.class) return src.readFloat8();
 			if(typ == Byte.class) return src.readInt1();
 			if(typ == Short.class) return src.readInt2();
 			
