@@ -293,9 +293,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				throw new NotImplementedException();
 			}
 			accessMap.preSet(getAccessor(), writer);
-			writer.write("static call #Float valueOf start");
 			readRawFloat(writer, accessMap);
-			writer.write("end");
+			writer.write("box");
 			accessMap.set(getAccessor(), writer);
 		}
 		
@@ -577,11 +576,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 							""",
 						maxSize.size.bytes, tmpInt
 					);
-					writer.write("static call #Long valueOf start");
 					maxSize.size.readConst(writer, "get #arg src", !unsigned);
 					writer.write(
 						"""
-								end
+								box
 								set #field {}
 							end
 							""", tmpInt);
@@ -597,13 +595,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 								null start #Long end
 								set #field {}
 							end else start
-								static call #Long valueOf start
 							""", tmpInt);
 					accessMap.get(getDynamicSize().field.getAccessor(), writer);
 					NumberSize.readDyn(writer, "get #arg src", !unsigned);
-					writer.wEnd();
 					writer.write(
 						"""
+								box
 								set #field {}
 							end""", tmpInt);
 				}
@@ -612,9 +609,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				accessMap.set(getAccessor(), writer);
 			}else{
 				accessMap.preSet(getAccessor(), writer);
-				writer.write("static call #Long valueOf start");
 				readLong(writer, accessMap);
-				writer.wEnd();
+				writer.write("box");
 				accessMap.set(getAccessor(), writer);
 			}
 		}
@@ -730,11 +726,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 							""",
 						maxSize.size.bytes, tmpInt
 					);
-					writer.write("static call #Integer valueOf start");
 					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
 					writer.write(
 						"""
-								end
+								box
 								set #field {}
 							end
 							""", tmpInt);
@@ -750,13 +745,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 								null start #Integer end
 								set #field {}
 							end else start
-								static call #Integer valueOf start
 							""", tmpInt);
 					accessMap.get(getDynamicSize().field.getAccessor(), writer);
 					readIntDyn(writer, "get #arg src", !unsigned);
-					writer.wEnd();
 					writer.write(
 						"""
+								box
 								set #field {}
 							end""", tmpInt);
 				}
@@ -765,14 +759,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				accessMap.set(getAccessor(), writer);
 			}else{
 				accessMap.preSet(getAccessor(), writer);
-				writer.write("static call #Integer valueOf start");
 				if(getDynamicSize() == null){
 					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
 				}else{
 					accessMap.get(getDynamicSize().field.getAccessor(), writer);
 					readIntDyn(writer, "get #arg src", !unsigned);
 				}
-				writer.wEnd();
+				writer.write("box");
 				accessMap.set(getAccessor(), writer);
 			}
 			
@@ -1185,10 +1178,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 							null start #Boolean end
 							set #field {1}
 						end else start
-							static call #Boolean valueOf start
-								get #field {2}
-								cast boolean
-							end
+							get #field {2}
+							cast boolean
+							box
 							set #field {1}
 						end
 						get #field {1}
@@ -1197,10 +1189,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			}else{
 				writer.write(
 					"""
-						static call #Boolean valueOf start
-							get #field {}
-							cast boolean
-						end
+						get #field {}
+						cast boolean
+						box
 						""", bitsFieldName);
 			}
 			accessMap.set(getAccessor(), writer);

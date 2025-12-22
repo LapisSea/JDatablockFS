@@ -813,6 +813,31 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		code().ended = true;
 	}
 	
+	private static final Map<GenericType, Class<?>> BOX_MAP = Map.of(
+		GenericType.BOOL, Boolean.class,
+		GenericType.BYTE, Byte.class,
+		GenericType.SHORT, Short.class,
+		GenericType.INT, Integer.class,
+		GenericType.LONG, Long.class,
+		GenericType.CHAR, Character.class,
+		GenericType.FLOAT, Float.class,
+		GenericType.DOUBLE, Double.class
+	);
+	
+	public void doBox() throws MalformedJorth{
+		var stack = code().stack;
+		var typ   = stack.peekLast();
+		
+		var boxedClass = BOX_MAP.get(typ);
+		if(boxedClass == null){
+			throw new MalformedJorth("Cannot box non-primitive type: " + typ);
+		}
+		
+		var cls = typeSource.byName(ClassName.of(boxedClass));
+		invokeOp(cls.getFunction(new Signature("valueOf", List.of(typ))), false);
+	}
+	
+	
 	private void branchCompareToBool(int ifNotOp){
 		Label falseL = new Label();
 		writer.visitJumpInsn(ifNotOp, falseL);

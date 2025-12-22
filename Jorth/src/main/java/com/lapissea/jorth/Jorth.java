@@ -586,6 +586,7 @@ public final class Jorth extends CodeDestination{
 			case NOT -> currentFunction.negateBool();
 			case RETURN -> currentFunction.returnOp();
 			case THROW -> currentFunction.throwOp();
+			case BOX -> currentFunction.doBox();
 			case NEW -> {
 				var clazz = getReadClassName(source);
 				currentFunction.newOp(new GenericType(clazz));

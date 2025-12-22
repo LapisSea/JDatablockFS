@@ -31,6 +31,7 @@ public enum Keyword implements KeyedEnum{
 	NOT,
 	RETURN,
 	THROW,
+	BOX,
 	DUP, POP,
 	AT("@"),
 	TYPE_ARG("type-arg"),
