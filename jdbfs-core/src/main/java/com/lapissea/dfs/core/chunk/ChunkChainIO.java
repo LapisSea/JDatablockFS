@@ -333,7 +333,9 @@ public final class ChunkChainIO implements RandomIO{
 		do{
 			long cursorOffset    = calcCursorOffset();
 			long cursorRemaining = cursor.getSize() - cursorOffset;
-			if(cursorRemaining == 0) throw new EOFException();
+			if(cursorRemaining == 0){
+				throw new EOFException();
+			}
 			
 			int toRead = (int)Math.min(remaining, cursorRemaining);
 			syncSourceCursor(cursorOffset);

@@ -33,7 +33,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -290,12 +289,57 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			if(nullable()){
-				throw new NotImplementedException();
+				var tmpInt = accessMap.temporaryLocalField(Float.class, writer);
+				if(getDynamicSize() == null){
+					accessMap.get(isNull, writer);
+					writer.write(
+						"""
+							if start
+								get #arg src
+								call skipExact start {0} cast long end
+								null start #Float end
+								set #field {1}
+							end else start
+							""",
+						maxSize.size.bytes, tmpInt
+					);
+					maxSize.size.readFloatConst(writer, "get #arg src");
+					writer.write(
+						"""
+								box
+								set #field {}
+							end
+							""", tmpInt);
+				}else{
+					accessMap.get(isNull, writer);
+					writer.write("if start");
+					accessMap.get(getDynamicSize().field, writer);
+					writer.write(
+						"""
+								call skip start
+									get #arg src
+								end
+								null start #Float end
+								set #field {}
+							end else start
+							""", tmpInt);
+					accessMap.get(getDynamicSize().field.getAccessor(), writer);
+					readFloatDyn(writer, "get #arg src");
+					writer.write(
+						"""
+								box
+								set #field {}
+							end""", tmpInt);
+				}
+				accessMap.preSet(getAccessor(), writer);
+				writer.write("get #field {}", tmpInt);
+				accessMap.set(getAccessor(), writer);
+			}else{
+				accessMap.preSet(getAccessor(), writer);
+				readRawFloat(writer, accessMap);
+				writer.write("box");
+				accessMap.set(getAccessor(), writer);
 			}
-			accessMap.preSet(getAccessor(), writer);
-			readRawFloat(writer, accessMap);
-			writer.write("box");
-			accessMap.set(getAccessor(), writer);
 		}
 		
 		
