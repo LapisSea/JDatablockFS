@@ -66,7 +66,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public <T extends IOInstance<T>> List<Behaviour<?, T>> annotationBehaviour(Class<IOField<T, ?>> fieldType){
 			var res = new ArrayList<Behaviour<?, T>>(3);
 			
-			if(List.of(FIntBoxed.class, FLongBoxed.class, FDoubleBoxed.class, FFloatBoxed.class).contains(fieldType)){
+			if(List.of(FIntBoxed.class, FCharBoxed.class, FLongBoxed.class, FDoubleBoxed.class, FFloatBoxed.class).contains(fieldType)){
 				res.add(Behaviour.of(IONullability.class, BehaviourSupport::ioNullability));
 			}
 			if(fieldType.equals(FBooleanBoxed.class)){
@@ -90,7 +90,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@SuppressWarnings("rawtypes")
 		public Set<Class<? extends IOField>> listFieldTypes(){
 			return Set.of(
-				FDouble.class, FDoubleBoxed.class, FChar.class, FFloat.class, FFloatBoxed.class, FLong.class, FLongBoxed.class, FInt.class, FIntBoxed.class, FShort.class, FByte.class,
+				FDouble.class, FDoubleBoxed.class,
+				FChar.class, FCharBoxed.class,
+				FFloat.class, FFloatBoxed.class,
+				FLong.class, FLongBoxed.class,
+				FInt.class, FIntBoxed.class,
+				FShort.class,
+				FByte.class,
 				FBoolean.class, FBooleanBoxed.class
 			);
 		}
@@ -101,7 +107,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		var prim = field.getType().isPrimitive();
 		return SupportedPrimitive.get(field.getType()).map(t -> switch(t){
 			case DOUBLE -> prim? new FDouble<>(field, null) : new FDoubleBoxed<>(field, null);
-			case CHAR -> new FChar<>(field, null);
+			case CHAR -> prim? new FChar<>(field, null) : new FCharBoxed<>(field, null);
 			case FLOAT -> prim? new FFloat<>(field, null) : new FFloatBoxed<>(field, null);
 			case LONG -> prim? new FLong<>(field, null) : new FLongBoxed<>(field, null);
 			case INT -> prim? new FInt<>(field, null) : new FIntBoxed<>(field, null);
@@ -304,14 +310,34 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static final class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
+	public abstract static sealed class FCharBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character> implements SpecializedGenerator{
 		
-		private FChar(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private FCharBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, BYTE, SHORT);
 		}
+		
+		@Override
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.ofNullable(get(ioPool, instance)).map(Object::toString);
+		}
+		
+		protected void writeChar(VarPool<T> ioPool, ContentWriter dest, T instance, char val) throws IOException{
+			var size = getSafeSize(ioPool, instance, true, val);
+			size.writeInt(dest, val);
+		}
+		protected char readChar(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var size = getSize(ioPool, instance);
+			return (char)size.readInt(src);
+		}
+	}
+	
+	public static final class FChar<T extends IOInstance<T>> extends FCharBase<T>{
+		
+		private FChar(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
 		@Override
 		protected IOField<T, Character> withVaryingSize(VaryingSize size){
 			return new FChar<>(getAccessor(), size);
@@ -336,22 +362,32 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			setValue(ioPool, instance, value);
 		}
 		
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			accessMap.preSet(getAccessor(), writer);
+			if(getDynamicSize() == null){
+				maxSize.size.readIntConst(writer, "get #arg src", false);
+			}else{
+				accessMap.get(getDynamicSize().field.getAccessor(), writer);
+				NumberSize.readIntDyn(writer, "get #arg src", false);
+			}
+			
+			writer.write("cast char");
+			
+			accessMap.set(getAccessor(), writer);
+		}
+		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, true, val);
-			size.writeInt(dest, val);
+			var val = getValue(ioPool, instance);
+			writeChar(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size = getSize(ioPool, instance);
-			setValue(ioPool, instance, (char)size.readInt(src));
-		}
-		
-		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+			var val = readChar(ioPool, src, instance);
+			setValue(ioPool, instance, val);
 		}
 		
 		@Override
@@ -360,7 +396,136 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		@Override
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
-			return Character.hashCode(getValue(ioPool, instance));
+			return getValue(ioPool, instance);
+		}
+	}
+	
+	public static final class FCharBoxed<T extends IOInstance<T>> extends FCharBase<T>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		private FCharBoxed(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+		}
+		
+		@Override
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			if(nullable()){
+				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
+			}
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			if(!nullable()) return super.getGenerators();
+			
+			return Utils.concat(super.getGenerators(), new ValueGeneratorInfo<>(isNull, new ValueGenerator.NoCheck<T, Boolean>(){
+				@Override
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance) == null;
+				}
+			}));
+		}
+		
+		@Override
+		protected IOField<T, Character> withVaryingSize(VaryingSize size){ return new FCharBoxed<>(getAccessor(), size); }
+		
+		@Override
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var val = get(ioPool, instance);
+			if(val == null){
+				if(nullable()){
+					var size = getSafeSize(ioPool, instance, VOID);
+					dest.writeWord(0, size.bytes);
+				}else{
+					throw new FieldIsNull(this);
+				}
+				return;
+			}
+			writeChar(ioPool, dest, instance, val);
+		}
+		
+		@Override
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			if(nullable() && isNull.getValue(ioPool, instance)){
+				set(ioPool, instance, null);
+				getSafeSize(ioPool, instance, VOID).skip(src);
+				return;
+			}
+			var val = readChar(ioPool, src, instance);
+			set(ioPool, instance, val);
+		}
+		@Override
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
+			return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		}
+		@Override
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
+			var val = get(ioPool, instance);
+			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
+		}
+		
+		@Override
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+			if(nullable()){
+				var tmpInt = accessMap.temporaryLocalField(Character.class, writer);
+				if(getDynamicSize() == null){
+					accessMap.get(isNull, writer);
+					writer.write(
+						"""
+							if start
+								get #arg src
+								call skipExact start {} cast long end
+								null start #Character end
+								set #field {}
+							end else start
+							""",
+						maxSize.size.bytes, tmpInt
+					);
+					maxSize.size.readIntConst(writer, "get #arg src", false);
+					writer.write(
+						"""
+								cast char box
+								set #field {}
+							end
+							""", tmpInt);
+				}else{
+					accessMap.get(isNull, writer);
+					writer.write("if start");
+					accessMap.get(getDynamicSize().field, writer);
+					writer.write(
+						"""
+								call skip start
+									get #arg src
+								end
+								null start #Character end
+								set #field {}
+							end else start
+							""", tmpInt);
+					accessMap.get(getDynamicSize().field.getAccessor(), writer);
+					readIntDyn(writer, "get #arg src", false);
+					writer.write(
+						"""
+								cast char box
+								set #field {}
+							end""", tmpInt);
+				}
+				accessMap.preSet(getAccessor(), writer);
+				writer.write("get #field {}", tmpInt);
+				accessMap.set(getAccessor(), writer);
+			}else{
+				accessMap.preSet(getAccessor(), writer);
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(writer, "get #arg src", false);
+				}else{
+					accessMap.get(getDynamicSize().field.getAccessor(), writer);
+					readIntDyn(writer, "get #arg src", false);
+				}
+				writer.write("cast char box");
+				accessMap.set(getAccessor(), writer);
+			}
+			
 		}
 	}
 	

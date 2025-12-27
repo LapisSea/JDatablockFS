@@ -337,6 +337,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 			case ID_INT -> getExactInt(ioPool, instance);
 			case ID_SHORT -> getExactShort(ioPool, instance);
 			case ID_BYTE -> getExactByte(ioPool, instance);
+			case ID_CHAR -> getExactChar(ioPool, instance);
 			case ID_OBJECT -> getObjAsLong(ioPool, instance);
 			default -> throw classCastThrow();
 		};
@@ -347,6 +348,7 @@ public abstract class ExactFieldAccessor<CTyp extends IOInstance<CTyp>> extends 
 			case Integer n -> n;
 			case Short n -> n;
 			case Byte n -> n;
+			case Character n -> n;
 			case null -> 0;//TODO: boxed primitive variant has null... what to do?
 			default -> throw classCastThrow();
 		};
