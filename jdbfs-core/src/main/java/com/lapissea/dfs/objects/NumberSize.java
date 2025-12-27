@@ -203,7 +203,7 @@ public enum NumberSize{
 		}
 	}
 	/**
-	 * Stack: pops NumberSize, pushes int
+	 * Stack: pops NumberSize, pushes float
 	 */
 	public static void readFloatDyn(CodeStream target, String getContentReader) throws MalformedJorth{
 		target.write(
