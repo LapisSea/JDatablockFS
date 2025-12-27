@@ -94,7 +94,7 @@ public class SpecializedPipeTests{
 		shorts = withVirtualSize(shorts);
 		
 		var primitives = Iters.concat(
-//			longs
+//			bytes
 			doubles, chars, floats, longs, ints, shorts, bytes, booleans
 		);
 		
@@ -103,7 +103,7 @@ public class SpecializedPipeTests{
 		
 		return Iters.concat(
 			primitives, boxed
-		).flatMapArray(e -> new Object[][]{{e, true}}).toArray(Object[].class);
+		).flatMapArray(e -> new Object[][]{{e, true}, {e, false}}).toArray(Object[].class);
 	}
 	
 	private static IterablePP<FieldDef> withFns(IterablePP<FieldDef> combinations){
@@ -289,7 +289,7 @@ public class SpecializedPipeTests{
 			fields,
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 30))) : List.of(),
+			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 80))) : List.of(),
 			fns);
 		return TempClassGen.gen(cg);
 	}
