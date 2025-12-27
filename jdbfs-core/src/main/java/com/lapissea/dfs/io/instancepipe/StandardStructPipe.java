@@ -544,7 +544,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		Set<ConstantRequest> constants = new HashSet<>();
 		
 		while(true){
-			var log = JorthLogger.make();
+			var    log      = JorthLogger.make();
+			byte[] bytecode = null;
 			try{
 				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 				
@@ -594,8 +595,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					writer.wEnd();
 				}
 				
-				var bytecode = jorth.getClassFile(className);
-				BytecodeUtils.printClass(bytecode);
+				bytecode = jorth.getClassFile(className);
 				
 				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 				var cls    = access.defineClass(type, bytecode, true);
@@ -616,6 +616,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			}finally{
 				if(log != null){
 					Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
+					if(bytecode != null) BytecodeUtils.printClass(bytecode);
 				}
 			}
 		}
