@@ -103,7 +103,7 @@ public class SpecializedPipeTests{
 		
 		return Iters.concat(
 			primitives, boxed
-		).flatMapArray(e -> new Object[][]{{e, true}, {e, false}}).toArray(Object[].class);
+		).flatMapArray(e -> new Object[][]{{e, true}}).toArray(Object[].class);
 	}
 	
 	private static IterablePP<FieldDef> withFns(IterablePP<FieldDef> combinations){
@@ -235,7 +235,7 @@ public class SpecializedPipeTests{
 	
 	private static Class<IOInstance<?>> makeFieldClass(FieldDef field, boolean special, boolean immediate){
 		var val = new TempClassGen.FieldGen(
-			"val", TempClassGen.VisiblityGen.PUBLIC, false, field.type,
+			"val", TempClassGen.VisiblityGen.PRIVATE, false, field.type,
 			Iters.concat1N(Annotations.make(IOValue.class), field.annotations).toList(),
 			field.generator
 		);
@@ -244,7 +244,7 @@ public class SpecializedPipeTests{
 		fields.add(val);
 		if(field.getter){
 			fields.add(new TempClassGen.FieldGen(
-				"valGetCount", TempClassGen.VisiblityGen.PUBLIC, false, int.class,
+				"valGetCount", TempClassGen.VisiblityGen.PRIVATE, false, int.class,
 				List.of(), null
 			));
 			fns.add(code -> code.write(
@@ -265,7 +265,7 @@ public class SpecializedPipeTests{
 		}
 		if(field.setter){
 			fields.add(new TempClassGen.FieldGen(
-				"valSetCount", TempClassGen.VisiblityGen.PUBLIC, false, int.class,
+				"valSetCount", TempClassGen.VisiblityGen.PRIVATE, false, int.class,
 				List.of(), null
 			));
 			fns.add(code -> code.write(

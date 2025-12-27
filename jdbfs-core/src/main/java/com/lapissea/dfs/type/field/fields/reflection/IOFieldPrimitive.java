@@ -672,8 +672,48 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	@SuppressWarnings("deprecation")
-	public static final class FIntBoxed<T extends IOInstance<T>> extends FInt<T>{
+	public abstract static sealed class FIntBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
+		
+		protected final boolean unsigned;
+		
+		private FIntBase(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
+		}
+		@Override
+		protected EnumSet<NumberSize> allowedSizes(){
+			var all = EnumSet.allOf(NumberSize.class);
+			all.removeIf(s -> s.greaterThan(INT));
+			return all;
+		}
+		
+		@Override
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+			var val = get(ioPool, instance);
+			if(val == null || val == 0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
+		}
+		
+		protected void writeInt(VarPool<T> ioPool, ContentWriter dest, T instance, int val) throws IOException{
+			var size = getSafeSize(ioPool, instance, unsigned, val);
+			if(unsigned){
+				size.writeInt(dest, val);
+			}else{
+				size.writeIntSigned(dest, val);
+			}
+		}
+		
+		protected int readInt(VarPool<T> ioPool, ContentReader src, T instance) throws IOException{
+			var size = getSize(ioPool, instance);
+			if(unsigned){
+				return size.readInt(src);
+			}else{
+				return size.readIntSigned(src);
+			}
+		}
+	}
+	
+	public static final class FIntBoxed<T extends IOInstance<T>> extends FIntBase<T>{
 		
 		private IOFieldPrimitive.FBoolean<T> isNull;
 		
@@ -705,15 +745,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FIntBoxed<>(getAccessor(), size); }
 		
 		@Override
-		public Integer get(VarPool<T> ioPool, T instance){
-			return getNullable(ioPool, instance);
-		}
-		@Override
-		public void set(VarPool<T> ioPool, T instance, Integer value){
-			getAccessor().set(ioPool, instance, value);
-		}
-		
-		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val = get(ioPool, instance);
 			if(val == null){
@@ -725,7 +756,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				}
 				return;
 			}
-			super.write(ioPool, provider, dest, instance);
+			writeInt(ioPool, dest, instance, val);
 		}
 		
 		@Override
@@ -735,13 +766,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				getSafeSize(ioPool, instance, VOID).skip(src);
 				return;
 			}
-			super.read(ioPool, provider, src, instance, genericContext);
-		}
-		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = get(ioPool, instance);
-			if(val == null || val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			var val = readInt(ioPool, src, instance);
+			set(ioPool, instance, val);
 		}
 		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
@@ -816,19 +842,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static sealed class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
-		
-		protected final boolean unsigned;
+	public static final class FInt<T extends IOInstance<T>> extends FIntBase<T>{
 		
 		private FInt(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
-			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
-		}
-		@Override
-		protected EnumSet<NumberSize> allowedSizes(){
-			var all = EnumSet.allOf(NumberSize.class);
-			all.removeIf(s -> s.greaterThan(INT));
-			return all;
 		}
 		@Override
 		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FInt<>(getAccessor(), size); }
@@ -854,24 +871,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var val  = getValue(ioPool, instance);
-			var size = getSafeSize(ioPool, instance, unsigned, val);
-			if(unsigned){
-				size.writeInt(dest, val);
-			}else{
-				size.writeIntSigned(dest, val);
-			}
+			int val = getValue(ioPool, instance);
+			this.writeInt(ioPool, dest, instance, val);
 		}
 		
 		@Override
 		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size = getSize(ioPool, instance);
-			int val;
-			if(unsigned){
-				val = size.readInt(src);
-			}else{
-				val = size.readIntSigned(src);
-			}
+			int val = readInt(ioPool, src, instance);
 			setValue(ioPool, instance, val);
 		}
 		
@@ -885,13 +891,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				NumberSize.readIntDyn(writer, "get #arg src", !unsigned);
 			}
 			accessMap.set(getAccessor(), writer);
-		}
-		
-		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-			var val = getValue(ioPool, instance);
-			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
