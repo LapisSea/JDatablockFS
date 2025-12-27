@@ -487,7 +487,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			}
 			
 			var bb        = jorth.getClassFile(cname);
-			var implClass = lookup.defineHiddenClass(bb, true);
+			var implClass = lookup.defineHiddenClass(bb, true, MethodHandles.Lookup.ClassOption.NESTMATE);
 			var method = Iters.from(implClass.lookupClass().getMethods())
 			                  .filter(e -> e.getName().equals(fnName))
 			                  .getFirst();

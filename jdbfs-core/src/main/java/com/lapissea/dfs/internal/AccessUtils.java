@@ -49,7 +49,7 @@ public final class AccessUtils{
 		return true;
 	}
 	
-	public static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz, Mode[] modes) throws IllegalAccessException{
+	public static MethodHandles.Lookup adaptLookupTo(MethodHandles.Lookup lookup, Class<?> clazz) throws IllegalAccessException{
 		MethodHandles.Lookup actualLookup;
 		if(lookup.lookupClass() == clazz){
 			actualLookup = lookup;

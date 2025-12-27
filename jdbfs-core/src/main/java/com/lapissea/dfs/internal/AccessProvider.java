@@ -104,7 +104,7 @@ public interface AccessProvider{
 		
 		protected MethodHandles.Lookup getLookup(Class<?> clazz, boolean strip, Mode... modes) throws Defunct, IllegalAccessException{
 			var lookup       = getLookup();
-			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz, modes);
+			var targetLookup = AccessUtils.adaptLookupTo(lookup, clazz);
 			if(strip) targetLookup = AccessUtils.stripModes(targetLookup, modes);
 			AccessUtils.requireModes(targetLookup, modes);
 			return targetLookup;
@@ -147,7 +147,7 @@ public interface AccessProvider{
 		public Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException, Defunct{
 			if(hidden){
 				var lookup = getLookup(target, true, Mode.PRIVATE, Mode.MODULE);
-				return lookup.defineHiddenClass(bytecode, true).lookupClass();
+				return lookup.defineHiddenClass(bytecode, true, MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
 			}
 			var lookup = getLookup(target, true, Mode.PACKAGE);
 			return lookup.defineClass(bytecode);
