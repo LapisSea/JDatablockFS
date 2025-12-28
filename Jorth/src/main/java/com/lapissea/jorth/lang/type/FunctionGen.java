@@ -1020,7 +1020,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		if(localFields.containsKey(name)){
 			throw new MalformedJorth("The field named " + name + " already exists");
 		}
-		var index = localFields.values().stream().mapToInt(i -> i.index() + 1).max().orElse(0);
+		var index = localFields.values().stream().mapToInt(i -> i.index() + i.type.getBaseType().slots).max().orElse(0);
 		localFields.put(name, new LocalFieldInfo(index, type));
 	}
 	public void arrayGetOp() throws MalformedJorth{
