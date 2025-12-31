@@ -7,6 +7,8 @@ import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.CheckedPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.SupportedPrimitive;
@@ -108,12 +110,12 @@ public class SpecializedPipeTests{
 	
 	private static IterablePP<FieldDef> withFns(IterablePP<FieldDef> combinations){
 		combinations = Iters.concat(
-			combinations.map(e -> e.withGetter(true)),
-			combinations.map(e -> e.withGetter(false))
+			combinations.map(e -> e.withGetter(false)),
+			combinations.map(e -> e.withGetter(true))
 		);
 		combinations = Iters.concat(
-			combinations.map(e -> e.withSetter(true)),
-			combinations.map(e -> e.withSetter(false))
+			combinations.map(e -> e.withSetter(false)),
+			combinations.map(e -> e.withSetter(true))
 		);
 		return combinations;
 	}
@@ -167,9 +169,18 @@ public class SpecializedPipeTests{
 	void testChunk() throws IOException{
 		AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
 	}
+	@Test(dependsOnMethods = {"testChunk"})
+	void testRef() throws IOException{
+		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+		
+		var refPipe = Reference.standardPipe();
+		var ref     = new Reference(ChunkPointer.of(10), 10);
+		refPipe.write(ch, ref);
+		
+	}
 	
 	@SuppressWarnings("unchecked")
-	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = "testChunk")
+	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = {"testChunk", "testRef"})
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		var basic   = (Class<T1>)makeFieldClass(field, false, immediate);
 		var special = (Class<T2>)makeFieldClass(field, true, immediate);

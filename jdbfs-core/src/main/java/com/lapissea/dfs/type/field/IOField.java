@@ -239,9 +239,11 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			private int tmpFieldCount = 0;
 			
 			private boolean hasIOPool;
+			private boolean localObject;
 			
-			public void setup(boolean hasIOPool){
+			public void setup(boolean hasIOPool, boolean localObject){
 				this.hasIOPool = hasIOPool;
+				this.localObject = localObject;
 				tmpFieldCount = 0;
 				localFields.clear();
 			}
@@ -249,6 +251,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
+						if(localObject){
+							return;
+						}
 						writer.write("dup");
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field ignore -> { }
@@ -264,6 +269,16 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			public void set(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth, ConstantNeeded{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
+						if(localObject){
+							if(!localFields.containsKey(field)){
+								var name = "initVal_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
+								localFields.put(field, name);
+								writer.write("field {} {}", name, field.getType());
+							}
+							var localFieldName = localFields.get(field);
+							writer.write("set #field {}", localFieldName);
+							return;
+						}
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
 								writer.write("set {} {!}", declaringClass, name);
@@ -294,15 +309,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 							else if(field.getType() == byte.class) fnName = "setByte";
 							else fnName = "set";
 							
-							writer.write(
-								"""
-									get #arg ioPool
-									call {} start
-										get {!} {!}
-										get #field {}
-									end
-									""",
-								fnName, accessorInfo.className, accessorInfo.fieldName, localFieldName);
+							writer.write("""
+								             get #arg ioPool
+								             call {} start
+								             	get {!} {!}
+								             	get #field {}
+								             end
+								             """, fnName, accessorInfo.className, accessorInfo.fieldName, localFieldName);
 						}
 					}
 					default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
@@ -321,6 +334,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			public void get(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
 				switch(field){
 					case FieldAccessor.FieldOrMethod fom -> {
+						if(localObject){
+							var localFieldName = localFields.get(field);
+							Objects.requireNonNull(localFieldName);
+							writer.write("get #field {}", localFieldName);
+							return;
+						}
+						
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
 								writer.write("dup");
@@ -381,11 +401,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	public static final int HAS_GENERATED_NAME_FLAG = 1<<4;
 	
 	public enum TypeFlag{
-		DYNAMIC(DYNAMIC_FLAG),
-		IO_INSTANCE(IO_INSTANCE_FLAG),
-		PRIMITIVE_OR_ENUM(PRIMITIVE_OR_ENUM_FLAG),
-		HAS_NO_POINTERS(HAS_NO_POINTERS_FLAG),
-		HAS_GENERATED_NAME(HAS_GENERATED_NAME_FLAG);
+		DYNAMIC(DYNAMIC_FLAG), IO_INSTANCE(IO_INSTANCE_FLAG), PRIMITIVE_OR_ENUM(PRIMITIVE_OR_ENUM_FLAG), HAS_NO_POINTERS(HAS_NO_POINTERS_FLAG), HAS_GENERATED_NAME(HAS_GENERATED_NAME_FLAG);
 		
 		public final int bit;
 		TypeFlag(int flag){ this.bit = flag; }
@@ -600,10 +616,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 		ValType generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
 	
-	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
-		IOField<T, ValType> field,
-		ValueGenerator<T, ValType> generator
-	) implements Stringify{
+	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(IOField<T, ValType> field,
+	                                                                   ValueGenerator<T, ValType> generator) implements Stringify{
 		public void generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 			if(generator.shouldGenerate(ioPool, provider, instance)){
 				var val = generator.generate(ioPool, provider, instance, allowExternalMod);
@@ -679,8 +693,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	public final boolean isVirtual(StoragePool pool){
-		return getAccessor() instanceof VirtualAccessor<?> acc &&
-		       (pool == null || acc.getStoragePool() == pool);
+		return getAccessor() instanceof VirtualAccessor<?> acc && (pool == null || acc.getStoragePool() == pool);
 	}
 	public final Optional<VirtualAccessor<T>> getVirtual(StoragePool pool){
 		if(getAccessor() instanceof VirtualAccessor<T> acc){

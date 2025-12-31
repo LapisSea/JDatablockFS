@@ -2,6 +2,7 @@ package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
@@ -306,7 +307,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					);
 					
 					var accessMap = new AccessMap();
-					accessMap.setup(true);
+					accessMap.setup(true, false);
 					
 					writeConstants(writer, constants, accessMap);
 					
@@ -369,7 +370,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					);
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);
-					generateFunction_readNew(name, writer, generators, accessMap);
+					generateFunction_readNew(name, writer, generators, accessMap, getStrategy(Struct.of(objType)));
 				});
 			}catch(AccessMap.ConstantNeeded e){
 				constants.add(e.constant);
@@ -383,7 +384,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static void generateFunction_readNew(String functionName, CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	private static void generateFunction_readNew(String functionName, CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap, ConstructionStrategy strategy) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				public static function {0}
@@ -392,14 +393,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					arg genericContext #GenericContext
 					returns #ObjType
 				start
-					new #ObjType
 				""",
 			functionName
 		);
 		
-		for(IOField.SpecializedGenerator generator : generators){
-			generator.injectReadField(writer, accessMap);
-		}
+		makeAndReadObj(writer, generators, accessMap, strategy);
 		
 		writer.write(
 			"""
@@ -589,7 +587,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					overwrite_doRead(writer, generators, accessMap);
 					
 					if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
-						overwrite_readNew(writer, generators, accessMap);
+						overwrite_readNew(writer, generators, accessMap, getStrategy(getType()));
 					}
 					
 					writer.wEnd();
@@ -622,7 +620,23 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	private static ConstructionStrategy getStrategy(Struct<?> type){
+		if(type.needsBuilderObj()){
+			if(type.getRealFields().size()>1 && IOFieldTools.tryGetOrImplyOrder(type).isEmpty()){
+				throw new MalformedStruct("fmt", "Structs with final fields need an {#yellowOrder#} annotation! {}#red does not have one. The order should match the order of fields in the constructor.", type.getType());
+			}
+			return new ConstructionStrategy.Constructor(type.getRealFields());
+		}
+		return new ConstructionStrategy.Setters();
+	}
+	
+	private sealed interface ConstructionStrategy{
+		record Setters() implements ConstructionStrategy{ }
+		
+		record Constructor(FieldSet<?> fields) implements ConstructionStrategy{ }
+	}
+	
+	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap, ConstructionStrategy strategy) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				@ #Override
@@ -635,12 +649,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				"""
 		);
 		if(generators != null){
-			accessMap.setup(false);
-			writer.write("new #ObjType");
-			
-			for(IOField.SpecializedGenerator generator : generators){
-				generator.injectReadField(writer, accessMap);
-			}
+			makeAndReadObj(writer, generators, accessMap, strategy);
 		}else{
 			writer.write(
 				"""
@@ -683,7 +692,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				"""
 		);
 		if(generators != null){
-			accessMap.setup(true);
+			accessMap.setup(true, false);
 			
 			writer.write(
 				"""
@@ -726,6 +735,38 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				end
 				"""
 		);
+	}
+	
+	
+	private static void makeAndReadObj(
+		CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap, ConstructionStrategy strategy
+	) throws MalformedJorth, AccessMap.ConstantNeeded{
+		switch(strategy){
+			case ConstructionStrategy.Setters ignore -> {
+				accessMap.setup(false, false);
+				writer.write("new #ObjType");
+			}
+			case ConstructionStrategy.Constructor ignore -> {
+				accessMap.setup(false, true);
+			}
+		}
+		
+		for(IOField.SpecializedGenerator generator : generators){
+			generator.injectReadField(writer, accessMap);
+		}
+		
+		switch(strategy){
+			case ConstructionStrategy.Setters ignore -> { }
+			case ConstructionStrategy.Constructor(var fields) -> {
+				writer.write("new #ObjType start");
+				
+				for(IOField<?, ?> field : fields){
+					accessMap.get(field, writer);
+				}
+				
+				writer.wEnd();
+			}
+		}
 	}
 	
 }
