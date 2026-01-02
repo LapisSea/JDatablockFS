@@ -7,6 +7,7 @@ import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.CheckedPipe;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
@@ -22,6 +23,7 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.IRetryAnalyzer;
 import org.testng.ITestResult;
@@ -182,6 +184,8 @@ public class SpecializedPipeTests{
 	@SuppressWarnings("unchecked")
 	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = {"testChunk", "testRef"})
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
+		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));
+		
 		var basic   = (Class<T1>)makeFieldClass(field, false, immediate);
 		var special = (Class<T2>)makeFieldClass(field, true, immediate);
 		
@@ -192,15 +196,26 @@ public class SpecializedPipeTests{
 			specialPipe = makeUncheckedPipe(special, immediate);
 		}
 		assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
-		if(!immediate){
-			assertThat(specialPipe.getInitializationState()).as("State done check").isNotEqualTo(StagedInit.STATE_DONE);
-		}
+		boolean debRead = getPipeFlag(specialPipe, "DEBUG_READY_READ");
+		assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
+		
 		var random = new RawRandom();//field.toString().hashCode()
 		for(int i = 0; i<50; i++){
 			doIOTest(field, basicPipe, basicPipe, random);
 			doIOTest(field, basicPipe, specialPipe, random);
 			doIOTest(field, specialPipe, basicPipe, random);
 		}
+	}
+	
+	private static <T2 extends IOInstance<T2>> boolean getPipeFlag(StructPipe<T2> specialPipe, String name){
+		boolean debRead;
+		try{
+			var debReadF = specialPipe.getClass().getDeclaredField(name);
+			debRead = (boolean)debReadF.get(null);
+		}catch(Throwable e){
+			throw new RuntimeException(Log.fmt("Failed to get {}#red flag", name), e);
+		}
+		return debRead;
 	}
 	private static <T1 extends IOInstance<T1>> StructPipe<T1> makeUncheckedPipe(Class<T1> basic, boolean imidiate){
 		StructPipe<T1> pipe = imidiate? StandardStructPipe.of(basic, StagedInit.STATE_DONE) : StandardStructPipe.of(basic);
@@ -300,7 +315,7 @@ public class SpecializedPipeTests{
 			fields,
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 80))) : List.of(),
+			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 20))) : List.of(),
 			fns);
 		return TempClassGen.gen(cg);
 	}

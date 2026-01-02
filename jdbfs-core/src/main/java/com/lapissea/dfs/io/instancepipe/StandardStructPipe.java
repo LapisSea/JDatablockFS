@@ -39,7 +39,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -291,9 +291,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
+		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
 		MethodHandle         target;
-		Set<ConstantRequest> constants = new HashSet<>();
+		Set<ConstantRequest> constants = new LinkedHashSet<>();
 		while(true){
 			try{
 				List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
@@ -354,10 +354,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getName());
+		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
 		MethodHandle target;
 		
-		Set<ConstantRequest>               constants  = new HashSet<>();
+		Set<ConstantRequest>               constants  = new LinkedHashSet<>();
 		List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
 		
 		while(true){
@@ -429,6 +429,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
 					accessMap.addAccessorField(accessor, "#ThisClass", name);
 				}
+				case ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
+					writer.write("public static final field {} {}", name, type);
+				}
 			}
 		}
 		
@@ -463,6 +466,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					""",
 				enumArr.type, enumArr.name
 			);
+		}
+		
+		for(var debugField : Iters.from(constants).instancesOf(ConstantRequest.DebugField.class)){
+			writer.write(debugField.initCode());
+			writer.write("set #ThisClass {}", debugField.name());
 		}
 		
 		writer.wEnd();
@@ -522,29 +530,26 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 		return generators;
 	}
+	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> tryGetSpecializedGenerators(Class<T> type){
+		List<IOField.SpecializedGenerator> generatorsTmp = null;
+		try{
+			generatorsTmp = getSpecializedGenerators(type);
+		}catch(UnsupportedOperationException t){
+			new RuntimeException("Failed to get specialized generators", t).printStackTrace();
+			if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+		}
+		return generatorsTmp;
+	}
 	
 	@Override
 	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
-		var type = getType().getType();
-		
-		List<IOField.SpecializedGenerator> generators;
-		if(getType().getInitializationState()>=StructPipe.STATE_IO_FIELD){
-			List<IOField.SpecializedGenerator> generatorsTmp = null;
-			try{
-				generatorsTmp = getSpecializedGenerators(type);
-			}catch(UnsupportedOperationException t){
-				new RuntimeException("Failed to get specialized generators", t).printStackTrace();
-				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-			}
-			generators = generatorsTmp;
-		}else generators = null;
-		
-		Set<ConstantRequest> constants = new HashSet<>();
+		Set<ConstantRequest> constants = new LinkedHashSet<>();
 		
 		while(true){
 			var    log      = JorthLogger.make();
 			byte[] bytecode = null;
 			try{
+				var type      = getType().getType();
 				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 				
 				var jorth = new Jorth(type.getClassLoader(), log);
@@ -571,15 +576,19 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 							public function <init> start
 								super start
 									static call #Struct of start
-										class {!}
+										class #ObjType
 									end
 									{!}
 								end
 							end
 							""",
-						type.getName(),
 						StructPipe.STATE_DONE
 					);
+					
+					boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
+					constants.add(new ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", hasReadyStruct + ""));
+					
+					List<IOField.SpecializedGenerator> generators = hasReadyStruct? tryGetSpecializedGenerators(type) : null;
 					
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);
@@ -587,7 +596,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					overwrite_doRead(writer, generators, accessMap);
 					
 					if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
-						overwrite_readNew(writer, generators, accessMap, getStrategy(getType()));
+						overwrite_readNew(writer, generators, accessMap, getType());
 					}
 					
 					writer.wEnd();
@@ -606,11 +615,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				}
 				log = null;
 			}catch(MalformedJorth e){
-				throw new RuntimeException("Failed to generate specialized pipe for type: " + type.getTypeName(), e);
+				throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
 			}catch(AccessProvider.Defunct e){
 				throw new ShouldNeverHappenError(e);
 			}catch(ReflectiveOperationException e){
-				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + type.getTypeName(), e);
+				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
 			}finally{
 				if(log != null){
 					Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
@@ -636,7 +645,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		record Constructor(FieldSet<?> fields) implements ConstructionStrategy{ }
 	}
 	
-	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap, ConstructionStrategy strategy) throws MalformedJorth, AccessMap.ConstantNeeded{
+	private static void overwrite_readNew(CodeStream writer, List<IOField.SpecializedGenerator> generators, AccessMap accessMap, Struct<?> type) throws MalformedJorth, AccessMap.ConstantNeeded{
 		writer.write(
 			"""
 				@ #Override
@@ -649,7 +658,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				"""
 		);
 		if(generators != null){
-			makeAndReadObj(writer, generators, accessMap, strategy);
+			makeAndReadObj(writer, generators, accessMap, getStrategy(type));
 		}else{
 			writer.write(
 				"""

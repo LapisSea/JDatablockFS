@@ -223,6 +223,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				record FieldAcc(FieldAccessor<?> val) implements ConstantRequest{ }
 				
 				record EnumArr(Class<? extends Enum<?>> type) implements ConstantRequest{ }
+				
+				record DebugField(Class<?> type, String name, String initCode) implements ConstantRequest{ }
 			}
 			
 			public static final class ConstantNeeded extends Exception{
