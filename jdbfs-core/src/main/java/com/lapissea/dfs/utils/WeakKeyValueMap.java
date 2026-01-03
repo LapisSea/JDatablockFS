@@ -3,6 +3,7 @@ package com.lapissea.dfs.utils;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.Objects;
@@ -60,13 +61,24 @@ public class WeakKeyValueMap<K, V>{
 		return ref == null? null : ref.get();
 	}
 	
-	protected final WeakHashMap<K, WeakReference<V>> data = new WeakHashMap<>();
+	private final   ReferenceQueue<V>                queue = new ReferenceQueue<>();
+	protected final WeakHashMap<K, WeakReference<V>> data  = new WeakHashMap<>();
 	
 	public V put(K key, V value){
+		if(queue.poll() != null){
+			cleanEmptyValues();
+		}
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(value);
-		return deref(data.put(key, new WeakReference<>(value)));
+		return deref(data.put(key, new WeakReference<>(value, queue)));
 	}
+	
+	private void cleanEmptyValues(){
+		while(queue.poll() != null) ;
+		data.entrySet().removeIf(e -> e.getValue().get() == null);
+	}
+	
+	public int size(){ return data.size(); }
 	
 	public V get(K key){
 		return deref(data.get(key));
