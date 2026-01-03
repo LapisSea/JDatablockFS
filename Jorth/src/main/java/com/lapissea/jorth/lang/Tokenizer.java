@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 
 import static java.lang.Float.parseFloat;
 import static java.lang.Integer.parseInt;
+import static java.lang.Long.parseLong;
 
 public class Tokenizer implements CodeStream, TokenSource{
 	
@@ -178,9 +179,12 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	
-	private static final Pattern HEX_NUM = Pattern.compile("^-?0[xX][0-9a-fA-F_]+$");
-	private static final Pattern BIN_NUM = Pattern.compile("^-?0[bB][0-1_]+$");
-	private static final Pattern DEC_NUM = Pattern.compile("^-?[0-9_]*\\.?[0-9]+[0-9_]*$");
+	private static final Pattern HEX_INT  = Pattern.compile("^-?0[xX][0-9a-fA-F_]+$");
+	private static final Pattern BIN_INT  = Pattern.compile("^-?0[bB][0-1_]+$");
+	private static final Pattern DEC_INT  = Pattern.compile("^-?[0-9_]*\\.?[0-9]+[0-9_]*$");
+	private static final Pattern HEX_LONG = Pattern.compile("^-?0[xX][0-9a-fA-F_]+[lL]$");
+	private static final Pattern BIN_LONG = Pattern.compile("^-?0[bB][0-1_]+[lL]$");
+	private static final Pattern DEC_LONG = Pattern.compile("^-?[0-9]+[0-9_]*[lL]$");
 	
 	private int lastLine;
 	
@@ -308,13 +312,23 @@ public class Tokenizer implements CodeStream, TokenSource{
 		
 		var c = word.charAt(0);
 		if(c == '-' || c == '.' || (c>='0' && c<='9')){
-			if(HEX_NUM.matcher(word).matches()){
+			if(HEX_LONG.matcher(word).matches()){
+				return new Token.NumToken.LongVal(lastLine, parseLong(cleanNumber(word, 2), 16));
+			}
+			if(BIN_LONG.matcher(word).matches()){
+				return new Token.NumToken.LongVal(lastLine, parseLong(cleanNumber(word, 2), 2));
+			}
+			if(DEC_LONG.matcher(word).matches()){
+				return new Token.NumToken.LongVal(lastLine, parseLong(cleanNumber(word, 0)));
+			}
+			
+			if(HEX_INT.matcher(word).matches()){
 				return new Token.NumToken.IntVal(lastLine, parseInt(cleanNumber(word, 2), 16));
 			}
-			if(BIN_NUM.matcher(word).matches()){
+			if(BIN_INT.matcher(word).matches()){
 				return new Token.NumToken.IntVal(lastLine, parseInt(cleanNumber(word, 2), 2));
 			}
-			if(DEC_NUM.matcher(word).matches()){
+			if(DEC_INT.matcher(word).matches()){
 				var dec = cleanNumber(word, 0);
 				if(dec.contains(".")){
 					return new Token.NumToken.FloatVal(lastLine, parseFloat(dec.replace("_", "")));
@@ -344,6 +358,11 @@ public class Tokenizer implements CodeStream, TokenSource{
 			}
 		}
 		num = num.replace("_", "");
+		
+		if(num.endsWith("L") || num.endsWith("l")){
+			num = num.substring(0, num.length() - 1);
+		}
+		
 		return num;
 	}
 	

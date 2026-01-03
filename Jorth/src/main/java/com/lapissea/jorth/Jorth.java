@@ -269,6 +269,7 @@ public final class Jorth extends CodeDestination{
 			switch(word){
 				case Token.NumToken.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
 				case Token.NumToken.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
+				case Token.NumToken.LongVal longVal -> requireFunction().loadLongOp(longVal.value());
 				case Token.StrValue sVal -> requireFunction().loadStringOp(sVal.value());
 				case Token.Bool booleVal -> requireFunction().loadBooleanOp(booleVal.value());
 				default -> {

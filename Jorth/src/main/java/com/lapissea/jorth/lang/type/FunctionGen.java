@@ -210,9 +210,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			}else if(from.equals(GenericType.INT) && to.equals(GenericType.SHORT)){
 				writer.visitInsn(I2S);
 			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BOOL)){
-				// integer == 1
-				writer.visitInsn(ICONST_1);
-				writer.visitInsn(IAND);
+				emitIntToTruthy();
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.BOOL)){
+				writer.visitInsn(LCONST_0);
+				writer.visitInsn(LCMP);
+				emitIntToTruthy();
 			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.FLOAT)){
 				writer.visitInsn(L2F);
 			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.DOUBLE)){
@@ -232,6 +234,19 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			}else{
 				throw new MalformedJorth("Unsupported primitive cast: " + from + " -> " + to);
 			}
+		}
+		private void emitIntToTruthy(){
+			Label isTrue = new Label();
+			Label end    = new Label();
+			
+			// if int != 0, jump to true
+			writer.visitJumpInsn(IFNE, isTrue);
+			writer.visitInsn(ICONST_0);
+			writer.visitJumpInsn(GOTO, end);
+			
+			writer.visitLabel(isTrue);
+			writer.visitInsn(ICONST_1);
+			writer.visitLabel(end);
 		}
 		
 	}

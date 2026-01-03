@@ -75,4 +75,10 @@ public class WTFIsMyBytecode<ARG>{
 	public static void staticVar(){
 		int thing = 100000;
 	}
+	public static boolean l2b(long thing){
+		return thing != 0;
+	}
+	public static boolean i2b(int thing){
+		return thing != 0;
+	}
 }

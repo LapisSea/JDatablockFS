@@ -169,6 +169,13 @@ public sealed interface Token{
 			}
 		}
 		
+		record LongVal(int line, long value) implements NumToken{
+			@Override
+			public Number getNum(){
+				return value;
+			}
+		}
+		
 		record FloatVal(int line, float value) implements NumToken{
 			@Override
 			public Number getNum(){
