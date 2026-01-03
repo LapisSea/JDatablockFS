@@ -39,6 +39,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,17 +72,19 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return of(StandardStructPipe.class, struct, minRequestedStage);
 	}
 	
+	private static <T extends IOInstance<T>> PipeFieldCompiler.Result<T> standardCompile(Struct<T> t, FieldSet<T> structFields, boolean testRun){
+		var fields = IOFieldTools.stepFinal(structFields, List.of(
+			IOFieldTools::dependencyReorder,
+			IOFieldTools::mergeBitSpace
+		));
+		return new PipeFieldCompiler.Result<>(fields);
+	}
+	
 	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, int syncStage){
 		super(type, compiler, syncStage);
 	}
 	public StandardStructPipe(Struct<T> type, int syncStage){
-		super(type, (t, structFields, testRun) -> {
-			var fields = IOFieldTools.stepFinal(structFields, List.of(
-				IOFieldTools::dependencyReorder,
-				IOFieldTools::mergeBitSpace
-			));
-			return new PipeFieldCompiler.Result<>(fields);
-		}, syncStage);
+		super(type, StandardStructPipe::standardCompile, syncStage);
 	}
 	
 	@Override
@@ -296,7 +299,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		Set<ConstantRequest> constants = new LinkedHashSet<>();
 		while(true){
 			try{
-				List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
+				List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType, null);
 				
 				target = makeImpl(lookup, name, writer -> {
 					writer.addImportAs(objType, "ObjType");
@@ -358,7 +361,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		MethodHandle target;
 		
 		Set<ConstantRequest>               constants  = new LinkedHashSet<>();
-		List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType);
+		List<IOField.SpecializedGenerator> generators = getSpecializedGenerators(objType, null);
 		
 		while(true){
 			try{
@@ -509,11 +512,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> getSpecializedGenerators(Class<T> objType){
+	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> getSpecializedGenerators(Class<T> objType, Collection<IOField<T, ?>> fields){
 		var struct = Struct.of(objType, Struct.STATE_FIELD_MAKE);
-		var pipe   = new StandardStructPipe<>(struct, StructPipe.STATE_IO_FIELD);
+		if(fields == null){
+			fields = standardCompile(struct, struct.getFields(), false).fields();
+		}
 		
-		var                                fields     = pipe.getSpecificFields();
 		List<IOField.SpecializedGenerator> generators = new ArrayList<>(fields.size());
 		
 		for(IOField<?, ?> field : fields){
@@ -530,9 +534,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 		return generators;
 	}
-	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> tryGetSpecializedGenerators(Class<T> type){
+	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> tryGetSpecializedGenerators(Class<T> type, Collection<IOField<T, ?>> fields){
 		try{
-			return getSpecializedGenerators(type);
+			return getSpecializedGenerators(type, fields);
 		}catch(UnsupportedOperationException t){
 			if(ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()){
 				return null;
@@ -588,7 +592,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
 					constants.add(new ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", hasReadyStruct + ""));
 					
-					List<IOField.SpecializedGenerator> generators = hasReadyStruct? tryGetSpecializedGenerators(type) : null;
+					List<IOField.SpecializedGenerator> generators;
+					if(hasReadyStruct){
+						var fields = getInitializationState()>=STATE_IO_FIELD? getSpecificFields() : null;
+						generators = tryGetSpecializedGenerators(type, fields);
+					}else generators = null;
 					
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);

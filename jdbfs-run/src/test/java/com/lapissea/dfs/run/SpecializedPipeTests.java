@@ -328,12 +328,12 @@ public class SpecializedPipeTests{
 		for(FieldDef field : fieldsInfo){
 			
 			if(field.getter){
-				assertThat(val).extracting(field.name + "_getCount").isNotEqualTo(0);
-				assertThat(readNew).extracting(field.name + "_getCount").isEqualTo(0);
+				assert getIntField(val, field.name + "_getCount") != 0;
+				assert getIntField(readNew, field.name + "_getCount") == 0;
 			}
 			if(field.setter){
-				assertThat(val).extracting(field.name + "_setCount").isEqualTo(1);
-				assertThat(readNew).extracting(field.name + "_setCount").isEqualTo(1);
+				assert getIntField(val, field.name + "_setCount") == 1;
+				assert getIntField(readNew, field.name + "_setCount") == 1;
 			}
 			
 			var f1 = (IOField<TF, Object>)from.getType().getFields().byName(field.name).orElseThrow();
@@ -346,6 +346,16 @@ public class SpecializedPipeTests{
 			assertThat(val1).isEqualTo(val2);
 			assertThat(val1).isEqualTo(val3);
 			assertThat(val2).isEqualTo(val3);
+		}
+	}
+	
+	private static int getIntField(Object val, String name){
+		try{
+			var f1 = val.getClass().getDeclaredField(name);
+			f1.setAccessible(true);
+			return (int)f1.get(val);
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException(e);
 		}
 	}
 	
