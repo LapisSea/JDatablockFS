@@ -20,7 +20,7 @@ public interface CodeUtils{
 		readBytesFromSrc(writer, ns);
 	}
 	static void readBytesFromSrc(CodeStream writer, NumberSize size) throws MalformedJorth{
-		size.readIntConst(writer, "get #arg src", false);
+		size.readConst(writer, "get #arg src", false);
 	}
 	
 	static void rawBitsToValidatedBits(CodeStream writer, int bytes, int bits) throws MalformedJorth{
@@ -42,7 +42,7 @@ public interface CodeUtils{
 			"""
 				static call {} checkFlag start
 					dup
-					{}
+					{}L
 				end
 				if not start
 					new {} start 'Illegal enum integrity bits' end
@@ -51,7 +51,7 @@ public interface CodeUtils{
 				""", UtilL.class, checkMask, IOException.class
 		);
 		
-		writer.write("{} bit-and", valueMask);
+		writer.write("{}L bit-and", valueMask);
 	}
 	
 }

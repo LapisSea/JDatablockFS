@@ -243,7 +243,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					"""
 						if start
 							get #arg src
-							call skipExact start {0} cast long end
+							call skipExact start {0}L end
 							null start #Double end
 							set #field {1}
 						end else start
@@ -476,7 +476,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						"""
 							if start
 								get #arg src
-								call skipExact start {} cast long end
+								call skipExact start {}L end
 								null start #Character end
 								set #field {}
 							end else start
@@ -595,7 +595,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						"""
 							if start
 								get #arg src
-								call skipExact start {0} cast long end
+								call skipExact start {0}L end
 								null start #Float end
 								set #field {1}
 							end else start
@@ -912,7 +912,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						"""
 							if start
 								get #arg src
-								call skipExact start {} cast long end
+								call skipExact start {}L end
 								null start #Long end
 								set #field {}
 							end else start
@@ -1088,7 +1088,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						"""
 							if start
 								get #arg src
-								call skipExact start {} cast long end
+								call skipExact start {}L end
 								null start #Integer end
 								set #field {}
 							end else start
@@ -1383,7 +1383,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						"""
 							if start
 								get #arg src
-								call skipExact start {} cast long end
+								call skipExact start {}L end
 								null start #Short end
 								set #field {}
 							end else start
@@ -1589,7 +1589,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					"""
 						if start
 							get #arg src
-							call skipExact start {0} cast long end
+							call skipExact start {0}L end
 							null start #Byte end
 							set #field {1}
 						end else start

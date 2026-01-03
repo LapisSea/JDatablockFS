@@ -531,14 +531,14 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return generators;
 	}
 	private static <T extends IOInstance<T>> List<IOField.SpecializedGenerator> tryGetSpecializedGenerators(Class<T> type){
-		List<IOField.SpecializedGenerator> generatorsTmp = null;
 		try{
-			generatorsTmp = getSpecializedGenerators(type);
+			return getSpecializedGenerators(type);
 		}catch(UnsupportedOperationException t){
-			new RuntimeException("Failed to get specialized generators", t).printStackTrace();
-			if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+			if(ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()){
+				return null;
+			}
+			throw t;
 		}
-		return generatorsTmp;
 	}
 	
 	@Override

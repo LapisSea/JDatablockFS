@@ -206,10 +206,13 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			default void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 				var bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
 				var bytes = BitUtils.bitsToBytes(bits);
-				var name  = accessMap.temporaryLocalField(int.class, writer);
+				var name  = accessMap.temporaryLocalField(bits<32? int.class : long.class, writer);
 				
 				CodeUtils.readBytesFromSrc(writer, bytes);
 				CodeUtils.rawBitsToValidatedBits(writer, bytes, bits);
+				if(bits<32){
+					writer.write("cast int");
+				}
 				writer.write("set #field {}", name);
 				
 				injectReadFieldFromBits(writer, accessMap, name);

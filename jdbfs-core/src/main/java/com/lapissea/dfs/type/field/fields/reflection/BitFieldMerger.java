@@ -25,6 +25,7 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -174,7 +175,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 		@Override
 		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			var rawBits = accessMap.temporaryLocalField(int.class, writer);
+			var rawBits = accessMap.temporaryLocalField(long.class, writer);
 			
 			int totalBits = 0;
 			for(var fi : group){
@@ -189,7 +190,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				writer.write(
 					"""
 						static call {} readIntegrityBits start
-							dup cast long
+							dup
 							{} {}
 						end
 						""",
@@ -204,6 +205,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			
 			for(var fi : group){
 				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
+				if(bits>31){
+					throw new NotImplementedException("Long bits field");
+				}
 				var mask = BitUtils.makeMask(bits);
 				
 				writer.write("get #field {}", rawBits);
@@ -212,6 +216,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				}
 				writer.write(
 					"""
+						cast int
 						{} bit-and
 						set #field {}
 						""",

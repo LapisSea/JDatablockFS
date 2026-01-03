@@ -1404,6 +1404,50 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default SizedPP<T> repeat(int times){
+		if(times<=0) throw new IllegalArgumentException("Times must be at least 1");
+		return new SizedPP.Default<>(){
+			@Override
+			public OptionalInt getSize(){
+				var size = SizedPP.tryGet(IterablePP.this);
+				if(size.isEmpty()) return OptionalInt.empty();
+				return Utils.longToOptInt(size.getAsInt()*(long)times);
+			}
+			@Override
+			public Iterator<T> iterator(){
+				return new Iterator<>(){
+					private Object[] data;
+					private int      i;
+					private int      repeat = 1;
+					
+					private void init(){
+						data = IterablePP.this.toArray(Object.class);
+						i = data.length - 1;
+					}
+					
+					@Override
+					public boolean hasNext(){
+						if(data == null) init();
+						return i<data.length;
+					}
+					@Override
+					public T next(){
+						if(data == null) init();
+						int next = i + 1;
+						if(next == data.length && repeat<times){
+							next = 0;
+							repeat++;
+						}
+						//noinspection unchecked
+						var val = (T)data[i];
+						i = next;
+						return val;
+					}
+				};
+			}
+		};
+	}
+	
 	private static void preIncrementLong(long index){
 		if(index == Long.MAX_VALUE) throw new IllegalStateException("Too many elements");
 	}
