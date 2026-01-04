@@ -72,11 +72,9 @@ public final class Access{
 	}
 	
 	public static void addLookup(MethodHandles.Lookup lookup){
-		try{
-			AccessUtils.requireModes(lookup, Mode.PRIVATE, Mode.MODULE);
-		}catch(IllegalAccessException e){
-			throw new IllegalArgumentException(e);
-		}
+		AccessUtils.requireModes(lookup, Mode.PRIVATE, Mode.MODULE).ifPresent(err -> {
+			throw new IllegalArgumentException(err.get());
+		});
 		registerProvider(new AccessProvider.DirectLookup(lookup));
 	}
 	
@@ -93,13 +91,13 @@ public final class Access{
 		return makeLambda(method, functionalInterface, true);
 	}
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface, boolean optimized) throws IllegalAccessException{
-		return access(AccessProvider::makeLambda, method, functionalInterface, "failed to create lambda\n  Method: {}#red", optimized);
+		return access((provider, m, type) -> provider.makeLambda(m, type, false), method, functionalInterface, "failed to create lambda\n  Method: {}#red", optimized);
 	}
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface) throws IllegalAccessException{
 		return makeLambda(constructor, functionalInterface, true);
 	}
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface, boolean optimized) throws IllegalAccessException{
-		return access(AccessProvider::makeLambda, constructor, functionalInterface, "failed to create lambda\n  Constructor: {}#red", optimized);
+		return access((provider, m, type) -> provider.makeLambda(m, type, false), constructor, functionalInterface, "failed to create lambda\n  Constructor: {}#red", optimized);
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, MethodHandles.Lookup lookup, Class<FInter> functionalInterface){
@@ -108,7 +106,7 @@ public final class Access{
 		}
 		try{
 			var access = new AccessProvider.DirectLookup(lookup);
-			return access.makeLambda(constructor, functionalInterface);
+			return access.makeLambda(constructor, functionalInterface, true);
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda for constructor " + constructor + " with " + functionalInterface, e);
 		}
@@ -124,7 +122,7 @@ public final class Access{
 		return access(AccessProvider::unreflect, method, "failed to create MethodHandle\n  Method: {}#red", true);
 	}
 	public static AccessProvider findAccess(Class<?> target, Mode... modes) throws IllegalAccessException{
-		return access(AccessProvider::adapt, target, modes, "failed to find AccessProvider\n  Target: {}#red", true);
+		return access((provider, targ, mods) -> provider.adapt(targ, false, mods), target, modes, "failed to find AccessProvider\n  Target: {}#red", true);
 	}
 	
 	
@@ -204,7 +202,8 @@ public final class Access{
 		
 		for(var provider : ACCESS_PROVIDERS){
 			try{
-				return fn.call(provider, value);
+				var res = fn.call(provider, value);
+				if(res != null) return res;
 			}catch(AccessProvider.Defunct e){
 				ACCESS_PROVIDERS.remove(provider);
 			}catch(IllegalAccessException ignored){ }
@@ -221,7 +220,8 @@ public final class Access{
 		
 		for(var provider : ACCESS_PROVIDERS){
 			try{
-				return fn.call(provider, value);
+				var res = fn.call(provider, value);
+				if(res != null) return res;
 			}catch(AccessProvider.Defunct e){
 				ACCESS_PROVIDERS.remove(provider);
 			}catch(IllegalAccessException ignored){ }
