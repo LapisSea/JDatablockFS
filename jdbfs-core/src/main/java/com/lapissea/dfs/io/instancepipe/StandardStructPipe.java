@@ -369,7 +369,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					writer.addImportAs(objType, "ObjType");
 					writer.addImports(
 						VarPool.class, DataProvider.class, ContentReader.class,
-						GenericContext.class, StandardStructPipe.class, IOInstance.class
+						GenericContext.class, Struct.class, StandardStructPipe.class, IOInstance.class
 					);
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);
@@ -412,8 +412,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	private static void writeConstants(CodeStream writer, Set<ConstantRequest> constants, AccessMap accessMap) throws MalformedJorth{
 		record Acc(FieldAccessor<?> accessor, String name){ }
+		record FRef(IOField<?, ?> field, String name){ }
 		record EArr(Class<?> type, String name){ }
 		List<Acc>  accessors = new ArrayList<>();
+		List<FRef> fieldRefs = new ArrayList<>();
 		List<EArr> enumArrs  = new ArrayList<>();
 		
 		int i = -1;
@@ -431,6 +433,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					accessors.add(new Acc(accessor, name));
 					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
 					accessMap.addAccessorField(accessor, "#ThisClass", name);
+				}
+				case ConstantRequest.FieldRef(var ioField) -> {
+					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
+					fieldRefs.add(new FRef(ioField, name));
+					writer.write("private static final field {} {}<#ObjType>", name, IOField.class);
+					accessMap.addFieldRefField(ioField, "#ThisClass", name);
 				}
 				case ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
 					writer.write("public static final field {} {}", name, type);
@@ -460,6 +468,25 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			}
 		}
 		
+		if(!fieldRefs.isEmpty()){
+			writer.write(
+				"""
+						static call #Struct of start
+							class #ObjType
+							{}
+						end
+						call getFields
+					""", Struct.STATE_FIELD_MAKE);
+			for(var it = fieldRefs.iterator(); it.hasNext(); ){
+				var acc = it.next();
+				if(it.hasNext()){
+					writer.write("dup");
+				}
+				writer.write("call requireByName start '{}' end", acc.field.getName());
+				writer.write("set #ThisClass {}", acc.name);
+			}
+		}
+		
 		
 		for(EArr enumArr : enumArrs){
 			writer.write(
@@ -469,6 +496,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					""",
 				enumArr.type, enumArr.name
 			);
+		}
+		
+		for(FRef fieldRef : fieldRefs){
+		
 		}
 		
 		for(var debugField : Iters.from(constants).instancesOf(ConstantRequest.DebugField.class)){
@@ -553,7 +584,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			var    log      = JorthLogger.make();
 			byte[] bytecode = null;
 			try{
-				var type      = getType().getType();
+				var type      = getType().getConcreteType();
 				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 				
 				var jorth = new Jorth(type.getClassLoader(), log);

@@ -25,7 +25,10 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -36,7 +39,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
-public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -177,5 +180,52 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		
 		IOType typ = getType(ioPool, provider, instance);
 		DynamicSupport.skipTyp(typ, provider, src, makeContext(genericContext));
+	}
+	
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		
+		accessMap.preSet(getAccessor(), writer);
+		if(nullable()){
+			var type = Objects.requireNonNull(getType());
+			var res  = accessMap.temporaryLocalField(type, writer);
+			
+			accessMap.get(isNull, writer);
+			
+			writer.write(
+				"""
+					if start
+						null start {} end
+						set #field {}
+					end else start
+					""", type, res
+			);
+			callReadTyp(writer, accessMap);
+			if(type != Object.class) writer.write("cast {}", type);
+			writer.write(
+				"""
+						set #field {}
+					end
+					""", res
+			);
+			writer.write("get #field {}", res);
+		}else{
+			callReadTyp(writer, accessMap);
+		}
+		accessMap.set(getAccessor(), writer);
+	}
+	
+	private void callReadTyp(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		writer.write("static call {} dynamic_readTyp start", CodeUtils.class);
+		accessMap.getFieldRef(this, writer);
+		accessMap.get(typeID, writer);
+		writer.write(
+			"""
+					get #field provider
+					get #field src
+					get #field genericContext
+				end
+				"""
+		);
 	}
 }

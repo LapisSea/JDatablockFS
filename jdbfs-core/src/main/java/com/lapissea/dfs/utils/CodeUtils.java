@@ -1,8 +1,14 @@
 package com.lapissea.dfs.utils;
 
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.bit.BitUtils;
+import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.type.GenericContext;
+import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
@@ -10,6 +16,11 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 
 public interface CodeUtils{
+	
+	static Object dynamic_readTyp(IOField<?, ?> caller, int typeID, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		IOType typ = provider.getTypeDb().fromID(typeID);
+		return DynamicSupport.readTyp(typ, provider, src, caller.makeContext(genericContext));
+	}
 	
 	static void readIntegrityBits(long raw, int totalBits, int readBits) throws IOException{
 		BitFieldMerger.readIntegrityBits(raw, totalBits, readBits);

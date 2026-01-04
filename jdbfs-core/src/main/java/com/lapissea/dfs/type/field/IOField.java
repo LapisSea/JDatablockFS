@@ -227,6 +227,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				
 				record EnumArr(Class<? extends Enum<?>> type) implements ConstantRequest{ }
 				
+				record FieldRef(IOField<?, ?> type) implements ConstantRequest{ }
+				
 				record DebugField(Class<?> type, String name, String initCode) implements ConstantRequest{ }
 			}
 			
@@ -239,6 +241,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			private final Map<FieldAccessor<?>, String>  localFields    = new HashMap<>();
 			private final Map<FieldAccessor<?>, GetInfo> accessorFields = new HashMap<>();
+			private final Map<IOField<?, ?>, GetInfo>    fieldRefFields = new HashMap<>();
 			private final Map<Class<?>, GetInfo>         enumArrays     = new HashMap<>();
 			
 			private int tmpFieldCount = 0;
@@ -333,6 +336,14 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				}
 				writer.write("get {} {}", info.className, info.fieldName);
 			}
+			public <E extends Enum<E>> void getFieldRef(IOField<?, ?> field, CodeStream writer) throws MalformedJorth, ConstantNeeded{
+				var info = fieldRefFields.get(field);
+				if(info == null){
+					throw new ConstantNeeded(new ConstantRequest.FieldRef(field));
+				}
+				writer.write("get {} {}", info.className, info.fieldName);
+			}
+			
 			public void get(IOField<?, ?> field, CodeStream writer) throws MalformedJorth{
 				get(field.getAccessor(), writer);
 			}
@@ -365,6 +376,9 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			}
 			public void addAccessorField(FieldAccessor<?> accessor, String className, String fieldName){
 				accessorFields.put(accessor, new GetInfo(className, fieldName));
+			}
+			public void addFieldRefField(IOField<?, ?> accessor, String className, String fieldName){
+				fieldRefFields.put(accessor, new GetInfo(className, fieldName));
 			}
 			public void addEnumArray(Class<?> type, String className, String fieldName){
 				enumArrays.put(type, new GetInfo(className, fieldName));

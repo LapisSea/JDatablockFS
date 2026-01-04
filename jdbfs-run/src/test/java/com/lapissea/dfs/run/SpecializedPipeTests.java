@@ -9,6 +9,7 @@ import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
+import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.StagedInit;
@@ -27,6 +28,7 @@ import com.lapissea.fuzz.Plan;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.IRetryAnalyzer;
@@ -124,9 +126,24 @@ public class SpecializedPipeTests{
 		
 		strings = withNullable(strings);
 		
+		
+		IterablePP<FieldDef> dynamic = withFns(Iters.of(new FieldDef(Object.class, r -> {
+			var type = r.nextInt(4);
+			return switch(type){
+				case 0 -> r.nextInt();
+				case 1 -> r.nextBoolean();
+				case 2 -> new Reference(ChunkPointer.of(r.nextInt(Integer.MAX_VALUE)), r.nextInt(Integer.MAX_VALUE));
+				case 3 -> new ObjectID.LID(r.nextLong());
+				default -> throw new NotImplementedException();
+			};
+		}).withAnnotations(List.of(Annotations.make(IOValue.Generic.class)))));
+		
+		dynamic = withNullable(dynamic);
+		
 		return Iters.concat(
 			primitives, boxed,
-			strings
+			strings,
+			dynamic
 		);
 	}
 	
@@ -175,7 +192,7 @@ public class SpecializedPipeTests{
 		
 		@Override
 		public boolean retry(ITestResult result){
-			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage().contains("State done check"))){
+			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage().contains("DEBUG_READY_READ"))){
 				return false;
 			}
 			var count = retryRecord.compute(new Entry(result.getName(), Arrays.asList(result.getParameters())), (k, v) -> {
@@ -200,14 +217,33 @@ public class SpecializedPipeTests{
 		refPipe.write(ch, ref);
 		
 	}
+	@Test(dependsOnMethods = "testRef")
+	void implPipe() throws IOException{
+		
+		@StructPipe.Special
+		interface Test extends IOInstance.Def<Test>{
+			int val();
+		}
+		
+		var ch = AllocateTicket.bytes(10).submit(DataProvider.newVerySimpleProvider());
+		try(var w = ch.write(0, true)){
+			w.writeInt4(69420);
+		}
+		
+		var pipe = StandardStructPipe.of(Test.class);
+		var test = pipe.readNew(ch, null);
+		assertThat(test.val()).isEqualTo(69420);
+	}
 	
-	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = {"testChunk", "testRef"})
+	private final Map<FieldDef, Integer> retries = new ConcurrentHashMap<>();
+	
+	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnMethods = {"testChunk", "testRef", "implPipe"})
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));
 		
 		var fields = List.of(field);
 		
-		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, immediate);
+		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
 		
 		boolean debRead = getPipeFlag(pipes.specialPipe(), "DEBUG_READY_READ");
 		assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
@@ -231,7 +267,7 @@ public class SpecializedPipeTests{
 //			new FieldDef(Integer.class, r -> r.nextBoolean()? r.nextInt() : null).withAnnotations(List.of(vns, nullable))
 		).repeat(25).enumerate((i, e) -> e.withName("val" + i)).toList();
 		
-		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, true);
+		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 0);
 		
 		doIOTest(fields, pipes.basicPipe(), pipes.basicPipe(), new RawRandom(0));
 		doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), new RawRandom(0));
@@ -263,7 +299,7 @@ public class SpecializedPipeTests{
 				
 				BasicSpecial<T1, T2> pipes;
 				try{
-					pipes = makeBasicSpecial(fields, true);
+					pipes = makeBasicSpecial(fields, 0);
 				}catch(UnsupportedOperationException e){
 					return;
 				}
@@ -280,13 +316,13 @@ public class SpecializedPipeTests{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> BasicSpecial<T1, T2> makeBasicSpecial(List<FieldDef> fields, boolean immediate) throws LockedFlagSet{
-		var basic   = (Class<T1>)makeFieldClass(fields, false, immediate);
-		var special = (Class<T2>)makeFieldClass(fields, true, immediate);
+	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> BasicSpecial<T1, T2> makeBasicSpecial(List<FieldDef> fields, int specialDelay) throws LockedFlagSet{
+		var basic   = (Class<T1>)makeFieldClass(fields, false, specialDelay);
+		var special = (Class<T2>)makeFieldClass(fields, true, specialDelay);
 		
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false)){
-			StructPipe<T1> basicPipe   = makeUncheckedPipe(basic, immediate);
-			StructPipe<T2> specialPipe = makeUncheckedPipe(special, immediate);
+			StructPipe<T1> basicPipe   = makeUncheckedPipe(basic, specialDelay == 0);
+			StructPipe<T2> specialPipe = makeUncheckedPipe(special, specialDelay == 0);
 			
 			assertThat(basicPipe).isNotInstanceOf(StructPipe.SpecializedImplementation.class);
 			assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
@@ -368,10 +404,7 @@ public class SpecializedPipeTests{
 		}
 	}
 	
-	private static Class<IOInstance<?>> makeFieldClass(FieldDef field, boolean special, boolean immediate){
-		return makeFieldClass(List.of(field), special, immediate);
-	}
-	private static Class<IOInstance<?>> makeFieldClass(List<FieldDef> fieldDefs, boolean special, boolean immediate){
+	private static Class<IOInstance<?>> makeFieldClass(List<FieldDef> fieldDefs, boolean special, int specialDelay){
 		var fields = new ArrayList<TempClassGen.FieldGen>();
 		var fns    = new ArrayList<UnsafeConsumer<CodeStream, MalformedJorth>>();
 		for(FieldDef field : fieldDefs){
@@ -433,7 +466,7 @@ public class SpecializedPipeTests{
 			fields,
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", immediate? 0 : 20))) : List.of(),
+			special? List.of(Annotations.make(StructPipe.Special.class, Map.of("debugStructDelay", specialDelay))) : List.of(),
 			fns);
 		return TempClassGen.gen(cg);
 	}
