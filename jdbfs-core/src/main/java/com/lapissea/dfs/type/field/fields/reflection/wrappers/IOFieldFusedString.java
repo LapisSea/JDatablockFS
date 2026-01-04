@@ -24,6 +24,8 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.nio.CharBuffer;
@@ -33,7 +35,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOField<CTyp, String>{
+public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOField<CTyp, String> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
@@ -187,5 +189,52 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
 		return Optional.of('"' + val + '"');
+	}
+	
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		accessMap.preSet(getAccessor(), writer);
+		
+		var cb = accessMap.temporaryLocalField(CharBuffer.class, writer);
+		
+		writer.write("static call {} allocate start", CharBuffer.class);
+		accessMap.get(charCountField, writer);
+		writer.write(
+			"""
+					end
+				set #field {}
+				""",
+			cb
+		);
+		
+		accessMap.get(encodingField, writer);
+		writer.write(
+			"""
+				call read start
+					new {} start
+						get #arg src
+				""",
+			LimitedContentReader.class
+		);
+		accessMap.get(bytesField, writer);
+		writer.write(
+			"""
+						cast long
+						end
+					get #field {}
+				end
+				""",
+			cb
+		);
+		
+		writer.write(
+			"""
+				get #field {}
+				call flip
+				call toString
+				"""
+			, cb);
+		
+		accessMap.set(getAccessor(), writer);
 	}
 }

@@ -30,7 +30,7 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
 	permits IOFieldBooleanArray, IOFieldByteArray, IOFieldByteBuffer, IOFieldDirectType, IOFieldDynamicInlineObject, IOFieldEnumCollection, IOFieldFloatArray, IOFieldInlineObject, IOFieldInlineSealedObject, IOFieldIntArray, IOFieldIntegerArray, IOFieldWrapper, InstanceCollection.InlineField{
 	
-	private IOFieldPrimitive.FBoolean<T> isNull;
+	protected IOFieldPrimitive.FBoolean<T> isNull;
 	
 	protected NullFlagCompanyField(FieldAccessor<T> accessor){
 		super(accessor);

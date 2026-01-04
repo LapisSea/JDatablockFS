@@ -15,13 +15,16 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, String>{
+public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, String> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{
@@ -92,5 +95,37 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
 		return Optional.of('"' + val + '"');
+	}
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		if(!nullable()){
+			throw new ShouldNeverHappenError();
+		}
+		
+		var result = accessMap.temporaryLocalField(String.class, writer);
+		accessMap.get(isNull, writer);
+		writer.write(
+			"""
+				if start
+					null start #String end
+					set #field {0}
+				end else start
+					get {1} STR_PIPE
+					call readNew start
+						get #field provider
+						get #field src
+						null start {2} end
+					end
+					cast #String
+					set #field {0}
+				end
+				""",
+			result, AutoText.class, GenericContext.class
+		);
+		
+		accessMap.preSet(getAccessor(), writer);
+		writer.write("get #field {}", result);
+		accessMap.set(getAccessor(), writer);
+		
 	}
 }

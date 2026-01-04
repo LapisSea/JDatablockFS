@@ -45,6 +45,7 @@ import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -116,8 +117,16 @@ public class SpecializedPipeTests{
 		IterablePP<FieldDef> boxed = primitives.map(e -> e.withType(SupportedPrimitive.get(e.type).orElseThrow().wrapper));
 		boxed = withNullable(boxed);
 		
+		
+		IterablePP<FieldDef> strings = withFns(Iters.of(new FieldDef(String.class, r -> {
+			return r.ints(r.nextInt(1, 10), 'A', 'z').mapToObj(i -> ((char)i) + "").collect(Collectors.joining());
+		})));
+		
+		strings = withNullable(strings);
+		
 		return Iters.concat(
-			primitives, boxed
+			primitives, boxed,
+			strings
 		);
 	}
 	
