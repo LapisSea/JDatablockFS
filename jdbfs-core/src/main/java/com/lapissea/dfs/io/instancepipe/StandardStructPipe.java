@@ -345,7 +345,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		);
 		
 		for(IOField.SpecializedGenerator generator : generators){
+			accessMap.markTemporary();
 			generator.injectReadField(writer, accessMap);
+			accessMap.dropTemporary(writer);
 		}
 		
 		writer.write(
@@ -760,7 +762,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			);
 			
 			for(IOField.SpecializedGenerator generator : generators){
+				accessMap.markTemporary();
 				generator.injectReadField(writer, accessMap);
+				accessMap.dropTemporary(writer);
 			}
 			
 		}else{
@@ -810,7 +814,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 		
 		for(IOField.SpecializedGenerator generator : generators){
+			accessMap.markTemporary();
 			generator.injectReadField(writer, accessMap);
+			accessMap.dropTemporary(writer);
 		}
 		
 		switch(strategy){

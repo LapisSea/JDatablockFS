@@ -7,6 +7,7 @@ public enum Keyword implements KeyedEnum{
 	CLASS,
 	ENUM,
 	FIELD,
+	FORGET,
 	FUNCTION,
 	START,
 	END,

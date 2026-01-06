@@ -7,6 +7,7 @@ import com.lapissea.jorth.lang.Keyword;
 import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
@@ -20,12 +21,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -266,7 +269,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private record LocalFieldInfo(int index, GenericType type){ }
 	
-	private final Map<String, LocalFieldInfo> localFields = new HashMap<>();
+	private final Map<String, LocalFieldInfo> localFields    = new HashMap<>();
+	private final Set<Integer>                freeLocalSlots = new HashSet<>();
 	
 	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, JType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		this.owner = owner;
@@ -1035,9 +1039,41 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		if(localFields.containsKey(name)){
 			throw new MalformedJorth("The field named " + name + " already exists");
 		}
-		var index = localFields.values().stream().mapToInt(i -> i.index() + i.type.getBaseType().slots).max().orElse(0);
+		var slots = type.getBaseType().slots;
+		
+		int index;
+		find:
+		{
+			for(int slot : freeLocalSlots){
+				if(IntStream.range(slot, slot + slots).allMatch(freeLocalSlots::contains)){
+					IntStream.range(slot, slot + slots).forEach(freeLocalSlots::remove);
+					index = slot;
+					break find;
+				}
+			}
+			index = allocateNewSlot();
+		}
+		
 		localFields.put(name, new LocalFieldInfo(index, type));
 	}
+	private int allocateNewSlot(){
+		return localFields.values().stream().mapToInt(i -> i.index() + i.type.getBaseType().slots).max().orElse(0);
+	}
+	
+	public void forgetField(String name) throws MalformedJorth{
+		var field = localFields.remove(name);
+		if(field == null){
+			throw new MalformedJorth("The field named " + name + " does not exist");
+		}
+		var slots = field.type.getBaseType().slots;
+		
+		for(int i = 0; i<slots; i++){
+			if(!freeLocalSlots.add(field.index + i)){
+				throw new ShouldNeverHappenError("Corrupted local free slots");
+			}
+		}
+	}
+	
 	public void arrayGetOp() throws MalformedJorth{
 		var stack = code().stack;
 		var index = stack.pop();

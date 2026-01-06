@@ -703,6 +703,16 @@ public final class Jorth extends CodeDestination{
 				var def = readFieldDef(source);
 				currentFunction.defineField(def.name, def.type.asGeneric());
 			}
+			case FORGET -> {
+				var what = source.readWord();
+				switch(what){
+					case "#field" -> {
+						var fieldName = source.readWord();
+						currentFunction.forgetField(fieldName);
+					}
+					default -> throw new MalformedJorth("Unknown forget type: " + what);
+				}
+			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in function " + currentFunction);
 		}
 	}

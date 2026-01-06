@@ -246,6 +246,8 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 			
 			private int tmpFieldCount = 0;
 			
+			private List<Set<String>> temporaryStack = new ArrayList<>();
+			
 			private boolean hasIOPool;
 			private boolean localObject;
 			
@@ -254,6 +256,7 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				this.localObject = localObject;
 				tmpFieldCount = 0;
 				localFields.clear();
+				temporaryStack.clear();
 			}
 			
 			public void preSet(FieldAccessor<?> field, CodeStream writer) throws MalformedJorth{
@@ -388,8 +391,28 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 				var name = "tmp_" + type.getSimpleName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
 				writer.write("field {} {}", name, type);
 				tmpFieldCount++;
+				if(!temporaryStack.isEmpty()){
+					temporaryStack.getLast().add(name);
+				}
 				return name;
 			}
+			
+			public void markTemporary(){
+				temporaryStack.add(new HashSet<>());
+			}
+			public void dropTemporary(CodeStream writer) throws MalformedJorth{
+				var fields = temporaryStack.removeLast();
+				if(fields.isEmpty()) return;
+				writer.write(
+					"""
+						template-for #name in {0} start
+							forget #field #name
+						end
+						""",
+					fields
+				);
+			}
+			
 			private int uniqueCounter(){
 				return localFields.size() + tmpFieldCount;
 			}

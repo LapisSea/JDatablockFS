@@ -224,7 +224,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				
 				bitOffset += bits;
 				
+				accessMap.markTemporary();
 				((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(writer, accessMap, field);
+				accessMap.dropTemporary(writer);
 			}
 		}
 	}
