@@ -208,7 +208,7 @@ public class SpecializedPipeTests{
 		
 		@Override
 		public boolean retry(ITestResult result){
-			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage().contains("DEBUG_READY_READ"))){
+			if(!(result.getThrowable() instanceof AssertionError a && a.getMessage() != null && a.getMessage().contains("DEBUG_READY_READ"))){
 				return false;
 			}
 			var count = retryRecord.compute(new Entry(result.getName(), Arrays.asList(result.getParameters())), (k, v) -> {
@@ -389,12 +389,12 @@ public class SpecializedPipeTests{
 		for(FieldDef field : fieldsInfo){
 			
 			if(field.getter){
-				assert getIntField(val, field.name + "_getCount") != 0;
-				assert getIntField(readNew, field.name + "_getCount") == 0;
+				assert getIntField(val, field.name + "_getCount") != 0 : getIntField(val, field.name + "_getCount") + " != " + 0;
+				assert getIntField(readNew, field.name + "_getCount") == 0 : getIntField(readNew, field.name + "_getCount") + " == " + 0;
 			}
 			if(field.setter){
-				assert getIntField(val, field.name + "_setCount") == 1;
-				assert getIntField(readNew, field.name + "_setCount") == 1;
+				assert getIntField(val, field.name + "_setCount") == 1 : getIntField(val, field.name + "_setCount") + " == " + 1;
+				assert getIntField(readNew, field.name + "_setCount") == 1 : getIntField(readNew, field.name + "_setCount") + " == " + 1;
 			}
 			
 			var f1 = (IOField<TF, Object>)from.getType().getFields().byName(field.name).orElseThrow();

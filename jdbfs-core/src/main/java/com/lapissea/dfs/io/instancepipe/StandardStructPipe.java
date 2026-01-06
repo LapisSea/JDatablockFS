@@ -2,7 +2,6 @@ package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
@@ -29,6 +28,7 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -632,9 +632,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);
 					
-					overwrite_doRead(writer, generators, accessMap);
+					boolean noCtor = type.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 					
-					if(!type.isAnnotationPresent(Struct.NoDefaultConstructor.class)){
+					overwrite_doRead(writer, noCtor? generators : null, accessMap);
+					
+					if(!noCtor){
 						overwrite_readNew(writer, generators, accessMap, getType());
 					}
 					
@@ -659,6 +661,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				throw new ShouldNeverHappenError(e);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
+			}catch(NotImplementedException e){
+				throw new UnsupportedOperationException("Can not create specialized pipe for type: " + getType().getType().getTypeName() + " because one of the fields has an unimplemented variant", e);
 			}finally{
 				if(log != null){
 					Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
@@ -669,12 +673,18 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	private static ConstructionStrategy getStrategy(Struct<?> type){
-		if(type.needsBuilderObj()){
-			if(type.getRealFields().size()>1 && IOFieldTools.tryGetOrImplyOrder(type).isEmpty()){
-				throw new MalformedStruct("fmt", "Structs with final fields need an {#yellowOrder#} annotation! {}#red does not have one. The order should match the order of fields in the constructor.", type.getType());
-			}
+		var cls = type.getType();
+		if(IOInstance.Def.isDefinition(cls)){
 			return new ConstructionStrategy.Constructor(type.getRealFields());
 		}
+		
+		if(IOFieldTools.tryGetOrImplyOrder(type).isPresent()) try{
+			cls.getConstructor(type.getRealFields().mapped(IOField::getType).toArray(Class[]::new));
+			
+			return new ConstructionStrategy.Constructor(type.getRealFields());
+			
+		}catch(ReflectiveOperationException ignore){ }
+		
 		return new ConstructionStrategy.Setters();
 	}
 	
