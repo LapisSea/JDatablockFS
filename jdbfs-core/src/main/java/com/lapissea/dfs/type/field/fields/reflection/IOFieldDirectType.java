@@ -22,17 +22,20 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 @IOUnsafeValue.Mark
-public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type>{
+public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type> implements IOField.SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -129,4 +132,69 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{ }
+	
+	@Override
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		
+		if(nullable()){
+			var res = accessMap.temporaryLocalField(Objects.requireNonNull(getType()), writer);
+			accessMap.get(id, writer);
+			writer.write(
+				"""
+					0 ==
+					if start
+						null start {0} end
+						set #field {1}
+					end else start
+						get #field provider
+						call getTypeDb
+						call fromID start
+					""",
+				getType(), res
+			);
+			accessMap.get(id, writer);
+			writer.write(
+				"""
+						end
+						call generic start
+							get #field provider
+							call getTypeDb
+						end
+						cast {}
+						set #field {}
+					end
+					""",
+				getType(), res
+			);
+			
+			accessMap.preSet(getAccessor(), writer);
+			writer.write("get #field {}", res);
+			accessMap.set(getAccessor(), writer);
+		}else{
+			
+			accessMap.preSet(getAccessor(), writer);
+			writer.write(
+				"""
+					get #field provider
+					call getTypeDb
+					call fromID start
+					"""
+			);
+			accessMap.get(id, writer);
+			writer.write(
+				"""
+					end
+					call generic start
+						get #field provider
+						call getTypeDb
+					end
+					cast {}
+					""",
+				getType()
+			);
+			accessMap.set(getAccessor(), writer);
+		}
+		
+		
+	}
 }

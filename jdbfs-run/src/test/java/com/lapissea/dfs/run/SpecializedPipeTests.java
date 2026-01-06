@@ -1,5 +1,6 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
@@ -18,6 +19,7 @@ import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -38,6 +40,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -124,26 +127,39 @@ public class SpecializedPipeTests{
 			return r.ints(r.nextInt(1, 10), 'A', 'z').mapToObj(i -> ((char)i) + "").collect(Collectors.joining());
 		})));
 		
-		strings = withNullable(strings);
-		
-		
-		IterablePP<FieldDef> dynamic = withFns(Iters.of(new FieldDef(Object.class, r -> {
-			var type = r.nextInt(4);
-			return switch(type){
-				case 0 -> r.nextInt();
-				case 1 -> r.nextBoolean();
-				case 2 -> new Reference(ChunkPointer.of(r.nextInt(Integer.MAX_VALUE)), r.nextInt(Integer.MAX_VALUE));
-				case 3 -> new ObjectID.LID(r.nextLong());
-				default -> throw new NotImplementedException();
-			};
+		IterablePP<FieldDef> dynamic = withFns(Iters.of(new FieldDef(Object.class, r -> switch(r.nextInt(4)){
+			case 0 -> r.nextInt();
+			case 1 -> r.nextBoolean();
+			case 2 -> new Reference(ChunkPointer.of(r.nextInt(Integer.MAX_VALUE)), r.nextInt(Integer.MAX_VALUE));
+			case 3 -> new ObjectID.LID(r.nextLong());
+			default -> throw new NotImplementedException();
 		}).withAnnotations(List.of(Annotations.make(IOValue.Generic.class)))));
 		
-		dynamic = withNullable(dynamic);
+		IterablePP<FieldDef> directType = withFns(Iters.of(
+			new FieldDef(Class.class, r -> switch(r.nextInt(3)){
+				case 0 -> int.class;
+				case 1 -> List.class;
+				case 2 -> Reference.class;
+				default -> throw new NotImplementedException();
+			}),
+			new FieldDef(Type.class, r -> switch(r.nextInt(5)){
+				case 0 -> int.class;
+				case 1 -> List.class;
+				case 2 -> Reference.class;
+				case 3 -> SyntheticParameterizedType.of(List.class, List.of(ObjectID.class));
+				case 4 -> SyntheticParameterizedType.of(Map.class, List.of(ObjectID.class, Long.class));
+				default -> throw new NotImplementedException();
+			})
+		)).map(e -> e.withAnnotations(List.of(Annotations.make(IOUnsafeValue.class))));
+		
+		IterablePP<FieldDef> objects = Iters.concat(
+			strings, dynamic, directType
+		);
+		
+		objects = withNullable(objects);
 		
 		return Iters.concat(
-			primitives, boxed,
-			strings,
-			dynamic
+			primitives, boxed, objects
 		);
 	}
 	
