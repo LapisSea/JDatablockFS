@@ -19,7 +19,7 @@ public final class FieldReader{
 	
 	record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, ChunkPointer block, DrawUtils.Range range){ }
 	
-	record ResSet<T extends IOInstance<T>>(T value, List<Res<T, ?>> fields){ }
+	record ResSet<T extends IOInstance<T>>(T value, long size, List<Res<T, ?>> fields){ }
 	
 	private static <T extends IOInstance<T>> ResSet<T> getChunkFields(DataProvider dataProvider, StructPipe<T> pipe, long offset) throws IOException{
 		var ch     = Chunk.readChunk(dataProvider, ChunkPointer.of(offset));
@@ -37,7 +37,7 @@ public final class FieldReader{
 			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, ChunkPointer.NULL, DrawUtils.Range.fromSize(valueOffset, valueSize)));
 		}
 		//noinspection unchecked
-		return (ResSet<T>)new ResSet<>(ch, fields);
+		return (ResSet<T>)new ResSet<>(ch, pos - offset, fields);
 	}
 	static <T extends IOInstance<T>> ResSet<T> readFields(DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer ptr, long offset) throws IOException{
 		if(pipe.getType().getType() == Chunk.class){
@@ -53,6 +53,7 @@ public final class FieldReader{
 			var ioPool  = pipe.makeIOPool();
 			T   inst    = pipe.getType().make();
 			var lastPos = src.getPos();
+			var start   = lastPos;
 			for(var field : pipe.getSpecificFields()){
 				field.read(ioPool, dataProvider, src, inst, null);
 				if(field instanceof BitFieldMerger<?>){
@@ -65,7 +66,7 @@ public final class FieldReader{
 				fields.add(new Res<>((IOField<T, ? super Object>)field, value, ptr, new DrawUtils.Range(lastPos, newPos)));
 				lastPos = newPos;
 			}
-			return new ResSet<>(inst, fields);
+			return new ResSet<>(inst, src.getPos() - start, fields);
 		}
 	}
 	
