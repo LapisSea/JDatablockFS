@@ -78,7 +78,7 @@ public class VulkanWindow implements AutoCloseable{
 		createSwapchainContext(renderSamples);
 		cmdPool = core.device.createCommandPool(core.renderQueueFamily, CommandPool.Type.NORMAL);
 		graphicsBuffs = cmdPool.createCommandBuffers(swapchain.images.size());
-		renderQueue = core.renderQueue.withSwap();
+		renderQueue = core.renderQueue.withSwap(swapchain.images.size());
 		frameGC = new DeviceGC.FrameGC(swapchain.images.size());
 	}
 	
@@ -87,29 +87,29 @@ public class VulkanWindow implements AutoCloseable{
 	}
 	
 	public VulkanQueue.SwapSync.PresentFrame renderQueueNoSwap(FillBuffer fillBuffer) throws VulkanCodeException{
-		var frame = renderQueue.nextFrame();
-		renderQueue.waitForFrameDone(frame);
+		var frameID = renderQueue.nextFrame();
+		renderQueue.waitForFrameDone(frameID);
 		
-		frameGC.startNewFrame(frame);
+		frameGC.startNewFrame(frameID);
 		
-		int index;
+		int swapID;
 		try{
-			index = renderQueue.acquireNextImage(swapchain, frame);
+			swapID = renderQueue.acquireNextImage(swapchain, frameID);
 		}catch(VulkanRecreateSwapchainException rec){
 			recreateSwapchainContext();
-			index = renderQueue.acquireNextImage(swapchain, frame);
+			swapID = renderQueue.acquireNextImage(swapchain, frameID);
 		}
 		
-		var buf = graphicsBuffs.get(frame);
-		var fb  = frameBuffers.get(index);
+		var buf = graphicsBuffs.get(frameID);
+		var fb  = frameBuffers.get(swapID);
 		
 		buf.reset();
 		buf.begin();
-		fillBuffer.record(this, frame, buf, fb);
+		fillBuffer.record(this, frameID, buf, fb);
 		buf.end();
 		
-		renderQueue.submitFrame(buf, frame);
-		return renderQueue.makePresentFrame(this, index, frame);
+		renderQueue.submitFrame(buf, frameID, swapID);
+		return renderQueue.makePresentFrame(this, swapID);
 	}
 	
 	public void recreateSwapchainContext() throws VulkanCodeException{
@@ -229,5 +229,10 @@ public class VulkanWindow implements AutoCloseable{
 			return;
 		}
 		recreateSwapchainContext();
+	}
+	
+	@Override
+	public int hashCode(){
+		return Long.hashCode(window.getHandle());
 	}
 }

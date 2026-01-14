@@ -1,6 +1,5 @@
 package com.lapissea.dfs.inspect.display.vk.wrap;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.BackedVkBuffer;
 import com.lapissea.dfs.inspect.display.vk.Flags;
@@ -14,6 +13,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VKImageType;
 import com.lapissea.dfs.inspect.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.inspect.display.vk.enums.VkBufferUsageFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkDescriptorPoolCreateFlag;
+import com.lapissea.dfs.inspect.display.vk.enums.VkDescriptorType;
 import com.lapissea.dfs.inspect.display.vk.enums.VkFilter;
 import com.lapissea.dfs.inspect.display.vk.enums.VkFormat;
 import com.lapissea.dfs.inspect.display.vk.enums.VkImageLayout;
@@ -22,6 +22,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSharingMode;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -32,6 +33,7 @@ import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
+import org.lwjgl.vulkan.VkDescriptorPoolSize;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 import org.lwjgl.vulkan.VkExtent3D;
@@ -247,16 +249,24 @@ public class Device implements VulkanResource{
 	}
 	
 	
-	public VkDescriptorPool createDescriptorPool(int maxSets, VkDescriptorPoolCreateFlag flag) throws VulkanCodeException{
-		return createDescriptorPool(maxSets, Flags.of(flag));
+	public VkDescriptorPool createDescriptorPool(int maxSets, Map<VkDescriptorType, Integer> poolSizes, VkDescriptorPoolCreateFlag flag) throws VulkanCodeException{
+		return createDescriptorPool(maxSets, poolSizes, Flags.of(flag));
 	}
-	public VkDescriptorPool createDescriptorPool(int maxSets, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
+	public VkDescriptorPool createDescriptorPool(int maxSets, Map<VkDescriptorType, Integer> poolSizes, Flags<VkDescriptorPoolCreateFlag> flags) throws VulkanCodeException{
 		try(var stack = MemoryStack.stackPush()){
+			
+			var poolSizesBuf = VkDescriptorPoolSize.malloc(poolSizes.size(), stack);
+			poolSizes.forEach((type, size) -> {
+				var e = poolSizesBuf.get();
+				e.set(type.id, size);
+			});
+			poolSizesBuf.flip();
 			
 			var info = VkDescriptorPoolCreateInfo.calloc(stack);
 			info.sType$Default()
 			    .flags(flags.value)
-			    .maxSets(maxSets);
+			    .maxSets(maxSets)
+			    .pPoolSizes(poolSizesBuf);
 			
 			return VKCalls.vkCreateDescriptorPool(this, info);
 		}
@@ -342,7 +352,7 @@ public class Device implements VulkanResource{
 				Flags.of(VkBufferUsageFlag.STORAGE_BUFFER, VkBufferUsageFlag.TRANSFER_DST),
 				Flags.of(VkMemoryPropertyFlag.DEVICE_LOCAL)
 			);
-			stagingVb.copyTo(transferBuffers, vb);
+			stagingVb.copyTo(transferBuffers, vb, vb.size());
 			return vb;
 		}
 	}
@@ -371,8 +381,8 @@ public class Device implements VulkanResource{
 			var actualProps = physicalDevice.getMemoryType(buffer.getRequirements().memoryTypeBits(), memoryFlags).type();
 			if(actualProps.propertyFlags.contains(VkMemoryPropertyFlag.HOST_CACHED)){
 				var newSize = physicalDevice.alignToAtomSizeUp(size);
-				if(newSize > requiredSize){
-					requiredSize=newSize;
+				if(newSize>requiredSize){
+					requiredSize = newSize;
 				}
 			}
 			

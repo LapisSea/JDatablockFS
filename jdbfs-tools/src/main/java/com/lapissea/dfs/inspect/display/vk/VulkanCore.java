@@ -5,6 +5,7 @@ import com.lapissea.dfs.inspect.display.ShaderType;
 import com.lapissea.dfs.inspect.display.TextureRegistry;
 import com.lapissea.dfs.inspect.display.VUtils;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
+import com.lapissea.dfs.inspect.display.VulkanWindow;
 import com.lapissea.dfs.inspect.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.inspect.display.vk.enums.VkAttachmentLoadOp;
 import com.lapissea.dfs.inspect.display.vk.enums.VkAttachmentStoreOp;
@@ -68,6 +69,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -166,9 +168,9 @@ public class VulkanCore implements AutoCloseable{
 	public final QueueFamilyProps renderQueueFamily;
 	public final QueueFamilyProps transferQueueFamily;
 	
-	public final VulkanQueue.SwapSync renderQueue;
-	public final TransferBuffers      transferBuffers;
-	public final TransferBuffers      transientGraphicsBuffs;
+	public final VulkanQueue     renderQueue;
+	public final TransferBuffers transferBuffers;
+	public final TransferBuffers transientGraphicsBuffs;
 	
 	public final VKPresentMode preferredPresentMode;
 	
@@ -203,7 +205,7 @@ public class VulkanCore implements AutoCloseable{
 		
 		device = physicalDevice.createDevice(Iters.of(renderQueueFamily, transferQueueFamily).distinct().toList(), new File("pipelineCache.bin"));
 		
-		renderQueue = device.allocateQueue(renderQueueFamily).withSwap();
+		renderQueue = device.allocateQueue(renderQueueFamily);
 		
 		TransferBuffers transferBuffers, transientGraphicsBuffs;
 		try{
@@ -217,7 +219,11 @@ public class VulkanCore implements AutoCloseable{
 		this.transientGraphicsBuffs = transientGraphicsBuffs;
 		
 		
-		globalDescriptorPool = device.createDescriptorPool(1000, VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
+		globalDescriptorPool = device.createDescriptorPool(1000, Map.of(
+			VkDescriptorType.UNIFORM_BUFFER, 4,
+			VkDescriptorType.STORAGE_BUFFER, 8,
+			VkDescriptorType.COMBINED_IMAGE_SAMPLER, 2
+		), VkDescriptorPoolCreateFlag.FREE_DESCRIPTOR_SET);
 		
 		defaultSampler = device.createSampler(VkFilter.LINEAR, VkFilter.LINEAR, VkSamplerAddressMode.REPEAT);
 		
@@ -518,13 +524,18 @@ public class VulkanCore implements AutoCloseable{
 		VK10.vkDestroyInstance(instance, null);
 	}
 	
-	private final List<VulkanQueue.SwapSync.PresentFrame> present = new ArrayList<>();
+	private final Map<VulkanWindow, List<VulkanQueue.SwapSync.PresentFrame>> present = new HashMap<>();
 	
 	public void pushSwap(VulkanQueue.SwapSync.PresentFrame presentFrame){
-		present.add(presentFrame);
+		present.computeIfAbsent(presentFrame.window(), e -> new ArrayList<>()).add(presentFrame);
 	}
 	public boolean executeSwaps() throws VulkanCodeException{
-		var swap = renderQueue.present(present);
+		boolean swap = false;
+		for(var e : present.entrySet()){
+			var renderQueue = e.getKey().renderQueue;
+			var present     = e.getValue();
+			swap |= renderQueue.present(present);
+		}
 		present.clear();
 		return swap;
 	}

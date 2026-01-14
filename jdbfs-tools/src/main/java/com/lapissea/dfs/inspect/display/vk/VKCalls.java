@@ -76,7 +76,7 @@ import java.util.List;
 
 public interface VKCalls{
 	
-	private static void fetchCurrentThreadInfo(){
+	static void fetchCurrentThreadInfo(){
 		if(VulkanCore.VK_DEBUG){
 			NativeThreadInfo.fetchCurrentThreadInfo();
 		}

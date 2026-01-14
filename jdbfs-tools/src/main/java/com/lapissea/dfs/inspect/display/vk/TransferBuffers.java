@@ -54,6 +54,7 @@ public class TransferBuffers implements VulkanResource{
 	}
 	
 	public <E extends Throwable> void syncAction(UnsafeConsumer<CommandBuffer, E> run) throws E, VulkanCodeException{
+		VKCalls.fetchCurrentThreadInfo();
 		var pool   = threadVkPools.get();
 		var buffer = pool.createCommandBuffer();
 		try{

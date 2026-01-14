@@ -1,16 +1,16 @@
 package com.lapissea.dfs.inspect.display.vk.wrap;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.inspect.display.VUtils;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.Flags;
 import com.lapissea.dfs.inspect.display.vk.VKCalls;
 import com.lapissea.dfs.inspect.display.vk.enums.VkFormat;
+import com.lapissea.dfs.inspect.display.vk.enums.VkFormatFeatureFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkMemoryPropertyFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.inspect.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
@@ -284,6 +284,14 @@ public class PhysicalDevice{
 			}
 			if(!features12.storageBuffer8BitAccess()){
 				arithmeticTypesError.add("storageBuffer8BitAccess");
+			}
+			
+			for(var format : List.of(VkFormat.R8G8B8A8_UINT, VkFormat.R8G8B8A8_UNORM)){
+				var props     = getFormatProperties(stack, format);
+				var sFeatures = VkFormatFeatureFlag.from(props.bufferFeatures());
+				if(!sFeatures.contains(VkFormatFeatureFlag.VERTEX_BUFFER)){
+					arithmeticTypesError.add(format + " can not be used in a VERTEX_BUFFER. Only supports: " + sFeatures);
+				}
 			}
 			
 			var extensions = getDeviceExtensionNames();

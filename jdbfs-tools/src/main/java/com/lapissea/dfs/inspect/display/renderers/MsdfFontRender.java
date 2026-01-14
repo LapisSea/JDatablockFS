@@ -283,6 +283,7 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 	}
 	
 	public boolean canDisplay(char c){
+		if(table == null) waitFullyCreated();
 		var i = table.index.getOrDefault(c, -1);
 		return i != -1 && !table.empty.get(i);
 	}

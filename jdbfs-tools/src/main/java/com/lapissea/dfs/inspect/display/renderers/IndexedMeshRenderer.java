@@ -116,7 +116,7 @@ public class IndexedMeshRenderer implements VulkanResource{
 			                .multisampling(rp.samples, false)
 			                .dynamicState(VkDynamicState.VIEWPORT, VkDynamicState.SCISSOR)
 			                .addVertexInput(0, 0, VkFormat.R32G32_SFLOAT, GpuVert.XY)
-			                .addVertexInput(1, 0, device.color8bitFormat, GpuVert.COLOR)
+			                .addVertexInput(1, 0, VkFormat.R8G8B8A8_UNORM, GpuVert.COLOR)
 			                .addVertexInputBinding(0, GpuVert.SIZEOF, VkVertexInputRate.VERTEX)
 			                .addPushConstantRange(VkShaderStageFlag.VERTEX, 0, PushConstant.SIZE)
 			                .build()

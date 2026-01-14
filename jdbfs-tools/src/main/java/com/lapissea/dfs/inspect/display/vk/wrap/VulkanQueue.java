@@ -27,49 +27,59 @@ public class VulkanQueue implements VulkanResource{
 		
 		private int frameID;
 		
-		private SwapSync(Device device, QueueFamilyProps queueFamily, VkQueue value) throws VulkanCodeException{
+		private final int imageCount;
+		
+		private SwapSync(Device device, QueueFamilyProps queueFamily, VkQueue value, int imageCount) throws VulkanCodeException{
 			super(device, queueFamily, value);
+			this.imageCount = imageCount;
 			
 			inFlightRender = device.createFences(MAX_IN_FLIGHT_FRAMES, true);
 			presentComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
-			renderComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
+			renderComplete = device.createSemaphores(imageCount);
 		}
 		
 		public int nextFrame(){
 			return frameID = (frameID + 1)%MAX_IN_FLIGHT_FRAMES;
 		}
 		
-		public void waitForFrameDone(int frame) throws VulkanCodeException{
-			inFlightRender[frame].waitReset();
+		public void waitForFrameDone(int frameID) throws VulkanCodeException{
+			inFlightRender[frameID].waitReset();
 		}
 		
-		public int acquireNextImage(Swapchain swapchain, int frame) throws VulkanCodeException{
+		/**
+		 * @return next swapID determined by the swapchain
+		 *
+		 */
+		public int acquireNextImage(Swapchain swapchain, int frameID) throws VulkanCodeException{
 			return VKCalls.vkAcquireNextImageKHR(
-				value.getDevice(), swapchain, Long.MAX_VALUE, presentComplete[frame], //Wait for presentation to complete
+				value.getDevice(), swapchain, Long.MAX_VALUE, presentComplete[frameID], //Wait for presentation to complete
 				null
 			);
 		}
 		
-		public void submitFrame(CommandBuffer commandBuffer, int frame) throws VulkanCodeException{
+		public void submitFrame(CommandBuffer commandBuffer, int frameID, int swapID) throws VulkanCodeException{
 			try(var stack = MemoryStack.stackPush()){
 				
 				var info = VkSubmitInfo.malloc(stack);
 				info.sType$Default()
 				    .pNext(0)
 				    .waitSemaphoreCount(1)
-				    .pWaitSemaphores(stack.longs(presentComplete[frame].handle))//Wait if presenting
+				    .pWaitSemaphores(stack.longs(presentComplete[frameID].handle))//Wait if presenting
 				    .pWaitDstStageMask(stack.ints(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT))
 				    .pCommandBuffers(stack.pointers(commandBuffer.handle()))
-				    .pSignalSemaphores(stack.longs(renderComplete[frame].handle));//Signal render complete when done
+				    .pSignalSemaphores(stack.longs(renderComplete[swapID].handle));//Signal render complete when done
 				
-				VKCalls.vkQueueSubmit(value, info, inFlightRender[frame]);
+				VKCalls.vkQueueSubmit(value, info, inFlightRender[frameID]);
 			}
 		}
 		
-		public record PresentFrame(VulkanWindow window, int index, VkSemaphore renderCompleteSemaphore){ }
+		/**
+		 * An object that represents a ready frame that is to be presented by the queue
+		 */
+		public record PresentFrame(VulkanWindow window, int swapID, VkSemaphore renderCompleteSemaphore){ }
 		
-		public PresentFrame makePresentFrame(VulkanWindow window, int index, int frame){
-			return new PresentFrame(window, index, renderComplete[frame]);
+		public PresentFrame makePresentFrame(VulkanWindow window, int swapID){
+			return new PresentFrame(window, swapID, renderComplete[swapID]);
 		}
 		/**
 		 * @return if there was a swapchain recreation
@@ -93,12 +103,13 @@ public class VulkanQueue implements VulkanResource{
 				for(var f : presentFrames){
 					semaphores.put(f.renderCompleteSemaphore.handle);
 					swapchains.put(f.window.swapchain.handle);
-					indices.put(f.index);
+					indices.put(f.swapID);
 				}
 				try{
 					VKCalls.vkQueuePresentKHR(value, info);
 					return false;
 				}catch(VulkanCodeException e){
+					//Recover swapchains that need a recreation
 					var errs = Iters.ofInts(results).mapToObj(VkResult::from);
 					for(var ent : errs.enumerate().filter(v -> v.val() != VkResult.SUCCESS)){
 						var err    = ent.val();
@@ -125,11 +136,13 @@ public class VulkanQueue implements VulkanResource{
 			for(int i = 0; i<MAX_IN_FLIGHT_FRAMES; i++){
 				inFlightRender[i].destroy();
 				presentComplete[i].destroy();
-				renderComplete[i].destroy();
+			}
+			for(var sem : renderComplete){
+				sem.destroy();
 			}
 			inFlightRender = device.createFences(MAX_IN_FLIGHT_FRAMES, true);
 			presentComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
-			renderComplete = device.createSemaphores(MAX_IN_FLIGHT_FRAMES);
+			renderComplete = device.createSemaphores(imageCount);
 		}
 		
 		@Override
@@ -138,7 +151,9 @@ public class VulkanQueue implements VulkanResource{
 			for(int i = 0; i<MAX_IN_FLIGHT_FRAMES; i++){
 				inFlightRender[i].destroy();
 				presentComplete[i].destroy();
-				renderComplete[i].destroy();
+			}
+			for(var sem : renderComplete){
+				sem.destroy();
 			}
 		}
 	}
@@ -181,7 +196,7 @@ public class VulkanQueue implements VulkanResource{
 		}catch(VulkanCodeException e){ e.printStackTrace(); }
 	}
 	
-	public SwapSync withSwap() throws VulkanCodeException{
-		return new SwapSync(device, queueFamily, value);
+	public SwapSync withSwap(int imageCount) throws VulkanCodeException{
+		return new SwapSync(device, queueFamily, value, imageCount);
 	}
 }

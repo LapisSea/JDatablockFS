@@ -77,9 +77,9 @@ public class BackedVkBuffer implements VulkanResource{
 		buffer.destroy();
 	}
 	
-	public void copyTo(TransferBuffers transferBuffers, BackedVkBuffer vb) throws VulkanCodeException{
+	public void copyTo(TransferBuffers transferBuffers, BackedVkBuffer vb, long size) throws VulkanCodeException{
 		transferBuffers.syncAction(copyBuffer -> {
-			copyBuffer.copyBuffer(buffer, vb.buffer, buffer.size);
+			copyBuffer.copyBuffer(buffer, vb.buffer, size);
 		});
 	}
 	
