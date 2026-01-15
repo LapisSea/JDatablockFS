@@ -30,7 +30,6 @@ import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import org.joml.Vector2f;
 
@@ -85,7 +84,7 @@ public class GridScene{
 					var chunk = dataProvider.getChunk(ChunkPointer.of(pointer));
 					flushError();
 					
-					annotateStruct(Chunk.PIPE, ChunkPointer.NULL, chunk.getPtr().getValue(), null);
+					annotateStruct(Chunk.PIPE, DataPos.absolute(chunk.getPtr().getValue()), null);
 					
 					var chRange = new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd());
 					messages.add("Hovered chunk: " + chunk, chRange, new RangeMessageSpace.HoverEffect.Outline(Color.CYAN.darker(), 2));
@@ -127,7 +126,7 @@ public class GridScene{
 			var rootWalk = cluster.rootWalker(null, false);
 			var root     = rootWalk.getRoot();
 			var rootPipe = FixedStructPipe.of(root.getClass());
-			annotateStruct(rootPipe, cluster.getFirstChunk().getPtr(), 0, null);
+			annotateStruct(rootPipe, new DataPos(cluster.getFirstChunk().getPtr(), 0), null);
 		}
 		
 		drawByteRanges(List.of(new DrawUtils.Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
@@ -181,19 +180,19 @@ public class GridScene{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, ChunkPointer ptr, long offset, GenericContext context) throws IOException{
+	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, DataPos pos, GenericContext context) throws IOException{
 		
 		if(pipe.getType().needsBuilderObj()){
-			annotateStruct(pipe.getBuilderPipe(), ptr, offset, context);
+			annotateStruct(pipe.getBuilderPipe(), pos, context);
 			return;
 		}
 		
 		var typeHash = pipe.getType().getFullName().hashCode();
 		
-		var info = FieldReader.readFields(dataProvider, pipe, ptr, offset);
+		var info = FieldReader.readFields(dataProvider, pipe, pos);
 		
 		{
-			var ranges = makeLocalRanges(new DrawUtils.Range(offset, offset + info.size()), ptr).toList();
+			var ranges = pos.toAbsoluteRanges(dataProvider, info.size()).toList();
 			var msg    = TextUtil.toString(info.value());
 			for(DrawUtils.Range rang : ranges){
 				messages.add(msg, rang, new RangeMessageSpace.HoverEffect.Outline(Color.red, 1));
@@ -204,30 +203,29 @@ public class GridScene{
 			var col = ColorUtils.makeCol(typeHash, rf.field());
 			annotateByteField(info.value(), rf, col);
 		}
-		
-		for(var rf : info.fields()){
-			var field = rf.field();
-			if(!(field instanceof RefField<T, ?> refField)){
-				continue;
-			}
-			
-			var ref = refField.getReference(info.value());
-			if(!ref.isNull()){
-				var referencedPipe = refField.getReferencedPipe(info.value());
-				if(referencedPipe instanceof StructPipe<?> sp){
-					annotateStruct(sp, ref.getPtr(), ref.getOffset(), null);
-				}else{
-					LogUtil.println("not implemented: non struct reference object: " + rf.value());
-				}
-			}
-		}
+
+//		for(var rf : info.fields()){
+//			var field = rf.field();
+//			if(!(field instanceof RefField<T, ?> refField)){
+//				continue;
+//			}
+//
+//			var ref = refField.getReference(info.value());
+//			if(!ref.isNull()){
+//				var referencedPipe = refField.getReferencedPipe(info.value());
+//				if(referencedPipe instanceof StructPipe<?> sp){
+//					annotateStruct(sp, DataPos.from(ref), null);
+//				}else{
+//					LogUtil.println("not implemented: non struct reference object: " + rf.value());
+//				}
+//			}
+//		}
 		
 	}
 	
 	private <T extends IOInstance<T>, V> void annotateByteField(T instance, FieldReader.Res<T, V> rf, Color col) throws IOException{
-		if(rf.range().size() == 0) return;
+		if(rf.pos().size() == 0) return;
 		
-		ChunkPointer  block = rf.block();
 		IOField<T, V> field = rf.field();
 		
 		DrawUtils.Range bestRange  = new DrawUtils.Range(0, 0);
@@ -239,7 +237,7 @@ public class GridScene{
 		
 		boolean drawDetails = gridSize.bytesPerRow()>6;
 		
-		for(DrawUtils.Range rng : makeLocalRanges(rf.range(), block)){
+		for(DrawUtils.Range rng : rf.pos().toAbsoluteRanges(dataProvider)){
 			messages.add(message, rng, new RangeMessageSpace.HoverEffect.Outline(col.brighter(), 2));
 			if(bestRange.size()<gridSize.bytesPerRow()){
 				var contiguousRange = DrawUtils.findBestContiguousRange(gridSize.bytesPerRow(), rng);
@@ -279,12 +277,6 @@ public class GridScene{
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
 		
-	}
-	private <T extends IOInstance<T>, V> IterablePP<DrawUtils.Range> makeLocalRanges(DrawUtils.Range logicalRange, ChunkPointer block){
-		var ranges = block.isNull()?
-		             Iters.of(logicalRange) :
-		             DrawUtils.chainRangeResolve(dataProvider, new Reference(block, 0), logicalRange.from(), logicalRange.size());
-		return ranges;
 	}
 	
 	private void recordPointer(long from, long to, int size, Color color, String message, float widthFactor){

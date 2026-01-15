@@ -42,6 +42,9 @@ public final class DrawUtils{
 		public static Range fromSize(long start, long size){
 			return new Range(start, start + size);
 		}
+		public static Range fromStartEnd(long start, long end){
+			return new Range(start, end);
+		}
 		
 		public static List<Range> fromInts(IntStream stream){
 			List<Builder> rangesBuild = new ArrayList<>();

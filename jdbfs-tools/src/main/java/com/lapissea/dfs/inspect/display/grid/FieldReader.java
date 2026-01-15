@@ -2,27 +2,32 @@ package com.lapissea.dfs.inspect.display.grid;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
+import com.lapissea.dfs.inspect.display.grid.read.FieldInspectRead;
+import com.lapissea.dfs.inspect.display.grid.read.ManagedRefInspectRead;
+import com.lapissea.dfs.inspect.display.grid.read.SimpleReadInspectRead;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.tools.DrawUtils;
+import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class FieldReader{
 	
-	record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, ChunkPointer block, DrawUtils.Range range){ }
+	public record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, DataPos.Sized pos){ }
 	
-	record ResSet<T extends IOInstance<T>>(T value, long size, List<Res<T, ?>> fields){ }
+	public record ResSet<T extends IOInstance<T>>(T value, long size, List<Res<T, ?>> fields){ }
 	
 	private static <T extends IOInstance<T>> ResSet<T> getChunkFields(DataProvider dataProvider, StructPipe<T> pipe, long offset) throws IOException{
-		var ch     = Chunk.readChunk(dataProvider, ChunkPointer.of(offset));
+		var ch     = dataProvider.getChunk(ChunkPointer.of(offset));
 		var ioPool = Chunk.PIPE.makeIOPool();
 		var pos    = offset;
 		
@@ -34,40 +39,60 @@ public final class FieldReader{
 			Object value = field instanceof BitFieldMerger? null : field.get(ioPool, ch);
 			
 			//noinspection unchecked
-			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, ChunkPointer.NULL, DrawUtils.Range.fromSize(valueOffset, valueSize)));
+			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, DataPos.Sized.ofRange(valueOffset, valueSize)));
 		}
 		//noinspection unchecked
 		return (ResSet<T>)new ResSet<>(ch, pos - offset, fields);
 	}
-	static <T extends IOInstance<T>> ResSet<T> readFields(DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer ptr, long offset) throws IOException{
+	
+	public static <T extends IOInstance<T>> ResSet<T> readFields(DataProvider dataProvider, StructPipe<T> pipe, DataPos pos) throws IOException{
 		if(pipe.getType().getType() == Chunk.class){
-			return getChunkFields(dataProvider, pipe, offset);
+			assert pos.ptr().isNull();
+			return getChunkFields(dataProvider, pipe, pos.offset());
 		}
 		
 		List<Res<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
 		
-		RandomIO src;
-		if(ptr.isNull()) src = dataProvider.getSource().ioAt(offset);
-		else src = ptr.dereference(dataProvider).ioAt(offset);
-		try(src){
-			var ioPool  = pipe.makeIOPool();
-			T   inst    = pipe.getType().make();
+		try(RandomIO src = pos.open(dataProvider)){
+			var ioPool = pipe.makeIOPool();
+			T   inst   = pipe.getType().make();
+			
 			var lastPos = src.getPos();
 			var start   = lastPos;
+			
 			for(var field : pipe.getSpecificFields()){
-				field.read(ioPool, dataProvider, src, inst, null);
-				if(field instanceof BitFieldMerger<?>){
-					lastPos = src.getPos();
-					continue;
-				}
-				var value  = field.get(ioPool, inst);
-				var newPos = src.getPos();
+				
+				FieldInspectRead reader = getReader(field);
+				
 				//noinspection unchecked
-				fields.add(new Res<>((IOField<T, ? super Object>)field, value, ptr, new DrawUtils.Range(lastPos, newPos)));
-				lastPos = newPos;
+				var res = reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst);
+				var ir  = (Res<T, ?>)res.inlineRes();
+				fields.add(ir);
+				lastPos = ir.pos.range().to();
+				
+				if(res.referenceInfo() instanceof FieldInspectRead.ReferenceInfo(Reference ref)){
+				
+				}
 			}
-			return new ResSet<>(inst, src.getPos() - start, fields);
+			return new ResSet<>(inst, lastPos - start, fields);
 		}
 	}
 	
+	private static final Map<Class<IOField<?, ?>>, FieldInspectRead> FIELD_IMPLS = Map.of(
+	
+	);
+	
+	private static FieldInspectRead getReader(IOField<?, ?> field){
+		var type = field.getClass();
+		{
+			var reader = FIELD_IMPLS.get(type);
+			if(reader != null) return reader;
+		}
+		
+		if(field instanceof RefField<?, ?> ref){
+			return new ManagedRefInspectRead();
+		}
+		
+		return new SimpleReadInspectRead();
+	}
 }
