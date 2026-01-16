@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.inspect.SessionSetView;
+import com.lapissea.dfs.inspect.display.grid.read.FieldInspectRead;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
 import com.lapissea.dfs.inspect.display.primitives.Path;
@@ -17,7 +18,6 @@ import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.BinaryGridRenderer.Pointer;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
@@ -25,7 +25,6 @@ import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -187,12 +186,14 @@ public class GridScene{
 			return;
 		}
 		
+		var info     = FieldReader.readFields(dataProvider, pipe, pos);
 		var typeHash = pipe.getType().getFullName().hashCode();
-		
-		var info = FieldReader.readFields(dataProvider, pipe, pos);
-		
+		annotateReadRes(info, typeHash);
+	}
+	
+	private <T extends IOInstance<T>> void annotateReadRes(FieldReader.ResSet<T> info, int typeHash) throws IOException{
 		{
-			var ranges = pos.toAbsoluteRanges(dataProvider, info.size()).toList();
+			var ranges = info.pos().toAbsoluteRanges(dataProvider).toList();
 			var msg    = TextUtil.toString(info.value());
 			for(DrawUtils.Range rang : ranges){
 				messages.add(msg, rang, new RangeMessageSpace.HoverEffect.Outline(Color.red, 1));
@@ -203,24 +204,14 @@ public class GridScene{
 			var col = ColorUtils.makeCol(typeHash, rf.field());
 			annotateByteField(info.value(), rf, col);
 		}
-
-//		for(var rf : info.fields()){
-//			var field = rf.field();
-//			if(!(field instanceof RefField<T, ?> refField)){
-//				continue;
-//			}
-//
-//			var ref = refField.getReference(info.value());
-//			if(!ref.isNull()){
-//				var referencedPipe = refField.getReferencedPipe(info.value());
-//				if(referencedPipe instanceof StructPipe<?> sp){
-//					annotateStruct(sp, DataPos.from(ref), null);
-//				}else{
-//					LogUtil.println("not implemented: non struct reference object: " + rf.value());
-//				}
-//			}
-//		}
 		
+		for(FieldInspectRead.ReferenceInfo reference : info.references()){
+			recordPointer(reference, Color.RED);
+			
+			var refInfo     = reference.reader().read();
+			var refTypeHash = reference.type().getName().hashCode();
+			annotateReadRes(refInfo, refTypeHash);
+		}
 	}
 	
 	private <T extends IOInstance<T>, V> void annotateByteField(T instance, FieldReader.Res<T, V> rf, Color col) throws IOException{
@@ -259,16 +250,16 @@ public class GridScene{
 		if(firstRange == null){
 			throw new IllegalStateException();
 		}
-		
-		if(field instanceof RefField<T, V> refF){
-			var ref       = refF.getReference(instance);
-			var globalOff = ref.calcGlobalOffset(dataProvider);
-			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-		}else if(field.getType() == Reference.class){
-			var ref       = (Reference)rf.value();
-			var globalOff = ref.calcGlobalOffset(dataProvider);
-			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-		}
+
+//		if(field instanceof RefField<T, V> refF){
+//			var ref       = refF.getReference(instance);
+//			var globalOff = ref.calcGlobalOffset(dataProvider);
+//			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
+//		}else if(field.getType() == Reference.class){
+//			var ref       = (Reference)rf.value();
+//			var globalOff = ref.calcGlobalOffset(dataProvider);
+//			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
+//		}
 		
 		if(!drawDetails) return;
 		
@@ -276,6 +267,19 @@ public class GridScene{
 		if(stringDrawIn(message, rect, col, gridSize.byteSize()*0.8F, false) instanceof Match.Some(var draw)){
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
+		
+	}
+	
+	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Color color) throws IOException{
+		var             rangeO = reference.origin().toAbsoluteRanges(dataProvider).maxByD(e -> gridSize.findBestRectScaled(e).area());
+		DrawUtils.Range range;
+		if(rangeO.isEmpty()){
+			range = DrawUtils.Range.fromSize(reference.origin().absoluteFrom(dataProvider), 0);
+		}else range = rangeO.get();
+		
+		var to   = reference.ref().calcGlobalOffset(dataProvider);
+		var size = Math.toIntExact(range.size());
+		recordPointer(range.from(), to, size, color, "test", 2F);
 		
 	}
 	

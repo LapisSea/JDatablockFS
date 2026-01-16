@@ -32,6 +32,13 @@ public record DataPos(ChunkPointer ptr, long offset){
 			}
 		}
 		
+		public long absoluteFrom(DataProvider provider) throws IOException{
+			if(ptr.isNull()){
+				return range.from();
+			}
+			return new Reference(ptr, range.from()).calcGlobalOffset(provider);
+		}
+		
 		public IterablePP<DrawUtils.Range> toAbsoluteRanges(DataProvider provider){
 			if(ptr.isNull()){
 				return Iters.of(range);
@@ -71,4 +78,7 @@ public record DataPos(ChunkPointer ptr, long offset){
 		return DrawUtils.chainRangeResolve(provider, ptr.makeReference(), offset, size);
 	}
 	
+	public Sized withSize(long size){
+		return new Sized(ptr, DrawUtils.Range.fromSize(offset, size));
+	}
 }

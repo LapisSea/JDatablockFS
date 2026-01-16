@@ -16,7 +16,11 @@ import java.io.IOException;
 
 public interface FieldInspectRead{
 	
-	record ReferenceInfo(Reference ref){ }
+	interface ValueReader{
+		FieldReader.ResSet<?> read() throws IOException;
+	}
+	
+	record ReferenceInfo(DataPos.Sized origin, Reference ref, Class<?> type, ValueReader reader){ }
 	
 	record ReadResult<T extends IOInstance<T>, V>(FieldReader.Res<T, V> inlineRes, ReferenceInfo referenceInfo){
 		
@@ -24,8 +28,8 @@ public interface FieldInspectRead{
 			return new ReadResult<>(new FieldReader.Res<>(field, value, pos), null);
 		}
 		
-		public ReadResult<T, V> withRef(Reference ref){
-			return new ReadResult<>(inlineRes, new ReferenceInfo(ref));
+		public ReadResult<T, V> withRef(DataPos.Sized origin, Reference ref, Class<?> type, ValueReader reader){
+			return new ReadResult<>(inlineRes, new ReferenceInfo(origin, ref, type, reader));
 		}
 		
 	}

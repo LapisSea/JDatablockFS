@@ -8,7 +8,6 @@ import com.lapissea.dfs.inspect.display.grid.read.SimpleReadInspectRead;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
@@ -24,7 +23,9 @@ public final class FieldReader{
 	
 	public record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, DataPos.Sized pos){ }
 	
-	public record ResSet<T extends IOInstance<T>>(T value, long size, List<Res<T, ?>> fields){ }
+	public record ResSet<T extends IOInstance<T>>(
+		T value, DataPos.Sized pos, List<Res<T, ?>> fields, List<FieldInspectRead.ReferenceInfo> references
+	){ }
 	
 	private static <T extends IOInstance<T>> ResSet<T> getChunkFields(DataProvider dataProvider, StructPipe<T> pipe, long offset) throws IOException{
 		var ch     = dataProvider.getChunk(ChunkPointer.of(offset));
@@ -42,7 +43,7 @@ public final class FieldReader{
 			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, DataPos.Sized.ofRange(valueOffset, valueSize)));
 		}
 		//noinspection unchecked
-		return (ResSet<T>)new ResSet<>(ch, pos - offset, fields);
+		return (ResSet<T>)new ResSet<>(ch, DataPos.Sized.ofRange(offset, pos - offset), fields, List.of());
 	}
 	
 	public static <T extends IOInstance<T>> ResSet<T> readFields(DataProvider dataProvider, StructPipe<T> pipe, DataPos pos) throws IOException{
@@ -51,7 +52,12 @@ public final class FieldReader{
 			return getChunkFields(dataProvider, pipe, pos.offset());
 		}
 		
-		List<Res<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
+		return readManaged(dataProvider, pipe, pos);
+	}
+	
+	public static <T extends IOInstance<T>> ResSet<T> readManaged(DataProvider dataProvider, StructPipe<T> pipe, DataPos pos) throws IOException{
+		List<Res<T, ?>>                      fields     = new ArrayList<>(pipe.getSpecificFields().size());
+		List<FieldInspectRead.ReferenceInfo> references = new ArrayList<>();
 		
 		try(RandomIO src = pos.open(dataProvider)){
 			var ioPool = pipe.makeIOPool();
@@ -70,11 +76,12 @@ public final class FieldReader{
 				fields.add(ir);
 				lastPos = ir.pos.range().to();
 				
-				if(res.referenceInfo() instanceof FieldInspectRead.ReferenceInfo(Reference ref)){
-				
+				if(res.referenceInfo() != null){
+					references.add(res.referenceInfo());
 				}
 			}
-			return new ResSet<>(inst, lastPos - start, fields);
+			
+			return new ResSet<>(inst, pos.withSize(lastPos - start), fields, references);
 		}
 	}
 	
