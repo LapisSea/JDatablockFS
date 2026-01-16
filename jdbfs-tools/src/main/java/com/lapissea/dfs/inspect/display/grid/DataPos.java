@@ -77,6 +77,12 @@ public record DataPos(ChunkPointer ptr, long offset){
 		}
 		return DrawUtils.chainRangeResolve(provider, ptr.makeReference(), offset, size);
 	}
+	public long toAbsoluteOffset(DataProvider provider) throws IOException{
+		if(ptr.isNull()){
+			return offset;
+		}
+		return new Reference(ptr, offset).calcGlobalOffset(provider);
+	}
 	
 	public Sized withSize(long size){
 		return new Sized(ptr, DrawUtils.Range.fromSize(offset, size));

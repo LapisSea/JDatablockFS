@@ -6,8 +6,8 @@ import com.lapissea.dfs.inspect.display.grid.DataPos;
 import com.lapissea.dfs.inspect.display.grid.FieldReader;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.DrawUtils;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
@@ -20,7 +20,7 @@ public interface FieldInspectRead{
 		FieldReader.ResSet<?> read() throws IOException;
 	}
 	
-	record ReferenceInfo(DataPos.Sized origin, Reference ref, Class<?> type, ValueReader reader){ }
+	record ReferenceInfo(DataPos.Sized origin, DataPos ref, Class<?> type, ValueReader reader){ }
 	
 	record ReadResult<T extends IOInstance<T>, V>(FieldReader.Res<T, V> inlineRes, ReferenceInfo referenceInfo){
 		
@@ -28,7 +28,7 @@ public interface FieldInspectRead{
 			return new ReadResult<>(new FieldReader.Res<>(field, value, pos), null);
 		}
 		
-		public ReadResult<T, V> withRef(DataPos.Sized origin, Reference ref, Class<?> type, ValueReader reader){
+		public ReadResult<T, V> withRef(DataPos.Sized origin, DataPos ref, Class<?> type, ValueReader reader){
 			return new ReadResult<>(inlineRes, new ReferenceInfo(origin, ref, type, reader));
 		}
 		
@@ -50,5 +50,5 @@ public interface FieldInspectRead{
 		return ptr;
 	}
 	
-	<T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst) throws IOException;
+	<T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException;
 }

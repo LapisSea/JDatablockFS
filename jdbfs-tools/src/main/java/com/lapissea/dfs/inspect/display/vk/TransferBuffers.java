@@ -1,10 +1,10 @@
 package com.lapissea.dfs.inspect.display.vk;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.enums.VkCommandBufferUsageFlag;
 import com.lapissea.dfs.inspect.display.vk.wrap.CommandPool;
 import com.lapissea.dfs.inspect.display.vk.wrap.VulkanQueue;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -67,6 +67,9 @@ public class TransferBuffers implements VulkanResource{
 			synchronized(queue){
 				queue.submitNow(buffer);
 			}
+		}catch(Throwable e){
+			queue.waitIdle();
+			throw e;
 		}finally{
 			buffer.destroy();
 		}

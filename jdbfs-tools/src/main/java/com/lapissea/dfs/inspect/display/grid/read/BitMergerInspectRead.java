@@ -9,17 +9,13 @@ import com.lapissea.dfs.type.field.IOField;
 
 import java.io.IOException;
 
-public class SimpleReadInspectRead implements FieldInspectRead{
+public class BitMergerInspectRead implements FieldInspectRead{
 	
 	@Override
 	public <T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
 		
-		var start = src.getPos();
 		field.read(ioPool, dataProvider, src, inst, null);
-		var end = src.getPos();
 		
-		var value = field.get(ioPool, inst);
-		
-		return ReadResult.res(field, value, defaultPos(src, start, end));
+		return ReadResult.res(field, null, defaultPos(src, 0, 0));
 	}
 }

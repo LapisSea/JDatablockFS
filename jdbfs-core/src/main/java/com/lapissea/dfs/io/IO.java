@@ -20,15 +20,15 @@ public interface IO<T extends IOInstance<T>>{
 	interface DisabledIO<T extends IOInstance<T>> extends IO<T>{
 		@Override
 		default void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance){
-			throw new UnsupportedOperationException();
+			throw new UnsupportedOperationException(this.getClass().getTypeName());
 		}
 		@Override
 		default void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
-			throw new UnsupportedOperationException();
+			throw new UnsupportedOperationException(this.getClass().getTypeName());
 		}
 		@Override
 		default void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
-			throw new UnsupportedOperationException();
+			throw new UnsupportedOperationException(this.getClass().getTypeName());
 		}
 	}
 }

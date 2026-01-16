@@ -7,14 +7,16 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 
 import java.io.IOException;
 
-public class ManagedRefInspectRead implements FieldInspectRead{
+public class UnmanagedRefInspectRead implements FieldInspectRead{
 	
+	@SuppressWarnings({"rawtypes", "unchecked"})
 	@Override
 	public <T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
 		
@@ -34,12 +36,15 @@ public class ManagedRefInspectRead implements FieldInspectRead{
 			return res;
 		}
 		
-		var pos = DataPos.from(ref);
-		
-		return res.withRef(fieldPos, pos, field.getType(), () -> {
-			@SuppressWarnings("unchecked")
-			StructPipe<T> pipe = (StructPipe<T>)(Object)refField.getReferencedPipe(inst);
-			return FieldReader.readFields(dataProvider, pipe, pos, genericContext);
+		return res.withRef(fieldPos, DataPos.from(ref), field.getType(), () -> {
+			var pipe = (StructPipe)refField.getReferencedPipe(inst);
+			var type = IOType.of(refField.getAccessor().getGenericType(genericContext));
+			try{
+				return FieldReader.readUnmanaged(dataProvider, pipe, ref.asPtr(), type, genericContext);
+			}catch(IOException e){
+				new IOException("Failed to read unmanaged value of " + type + " on " + ref.asPtr(), e).printStackTrace();
+				return FieldReader.ResSet.empty();
+			}
 		});
 	}
 }

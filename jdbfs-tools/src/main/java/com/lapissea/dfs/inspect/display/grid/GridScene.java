@@ -186,7 +186,7 @@ public class GridScene{
 			return;
 		}
 		
-		var info     = FieldReader.readFields(dataProvider, pipe, pos);
+		var info     = FieldReader.readFields(dataProvider, pipe, pos, context);
 		var typeHash = pipe.getType().getFullName().hashCode();
 		annotateReadRes(info, typeHash);
 	}
@@ -248,7 +248,7 @@ public class GridScene{
 		}
 		
 		if(firstRange == null){
-			throw new IllegalStateException();
+			return;
 		}
 
 //		if(field instanceof RefField<T, V> refF){
@@ -277,7 +277,7 @@ public class GridScene{
 			range = DrawUtils.Range.fromSize(reference.origin().absoluteFrom(dataProvider), 0);
 		}else range = rangeO.get();
 		
-		var to   = reference.ref().calcGlobalOffset(dataProvider);
+		var to   = reference.ref().toAbsoluteOffset(dataProvider);
 		var size = Math.toIntExact(range.size());
 		recordPointer(range.from(), to, size, color, "test", 2F);
 		

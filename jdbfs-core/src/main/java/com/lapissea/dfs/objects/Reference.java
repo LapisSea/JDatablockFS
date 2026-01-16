@@ -227,7 +227,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	
 	
 	public ChunkPointer asPtr(){
-		if(offset != 0) throw new UnsupportedOperationException();
+		if(offset != 0) throw new UnsupportedOperationException("Reference has offset, can not convert to ChunkPointer without data loss");
 		return ptr;
 	}
 	
