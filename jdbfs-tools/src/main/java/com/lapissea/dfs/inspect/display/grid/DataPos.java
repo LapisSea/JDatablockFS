@@ -49,6 +49,11 @@ public record DataPos(ChunkPointer ptr, long offset){
 		public long size(){
 			return range.size();
 		}
+		
+		@Override
+		public String toString(){
+			return "{" + ptr + " + " + range + "}";
+		}
 	}
 	
 	public static DataPos from(Reference ref){
@@ -86,5 +91,10 @@ public record DataPos(ChunkPointer ptr, long offset){
 	
 	public Sized withSize(long size){
 		return new Sized(ptr, DrawUtils.Range.fromSize(offset, size));
+	}
+	
+	@Override
+	public String toString(){
+		return "{" + ptr + " + " + offset + "}";
 	}
 }

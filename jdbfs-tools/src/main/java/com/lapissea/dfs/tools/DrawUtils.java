@@ -127,35 +127,29 @@ public final class DrawUtils{
 			return actualRanges;
 		}
 		public static List<Range> clamp(List<Range> ranges, long max){
-			List<Range> build = null;
-			{
-				boolean same = true;
-				for(int i = 0; i<ranges.size(); i++){
-					Range r = ranges.get(i);
-					if(same){
-						if(r.from>=max || r.to>=max){
-							build = new ArrayList<>(ranges.size());
-							for(int j = 0; j<i; j++){
-								build.add(ranges.get(j));
-							}
-							same = false;
-						}
-					}
-					if(!same){
-						if(r.from>=max) continue;
-						if(r.to>=max) build.add(new Range(r.from, max));
-					}
-				}
-				if(build == null){
-					build = ranges;
+			for(Range r : ranges){
+				if(r.to>max){
+					return clampFilter(ranges, max);
 				}
 			}
-			return build;
+			return ranges;
 		}
+		private static List<Range> clampFilter(List<Range> ranges, long max){
+			var res = new ArrayList<Range>(ranges.size());
+			for(Range r : ranges){
+				if(r.from>=max) continue;
+				if(r.to>max) res.add(new Range(r.from, max));
+			}
+			return res;
+		}
+		
 		public static IterableLongPP toInts(List<Range> ranges){
 			return Iters.from(ranges).flatMapToLong(Range::longsI);
 		}
 		
+		public boolean isEmpty(){
+			return to == from;
+		}
 		public long size(){
 			return to - from;
 		}
@@ -182,6 +176,11 @@ public final class DrawUtils{
 		
 		public boolean isWithin(Range range){
 			return range.from<=from && to<=range.to;
+		}
+		
+		@Override
+		public String toString(){
+			return from + ".." + to;
 		}
 	}
 	

@@ -1,5 +1,6 @@
 package com.lapissea.dfs.inspect.display.grid;
 
+import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
@@ -18,6 +19,8 @@ public class RangeMessageSpace{
 		None NONE = new None();
 		
 		record Outline(Color color, float lineWidth) implements HoverEffect{ }
+		
+		record MultiOutline(Color color, float lineWidth, List<Range> ranges) implements HoverEffect{ }
 		
 	}
 	
@@ -109,6 +112,24 @@ public class RangeMessageSpace{
 	private long idCounter;
 	
 	private final Node root = new Node(new Range(Long.MIN_VALUE, Long.MAX_VALUE), null);
+	
+	public void addMultiRangeOutline(String message, Color color, float lineWidth, List<Range> ranges){
+		for(DrawUtils.Range rng : ranges){
+			addOutline(message, rng, color, lineWidth, ranges);
+		}
+	}
+	
+	public void addOutline(String message, Range range, Color color, float lineWidth){
+		add(message, range, new HoverEffect.Outline(color, lineWidth));
+	}
+	public void addOutline(String message, Range range, Color color, float lineWidth, List<Range> ranges){
+		if(ranges.isEmpty()) return;
+		if(ranges.size() == 1 && ranges.getFirst().equals(range)){
+			add(message, range, new HoverEffect.Outline(color, lineWidth));
+		}else{
+			add(message, range, new HoverEffect.MultiOutline(color, lineWidth, ranges));
+		}
+	}
 	
 	public void add(String message, Range range){
 		add(message, range, HoverEffect.NONE);

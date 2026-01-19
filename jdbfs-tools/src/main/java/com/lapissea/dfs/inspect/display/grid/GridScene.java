@@ -21,12 +21,12 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.tools.BinaryGridRenderer.Pointer;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
+import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.TextUtil;
@@ -85,8 +85,8 @@ public class GridScene{
 					
 					annotateStruct(Chunk.PIPE, DataPos.absolute(chunk.getPtr().getValue()), null);
 					
-					var chRange = new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataEnd());
-					messages.add("Hovered chunk: " + chunk, chRange, new RangeMessageSpace.HoverEffect.Outline(Color.CYAN.darker(), 2));
+					var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
+					messages.addOutline("Hovered chunk: " + chunk, chRange, Color.CYAN.darker(), 2);
 					
 					if(chunk.checkLastPhysical()){
 						break;
@@ -106,9 +106,9 @@ public class GridScene{
 		
 		private void flushError() throws IOException{
 			if(errorStart == -1) return;
-			var range = new DrawUtils.Range(errorStart, errorEnd);
+			var range = new Range(errorStart, errorEnd);
 			drawByteRangesForced(List.of(range), Color.RED.darker(), true);
-			messages.add(Utils.errToStackTrace(error), range, new RangeMessageSpace.HoverEffect.Outline(Color.ORANGE, 3));
+			messages.addOutline(Utils.errToStackTrace(error), range, Color.ORANGE, 3);
 			errorStart = errorEnd = -1;
 			error = null;
 		}
@@ -128,7 +128,7 @@ public class GridScene{
 			annotateStruct(rootPipe, new DataPos(cluster.getFirstChunk().getPtr(), 0), null);
 		}
 		
-		drawByteRanges(List.of(new DrawUtils.Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
+		drawByteRanges(List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
 		buffer.renderBytes(
 			0, null,
 			List.of(),
@@ -146,23 +146,23 @@ public class GridScene{
 		try{
 			frameData.contents().io(MagicID::read);
 			dataProvider = new Cluster(frameData.contents());
-			drawByteRanges(List.of(new DrawUtils.Range(0, MagicID.size())), Color.BLUE, false, true);
+			drawByteRanges(List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
 			
 			var byteBae = new MsdfFontRender.StringDraw(
 				gridSize.byteSize(), new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
 			);
-			if(stringDrawIn(byteBae, gridSize.findBestRectScaled(DrawUtils.Range.fromSize(0, MagicID.size())), false) instanceof Match.Some(var str)){
+			if(stringDrawIn(byteBae, gridSize.findBestRectScaled(Range.fromSize(0, MagicID.size())), false) instanceof Match.Some(var str)){
 				buffer.renderFont(str, str.withOutline(Color.black, 1F));
 			}
 			
-			messages.add(
+			messages.addOutline(
 				"The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()),
-				new DrawUtils.Range(0, MagicID.size()),
-				new RangeMessageSpace.HoverEffect.Outline(Color.BLUE, 3)
+				new Range(0, MagicID.size()),
+				Color.BLUE, 3
 			);
 			return;
 		}catch(IOException ignore){
-			messages.add("Does not have valid magic ID", new DrawUtils.Range(0, dataSize));
+			messages.add("Does not have valid magic ID", new Range(0, dataSize));
 		}
 		
 		dataProvider = DataProvider.newVerySimpleProvider(frameData.contents());
@@ -175,7 +175,7 @@ public class GridScene{
 			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
 			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
 		}catch(IOException e){
-			drawByteRanges(List.of(new DrawUtils.Range(0, MagicID.size())), Color.RED, false, true);
+			drawByteRanges(List.of(new Range(0, MagicID.size())), Color.RED, false, true);
 		}
 	}
 	
@@ -195,9 +195,9 @@ public class GridScene{
 		{
 			var ranges = info.pos().toAbsoluteRanges(dataProvider).toList();
 			var msg    = TextUtil.toString(info.value());
-			for(DrawUtils.Range rang : ranges){
-				messages.add(msg, rang, new RangeMessageSpace.HoverEffect.Outline(Color.red, 1));
-			}
+			messages.addMultiRangeOutline(msg, Color.red, 2, ranges);
+			var background = ColorUtils.mul(ColorUtils.makeCol(typeHash, ""), 0.6F);
+			fillByteRange(ranges, background);
 		}
 		
 		for(var rf : info.fields()){
@@ -219,8 +219,8 @@ public class GridScene{
 		
 		IOField<T, V> field = rf.field();
 		
-		DrawUtils.Range bestRange  = new DrawUtils.Range(0, 0);
-		DrawUtils.Range firstRange = null, lastRange = null;
+		Range bestRange  = new Range(0, 0);
+		Range firstRange = null, lastRange = null;
 		
 		var message = field + " " + rf.value();
 		
@@ -228,8 +228,10 @@ public class GridScene{
 		
 		boolean drawDetails = gridSize.bytesPerRow()>6;
 		
-		for(DrawUtils.Range rng : rf.pos().toAbsoluteRanges(dataProvider)){
-			messages.add(message, rng, new RangeMessageSpace.HoverEffect.Outline(col.brighter(), 2));
+		var ranges = rf.pos().toAbsoluteRanges(dataProvider).toList();
+		messages.addMultiRangeOutline(message, col.brighter(), 2, ranges);
+		
+		for(Range rng : ranges){
 			if(bestRange.size()<gridSize.bytesPerRow()){
 				var contiguousRange = DrawUtils.findBestContiguousRange(gridSize.bytesPerRow(), rng);
 				if(bestRange.size()<contiguousRange.size()) bestRange = contiguousRange;
@@ -271,10 +273,10 @@ public class GridScene{
 	}
 	
 	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Color color) throws IOException{
-		var             rangeO = reference.origin().toAbsoluteRanges(dataProvider).maxByD(e -> gridSize.findBestRectScaled(e).area());
-		DrawUtils.Range range;
+		var   rangeO = reference.origin().toAbsoluteRanges(dataProvider).maxByD(e -> gridSize.findBestRectScaled(e).area());
+		Range range;
 		if(rangeO.isEmpty()){
-			range = DrawUtils.Range.fromSize(reference.origin().absoluteFrom(dataProvider), 0);
+			range = Range.fromSize(reference.origin().absoluteFrom(dataProvider), 0);
 		}else range = rangeO.get();
 		
 		var to   = reference.ref().toAbsoluteOffset(dataProvider);
@@ -356,30 +358,30 @@ public class GridScene{
 	}
 	
 	private void drawBytes(IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException{
-		drawByteRanges(DrawUtils.Range.fromInts(stream), color, withChar, force);
+		drawByteRanges(Range.fromInts(stream), color, withChar, force);
 	}
 	
-	private void drawByteRanges(List<DrawUtils.Range> ranges, Color color, boolean withChar, boolean force) throws IOException{
-		List<DrawUtils.Range> actualRanges;
+	private void drawByteRanges(List<Range> ranges, Color color, boolean withChar, boolean force) throws IOException{
+		List<Range> actualRanges;
 		if(force) actualRanges = ranges;
-		else actualRanges = DrawUtils.Range.filterRanges(ranges, this::isNotFilled);
+		else actualRanges = Range.filterRanges(ranges, this::isNotFilled);
 		
 		drawByteRangesForced(actualRanges, color, withChar);
 	}
 	
-	private void drawByteRangesForced(List<DrawUtils.Range> ranges, Color color, boolean withChar) throws IOException{
+	private void drawByteRangesForced(List<Range> ranges, Color color, boolean withChar) throws IOException{
 		var col        = ColorUtils.mul(color, 0.8F);
 		var background = ColorUtils.mul(col, 0.6F);
 		
-		List<DrawUtils.Range> clampedOverflow = DrawUtils.Range.clamp(ranges, dataSize);
+		List<Range> clampedOverflow = Range.clamp(ranges, dataSize);
 		
-		fillByteRange(Iters.from(clampedOverflow), background);
+		fillByteRange(clampedOverflow, background);
 		
 		fillByteRange(
 			Iters.from(ranges).filter(r -> r.to()>=dataSize).map(r -> {
-				if(r.from()<dataSize) return new DrawUtils.Range(dataSize, r.to());
+				if(r.from()<dataSize) return new Range(dataSize, r.to());
 				return r;
-			}),
+			}).toModList(),
 			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
 		);
 		
@@ -389,49 +391,59 @@ public class GridScene{
 			var sizeI = to - from;
 			var bytes = frameData.contents().read(range.from(), sizeI);
 			
-			buffer.renderBytes(range.from(), bytes, List.of(new ByteGridRender.DrawRange(from, to, col)), java.util.List.of());
+			buffer.renderBytes(range.from(), bytes, List.of(new ByteGridRender.DrawRange(from, to, col)), List.of());
 		}
 		
 		if(withChar){
-			var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
-			
-			var fr       = buffer.getFontRender();
-			var width    = gridSize.bytesPerRow();
-			var byteSize = gridSize.byteSize();
-			
-			List<MsdfFontRender.StringDraw> chars = new ArrayList<>();
-			
-			var it = DrawUtils.Range.toInts(clampedOverflow).iterator();
-			
-			while(it.hasNext()){
-				var  i  = it.nextLong();
-				char ub = (char)getUint8(frameData, i);
-				
-				if(!fr.canDisplay(ub)){
-					continue;
-				}
-				
-				int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
-				float xF = byteSize*xi, yF = byteSize*yi;
-				
-				if(stringDrawIn(Character.toString(ub), new GridRect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Match.Some(
-					var sd
-				)){
-					chars.add(sd);
-				}
-			}
-			
-			buffer.renderFont(chars);
+			drawChars(col, clampedOverflow);
 		}
+		
 		for(var range : clampedOverflow){
 			fill(range);
 		}
 	}
 	
-	private void fillByteRange(IterablePP<DrawUtils.Range> ranges, Color color){
-		var count = IterablePP.SizedPP.tryGet(ranges).orElse(4);
-		var mesh  = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
+	private void drawChars(Color col, List<Range> clampedOverflow){
+		var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
+		
+		var fr       = buffer.getFontRender();
+		var width    = gridSize.bytesPerRow();
+		var byteSize = gridSize.byteSize();
+		
+		List<MsdfFontRender.StringDraw> chars = new ArrayList<>();
+		
+		var it = Range.toInts(clampedOverflow).iterator();
+		
+		while(it.hasNext()){
+			var  i  = it.nextLong();
+			char ub = (char)getUint8(frameData, i);
+			
+			if(!fr.canDisplay(ub)){
+				continue;
+			}
+			
+			int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
+			float xF = byteSize*xi, yF = byteSize*yi;
+			
+			if(stringDrawIn(Character.toString(ub), new GridRect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Match.Some(
+				var sd
+			)){
+				chars.add(sd);
+			}
+		}
+		
+		buffer.renderFont(chars);
+	}
+	
+	private void fillByteRange(List<Range> ranges, Color color){
+		int count = 0;
+		for(Range range : ranges){
+			if(!range.isEmpty()) count++;
+		}
+		if(count == 0) return;
+		var mesh = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
 		for(var range : ranges){
+			if(range.isEmpty()) continue;
 			DrawUtilsVK.fillByteRange(gridSize, mesh, color, range);
 		}
 		buffer.renderMesh(mesh);
@@ -443,7 +455,7 @@ public class GridScene{
 	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, GridRect area, Color color, float fontScale, boolean alignLeft){
 		return GridUtils.stringDrawIn(buffer.getFontRender(), s, area, color, fontScale, alignLeft);
 	}
-	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, DrawUtils.Range range, float lineWidth){
+	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
 		buffer.renderLines(lines);
 	}
@@ -459,10 +471,10 @@ public class GridScene{
 		return ub;
 	}
 	
-	private boolean isNotFilled(long idx)   { return !filled.get(Math.toIntExact(idx)); }
-	private boolean isFilled(long idx)      { return filled.get(Math.toIntExact(idx)); }
-	private void fill(long idx)             { filled.set(Math.toIntExact(idx)); }
-	private void fill(DrawUtils.Range range){ fill(range.from(), range.to()); }
+	private boolean isNotFilled(long idx){ return !filled.get(Math.toIntExact(idx)); }
+	private boolean isFilled(long idx)   { return filled.get(Math.toIntExact(idx)); }
+	private void fill(long idx)          { filled.set(Math.toIntExact(idx)); }
+	private void fill(Range range)       { fill(range.from(), range.to()); }
 	private void fill(long start, long end){
 		for(long i = start; i<end; i++){
 			filled.set(Math.toIntExact(i));

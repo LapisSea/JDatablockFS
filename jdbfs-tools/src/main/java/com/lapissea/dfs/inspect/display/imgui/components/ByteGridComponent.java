@@ -265,6 +265,11 @@ public class ByteGridComponent extends BackbufferComponent{
 					case RangeMessageSpace.HoverEffect.Outline(Color color, float lineWidth) -> {
 						outlineByteRange(scene.gridSize, color, message.range(), lineWidth);
 					}
+					case RangeMessageSpace.HoverEffect.MultiOutline(Color color, float lineWidth, List<Range> ranges) -> {
+						for(Range range : ranges){
+							outlineByteRange(scene.gridSize, color, range, lineWidth);
+						}
+					}
 				}
 				messages.add(message.message());
 			}
