@@ -17,6 +17,9 @@ import java.io.IOException;
 public interface FieldInspectRead{
 	
 	interface ValueReader{
+		
+		ValueReader BLANK = FieldReader.ResSet::empty;
+		
 		FieldReader.ResSet<?> read() throws IOException;
 	}
 	
@@ -43,7 +46,7 @@ public interface FieldInspectRead{
 	default ChunkPointer tryGetPtr(RandomIO src){
 		ChunkPointer ptr;
 		if(src instanceof ChunkChainIO io){
-			ptr = io.getCursor().getPtr();
+			ptr = io.head.getPtr();
 		}else{
 			ptr = ChunkPointer.NULL;
 		}

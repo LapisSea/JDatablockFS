@@ -57,7 +57,12 @@ public final class FieldReader{
 			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, dataPos));
 			
 			if(field.getType() == ChunkPointer.class && ch.hasNextPtr()){
-				references.add(new FieldInspectRead.ReferenceInfo(dataPos, DataPos.absolute(ch.getNextPtr().getValue()), ChunkPointer.class, ResSet::empty));
+				references.add(new FieldInspectRead.ReferenceInfo(
+					dataPos,
+					DataPos.absolute(ch.getNextPtr().getValue()),
+					ChunkPointer.class,
+					FieldInspectRead.ValueReader.BLANK
+				));
 			}
 		}
 		//noinspection unchecked

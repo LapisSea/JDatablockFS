@@ -61,6 +61,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	
 	private GridScene scene;
 	private GridScene oldScene;
+	private boolean   currentBuildFlag;
 	
 	public ByteGridComponent(VulkanCore core, ImBoolean open, SettingsUIComponent uiSettings, List<String> messages) throws VulkanCodeException{
 		super(core, open, uiSettings.byteGridSampleEnumIndex);
@@ -101,6 +102,7 @@ public class ByteGridComponent extends BackbufferComponent{
 	private synchronized void clearScene(){
 		oldScene = null;
 		scene = null;
+		currentBuildFlag = false;
 		clearStaticRenderer();
 	}
 	private synchronized void retireScene(){
@@ -108,10 +110,12 @@ public class ByteGridComponent extends BackbufferComponent{
 			oldScene = scene;
 		}
 		scene = null;
+		currentBuildFlag = false;
 	}
 	private synchronized void pushScene(GridScene newScene){
 		oldScene = null;
 		scene = newScene;
+		currentBuildFlag = false;
 	}
 	
 	public synchronized void setDisplayData(SessionSetView.FrameData src) throws IOException{
@@ -183,7 +187,10 @@ public class ByteGridComponent extends BackbufferComponent{
 		ImGui.begin("Grid debug");
 		
 		ImGui.checkbox("Show bounding boxes", showBoundingBoxes);
-		if(ImGui.checkbox("toggle", merge)){
+		if(ImGui.checkbox("Merge draw calls", merge)){
+			retireScene();
+		}
+		if(ImGui.button("Invalidate scene")){
 			retireScene();
 		}
 		
@@ -206,7 +213,12 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		ImGui.end();
 		
+		buildDispatch:
 		if(scene == null){
+			synchronized(this){
+				if(currentBuildFlag) break buildDispatch;
+				currentBuildFlag = true;
+			}
 			if(SCENE_BUILD_POOL.getQueue().size()>3) UtilL.sleep(20);
 			var task = new BuildTask(frameData, gridSize, merge.get(), dynamicTokens.getFontRender(), this.cutoff[0]);
 			var lock = this;
