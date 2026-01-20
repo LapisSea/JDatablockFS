@@ -29,6 +29,7 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import org.joml.Vector2f;
 
@@ -151,7 +152,7 @@ public class GridScene{
 			var byteBae = new MsdfFontRender.StringDraw(
 				gridSize.byteSize(), new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
 			);
-			if(stringDrawIn(byteBae, gridSize.findBestRectScaled(Range.fromSize(0, MagicID.size())), false) instanceof Match.Some(var str)){
+			if(stringDrawIn(byteBae, gridSize.findBestRectScaled(Range.fromSize(0, MagicID.size())), false) instanceof Some(var str)){
 				buffer.renderFont(str, str.withOutline(Color.black, 1F));
 			}
 			
@@ -266,7 +267,7 @@ public class GridScene{
 		if(!drawDetails) return;
 		
 		
-		if(stringDrawIn(message, rect, col, gridSize.byteSize()*0.8F, false) instanceof Match.Some(var draw)){
+		if(stringDrawIn(message, rect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
 		
@@ -412,23 +413,25 @@ public class GridScene{
 		
 		List<MsdfFontRender.StringDraw> chars = new ArrayList<>();
 		
-		var it = Range.toInts(clampedOverflow).iterator();
-		
-		while(it.hasNext()){
-			var  i  = it.nextLong();
-			char ub = (char)getUint8(frameData, i);
+		for(Range range : clampedOverflow){
 			
-			if(!fr.canDisplay(ub)){
-				continue;
-			}
-			
-			int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
-			float xF = byteSize*xi, yF = byteSize*yi;
-			
-			if(stringDrawIn(Character.toString(ub), new GridRect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Match.Some(
-				var sd
-			)){
-				chars.add(sd);
+			try(var io = frameData.contents().ioAt(range.from())){
+				for(long i = range.from(); i<range.to(); i++){
+					char ub = (char)io.readUnsignedInt1();
+					
+					if(!fr.canDisplay(ub)){
+						continue;
+					}
+					
+					int   xi = Math.toIntExact(i%width), yi = Math.toIntExact(i/width);
+					float xF = byteSize*xi, yF = byteSize*yi;
+					
+					if(stringDrawIn(ub + "", new GridRect(xF, yF, byteSize, byteSize), c, byteSize, false) instanceof Some(var sd)){
+						chars.add(sd);
+					}
+				}
+			}catch(IOException e){
+				throw new UncheckedIOException(e);
 			}
 		}
 		
@@ -458,17 +461,6 @@ public class GridScene{
 	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
 		buffer.renderLines(lines);
-	}
-	
-	private static int getUint8(SessionSetView.FrameData frameData, long i){
-		int ub;
-		var contents = frameData.contents();
-		try(var io = contents.ioAt(i)){
-			ub = io.readUnsignedInt1();
-		}catch(IOException e){
-			throw new UncheckedIOException(e);
-		}
-		return ub;
 	}
 	
 	private boolean isNotFilled(long idx){ return !filled.get(Math.toIntExact(idx)); }
