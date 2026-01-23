@@ -36,10 +36,10 @@ public class ManagedRefInspectRead implements FieldInspectRead{
 		
 		var pos = DataPos.from(ref);
 		
-		return res.withRef(fieldPos, pos, field.getType(), () -> {
-			@SuppressWarnings("unchecked")
-			StructPipe<T> pipe = (StructPipe<T>)(Object)refField.getReferencedPipe(inst);
-			return FieldReader.readFields(dataProvider, pipe, pos, genericContext);
-		});
+		@SuppressWarnings("unchecked")
+		StructPipe<T> pipe = (StructPipe<T>)(Object)refField.getReferencedPipe(inst);
+		var refVal = FieldReader.readFields(dataProvider, pipe, pos, genericContext);
+		
+		return res.withRef(fieldPos, pos, field.getType(), refVal);
 	}
 }

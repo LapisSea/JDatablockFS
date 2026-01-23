@@ -62,7 +62,7 @@ public final class FieldReader{
 					dataPos,
 					DataPos.from(ch.getNextPtr()),
 					ChunkPointer.class,
-					FieldInspectRead.ValueReader.BLANK
+					ResSet.empty()
 				));
 			}
 		}

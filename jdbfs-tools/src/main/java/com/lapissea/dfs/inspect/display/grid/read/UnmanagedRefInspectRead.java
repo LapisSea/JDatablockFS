@@ -32,15 +32,17 @@ public class UnmanagedRefInspectRead implements FieldInspectRead{
 			return res;
 		}
 		
-		return res.withRef(fieldPos, DataPos.from(ref), field.getType(), () -> {
-			var pipe = (StructPipe)refField.getReferencedPipe(inst);
-			var type = IOType.of(refField.getAccessor().getGenericType(genericContext));
-			try{
-				return FieldReader.readUnmanaged(dataProvider, pipe, ref.asPtr(), type, genericContext);
-			}catch(IOException e){
-				new IOException("Failed to read unmanaged value of " + type + " on " + ref.asPtr(), e).printStackTrace();
-				return FieldReader.ResSet.empty();
-			}
-		});
+		FieldReader.ResSet<?> refVal;
+		
+		var pipe = (StructPipe)refField.getReferencedPipe(inst);
+		var type = IOType.of(refField.getAccessor().getGenericType(genericContext));
+		try{
+			refVal = FieldReader.readUnmanaged(dataProvider, pipe, ref.asPtr(), type, genericContext);
+		}catch(IOException e){
+			new IOException("Failed to read unmanaged value of " + type + " on " + ref.asPtr(), e).printStackTrace();
+			refVal = FieldReader.ResSet.empty();
+		}
+		
+		return res.withRef(fieldPos, DataPos.from(ref), field.getType(), refVal);
 	}
 }

@@ -209,7 +209,7 @@ public class GridScene{
 		for(FieldInspectRead.ReferenceInfo reference : info.references()){
 			recordPointer(reference, Color.RED);
 			
-			var refInfo     = reference.reader().read();
+			var refInfo     = reference.value();
 			var refTypeHash = reference.type().getName().hashCode();
 			annotateReadRes(refInfo, refTypeHash);
 		}

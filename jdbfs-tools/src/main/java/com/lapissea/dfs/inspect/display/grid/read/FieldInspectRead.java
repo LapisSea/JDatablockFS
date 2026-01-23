@@ -18,14 +18,7 @@ import java.io.IOException;
 
 public interface FieldInspectRead{
 	
-	interface ValueReader{
-		
-		ValueReader BLANK = FieldReader.ResSet::empty;
-		
-		FieldReader.ResSet<?> read() throws IOException;
-	}
-	
-	record ReferenceInfo(DataPos.Sized origin, DataPos ref, Class<?> type, ValueReader reader){ }
+	record ReferenceInfo(DataPos.Sized origin, DataPos ref, Class<?> type, FieldReader.ResSet<?> value){ }
 	
 	record ReadResult<T extends IOInstance<T>, V>(FieldReader.Res<T, V> inlineRes, ReferenceInfo referenceInfo){
 		
@@ -33,8 +26,8 @@ public interface FieldInspectRead{
 			return new ReadResult<>(new FieldReader.Res<>(field, value, pos, null), null);
 		}
 		
-		public ReadResult<T, V> withRef(DataPos.Sized origin, DataPos ref, Class<?> type, ValueReader reader){
-			return new ReadResult<>(inlineRes, new ReferenceInfo(origin, ref, type, reader));
+		public ReadResult<T, V> withRef(DataPos.Sized origin, DataPos ref, Class<?> type, FieldReader.ResSet<?> value){
+			return new ReadResult<>(inlineRes, new ReferenceInfo(origin, ref, type, value));
 		}
 		
 		public ReadResult<T, V> withInner(FieldReader.ResSet<?> inner){
