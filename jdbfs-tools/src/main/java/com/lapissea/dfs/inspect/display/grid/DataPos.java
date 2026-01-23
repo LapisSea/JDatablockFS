@@ -54,10 +54,16 @@ public record DataPos(ChunkPointer ptr, long offset){
 		public String toString(){
 			return "{" + ptr + " + " + range + "}";
 		}
+		public DataPos withoutSize(){
+			return new DataPos(ptr, range.from());
+		}
 	}
 	
 	public static DataPos from(Reference ref){
 		return new DataPos(ref.getPtr(), ref.getOffset());
+	}
+	public static DataPos from(ChunkPointer ptr){
+		return absolute(ptr.getValue());
 	}
 	
 	public static DataPos absolute(long offset){

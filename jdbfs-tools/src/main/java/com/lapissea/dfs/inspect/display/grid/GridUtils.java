@@ -69,6 +69,17 @@ public final class GridUtils{
 			return new ByteGridSize(bytesPerRow, byteSize, windowSize);
 		}
 		
+		public GridRect findBestRectScaled(Iterable<DrawUtils.Range> ranges){
+			GridRect infoRect = null;
+			for(DrawUtils.Range range : ranges){
+				var nr = findBestRect(range);
+				if(infoRect == null || infoRect.area()<nr.area()){
+					infoRect = nr;
+				}
+			}
+			if(infoRect == null) return null;
+			return infoRect.scale(byteSize);
+		}
 		public GridRect findBestRectScaled(DrawUtils.Range range){
 			return findBestRect(range).scale(byteSize);
 		}

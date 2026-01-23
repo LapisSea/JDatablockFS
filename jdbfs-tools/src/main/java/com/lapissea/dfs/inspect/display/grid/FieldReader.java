@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.inspect.display.grid.read.BitMergerInspectRead;
 import com.lapissea.dfs.inspect.display.grid.read.FieldInspectRead;
 import com.lapissea.dfs.inspect.display.grid.read.ManagedRefInspectRead;
-import com.lapissea.dfs.inspect.display.grid.read.NoIOInspectRead;
 import com.lapissea.dfs.inspect.display.grid.read.SimpleReadInspectRead;
 import com.lapissea.dfs.inspect.display.grid.read.UnmanagedRefInspectRead;
 import com.lapissea.dfs.io.RandomIO;
@@ -15,9 +14,9 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.fields.NoIOField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.utils.iterableplus.Iters;
@@ -28,7 +27,9 @@ import java.util.List;
 
 public final class FieldReader{
 	
-	public record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, DataPos.Sized pos){ }
+	public record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, DataPos.Sized pos, ResSet<?> inner){
+		public Res<T, V> withInner(ResSet<?> inner){ return new Res<>(field, value, pos, inner); }
+	}
 	
 	public record ResSet<T extends IOInstance<T>>(
 		T value, DataPos.Sized pos, List<Res<T, ?>> fields, List<FieldInspectRead.ReferenceInfo> references
@@ -54,12 +55,12 @@ public final class FieldReader{
 			
 			var dataPos = DataPos.Sized.ofRange(valueOffset, valueSize);
 			//noinspection unchecked
-			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, dataPos));
+			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, dataPos, null));
 			
 			if(field.getType() == ChunkPointer.class && ch.hasNextPtr()){
 				references.add(new FieldInspectRead.ReferenceInfo(
 					dataPos,
-					DataPos.absolute(ch.getNextPtr().getValue()),
+					DataPos.from(ch.getNextPtr()),
 					ChunkPointer.class,
 					FieldInspectRead.ValueReader.BLANK
 				));
@@ -95,10 +96,7 @@ public final class FieldReader{
 			
 			for(var field : pipe.getSpecificFields()){
 				
-				FieldInspectRead reader = getReader(field);
-				
-				//noinspection unchecked
-				var res = reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst, genericContext);
+				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
 				var ir  = (Res<T, ?>)res.inlineRes();
 				fields.add(ir);
 				lastPos = ir.pos.range().to();
@@ -129,11 +127,7 @@ public final class FieldReader{
 			var start   = lastPos;
 			
 			for(var field : Iters.concat(pipe.getSpecificFields(), inst.listUnmanagedFields())){
-				
-				FieldInspectRead reader = getReader(field);
-				
-				//noinspection unchecked
-				var res = reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst, genericContext);
+				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
 				var ir  = (Res<T, ?>)res.inlineRes();
 				fields.add(ir);
 				lastPos = ir.pos.range().to();
@@ -147,10 +141,12 @@ public final class FieldReader{
 		}
 	}
 	
+	private static <T extends IOInstance<T>> FieldInspectRead.ReadResult<T, ?> readField(DataProvider dataProvider, GenericContext genericContext, IOField<T, ?> field, VarPool<T> ioPool, RandomIO src, T inst) throws IOException{
+		FieldInspectRead reader = getReader(field);
+		//noinspection unchecked
+		return reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst, genericContext);
+	}
 	private static FieldInspectRead getReader(IOField<?, ?> field){
-		if(field instanceof NoIOField){
-			return new NoIOInspectRead();
-		}
 		if(field instanceof BitFieldMerger){
 			return new BitMergerInspectRead();
 		}

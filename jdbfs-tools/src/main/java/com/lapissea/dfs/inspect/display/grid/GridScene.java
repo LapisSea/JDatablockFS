@@ -84,7 +84,7 @@ public class GridScene{
 					var chunk = dataProvider.getChunk(ChunkPointer.of(pointer));
 					flushError();
 					
-					annotateStruct(Chunk.PIPE, DataPos.absolute(chunk.getPtr().getValue()), null);
+					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null);
 					
 					var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
 					messages.addOutline("Hovered chunk: " + chunk, chRange, Color.CYAN.darker(), 2);
@@ -203,7 +203,7 @@ public class GridScene{
 		
 		for(var rf : info.fields()){
 			var col = ColorUtils.makeCol(typeHash, rf.field());
-			annotateByteField(info.value(), rf, col);
+			annotateByteField(rf, col);
 		}
 		
 		for(FieldInspectRead.ReferenceInfo reference : info.references()){
@@ -215,62 +215,43 @@ public class GridScene{
 		}
 	}
 	
-	private <T extends IOInstance<T>, V> void annotateByteField(T instance, FieldReader.Res<T, V> rf, Color col) throws IOException{
+	private <T extends IOInstance<T>, V> void annotateByteField(FieldReader.Res<T, V> rf, Color col) throws IOException{
 		if(rf.pos().size() == 0) return;
 		
 		IOField<T, V> field = rf.field();
 		
-		Range bestRange  = new Range(0, 0);
-		Range firstRange = null, lastRange = null;
+		Range bestRange = new Range(0, 0);
+		Range lastRange = null;
 		
 		var message = field + " " + rf.value();
 		
-		GridRect rect = null;
 		
 		boolean drawDetails = gridSize.bytesPerRow()>6;
 		
 		var ranges = rf.pos().toAbsoluteRanges(dataProvider).toList();
 		messages.addMultiRangeOutline(message, col.brighter(), 2, ranges);
 		
+		if(rf.inner() != null){
+			annotateReadRes(rf.inner(), col.hashCode());
+			return;
+		}
+		
 		for(Range rng : ranges){
 			if(bestRange.size()<gridSize.bytesPerRow()){
 				var contiguousRange = DrawUtils.findBestContiguousRange(gridSize.bytesPerRow(), rng);
 				if(bestRange.size()<contiguousRange.size()) bestRange = contiguousRange;
 			}
-			if(firstRange == null) firstRange = rng;
-			if(lastRange != null) recordPointer(lastRange.to() - 1, rng.from(), 0, col, field.toString(), 0.2F);
+			if(lastRange != null) recordPointer(lastRange.to() - 1, rng.from(), 0, col, field.toString(), 1F);
 			lastRange = rng;
 			drawByteRanges(List.of(rng), ColorUtils.alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
-			
-			if(drawDetails){
-				var nr = gridSize.findBestRectScaled(rng);
-				if(rect == null || rect.area()<nr.area()){
-					rect = nr;
-				}
-			}
 		}
-		
-		if(firstRange == null){
-			return;
-		}
-
-//		if(field instanceof RefField<T, V> refF){
-//			var ref       = refF.getReference(instance);
-//			var globalOff = ref.calcGlobalOffset(dataProvider);
-//			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-//		}else if(field.getType() == Reference.class){
-//			var ref       = (Reference)rf.value();
-//			var globalOff = ref.calcGlobalOffset(dataProvider);
-//			recordPointer(firstRange.from(), globalOff, (int)firstRange.size(), Color.RED, message, 3);
-//		}
 		
 		if(!drawDetails) return;
-		
-		
-		if(stringDrawIn(message, rect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
+		var infoRect = gridSize.findBestRectScaled(ranges);
+		if(infoRect == null) return;
+		if(stringDrawIn(message, infoRect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
 			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
 		}
-		
 	}
 	
 	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Color color) throws IOException{

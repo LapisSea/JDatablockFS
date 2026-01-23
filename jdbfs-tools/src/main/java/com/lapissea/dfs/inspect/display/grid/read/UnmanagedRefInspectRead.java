@@ -20,15 +20,11 @@ public class UnmanagedRefInspectRead implements FieldInspectRead{
 	@Override
 	public <T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
 		
-		var start = src.getPos();
-		field.read(ioPool, dataProvider, src, inst, null);
-		var end = src.getPos();
-		
+		var fieldPos = readOrSkip(field, ioPool, dataProvider, src, inst);
 		
 		var value = field.get(ioPool, inst);
 		
-		var fieldPos = defaultPos(src, start, end);
-		var res      = ReadResult.res(field, value, fieldPos);
+		var res = ReadResult.res(field, value, fieldPos);
 		
 		var refField = (RefField<T, Object>)field;
 		var ref      = refField.getReference(inst);
