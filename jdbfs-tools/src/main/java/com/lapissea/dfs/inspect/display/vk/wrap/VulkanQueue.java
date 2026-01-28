@@ -174,6 +174,9 @@ public class VulkanQueue implements VulkanResource{
 		try(var fence = device.createFence(false)){
 			submit(commandBuffer, fence);
 			fence.waitFor();
+		}catch(Throwable e){
+			device.waitIdle();
+			throw e;
 		}
 	}
 	public void submit(CommandBuffer commandBuffer, VkFence fence) throws VulkanCodeException{

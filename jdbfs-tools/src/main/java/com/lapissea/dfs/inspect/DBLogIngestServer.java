@@ -156,6 +156,12 @@ public final class DBLogIngestServer{
 						if(close) break;
 					}
 					
+				}catch(SocketException e){
+					if(e.getMessage().equals("Socket closed")){
+						SERVER.warn("[{}#yellow] Socket closed...", name);
+					}else{
+						e.printStackTrace();
+					}
 				}catch(Throwable e){
 					e.printStackTrace();
 				}finally{
