@@ -15,13 +15,13 @@ import java.io.IOException;
 public class SimpleReadInspectRead implements FieldInspectRead{
 	
 	@Override
-	public <T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
+	public <T extends IOInstance<T>> FieldReader.Res<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
 		
 		var pos = readOrSkip(field, ioPool, dataProvider, src, inst);
 		
 		var value = field.get(ioPool, inst);
 		
-		var res = ReadResult.res(field, value, pos);
+		var res = FieldReader.res(field, value, pos);
 		
 		//noinspection rawtypes
 		if(value != null && field instanceof IOFieldInlineObject f){

@@ -204,15 +204,17 @@ public class GridScene{
 		for(var rf : info.fields()){
 			var col = ColorUtils.makeCol(typeHash, rf.field());
 			annotateByteField(rf, col);
+			
+			var reference = rf.reference();
+			if(reference != null){
+				recordPointer(reference, ColorUtils.alpha(col, 0.5F));
+				
+				var refInfo     = reference.value();
+				var refTypeHash = reference.type().getName().hashCode();
+				annotateReadRes(refInfo, refTypeHash);
+			}
 		}
 		
-		for(FieldInspectRead.ReferenceInfo reference : info.references()){
-			recordPointer(reference, Color.RED);
-			
-			var refInfo     = reference.value();
-			var refTypeHash = reference.type().getName().hashCode();
-			annotateReadRes(refInfo, refTypeHash);
-		}
 	}
 	
 	private <T extends IOInstance<T>, V> void annotateByteField(FieldReader.Res<T, V> rf, Color col) throws IOException{

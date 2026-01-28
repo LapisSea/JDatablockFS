@@ -20,22 +20,6 @@ public interface FieldInspectRead{
 	
 	record ReferenceInfo(DataPos.Sized origin, DataPos ref, Class<?> type, FieldReader.ResSet<?> value){ }
 	
-	record ReadResult<T extends IOInstance<T>, V>(FieldReader.Res<T, V> inlineRes, ReferenceInfo referenceInfo){
-		
-		public static <T extends IOInstance<T>, V> ReadResult<T, V> res(IOField<T, V> field, V value, DataPos.Sized pos){
-			return new ReadResult<>(new FieldReader.Res<>(field, value, pos, null), null);
-		}
-		
-		public ReadResult<T, V> withRef(DataPos.Sized origin, DataPos ref, Class<?> type, FieldReader.ResSet<?> value){
-			return new ReadResult<>(inlineRes, new ReferenceInfo(origin, ref, type, value));
-		}
-		
-		public ReadResult<T, V> withInner(FieldReader.ResSet<?> inner){
-			return new ReadResult<>(inlineRes.withInner(inner), referenceInfo);
-		}
-		
-	}
-	
 	default <T extends IOInstance<T>> DataPos.Sized readOrSkip(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst) throws IOException{
 		var start = src.getPos();
 		if(field instanceof IO.DisabledIO<?>){
@@ -63,5 +47,5 @@ public interface FieldInspectRead{
 		return ptr;
 	}
 	
-	<T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException;
+	<T extends IOInstance<T>> FieldReader.Res<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException;
 }

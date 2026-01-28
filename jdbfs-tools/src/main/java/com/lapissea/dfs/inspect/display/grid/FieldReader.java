@@ -27,15 +27,28 @@ import java.util.List;
 
 public final class FieldReader{
 	
-	public record Res<T extends IOInstance<T>, V>(IOField<T, V> field, V value, DataPos.Sized pos, ResSet<?> inner){
-		public Res<T, V> withInner(ResSet<?> inner){ return new Res<>(field, value, pos, inner); }
+	public record Res<T extends IOInstance<T>, V>(
+		IOField<T, V> field, V value, DataPos.Sized pos, FieldInspectRead.ReferenceInfo reference, ResSet<?> inner
+	){
+		public Res<T, V> withInner(ResSet<?> inner){
+			return new Res<>(field, value, pos, reference, inner);
+		}
+		public Res<T, V> withRef(DataPos.Sized origin, DataPos ref, Class<?> type, FieldReader.ResSet<?> value){
+			return withRef(new FieldInspectRead.ReferenceInfo(origin, ref, type, value));
+		}
+		public Res<T, V> withRef(FieldInspectRead.ReferenceInfo reference){
+			return new Res<>(field, value, pos, reference, inner);
+		}
+	}
+	public static <T extends IOInstance<T>, V> Res<T, V> res(IOField<T, V> field, V value, DataPos.Sized pos){
+		return new Res<>(field, value, pos, null, null);
 	}
 	
 	public record ResSet<T extends IOInstance<T>>(
-		T value, DataPos.Sized pos, List<Res<T, ?>> fields, List<FieldInspectRead.ReferenceInfo> references
+		T value, DataPos.Sized pos, List<Res<T, ?>> fields
 	){
 		public static <T extends IOInstance<T>> ResSet<T> empty(){
-			return new FieldReader.ResSet<>(null, DataPos.Sized.ofRange(0, 0), List.of(), List.of());
+			return new FieldReader.ResSet<>(null, DataPos.Sized.ofRange(0, 0), List.of());
 		}
 	}
 	
@@ -44,8 +57,7 @@ public final class FieldReader{
 		var ioPool = Chunk.PIPE.makeIOPool();
 		var pos    = offset;
 		
-		List<Res<Chunk, ?>>                  fields     = new ArrayList<>(pipe.getSpecificFields().size());
-		List<FieldInspectRead.ReferenceInfo> references = new ArrayList<>();
+		List<Res<Chunk, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
 		
 		for(var field : Chunk.PIPE.getSpecificFields()){
 			var valueSize   = field.getSizeDescriptor().calcUnknown(ioPool, dataProvider, ch, WordSpace.BYTE);
@@ -54,20 +66,24 @@ public final class FieldReader{
 			Object value = field instanceof BitFieldMerger? null : field.get(ioPool, ch);
 			
 			var dataPos = DataPos.Sized.ofRange(valueOffset, valueSize);
-			//noinspection unchecked
-			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, dataPos, null));
+			
+			FieldInspectRead.ReferenceInfo ref = null;
 			
 			if(field.getType() == ChunkPointer.class && ch.hasNextPtr()){
-				references.add(new FieldInspectRead.ReferenceInfo(
+				ref = new FieldInspectRead.ReferenceInfo(
 					dataPos,
 					DataPos.from(ch.getNextPtr()),
 					ChunkPointer.class,
 					ResSet.empty()
-				));
+				);
 			}
+			
+			//noinspection unchecked
+			fields.add(new Res<>((IOField<Chunk, ? super Object>)field, value, dataPos, ref, null));
 		}
+		
 		//noinspection unchecked
-		return (ResSet<T>)new ResSet<>(ch, DataPos.Sized.ofRange(offset, pos - offset), fields, references);
+		return (ResSet<T>)new ResSet<>(ch, DataPos.Sized.ofRange(offset, pos - offset), fields);
 	}
 	
 	public static <T extends IOInstance<T>> ResSet<T> readFields(
@@ -84,8 +100,7 @@ public final class FieldReader{
 	public static <T extends IOInstance<T>> ResSet<T> readManaged(
 		DataProvider dataProvider, StructPipe<T> pipe, DataPos pos, GenericContext genericContext
 	) throws IOException{
-		List<Res<T, ?>>                      fields     = new ArrayList<>(pipe.getSpecificFields().size());
-		List<FieldInspectRead.ReferenceInfo> references = new ArrayList<>();
+		List<Res<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
 		
 		try(RandomIO src = pos.open(dataProvider)){
 			var ioPool = pipe.makeIOPool();
@@ -97,24 +112,18 @@ public final class FieldReader{
 			for(var field : pipe.getSpecificFields()){
 				
 				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
-				var ir  = (Res<T, ?>)res.inlineRes();
-				fields.add(ir);
-				lastPos = ir.pos.range().to();
-				
-				if(res.referenceInfo() != null){
-					references.add(res.referenceInfo());
-				}
+				fields.add(res);
+				lastPos = res.pos.range().to();
 			}
 			
-			return new ResSet<>(inst, pos.withSize(lastPos - start), fields, references);
+			return new ResSet<>(inst, pos.withSize(lastPos - start), fields);
 		}
 	}
 	
 	public static <T extends IOInstance.Unmanaged<T>> ResSet<T> readUnmanaged(
 		DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer pos, IOType type, GenericContext genericContext
 	) throws IOException{
-		List<Res<T, ?>>                      fields     = new ArrayList<>();
-		List<FieldInspectRead.ReferenceInfo> references = new ArrayList<>();
+		List<Res<T, ?>> fields = new ArrayList<>();
 		
 		var identity = pos.dereference(dataProvider);
 		
@@ -128,20 +137,15 @@ public final class FieldReader{
 			
 			for(var field : Iters.concat(pipe.getSpecificFields(), inst.listUnmanagedFields())){
 				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
-				var ir  = (Res<T, ?>)res.inlineRes();
-				fields.add(ir);
-				lastPos = ir.pos.range().to();
-				
-				if(res.referenceInfo() != null){
-					references.add(res.referenceInfo());
-				}
+				fields.add(res);
+				lastPos = res.pos.range().to();
 			}
 			
-			return new ResSet<>(inst, new DataPos(pos, 0).withSize(lastPos - start), fields, references);
+			return new ResSet<>(inst, new DataPos(pos, 0).withSize(lastPos - start), fields);
 		}
 	}
 	
-	private static <T extends IOInstance<T>> FieldInspectRead.ReadResult<T, ?> readField(DataProvider dataProvider, GenericContext genericContext, IOField<T, ?> field, VarPool<T> ioPool, RandomIO src, T inst) throws IOException{
+	private static <T extends IOInstance<T>> Res<T, ?> readField(DataProvider dataProvider, GenericContext genericContext, IOField<T, ?> field, VarPool<T> ioPool, RandomIO src, T inst) throws IOException{
 		FieldInspectRead reader = getReader(field);
 		//noinspection unchecked
 		return reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst, genericContext);

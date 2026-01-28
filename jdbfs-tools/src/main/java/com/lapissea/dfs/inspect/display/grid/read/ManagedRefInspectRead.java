@@ -16,7 +16,7 @@ import java.io.IOException;
 public class ManagedRefInspectRead implements FieldInspectRead{
 	
 	@Override
-	public <T extends IOInstance<T>> ReadResult<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
+	public <T extends IOInstance<T>> FieldReader.Res<T, ?> read(IOField<T, Object> field, VarPool<T> ioPool, DataProvider dataProvider, RandomIO src, T inst, GenericContext genericContext) throws IOException{
 		
 		var start = src.getPos();
 		field.read(ioPool, dataProvider, src, inst, null);
@@ -26,7 +26,7 @@ public class ManagedRefInspectRead implements FieldInspectRead{
 		var value = field.get(ioPool, inst);
 		
 		var fieldPos = defaultPos(src, start, end);
-		var res      = ReadResult.res(field, value, fieldPos);
+		var res      = FieldReader.res(field, value, fieldPos);
 		
 		var refField = (RefField<T, Object>)field;
 		var ref      = refField.getReference(inst);
