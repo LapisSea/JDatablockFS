@@ -3,10 +3,51 @@ package com.lapissea.dfs.inspect;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 public abstract class SessionSetView{
+	
+	public static class Lazy extends SessionSetView{
+		
+		private SessionSetView data;
+		private boolean        dirty;
+		
+		public synchronized void init(SessionSetView data){
+			Objects.requireNonNull(data);
+			if(this.data != null) throw new IllegalStateException();
+			this.data = data;
+			dirty = true;
+		}
+		
+		@Override
+		public Optional<SessionView> getSession(String name){
+			if(data == null) return Optional.empty();
+			return data.getSession(name);
+		}
+		@Override
+		public Optional<SessionView> getAnySession(){
+			if(data == null) return Optional.empty();
+			return data.getAnySession();
+		}
+		@Override
+		public boolean isDirty(){
+			if(data == null || dirty) return dirty;
+			return data.isDirty();
+		}
+		@Override
+		public void clearDirty(){
+			dirty = false;
+			if(data == null) return;
+			data.clearDirty();
+		}
+		@Override
+		public Set<String> getSessionNames(){
+			if(data == null) return Set.of();
+			return data.getSessionNames();
+		}
+	}
 	
 	public record FrameData(IOInterface contents, IPC.RangeSet writes, String stacktrace){
 		public static final FrameData EMPTY = new SessionSetView.FrameData(MemoryData.viewOf(new byte[0]), IPC.RangeSet.EMPTY, "");
