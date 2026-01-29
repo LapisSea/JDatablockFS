@@ -1,5 +1,6 @@
 package com.lapissea.dfs.tools;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.MathUtil;
@@ -35,10 +36,17 @@ public final class ColorUtils{
 		return add(mul(color, 1 - mul), mul(other, mul));
 	}
 	
-	public static Color makeCol(int typeHash, IOField<?, ?> field){
+	public static Col makeCol(int typeHash, IOField<?, ?> field){
 		return makeCol(typeHash, field.getName());
 	}
-	public static Color makeCol(int typeHash, String fieldName){
+	public static Col makeCol(int typeHash, String fieldName){
+		return new Col(makeColor(typeHash, fieldName));
+	}
+	
+	public static Color makeColor(int typeHash, IOField<?, ?> field){
+		return makeColor(typeHash, field.getName());
+	}
+	public static Color makeColor(int typeHash, String fieldName){
 		float typeHue   = calcHue(new RawRandom(typeHash));
 		var   fieldRand = new RawRandom(fieldName.hashCode());
 		float fieldHue  = calcHue(fieldRand);

@@ -2,6 +2,7 @@ package com.lapissea.dfs.inspect.display.renderers;
 
 import com.carrotsearch.hppc.IntIntHashMap;
 import com.lapissea.dfs.inspect.IOFrame;
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.ColorU8;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.ShaderType;
@@ -38,7 +39,6 @@ import org.lwjgl.system.StructBuffer;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
-import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -192,8 +192,8 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			colorIndex.clear();
 		}
 		
-		private int colorToIndex(Color color, List<IndexedColor> toUpdate){
-			var ic    = VUtils.toRGBAi4(color);
+		private int colorToIndex(Col color, List<IndexedColor> toUpdate){
+			var ic    = color.toRGBAi4();
 			var map   = colorIndex;
 			var index = map.indexOf(ic);
 			if(index>=0) return map.indexGet(index);
@@ -385,8 +385,8 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 		}
 	}
 	
-	public record DrawRange(char from, char to, Color color){
-		public DrawRange(int from, int to, Color color){
+	public record DrawRange(char from, char to, Col color){
+		public DrawRange(int from, int to, Col color){
 			this(toCharExact(from, "from"), toCharExact(to, "to"), color);
 		}
 		public DrawRange{
@@ -491,7 +491,7 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 				var write   = eventType.hasWrite(offset);
 				var pos     = (read? 0b01 : 0)|(write? 0b10 : 0);
 				var colorID = colorIds[pos];
-				if(colorID == -1) colorID = colorIds[pos] = resource.colorToIndex(new Color(write? 255 : 0, 255, read? 255 : 0), toUpdate);
+				if(colorID == -1) colorID = colorIds[pos] = resource.colorToIndex(new Col(write? 1 : 0, 1, read? 1 : 0), toUpdate);
 				ioBuff.put(offset, (byte)0, colorID);
 			});
 		}

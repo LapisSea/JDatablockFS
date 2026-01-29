@@ -49,17 +49,17 @@ public class ColorU8 extends Struct<ColorU8>{
 			var address = addressNext();
 			MemoryUtil.memPutInt(address, rgba);
 		}
-		public void put(Color color){
+		public void put(Col color){
 			var address = addressNext();
-			MemoryUtil.memPutInt(address, VUtils.toRGBAi4(color));
+			MemoryUtil.memPutInt(address, color.toRGBAi4());
 		}
 	}
 	
 	public void set(int rgba){
 		MemoryUtil.memPutInt(address(), rgba);
 	}
-	public void set(Color color){
-		MemoryUtil.memPutInt(address(), VUtils.toRGBAi4(color));
+	public void set(Col color){
+		MemoryUtil.memPutInt(address(), color.toRGBAi4());
 	}
 	public void set(int r, int g, int b, int a){
 		assert r>0;

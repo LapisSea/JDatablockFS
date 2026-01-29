@@ -6,6 +6,7 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.inspect.SessionSetView;
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.grid.read.FieldInspectRead;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
@@ -18,7 +19,6 @@ import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.tools.BinaryGridRenderer.Pointer;
 import com.lapissea.dfs.tools.ColorUtils;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
@@ -33,7 +33,6 @@ import com.lapissea.dfs.utils.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +43,9 @@ import java.util.List;
 import java.util.function.IntPredicate;
 
 public class GridScene{
+	
+	public record Pointer(long from, long to, int size, Col color, String message, float widthFactor){ }
+	
 	public final RangeMessageSpace        messages = new RangeMessageSpace();
 	public final PrimitiveBuffer          buffer;
 	public final SessionSetView.FrameData frameData;
@@ -87,7 +89,7 @@ public class GridScene{
 					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null);
 					
 					var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
-					messages.addOutline("Hovered chunk: " + chunk, chRange, Color.CYAN.darker(), 2);
+					messages.addOutline("Hovered chunk: " + chunk, chRange, Col.CYAN.darker(), 2);
 					
 					if(chunk.checkLastPhysical()){
 						break;
@@ -108,8 +110,8 @@ public class GridScene{
 		private void flushError() throws IOException{
 			if(errorStart == -1) return;
 			var range = new Range(errorStart, errorEnd);
-			drawByteRangesForced(List.of(range), Color.RED.darker(), true);
-			messages.addOutline(Utils.errToStackTrace(error), range, Color.ORANGE, 3);
+			drawByteRangesForced(List.of(range), Col.RED.darker(), true);
+			messages.addOutline(Utils.errToStackTrace(error), range, Col.ORANGE, 3);
 			errorStart = errorEnd = -1;
 			error = null;
 		}
@@ -129,7 +131,7 @@ public class GridScene{
 			annotateStruct(rootPipe, new DataPos(cluster.getFirstChunk().getPtr(), 0), null);
 		}
 		
-		drawByteRanges(List.of(new Range(0, frameData.contents().getIOSize())), Color.LIGHT_GRAY, true, false);
+		drawByteRanges(List.of(new Range(0, frameData.contents().getIOSize())), Col.LIGHT_GRAY, true, false);
 		buffer.renderBytes(
 			0, null,
 			List.of(),
@@ -147,19 +149,19 @@ public class GridScene{
 		try{
 			frameData.contents().io(MagicID::read);
 			dataProvider = new Cluster(frameData.contents());
-			drawByteRanges(List.of(new Range(0, MagicID.size())), Color.BLUE, false, true);
+			drawByteRanges(List.of(new Range(0, MagicID.size())), Col.BLUE, false, true);
 			
 			var byteBae = new MsdfFontRender.StringDraw(
-				gridSize.byteSize(), new Color(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
+				gridSize.byteSize(), new Col(0.1F, 0.3F, 1, 1), StandardCharsets.UTF_8.decode(MagicID.get()).toString(), 0, 0
 			);
 			if(stringDrawIn(byteBae, gridSize.findBestRectScaled(Range.fromSize(0, MagicID.size())), false) instanceof Some(var str)){
-				buffer.renderFont(str, str.withOutline(Color.black, 1F));
+				buffer.renderFont(str, str.withOutline(Col.BLACK, 1F));
 			}
 			
 			messages.addOutline(
 				"The magic ID that identifies this as a DFS database: " + StandardCharsets.UTF_8.decode(MagicID.get()),
 				new Range(0, MagicID.size()),
-				Color.BLUE, 3
+				Col.BLUE, 3
 			);
 			return;
 		}catch(IOException ignore){
@@ -173,10 +175,10 @@ public class GridScene{
 			frameData.contents().read(0, bytes);
 			
 			IntPredicate isValidMagicByte = i -> dataSize>i && MagicID.get(i) == bytes[i];
-			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte), Color.BLUE, true, true);
-			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Color.RED, true, true);
+			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte), Col.BLUE, true, true);
+			drawBytes(Iters.range(0, MagicID.size()).filter(isValidMagicByte.negate()), Col.RED, true, true);
 		}catch(IOException e){
-			drawByteRanges(List.of(new Range(0, MagicID.size())), Color.RED, false, true);
+			drawByteRanges(List.of(new Range(0, MagicID.size())), Col.RED, false, true);
 		}
 	}
 	
@@ -196,8 +198,8 @@ public class GridScene{
 		{
 			var ranges = info.pos().toAbsoluteRanges(dataProvider).toList();
 			var msg    = TextUtil.toString(info.value());
-			messages.addMultiRangeOutline(msg, Color.red, 2, ranges);
-			var background = ColorUtils.mul(ColorUtils.makeCol(typeHash, ""), 0.6F);
+			messages.addMultiRangeOutline(msg, Col.RED, 2, ranges);
+			var background = ColorUtils.makeCol(typeHash, "").a(0.6F);
 			fillByteRange(ranges, background);
 		}
 		
@@ -207,7 +209,7 @@ public class GridScene{
 			
 			var reference = rf.reference();
 			if(reference != null){
-				recordPointer(reference, ColorUtils.alpha(col, 0.5F));
+				recordPointer(reference, col.a(0.5F));
 				
 				var refInfo     = reference.value();
 				var refTypeHash = reference.type().getName().hashCode();
@@ -217,7 +219,7 @@ public class GridScene{
 		
 	}
 	
-	private <T extends IOInstance<T>, V> void annotateByteField(FieldReader.Res<T, V> rf, Color col) throws IOException{
+	private <T extends IOInstance<T>, V> void annotateByteField(FieldReader.Res<T, V> rf, Col col) throws IOException{
 		if(rf.pos().size() == 0) return;
 		
 		IOField<T, V> field = rf.field();
@@ -245,18 +247,18 @@ public class GridScene{
 			}
 			if(lastRange != null) recordPointer(lastRange.to() - 1, rng.from(), 0, col, field.toString(), 1F);
 			lastRange = rng;
-			drawByteRanges(List.of(rng), ColorUtils.alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
+			drawByteRanges(List.of(rng), col.mul(0.8F).a(0.6F), false, true);
 		}
 		
 		if(!drawDetails) return;
 		var infoRect = gridSize.findBestRectScaled(ranges);
 		if(infoRect == null) return;
 		if(stringDrawIn(message, infoRect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
-			buffer.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
+			buffer.renderFont(draw, draw.withOutline(Col.BLACK.a(0.5F), 1.5F));
 		}
 	}
 	
-	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Color color) throws IOException{
+	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Col color) throws IOException{
 		var   rangeO = reference.origin().toAbsoluteRanges(dataProvider).maxByD(e -> gridSize.findBestRectScaled(e).area());
 		Range range;
 		if(rangeO.isEmpty()){
@@ -269,7 +271,7 @@ public class GridScene{
 		
 	}
 	
-	private void recordPointer(long from, long to, int size, Color color, String message, float widthFactor){
+	private void recordPointer(long from, long to, int size, Col color, String message, float widthFactor){
 		recordPointer(new Pointer(from, to, size, color, message, widthFactor));
 	}
 	
@@ -341,11 +343,11 @@ public class GridScene{
 		
 	}
 	
-	private void drawBytes(IterableIntPP stream, Color color, boolean withChar, boolean force) throws IOException{
+	private void drawBytes(IterableIntPP stream, Col color, boolean withChar, boolean force) throws IOException{
 		drawByteRanges(Range.fromInts(stream), color, withChar, force);
 	}
 	
-	private void drawByteRanges(List<Range> ranges, Color color, boolean withChar, boolean force) throws IOException{
+	private void drawByteRanges(List<Range> ranges, Col color, boolean withChar, boolean force) throws IOException{
 		List<Range> actualRanges;
 		if(force) actualRanges = ranges;
 		else actualRanges = Range.filterRanges(ranges, this::isNotFilled);
@@ -353,9 +355,9 @@ public class GridScene{
 		drawByteRangesForced(actualRanges, color, withChar);
 	}
 	
-	private void drawByteRangesForced(List<Range> ranges, Color color, boolean withChar) throws IOException{
-		var col        = ColorUtils.mul(color, 0.8F);
-		var background = ColorUtils.mul(col, 0.6F);
+	private void drawByteRangesForced(List<Range> ranges, Col color, boolean withChar) throws IOException{
+		var col        = color.mul(0.8F);
+		var background = color.mul(0.6F);
 		
 		List<Range> clampedOverflow = Range.clamp(ranges, dataSize);
 		
@@ -366,7 +368,7 @@ public class GridScene{
 				if(r.from()<dataSize) return new Range(dataSize, r.to());
 				return r;
 			}).toModList(),
-			ColorUtils.alpha(Color.RED, color.getAlpha()/255F)
+			Col.RED.a(color.a())
 		);
 		
 		for(var range : clampedOverflow){
@@ -387,8 +389,8 @@ public class GridScene{
 		}
 	}
 	
-	private void drawChars(Color col, List<Range> clampedOverflow){
-		var c = new Color(1, 1, 1, col.getAlpha()/255F*0.6F);
+	private void drawChars(Col col, List<Range> clampedOverflow){
+		var c = Col.WHITE.a(col.a()*0.6F);
 		
 		var fr       = buffer.getFontRender();
 		var width    = gridSize.bytesPerRow();
@@ -421,7 +423,7 @@ public class GridScene{
 		buffer.renderFont(chars);
 	}
 	
-	private void fillByteRange(List<Range> ranges, Color color){
+	private void fillByteRange(List<Range> ranges, Col color){
 		int count = 0;
 		for(Range range : ranges){
 			if(!range.isEmpty()) count++;
@@ -438,10 +440,10 @@ public class GridScene{
 	private Match<MsdfFontRender.StringDraw> stringDrawIn(MsdfFontRender.StringDraw draw, GridRect area, boolean alignLeft){
 		return stringDrawIn(draw.string(), area, draw.color(), draw.pixelHeight(), alignLeft);
 	}
-	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, GridRect area, Color color, float fontScale, boolean alignLeft){
+	private Match<MsdfFontRender.StringDraw> stringDrawIn(String s, GridRect area, Col color, float fontScale, boolean alignLeft){
 		return GridUtils.stringDrawIn(buffer.getFontRender(), s, area, color, fontScale, alignLeft);
 	}
-	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
+	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Col color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
 		buffer.renderLines(lines);
 	}

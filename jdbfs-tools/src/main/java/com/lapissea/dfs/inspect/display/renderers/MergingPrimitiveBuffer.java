@@ -1,5 +1,6 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.grid.RectSet;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
@@ -14,7 +15,6 @@ import com.lapissea.dfs.utils.iterableplus.IterablePP;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -206,7 +206,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 		for(Range range : Iters.from(ioEvents).map(e -> new Range(e.from(), e.to()))){
 			
 			var mesh = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*4), new IndexBuilder(1 + 6*4));
-			DrawUtilsVK.fillByteRange(gridSize, mesh, Color.RED, range);
+			DrawUtilsVK.fillByteRange(gridSize, mesh, Col.RED, range);
 			
 			
 			for(Rect bb : Iters.range(0, mesh.verts().size(), 4).mapToObj(i -> {
@@ -229,7 +229,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 		
 		var mesh = new Geometry.IndexedMesh(new VertexBuilder(), new IndexBuilder());
 		for(Range range : r){
-			DrawUtilsVK.fillByteRange(gridSize, mesh, Color.RED, range);
+			DrawUtilsVK.fillByteRange(gridSize, mesh, Col.RED, range);
 		}
 		
 		Iters.range(0, mesh.verts().size(), 4).mapToObj(i -> {
@@ -256,7 +256,7 @@ public final class MergingPrimitiveBuffer implements PrimitiveBuffer{
 				return List.of();
 			}
 			var r = new RawRandom(e.tokens.getClass().getName().hashCode() + 1);
-			var c = new Color(r.nextInt(255), r.nextInt(255), r.nextInt(255));
+			var c = new Col(r);
 			
 			return e.areas.all().filter(rect -> Rect.ofWH(x, y, 0, 0).isWithin(rect)).map(rect -> {
 				

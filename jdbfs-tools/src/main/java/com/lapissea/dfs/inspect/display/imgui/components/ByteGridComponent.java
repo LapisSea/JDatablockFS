@@ -1,6 +1,7 @@
 package com.lapissea.dfs.inspect.display.imgui.components;
 
 import com.lapissea.dfs.inspect.SessionSetView;
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.TextureRegistry;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
@@ -29,7 +30,6 @@ import imgui.flag.ImGuiKey;
 import imgui.type.ImBoolean;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -162,9 +162,9 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		{
 			boolean errorMode = false;//TODO should error mode even be used? Bake whole database once instead of at render time?
-			var     color     = errorMode? Color.RED.darker() : new Color(0xDBFFD700, true);
+			var     col       = errorMode? Col.RED.darker() : Col.rgba(0xDB_00_D7_FF);
 			
-			dynamicTokens.renderMesh(GridUtils.backgroundDots(viewSize, color, ImGui.getWindowDpiScale()));
+			dynamicTokens.renderMesh(GridUtils.backgroundDots(viewSize, col, ImGui.getWindowDpiScale()));
 		}
 		
 		long byteCount = getFrameSize(frameData);
@@ -274,10 +274,10 @@ public class ByteGridComponent extends BackbufferComponent{
 				}
 				switch(message.hoverEffect()){
 					case RangeMessageSpace.HoverEffect.None ignore -> { }
-					case RangeMessageSpace.HoverEffect.Outline(Color color, float lineWidth) -> {
+					case RangeMessageSpace.HoverEffect.Outline(Col color, float lineWidth) -> {
 						outlineByteRange(scene.gridSize, color, message.range(), lineWidth);
 					}
-					case RangeMessageSpace.HoverEffect.MultiOutline(Color color, float lineWidth, List<Range> ranges) -> {
+					case RangeMessageSpace.HoverEffect.MultiOutline(Col color, float lineWidth, List<Range> ranges) -> {
 						for(Range range : ranges){
 							outlineByteRange(scene.gridSize, color, range, lineWidth);
 						}
@@ -293,7 +293,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
 			if(needsByteOutline){
-				outlineByteRange(scene.gridSize, Color.WHITE, hoverRange, 1.5F);
+				outlineByteRange(scene.gridSize, Col.WHITE, hoverRange, 1.5F);
 			}
 		}
 		
@@ -303,13 +303,13 @@ public class ByteGridComponent extends BackbufferComponent{
 		
 		if(oldData) dynamicTokens.renderFont(new MsdfFontRender.StringDraw(
 			20*ImGui.getWindowDpiScale(),
-			Color.DARK_GRAY, "Old data...",
+			Col.DARK_GRAY, "Old data...",
 			2, viewSize.height - 2
 		));
 		
 		return scene.gridSize;
 	}
-	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Color color, Range range, float lineWidth){
+	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Col color, Range range, float lineWidth){
 		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
 		dynamicTokens.renderLines(lines);
 	}
@@ -319,9 +319,9 @@ public class ByteGridComponent extends BackbufferComponent{
 		var fontScale = Math.min(h*0.8F, w/(str.length()*0.8F));
 		
 		if(GridUtils.stringDrawIn(
-			dynamicTokens.getFontRender(), str, new GridRect(w, h), Color.LIGHT_GRAY, fontScale, false
+			dynamicTokens.getFontRender(), str, new GridRect(w, h), Col.LIGHT_GRAY, fontScale, false
 		) instanceof Some(var draw)){
-			dynamicTokens.renderFont(draw, draw.withOutline(new Color(0, 0, 0, 0.5F), 1.5F));
+			dynamicTokens.renderFont(draw, draw.withOutline(Col.BLACK.a(0.5F), 1.5F));
 		}
 	}
 	
@@ -351,6 +351,6 @@ public class ByteGridComponent extends BackbufferComponent{
 			(float)Math.sin(t/s)*100 + 200*(i + 1),
 			(float)Math.cos(t/s)*100 + 200
 		)).toList();
-		dynamicTokens.renderLines(List.of(new Path.BezierCurve(controlPoints, 10, new Color(0.1F, 0.3F, 1, 0.6F), 30)));
+		dynamicTokens.renderLines(List.of(new Path.BezierCurve(controlPoints, 10, new Col(0.1F, 0.3F, 1, 0.6F), 30)));
 	}
 }

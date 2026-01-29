@@ -1,10 +1,10 @@
 package com.lapissea.dfs.inspect.display.grid;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,9 +18,9 @@ public class RangeMessageSpace{
 		
 		None NONE = new None();
 		
-		record Outline(Color color, float lineWidth) implements HoverEffect{ }
+		record Outline(Col color, float lineWidth) implements HoverEffect{ }
 		
-		record MultiOutline(Color color, float lineWidth, List<Range> ranges) implements HoverEffect{ }
+		record MultiOutline(Col color, float lineWidth, List<Range> ranges) implements HoverEffect{ }
 		
 	}
 	
@@ -113,16 +113,16 @@ public class RangeMessageSpace{
 	
 	private final Node root = new Node(new Range(Long.MIN_VALUE, Long.MAX_VALUE), null);
 	
-	public void addMultiRangeOutline(String message, Color color, float lineWidth, List<Range> ranges){
+	public void addMultiRangeOutline(String message, Col color, float lineWidth, List<Range> ranges){
 		for(DrawUtils.Range rng : ranges){
 			addOutline(message, rng, color, lineWidth, ranges);
 		}
 	}
 	
-	public void addOutline(String message, Range range, Color color, float lineWidth){
+	public void addOutline(String message, Range range, Col color, float lineWidth){
 		add(message, range, new HoverEffect.Outline(color, lineWidth));
 	}
-	public void addOutline(String message, Range range, Color color, float lineWidth, List<Range> ranges){
+	public void addOutline(String message, Range range, Col color, float lineWidth, List<Range> ranges){
 		if(ranges.isEmpty()) return;
 		if(ranges.size() == 1 && ranges.getFirst().equals(range)){
 			add(message, range, new HoverEffect.Outline(color, lineWidth));

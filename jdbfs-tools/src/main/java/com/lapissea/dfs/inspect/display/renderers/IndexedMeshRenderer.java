@@ -1,8 +1,8 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.ShaderType;
-import com.lapissea.dfs.inspect.display.VUtils;
 import com.lapissea.dfs.inspect.display.VkPipelineSet;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
@@ -27,7 +27,6 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
 
-import java.awt.Color;
 import java.nio.ByteBuffer;
 
 public class IndexedMeshRenderer implements VulkanResource{
@@ -81,8 +80,8 @@ public class IndexedMeshRenderer implements VulkanResource{
 			protected Buf create(long address, ByteBuffer container, int mark, int position, int limit, int capacity){
 				throw NotImplementedException.infer();//TODO: implement Buf.create()
 			}
-			void put(Vector2f pos, Color color){
-				get().set(pos.x, pos.y, VUtils.toRGBAi4(color));
+			void put(Vector2f pos, Col color){
+				get().set(pos.x, pos.y, color.toRGBAi4());
 			}
 			void put(float x, float y, int color){
 				get().set(x, y, color);

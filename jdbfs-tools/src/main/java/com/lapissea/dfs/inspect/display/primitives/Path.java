@@ -1,17 +1,17 @@
 package com.lapissea.dfs.inspect.display.primitives;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.renderers.BezierCurveRes;
 import com.lapissea.dfs.tools.DrawUtils;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.util.List;
 
 public interface Path{
 	PointsLine toPoints();
 	DrawUtils.Rect boundingBox();
 	
-	record PointsLine(List<Vector2f> points, float width, Color color, boolean miterJoints) implements Path{
+	record PointsLine(List<Vector2f> points, float width, Col color, boolean miterJoints) implements Path{
 		@Override
 		public PointsLine toPoints(){ return this; }
 		@Override
@@ -39,8 +39,8 @@ public interface Path{
 		}
 	}
 	
-	record BezierCurve(List<Vector2f> controlPoints, float width, Color color, int resolution, float epsilon) implements Path{
-		public BezierCurve(List<Vector2f> controlPoints, float width, Color color, int resolution){
+	record BezierCurve(List<Vector2f> controlPoints, float width, Col color, int resolution, float epsilon) implements Path{
+		public BezierCurve(List<Vector2f> controlPoints, float width, Col color, int resolution){
 			this(controlPoints, width, color, resolution, 0.3F);
 		}
 		@Override
@@ -64,8 +64,8 @@ public interface Path{
 		
 	}
 	
-	record CatmullRomCurve(List<Vector2f> controlPoints, float width, Color color, int resolution, float epsilon) implements Path{
-		public CatmullRomCurve(List<Vector2f> controlPoints, float width, Color color, int resolution){
+	record CatmullRomCurve(List<Vector2f> controlPoints, float width, Col color, int resolution, float epsilon) implements Path{
+		public CatmullRomCurve(List<Vector2f> controlPoints, float width, Col color, int resolution){
 			this(controlPoints, width, color, resolution, 0.3F);
 		}
 		@Override

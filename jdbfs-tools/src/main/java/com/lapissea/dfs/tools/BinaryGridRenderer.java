@@ -1474,7 +1474,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				
 				var field = (IOField<T, Object>)iterator.next();
 				try{
-					var col = ColorUtils.makeCol(typeHash, field);
+					var col = ColorUtils.makeColor(typeHash, field);
 					
 					final long size;
 					
@@ -1607,7 +1607,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(rctx.pixelsPerByte>8){
 								for(BitField<T, ?> bit : merger.fieldGroup()){
 									
-									var bCol = ColorUtils.makeCol(typeHash, bit);
+									var bCol = ColorUtils.makeColor(typeHash, bit);
 									var siz  = bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 									
 									if(annotate)
@@ -1847,7 +1847,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									var universe  = EnumUniverse.ofUnknown(comp);
 									var arrOffset = 0;
 									for(int i = 0; i<arrSiz; i++){
-										var bCol = ColorUtils.makeCol(typeHash, field);
+										var bCol = ColorUtils.makeColor(typeHash, field);
 										var bit  = BGRUtils.enumListElement(instance, i, inst, comp);
 										annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, universe.bitSize, reference, fieldOffset + arrOffset);
 										bitOffset += universe.bitSize;
@@ -1905,7 +1905,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ranges = instance instanceof Chunk? List.of(DrawUtils.Range.fromSize(offsetStart, fieldOffset)) : DrawUtils.chainRangeResolve(ctx.provider, reference, 0, fieldOffset);
 			for(DrawUtils.Range range : ranges){
 				if(rctx.isRangeHovered(range)){
-					rctx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), ColorUtils.makeCol(typeHash, offsetStart + ""), new Object[]{"Inst: ", instance}));
+					rctx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), ColorUtils.makeColor(typeHash, offsetStart + ""), new Object[]{"Inst: ", instance}));
 					break;
 				}
 			}

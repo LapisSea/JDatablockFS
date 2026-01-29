@@ -1,6 +1,6 @@
 package com.lapissea.dfs.inspect.display.grid;
 
-import com.lapissea.dfs.inspect.display.VUtils;
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
 import com.lapissea.dfs.inspect.display.primitives.Path;
@@ -18,7 +18,6 @@ import imgui.ImGui;
 import org.joml.SimplexNoise;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -122,7 +121,7 @@ public final class GridUtils{
 		}
 	}
 	
-	public static List<Path.PointsLine> outlineByteRange(Color color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
+	public static List<Path.PointsLine> outlineByteRange(Col color, ByteGridSize gridInfo, DrawUtils.Range range, float lineWidth){
 		record Line(Vector2f a, Vector2f b){
 			Line(float xa, float ya, float xb, float yb){
 				this(new Vector2f(xa, ya), new Vector2f(xb, yb));
@@ -204,7 +203,7 @@ public final class GridUtils{
 		}).toList();
 	}
 	
-	public static Geometry.IndexedMesh backgroundDots(Extent2D viewSize, Color color, float contentScale){
+	public static Geometry.IndexedMesh backgroundDots(Extent2D viewSize, Col color, float contentScale){
 		float jitter     = 125*contentScale;
 		float step       = 25*contentScale;
 		float randX      = (float)ImGui.getTime()/10f;
@@ -224,7 +223,7 @@ public final class GridUtils{
 			}
 		}
 		
-		var colorI = VUtils.toRGBAi4(color);
+		var colorI = color.toRGBAi4();
 		var res    = new VertexBuilder(pointCount*4);
 		
 		for(float x = 0; x<viewSize.width; x += step){
@@ -251,7 +250,7 @@ public final class GridUtils{
 		return new Geometry.IndexedMesh(res, index);
 	}
 	
-	public static Match<StringDraw> stringDrawIn(PrimitiveBuffer.FontRednerer fontRender, String s, GridRect area, Color color, float fontScale, boolean alignLeft){
+	public static Match<StringDraw> stringDrawIn(PrimitiveBuffer.FontRednerer fontRender, String s, GridRect area, Col color, float fontScale, boolean alignLeft){
 		if(s.isEmpty()) return Match.empty();
 		
 		noneCanRender:

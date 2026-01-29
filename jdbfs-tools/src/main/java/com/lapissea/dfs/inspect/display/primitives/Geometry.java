@@ -1,12 +1,12 @@
 package com.lapissea.dfs.inspect.display.primitives;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.primitives.Path.PointsLine;
 import com.lapissea.dfs.tools.DrawUtils;
 import org.joml.Intersectionf;
 import org.joml.Matrix2f;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -57,7 +57,7 @@ public final class Geometry{
 		if(pts.size()<2) return new IndexedMesh(verts, new IndexBuilder());
 		
 		float halfWidth = line.width()*0.5f;
-		Color color     = line.color();
+		Col   color     = line.color();
 		
 		{
 			Vector2f p1    = pts.get(0), p2 = pts.get(1);

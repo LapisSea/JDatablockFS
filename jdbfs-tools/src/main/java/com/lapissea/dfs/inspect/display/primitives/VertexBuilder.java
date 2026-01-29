@@ -1,10 +1,9 @@
 package com.lapissea.dfs.inspect.display.primitives;
 
 import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.inspect.display.VUtils;
+import com.lapissea.dfs.inspect.display.Col;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.util.Arrays;
 
 public class VertexBuilder{
@@ -21,14 +20,14 @@ public class VertexBuilder{
 		this.color = new int[initialCapacity];
 	}
 	
-	public void add(Vector2f xy, Color color){
-		add(xy.x, xy.y, VUtils.toRGBAi4(color));
+	public void add(Vector2f xy, Col color){
+		add(xy.x, xy.y, color.toRGBAi4());
 	}
 	public void add(Vector2f xy, int color){
 		add(xy.x, xy.y, color);
 	}
-	public void add(float x, float y, Color color){
-		add(x, y, VUtils.toRGBAi4(color));
+	public void add(float x, float y, Col color){
+		add(x, y, color.toRGBAi4());
 	}
 	public void add(float x, float y, int color){
 		if(cursor == this.color.length){

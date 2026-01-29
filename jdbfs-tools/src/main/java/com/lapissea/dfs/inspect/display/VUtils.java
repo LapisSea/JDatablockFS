@@ -271,10 +271,6 @@ public final class VUtils{
 		};
 	}
 	
-	public static int toRGBAi4(Color color){
-		return color.getRed()|(color.getGreen()<<8)|(color.getBlue()<<16)|(color.getAlpha()<<24);
-	}
-	
 	public static void copyDestroy(DeviceGC deviceGC, BackedVkBuffer oldBuff, BackedVkBuffer newBuff) throws VulkanCodeException{
 		if(oldBuff == null) return;
 		oldBuff.transferTo(newBuff);

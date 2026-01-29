@@ -2,6 +2,7 @@ package com.lapissea.dfs.inspect.display.renderers;
 
 import com.carrotsearch.hppc.CharObjectHashMap;
 import com.carrotsearch.hppc.CharObjectMap;
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.DeviceGC;
 import com.lapissea.dfs.inspect.display.ShaderType;
 import com.lapissea.dfs.inspect.display.VUtils;
@@ -35,7 +36,6 @@ import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;
 import org.lwjgl.vulkan.VkDrawIndirectCommand;
 
-import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -133,12 +133,12 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 			X_SCALE = layout.offsetof(5);
 		}
 		
-		void set(float posX, float posY, float scale, Color color, float outline, float xScale){
+		void set(float posX, float posY, float scale, Col color, float outline, float xScale){
 			var address = this.address;
 			MemoryUtil.memPutFloat(address + POS_X, posX);
 			MemoryUtil.memPutFloat(address + POS_Y, posY);
 			MemoryUtil.memPutFloat(address + SCALE, scale);
-			MemoryUtil.memPutInt(address + COLOR, VUtils.toRGBAi4(color));
+			MemoryUtil.memPutInt(address + COLOR, color.toRGBAi4());
 			MemoryUtil.memPutFloat(address + OUTLINE, outline);
 			MemoryUtil.memPutFloat(address + X_SCALE, xScale);
 		}
@@ -251,11 +251,11 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		});
 	}
 	
-	public record StringDraw(float pixelHeight, Color color, String string, float x, float y, float xScale, float outline){
-		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
+	public record StringDraw(float pixelHeight, Col color, String string, float x, float y, float xScale, float outline){
+		public StringDraw(float pixelHeight, Col color, String string, float x, float y){
 			this(pixelHeight, color, string, x, y, 1, 0);
 		}
-		public StringDraw withOutline(Color color, float outline){
+		public StringDraw withOutline(Col color, float outline){
 			return new StringDraw(pixelHeight, color, string, x, y, xScale, outline);
 		}
 		public DrawUtils.Rect boundingBox(PrimitiveBuffer.FontRednerer fontRednerer){

@@ -1,14 +1,13 @@
 package com.lapissea.dfs.inspect.display.vk;
 
+import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.tools.DrawUtils;
 
-import java.awt.Color;
-
 public final class DrawUtilsVK{
 	
-	public static void fillByteRange(GridUtils.ByteGridSize gridSize, Geometry.IndexedMesh dest, Color color, DrawUtils.Range range){
+	public static void fillByteRange(GridUtils.ByteGridSize gridSize, Geometry.IndexedMesh dest, Col color, DrawUtils.Range range){
 		long from = range.from();
 		long to   = range.to();
 		
@@ -35,7 +34,7 @@ public final class DrawUtilsVK{
 		}
 	}
 	
-	public static void fillByteRect(GridUtils.ByteGridSize gridSize, Geometry.IndexedMesh dest, Color color, long start, long width, long columnCount){
+	public static void fillByteRect(GridUtils.ByteGridSize gridSize, Geometry.IndexedMesh dest, Col color, long start, long width, long columnCount){
 		var bytesPerRow = gridSize.bytesPerRow();
 		var xi          = (int)(start%bytesPerRow);
 		var yStart      = (int)(start/bytesPerRow);
@@ -50,7 +49,7 @@ public final class DrawUtilsVK{
 	}
 	
 	private static final int[] quad = {0, 2, 1, 0, 3, 2};
-	public static void fillQuad(Geometry.IndexedMesh dest, Color color, float x, float y, float width, float height){
+	public static void fillQuad(Geometry.IndexedMesh dest, Col color, float x, float y, float width, float height){
 		var vts = dest.verts();
 		var off = vts.size();
 		vts.add(x, y, color);
