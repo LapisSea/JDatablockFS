@@ -53,6 +53,18 @@ public record Col(float r, float g, float b, float a){
 		return new Col(r, g, b, a);
 	}
 	
+	public Col mix(Col other, float factor){
+		if(factor<=0) return this;
+		if(factor>=1) return other;
+		var f2 = 1 - factor;
+		return new Col(
+			r*f2 + other.r*factor,
+			g*f2 + other.g*factor,
+			b*f2 + other.b*factor,
+			a*f2 + other.a*factor
+		);
+	}
+	
 	private static final float FACTOR = 0.7F;
 	public Col brighter(){
 		float r = this.r;

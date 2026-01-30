@@ -268,21 +268,26 @@ public class ByteGridComponent extends BackbufferComponent{
 		if(GridUtils.calcByteIndex(scene.gridSize, mouseX(), mouseY(), byteCount, 1) instanceof Some(var p)){
 			boolean needsByteOutline = true;
 			var     hoverRange       = Range.fromSize(p, 1);
-			for(var message : scene.messages.collect(p)){
+			var     msgs             = scene.messages.collect(p);
+			for(int i = msgs.size() - 1; i>=0; i--){
+				var message = msgs.get(i);
 				if(needsByteOutline && message.range().equals(hoverRange)){
 					needsByteOutline = false;
 				}
+				var off = new Vector2f(i*1F, i*2F);
 				switch(message.hoverEffect()){
 					case RangeMessageSpace.HoverEffect.None ignore -> { }
 					case RangeMessageSpace.HoverEffect.Outline(Col color, float lineWidth) -> {
-						outlineByteRange(scene.gridSize, color, message.range(), lineWidth);
+						outlineByteRange(scene.gridSize, color, message.range(), lineWidth, off);
 					}
 					case RangeMessageSpace.HoverEffect.MultiOutline(Col color, float lineWidth, List<Range> ranges) -> {
 						for(Range range : ranges){
-							outlineByteRange(scene.gridSize, color, range, lineWidth);
+							outlineByteRange(scene.gridSize, color, range, lineWidth, range.isWithin(Range.fromSize(p, 1))? off : new Vector2f());
 						}
 					}
 				}
+			}
+			for(var message : msgs){
 				messages.add(message.message());
 			}
 			
@@ -293,7 +298,7 @@ public class ByteGridComponent extends BackbufferComponent{
 			messages.add("Hovered byte at " + p + ": " + (b == -1? "Unable to read byte" : b + "/" + (char)b));
 			
 			if(needsByteOutline){
-				outlineByteRange(scene.gridSize, Col.WHITE, hoverRange, 1.5F);
+				outlineByteRange(scene.gridSize, Col.GREEN.brighter().a(0.6F), hoverRange, 1.5F);
 			}
 		}
 		
@@ -310,7 +315,17 @@ public class ByteGridComponent extends BackbufferComponent{
 		return scene.gridSize;
 	}
 	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Col color, Range range, float lineWidth){
-		var lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
+		outlineByteRange(gridSize, color, range, lineWidth, new Vector2f());
+	}
+	private void outlineByteRange(GridUtils.ByteGridSize gridSize, Col color, Range range, float lineWidth, Vector2f offset){
+		List<Path.PointsLine> lines = GridUtils.outlineByteRange(color, gridSize, range, lineWidth);
+		if(!offset.equals(0, 0)){
+			for(Path.PointsLine line : lines){
+				for(Vector2f point : line.points()){
+					point.add(offset);
+				}
+			}
+		}
 		dynamicTokens.renderLines(lines);
 	}
 	

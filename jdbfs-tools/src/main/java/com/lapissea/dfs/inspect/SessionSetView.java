@@ -47,6 +47,11 @@ public abstract class SessionSetView{
 			if(data == null) return Set.of();
 			return data.getSessionNames();
 		}
+		
+		@Override
+		public String toString(){
+			return data == null? "Lazy<Uninitialized>" : data.toString();
+		}
 	}
 	
 	public record FrameData(IOInterface contents, IPC.RangeSet writes, String stacktrace){

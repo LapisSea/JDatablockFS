@@ -86,10 +86,10 @@ public class GridScene{
 					var chunk = dataProvider.getChunk(ChunkPointer.of(pointer));
 					flushError();
 					
-					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null);
-					
 					var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
 					messages.addOutline("Hovered chunk: " + chunk, chRange, Col.CYAN.darker(), 2);
+					
+					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null);
 					
 					if(chunk.checkLastPhysical()){
 						break;
@@ -196,10 +196,10 @@ public class GridScene{
 	
 	private <T extends IOInstance<T>> void annotateReadRes(FieldReader.ResSet<T> info, int typeHash) throws IOException{
 		{
-			var ranges = info.pos().toAbsoluteRanges(dataProvider).toList();
-			var msg    = TextUtil.toString(info.value());
-			messages.addMultiRangeOutline(msg, Col.RED, 2, ranges);
+			var ranges     = info.pos().toAbsoluteRanges(dataProvider).toList();
+			var msg        = TextUtil.toString(info.value());
 			var background = ColorUtils.makeCol(typeHash, "").a(0.6F);
+			messages.addMultiRangeOutline(msg, background, 2, ranges);
 			fillByteRange(ranges, background);
 		}
 		
