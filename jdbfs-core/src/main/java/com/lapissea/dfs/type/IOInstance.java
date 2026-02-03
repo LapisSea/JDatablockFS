@@ -578,6 +578,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			if(id.getSize()>0){
 				return false;
 			}
+			return nextHasData(id);
+		}
+		private static boolean nextHasData(Chunk id){
 			try{
 				var next = id.next();
 				if(next != null){

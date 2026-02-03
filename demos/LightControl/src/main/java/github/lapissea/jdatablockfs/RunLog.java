@@ -138,6 +138,7 @@ public final class RunLog{
 		}
 		
 		var iArgs = Iters.of(args);
+		var ip    = iArgs.findFirst().orElseThrow(() -> new IllegalArgumentException("Please provide IP"));
 		if(iArgs.anyEquals("export")){
 			export(stamps);
 			return;
@@ -145,8 +146,7 @@ public final class RunLog{
 		if(iArgs.noneEquals("singleReport")){
 			startMonitorControl();
 		}
-		
-		var serverURI     = URI.create("http://192.168.0.16:42069");
+		var serverURI     = URI.create("http://" + ip + ":42069");
 		var cookieManager = new CookieManager();
 		
 		if(iArgs.anyMatch(e -> e.startsWith("user="))){
@@ -154,7 +154,7 @@ public final class RunLog{
 				iArgs.filter(e -> e.startsWith("user=")).getFirst().substring(5),
 				iArgs.filter(e -> e.startsWith("login=")).getFirst().substring(6)
 			);
-			cookie.setDomain("192.168.0.16");
+			cookie.setDomain(ip);
 			cookie.setPath("/");
 			cookieManager.getCookieStore().add(serverURI, cookie);
 		}
