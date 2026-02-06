@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -33,7 +34,7 @@ public interface Query<T>{
 	}
 	
 	default <V> V stream(Function<Stream<T>, V> fn) throws IOException{
-		try(var data = open(new QueryFields())){
+		try(var data = open()){
 			record Val<T>(T value){ }
 			var stream = Stream.generate(() -> {
 				try{
@@ -51,7 +52,7 @@ public interface Query<T>{
 	
 	default List<T> allToList() throws IOException{
 		var res = new ArrayList<T>();
-		try(var data = open(new QueryFields())){
+		try(var data = open()){
 			while(data.step()){
 				var full = data.fullEntry();
 				res.add(full);
@@ -62,7 +63,7 @@ public interface Query<T>{
 	
 	default Match<T> firstM() throws IOException{ return Match.from(first()); }
 	default Optional<T> first() throws IOException{
-		try(var data = open(new QueryFields())){
+		try(var data = open()){
 			while(data.step()){
 				var full = data.fullEntry();
 				if(full == null) continue;
@@ -72,7 +73,7 @@ public interface Query<T>{
 		return Optional.empty();
 	}
 	default T firstNullable() throws IOException{
-		try(var data = open(new QueryFields())){
+		try(var data = open()){
 			if(data.step()){
 				return data.fullEntry();
 			}
@@ -82,9 +83,31 @@ public interface Query<T>{
 	
 	default long count() throws IOException{
 		long count = 0;
-		try(var data = open(new QueryFields())){
+		try(var data = open()){
 			while(data.step()){
 				count++;
+			}
+		}
+		return count;
+	}
+	default void forEach(Consumer<T> action) throws IOException{
+		try(var data = open()){
+			while(data.step()){
+				action.accept(data.fullEntry());
+			}
+		}
+	}
+	/**
+	 * @return count of entries visited
+	 */
+	default long forEach(Predicate<T> action) throws IOException{
+		long count = 0;
+		try(var data = open()){
+			while(data.step()){
+				count++;
+				if(!action.test(data.fullEntry())){
+					break;
+				}
 			}
 		}
 		return count;
@@ -237,6 +260,10 @@ public interface Query<T>{
 	
 	default Query<T> limit(long count){
 		return new Queries.Limited<>(this, count);
+	}
+	
+	default QueryableData.QuerySource<T> open() throws IOException{
+		return open(new QueryFields());
 	}
 	
 	QueryableData.QuerySource<T> open(QueryFields queryFields) throws IOException;

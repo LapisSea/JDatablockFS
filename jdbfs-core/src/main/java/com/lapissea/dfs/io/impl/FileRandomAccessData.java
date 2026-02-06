@@ -1,6 +1,7 @@
 package com.lapissea.dfs.io.impl;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.util.MathUtil;
@@ -41,17 +42,23 @@ public final class FileRandomAccessData extends ClosableIOData{
 	private final RandomAccessFile fileData;
 	private final FileLock         fileLock;
 	
-	public FileRandomAccessData(String fileName) throws IOException{ this(new File(fileName), false); }
+	public FileRandomAccessData(String fileName) throws IOException{ this(new File(fileName)); }
 	public FileRandomAccessData(File file) throws IOException      { this(file, false); }
 	public FileRandomAccessData(File file, boolean readOnly) throws IOException{
-		this(file,
+		this(null, file, readOnly);
+	}
+	public FileRandomAccessData(IOHook hook, File file, boolean readOnly) throws IOException{
+		this(hook, file,
 		     readOnly?
 		     Mode.READ_ONLY :
 		     ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE
 		);
 	}
 	public FileRandomAccessData(File file, Mode mode) throws IOException{
-		super(null, mode == Mode.READ_ONLY);
+		this(null, file, mode);
+	}
+	public FileRandomAccessData(IOHook hook, File file, Mode mode) throws IOException{
+		super(hook, mode == Mode.READ_ONLY);
 		this.file = file;
 		try{
 			fileData = new RandomAccessFile(file, mode.str);

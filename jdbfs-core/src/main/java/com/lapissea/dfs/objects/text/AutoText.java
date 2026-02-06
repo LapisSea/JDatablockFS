@@ -28,6 +28,7 @@ import java.nio.CharBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
 
+import static com.lapissea.dfs.objects.text.AutoText.Info.NEEDS_POOL;
 import static com.lapissea.dfs.objects.text.AutoText.Info.PIPE;
 import static com.lapissea.dfs.objects.text.AutoText.Info.STRUCT;
 
@@ -35,8 +36,9 @@ import static com.lapissea.dfs.objects.text.AutoText.Info.STRUCT;
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
 	public static final class Info{
-		public static final Struct<AutoText>     STRUCT = Struct.of(AutoText.class);
-		public static final StructPipe<AutoText> PIPE   = StandardStructPipe.of(STRUCT);
+		public static final Struct<AutoText>     STRUCT     = Struct.of(AutoText.class);
+		public static final StructPipe<AutoText> PIPE       = StandardStructPipe.of(STRUCT);
+		static final        boolean              NEEDS_POOL = !PIPE.getClass().getSimpleName().contains("AutoTextPipe");
 	}
 	
 	static final class RegisterPipe{
@@ -131,7 +133,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 			return BasicSizeDescriptor.Unknown.of(
 				wordSpace, desc.getMin(), desc.getMax(),
 				(pool, prov, value) -> {
-					return desc.calcUnknown(null, null, new AutoText(value), wordSpace);
+					return desc.calcUnknown(NEEDS_POOL? PIPE.makeIOPool() : null, null, new AutoText(value), wordSpace);
 				});
 		}
 		

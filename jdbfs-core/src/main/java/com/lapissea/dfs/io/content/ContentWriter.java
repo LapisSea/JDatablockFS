@@ -3,6 +3,7 @@ package com.lapissea.dfs.io.content;
 import com.lapissea.dfs.BufferErrorSupplier;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.objects.NumberSize;
+import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
@@ -13,7 +14,7 @@ import java.nio.ByteBuffer;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-@SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression", "unused"})
+@SuppressWarnings({"PointlessBitwiseExpression", "unused"})
 public interface ContentWriter extends AutoCloseable{
 	
 	default void write(ByteBuffer b) throws IOException{
@@ -178,6 +179,10 @@ public interface ContentWriter extends AutoCloseable{
 			BBView.writeFloat4(bb, i*numSize, f[i]);
 		}
 		write(bb, 0, bb.length);
+	}
+	
+	default void writeFloat2(float v) throws IOException{
+		writeInt2(IOUtils.floatToShortBits(v));
 	}
 	
 	default void writeFloat4(float v) throws IOException{

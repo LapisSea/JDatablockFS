@@ -1,6 +1,7 @@
 package com.lapissea.dfs.io.impl;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.content.WordIO;
 
 import java.io.File;
@@ -17,10 +18,12 @@ public final class FileMemoryMappedData extends ClosableIOData{
 	private final File         file;
 	private final FileMappings mappedFileData;
 	
-	public FileMemoryMappedData(String fileName) throws IOException{ this(new File(fileName), false); }
-	public FileMemoryMappedData(File file) throws IOException      { this(file, false); }
-	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{
-		super(null, readOnly);
+	public FileMemoryMappedData(String fileName) throws IOException            { this(new File(fileName), false); }
+	public FileMemoryMappedData(File file) throws IOException                  { this(file, false); }
+	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{ this(null, file, readOnly); }
+	public FileMemoryMappedData(IOHook hook, File file) throws IOException     { this(hook, file, false); }
+	public FileMemoryMappedData(IOHook hook, File file, boolean readOnly) throws IOException{
+		super(hook, readOnly);
 		this.file = file;
 		
 		var ioOptions = EnumSet.of(

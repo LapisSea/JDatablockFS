@@ -274,7 +274,12 @@ public final class Cluster implements DataProvider{
 		return emptyClusterSnap;
 	}
 	
-	
+	public static Cluster initOrOpen(IOInterface data) throws IOException{
+		if(data.getIOSize() == 0){
+			return init(data);
+		}
+		return new Cluster(data);
+	}
 	public static Cluster init(IOInterface data) throws IOException{
 		data.write(true, getEmptyClusterSnapshot());
 		return new Cluster(data);

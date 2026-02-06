@@ -7,7 +7,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<github.spair.version>1.90.0</github.spair.version>
-		<lwjgl.version>3.4.0-SNAPSHOT</lwjgl.version>
+		<lwjgl.version>3.4.1</lwjgl.version>
 		<joml.version>1.10.7</joml.version>
 	</properties>
 	

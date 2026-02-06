@@ -702,6 +702,10 @@ public sealed interface ValueStorage<T>{
 				}
 				@Override
 				public ObjectPipe<String, ?> getReferencedPipe(I instance){ return AutoText.STR_PIPE; }
+				@Override
+				protected Set<TypeFlag> computeTypeFlags(){
+					return Set.of(TypeFlag.HAS_NO_POINTERS);
+				}
 			};
 		}
 		
