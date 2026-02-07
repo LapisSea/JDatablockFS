@@ -645,7 +645,7 @@ public class MemoryWalker{
 	}
 	
 	private static <T extends IOInstance<T>> CmdReader unmanagedCmd(IOInstance<T> instance){
-		return ((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
+		return ((IOInstance.Unmanaged.DynamicFields<?>)instance).getUnmanagedReferenceWalkCommands();
 	}
 	
 	private <T extends IOInstance<T>> int handlePtr(
