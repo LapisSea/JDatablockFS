@@ -14,7 +14,6 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.Struct;
-import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.RefField;
@@ -87,19 +86,22 @@ public final class FieldReader{
 	}
 	
 	public static <T extends IOInstance<T>> ResSet<T> readFields(
-		DataProvider dataProvider, StructPipe<T> pipe, DataPos pos, GenericContext genericContext
+		DataProvider dataProvider, StructPipe<T> pipe, DataPos pos, GenericContext genericContext, String path
 	) throws IOException{
 		if(pipe.getType().getType() == Chunk.class){
 			assert pos.ptr().isNull();
 			return getChunkFields(dataProvider, pipe, pos.offset());
 		}
 		
-		return readManaged(dataProvider, pipe, pos, genericContext);
+		return readManaged(dataProvider, pipe, pos, genericContext, path);
 	}
 	
 	public static <T extends IOInstance<T>> ResSet<T> readManaged(
-		DataProvider dataProvider, StructPipe<T> pipe, DataPos pos, GenericContext genericContext
+		DataProvider dataProvider, StructPipe<T> pipe, DataPos pos, GenericContext genericContext, String path
 	) throws IOException{
+		if(pipe.getType() instanceof Struct.Unmanaged){
+			throw new IllegalArgumentException(pipe.getType().cleanFullName());
+		}
 		List<Res<T, ?>> fields = new ArrayList<>(pipe.getSpecificFields().size());
 		
 		try(RandomIO src = pos.open(dataProvider)){
@@ -109,9 +111,13 @@ public final class FieldReader{
 			var lastPos = src.getPos();
 			var start   = lastPos;
 			
+			var ctx = new FieldInspectRead.ReadCtx<>(
+				path, dataProvider, null, ioPool, genericContext, src, inst, false, pipe
+			);
+			
 			for(var field : pipe.getSpecificFields()){
-				
-				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
+				var fCtx = ctx.withField(field, false);
+				var res  = readField(fCtx);
 				fields.add(res);
 				lastPos = res.pos.range().to();
 			}
@@ -121,7 +127,7 @@ public final class FieldReader{
 	}
 	
 	public static <T extends IOInstance.Unmanaged<T>> ResSet<T> readUnmanaged(
-		DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer pos, IOType type, GenericContext genericContext
+		DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer pos, IOType type, GenericContext genericContext, String path
 	) throws IOException{
 		List<Res<T, ?>> fields = new ArrayList<>();
 		
@@ -135,8 +141,13 @@ public final class FieldReader{
 			var lastPos = src.getPos();
 			var start   = lastPos;
 			
+			var ctx = new FieldInspectRead.ReadCtx<>(
+				path, dataProvider, null, ioPool, genericContext, src, inst, false, pipe
+			);
+			
 			for(var field : Iters.concat(pipe.getSpecificFields(), inst.listUnmanagedFields())){
-				var res = readField(dataProvider, genericContext, field, ioPool, src, inst);
+				var fCtx = ctx.withField(field, !pipe.getSpecificFields().contains(field));
+				var res  = readField(fCtx);
 				fields.add(res);
 				lastPos = res.pos.range().to();
 			}
@@ -145,10 +156,9 @@ public final class FieldReader{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Res<T, ?> readField(DataProvider dataProvider, GenericContext genericContext, IOField<T, ?> field, VarPool<T> ioPool, RandomIO src, T inst) throws IOException{
-		FieldInspectRead reader = getReader(field);
-		//noinspection unchecked
-		return reader.read((IOField<T, Object>)field, ioPool, dataProvider, src, inst, genericContext);
+	private static <T extends IOInstance<T>> Res<T, ?> readField(FieldInspectRead.ReadCtx<T> ctx) throws IOException{
+		FieldInspectRead reader = getReader(ctx.field);
+		return reader.read(ctx);
 	}
 	private static FieldInspectRead getReader(IOField<?, ?> field){
 		if(field instanceof BitFieldMerger){

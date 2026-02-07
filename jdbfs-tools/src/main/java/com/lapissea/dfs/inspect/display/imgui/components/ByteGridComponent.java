@@ -278,11 +278,12 @@ public class ByteGridComponent extends BackbufferComponent{
 				switch(message.hoverEffect()){
 					case RangeMessageSpace.HoverEffect.None ignore -> { }
 					case RangeMessageSpace.HoverEffect.Outline(Col color, float lineWidth) -> {
-						outlineByteRange(scene.gridSize, color, message.range(), lineWidth, off);
+						outlineByteRange(scene.gridSize, color, message.range(), lineWidth);
 					}
 					case RangeMessageSpace.HoverEffect.MultiOutline(Col color, float lineWidth, List<Range> ranges) -> {
 						for(Range range : ranges){
-							outlineByteRange(scene.gridSize, color, range, lineWidth, range.isWithin(Range.fromSize(p, 1))? off : new Vector2f());
+							var offL = range.isWithin(Range.fromSize(p, 1))? off : new Vector2f();
+							outlineByteRange(scene.gridSize, color, range, lineWidth);
 						}
 					}
 				}

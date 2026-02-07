@@ -89,7 +89,7 @@ public class GridScene{
 					var chRange = new Range(chunk.getPtr().getValue(), chunk.dataEnd());
 					messages.addOutline("Hovered chunk: " + chunk, chRange, Col.CYAN.darker(), 2);
 					
-					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null);
+					annotateStruct(Chunk.PIPE, DataPos.from(chunk.getPtr()), null, chunk + "");
 					
 					if(chunk.checkLastPhysical()){
 						break;
@@ -128,7 +128,7 @@ public class GridScene{
 			var rootWalk = cluster.rootWalker(null, false);
 			var root     = rootWalk.getRoot();
 			var rootPipe = FixedStructPipe.of(root.getClass());
-			annotateStruct(rootPipe, new DataPos(cluster.getFirstChunk().getPtr(), 0), null);
+			annotateStruct(rootPipe, new DataPos(cluster.getFirstChunk().getPtr(), 0), null, "Root");
 		}
 		
 		drawByteRanges(List.of(new Range(0, frameData.contents().getIOSize())), Col.LIGHT_GRAY, true, false);
@@ -182,14 +182,14 @@ public class GridScene{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, DataPos pos, GenericContext context) throws IOException{
+	private <T extends IOInstance<T>> void annotateStruct(StructPipe<T> pipe, DataPos pos, GenericContext context, String path) throws IOException{
 		
 		if(pipe.getType().needsBuilderObj()){
-			annotateStruct(pipe.getBuilderPipe(), pos, context);
+			annotateStruct(pipe.getBuilderPipe(), pos, context, path);
 			return;
 		}
 		
-		var info     = FieldReader.readFields(dataProvider, pipe, pos, context);
+		var info     = FieldReader.readFields(dataProvider, pipe, pos, context, path);
 		var typeHash = pipe.getType().getFullName().hashCode();
 		annotateReadRes(info, typeHash);
 	}
