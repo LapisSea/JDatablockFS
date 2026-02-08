@@ -1,5 +1,6 @@
 package com.lapissea.dfs.objects.collections;
 
+import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
@@ -152,10 +153,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			var nextAccessor = new BasicFieldAccessor<IONode<T>>(null, "next", List.of(
 				Annotations.makeNullability(IONullability.Mode.NULLABLE)
 			)){
+				private static final Type UNRESOLVED = SyntheticParameterizedType.of(IONode.class, List.of(IONode.class.getTypeParameters()));
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					if(genericContext == null) return IONode.class;
-					throw new NotImplementedException();
+					return genericContext.resolveType(UNRESOLVED);
 				}
 				@Override
 				public Class<?> getType(){

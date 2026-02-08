@@ -7,6 +7,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.inspect.SessionSetView;
 import com.lapissea.dfs.inspect.display.Col;
+import com.lapissea.dfs.inspect.display.grid.read.BitMergerInspectRead;
 import com.lapissea.dfs.inspect.display.grid.read.FieldInspectRead;
 import com.lapissea.dfs.inspect.display.primitives.Geometry;
 import com.lapissea.dfs.inspect.display.primitives.IndexBuilder;
@@ -16,6 +17,7 @@ import com.lapissea.dfs.inspect.display.renderers.ByteGridRender;
 import com.lapissea.dfs.inspect.display.renderers.MsdfFontRender;
 import com.lapissea.dfs.inspect.display.renderers.PrimitiveBuffer;
 import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
+import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
@@ -205,6 +207,17 @@ public class GridScene{
 		
 		for(var rf : info.fields()){
 			var col = ColorUtils.makeCol(typeHash, rf.field());
+			
+			if(rf.value() instanceof BitMergerInspectRead.Value<?> bitValues){
+				if(gridSize.byteSize()>8){
+					for(var bit : bitValues.values()){
+						var bCol = ColorUtils.makeCol(typeHash, bit.f());
+						annotateBitField(bit.val(), bit.f(), bCol, bit.offset(), bit.size(), rf.pos().withoutSize());
+					}
+				}
+				continue;
+			}
+			
 			annotateByteField(rf, col);
 			
 			var reference = rf.reference();
@@ -256,6 +269,52 @@ public class GridScene{
 		if(stringDrawIn(message, infoRect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
 			buffer.renderFont(draw, draw.withOutline(Col.BLACK.a(0.5F), 1.5F));
 		}
+	}
+	
+	private <T extends IOInstance<T>> void annotateBitField(
+		Object value, IOField<T, ?> field,
+		Col col, int bitOffset, long bitSize, DataPos pos
+	) throws IOException{
+		if(bitSize<8 && gridSize.byteSize()<8) return;
+		
+		String str;
+		if(value instanceof Boolean bool){
+			str = bool? "√" : "x";
+		}else{
+			str = TextUtil.toShortString(value); //TODO: use field to string properly
+		}
+		
+		{
+			var ranges = pos.toAbsoluteRanges(dataProvider, BitUtils.bitsToBytes(bitSize)).toList();
+			drawByteRanges(ranges, Col.GREEN.darker(), false, false);
+			for(Range range : ranges){
+				messages.add(field + ": " + TextUtil.toShortString(value), range, RangeMessageSpace.HoverEffect.NONE);
+			}
+		}
+		
+		var remaining = bitSize;
+		var bitOff    = bitOffset;
+		var movingPos = pos;
+		while(remaining>0){
+			var trueOffset = movingPos.toAbsoluteOffset(dataProvider);
+			var bitRect    = DrawUtils.makeBitRect(gridSize, trueOffset, bitOff, remaining);
+			
+			var c    = col.a(0.8F).darker();
+			var mesh = newIMesh(4, 6);
+			DrawUtilsVK.fillQuad(mesh, c, bitRect.x(), bitRect.y(), bitRect.width(), bitRect.height());
+			buffer.renderMesh(mesh);
+			
+			if(stringDrawIn(str, bitRect, col, gridSize.byteSize()*0.8F, false) instanceof Some(var draw)){
+				buffer.renderFont(draw);
+			}
+			
+			remaining -= Math.min(8, remaining);
+			bitOff = 0;
+			movingPos = movingPos.addOffset(1);
+		}
+	}
+	private static Geometry.IndexedMesh newIMesh(int vertCapacity, int indexCapacity){
+		return new Geometry.IndexedMesh(new VertexBuilder(vertCapacity), new IndexBuilder(indexCapacity));
 	}
 	
 	private void recordPointer(FieldInspectRead.ReferenceInfo reference, Col color) throws IOException{
@@ -429,7 +488,7 @@ public class GridScene{
 			if(!range.isEmpty()) count++;
 		}
 		if(count == 0) return;
-		var mesh = new Geometry.IndexedMesh(new VertexBuilder(1 + 4*2*count), new IndexBuilder(1 + 6*2*count));
+		var mesh = newIMesh(1 + 4*2*count, 1 + 6*2*count);
 		for(var range : ranges){
 			if(range.isEmpty()) continue;
 			DrawUtilsVK.fillByteRange(gridSize, mesh, color, range);

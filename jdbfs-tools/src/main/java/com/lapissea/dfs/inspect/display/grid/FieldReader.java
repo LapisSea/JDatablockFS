@@ -127,7 +127,7 @@ public final class FieldReader{
 	}
 	
 	public static <T extends IOInstance.Unmanaged<T>> ResSet<T> readUnmanaged(
-		DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer pos, IOType type, GenericContext genericContext, String path
+		DataProvider dataProvider, StructPipe<T> pipe, ChunkPointer pos, IOType type, String path
 	) throws IOException{
 		List<Res<T, ?>> fields = new ArrayList<>();
 		
@@ -142,7 +142,7 @@ public final class FieldReader{
 			var start   = lastPos;
 			
 			var ctx = new FieldInspectRead.ReadCtx<>(
-				path, dataProvider, null, ioPool, genericContext, src, inst, false, pipe
+				path, dataProvider, null, ioPool, inst.getGenerics(), src, inst, false, pipe
 			);
 			
 			for(var field : Iters.concat(pipe.getSpecificFields(), inst.listUnmanagedFields())){

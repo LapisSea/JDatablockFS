@@ -2,6 +2,8 @@ package com.lapissea.dfs.tools;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
+import com.lapissea.dfs.inspect.display.grid.GridRect;
+import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.render.RenderBackend;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
@@ -153,6 +155,9 @@ public final class DrawUtils{
 		public long size(){
 			return to - from;
 		}
+		public Rect toRect(GridUtils.ByteGridSize size){
+			return toRect(size.bytesPerRow(), size.byteSize());
+		}
 		public Rect toRect(BinaryGridRenderer.RenderContext ctx){
 			return toRect(ctx.width(), ctx.pixelsPerByte());
 		}
@@ -236,6 +241,16 @@ public final class DrawUtils{
 			       '}';
 		}
 	}
+	public static GridRect makeBitRect(GridUtils.ByteGridSize size, long trueOffset, int bitOffset, long siz){
+		var range    = findBestContiguousRange(3, new Range(bitOffset, bitOffset + siz));
+		var byteRect = new Range(trueOffset, trueOffset).toRect(size);
+		var bitRect  = range.toRect(3, size.byteSize()/3);
+		
+		var x = bitRect.x + byteRect.x;
+		var y = bitRect.y + byteRect.y;
+		return new GridRect(x, y, bitRect.width(), bitRect.height());
+	}
+	
 	public static Rect makeBitRect(BinaryGridRenderer.RenderContext ctx, long trueOffset, int bitOffset, long siz){
 		var range    = findBestContiguousRange(3, new Range(bitOffset, bitOffset + siz));
 		var byteRect = new Range(trueOffset, trueOffset).toRect(ctx);

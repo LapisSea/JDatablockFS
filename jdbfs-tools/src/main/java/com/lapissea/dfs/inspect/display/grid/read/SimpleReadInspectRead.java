@@ -18,7 +18,7 @@ public class SimpleReadInspectRead extends FieldInspectRead{
 		}
 		
 		if(instVal instanceof IOInstance.Unmanaged<?> uInst){
-			var unmanagedRes = FieldReader.readUnmanaged(ctx.dataProvider, uInst.getPipe(), uInst.getPointer(), uInst.getTypeDef(), ctx.genericContext, ctx.path + " -> " + ctx.field);
+			var unmanagedRes = FieldReader.readUnmanaged(ctx.dataProvider, uInst.getPipe(), uInst.getPointer(), uInst.getTypeDef(), ctx.path + " -> " + ctx.field);
 			return res.withRef(res.pos(), DataPos.from(uInst.getPointer()), uInst.getClass(), unmanagedRes);
 		}
 		

@@ -27,7 +27,7 @@ public class UnmanagedRefInspectRead extends FieldInspectRead{
 		var pipe = (StructPipe)refField.getReferencedPipe(ctx.inst);
 		var type = IOType.of(refField.getAccessor().getGenericType(ctx.genericContext));
 		try{
-			refVal = FieldReader.readUnmanaged(ctx.dataProvider, pipe, ref.asPtr(), type, ctx.genericContext, ctx.path + " -> " + ctx.field);
+			refVal = FieldReader.readUnmanaged(ctx.dataProvider, pipe, ref.asPtr(), type, ctx.path + " -> " + ctx.field);
 		}catch(IOException e){
 			new IOException("Failed to read unmanaged value of " + type + " on " + ref.asPtr(), e).printStackTrace();
 			refVal = FieldReader.ResSet.empty();

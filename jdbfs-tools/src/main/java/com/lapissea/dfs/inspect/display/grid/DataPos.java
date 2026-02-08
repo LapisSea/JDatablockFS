@@ -74,6 +74,10 @@ public record DataPos(ChunkPointer ptr, long offset){
 		Objects.requireNonNull(ptr);
 	}
 	
+	public DataPos addOffset(long delta){
+		return new DataPos(ptr, offset + delta);
+	}
+	
 	public RandomIO open(DataProvider dataProvider) throws IOException{
 		if(ptr.isNull()){
 			return dataProvider.getSource().ioAt(offset);
