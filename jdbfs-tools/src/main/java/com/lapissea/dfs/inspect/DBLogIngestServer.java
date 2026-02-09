@@ -39,6 +39,8 @@ import static com.lapissea.dfs.inspect.IPC.SERVER;
 
 public final class DBLogIngestServer{
 	
+	private static final boolean BUFFER_WRITE = true;
+	
 	private static final class StoredSession implements SessionSetView.SessionView{
 		
 		final String  name;
@@ -125,7 +127,25 @@ public final class DBLogIngestServer{
 		boolean hasSession(String name){
 			lock.lock();
 			try{
-				return sessions.containsKey(name);
+				var ses = sessions.get(name);
+				if(ses == null) return false;
+				if(ses.closeRequested){
+					try{
+						lock.unlock();
+						try{
+							ses.exec.awaitTermination(1, TimeUnit.DAYS);
+							while(sessions.get(name) == ses){
+								Thread.sleep(1);
+							}
+						}finally{
+							lock.lock();
+						}
+					}catch(InterruptedException e){
+						throw new RuntimeException(e);
+					}
+					return false;
+				}
+				return true;
 			}finally{
 				lock.unlock();
 			}
@@ -229,7 +249,8 @@ public final class DBLogIngestServer{
 		private final DataInputStream  in;
 		private final DataOutputStream out;
 		
-		private Thread processThread;
+		private Thread  processThread;
+		private boolean closeRequested;
 		
 		private final ThreadPoolExecutor exec = new ThreadPoolExecutor(
 			1,
@@ -330,23 +351,32 @@ public final class DBLogIngestServer{
 			return false;
 		}
 		private void execDB(AtomicLong modId, UnsafeConsumer<FrameDB, IOException> action){
-			exec.submit(() -> {
+			Runnable r = () -> {
 				try{
 					action.accept(storedSession.frameDB);
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
 				modId.incrementAndGet();
-			});
+			};
+			if(!BUFFER_WRITE){
+				r.run();
+				return;
+			}
+			exec.submit(r);
 		}
 		private <T> T execDBInQueue(UnsafeFunction<FrameDB, T, IOException> action){
-			return CompletableFuture.supplyAsync(() -> {
+			Supplier<T> r = () -> {
 				try{
 					return action.apply(storedSession.frameDB);
 				}catch(IOException e){
 					throw UtilL.uncheckedThrow(e);
 				}
-			}, exec).join();
+			};
+			if(!BUFFER_WRITE){
+				return r.get();
+			}
+			return CompletableFuture.supplyAsync(r, exec).join();
 		}
 		private static void ackNow(DataOutputStream out) throws IOException{
 			try{
@@ -357,6 +387,7 @@ public final class DBLogIngestServer{
 		}
 		
 		public void close(){
+			closeRequested = true;
 			processThread.interrupt();
 			UtilL.closeSilently(socket);
 			Thread.interrupted();
