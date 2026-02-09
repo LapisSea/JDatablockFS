@@ -114,7 +114,12 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(compression != null){
-			var data = compression.unpack(compressed.get(ioPool, instance));
+			byte[] data;
+			try{
+				data = compression.unpack(compressed.get(ioPool, instance));
+			}catch(IOException e){
+				throw new IOException(this + " has invalid data");
+			}
 			set(ioPool, instance, data);
 			return;
 		}

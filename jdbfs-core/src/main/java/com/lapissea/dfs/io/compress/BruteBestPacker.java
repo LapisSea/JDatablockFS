@@ -1,5 +1,6 @@
 package com.lapissea.dfs.io.compress;
 
+import java.io.IOException;
 import java.util.Map;
 
 //Stop it, get some help
@@ -23,7 +24,7 @@ public final class BruteBestPacker implements Packer{
 		return arr;
 	}
 	@Override
-	public byte[] unpack(byte[] packedData){
+	public byte[] unpack(byte[] packedData) throws IOException{
 		if(packedData.length == 0) return packedData;
 		var    p   = PACKERS.get(packedData[0]);
 		byte[] arr = new byte[packedData.length - 1];

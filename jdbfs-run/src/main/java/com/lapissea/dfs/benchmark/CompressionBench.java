@@ -17,6 +17,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
@@ -73,7 +74,7 @@ public class CompressionBench{
 	@Measurement(iterations = 10, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
 	@BenchmarkMode(Mode.Throughput)
 	@Group("decompress")
-	public void decompress(Blackhole blackhole){
+	public void decompress(Blackhole blackhole) throws IOException{
 		var decompressed = type.unpack(compressed);
 		blackhole.consume(decompressed);
 	}
