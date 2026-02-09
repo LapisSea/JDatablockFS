@@ -1,16 +1,12 @@
 package com.lapissea.dfs.inspect;
 
-import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.inspect.display.VulkanDisplay;
 import com.lapissea.dfs.inspect.display.vk.VulkanCore;
-import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -22,12 +18,12 @@ public final class LogServerStart{
 	}
 	
 	public static void main(String[] args) throws InterruptedException{
-		new LogServerStart().start();
+		new LogServerStart().start(Arrays.asList(args).contains("nodata"));
 	}
 	
 	private DBLogIngestServer server;
 	
-	private void start() throws InterruptedException{
+	private void start(boolean nodata) throws InterruptedException{
 		var lazyView = new SessionSetView.Lazy();
 		var sem      = new Semaphore(1);
 		sem.acquire();
@@ -43,7 +39,7 @@ public final class LogServerStart{
 			
 			server = new DBLogIngestServer(() -> new FrameDB(dbFile));
 			lazyView.init(server.view);
-			loadDummyData();
+			if(!nodata) loadDummyData();
 			try{
 				server.start();
 			}catch(Throwable e){
@@ -73,36 +69,12 @@ public final class LogServerStart{
 	private void loadDummyData(){
 		Thread.ofVirtual().start(() -> {
 			try{
-				var mem = Cluster.emptyMem();
-				mem.roots().provide(69, "This is a test!!! :D");
-				UtilL.sleepWhile(() -> server == null);
-				
-				try(var remote = new DBLogConnection.OfRemote()){
-//					try(var ses = remote.openSession("test")){
-//						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
-//						mem.getSource().transferTo(dst, true);
-//					}
-//					LogUtil.println("======= Sent frame =======");
-//
-//					remote.openSession("empty").close();
-//					LogUtil.println("======= Sent empty frame =======");
-					
-					try(var ses = remote.openSession("bigMap")){
-						var dst = MemoryData.builder().withOnWrite(ses.getIOHook()).build();
-						
-						var                    cluster = Cluster.init(dst);
-						IOMap<Integer, String> map     = cluster.roots().request(0, IOMap.class, Integer.class, String.class);
-						for(int i = 0; i<5; i++){
-							var val = ("int(" + map.size() + ")").repeat(new RawRandom(dst.getIOSize() + map.size()).nextInt(20));
-							map.put((int)map.size(), val);
-						}
-						LogUtil.println("======= Sent frame =======");
-					}
-				}
+				LogServerDummyData.mapAdd();
 			}catch(Throwable e){
 				new RuntimeException("Failed to send dummy data", e).printStackTrace();
 				System.exit(1);
 			}
 		});
 	}
+	
 }

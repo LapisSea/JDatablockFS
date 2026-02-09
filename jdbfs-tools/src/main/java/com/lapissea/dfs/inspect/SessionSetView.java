@@ -32,15 +32,13 @@ public abstract class SessionSetView{
 			return data.getAnySession();
 		}
 		@Override
-		public boolean isDirty(){
-			if(data == null || dirty) return dirty;
-			return data.isDirty();
-		}
-		@Override
-		public void clearDirty(){
-			dirty = false;
-			if(data == null) return;
-			data.clearDirty();
+		public boolean checkPopDirty(){
+			var d = dirty;
+			if(data == null || d){
+				dirty = false;
+				return d;
+			}
+			return data.checkPopDirty();
 		}
 		@Override
 		public Set<String> getSessionNames(){
@@ -64,8 +62,7 @@ public abstract class SessionSetView{
 		FrameData getFrameData(int id);
 	}
 	
-	public abstract boolean isDirty();
-	public abstract void clearDirty();
+	public abstract boolean checkPopDirty();
 	
 	public abstract Set<String> getSessionNames();
 	

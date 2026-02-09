@@ -255,7 +255,7 @@ public interface DBLogConnection extends Closeable{
 				CLIENT.info("Opened session {}#green on port: {}#green", name, sessionSocket.getPort());
 				
 				var ses = new IPCSession(name, sessionSocket);
-				
+				ses.clear();
 				sessions.put(name, ses);
 				return ses;
 			}catch(IOException e){

@@ -110,7 +110,6 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public void run() throws VulkanCodeException{
 		var window = this.window.getGlfwWindow();
-		window.show();
 		
 		var event = GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), (window1, width, height) -> {
 			try{
@@ -126,6 +125,7 @@ public class VulkanDisplay implements AutoCloseable{
 		var mark = new AtomicBoolean();
 		window.mousePos.register(() -> mark.set(true));
 		
+		var show     = true;
 		var second   = Duration.ofSeconds(1);
 		var lastTime = NanoClock.now();
 		while(!window.shouldClose()){
@@ -151,6 +151,10 @@ public class VulkanDisplay implements AutoCloseable{
 			
 			this.window.checkSwapchainSize();
 			renderAndSwap();
+			if(show){
+				window.show();
+				show = false;
+			}
 		}
 		
 		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), event);
@@ -161,12 +165,11 @@ public class VulkanDisplay implements AutoCloseable{
 			return;
 		}
 		
-		if(forceSessionUpdate || sessionSetView.isDirty()){
-			forceSessionUpdate = false;
-			sessionSetView.clearDirty();
+		if(forceSessionUpdate || sessionSetView.checkPopDirty()){
 			if(forceSessionUpdate || uiSettings.lastFrame){
 				setLastFrameData();
 			}
+			forceSessionUpdate = false;
 		}
 		uiMessages.clear();
 		try{
@@ -182,7 +185,7 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	private void setLastFrameData(){
 		var ses = getSessionView();
-		setFrameData(ses, ses.map(e -> e.frameCount() - 1).orElse(-1));
+		setFrameData(ses, ses.map(SessionSetView.SessionView::frameCount).orElse(-1));
 	}
 	public void setFrameData(Optional<SessionSetView.SessionView> sessionView, int frame){
 		if(sessionView.isEmpty()){
