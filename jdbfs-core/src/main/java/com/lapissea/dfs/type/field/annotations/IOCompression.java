@@ -6,6 +6,7 @@ import com.lapissea.dfs.io.compress.Lz4Packer;
 import com.lapissea.dfs.io.compress.Packer;
 import com.lapissea.dfs.io.compress.RlePacker;
 
+import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -58,8 +59,8 @@ public @interface IOCompression{
 				src = null;
 			}
 		}
-		public byte[] pack(byte[] data)        { return getPacker().pack(data); }
-		public byte[] unpack(byte[] packedData){ return getPacker().unpack(packedData); }
+		public byte[] pack(byte[] data)                           { return getPacker().pack(data); }
+		public byte[] unpack(byte[] packedData) throws IOException{ return getPacker().unpack(packedData); }
 	}
 	
 	Type value() default Type.LZ4;

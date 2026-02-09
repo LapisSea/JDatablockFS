@@ -82,6 +82,16 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
+	public boolean isNull(VarPool<T> ioPool, T instance){
+		return switch(getNullability()){
+			case NOT_NULL, NULLABLE -> {
+				var raw = rawGet(ioPool, instance);
+				yield raw == null;
+			}
+			case DEFAULT_IF_NULL -> false;
+		};
+	}
+	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		if(compression == null){
@@ -114,7 +124,12 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(compression != null){
-			var data = compression.unpack(compressed.get(ioPool, instance));
+			byte[] data;
+			try{
+				data = compression.unpack(compressed.get(ioPool, instance));
+			}catch(IOException e){
+				throw new IOException(this + " has invalid data");
+			}
 			set(ioPool, instance, data);
 			return;
 		}

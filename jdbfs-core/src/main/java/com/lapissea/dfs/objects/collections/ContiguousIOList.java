@@ -158,16 +158,16 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		private final Type     elementType;
 		private final boolean  genericTypeHasArgs;
 		private final Class<?> rawElementType;
-		private       long     index;
+		private final long     index;
 		private final int      typeID;
 		
-		protected IndexAccessor(Type elementType, boolean nullable){
+		protected IndexAccessor(Type elementType, boolean nullable, boolean genericTypeHasArgs, Class<?> rawElementType, long index, int typeID){
 			super(null, "", nullable? NULLABLE_ANNS : List.of());
 			this.elementType = elementType;
-			rawElementType = Utils.typeToRaw(elementType);
-			this.index = -1;
-			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
-			genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(elementType);
+			this.genericTypeHasArgs = genericTypeHasArgs;
+			this.rawElementType = rawElementType;
+			this.index = index;
+			this.typeID = typeID;
 		}
 		
 		@NotNull
@@ -212,13 +212,13 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	
 	private static class UnmanagedField<T extends IOInstance.Unmanaged<T>> extends RefField.NoIO<ContiguousIOList<T>, T>{
 		
-		private       long                        index;
+		private final long                        index;
 		private final ObjectPipe<ChunkPointer, ?> refPipe;
 		
-		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ValueStorage.UnmanagedInstance<T> storage){
-			super(accessor, SizeDescriptor.Fixed.of(storage.getSizeDescriptor()));
+		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ObjectPipe<ChunkPointer, ?> refPipe, SizeDescriptor<ContiguousIOList<T>> sizeDescriptor){
+			super(accessor, sizeDescriptor);
+			this.refPipe = refPipe;
 			this.index = index;
-			refPipe = storage.getPtrPipe();
 		}
 		
 		@Override
@@ -268,55 +268,29 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		var genericType  = IOType.getArg(getTypeDef(), 0).generic(typeDatabase);
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
 		
-		
-		//TODO: index and object reusing hackery may cause problems? Investigate when appropriate
-		//if(unmanaged != null){
-		//	return Iters.range(0, size()).mapToObj(
-		//		index -> {
-		//			var f = new UnmanagedField<>(new IndexAccessor<>(genericType, index, true), index, unmanaged);
-		//			return (IOField<ContiguousIOList<T>, ?>)(Object)f;
-		//		}
-		//	);
-		//}
-		//return Iters.range(0, size()).mapToObj(
-		//	index -> storage.field(new IndexAccessor<>(genericType, index, false), () -> ioAtElement(index))
-		//);
-		
+		var rawElementType     = Utils.typeToRaw(genericType);
+		var typeID             = TypeFlag.getId(Utils.typeToRaw(genericType));
+		var genericTypeHasArgs = IOFieldTools.doesTypeHaveArgs(genericType);
 		
 		if(unmanaged != null){
-			var indexAccessor = new IndexAccessor<>(genericType, true);
-			//noinspection rawtypes
-			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
-			return Iters.rangeMapL(
-				0, size(),
-				index -> {
-					indexAccessor.index = index;
-					f.index = index;
-					return f;
-				});
+			var sd   = SizeDescriptor.Fixed.of(storage.getSizeDescriptor());
+			var pipe = unmanaged.getPtrPipe();
+			return Iters.rangeMapL(0, size(), index -> {
+				var indexAccessor = new IndexAccessor<>(genericType, true, genericTypeHasArgs, rawElementType, index, typeID);
+				//noinspection rawtypes
+				return new UnmanagedField(indexAccessor, index, pipe, sd);
+			});
 		}
 		
-		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
-			private long index;
-			@Override
-			public RandomIO get() throws IOException{
+		return Iters.rangeMapL(0, size(), index -> {
+			var indexAccessor = new IndexAccessor<T>(genericType, false, genericTypeHasArgs, rawElementType, index, typeID);
+			return storage.field(indexAccessor, () -> {
 				var io = selfIO();
 				assert io.getPos() == 0;
 				io.skipExact(calcElementOffset(index));
 				return io;
-			}
-		};
-		
-		var indexAccessor = new IndexAccessor<T>(genericType, false);
-		var indexField    = storage.field(indexAccessor, ioAt);
-		
-		return Iters.rangeMapL(
-			0, size(),
-			index -> {
-				indexAccessor.index = index;
-				ioAt.index = index;
-				return indexField;
 			});
+		});
 	}
 	
 	private static final CommandSet END_SET  = CommandSet.builder(CommandSet.Builder::endFlow);

@@ -9,7 +9,7 @@ import java.io.IOException;
 
 public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer, BruteBestPacker{
 	byte[] pack(byte[] data);
-	byte[] unpack(byte[] packedData);
+	byte[] unpack(byte[] packedData) throws IOException;
 	
 	static int sizeBytes(int siz){
 		return 1 + NumberSize.bySize(siz).bytes;

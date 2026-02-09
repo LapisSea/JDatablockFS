@@ -312,7 +312,7 @@ public final class Utils{
 	/**
 	 * To be used only for debugging
 	 */
-	public static byte[] dataFromBase64(String base64){
+	public static byte[] dataFromBase64(String base64) throws IOException{
 		var compressed = Base64.getDecoder().decode(base64);
 		return IOCompression.Type.GZIP.unpack(compressed);
 	}

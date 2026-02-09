@@ -289,7 +289,7 @@ public class GeneralTypeHandlingTests{
 		return new Object[][]{
 			{new LongTyp<>(Dur.class, l -> IOInstance.Def.of(Dur.class, Duration.ofMillis(l)))},
 			{new LongTyp<>(Inst.class, l -> IOInstance.Def.of(Inst.class, Instant.ofEpochMilli(l)))},
-			{new LongTyp<>(LocDate.class, l -> IOInstance.Def.of(LocDate.class, LocalDate.ofEpochDay(l%365243219162L)))},
+			{new LongTyp<>(LocDate.class, l -> IOInstance.Def.of(LocDate.class, LocalDate.ofEpochDay(l%365243219000L)))},
 			{new LongTyp<>(LocTime.class, l -> IOInstance.Def.of(LocTime.class, LocalTime.ofNanoOfDay(Math.abs(l)%86399999999999L)))},
 			};
 	}
