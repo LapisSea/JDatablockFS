@@ -82,6 +82,16 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		return getNullable(ioPool, instance, DEFAULT_VAL);
 	}
 	
+	public boolean isNull(VarPool<T> ioPool, T instance){
+		return switch(getNullability()){
+			case NOT_NULL, NULLABLE -> {
+				var raw = rawGet(ioPool, instance);
+				yield raw == null;
+			}
+			case DEFAULT_IF_NULL -> false;
+		};
+	}
+	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		if(compression == null){
