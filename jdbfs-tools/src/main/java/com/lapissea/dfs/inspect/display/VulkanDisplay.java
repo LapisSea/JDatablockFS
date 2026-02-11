@@ -125,39 +125,55 @@ public class VulkanDisplay implements AutoCloseable{
 		var mark = new AtomicBoolean();
 		window.mousePos.register(() -> mark.set(true));
 		
-		var show     = true;
-		var second   = Duration.ofSeconds(1);
+		if(GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND){
+			//Wayland requires the window to be visible before submitting a frame. Show first and pray for no flashbang...
+			window.show();
+			renderBlankFrame();
+		}else{
+			renderAndSwap();
+			window.show();
+		}
+		
 		var lastTime = NanoClock.now();
 		while(!window.shouldClose()){
 			glfwPollEvents();
-			int fpsLimit = uiSettings.fpsLimit.get();
-			if(fpsLimit>0){
-				Instant now, releaseTime = lastTime.plus(second.dividedBy(fpsLimit));
-				while((now = NanoClock.now()).isBefore(releaseTime)){
-					if(mark.get()){
-						mark.set(false);
-						break;
-					}
-					var remaning = Duration.between(now, releaseTime).toMillis();
-					if(remaning>2){
-						glfwPollEvents();
-						UtilL.sleep(remaning/2);
-					}else{
-						Thread.yield();
-					}
-				}
-				lastTime = now;
-			}
 			
 			this.window.checkSwapchainSize();
 			renderAndSwap();
-			if(show){
-				window.show();
-				show = false;
+			
+			int fpsLimit = uiSettings.fpsLimit.get();
+			if(fpsLimit>0){
+				lastTime = fpsSleep(lastTime, fpsLimit, mark);
 			}
 		}
 		
 		GLFW.glfwSetFramebufferSizeCallback(window.getHandle(), event);
+	}
+	
+	private static Instant fpsSleep(Instant lastTime, int fpsLimit, AtomicBoolean mark){
+		Instant now, releaseTime = lastTime.plus(Duration.ofSeconds(1).dividedBy(fpsLimit));
+		while((now = NanoClock.now()).isBefore(releaseTime)){
+			if(mark.get()){
+				mark.set(false);
+				return now;
+			}
+			var remaning = Duration.between(now, releaseTime).toMillis();
+			if(remaning>2){
+				glfwPollEvents();
+				UtilL.sleep(remaning/2);
+			}else{
+				Thread.yield();
+			}
+		}
+		return now;
+	}
+	
+	private void renderBlankFrame() throws VulkanCodeException{
+		core.pushSwap(this.window.renderQueueNoSwap((win, frameID, buf, fb) -> {
+			var rp = win.getSurfaceRenderPass();
+			buf.beginRenderPass(rp, fb, win.swapchain.extent.asRect(), new Vector4f(0, 0, 0, 1)).close();
+		}));
+		core.executeSwaps();
 	}
 	
 	private void renderAndSwap(){
