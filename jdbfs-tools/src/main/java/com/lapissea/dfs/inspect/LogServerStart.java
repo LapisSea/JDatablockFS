@@ -5,10 +5,8 @@ import com.lapissea.dfs.inspect.display.vk.VulkanCore;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LogUtil;
 
-import java.time.Duration;
 import java.util.Arrays;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 
 public final class LogServerStart{
 	static{
@@ -18,63 +16,42 @@ public final class LogServerStart{
 	}
 	
 	public static void main(String[] args) throws InterruptedException{
-		new LogServerStart().start(Arrays.asList(args).contains("nodata"));
-	}
-	
-	private DBLogIngestServer server;
-	
-	private void start(boolean nodata) throws InterruptedException{
-		var lazyView = new SessionSetView.Lazy();
-		var sem      = new Semaphore(1);
-		sem.acquire();
-		var ingestThread = Thread.ofPlatform().name("Ingest").start(() -> {
-			try{
-				sem.tryAcquire(1, TimeUnit.SECONDS);
-			}catch(InterruptedException e){
-				throw new RuntimeException(e);
-			}
+		
+		var ingestServer = CompletableFuture.supplyAsync(() -> {
 			var logger = LoggedMemoryUtils.createLoggerFromConfig();
-			logger.block();
-			var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
-			
-			server = new DBLogIngestServer(() -> new FrameDB(dbFile));
-			lazyView.init(server.view);
-			if(!nodata) loadDummyData();
+			return new DBLogIngestServer(() -> {
+				var dbFile = LoggedMemoryUtils.newLoggedMemory("DBLogIngestServer", logger);
+				return new FrameDB(dbFile);
+			});
+		});
+		
+		var ingestProcess = ingestServer.thenAcceptAsync(server -> {
+			if(!Arrays.asList(args).contains("nodata")) Thread.ofVirtual().start(() -> {
+				try{
+					LogServerDummyData.mapAdd();
+				}catch(Throwable e){
+					new RuntimeException("Failed to send dummy data", e).printStackTrace();
+					System.exit(1);
+				}
+			});
 			try{
 				server.start();
 			}catch(Throwable e){
 				e.printStackTrace();
 				System.exit(1);
 			}
-		});
+		}, Thread.ofPlatform().name("Ingest")::start);
 		
 		var t = System.currentTimeMillis();
-		try(var display = new VulkanDisplay(lazyView)){
+		try(var display = new VulkanDisplay()){
 			LogUtil.println("Initialized window in ", System.currentTimeMillis() - t, "ms");
-			sem.release();
+			ingestServer.thenAccept(e -> display.setSessionSetView(e.view));
 			display.run();
 		}catch(Throwable e){
 			e.printStackTrace();
-		}finally{
-			do{
-				if(server != null){
-					server.stop();
-					ingestThread.join();
-				}
-			}while(!ingestThread.join(Duration.ofMillis(10)));
 		}
-		System.exit(0);
+		
+		ingestProcess.whenComplete((server, e) -> System.exit(0));
+		ingestServer.join().stop();
 	}
-	
-	private void loadDummyData(){
-		Thread.ofVirtual().start(() -> {
-			try{
-				LogServerDummyData.mapAdd();
-			}catch(Throwable e){
-				new RuntimeException("Failed to send dummy data", e).printStackTrace();
-				System.exit(1);
-			}
-		});
-	}
-	
 }

@@ -97,7 +97,7 @@ public final class SettingsUIComponent implements UIComponent{
 		}
 		
 		if(ImGui.beginCombo("Session", currentSessionName.get())){
-			for(String name : vulkanDisplay.sessionSetView.getSessionNames()){
+			for(String name : vulkanDisplay.getSessionSetView().getSessionNames()){
 				var selected = currentSessionName.get().equals(name);
 				if(ImGui.selectable(name, selected)){
 					currentSessionName.set(name);
@@ -129,7 +129,7 @@ public final class SettingsUIComponent implements UIComponent{
 	
 	public Optional<SessionSetView.SessionView> currentSessionView(){
 		var sesName = currentSessionName.get();
-		return vulkanDisplay.sessionSetView.getSession(sesName);
+		return vulkanDisplay.getSession(sesName);
 	}
 	
 	private void generalSettingsUI(){

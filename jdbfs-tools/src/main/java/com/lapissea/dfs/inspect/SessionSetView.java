@@ -52,6 +52,19 @@ public abstract class SessionSetView{
 		}
 	}
 	
+	public static class Empty extends SessionSetView{
+		@Override
+		public Optional<SessionView> getSession(String name){ return Optional.empty(); }
+		@Override
+		public Optional<SessionView> getAnySession(){ return Optional.empty(); }
+		@Override
+		public boolean checkPopDirty(){ return false; }
+		@Override
+		public Set<String> getSessionNames(){ return Set.of(); }
+		@Override
+		public String toString(){ return "EmptySessionSet"; }
+	}
+	
 	public record FrameData(IOInterface contents, IPC.RangeSet writes, String stacktrace){
 		public static final FrameData EMPTY = new SessionSetView.FrameData(MemoryData.viewOf(new byte[0]), IPC.RangeSet.EMPTY, "");
 	}

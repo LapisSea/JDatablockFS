@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -48,13 +49,12 @@ public class VulkanDisplay implements AutoCloseable{
 	
 	public boolean forceSessionUpdate;
 	
-	public final  SessionSetView      sessionSetView;
+	private       SessionSetView      sessionSetView = new SessionSetView.Empty();
 	private final SettingsUIComponent uiSettings;
 	
 	private final List<String> uiMessages = new ArrayList<>();
 	
-	public VulkanDisplay(SessionSetView sessionSetView){
-		this.sessionSetView = sessionSetView;
+	public VulkanDisplay(){
 		try{
 			core = new VulkanCore("DFS debugger", VKPresentMode.IMMEDIATE);
 			
@@ -77,6 +77,17 @@ public class VulkanDisplay implements AutoCloseable{
 		}catch(VulkanCodeException e){
 			throw new RuntimeException("Failed to init vulkan display", e);
 		}
+	}
+	
+	public void setSessionSetView(SessionSetView sessionSetView){
+		this.sessionSetView = Objects.requireNonNull(sessionSetView);
+		forceSessionUpdate = true;
+	}
+	public SessionSetView getSessionSetView(){
+		return sessionSetView;
+	}
+	public Optional<SessionSetView.SessionView> getSession(String name){
+		return sessionSetView.getSession(name);
 	}
 	
 	private VulkanWindow createMainWindow() throws VulkanCodeException{
