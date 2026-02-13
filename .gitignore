@@ -9,6 +9,7 @@
 !/jdbfs-core/
 !/jdbfs-tools/
 !/jdbfs-run/
+!/jdbfs-lz4/
 !/Jorth/
 !/Fuzzer/
 !/demos

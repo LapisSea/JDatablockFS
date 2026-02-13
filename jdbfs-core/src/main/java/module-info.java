@@ -4,7 +4,6 @@ module JDatablockFS.core {
 	requires jlapisutil;
 	requires roaringbitmap;
 	requires Jorth;
-	requires org.lz4.java;
 	
 	exports com.lapissea.dfs.type.field.annotations;
 	exports com.lapissea.dfs.objects;
@@ -40,4 +39,8 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.type.field.fields.reflection to JDatablockFS.tools, jlapisutil;
 	exports com.lapissea.dfs.logging to JDatablockFS.tools, JDatablockFS.run;
 	exports com.lapissea.dfs.type.field.fields.reflection.wrappers to JDatablockFS.tools, jlapisutil;
+	
+	
+	exports com.lapissea.dfs.io.compress;
+	uses com.lapissea.dfs.io.compress.Packer;
 }

@@ -30,9 +30,10 @@
 	<version>1.0</version>
 	
 	<modules>
-		<module>/jdbfs-core</module>
-		<module>/jdbfs-run</module>
-		<module>/jdbfs-tools</module>
+		<module>jdbfs-core</module>
+		<module>jdbfs-run</module>
+		<module>jdbfs-tools</module>
+		<module>jdbfs-lz4</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
 		<module>demos/Photos</module>
