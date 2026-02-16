@@ -24,8 +24,8 @@ import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.lang.reflect.Type;

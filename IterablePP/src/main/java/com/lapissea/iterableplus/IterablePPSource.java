@@ -1,7 +1,5 @@
-package com.lapissea.dfs.utils.iterableplus;
+package com.lapissea.iterableplus;
 
-import com.lapissea.dfs.utils.function.FunctionOI;
-import com.lapissea.dfs.utils.function.FunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 
 import java.util.Collection;
@@ -10,6 +8,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 @SuppressWarnings("unused")
 public interface IterablePPSource<T> extends Iterable<T>{
@@ -56,10 +56,10 @@ public interface IterablePPSource<T> extends Iterable<T>{
 	default <L> IterablePP<L> flatMapped(Function<T, Iterable<L>> mapper){
 		return iter().flatMap(mapper);
 	}
-	default IterableLongPP mappedToLong()                    { return iter().mapToLong(); }
-	default IterableLongPP mappedToLong(FunctionOL<T> mapper){ return iter().mapToLong(mapper); }
-	default IterableIntPP mappedToInt()                      { return iter().mapToInt(); }
-	default IterableIntPP mappedToInt(FunctionOI<T> mapper)  { return iter().mapToInt(mapper); }
+	default IterableLongPP mappedToLong()                        { return iter().mapToLong(); }
+	default IterableLongPP mappedToLong(ToLongFunction<T> mapper){ return iter().mapToLong(mapper); }
+	default IterableIntPP mappedToInt()                          { return iter().mapToInt(); }
+	default IterableIntPP mappedToInt(ToIntFunction<T> mapper)   { return iter().mapToInt(mapper); }
 	
 	default <E extends Throwable> boolean noneMatches(UnsafePredicate<T, E> predicate) throws E{
 		return iter().noneMatch(predicate);

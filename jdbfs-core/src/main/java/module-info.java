@@ -4,6 +4,7 @@ module JDatablockFS.core {
 	requires jlapisutil;
 	requires roaringbitmap;
 	requires Jorth;
+	requires IterablePP;
 	
 	exports com.lapissea.dfs.type.field.annotations;
 	exports com.lapissea.dfs.objects;
@@ -26,7 +27,6 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.query;
 	exports com.lapissea.dfs.utils;
 	exports com.lapissea.dfs.utils.function;
-	exports com.lapissea.dfs.utils.iterableplus;
 	exports com.lapissea.dfs.type.string;
 	exports com.lapissea.dfs.type.compilation.helpers;
 	exports com.lapissea.dfs.type.def;

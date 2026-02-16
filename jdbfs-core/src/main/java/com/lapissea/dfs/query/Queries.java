@@ -3,7 +3,7 @@ package com.lapissea.dfs.query;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.List;

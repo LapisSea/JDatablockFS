@@ -3,7 +3,7 @@ package com.lapissea.dfs.objects.text;
 import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;

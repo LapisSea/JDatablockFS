@@ -1,6 +1,6 @@
 package demo.photo.ui;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import demo.photo.Options;
 import demo.photo.Texture;

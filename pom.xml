@@ -39,6 +39,7 @@
 		<module>demos/Photos</module>
 		<module>demos/World</module>
 		<module>demos/LightControl</module>
+		<module>IterablePP</module>
 	</modules>
 	
 	<dependencyManagement>

@@ -2,7 +2,7 @@ package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.testng.annotations.Test;
 
 import java.io.IOException;

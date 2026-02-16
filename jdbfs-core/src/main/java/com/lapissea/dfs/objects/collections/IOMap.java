@@ -4,7 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;

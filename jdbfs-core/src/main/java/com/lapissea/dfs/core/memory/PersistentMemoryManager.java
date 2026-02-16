@@ -13,10 +13,10 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;

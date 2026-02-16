@@ -7,7 +7,7 @@ import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;

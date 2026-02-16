@@ -1,6 +1,5 @@
-package com.lapissea.dfs.utils;
+package com.lapissea.iterableplus;
 
-import com.lapissea.dfs.utils.iterableplus.Match;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeFunctionOL;

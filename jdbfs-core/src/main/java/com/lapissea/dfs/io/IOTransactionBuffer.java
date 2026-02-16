@@ -2,8 +2,8 @@ package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.WordIO;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
+import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.util.UtilL;
 
 import java.io.EOFException;

@@ -20,6 +20,11 @@
 		</dependency>
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
+			<artifactId>IterablePP</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>lapissea.jdatablockfs</groupId>
 			<artifactId>Jorth</artifactId>
 			<version>0.0.1</version>
 		</dependency>

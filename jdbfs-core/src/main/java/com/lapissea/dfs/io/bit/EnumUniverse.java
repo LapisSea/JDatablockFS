@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io.bit;
 
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 

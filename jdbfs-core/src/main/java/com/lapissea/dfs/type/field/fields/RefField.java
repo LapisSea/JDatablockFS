@@ -17,7 +17,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObje
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldObjectReference;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
 import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.List;

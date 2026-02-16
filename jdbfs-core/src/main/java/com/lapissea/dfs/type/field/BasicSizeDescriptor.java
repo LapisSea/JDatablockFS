@@ -2,7 +2,7 @@ package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.type.WordSpace;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.util.Objects;

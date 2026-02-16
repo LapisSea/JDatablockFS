@@ -7,7 +7,7 @@ import com.lapissea.dfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.dfs.objects.collections.listtools.MemoryWrappedIOList;
 import com.lapissea.dfs.query.Query;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.IterablePPSource;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;

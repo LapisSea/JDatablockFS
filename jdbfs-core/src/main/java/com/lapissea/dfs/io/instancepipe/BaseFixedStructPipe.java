@@ -15,8 +15,8 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.util.List;
@@ -60,7 +60,6 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 			       .toMap(Function.identity(), sizingField -> {
 				       return getType().getFields().iterDependentOn(sizingField)
 				                       .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
-				                       .distinct()
 				                       .mapToObj(l -> NumberSize.FLAG_INFO.firstMatching(s -> s.bytes == l).orElseThrow())
 				                       .reduce((a, b) -> {
 					                       if(a != b){

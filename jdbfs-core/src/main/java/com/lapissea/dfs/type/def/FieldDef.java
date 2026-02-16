@@ -10,8 +10,8 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match.Some;
 
 import java.util.ArrayList;
 import java.util.List;

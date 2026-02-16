@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;

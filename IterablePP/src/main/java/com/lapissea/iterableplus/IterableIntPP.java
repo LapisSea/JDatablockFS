@@ -1,8 +1,6 @@
-package com.lapissea.dfs.utils.iterableplus;
+package com.lapissea.iterableplus;
 
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.utils.IntHashSet;
 import com.lapissea.util.IntHolder;
 import com.lapissea.util.ZeroArrays;
 

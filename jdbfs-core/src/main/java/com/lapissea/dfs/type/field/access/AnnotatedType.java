@@ -2,8 +2,8 @@ package com.lapissea.dfs.type.field.access;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.type.GenericContext;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;

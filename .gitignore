@@ -13,6 +13,7 @@
 !/Jorth/
 !/Fuzzer/
 !/demos
+!/IterablePP
 !pom.xml
 
 !/.idea/

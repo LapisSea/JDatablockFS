@@ -3,7 +3,7 @@ package com.lapissea.dfs.run.checked;
 import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.objects.collections.IOMap;
 import com.lapissea.dfs.query.Query;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;

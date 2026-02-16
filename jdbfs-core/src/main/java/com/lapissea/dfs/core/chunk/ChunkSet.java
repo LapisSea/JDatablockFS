@@ -2,10 +2,10 @@ package com.lapissea.dfs.core.chunk;
 
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.LongIterator;
+import com.lapissea.iterableplus.IterableLongPP;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.LongIterator;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;

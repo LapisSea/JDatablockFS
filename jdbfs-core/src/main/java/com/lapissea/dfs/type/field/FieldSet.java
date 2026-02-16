@@ -5,11 +5,11 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 

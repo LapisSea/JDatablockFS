@@ -33,10 +33,10 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
