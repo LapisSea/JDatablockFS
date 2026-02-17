@@ -21,6 +21,13 @@
 	<version>1.0</version>
 	
 	<dependencies>
+		
+		<dependency>
+			<groupId>lapissea.jdatablockfs</groupId>
+			<artifactId>jdbfs-old-logger</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
 			<artifactId>jdbfs-core</artifactId>

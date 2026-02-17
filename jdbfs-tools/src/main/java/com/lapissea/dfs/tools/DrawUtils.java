@@ -5,7 +5,6 @@ import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.inspect.display.grid.GridRect;
 import com.lapissea.dfs.inspect.display.grid.GridUtils;
 import com.lapissea.dfs.objects.Reference;
-import com.lapissea.dfs.tools.render.RenderBackend;
 import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
 import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
 import com.lapissea.dfs.utils.iterableplus.IterablePP;
@@ -13,7 +12,6 @@ import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import org.joml.Vector2f;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -158,9 +156,6 @@ public final class DrawUtils{
 		public Rect toRect(GridUtils.ByteGridSize size){
 			return toRect(size.bytesPerRow(), size.byteSize());
 		}
-		public Rect toRect(BinaryGridRenderer.RenderContext ctx){
-			return toRect(ctx.width(), ctx.pixelsPerByte());
-		}
 		public Rect toRect(int width, float pixelsPerByte){
 			var xByteFrom = (from%width)*pixelsPerByte;
 			var yByteFrom = (from/width)*pixelsPerByte;
@@ -251,16 +246,6 @@ public final class DrawUtils{
 		return new GridRect(x, y, bitRect.width(), bitRect.height());
 	}
 	
-	public static Rect makeBitRect(BinaryGridRenderer.RenderContext ctx, long trueOffset, int bitOffset, long siz){
-		var range    = findBestContiguousRange(3, new Range(bitOffset, bitOffset + siz));
-		var byteRect = new Range(trueOffset, trueOffset).toRect(ctx);
-		var bitRect  = range.toRect(3, ctx.pixelsPerByte()/3);
-		
-		var x = bitRect.x + byteRect.x;
-		var y = bitRect.y + byteRect.y;
-		return Rect.ofWH(x, y, bitRect.width(), bitRect.height());
-	}
-	
 	public static Range findBestContiguousRange(int width, Range range){
 		var start        = (range.from()/width)*width;
 		var nextLineFrom = start + width;
@@ -283,45 +268,6 @@ public final class DrawUtils{
 			cause = cause.getCause();
 		}
 		return message.toString();
-	}
-	
-	public static void fillByteRect(BinaryGridRenderer.RenderContext ctx, long start, long width, long columnCount){
-		long xi     = start%ctx.width();
-		long yStart = start/ctx.width();
-		ctx.renderer().fillQuad(ctx.pixelsPerByte()*xi,
-		                        ctx.pixelsPerByte()*yStart,
-		                        ctx.pixelsPerByte()*width,
-		                        ctx.pixelsPerByte()*columnCount);
-	}
-	
-	public static void fillByteRange(Color color, BinaryGridRenderer.RenderContext ctx, Range range){
-		ctx.renderer().setColor(color);
-		fillByteRange(ctx, range);
-	}
-	
-	public static void fillByteRange(BinaryGridRenderer.RenderContext ctx, Range range){
-		long from = range.from();
-		long to   = range.to();
-		
-		//tail
-		long fromX      = from%ctx.width();
-		long rightSpace = Math.min(ctx.width() - fromX, to - from);
-		if(rightSpace>0){
-			fillByteRect(ctx, from, rightSpace, 1);
-			from += rightSpace;
-		}
-		
-		//bulk
-		long bulkColumns = (to - from)/ctx.width();
-		if(bulkColumns>0){
-			fillByteRect(ctx, from, ctx.width(), bulkColumns);
-			from += bulkColumns*ctx.width();
-		}
-		
-		//head
-		if(to>from){
-			fillByteRect(ctx, from, to - from, 1);
-		}
 	}
 	
 	
@@ -355,91 +301,6 @@ public final class DrawUtils{
 		return index;
 	}
 	
-	private static double[] DeBoor(int _k, double[] T, double[][] handles, double t){
-		int i = WhichInterval(t, T, T.length);
-		return deBoor(_k, 3, i, t, T, handles);
-	}
-	
-	public static void drawPath(BinaryGridRenderer.RenderContext ctx, double[][] handles, boolean arrow){
-		final int _k = 3;
-		
-		var    tPoints = new double[_k + handles.length + 1];
-		double d       = 1.0/(tPoints.length - 1);
-		for(int i = 0; i<tPoints.length; i++){
-			tPoints[i] = i*d;
-		}
-		
-		if(handles.length<2) return;
-		
-		try(var ignored = ctx.renderer().bulkDraw(RenderBackend.DrawMode.QUADS)){
-			double[] lastPoint = null;
-			double   lastAngle = 0;
-			double   delta     = 1/64.0;
-			double   lastArrow = 0;
-			for(double t = tPoints[2]; t<tPoints[5]; t += delta){
-				double[] newPoint = DeBoor(_k, tPoints, handles, t);
-				if(lastPoint != null){
-					var angle = Math.atan2(lastPoint[0] - newPoint[0], lastPoint[1] - newPoint[1]);
-					if(angle<0) angle += Math.PI;
-					var angleDiff = Math.abs(angle - lastAngle);
-					lastAngle = angle;
-					
-					var minAngle = 0.1;
-					
-					if(angleDiff<minAngle/2){
-						delta = Math.min(1/32D, delta*3/2D);
-					}else if(angleDiff>minAngle){
-						t -= delta;
-						delta /= 3/2D;
-						continue;
-					}
-					boolean didArrow = false;
-					if(arrow){
-						var mid = (tPoints[5] + tPoints[2])/2;
-						if(t<mid && (t + delta)>mid || t - lastArrow>0.1){
-							drawArrow(ctx, lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
-							lastArrow = t;
-							didArrow = true;
-						}
-					}
-					if(!didArrow){
-						drawPixelLine(ctx, lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
-					}
-				}else{
-					drawPixelLine(ctx, handles[0][0], handles[0][1], newPoint[0], newPoint[1]);
-				}
-				lastPoint = newPoint;
-			}
-			if(lastPoint != null){
-				drawPixelLine(ctx, handles[handles.length - 1][0], handles[handles.length - 1][1], lastPoint[0], lastPoint[1]);
-			}
-		}
-	}
-	
-	public static void drawArrow(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
-		drawArrow(ctx.renderer(), ctx.pixelsPerByte(), xFrom, yFrom, xTo, yTo);
-	}
-	public static void drawArrow(RenderBackend renderer, float scale, double xFrom, double yFrom, double xTo, double yTo){
-		double xMid = (xFrom + xTo)/2, yMid = (yFrom + yTo)/2;
-		
-		double angle = Math.atan2(xTo - xFrom, yTo - yFrom);
-		
-		double arrowSize = 0.4;
-		
-		double sin = Math.sin(angle)*arrowSize/2;
-		double cos = Math.cos(angle)*arrowSize/2;
-		
-		drawPixelLine(renderer, scale, xMid + sin, yMid + cos, xMid - sin - cos, yMid - cos + sin);
-		drawPixelLine(renderer, scale, xMid + sin, yMid + cos, xMid - sin + cos, yMid - cos - sin);
-		drawPixelLine(renderer, scale, xFrom, yFrom, xTo, yTo);
-	}
-	
-	public static void drawPixelLine(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
-		drawPixelLine(ctx.renderer(), ctx.pixelsPerByte(), xFrom, yFrom, xTo, yTo);
-	}
-	public static void drawPixelLine(RenderBackend renderer, float scale, double xFrom, double yFrom, double xTo, double yTo){
-		renderer.drawLine(xFrom*scale, yFrom*scale, xTo*scale, yTo*scale);
-	}
 	public static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
 		return Iters.nullTerminated(() -> new Supplier<>(){
 			long remaining = size;

@@ -18,12 +18,7 @@ module JDatablockFS.tools {
 	requires org.lwjgl.stb;
 	requires com.carrotsearch.hppc;
 	requires com.sun.jna;
-	
-	exports com.lapissea.dfs.tools;
-	exports com.lapissea.dfs.tools.logging;
-	exports com.lapissea.dfs.tools.server;
-	exports com.lapissea.dfs.tools.utils;
-	
+	requires JDatablockFS.old_logger;
 	
 	opens com.lapissea.dfs.tools;
 	opens com.lapissea.dfs.inspect.display to com.google.gson;

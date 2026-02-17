@@ -8,6 +8,7 @@
 
 !/jdbfs-core/
 !/jdbfs-tools/
+!/jdbfs-old-logger
 !/jdbfs-run/
 !/Jorth/
 !/Fuzzer/

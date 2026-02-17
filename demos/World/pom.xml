@@ -26,7 +26,7 @@
 		</dependency>
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
-			<artifactId>jdbfs-tools</artifactId>
+			<artifactId>jdbfs-old-logger</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>

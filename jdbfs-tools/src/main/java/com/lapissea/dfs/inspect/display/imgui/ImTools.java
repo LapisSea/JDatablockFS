@@ -1,6 +1,5 @@
 package com.lapissea.dfs.inspect.display.imgui;
 
-import com.lapissea.dfs.tools.DisplayManager;
 import imgui.ImFontConfig;
 import imgui.ImGuiIO;
 import imgui.ImGuiViewport;
@@ -207,7 +206,7 @@ public final class ImTools{
 		try{
 			var    f = io.getFonts();
 			byte[] bb;
-			try(var t = Objects.requireNonNull(DisplayManager.class.getResourceAsStream(resourcePath))){
+			try(var t = Objects.requireNonNull(ImTools.class.getResourceAsStream(resourcePath))){
 				bb = t.readAllBytes();
 			}
 			f.setFreeTypeRenderer(true);

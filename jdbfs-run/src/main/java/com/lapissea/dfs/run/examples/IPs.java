@@ -4,7 +4,7 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.collections.IOList;
-import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.old_logger.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
 
 import java.io.IOException;

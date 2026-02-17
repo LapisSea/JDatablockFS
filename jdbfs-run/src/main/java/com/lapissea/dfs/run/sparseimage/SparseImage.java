@@ -1,8 +1,8 @@
 package com.lapissea.dfs.run.sparseimage;
 
 import com.lapissea.dfs.core.Cluster;
+import com.lapissea.dfs.old_logger.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.run.Configuration;
-import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LogUtil;
 
 import java.io.File;

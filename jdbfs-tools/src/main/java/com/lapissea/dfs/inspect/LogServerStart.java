@@ -2,7 +2,7 @@ package com.lapissea.dfs.inspect;
 
 import com.lapissea.dfs.inspect.display.VulkanDisplay;
 import com.lapissea.dfs.inspect.display.vk.VulkanCore;
-import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.old_logger.logging.LoggedMemoryUtils;
 import com.lapissea.util.LogUtil;
 
 import java.util.Arrays;

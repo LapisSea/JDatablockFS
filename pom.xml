@@ -33,6 +33,7 @@
 		<module>/jdbfs-core</module>
 		<module>/jdbfs-run</module>
 		<module>/jdbfs-tools</module>
+		<module>/jdbfs-old-logger</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
 		<module>demos/Photos</module>
