@@ -1,6 +1,7 @@
 package com.lapissea.dfs.inspect.display.renderers;
 
 import com.carrotsearch.hppc.IntIntHashMap;
+import com.carrotsearch.hppc.cursors.IntIntCursor;
 import com.lapissea.dfs.inspect.IOFrame;
 import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.inspect.display.ColorU8;
@@ -27,6 +28,7 @@ import com.lapissea.dfs.inspect.display.vk.wrap.RenderPass;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkPipeline;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
@@ -198,6 +200,26 @@ public class ByteGridRender implements Renderer<ByteGridRender.RenderResource, B
 			var index = map.indexOf(ic);
 			if(index>=0) return map.indexGet(index);
 			var i = map.size();
+			
+			if(i>255){
+				float bestDist = Float.MAX_VALUE;
+				int   bestId   = -1;
+				for(IntIntCursor c : map){
+					var col = Col.rgba(c.key);
+					var val = Math.abs(col.a() - color.a())*2 +
+					          Math.abs(col.r() - color.r()) +
+					          Math.abs(col.g() - color.g()) +
+					          Math.abs(col.b() - color.b());
+					if(val<bestDist){
+						bestDist = val;
+						bestId = c.key;
+					}
+				}
+				map.put(ic, bestId);
+				Log.warn("Color index full. Trying to use best match. {#redDistance: {}#}", bestDist);
+				return bestId;
+			}
+			
 			map.put(ic, i);
 			toUpdate.add(new IndexedColor(ic, i));
 			return i;
