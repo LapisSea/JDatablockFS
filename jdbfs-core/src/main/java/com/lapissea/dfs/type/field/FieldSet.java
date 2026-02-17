@@ -591,6 +591,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return switch(data.length){
 			case 0 -> false;
 			case 1 -> data[0].equals(f);
+			case 2 -> data[0].equals(f) || data[1].equals(f);
 			default -> {
 				var index = indexByName(f.getName());
 				if(index == -1) yield false;

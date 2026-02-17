@@ -638,10 +638,12 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	@Override
-	public boolean equals(Object o){
-		if(this == o) return true;
-		if(!(o instanceof IOField<?, ?> ioField)) return false;
-		
+	public final boolean equals(Object o){
+		return o instanceof IOField<?, ?> ioField &&
+		       equals(ioField);
+	}
+	public final boolean equals(IOField<?, ?> ioField){
+		if(ioField == null) return false;
 		var acc = getAccessor();
 		if(acc == null){
 			if(ioField.getAccessor() != null) return false;
