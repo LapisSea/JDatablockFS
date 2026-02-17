@@ -20,6 +20,11 @@
 		</dependency>
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
+			<artifactId>IterablePP</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>lapissea.jdatablockfs</groupId>
 			<artifactId>Jorth</artifactId>
 			<version>0.0.1</version>
 		</dependency>
@@ -27,12 +32,6 @@
 			<groupId>org.roaringbitmap</groupId>
 			<artifactId>RoaringBitmap</artifactId>
 			<version>1.3.0</version>
-		</dependency>
-		<dependency>
-			<groupId>at.yawk.lz4</groupId>
-			<artifactId>lz4-java</artifactId>
-			<version>1.10.3</version>
-			<scope>compile</scope>
 		</dependency>
 		
 		<dependency>

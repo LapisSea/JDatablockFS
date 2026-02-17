@@ -9,7 +9,7 @@ import com.lapissea.dfs.objects.collections.HashIOMap;
 import com.lapissea.dfs.objects.collections.IOHashSet;
 import com.lapissea.dfs.objects.collections.IOTreeSet;
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeRunnable;
 

@@ -1,7 +1,4 @@
-package com.lapissea.dfs.utils.iterableplus;
-
-import com.lapissea.dfs.Utils;
-import org.roaringbitmap.longlong.Roaring64Bitmap;
+package com.lapissea.iterableplus;
 
 import java.nio.LongBuffer;
 import java.util.Arrays;
@@ -13,6 +10,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.LongBinaryOperator;
 import java.util.function.LongConsumer;
@@ -594,16 +592,36 @@ public interface IterableLongPP{
 			public LongIterator iterator(){
 				var src = IterableLongPP.this.iterator();
 				return new Iters.FindingLongIterator(){
-					private final Roaring64Bitmap seen = new Roaring64Bitmap();
+					private IntHashSet lows;
+					private Set<Long>  highs;
+					
+					private boolean lowAdd(int val){
+						var m = lows;
+						if(m == null) m = lows = new IntHashSet();
+						return m.add(val);
+					}
+					private boolean highAdd(long val){
+						var m = highs;
+						if(m == null) m = highs = new HashSet<>();
+						return m.add(val);
+					}
+					
 					@Override
 					protected boolean doNext(){
 						while(true){
 							if(!src.hasNext()) return false;
 							var t = src.nextLong();
-							if(!seen.contains(t)){
-								seen.addLong(t);
-								reportFound(t);
-								return true;
+							var i = (int)t;
+							if(t == i){
+								if(lowAdd(i)){
+									reportFound(t);
+									return true;
+								}
+							}else{
+								if(!highAdd(t)){
+									reportFound(t);
+									return true;
+								}
 							}
 						}
 					}

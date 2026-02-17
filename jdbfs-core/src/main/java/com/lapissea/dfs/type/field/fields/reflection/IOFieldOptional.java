@@ -19,7 +19,7 @@ import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;

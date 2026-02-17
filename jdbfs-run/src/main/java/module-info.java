@@ -3,6 +3,7 @@ module JDatablockFS.run {
 	requires JDatablockFS.tools;
 	requires Jorth;
 	requires jlapisutil;
+	requires IterablePP;
 	requires jmh.core;
 	requires com.google.gson;
 	requires Fuzzer;

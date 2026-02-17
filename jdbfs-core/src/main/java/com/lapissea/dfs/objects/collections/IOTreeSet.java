@@ -14,7 +14,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;

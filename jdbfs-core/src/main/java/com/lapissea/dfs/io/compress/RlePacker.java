@@ -238,4 +238,8 @@ public final class RlePacker implements Packer{
 		if(packedData.length == 0) return packedData;
 		return new Unpacker(packedData).decompress();
 	}
+	@Override
+	public String name(){
+		return "RLE";
+	}
 }

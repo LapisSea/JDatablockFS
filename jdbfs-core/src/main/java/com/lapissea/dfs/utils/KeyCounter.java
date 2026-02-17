@@ -1,6 +1,6 @@
 package com.lapissea.dfs.utils;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.Comparator;
 import java.util.Map;

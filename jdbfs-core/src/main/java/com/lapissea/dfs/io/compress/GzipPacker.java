@@ -27,4 +27,8 @@ public final class GzipPacker implements Packer{
 			throw new IOException("Failed to unpack packed data", e);
 		}
 	}
+	@Override
+	public String name(){
+		return "GZIP";
+	}
 }

@@ -10,9 +10,11 @@
 !/jdbfs-tools/
 !/jdbfs-old-logger
 !/jdbfs-run/
+!/jdbfs-lz4/
 !/Jorth/
 !/Fuzzer/
 !/demos
+!/IterablePP
 !pom.xml
 
 !/.idea/

@@ -16,7 +16,7 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.Match.Some;
 
 import java.io.IOException;
 import java.util.List;

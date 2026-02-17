@@ -6,7 +6,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.access.AnnotatedType;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.List;
 

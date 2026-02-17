@@ -1,7 +1,7 @@
 package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.objects.Stringify;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.EOFException;
 import java.io.IOException;

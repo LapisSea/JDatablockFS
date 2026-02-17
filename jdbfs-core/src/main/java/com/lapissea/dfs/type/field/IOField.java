@@ -26,9 +26,9 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -638,10 +638,12 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	@Override
-	public boolean equals(Object o){
-		if(this == o) return true;
-		if(!(o instanceof IOField<?, ?> ioField)) return false;
-		
+	public final boolean equals(Object o){
+		return o instanceof IOField<?, ?> ioField &&
+		       equals(ioField);
+	}
+	public final boolean equals(IOField<?, ?> ioField){
+		if(ioField == null) return false;
 		var acc = getAccessor();
 		if(acc == null){
 			if(ioField.getAccessor() != null) return false;

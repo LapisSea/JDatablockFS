@@ -9,7 +9,7 @@ import com.lapissea.dfs.type.def.TypeDef;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;

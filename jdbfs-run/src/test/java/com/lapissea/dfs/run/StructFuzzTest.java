@@ -17,7 +17,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;

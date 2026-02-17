@@ -1,6 +1,6 @@
 package com.lapissea.dfs.io.bit;
 
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.OptionalLong;
 import java.util.stream.Collectors;

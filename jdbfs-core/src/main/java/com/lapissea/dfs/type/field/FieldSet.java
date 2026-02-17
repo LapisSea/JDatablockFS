@@ -5,11 +5,11 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -591,6 +591,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return switch(data.length){
 			case 0 -> false;
 			case 1 -> data[0].equals(f);
+			case 2 -> data[0].equals(f) || data[1].equals(f);
 			default -> {
 				var index = indexByName(f.getName());
 				if(index == -1) yield false;

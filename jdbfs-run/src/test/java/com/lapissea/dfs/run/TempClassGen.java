@@ -2,7 +2,7 @@ package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.JorthUtils;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;

@@ -14,7 +14,7 @@ import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;

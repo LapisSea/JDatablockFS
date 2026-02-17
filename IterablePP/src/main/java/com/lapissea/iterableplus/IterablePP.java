@@ -1,9 +1,5 @@
-package com.lapissea.dfs.utils.iterableplus;
+package com.lapissea.iterableplus;
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.dfs.utils.function.FunctionOI;
-import com.lapissea.dfs.utils.function.FunctionOL;
 import com.lapissea.util.function.UnsafePredicate;
 
 import java.lang.reflect.Array;
@@ -1097,7 +1093,7 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		};
 	}
-	default IterableLongPP mapToLong(FunctionOL<T> mapper){
+	default IterableLongPP mapToLong(ToLongFunction<T> mapper){
 		return new IterableLongPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){
@@ -1111,7 +1107,7 @@ public interface IterablePP<T> extends Iterable<T>{
 					public boolean hasNext(){ return iter.hasNext(); }
 					@Override
 					public long nextLong(){
-						return mapper.apply(iter.next());
+						return mapper.applyAsLong(iter.next());
 					}
 				};
 			}
@@ -1135,7 +1131,7 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		};
 	}
-	default IterableIntPP mapToInt(FunctionOI<T> mapper){
+	default IterableIntPP mapToInt(ToIntFunction<T> mapper){
 		return new IterableIntPP.SizedPP.Default(){
 			@Override
 			public OptionalInt getSize(){ return IterablePP.SizedPP.tryGet(IterablePP.this); }
@@ -1147,7 +1143,7 @@ public interface IterablePP<T> extends Iterable<T>{
 					public boolean hasNext(){ return iter.hasNext(); }
 					@Override
 					public int nextInt(){
-						return mapper.apply(iter.next());
+						return mapper.applyAsInt(iter.next());
 					}
 				};
 			}

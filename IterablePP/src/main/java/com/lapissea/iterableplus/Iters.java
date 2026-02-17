@@ -1,7 +1,5 @@
-package com.lapissea.dfs.utils.iterableplus;
+package com.lapissea.iterableplus;
 
-import com.lapissea.dfs.Utils;
-import com.lapissea.dfs.utils.OptionalPP;
 import com.lapissea.util.TextUtil;
 
 import java.nio.IntBuffer;

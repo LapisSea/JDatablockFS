@@ -1,16 +1,17 @@
 package com.lapissea.dfs.type.field.annotations;
 
-import com.lapissea.dfs.io.compress.BruteBestPacker;
 import com.lapissea.dfs.io.compress.GzipPacker;
-import com.lapissea.dfs.io.compress.Lz4Packer;
 import com.lapissea.dfs.io.compress.Packer;
 import com.lapissea.dfs.io.compress.RlePacker;
+import com.lapissea.dfs.logging.Log;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.function.Supplier;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -25,21 +26,51 @@ public @interface IOCompression{
 		/**
 		 * LZ4 fast compression is a very fast compression algorithm similar in speed to RLE but works better on higher noise/variation data.
 		 */
-		LZ4_FAST(Lz4Packer.Fast::new),
+		LZ4_FAST(() -> {
+			return getByName("LZ4-Fast")
+				       .or(getByNameCName("lz4.Lz4Packer$Fast"))
+				       .orElseThrow(() -> new UnsupportedOperationException(
+					       "LZ4 compression not supported, please include an LZ4-Fast Packer implementation (jdbfs-lz4)"
+				       ));
+		}),
 		/**
 		 * LZ4 compression is a balance between RLE and GZIP. It is significantly slower than RLE but is also produces a higher compression
 		 * ratio. This is probably the right choice if the type of data is unknown.
 		 */
-		LZ4(Lz4Packer.High::new),
+		LZ4(() -> {
+			return getByName("LZ4-High")
+				       .or(getByNameCName("lz4.Lz4Packer$High"))
+				       .orElseThrow(() -> new UnsupportedOperationException(
+					       "LZ4 compression not supported, please include an LZ4-High Packer implementation (jdbfs-lz4)"
+				       ));
+		}),
 		/**
 		 * Your standard gzip compression. Pretty slow but has the best compression ratio.
 		 */
-		GZIP(GzipPacker::new),
-		/**
-		 * An experimental amalgamation of all previous types where all of them are run and the smallest output is picked.
-		 * This is horribly inefficient and slow and should probably not be used.
-		 */
-		BRUTE_BEST(BruteBestPacker::new);
+		GZIP(GzipPacker::new);
+		
+		private static Supplier<Optional<Packer>> getByNameCName(String name){
+			return () -> {
+				var cName = Packer.class.getPackageName() + "." + name;
+				try{
+					var clazz = Class.forName(cName, false, Packer.class.getClassLoader()).asSubclass(Packer.class);
+					var inst  = clazz.getConstructor().newInstance();
+					Log.info("Loaded {}#yellow without ServiceLoader", cName);
+					return Optional.of(inst);
+				}catch(Throwable e){
+					Log.warn("Failed to load {}#red\n  {}", cName, e);
+					return Optional.empty();
+				}
+			};
+		}
+		private static Optional<Packer> getByName(String algorithm){
+			for(Packer packer : ServiceLoader.load(Packer.class)){
+				if(packer.name().equals(algorithm)){
+					return Optional.of(packer);
+				}
+			}
+			return Optional.empty();
+		}
 		
 		private Supplier<Packer> src;
 		private Packer           packer;

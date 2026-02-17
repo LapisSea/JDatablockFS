@@ -8,7 +8,7 @@ import com.lapissea.dfs.old_logger.logging.LoggedMemoryUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;

@@ -12,7 +12,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.MemoryWalker;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;

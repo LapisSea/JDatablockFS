@@ -6,7 +6,7 @@ import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Annotation;

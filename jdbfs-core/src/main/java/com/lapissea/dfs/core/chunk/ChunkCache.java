@@ -3,7 +3,7 @@ package com.lapissea.dfs.core.chunk;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.CacheOutOfSync;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;

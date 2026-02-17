@@ -2,8 +2,8 @@ package com.lapissea.dfs.config;
 
 import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;

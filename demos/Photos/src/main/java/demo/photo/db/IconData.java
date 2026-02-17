@@ -2,7 +2,7 @@ package demo.photo.db;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import demo.photo.ImageUitls;
 
 import javax.imageio.IIOImage;

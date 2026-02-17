@@ -8,7 +8,7 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.field.FieldNames;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.EOFException;

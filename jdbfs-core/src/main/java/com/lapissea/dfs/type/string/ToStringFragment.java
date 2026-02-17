@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.string;
 
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.List;
 import java.util.Optional;

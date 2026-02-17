@@ -2,7 +2,7 @@ package com.lapissea.dfs.exceptions;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;

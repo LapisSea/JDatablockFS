@@ -2,7 +2,7 @@ package com.lapissea.dfs.type.field.annotations;
 
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
+import com.lapissea.iterableplus.IterablePP;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -4,7 +4,7 @@ import com.lapissea.dfs.internal.Access.Mode;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.NewObj;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;

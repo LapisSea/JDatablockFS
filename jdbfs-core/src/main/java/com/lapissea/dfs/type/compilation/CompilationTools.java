@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
-import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.Method;

@@ -31,7 +31,7 @@ import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
