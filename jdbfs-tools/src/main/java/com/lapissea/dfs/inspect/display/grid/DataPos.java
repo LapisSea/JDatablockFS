@@ -5,8 +5,8 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.tools.DrawUtils;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.IOException;
 import java.util.Objects;

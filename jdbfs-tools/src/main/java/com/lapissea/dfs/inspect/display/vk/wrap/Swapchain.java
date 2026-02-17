@@ -7,7 +7,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VKImageType;
 import com.lapissea.dfs.inspect.display.vk.enums.VkImageAspectFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkImageViewType;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;

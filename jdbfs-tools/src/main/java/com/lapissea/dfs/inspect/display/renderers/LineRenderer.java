@@ -9,7 +9,7 @@ import com.lapissea.dfs.inspect.display.primitives.VertexBuilder;
 import com.lapissea.dfs.inspect.display.vk.CommandBuffer;
 import com.lapissea.dfs.inspect.display.vk.VulkanResource;
 import com.lapissea.dfs.inspect.display.vk.wrap.Extent2D;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.joml.Matrix3x2f;
 
 public class LineRenderer implements VulkanResource{

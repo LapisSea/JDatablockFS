@@ -5,7 +5,6 @@ module JDatablockFS.tools {
 	requires JDatablockFS.lz4;
 	requires jlapisutil;
 	requires IterablePP;
-	requires glfw.window;
 	requires GLFWWindow;
 	requires jlapisvector;
 	requires org.lwjgl.glfw;

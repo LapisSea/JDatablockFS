@@ -25,7 +25,7 @@ import com.lapissea.dfs.inspect.display.vk.wrap.VkPipelineCache;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkPipelineLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkSampler;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkSemaphore;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;

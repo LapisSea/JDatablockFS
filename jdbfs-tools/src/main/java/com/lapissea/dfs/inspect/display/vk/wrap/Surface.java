@@ -1,14 +1,14 @@
 package com.lapissea.dfs.inspect.display.vk.wrap;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.VKCalls;
 import com.lapissea.dfs.inspect.display.vk.VulkanResource;
 import com.lapissea.dfs.inspect.display.vk.enums.VKPresentMode;
 import com.lapissea.dfs.inspect.display.vk.enums.VkColorSpaceKHR;
 import com.lapissea.dfs.inspect.display.vk.enums.VkFormat;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.dfs.logging.Log;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.VkInstance;

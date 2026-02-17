@@ -28,10 +28,10 @@ import com.lapissea.dfs.tools.utils.NanoClock;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.IterableIntPP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.util.TextUtil;
 import org.joml.Vector2f;
 

@@ -24,7 +24,7 @@ import com.lapissea.dfs.inspect.display.vk.wrap.Device;
 import com.lapissea.dfs.inspect.display.vk.wrap.Rect2D;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkPipeline;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import imgui.ImDrawData;
 import imgui.ImGui;
 import imgui.ImVec4;

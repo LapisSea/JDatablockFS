@@ -23,7 +23,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSamplerAddressMode;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSharingMode;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.lwjgl.system.MemoryStack;

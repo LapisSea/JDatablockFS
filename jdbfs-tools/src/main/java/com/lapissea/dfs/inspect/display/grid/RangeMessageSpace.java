@@ -3,7 +3,7 @@ package com.lapissea.dfs.inspect.display.grid;
 import com.lapissea.dfs.inspect.display.Col;
 import com.lapissea.dfs.tools.DrawUtils;
 import com.lapissea.dfs.tools.DrawUtils.Range;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.ArrayList;
 import java.util.Collections;

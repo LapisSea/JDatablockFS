@@ -2,7 +2,7 @@ package com.lapissea.dfs.inspect.display.vk;
 
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.wrap.Device;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 public interface VulkanResource extends AutoCloseable{
 	

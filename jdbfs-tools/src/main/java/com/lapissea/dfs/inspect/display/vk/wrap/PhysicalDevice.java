@@ -11,7 +11,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VkPhysicalDeviceType;
 import com.lapissea.dfs.inspect.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.EXTIndexTypeUint8;

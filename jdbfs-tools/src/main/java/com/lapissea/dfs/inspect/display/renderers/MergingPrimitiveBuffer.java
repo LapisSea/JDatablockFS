@@ -11,8 +11,8 @@ import com.lapissea.dfs.inspect.display.vk.DrawUtilsVK;
 import com.lapissea.dfs.tools.DrawUtils.Range;
 import com.lapissea.dfs.tools.DrawUtils.Rect;
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
 import org.joml.Vector2f;
 
 import java.util.ArrayList;

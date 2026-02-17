@@ -5,7 +5,7 @@ import com.lapissea.dfs.inspect.display.vk.Flags;
 import com.lapissea.dfs.inspect.display.vk.enums.VkFormat;
 import com.lapissea.dfs.inspect.display.vk.enums.VkResult;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;

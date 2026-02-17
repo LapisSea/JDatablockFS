@@ -7,7 +7,7 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.objects.collections.IOMap;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ShouldNeverHappenError;
 

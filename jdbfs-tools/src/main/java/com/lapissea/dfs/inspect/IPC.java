@@ -6,8 +6,8 @@ import com.lapissea.dfs.io.content.ContentInputStream;
 import com.lapissea.dfs.io.content.ContentOutputStream;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.utils.iterableplus.IterablePPSource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePPSource;
+import com.lapissea.iterableplus.Iters;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

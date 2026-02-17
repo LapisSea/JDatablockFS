@@ -29,7 +29,7 @@ import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSetLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkPipeline;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.joml.Matrix4f;

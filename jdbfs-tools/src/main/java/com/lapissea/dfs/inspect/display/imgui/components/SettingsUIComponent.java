@@ -7,7 +7,7 @@ import com.lapissea.dfs.inspect.display.VulkanDisplay;
 import com.lapissea.dfs.inspect.display.imgui.ImGuiImpl;
 import com.lapissea.dfs.inspect.display.imgui.UIComponent;
 import com.lapissea.dfs.inspect.display.vk.enums.VkSampleCountFlag;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.TextUtil;
 import imgui.ImGui;
 import imgui.flag.ImGuiKey;

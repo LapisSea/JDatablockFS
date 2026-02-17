@@ -1,9 +1,9 @@
 package com.lapissea.dfs.inspect.display.primitives;
 
 import com.lapissea.dfs.inspect.display.vk.enums.VkIndexType;
-import com.lapissea.dfs.utils.iterableplus.IntIterator;
-import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IntIterator;
+import com.lapissea.iterableplus.IterableIntPP;
+import com.lapissea.iterableplus.Iters;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

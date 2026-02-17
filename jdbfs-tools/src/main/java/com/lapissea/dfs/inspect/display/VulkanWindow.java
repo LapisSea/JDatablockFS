@@ -20,8 +20,8 @@ import com.lapissea.dfs.inspect.display.vk.wrap.Surface;
 import com.lapissea.dfs.inspect.display.vk.wrap.Swapchain;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkImageView;
 import com.lapissea.dfs.inspect.display.vk.wrap.VulkanQueue;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.iterableplus.Iters;
 import org.joml.Matrix3x2f;
 import org.lwjgl.glfw.GLFW;
 

@@ -8,7 +8,7 @@ import com.lapissea.dfs.inspect.display.vk.enums.VkImageLayout;
 import com.lapissea.dfs.inspect.display.vk.wrap.Descriptor;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSet;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkDescriptorSetLayout;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;

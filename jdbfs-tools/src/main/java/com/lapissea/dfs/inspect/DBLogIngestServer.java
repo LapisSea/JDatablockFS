@@ -1,7 +1,7 @@
 package com.lapissea.dfs.inspect;
 
 import com.lapissea.dfs.io.impl.MemoryData;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;

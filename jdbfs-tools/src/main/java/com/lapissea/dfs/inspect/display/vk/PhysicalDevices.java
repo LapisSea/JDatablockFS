@@ -1,10 +1,10 @@
 package com.lapissea.dfs.inspect.display.vk;
 
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.enums.VkQueueFlag;
 import com.lapissea.dfs.inspect.display.vk.wrap.PhysicalDevice;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.dfs.logging.Log;
+import com.lapissea.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkPhysicalDevice;

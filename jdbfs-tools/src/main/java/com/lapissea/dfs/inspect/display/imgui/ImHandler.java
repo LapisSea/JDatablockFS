@@ -36,7 +36,7 @@ public class ImHandler{
 		io.setConfigWindowsResizeFromEdges(true);
 		
 		
-		rawFontResources.addAll(ImTools.setupFont(io, "/CourierPrime/Regular/font.ttf"));
+		rawFontResources.addAll(ImTools.setupFont(io, "/font/CourierPrime/Regular/font.ttf"));
 		
 		imGuiImpl = new ImGuiImpl(core, imGuiRenderer);
 		imGuiImpl.init(window, true);

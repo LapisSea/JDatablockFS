@@ -3,7 +3,7 @@ module JDatablockFS.old_logger {
 	requires org.joml;
 	requires JDatablockFS.core;
 	requires jlapisutil;
-	requires glfw.window;
+	requires GLFWWindow;
 	requires jlapisvector;
 	requires org.lwjgl.glfw;
 	requires org.lwjgl.opengl;
@@ -13,6 +13,7 @@ module JDatablockFS.old_logger {
 	
 	requires imgui.lwjgl3;
 	requires imgui.binding;
+	requires IterablePP;
 	
 	exports com.lapissea.dfs.old_logger.logging;
 	

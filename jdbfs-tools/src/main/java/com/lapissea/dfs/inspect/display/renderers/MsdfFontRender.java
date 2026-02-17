@@ -46,8 +46,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, MsdfFontRender.RenderToken>, PrimitiveBuffer.FontRednerer{
 	
-	private static final String TEXTURE_PATH = "/roboto/regular/atlas.png";
-	private static final String LAYOUT_PATH  = "/roboto/regular/atlas.json";
+	private static final String FONT_PATH = "/font/CourierPrime/Regular";
 	
 	private static class Letter{
 		private static final int SIZE = (2 + 4)*2;
@@ -172,11 +171,11 @@ public class MsdfFontRender implements Renderer<MsdfFontRender.RenderResource, M
 		this.core = Objects.requireNonNull(core);
 		shader = new ShaderModuleSet(core, "msdfFont", ShaderType.VERTEX, ShaderType.FRAGMENT);
 		
-		var tableTask = CompletableFuture.supplyAsync(() -> Glyphs.loadTable(LAYOUT_PATH)).whenComplete((table, e) -> {
+		var tableTask = CompletableFuture.supplyAsync(() -> Glyphs.loadTable(FONT_PATH + "/atlas.json")).whenComplete((table, e) -> {
 			if(e != null) throw UtilL.uncheckedThrow(e);
 			this.table = table;
 		});
-		var atlasTask = VulkanTexture.loadTexture(TEXTURE_PATH, false, () -> core).whenComplete((texture, e) -> {
+		var atlasTask = VulkanTexture.loadTexture(FONT_PATH + "/atlas.png", false, () -> core).whenComplete((texture, e) -> {
 			if(e != null) throw UtilL.uncheckedThrow(e);
 			atlasTexture = texture;
 		});

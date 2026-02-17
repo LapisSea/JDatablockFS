@@ -1,8 +1,8 @@
 package com.lapissea.dfs.inspect.display.vk;
 
 import com.lapissea.dfs.inspect.display.VUtils;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.PPBakedSequence;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.PPBakedSequence;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 

@@ -2,7 +2,7 @@ package com.lapissea.dfs.inspect.display.vk;
 
 import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.wrap.VkBuffer;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 import org.lwjgl.system.StructBuffer;

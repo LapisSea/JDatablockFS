@@ -1,6 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/Fuzzer/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Fuzzer/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/IterablePP/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/IterablePP/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Jorth/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Jorth/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/LightControl/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/LightControl/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/Photos/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/Photos/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/World/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/demos/World/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-lz4/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-lz4/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-old-logger/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-old-logger/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-run/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-run/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-tools/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/jdbfs-tools/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$APPLICATION_HOME_DIR$/bin/src/main/java" charset="UTF-8" />
     <file url="file://$APPLICATION_HOME_DIR$/bin/src/main/resources" charset="UTF-8" />
   </component>

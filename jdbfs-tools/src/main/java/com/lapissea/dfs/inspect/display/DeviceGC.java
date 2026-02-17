@@ -1,7 +1,7 @@
 package com.lapissea.dfs.inspect.display;
 
 import com.lapissea.dfs.inspect.display.vk.VulkanResource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.ArrayList;
 import java.util.Collection;

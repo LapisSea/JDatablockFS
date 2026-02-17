@@ -4,7 +4,7 @@ import com.lapissea.dfs.inspect.display.VulkanCodeException;
 import com.lapissea.dfs.inspect.display.vk.CommandBuffer;
 import com.lapissea.dfs.inspect.display.vk.VKCalls;
 import com.lapissea.dfs.inspect.display.vk.VulkanResource;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
@@ -14,11 +14,17 @@ import java.util.List;
 public class CommandPool extends VulkanResource.DeviceHandleObj{
 	
 	public enum Type{
-		/**For general use*/
+		/**
+		 * For general use
+		 */
 		NORMAL,
-		/**For data that is often rewritten*/
+		/**
+		 * For data that is often rewritten
+		 */
 		SHORT_LIVED,
-		/**For data that is set only once*/
+		/**
+		 * For data that is set only once
+		 */
 		WRITE_ONCE
 	}
 	
