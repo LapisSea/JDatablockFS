@@ -493,7 +493,7 @@ public final class IOFieldTools{
 		            });
 	}
 	public static IOInstance.Order orderFromNames(IterablePP<String> names){
-		return Annotations.make(IOInstance.Order.class, Map.of("value", names.toArray(String[]::new)));
+		return Annotations.makeVal(IOInstance.Order.class, names.toArray(String[]::new));
 	}
 	
 	public static <T extends IOInstance<T>> String toTableString(String title, Iterable<IOField<T, ?>> fields){

@@ -70,7 +70,7 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 							List.of(
 								Annotations.make(IODependency.VirtualNumSize.class, Map.of("name", numSizeName)),
 								IOValue.Unsigned.INSTANCE,
-								Annotations.make(IODependency.class, Map.of("value", new String[]{encodingName}))
+								Annotations.makeVal(IODependency.class, new String[]{encodingName})
 							)
 						)
 					));
@@ -120,7 +120,7 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 			}),
 			new ValueGeneratorInfo<>(bytesField, new ValueGenerator.NoCheck<CTyp, Integer>(){
 				@Override
-				public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
+				public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
 					String   data = get(ioPool, instance);
 					Encoding enc  = encodingField.get(ioPool, instance);
 					return enc.calcSize(data);

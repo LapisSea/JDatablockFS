@@ -21,7 +21,7 @@ import java.util.WeakHashMap;
 public abstract class Annotations{
 	
 	public static IONullability makeNullability(IONullability.Mode mode){
-		return make(IONullability.class, Map.of("value", mode));
+		return makeVal(IONullability.class, mode);
 	}
 	
 	private static final Object                    NULL_CACHE           = new Object();
@@ -29,6 +29,9 @@ public abstract class Annotations{
 	private static final Map<Class<?>, Annotation> NO_ARG_CACHE         = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
 	public static <E extends Annotation> E make(Class<E> annotationType){ return make(annotationType, Map.of()); }
+	public static <E extends Annotation> E makeVal(Class<E> annotationType, Object value){
+		return make(annotationType, Map.of("value", value));
+	}
 	@SuppressWarnings("unchecked")
 	public static <E extends Annotation> E make(Class<E> annotationType, @NotNull Map<String, Object> annValues){
 		var        values     = Map.copyOf(annValues);
