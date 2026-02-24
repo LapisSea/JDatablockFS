@@ -6,7 +6,7 @@
 	
 	<properties>
 		<github.spair.version>1.86.11</github.spair.version>
-		<lwjgl.version>3.3.3</lwjgl.version>
+		<lwjgl.version>3.4.1</lwjgl.version>
 		<joml.version>1.10.5</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 	</properties>
@@ -18,12 +18,16 @@
 	</parent>
 	
 	<artifactId>jdbfs-tools</artifactId>
-	<version>1.0</version>
 	
 	<dependencies>
 		<dependency>
 			<groupId>lapissea.jdatablockfs</groupId>
 			<artifactId>jdbfs-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>lapissea.jdatablockfs</groupId>
+			<artifactId>jdbfs-lz4</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

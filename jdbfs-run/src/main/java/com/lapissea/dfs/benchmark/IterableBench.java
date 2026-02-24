@@ -1,7 +1,7 @@
 package com.lapissea.dfs.benchmark;
 
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;

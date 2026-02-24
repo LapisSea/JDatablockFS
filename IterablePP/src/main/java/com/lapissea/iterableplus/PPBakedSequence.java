@@ -1,4 +1,4 @@
-package com.lapissea.dfs.utils.iterableplus;
+package com.lapissea.iterableplus;
 
 import java.util.AbstractList;
 import java.util.Arrays;

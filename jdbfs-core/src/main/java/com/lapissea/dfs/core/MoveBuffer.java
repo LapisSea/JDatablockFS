@@ -2,7 +2,7 @@ package com.lapissea.dfs.core;
 
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.objects.ChunkPointer;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.util.Arrays;
 import java.util.Optional;

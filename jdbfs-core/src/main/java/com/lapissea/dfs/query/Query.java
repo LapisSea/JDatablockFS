@@ -4,7 +4,7 @@ import com.lapissea.dfs.objects.collections.IOIterator;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Match;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

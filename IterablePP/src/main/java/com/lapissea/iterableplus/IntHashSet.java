@@ -224,11 +224,12 @@ HPPC-RT borrowed code, ideas or both from:
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package com.lapissea.dfs.utils;
+package com.lapissea.iterableplus;
 
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 
@@ -298,7 +299,7 @@ public final class IntHashSet implements Cloneable, Iterable<IntHashSet.Cursor>{
 	 * Per-instance perturbation
 	 * introduced in rehashing to create a unique key distribution.
 	 */
-	private final int perturbation = new RawRandom().nextInt();
+	private final int perturbation = new Random().nextInt();
 	
 	
 	public IntHashSet(){

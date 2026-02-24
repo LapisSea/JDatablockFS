@@ -8,7 +8,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;

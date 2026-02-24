@@ -3,7 +3,7 @@ package com.lapissea.dfs.config;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.IllegalConfiguration;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

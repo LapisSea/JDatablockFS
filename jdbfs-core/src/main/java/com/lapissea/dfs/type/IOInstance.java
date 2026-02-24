@@ -19,9 +19,8 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
@@ -479,6 +478,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public interface DynamicFields<SELF extends Unmanaged<SELF>>{
 			@NotNull
 			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
+			@NotNull
+			CommandSet.CmdReader getUnmanagedReferenceWalkCommands();
 		}
 		
 		protected static void allowFullAccess(MethodHandles.Lookup lookup){
@@ -553,14 +554,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			if(fs.isEmpty()) return dynamic;
 			
 			return Iters.concat(fs, dynamic);
-		}
-		
-		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
-			if(getThisStruct().hasDynamicFields()){
-				throw new NotImplementedException(getThisStruct() + " has dynamic fields! Please implement walk commands!");
-			}else{
-				throw new UnsupportedOperationException();
-			}
 		}
 		
 		public final IOType getTypeDef(){

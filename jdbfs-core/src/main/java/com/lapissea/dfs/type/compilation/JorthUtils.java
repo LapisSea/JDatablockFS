@@ -1,7 +1,7 @@
 package com.lapissea.dfs.type.compilation;
 
 import com.lapissea.dfs.type.SupportedPrimitive;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;

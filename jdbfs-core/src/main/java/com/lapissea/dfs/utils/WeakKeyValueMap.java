@@ -1,7 +1,7 @@
 package com.lapissea.dfs.utils;
 
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;

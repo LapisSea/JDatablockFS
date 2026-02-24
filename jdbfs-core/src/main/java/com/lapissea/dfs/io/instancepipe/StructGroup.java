@@ -12,7 +12,7 @@ import com.lapissea.dfs.utils.ClosableLock;
 import com.lapissea.dfs.utils.GcDelayer;
 import com.lapissea.dfs.utils.KeyCounter;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Constructor;

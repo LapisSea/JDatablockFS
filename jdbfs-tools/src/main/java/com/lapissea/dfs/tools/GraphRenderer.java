@@ -12,7 +12,7 @@ import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;

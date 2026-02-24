@@ -2,8 +2,8 @@ package com.lapissea.dfs.internal;
 
 import com.lapissea.dfs.internal.Access.Mode;
 import com.lapissea.dfs.logging.Log;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.UtilL;
 
 import java.lang.invoke.MethodHandles;

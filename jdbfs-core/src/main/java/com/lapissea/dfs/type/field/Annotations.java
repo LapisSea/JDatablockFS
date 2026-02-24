@@ -1,8 +1,8 @@
 package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.type.field.annotations.IONullability;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -21,7 +21,7 @@ import java.util.WeakHashMap;
 public abstract class Annotations{
 	
 	public static IONullability makeNullability(IONullability.Mode mode){
-		return make(IONullability.class, Map.of("value", mode));
+		return makeVal(IONullability.class, mode);
 	}
 	
 	private static final Object                    NULL_CACHE           = new Object();
@@ -29,6 +29,9 @@ public abstract class Annotations{
 	private static final Map<Class<?>, Annotation> NO_ARG_CACHE         = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
 	public static <E extends Annotation> E make(Class<E> annotationType){ return make(annotationType, Map.of()); }
+	public static <E extends Annotation> E makeVal(Class<E> annotationType, Object value){
+		return make(annotationType, Map.of("value", value));
+	}
 	@SuppressWarnings("unchecked")
 	public static <E extends Annotation> E make(Class<E> annotationType, @NotNull Map<String, Object> annValues){
 		var        values     = Map.copyOf(annValues);

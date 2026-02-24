@@ -4,7 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.exceptions.MissingConstructor;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.lang.invoke.MethodHandle;

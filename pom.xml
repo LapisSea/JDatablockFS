@@ -12,11 +12,11 @@
 		
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		
-		<maven-compiler-plugin-version>3.13.0</maven-compiler-plugin-version>
-		<maven-surefire-plugin-version>3.5.2</maven-surefire-plugin-version>
-		<maven-assembly-plugin-version>3.7.1</maven-assembly-plugin-version>
-		<maven-gpg-plugin-version>3.2.7</maven-gpg-plugin-version>
-		<maven-source-plugin-version>3.3.1</maven-source-plugin-version>
+		<maven-compiler-plugin-version>3.15.0</maven-compiler-plugin-version>
+		<maven-surefire-plugin-version>3.5.4</maven-surefire-plugin-version>
+		<maven-assembly-plugin-version>3.8.0</maven-assembly-plugin-version>
+		<maven-gpg-plugin-version>3.2.8</maven-gpg-plugin-version>
+		<maven-source-plugin-version>3.4.0</maven-source-plugin-version>
 		
 		<jmh.version>1.37</jmh.version>
 		
@@ -30,14 +30,16 @@
 	<version>1.0</version>
 	
 	<modules>
-		<module>/jdbfs-core</module>
-		<module>/jdbfs-run</module>
-		<module>/jdbfs-tools</module>
+		<module>jdbfs-core</module>
+		<module>jdbfs-run</module>
+		<module>jdbfs-tools</module>
+		<module>jdbfs-lz4</module>
 		<module>Jorth</module>
 		<module>Fuzzer</module>
 		<module>demos/Photos</module>
 		<module>demos/World</module>
 		<module>demos/LightControl</module>
+		<module>IterablePP</module>
 	</modules>
 	
 	<dependencyManagement>
@@ -47,10 +49,11 @@
 				<artifactId>jlapisutil</artifactId>
 				<version>1.2.2</version>
 			</dependency>
+			
 			<dependency>
 				<groupId>org.testng</groupId>
 				<artifactId>testng</artifactId>
-				<version>7.10.2</version>
+				<version>7.12.0</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>
@@ -68,13 +71,13 @@
 			<dependency>
 				<groupId>org.assertj</groupId>
 				<artifactId>assertj-core</artifactId>
-				<version>3.27.2</version>
+				<version>4.0.0-M1</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>
 				<groupId>com.google.code.gson</groupId>
 				<artifactId>gson</artifactId>
-				<version>2.11.0</version>
+				<version>2.13.2</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

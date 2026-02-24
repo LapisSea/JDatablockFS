@@ -17,12 +17,12 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RunMark;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
 import org.testng.annotations.Test;
 
@@ -63,7 +63,7 @@ public final class StructFuzzTest{
 		Unsigned = Annotations.make(IOValue.Unsigned.class),
 		Gen      = Annotations.make(IOValue.Generic.class),
 		vns      = Annotations.make(IODependency.VirtualNumSize.class),
-		Nullable = Annotations.make(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE));
+		Nullable = Annotations.makeNullability(IONullability.Mode.NULLABLE);
 	
 	private static Annotation opt(RandomGenerator rand, Annotation ann){
 		return rand.nextBoolean()? ann : null;
@@ -211,7 +211,7 @@ public final class StructFuzzTest{
 			),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of(Annotations.make(IOInstance.Order.class, Map.of("value", new String[]{"s1", "s2"}))),
+			List.of(Annotations.makeVal(IOInstance.Order.class, new String[]{"s1", "s2"})),
 			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);

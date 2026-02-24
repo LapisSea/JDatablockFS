@@ -8,7 +8,7 @@ import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.type.field.fields.RefField;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;

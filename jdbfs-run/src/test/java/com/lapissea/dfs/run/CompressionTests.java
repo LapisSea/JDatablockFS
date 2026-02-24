@@ -19,9 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class CompressionTests{
 	
-	@DataProvider(name = "comps", parallel = true)
+	@DataProvider(name = "comps")
 	Object[][] comps(){
 		return Arrays.stream(IOCompression.Type.values()).map(t -> new Object[]{t}).toArray(Object[][]::new);
+	}
+	
+	@Test
+	void requireLZ4(){
+		IOCompression.Type.LZ4_FAST.pack(new byte[10]);
 	}
 	
 	@Test(dataProvider = "comps")

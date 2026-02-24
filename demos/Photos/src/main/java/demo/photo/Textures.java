@@ -1,7 +1,7 @@
 package demo.photo;
 
 import com.lapissea.dfs.utils.RawRandom;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOI;
 import demo.photo.db.ThumbnailDB;

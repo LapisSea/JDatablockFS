@@ -6,7 +6,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.utils.iterableplus.Iters;
+import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.util.ArrayDeque;
@@ -100,13 +100,15 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	private void writeDependencies(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
 		
-		if(field.hasDependencies()){
-			// add fields that are a dependency or contain any dependencies
-			allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).forEach(deps);
-		}
+		includeFieldDependency(field, deps);
 		
 		//If a field generates another one, then that one may be changed as well and must be written to preserve consistancy
-		Iters.from(field.getGenerators()).map(IOField.ValueGeneratorInfo::field).filter(allFields::contains).forEach(deps);
+		for(IOField.ValueGeneratorInfo<T, ?> info : field.getGenerators()){
+			IOField<T, ?> f = info.field();
+			if(allFields.contains(f)){
+				deps.accept(f);
+			}
+		}
 		
 		// must write all fields after this one as it may change size and shift around fields after it
 		if(!field.getSizeDescriptor().hasFixed()){
@@ -118,10 +120,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	private void readDependencies(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
 		
-		if(field.hasDependencies()){
-			// add fields that are a dependency or contain any dependencies
-			allFields.filtered(f -> f.iterUnpackedFields().anyMatch(field::isDependency)).forEach(deps);
-		}
+		includeFieldDependency(field, deps);
 		
 		//Find field and add to read fields when the field is skipped but is a dependency of another
 		// skipped field that may need the dependency to correctly skip
@@ -138,6 +137,20 @@ public class FieldDependency<T extends IOInstance<T>>{
 					if(dependenciesOfSkipped.anyMatch(e -> skippedField.iterUnpackedFields().anyIs(e))){
 						deps.accept(skippedField);
 					}
+				}
+			}
+		}
+	}
+	
+	private void includeFieldDependency(IOField<T, ?> field, Consumer<IOField<T, ?>> deps){
+		if(!field.hasDependencies()) return;
+		
+		// add fields that are a dependency or contain any dependencies
+		for(IOField<T, ?> f : allFields){
+			for(IOField<T, ?> tioField : f.iterUnpackedFields()){
+				if(field.isDependency(tioField)){
+					deps.accept(f);
+					break;
 				}
 			}
 		}
@@ -184,14 +197,22 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	private void ioAffectorResolve(IOField<T, ?> field, Predicate<IOField<T, ?>> isListed, Consumer<IOField<T, ?>> deps){
 		
-		var affectFields = allFields.filtered(
-			f -> Iters.from(f.getGenerators())
-			          .map(IOField.ValueGeneratorInfo::field)
-			          .anyMatch(gf -> gf == field)
-		);
-		var sizeLook = allFields.iterDependentOn(field);
-		
-		Iters.concat(affectFields, sizeLook).filter(f -> f.isVirtual(StoragePool.IO)).forEach(deps);
+		// affectFields
+		for(IOField<T, ?> f : allFields){
+			if(!f.isVirtual(StoragePool.IO)) continue;
+			
+			if(f.isDependency(field)){
+				deps.accept(f);
+				continue;
+			}
+			
+			for(IOField.ValueGeneratorInfo<T, ?> generator : f.getGenerators()){
+				if(generator.field() == field){
+					deps.accept(f);
+					break;
+				}
+			}
+		}
 	}
 	
 	private List<IOField.ValueGeneratorInfo<T, ?>> collectGenerators(Collection<IOField<T, ?>> writeFields){

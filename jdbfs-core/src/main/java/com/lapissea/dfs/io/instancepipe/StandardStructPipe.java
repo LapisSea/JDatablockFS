@@ -22,8 +22,8 @@ import com.lapissea.dfs.type.field.IOField.SpecializedGenerator.AccessMap.Consta
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.VirtualAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;

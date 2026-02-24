@@ -1,9 +1,9 @@
 package demo.photo;
 
-import com.lapissea.dfs.utils.iterableplus.IterablePP;
-import com.lapissea.dfs.utils.iterableplus.Iters;
-import com.lapissea.dfs.utils.iterableplus.Match;
-import com.lapissea.dfs.utils.iterableplus.Match.Some;
+import com.lapissea.iterableplus.IterablePP;
+import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
+import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import demo.photo.db.ThumbnailDB;

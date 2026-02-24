@@ -6,9 +6,9 @@ import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.utils.OptionalPP;
-import com.lapissea.dfs.utils.iterableplus.IterableIntPP;
-import com.lapissea.dfs.utils.iterableplus.IterableLongPP;
+import com.lapissea.iterableplus.IterableIntPP;
+import com.lapissea.iterableplus.IterableLongPP;
+import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 
