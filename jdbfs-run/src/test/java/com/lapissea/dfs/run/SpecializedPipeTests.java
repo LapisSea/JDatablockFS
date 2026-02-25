@@ -15,6 +15,7 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.SupportedPrimitive;
+import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -296,7 +297,7 @@ public class SpecializedPipeTests{
 	
 	
 	@Test(dependsOnMethods = {"testType", "aBunchOfFlags"})
-	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testMultiFuzz(){
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testMultiFuzz() throws LockedFlagSet{
 		var allFields = fieldPermutations().stream().toList();
 		
 		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
@@ -327,8 +328,9 @@ public class SpecializedPipeTests{
 				}
 			}
 		), FuzzingRunner::noopAction);
-		
-		FuzzingUtils.stableRun(Plan.start(fuz, 123, 10_000, 1), "testMultiFuzz");
+		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
+			FuzzingUtils.stableRun(Plan.start(fuz, 123, 10_000, 1), "testMultiFuzz");
+		}
 	}
 	
 	@SuppressWarnings("unchecked")

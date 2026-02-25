@@ -314,6 +314,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					
 					writeConstants(writer, constants, accessMap);
 					
+					Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
 					generateFunction_doRead(name, writer, generators, accessMap);
 				});
 			}catch(AccessMap.ConstantNeeded e){
@@ -375,7 +376,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 					);
 					var accessMap = new AccessMap();
 					writeConstants(writer, constants, accessMap);
-					generateFunction_readNew(name, writer, generators, accessMap, getStrategy(Struct.of(objType)));
+					generateFunction_readNew(name, writer, generators, accessMap, getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS)));
 				});
 			}catch(AccessMap.ConstantNeeded e){
 				constants.add(e.constant);
