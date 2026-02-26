@@ -12,6 +12,7 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -25,7 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, byte[]> implements IOField.SpecializedGenerator{
+public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCompanyField<T, byte[]> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<byte[]>{

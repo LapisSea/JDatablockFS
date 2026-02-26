@@ -15,6 +15,7 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -35,7 +36,7 @@ import java.util.Set;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 @IOUnsafeValue.Mark
-public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type> implements IOField.SpecializedGenerator{
+public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCompanyField<T, Type> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{

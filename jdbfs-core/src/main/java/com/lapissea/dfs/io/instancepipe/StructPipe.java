@@ -9,7 +9,7 @@ import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.internal.Access;
-import com.lapissea.dfs.internal.Runner;
+import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.io.content.ContentInputStream;
@@ -28,12 +28,14 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -46,8 +48,12 @@ import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
+import com.lapissea.jorth.BytecodeUtils;
+import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ObjectHolder;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -62,6 +68,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -135,6 +142,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private FieldDependency<T> fieldDependency;
 	
 	private StructPipe<ProxyBuilder<T>> builderPipe;
+	private Object                      builderMetadata;
 	private boolean                     needsBuilderObj;
 	
 	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2, LOCAL_DATA = 3;
@@ -155,7 +163,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 						throw UtilL.uncheckedThrow(e);
 					}
 					
-					builderTask.obj = needsBuilderObj? builderObjectTask(syncStage == STATE_DONE, res.builderMetadata()) : null;
+					builderMetadata = res.builderMetadata();
 					
 					if(DEBUG_VALIDATION) this.checkOrder(ioFields, compiler, getType());
 					
@@ -188,17 +196,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	boolean needsBuilderObj(){
 		waitForState(STATE_IO_FIELD);
 		return needsBuilderObj;
-	}
-	private CompletableFuture<StructPipe<ProxyBuilder<T>>> builderObjectTask(boolean initNow, Object builderMetadata){
-		if(initNow){
-			try{
-				var res = createBuilderPipe(builderMetadata);
-				return CompletableFuture.completedFuture(res);
-			}catch(Throwable err){
-				return CompletableFuture.failedFuture(err);
-			}
-		}
-		return CompletableFuture.supplyAsync(() -> createBuilderPipe(builderMetadata), t -> Runner.run(t, "BP-" + this.toShortString()));
 	}
 	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
 		var struct = getType().getBuilderObjType(true);
@@ -660,7 +657,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public StructPipe<ProxyBuilder<T>> getBuilderPipe(){
 		var pipe = builderPipe;
 		if(pipe != null) return pipe;
-		waitForStateDone();
+		return makeBuilderPipe();
+	}
+	private StructPipe<ProxyBuilder<T>> makeBuilderPipe(){
+		waitForState(STATE_IO_FIELD);
+		builderPipe = createBuilderPipe(builderMetadata);
+		builderMetadata = null;
 		return Objects.requireNonNull(builderPipe);
 	}
 	
@@ -1105,8 +1107,64 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	
-	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
+	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
 		return Match.empty();
+	}
+	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
+		if(!(getSpecializedImplementationWriter() instanceof Match.Some(var pipeWriter))){
+			return Match.empty();
+		}
+		
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
+		
+		while(true){
+			var    log      = JorthLogger.make();
+			byte[] bytecode = null;
+			try{
+				var type      = getType().getConcreteType();
+				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
+				
+				var jorth = new Jorth(type.getClassLoader(), log);
+				try(var writer = jorth.writer()){
+					
+					writer.addImportAs(type, "ObjType");
+					writer.addImportAs(className, "ThisClass");
+					writer.addImports(
+						Struct.class,
+						VarPool.class, DataProvider.class, ContentReader.class,
+						GenericContext.class, IOInstance.class
+					);
+					
+					pipeWriter.writePipeClass(writer, constants, type);
+				}
+				
+				bytecode = jorth.getClassFile(className);
+				
+				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
+				var cls    = access.defineClass(type, bytecode, true);
+				//noinspection unchecked
+				return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
+			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+				var added = constants.add(e.constant);
+				if(!added){
+					throw new IllegalStateException("Accessor already added");
+				}
+				log = null;
+			}catch(MalformedJorth e){
+				throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
+			}catch(AccessProvider.Defunct e){
+				throw new ShouldNeverHappenError(e);
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
+			}catch(NotImplementedException e){
+				throw new UnsupportedOperationException("Can not create specialized pipe for type: " + getType().getType().getTypeName() + " because one of the fields has an unimplemented variant", e);
+			}finally{
+				if(log != null){
+					Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
+					if(bytecode != null) BytecodeUtils.printClass(bytecode);
+				}
+			}
+		}
 	}
 	
 	@Override

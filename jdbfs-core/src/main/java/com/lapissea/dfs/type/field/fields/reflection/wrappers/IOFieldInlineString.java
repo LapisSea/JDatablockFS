@@ -11,6 +11,7 @@ import com.lapissea.dfs.type.field.BehaviourSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
@@ -24,7 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, String> implements IOField.SpecializedGenerator{
+public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOFieldWrapper<CTyp, String> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<String>{

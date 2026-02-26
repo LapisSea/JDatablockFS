@@ -13,6 +13,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
@@ -29,7 +30,7 @@ import java.util.function.BiFunction;
 import static com.lapissea.dfs.objects.NumberSize.LARGEST;
 import static com.lapissea.dfs.objects.NumberSize.VOID;
 
-public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer> implements IOField.SpecializedGenerator{
+public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage extends FieldUsage.InstanceOf<ChunkPointer>{
