@@ -616,7 +616,7 @@ public class MemoryWalker{
 		if(field instanceof IOFieldInlineObject objField){
 			return objField.getInstancePipe();
 		}
-		return StructPipe.of(parentPipe.getClass(), fieldValue.getThisStruct());
+		return StructPipe.of(parentPipe, fieldValue.getThisStruct());
 	}
 	
 	private <T extends IOInstance<T>> long unknownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, T instance, VarPool<T> ioPool, IOField<T, ?> field){

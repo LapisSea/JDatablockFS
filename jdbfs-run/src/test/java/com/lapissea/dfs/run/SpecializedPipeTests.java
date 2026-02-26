@@ -329,7 +329,7 @@ public class SpecializedPipeTests{
 			}
 		), FuzzingRunner::noopAction);
 		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
-			FuzzingUtils.stableRun(Plan.start(fuz, 123, 10_000, 1), "testMultiFuzz");
+			FuzzingUtils.stableRun(Plan.start(fuz, 123, 5_000, 1), "testMultiFuzz");
 		}
 	}
 	

@@ -104,7 +104,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public interface SpecializedImplementation{
-	
+		Class<StructPipe<?>> getGenericType();
 	}
 	
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE = new ConcurrentHashMap<>();
@@ -119,6 +119,28 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);
 		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(StructPipe<?> pipeType, Struct<T> struct){
+		
+		if(DEBUG_VALIDATION){
+			if(pipeType instanceof CheckedPipe.Standard<?> s){
+				pipeType = s.getUncheckedPipe();
+			}
+			if(pipeType instanceof CheckedPipe.Fixed<?> s){
+				pipeType = s.getUncheckedPipe();
+			}
+		}
+		
+		Class<? extends StructPipe> type;
+		if(pipeType instanceof StructPipe.SpecializedImplementation specialized){
+			type = specialized.getGenericType();
+		}else{
+			type = pipeType.getClass();
+		}
+		
+		return (P)of(type, struct);
 	}
 	
 	@SuppressWarnings("unchecked")

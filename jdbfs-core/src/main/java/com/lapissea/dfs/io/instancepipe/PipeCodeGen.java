@@ -169,11 +169,6 @@ public final class PipeCodeGen{
 		}
 	}
 	static <T extends IOInstance<T>> List<SpecializedGenerator> getSpecializedGenerators(Class<T> objType, Collection<IOField<T, ?>> fields){
-		var struct = Struct.of(objType, Struct.STATE_FIELD_MAKE);
-		if(fields == null){
-			fields = StandardStructPipe.standardCompile(struct, struct.getFields(), false).fields();
-		}
-		
 		List<SpecializedGenerator> generators = new ArrayList<>(fields.size());
 		
 		for(IOField<?, ?> field : fields){

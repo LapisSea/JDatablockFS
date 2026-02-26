@@ -1922,7 +1922,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			if(field instanceof IOFieldInlineObject obj){
 				return obj.getInstancePipe();
 			}
-			return StructPipe.of(pipe.getClass(), inst.getThisStruct());
+			return StructPipe.of(pipe, inst.getThisStruct());
 		}
 	}
 	

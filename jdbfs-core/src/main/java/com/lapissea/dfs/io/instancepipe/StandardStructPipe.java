@@ -62,7 +62,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return of(StandardStructPipe.class, struct, minRequestedStage);
 	}
 	
-	static <T extends IOInstance<T>> PipeFieldCompiler.Result<T> standardCompile(Struct<T> t, FieldSet<T> structFields, boolean testRun){
+	private static <T extends IOInstance<T>> PipeFieldCompiler.Result<T> standardCompile(Struct<T> t, FieldSet<T> structFields, boolean testRun){
 		var fields = IOFieldTools.stepFinal(structFields, List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
@@ -289,7 +289,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		Set<ConstantRequest> constants = new LinkedHashSet<>();
 		while(true){
 			try{
-				List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, null);
+				List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, makeSTDFields(objType));
 				
 				target = PipeCodeGen.makeImpl(lookup, name, writer -> {
 					writer.addImportAs(objType, "ObjType");
@@ -354,7 +354,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		MethodHandle target;
 		
 		Set<ConstantRequest>       constants  = new LinkedHashSet<>();
-		List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, null);
+		List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, makeSTDFields(objType));
 		
 		while(true){
 			try{
@@ -425,6 +425,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 							{!}
 						end
 					end
+					
+					public function getGenericType
+						returns #Class
+					start
+						class #StandardStructPipe
+					end
 					""",
 				StructPipe.STATE_DONE
 			);
@@ -434,7 +440,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			
 			List<SpecializedGenerator> generators;
 			if(hasReadyStruct){
-				var fields = getInitializationState()>=STATE_IO_FIELD? getSpecificFields() : null;
+				List<IOField<T, ?>> fields;
+				if(getInitializationState()>=STATE_IO_FIELD) fields = getSpecificFields();
+				else fields = makeSTDFields(type);
 				generators = PipeCodeGen.tryGetSpecializedGenerators(type, fields);
 			}else generators = null;
 			
@@ -451,6 +459,10 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			
 			writer.wEnd();
 		});
+	}
+	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){
+		var struct = Struct.of(type, Struct.STATE_FIELD_MAKE);
+		return standardCompile(struct, struct.getFields(), false).fields();
 	}
 	
 	

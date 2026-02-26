@@ -667,7 +667,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				struct = Struct.of((Class<VT>)unmanagedField.getType());
 			}
 			
-			return StructPipe.of(pipe.getClass(), struct);
+			return StructPipe.of(pipe, struct);
 		}
 		
 		protected final void writeManagedFields() throws IOException{
