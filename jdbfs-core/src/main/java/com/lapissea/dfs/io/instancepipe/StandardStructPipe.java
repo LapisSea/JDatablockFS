@@ -1,12 +1,10 @@
 package com.lapissea.dfs.io.instancepipe;
 
-import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -20,19 +18,14 @@ import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap;
 import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap.ConstantRequest;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
-import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
@@ -284,156 +277,19 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
-		MethodHandle         target;
-		Set<ConstantRequest> constants = new LinkedHashSet<>();
-		while(true){
-			try{
-				List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, makeSTDFields(objType));
-				
-				target = PipeCodeGen.makeImpl(lookup, name, writer -> {
-					writer.addImportAs(objType, "ObjType");
-					writer.addImports(
-						VarPool.class, DataProvider.class, ContentReader.class,
-						GenericContext.class, StandardStructPipe.class, IOInstance.class,
-						Struct.class
-					);
-					
-					var accessMap = new AccessMap();
-					accessMap.setup(true, false);
-					
-					PipeCodeGen.writeConstants(writer, constants, accessMap);
-					
-					Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
-					generateFunction_doRead(name, writer, generators, accessMap);
-				});
-			}catch(AccessMap.ConstantNeeded e){
-				constants.add(e.constant);
-				continue;
-			}catch(Throwable t){
-				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
-				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-				target = getGenericDoRead();
-			}
-			return new ConstantCallSite(target);
-		}
-	}
-	
-	private static void generateFunction_doRead(String name, CodeStream writer, List<SpecializedGenerator> generators, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-		writer.write(
-			"""
-				public static function {0}
-					arg ioPool #VarPool<#ObjType>
-					arg provider #DataProvider
-					arg src #ContentReader
-					arg instance #ObjType
-					arg genericContext #GenericContext
-					returns #ObjType
-				start
-					get #arg instance
-				""",
-			name
-		);
-		
-		for(SpecializedGenerator generator : generators){
-			accessMap.markTemporary();
-			generator.injectReadField(writer, accessMap);
-			accessMap.dropTemporary(writer);
-		}
-		
-		writer.write(
-			"""
-					return
-				end
-				"""
-		);
+		var fields = makeSTDFields(objType);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields, StandardStructPipe::getGenericDoRead);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
-		MethodHandle target;
-		
-		Set<ConstantRequest>       constants  = new LinkedHashSet<>();
-		List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(objType, makeSTDFields(objType));
-		
-		while(true){
-			try{
-				target = PipeCodeGen.makeImpl(lookup, name, writer -> {
-					writer.addImportAs(objType, "ObjType");
-					writer.addImports(
-						VarPool.class, DataProvider.class, ContentReader.class,
-						GenericContext.class, Struct.class, StandardStructPipe.class, IOInstance.class
-					);
-					var accessMap = new AccessMap();
-					PipeCodeGen.writeConstants(writer, constants, accessMap);
-					generateFunction_readNew(name, writer, generators, accessMap, PipeCodeGen.getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS)));
-				});
-			}catch(AccessMap.ConstantNeeded e){
-				constants.add(e.constant);
-				continue;
-			}catch(Throwable t){
-				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
-				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-				target = getGenericReadNew();
-			}
-			return new ConstantCallSite(target);
-		}
-	}
-	
-	private static void generateFunction_readNew(String functionName, CodeStream writer, List<SpecializedGenerator> generators, AccessMap accessMap, PipeCodeGen.ConstructionStrategy strategy) throws MalformedJorth, AccessMap.ConstantNeeded{
-		writer.write(
-			"""
-				public static function {0}
-					arg provider #DataProvider
-					arg src #ContentReader
-					arg genericContext #GenericContext
-					returns #ObjType
-				start
-				""",
-			functionName
-		);
-		
-		PipeCodeGen.makeAndReadObj(writer, generators, accessMap, strategy);
-		
-		writer.write(
-			"""
-					return
-				end
-				"""
-		);
+		var fields = makeSTDFields(objType);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields, StandardStructPipe::getGenericReadNew);
 	}
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
 		return Match.of((writer, constants, type) -> {
-			writer.addImport(StandardStructPipe.class);
-			writer.write(
-				"""
-					extends #StandardStructPipe<#ObjType>
-					implements {}
-					public class #ThisClass start
-					""",
-				SpecializedImplementation.class
-			);
-			writer.write(
-				"""
-					public function <init> start
-						super start
-							static call #Struct of start
-								class #ObjType
-							end
-							{!}
-						end
-					end
-					
-					public function getGenericType
-						returns #Class
-					start
-						class #StandardStructPipe
-					end
-					""",
-				StructPipe.STATE_DONE
-			);
+			PipeCodeGen.defaultClassDef(writer);
 			
 			boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
 			constants.add(new ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", hasReadyStruct + ""));
@@ -464,6 +320,5 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var struct = Struct.of(type, Struct.STATE_FIELD_MAKE);
 		return standardCompile(struct, struct.getFields(), false).fields();
 	}
-	
 	
 }

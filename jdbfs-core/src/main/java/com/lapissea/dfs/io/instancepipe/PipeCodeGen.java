@@ -1,9 +1,13 @@
 package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
@@ -16,11 +20,14 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeSupplier;
 
+import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -147,6 +154,10 @@ public final class PipeCodeGen{
 		jorth.addImportAs(cname, "ThisClass");
 		try{
 			try(var writer = jorth.writer()){
+				writer.addImports(
+					VarPool.class, DataProvider.class, ContentReader.class,
+					GenericContext.class, Struct.class, IOInstance.class
+				);
 				writer.write("class #ThisClass start");
 				generateFn.accept(writer);
 				writer.wEnd();
@@ -261,7 +272,7 @@ public final class PipeCodeGen{
 			writer.write(
 				"""
 					call-virtual
-						bootstrap-fn #StandardStructPipe bootstrapReadNew
+						bootstrap-fn #GeneratorPipeClass bootstrapReadNew
 							arg #Class #ObjType
 						calling-fn readNew start
 							arg #DataProvider
@@ -318,7 +329,7 @@ public final class PipeCodeGen{
 			writer.write(
 				"""
 					call-virtual
-						bootstrap-fn #StandardStructPipe bootstrapDoRead
+						bootstrap-fn #GeneratorPipeClass bootstrapDoRead
 							arg #Class #ObjType
 						calling-fn doRead start
 							arg #VarPool<#ObjType>
@@ -343,6 +354,147 @@ public final class PipeCodeGen{
 					return
 				end
 				"""
+		);
+	}
+	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
+		MethodHandles.Lookup lookup, String name, Class<T> objType,
+		List<IOField<T, ?>> fields, UnsafeSupplier<MethodHandle, ReflectiveOperationException> getGenericDoRead
+	) throws Throwable{
+		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
+		MethodHandle                                        target;
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
+		while(true){
+			try{
+				List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
+				
+				target = makeImpl(lookup, name, writer -> {
+					writer.addImportAs(objType, "ObjType");
+					
+					var accessMap = new SpecializedGenerator.AccessMap();
+					accessMap.setup(true, false);
+					
+					writeConstants(writer, constants, accessMap);
+					
+					Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
+					
+					writer.write(
+						"""
+							public static function {0}
+								arg ioPool #VarPool<#ObjType>
+								arg provider #DataProvider
+								arg src #ContentReader
+								arg instance #ObjType
+								arg genericContext #GenericContext
+								returns #ObjType
+							start
+								get #arg instance
+							""",
+						name
+					);
+					
+					for(SpecializedGenerator generator : generators){
+						accessMap.markTemporary();
+						generator.injectReadField(writer, accessMap);
+						accessMap.dropTemporary(writer);
+					}
+					
+					writer.write(
+						"""
+								return
+							end
+							"""
+					);
+					
+				});
+			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+				constants.add(e.constant);
+				continue;
+			}catch(Throwable t){
+				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+				target = getGenericDoRead.get();
+			}
+			return new ConstantCallSite(target);
+		}
+	}
+	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
+		MethodHandles.Lookup lookup, String name, Class<T> objType,
+		List<IOField<T, ?>> fields, UnsafeSupplier<MethodHandle, ReflectiveOperationException> getGenericReadNew
+	) throws Throwable{
+		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
+		MethodHandle target;
+		
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants  = new LinkedHashSet<>();
+		List<SpecializedGenerator>                          generators = getSpecializedGenerators(objType, fields);
+		
+		while(true){
+			try{
+				target = makeImpl(lookup, name, writer -> {
+					writer.addImportAs(objType, "ObjType");
+					var accessMap = new SpecializedGenerator.AccessMap();
+					
+					writeConstants(writer, constants, accessMap);
+					
+					ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
+					writer.write(
+						"""
+							public static function {0}
+								arg provider #DataProvider
+								arg src #ContentReader
+								arg genericContext #GenericContext
+								returns #ObjType
+							start
+							""",
+						name
+					);
+					
+					makeAndReadObj(writer, generators, accessMap, strategy);
+					
+					writer.write(
+						"""
+								return
+							end
+							"""
+					);
+				});
+			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+				constants.add(e.constant);
+				continue;
+			}catch(Throwable t){
+				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
+				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
+				target = getGenericReadNew.get();
+			}
+			return new ConstantCallSite(target);
+		}
+	}
+	static void defaultClassDef(CodeStream writer) throws MalformedJorth{
+		writer.write(
+			"""
+				extends #GeneratorPipeClass<#ObjType>
+				implements {}
+				public class #ThisClass start
+				""",
+			StructPipe.SpecializedImplementation.class
+		);
+		writer.write(
+			"""
+				public function <init> start
+					super start
+						static call #Struct of start
+							class #ObjType
+						end
+						{!}
+					end
+				end
+				
+				public function getGenericType
+					returns #Class
+				start
+					class #GeneratorPipeClass
+				end
+				""",
+			StructPipe.STATE_DONE
 		);
 	}
 }

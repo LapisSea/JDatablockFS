@@ -1149,6 +1149,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var jorth = new Jorth(type.getClassLoader(), log);
 				try(var writer = jorth.writer()){
 					
+					writer.addImportAs(this.getClass(), "GeneratorPipeClass");
 					writer.addImportAs(type, "ObjType");
 					writer.addImportAs(className, "ThisClass");
 					writer.addImports(

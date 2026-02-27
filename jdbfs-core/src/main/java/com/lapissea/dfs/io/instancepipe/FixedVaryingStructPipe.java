@@ -12,9 +12,11 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldSet;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.iterableplus.Match;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -187,5 +189,30 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	@Override
 	public String toString(){
 		return shortPipeName(getClass()) + "(" + getType().cleanName() + ":" + sizesStr + ")";
+	}
+	
+	@Override
+	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
+		return Match.of((writer, constants, type) -> {
+			PipeCodeGen.defaultClassDef(writer);
+			
+			//Always true, varying pipe needs object info, can't generate fields on the fly so delegation is not possible
+			constants.add(new SpecializedGenerator.AccessMap.ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", "true"));
+			
+			List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(type, getSpecificFields());
+			
+			var accessMap = new SpecializedGenerator.AccessMap();
+			PipeCodeGen.writeConstants(writer, constants, accessMap);
+			
+			boolean noCtor = type.isAnnotationPresent(Struct.NoDefaultConstructor.class);
+			
+			PipeCodeGen.overwrite_doRead(writer, noCtor? generators : null, accessMap);
+			
+			if(!noCtor){
+				PipeCodeGen.overwrite_readNew(writer, generators, accessMap, getType());
+			}
+			
+			writer.wEnd();
+		});
 	}
 }
