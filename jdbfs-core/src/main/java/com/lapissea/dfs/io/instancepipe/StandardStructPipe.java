@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap;
 import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap.ConstantRequest;
+import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
 
@@ -26,8 +27,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
@@ -179,7 +178,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			
 			//If any other field depends on this field, then it has to be read
 			if(field.iterUnpackedFields().flatMap(fields::iterDependentOn).hasAny()){
-				var needsInstance = !field.iterUnpackedFields().allMatch(f -> f.isVirtual(IO));
+				var needsInstance = !field.iterUnpackedFields().filter(e -> e.getAccessor() != null).allMatch(f -> f.isVirtual(StoragePool.IO));
 				cmds.add(new CmdBuild.Read(needsInstance, field.needsIOPool()));
 				continue;
 			}
