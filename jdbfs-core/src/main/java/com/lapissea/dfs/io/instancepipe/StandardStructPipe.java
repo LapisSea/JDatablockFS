@@ -5,6 +5,7 @@ import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.content.BBView;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -14,15 +15,14 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
-import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap;
 import com.lapissea.dfs.type.field.SpecializedGenerator.AccessMap.ConstantRequest;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
@@ -251,38 +251,18 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static MethodHandle genericDoRead;
-	private static MethodHandle genericReadNew;
-	private static synchronized MethodHandle getGenericDoRead() throws IllegalAccessException, NoSuchMethodException{
-		if(genericDoRead == null){
-			var mt = StandardStructPipe.class.getDeclaredMethod(
-				"genericDoRead",
-				VarPool.class, DataProvider.class, ContentReader.class, IOInstance.class, GenericContext.class);
-			genericDoRead = MethodHandles.lookup().unreflect(mt);
-		}
-		return genericDoRead;
-	}
-	private static synchronized MethodHandle getGenericReadNew() throws IllegalAccessException, NoSuchMethodException{
-		if(genericReadNew == null){
-			var mt = StandardStructPipe.class.getDeclaredMethod(
-				"genericReadNew", DataProvider.class, ContentReader.class, GenericContext.class);
-			genericReadNew = MethodHandles.lookup().unreflect(mt);
-		}
-		return genericReadNew;
-	}
-	
 	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		return super.readNew(provider, src, genericContext);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields, StandardStructPipe::getGenericDoRead);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields, StandardStructPipe::getGenericReadNew);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields);
 	}
 	
 	@Override
@@ -295,22 +275,20 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			
 			List<SpecializedGenerator> generators;
 			if(hasReadyStruct){
-				List<IOField<T, ?>> fields;
-				if(getInitializationState()>=STATE_IO_FIELD) fields = getSpecificFields();
-				else fields = makeSTDFields(type);
-				generators = PipeCodeGen.tryGetSpecializedGenerators(type, fields);
+				for(int i = 0; i<10; i++){
+					if(getInitializationState()>=STATE_IO_FIELD) break;
+					UtilL.sleep(2);
+				}
+				if(getInitializationState()>=STATE_IO_FIELD){
+					var fields = getSpecificFields();
+					generators = PipeCodeGen.getSpecializedGenerators(type, fields);
+				}else{
+					Log.info("Delaying codegen to boostrap because {}#yellow is not ready", this);
+					generators = null;
+				}
 			}else generators = null;
 			
-			var accessMap = new AccessMap();
-			PipeCodeGen.writeConstants(writer, constants, accessMap);
-			
-			boolean noCtor = type.isAnnotationPresent(Struct.NoDefaultConstructor.class);
-			
-			PipeCodeGen.overwrite_doRead(writer, noCtor? generators : null, accessMap);
-			
-			if(!noCtor){
-				PipeCodeGen.overwrite_readNew(writer, generators, accessMap, getType());
-			}
+			PipeCodeGen.standardPipeImpl(writer, constants, type, getType(), generators);
 			
 			writer.wEnd();
 		});

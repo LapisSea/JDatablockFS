@@ -1,5 +1,6 @@
 package com.lapissea.dfs.type.field;
 
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.WordSpace;
@@ -20,13 +21,13 @@ import java.util.Set;
 public interface SpecializedGenerator{
 	
 	interface OnBitSpace<T extends IOInstance<T>> extends SpecializedGenerator{
-		void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded;
+		void injectReadFieldFromBits(CodeStream writer, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType;
 		
 		SizeDescriptor<T> getSizeDescriptor();
 		FieldAccessor<T> getAccessor();
 		
 		@Override
-		default void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		default void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			var bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
 			var bytes = BitUtils.bitsToBytes(bits);
 			var name  = accessMap.temporaryLocalField(bits<32? int.class : long.class, writer);
@@ -241,5 +242,5 @@ public interface SpecializedGenerator{
 		}
 	}
 	
-	void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded;
+	void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType;
 }

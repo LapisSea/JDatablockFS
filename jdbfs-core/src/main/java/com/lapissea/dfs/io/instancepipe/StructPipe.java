@@ -7,7 +7,9 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.TypeIOFail;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
@@ -1132,7 +1134,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
 		return Match.empty();
 	}
-	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
+	protected Match<StructPipe<T>> buildSpecializedImplementation(){
 		if(!(getSpecializedImplementationWriter() instanceof Match.Some(var pipeWriter))){
 			return Match.empty();
 		}
@@ -1158,7 +1160,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 						GenericContext.class, IOInstance.class
 					);
 					
-					pipeWriter.writePipeClass(writer, constants, type);
+					try{
+						pipeWriter.writePipeClass(writer, constants, type);
+					}catch(UnsupportedCodeGenType e){
+						if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
+							Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
+							return Match.empty();
+						}
+						throw new MalformedStruct("The struct was selected for optimized pipe implementation but it is not supported", e);
+					}
 				}
 				
 				bytecode = jorth.getClassFile(className);

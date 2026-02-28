@@ -1,6 +1,9 @@
 package com.lapissea.dfs.config;
 
+import com.lapissea.dfs.io.instancepipe.StructPipe.Special;
 import com.lapissea.dfs.logging.Log;
+import com.lapissea.dfs.logging.Log.LogLevel;
+import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.FieldCompiler.AccessType;
 import com.lapissea.dfs.type.compilation.JorthLogger.CodeLog;
 import com.lapissea.util.LogUtil;
@@ -49,6 +52,27 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 		public void log(String msg)                                       { if(isEnabled()) Log.log(msg); }
 	}
 	
+	enum PipeOptimization{
+		/**
+		 * Every managed {@link IOInstance} will attempt to generate optimized implementations of pipes </br>
+		 * <i>Note: When a type is unsupported, it will be ignored and fallback will be used.
+		 * Set {@link ConfigDefs#LOG_LEVEL} to {@link LogLevel#INFO} or greater to see if or why a field will not be optimized.</i> </br>
+		 * <b>Warning:</b> This flag is experimental and will cause additional synchronization when loading instances.
+		 * If you are experiencing deadlocks, please do not use this.
+		 */
+		TRY_ALWAYS,
+		/**
+		 * Only {@link IOInstance}s with the {@link Special} annotation will generate optimized implementations of pipes.
+		 * This annotation is to be given to types that are known to only have fields supported by the codegen.
+		 * It is recommended to only add this annotation on types that will be read or written a lot as it may slow down startup time.
+		 */
+		SPECIAL_ONLY,
+		/**
+		 * Never generate optimized pipes. Should only be used if there is an issue
+		 */
+		NEVER
+	}
+	
 	String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
 	Flag.FBool STRICT_FLAGS       = flagB("strictFlags", false);
@@ -57,7 +81,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool DO_INTEGRITY_CHECK = flagB("typeValidation.doIntegrityCheck", TYPE_VALIDATION);
 	Flag.FInt  BATCH_BYTES        = flagI("batchBytes", 8192).natural();
 	
-	Flag.FEnum<Log.LogLevel> LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
+	Flag.FEnum<LogLevel>     LOG_LEVEL         = flagE("log.level", RELEASE_MODE.boolMap(WARN, INFO));
 	Flag.FBool               PRINT_FLAGS       = flagB("log.printFlags", () -> deb() && LOG_LEVEL.resolve().isWithin(INFO));
 	Flag.FEnum<CompLogLevel> PRINT_COMPILATION = flagE("log.printCompilation", LOG_LEVEL.<CompLogLevel>map(l -> {
 		if(l.isWithin(SMALL_TRACE)) return CompLogLevel.FULL;
@@ -70,7 +94,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool             COSTLY_STACK_TRACE  = flagB("tweaks.costlyStackTrace", deb());
 	Flag.FDur              DELAY_COMP_OBJ_GC   = flagDur("tweaks.delayCompilationObjGC", RELEASE_MODE.boolMap(Duration.ZERO, Duration.ofSeconds(5))).positive();
 	
-	Flag.FBool OPTIMIZED_PIPE = flagB("optimizedPipe", true);
+	Flag.FEnum<PipeOptimization> OPTIMIZED_PIPE = flagEV("optimizedPipe", PipeOptimization.SPECIAL_ONLY);
 	
 	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE("purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	
@@ -83,12 +107,11 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FDur  RUNNER_TASK_CHOKE_TIME      = flagDur("runner.taskChokeTime", () -> Duration.ofMillis(2000/cores())).positive().limitMaxNs(Long.MAX_VALUE);
 	Flag.FDur  RUNNER_WATCHER_TIMEOUT      = flagDur("runner.watcherTimeout", Duration.ofMillis(1000)).positive().limitMaxMs(Integer.MAX_VALUE);
 	
-	Flag.FBool          CLASSGEN_DEBUG                   = flagB("classGen.debug", false);
-	Flag.FBool          CLASSGEN_EXIT_ON_FAIL            = flagB("classGen.exitOnFail", false);
-	Flag.FBool          CLASSGEN_PRINT_GENERATING_INFO   = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
-	Flag.FEnum<CodeLog> CLASSGEN_PRINT_BYTECODE          = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
-	Flag.FStrOptional   CLASSGEN_DUMP_LOCATION           = flagS("classGen.dumpLocation");
-	Flag.FBool          CLASSGEN_SPECIALIZATION_FALLBACK = flagB("classGen.specializationFallback", false);
+	Flag.FBool          CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
+	Flag.FBool          CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
+	Flag.FBool          CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
+	Flag.FEnum<CodeLog> CLASSGEN_PRINT_BYTECODE        = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
+	Flag.FStrOptional   CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	
 	Flag.FEnum<LZ4Compatibility> LZ4_COMPATIBILITY = flagEV("lz4.compatibility", LZ4Compatibility.ANY);

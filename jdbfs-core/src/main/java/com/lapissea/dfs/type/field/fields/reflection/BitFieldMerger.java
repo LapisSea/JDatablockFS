@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitInputStream;
 import com.lapissea.dfs.io.bit.BitOutputStream;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -175,7 +176,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			src.skipExact(bytes);
 		}
 		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			var rawBits = accessMap.temporaryLocalField(long.class, writer);
 			
 			int totalBits = 0;
@@ -207,7 +208,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			for(var fi : group){
 				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
 				if(bits>31){
-					throw new NotImplementedException("Long bits field");
+					throw new UnsupportedCodeGenType("Long bits field");
 				}
 				var mask = BitUtils.makeMask(bits);
 				

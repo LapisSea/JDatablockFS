@@ -194,6 +194,9 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
 		return Match.of((writer, constants, type) -> {
+			if(type != getType().getType()){
+				throw new AssertionError();
+			}
 			PipeCodeGen.defaultClassDef(writer);
 			
 			//Always true, varying pipe needs object info, can't generate fields on the fly so delegation is not possible
@@ -201,16 +204,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			
 			List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(type, getSpecificFields());
 			
-			var accessMap = new SpecializedGenerator.AccessMap();
-			PipeCodeGen.writeConstants(writer, constants, accessMap);
-			
-			boolean noCtor = type.isAnnotationPresent(Struct.NoDefaultConstructor.class);
-			
-			PipeCodeGen.overwrite_doRead(writer, noCtor? generators : null, accessMap);
-			
-			if(!noCtor){
-				PipeCodeGen.overwrite_readNew(writer, generators, accessMap, getType());
-			}
+			PipeCodeGen.standardPipeImpl(writer, constants, type, getType(), generators);
 			
 			writer.wEnd();
 		});

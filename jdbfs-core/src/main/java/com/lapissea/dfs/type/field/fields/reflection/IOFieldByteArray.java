@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
@@ -20,7 +21,6 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.List;
@@ -148,12 +148,12 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		set(ioPool, instance, data);
 	}
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		if(compression != null){
-			throw new NotImplementedException("Compression variation not implemented");
+			throw new UnsupportedCodeGenType("Compression variation not implemented");
 		}
 		if(nullable()){
-			throw new NotImplementedException("Nullable variation not implemented");
+			throw new UnsupportedCodeGenType("Nullable variation not implemented");
 		}
 		
 		accessMap.preSet(getAccessor(), writer);

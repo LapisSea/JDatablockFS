@@ -258,10 +258,11 @@ public class SpecializedPipeTests{
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));
 		
-		var fields = List.of(field);
-		
-		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
-		
+		var                  fields = List.of(field);
+		BasicSpecial<T1, T2> pipes;
+		try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
+			pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
+		}
 		boolean debRead = getPipeFlag(pipes.specialPipe(), "DEBUG_READY_READ");
 		assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
 		

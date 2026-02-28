@@ -686,7 +686,7 @@ public final class Jorth extends CodeDestination{
 				var hasStart = optionalStart(source);
 				
 				var parent = currentClass.superType();
-				var call   = currentFunction.startCallRaw(parent, "<init>", true);
+				var call   = currentFunction.startCallRaw(parent, currentFunction.name(), true);
 				if(hasStart) pushEndStack(call);
 				else call.end();
 			}

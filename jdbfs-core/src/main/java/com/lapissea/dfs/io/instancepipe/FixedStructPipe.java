@@ -4,6 +4,7 @@ import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -16,7 +17,6 @@ import com.lapissea.iterableplus.Match;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.List;
@@ -98,38 +98,18 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 		return instance;
 	}
 	
-	private static MethodHandle genericDoRead;
-	private static MethodHandle genericReadNew;
-	private static synchronized MethodHandle getGenericDoRead() throws IllegalAccessException, NoSuchMethodException{
-		if(genericDoRead == null){
-			var mt = FixedStructPipe.class.getDeclaredMethod(
-				"genericDoRead",
-				VarPool.class, DataProvider.class, ContentReader.class, IOInstance.class, GenericContext.class);
-			genericDoRead = MethodHandles.lookup().unreflect(mt);
-		}
-		return genericDoRead;
-	}
-	private static synchronized MethodHandle getGenericReadNew() throws IllegalAccessException, NoSuchMethodException{
-		if(genericReadNew == null){
-			var mt = FixedStructPipe.class.getDeclaredMethod(
-				"genericReadNew", DataProvider.class, ContentReader.class, GenericContext.class);
-			genericReadNew = MethodHandles.lookup().unreflect(mt);
-		}
-		return genericReadNew;
-	}
-	
 	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		return super.readNew(provider, src, genericContext);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields, FixedStructPipe::getGenericDoRead);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields, FixedStructPipe::getGenericReadNew);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields);
 	}
 	
 	@Override
@@ -142,22 +122,16 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 			
 			List<SpecializedGenerator> generators;
 			if(hasReadyStruct){
-				List<IOField<T, ?>> fields;
-				if(getInitializationState()>=STATE_IO_FIELD) fields = getSpecificFields();
-				else fields = makeSTDFields(type);
-				generators = PipeCodeGen.tryGetSpecializedGenerators(type, fields);
+				if(getInitializationState()>=STATE_IO_FIELD){
+					var fields = getSpecificFields();
+					generators = PipeCodeGen.getSpecializedGenerators(type, fields);
+				}else{
+					Log.info("Delaying codegen to boostrap because {}#yellow is not ready", this);
+					generators = null;
+				}
 			}else generators = null;
 			
-			var accessMap = new SpecializedGenerator.AccessMap();
-			PipeCodeGen.writeConstants(writer, constants, accessMap);
-			
-			boolean noCtor = type.isAnnotationPresent(Struct.NoDefaultConstructor.class);
-			
-			PipeCodeGen.overwrite_doRead(writer, noCtor? generators : null, accessMap);
-			
-			if(!noCtor){
-				PipeCodeGen.overwrite_readNew(writer, generators, accessMap, getType());
-			}
+			PipeCodeGen.standardPipeImpl(writer, constants, type, getType(), generators);
 			
 			writer.wEnd();
 		});

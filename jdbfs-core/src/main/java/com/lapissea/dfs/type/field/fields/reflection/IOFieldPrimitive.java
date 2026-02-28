@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitReader;
 import com.lapissea.dfs.io.bit.BitWriter;
 import com.lapissea.dfs.io.content.ContentReader;
@@ -164,9 +165,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
-				throw new NotImplementedException("For now doubles can only be 8 bytes");
+				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
 			}
 			
 			accessMap.preSet(getAccessor(), writer);
@@ -231,9 +232,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+		public void injectReadField(CodeStream writer, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
-				throw new NotImplementedException("For now doubles can only be 8 bytes");
+				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
 			}
 			
 			if(nullable()){

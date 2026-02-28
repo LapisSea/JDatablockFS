@@ -2,6 +2,7 @@ package com.lapissea.dfs.io.instancepipe;
 
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
@@ -20,7 +21,6 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.function.UnsafeConsumer;
-import com.lapissea.util.function.UnsafeSupplier;
 
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
@@ -36,7 +36,7 @@ public final class PipeCodeGen{
 	public interface PipeWriter<T extends IOInstance<T>>{
 		void writePipeClass(
 			CodeStream writer, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, Class<T> type
-		) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded;
+		) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType;
 	}
 	
 	sealed interface ConstructionStrategy{
@@ -179,7 +179,7 @@ public final class PipeCodeGen{
 			}
 		}
 	}
-	static <T extends IOInstance<T>> List<SpecializedGenerator> getSpecializedGenerators(Class<T> objType, Collection<IOField<T, ?>> fields){
+	static <T extends IOInstance<T>> List<SpecializedGenerator> getSpecializedGenerators(Class<T> objType, Collection<IOField<T, ?>> fields) throws UnsupportedCodeGenType{
 		List<SpecializedGenerator> generators = new ArrayList<>(fields.size());
 		
 		for(IOField<?, ?> field : fields){
@@ -187,7 +187,7 @@ public final class PipeCodeGen{
 				generators.add(sg);
 				continue;
 			}
-			throw new UnsupportedOperationException(
+			throw new UnsupportedCodeGenType(
 				Log.fmt("""
 					        Not all fields support code generation:
 					          Type:  {}#red
@@ -196,17 +196,7 @@ public final class PipeCodeGen{
 		}
 		return generators;
 	}
-	static <T extends IOInstance<T>> List<SpecializedGenerator> tryGetSpecializedGenerators(Class<T> type, Collection<IOField<T, ?>> fields){
-		try{
-			return getSpecializedGenerators(type, fields);
-		}catch(UnsupportedOperationException t){
-			if(ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()){
-				Log.warn("Failed to generate specialization for {}#red because\n  {}", type, t);
-				return null;
-			}
-			throw t;
-		}
-	}
+	
 	static ConstructionStrategy getStrategy(Struct<?> type){
 		var cls = type.getType();
 		if(IOInstance.Def.isDefinition(cls)){
@@ -224,7 +214,7 @@ public final class PipeCodeGen{
 	}
 	static void makeAndReadObj(
 		CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, ConstructionStrategy strategy
-	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> {
 				accessMap.setup(false, false);
@@ -237,7 +227,11 @@ public final class PipeCodeGen{
 		
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
-			generator.injectReadField(writer, accessMap);
+			try{
+				generator.injectReadField(writer, accessMap);
+			}catch(UnsupportedCodeGenType e){
+				throw new UnsupportedCodeGenType("Failed to generate code for: " + generator, e);
+			}
 			accessMap.dropTemporary(writer);
 		}
 		
@@ -254,7 +248,8 @@ public final class PipeCodeGen{
 			}
 		}
 	}
-	static void overwrite_readNew(CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, Struct<?> type) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+	static void overwrite_readNew(CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, Struct<?> type)
+		throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		writer.write(
 			"""
 				@ #Override
@@ -278,12 +273,21 @@ public final class PipeCodeGen{
 							arg #DataProvider
 							arg #ContentReader
 							arg #GenericContext
-							returns #ObjType
+							returns #IOInstance
 						end
 					start
 						get #arg provider
 						get #arg src
 						get #arg genericContext
+					end
+					dup null ==
+					if start
+						super start
+							get #arg provider
+							get #arg src
+							get #arg genericContext
+						end
+						return
 					end
 					"""
 			);
@@ -295,7 +299,7 @@ public final class PipeCodeGen{
 				"""
 		);
 	}
-	static void overwrite_doRead(CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+	static void overwrite_doRead(CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		writer.write(
 			"""
 				@ #Override
@@ -346,6 +350,17 @@ public final class PipeCodeGen{
 						get #arg instance cast #ObjType
 						get #arg genericContext
 					end
+					dup null ==
+					if start
+						super start
+							get #arg ioPool
+							get #arg provider
+							get #arg src
+							get #arg instance cast #ObjType
+							get #arg genericContext
+						end
+						return
+					end
 					"""
 			);
 		}
@@ -356,116 +371,173 @@ public final class PipeCodeGen{
 				"""
 		);
 	}
-	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType,
-		List<IOField<T, ?>> fields, UnsafeSupplier<MethodHandle, ReflectiveOperationException> getGenericDoRead
-	) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
-		MethodHandle                                        target;
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
-		while(true){
-			try{
-				List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
-				
-				target = makeImpl(lookup, name, writer -> {
-					writer.addImportAs(objType, "ObjType");
-					
-					var accessMap = new SpecializedGenerator.AccessMap();
-					accessMap.setup(true, false);
-					
-					writeConstants(writer, constants, accessMap);
-					
-					Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
-					
-					writer.write(
-						"""
-							public static function {0}
-								arg ioPool #VarPool<#ObjType>
-								arg provider #DataProvider
-								arg src #ContentReader
-								arg instance #ObjType
-								arg genericContext #GenericContext
-								returns #ObjType
-							start
-								get #arg instance
-							""",
-						name
-					);
-					
-					for(SpecializedGenerator generator : generators){
-						accessMap.markTemporary();
-						generator.injectReadField(writer, accessMap);
-						accessMap.dropTemporary(writer);
-					}
-					
-					writer.write(
-						"""
-								return
-							end
-							"""
-					);
-					
-				});
-			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-				constants.add(e.constant);
-				continue;
-			}catch(Throwable t){
-				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
-				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-				target = getGenericDoRead.get();
-			}
-			return new ConstantCallSite(target);
+	
+	private static <T extends IOInstance<T>> ConstantCallSite failedDoReadNew(MethodHandles.Lookup lookup, String name, Class<T> objType){
+		try{
+			return new ConstantCallSite(makeImpl(lookup, name, writer -> {
+				writer.addImportAs(objType, "ObjType");
+				writer.write(
+					"""
+						public static function {}
+							arg ioPool #VarPool<#ObjType>
+							arg provider #DataProvider
+							arg src #ContentReader
+							arg instance #ObjType
+							arg genericContext #GenericContext
+							returns #ObjType
+						start
+							null start #ObjType end
+							return
+						end
+						""", name
+				);
+			}));
+		}catch(Throwable ex){
+			throw new RuntimeException(ex);
 		}
 	}
-	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType,
-		List<IOField<T, ?>> fields, UnsafeSupplier<MethodHandle, ReflectiveOperationException> getGenericReadNew
-	) throws Throwable{
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
-		MethodHandle target;
+	
+	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
+	){
+		Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
 		
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants  = new LinkedHashSet<>();
-		List<SpecializedGenerator>                          generators = getSpecializedGenerators(objType, fields);
-		
-		while(true){
-			try{
-				target = makeImpl(lookup, name, writer -> {
-					writer.addImportAs(objType, "ObjType");
-					var accessMap = new SpecializedGenerator.AccessMap();
-					
-					writeConstants(writer, constants, accessMap);
-					
-					ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
-					writer.write(
-						"""
-							public static function {0}
-								arg provider #DataProvider
-								arg src #ContentReader
-								arg genericContext #GenericContext
-								returns #ObjType
-							start
-							""",
-						name
-					);
-					
-					makeAndReadObj(writer, generators, accessMap, strategy);
-					
-					writer.write(
-						"""
-								return
-							end
+		try{
+			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
+			
+			while(true){
+				try{
+					var target = makeImpl(lookup, "bootstrapDoRead", writer -> {
+						writer.addImportAs(objType, "ObjType");
+						
+						var accessMap = new SpecializedGenerator.AccessMap();
+						accessMap.setup(true, false);
+						
+						writeConstants(writer, constants, accessMap);
+						
+						Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
+						
+						writer.write(
 							"""
-					);
-				});
-			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-				constants.add(e.constant);
-				continue;
-			}catch(Throwable t){
-				new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t).printStackTrace();
-				if(!ConfigDefs.CLASSGEN_SPECIALIZATION_FALLBACK.resolveVal()) throw t;
-				target = getGenericReadNew.get();
+								public static function bootstrapDoRead
+									arg ioPool #VarPool<#ObjType>
+									arg provider #DataProvider
+									arg src #ContentReader
+									arg instance #ObjType
+									arg genericContext #GenericContext
+									returns #ObjType
+								start
+									get #arg instance
+								""",
+							name
+						);
+						
+						for(SpecializedGenerator generator : generators){
+							accessMap.markTemporary();
+							generator.injectReadField(writer, accessMap);
+							accessMap.dropTemporary(writer);
+						}
+						
+						writer.write(
+							"""
+									return
+								end
+								"""
+						);
+						
+					});
+					return new ConstantCallSite(target);
+				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+					constants.add(e.constant);
+				}
 			}
-			return new ConstantCallSite(target);
+		}catch(UnsupportedCodeGenType e){
+			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
+				throw new RuntimeException("Failed to make specialized generators for " + objType.getTypeName());
+			}
+			Log.info("Failed to make specialized generators for {}#red because\n  {}", objType.getTypeName(), e);
+			return failedDoReadNew(lookup, name, objType);
+		}catch(Throwable t){
+			throw new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t);
+		}
+	}
+	
+	private static <T extends IOInstance<T>> ConstantCallSite failedReadNew(MethodHandles.Lookup lookup, String name, Class<T> objType){
+		try{
+			return new ConstantCallSite(makeImpl(lookup, name, writer -> {
+				writer.addImportAs(objType, "ObjType");
+				writer.write(
+					"""
+						public static function {}
+							arg provider #DataProvider
+							arg src #ContentReader
+							arg genericContext #GenericContext
+							returns #IOInstance
+						start
+							null start #IOInstance end
+							return
+						end
+						""", name
+				);
+			}));
+		}catch(Throwable ex){
+			ex.printStackTrace();
+			throw new RuntimeException(ex);
+		}
+	}
+	
+	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
+	){
+		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
+		
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
+		try{
+			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
+			
+			while(true){
+				try{
+					var target = makeImpl(lookup, name, writer -> {
+						writer.addImportAs(objType, "ObjType");
+						var accessMap = new SpecializedGenerator.AccessMap();
+						
+						writeConstants(writer, constants, accessMap);
+						
+						ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
+						writer.write(
+							"""
+								public static function {}
+									arg provider #DataProvider
+									arg src #ContentReader
+									arg genericContext #GenericContext
+									returns #IOInstance
+								start
+								""", name
+						);
+						
+						makeAndReadObj(writer, generators, accessMap, strategy);
+						
+						writer.write(
+							"""
+									return
+								end
+								"""
+						);
+					});
+					return new ConstantCallSite(target);
+				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+					constants.add(e.constant);
+				}
+			}
+		}catch(UnsupportedCodeGenType e){
+			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
+				throw new RuntimeException("Failed to make specialized generators for " + objType.getTypeName());
+			}
+			Log.info("Failed to make specialized generators for {}#red because\n  {}", objType.getTypeName(), e);
+			return failedReadNew(lookup, name, objType);
+		}catch(Throwable t){
+			throw new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t);
 		}
 	}
 	static void defaultClassDef(CodeStream writer) throws MalformedJorth{
@@ -496,5 +568,22 @@ public final class PipeCodeGen{
 				""",
 			StructPipe.STATE_DONE
 		);
+	}
+	
+	public static void standardPipeImpl(
+		CodeStream writer, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants,
+		Class<?> concreteType, Struct<?> type,
+		List<SpecializedGenerator> generators
+	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		var accessMap = new SpecializedGenerator.AccessMap();
+		writeConstants(writer, constants, accessMap);
+		
+		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
+		
+		overwrite_doRead(writer, noCtor? generators : null, accessMap);
+		
+		if(!noCtor){
+			overwrite_readNew(writer, generators, accessMap, type);
+		}
 	}
 }

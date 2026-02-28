@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.util.ConsoleColors.RESET;
@@ -147,21 +146,26 @@ final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 	}
 	private P newPipe(Struct<T> struct, int syncStage) throws ReflectiveOperationException{
 		var pipe = constructor.newInstance(struct, syncStage);
-		if(!ConfigDefs.OPTIMIZED_PIPE.resolveVal()){
-			return pipe;
-		}
-		if(!struct.getType().isAnnotationPresent(StructPipe.Special.class)){
-			return pipe;
-		}
-		if(!(pipe.buildSpecializedImplementation(syncStage) instanceof Match.Some(var specializedImplementation))){
+		if(struct instanceof Struct.Unmanaged){
 			return pipe;
 		}
 		
-		if(DEBUG_VALIDATION){
-			checkPipe(specializedImplementation, pipe);
-			//noinspection unchecked
-			return makeCheckedSpecialPipe(struct, syncStage, (P)specializedImplementation);
+		switch(ConfigDefs.OPTIMIZED_PIPE.resolve()){
+			case TRY_ALWAYS -> { }
+			case SPECIAL_ONLY -> {
+				if(!struct.getType().isAnnotationPresent(StructPipe.Special.class)){
+					return pipe;
+				}
+			}
+			case NEVER -> {
+				return pipe;
+			}
 		}
+		
+		if(!(pipe.buildSpecializedImplementation() instanceof Match.Some(var specializedImplementation))){
+			return pipe;
+		}
+		
 		//noinspection unchecked
 		return (P)specializedImplementation;
 	}
