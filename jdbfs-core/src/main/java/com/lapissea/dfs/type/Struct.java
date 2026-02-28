@@ -1068,4 +1068,68 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		var impl  = IOInstance.Def.partialImplementation(typ, names);
 		return Struct.of(impl);
 	}
+	
+	T immutableDeepClone(T toCopy){
+		builderCopy:
+		{
+			var builderTyp = builderObjType;
+			if(builderTyp == null) break builderCopy;
+			return builderClone(toCopy, builderTyp);
+		}
+		return reflectionClone(toCopy);
+	}
+	private T reflectionClone(T toCopy){
+		FieldSet<T> fields = getRealFields();
+		Object[]    values = new Object[fields.size()];
+		for(int i = 0; i<fields.size(); i++){
+			IOField<T, ?> field  = fields.get(i);
+			var           copied = makeCopyValue(toCopy, field);
+			values[i] = copied;
+		}
+		var types = getRealFields().mapped(IOField::getType).toArray(Class[]::new);
+		try{
+			var ctor = getType().getConstructor(types);
+			return ctor.newInstance(values);
+		}catch(Throwable e){
+			Log.warn("Failed to do reflection based clone for {}#red. Trying builder clone...", this);
+			return builderClone(toCopy, getBuilderObjType(false));
+		}
+	}
+	private static <T extends IOInstance<T>> T builderClone(T toCopy, Struct<ProxyBuilder<T>> builderTyp){
+		var builder = builderTyp.make();
+		builder.copyFrom(toCopy);
+		builder = builder.clone();//deep clone fields
+		return builder.build();
+	}
+	
+	@SuppressWarnings("unchecked")
+	static <T extends IOInstance<T>, V> V makeCopyValue(T toCopyFrom, IOField<T, V> field){
+		
+		var acc = field.getAccessor();
+		var typ = acc.getType();
+		if(typ.isArray()){
+			var arrField = (IOField<T, Object[]>)field;
+			
+			var arr = arrField.get(null, toCopyFrom);
+			if(arr == null || arr.length == 0) return (V)arr;
+			
+			arr = arr.clone();
+			
+			if(IOInstance.isInstance(typ.componentType())){
+				var iArr = (IOInstance<?>[])arr;
+				for(int i = 0; i<iArr.length; i++){
+					var el = iArr[i];
+					iArr[i] = el.clone();
+				}
+			}
+			return (V)arr;
+		}
+		var oVal = field.get(null, toCopyFrom);
+		if(oVal == null) return null;
+		
+		if(!IOInstance.isInstance(typ)) return oVal;
+		if(IOInstance.isUnmanaged(typ)) return oVal;
+		var val = (IOInstance<?>)oVal;
+		return (V)val.clone();
+	}
 }
