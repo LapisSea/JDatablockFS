@@ -14,6 +14,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,6 +35,8 @@ public final class TempClassGen{
 				this(Map.of());
 			}
 		}
+		
+		record Some(List<String> fieldNames) implements CtorType{ }
 		
 		record All() implements CtorType{ }
 	}
@@ -159,22 +162,7 @@ public final class TempClassGen{
 				
 				for(var ctor : classGen.constructors){
 					switch(ctor){
-						case CtorType.All ignored -> {
-							code.write(
-								"""
-									public function <init>
-										template-for #field in {0} start
-											arg #field.name #field.type
-										end
-									start
-										super start end
-										template-for #field in {0} start
-											get #arg #field.name
-											set this #field.name
-										end
-									end
-									""", classGen.fields);
-						}
+						case CtorType.All ignored -> writeFieldsCtor(code, classGen.fields);
 						case CtorType.Empty empty -> {
 							code.write(
 								"""
@@ -196,6 +184,13 @@ public final class TempClassGen{
 							}
 							code.wEnd();
 						}
+						case CtorType.Some(var names) -> {
+							List<FieldGen> list = new ArrayList<>(names.size());
+							for(String name : names){
+								list.add(classGen.fields.stream().filter(e -> e.name.equals(name)).findFirst().orElseThrow());
+							}
+							writeFieldsCtor(code, list);
+						}
 					}
 					for(var extra : classGen.extras){
 						extra.accept(code);
@@ -213,6 +208,23 @@ public final class TempClassGen{
 			throw new RuntimeException("Failed to generate class", e);
 		}
 	}
+	private static void writeFieldsCtor(CodeStream code, List<FieldGen> fields) throws MalformedJorth{
+		code.write(
+			"""
+				public function <init>
+					template-for #field in {0} start
+						arg #field.name #field.type
+					end
+				start
+					super start end
+					template-for #field in {0} start
+						get #arg #field.name
+						set this #field.name
+					end
+				end
+				""", fields);
+	}
+	
 	private static String providerName(String name){
 		return name + "€LookupProvider";
 	}

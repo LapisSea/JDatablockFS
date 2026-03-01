@@ -66,12 +66,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			var owner = field.owner();
 			var type  = field.type().asGeneric().withoutArgs();
 			
-			if(!field.isStatic()){
-				var stackOwnerType = stack.pop().raw();
-				if(!stackOwnerType.instanceOf(typeSource, owner)){
-					throw new ClassCastException(stackOwnerType + " not compatible with " + owner);
-				}
-			}
+			popFieldOwner(field, owner);
 			
 			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
 			stack.push(type);
@@ -89,14 +84,17 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				throw new ClassCastException(valueType + " not compatible with " + type);
 			}
 			
-			if(!field.isStatic()){
-				var stackOwnerType = stack.pop().raw();
-				if(!stackOwnerType.instanceOf(typeSource, owner)){
-					throw new ClassCastException(stackOwnerType + " not compatible with " + owner);
-				}
-			}
+			popFieldOwner(field, owner);
 			
 			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmDescriptorStr());
+		}
+		
+		private void popFieldOwner(FieldInfo field, ClassName owner) throws MalformedJorth{
+			if(field.isStatic()) return;
+			var stackOwnerType = stack.pop().raw();
+			if(!stackOwnerType.instanceOf(typeSource, owner)){
+				throw new ClassCastException(stackOwnerType + " not compatible with " + owner);
+			}
 		}
 		
 		public void loadArgumentIns(Arg arg){

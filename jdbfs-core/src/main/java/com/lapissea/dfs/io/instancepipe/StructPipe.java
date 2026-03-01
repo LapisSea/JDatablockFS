@@ -7,7 +7,6 @@ import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
 import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
-import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.exceptions.TypeIOFail;
 import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.internal.Access;
@@ -1167,7 +1166,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 							Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
 							return Match.empty();
 						}
-						throw new MalformedStruct("The struct was selected for optimized pipe implementation but it is not supported", e);
+						throw new UnsupportedOperationException("The struct was selected for optimized pipe implementation but it is not supported", e);
 					}
 				}
 				

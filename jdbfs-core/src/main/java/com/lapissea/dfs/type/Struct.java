@@ -422,6 +422,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					
 					if(canHaveDefaultConstructor()){
 						findEmptyConstructor(false);
+						
+						if(needsBuilderObj){
+							validateToBuildObj();
+						}
 					}
 				}
 				default -> throw new NotImplementedException();
@@ -1023,6 +1027,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
 		if(!needsBuilderObj()) throw new UnsupportedOperationException();
+		validateToBuildObj();
 		Class<ProxyBuilder<T>> cls;
 		try{
 			cls = BuilderProxyCompiler.getProxy(this);
@@ -1040,6 +1045,20 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		return builderObjType = typ;
+	}
+	
+	private void validateToBuildObj(){
+		var types = getRealFields()
+			            .mapped(IOField::getType)
+			            .toArray(Class[]::new);
+		try{
+			getConcreteType().getConstructor(types);
+		}catch(NoSuchMethodException e){
+			throw new MalformedStruct(
+				"fmt", e,
+				"Type {}#red contains read only fields but has no constructor containing all fields.\n" +
+				"  Required fields: {}#red", getConcreteType().getTypeName(), fields.mapped(e1 -> e1.getType().getTypeName()).joinAsStr(", "));
+		}
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
