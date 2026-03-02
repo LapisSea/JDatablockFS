@@ -44,6 +44,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -377,6 +378,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
 	private Struct<ProxyBuilder<T>> builderObjType;
+	private Constructor<T>          argsCtorCache;
 	
 	private int hash = -1;
 	
@@ -1023,6 +1025,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public Struct<ProxyBuilder<T>> getBuilderObjType(boolean now){
 		var typ = builderObjType;
 		if(typ == null) typ = createBuilderObjType(now);
+		argsCtorCache = null;
 		return typ;
 	}
 	private Struct<ProxyBuilder<T>> createBuilderObjType(boolean now){
@@ -1097,6 +1100,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		return reflectionClone(toCopy);
 	}
+	
 	private T reflectionClone(T toCopy){
 		FieldSet<T> fields = getRealFields();
 		Object[]    values = new Object[fields.size()];
@@ -1107,7 +1111,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		var types = getRealFields().mapped(IOField::getType).toArray(Class[]::new);
 		try{
-			var ctor = getType().getConstructor(types);
+			var ctor = argsCtorCache == null? argsCtorCache = getType().getConstructor(types) : argsCtorCache;
 			return ctor.newInstance(values);
 		}catch(Throwable e){
 			Log.warn("Failed to do reflection based clone for {}#red. Trying builder clone...", this);
