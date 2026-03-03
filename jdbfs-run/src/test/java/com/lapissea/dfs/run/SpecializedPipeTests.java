@@ -261,6 +261,14 @@ public class SpecializedPipeTests{
 		));
 	}
 	
+	@Test(groups = "specializedSimple")
+	void setAndFinal() throws IOException, LockedFlagSet{
+		fieldsTest(List.of(
+			new FieldDef(double.class, RandomGenerator::nextDouble).withSetter(true).withName("f1"),
+			new FieldDef(double.class, RandomGenerator::nextDouble).withFinalMod(true).withName("f2")
+		));
+	}
+	
 	private static <T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void fieldsTest(List<FieldDef> fields) throws LockedFlagSet, IOException{
 		BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 0);
 		
@@ -463,9 +471,11 @@ public class SpecializedPipeTests{
 				assert getIntField(val, field.name + "_getCount") != 0 : getIntField(val, field.name + "_getCount") + " != " + 0;
 				assert getIntField(readNew, field.name + "_getCount") == 0 : getIntField(readNew, field.name + "_getCount") + " == " + 0;
 			}
-			if(field.setter){
-				assert getIntField(val, field.name + "_setCount") == 1 : getIntField(val, field.name + "_setCount") + " == " + 1;
-				assert getIntField(readNew, field.name + "_setCount") == 1 : getIntField(readNew, field.name + "_setCount") + " == " + 1;
+			if(!to.getType().needsBuilderObj() && field.setter){
+				int orgSetCount = getIntField(val, field.name + "_setCount");
+				assert orgSetCount == 1 : orgSetCount + " == " + 1;
+				int rNewSetCount = getIntField(readNew, field.name + "_setCount");
+				assert rNewSetCount == 1 : rNewSetCount + " == " + 1;
 			}
 			
 			var f1 = (IOField<TF, Object>)from.getType().getFields().byName(field.name).orElseThrow();
