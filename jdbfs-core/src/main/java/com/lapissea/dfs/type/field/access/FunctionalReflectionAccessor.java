@@ -17,7 +17,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Map;
 
-public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp>{
+public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends BasicFieldAccessor<CTyp> implements FieldAccessor.FieldOrMethod{
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
@@ -61,6 +61,16 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			default -> null;
 		};
 		
+	}
+	@Override
+	public AccessType getter(){
+		if(getter != null) return new AccessType.Method(getter.getName());
+		throw new UnsupportedOperationException(this + " does not have a getter");
+	}
+	@Override
+	public AccessType setter(){
+		if(setter != null) return new AccessType.Method(setter.getName());
+		throw new UnsupportedOperationException(this + " does not have a setter");
 	}
 	
 	@Override

@@ -182,6 +182,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends ExactF
 	}
 	@Override
 	public AccessType setter(){
+		if(isReadOnly()) throw new UnsupportedOperationException("Cannot make read-only field access for " + this);
 		return new AccessType.Field(declaringClass, fieldName);
 	}
 	

@@ -171,6 +171,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Exa
 	}
 	@Override
 	public AccessType setter(){
+		if(isReadOnly()) throw new UnsupportedOperationException("Cannot make read-only field access for " + this);
 		return new AccessType.Field(field.getDeclaringClass(), field.getName());
 	}
 	
