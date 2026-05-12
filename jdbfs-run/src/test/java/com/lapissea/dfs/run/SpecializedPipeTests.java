@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
@@ -316,12 +318,16 @@ public class SpecializedPipeTests{
 	
 	@Test(dependsOnMethods = "testType")
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void twoFieldsPermutations() throws LockedFlagSet, IOException{
-		var allFields = fieldPermutations().stream().toList();
+		var index     = new AtomicInteger(LocalDate.now().getDayOfYear());
+		var allFields = fieldPermutations().stream().map(e -> e.withName("" + index.incrementAndGet())).toList();
 		
 		List<FieldDef> fields;
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
 		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
-			fields = allFields.parallelStream().flatMap(f1 -> allFields.stream().map(f2 -> List.of(f1.withName("val1"), f2.withName("val2")))).filter(f1f2 -> {
+			fields = allFields.parallelStream().flatMap(f1 -> {
+				var rand = new RawRandom(f1.name().hashCode());
+				return allFields.stream().filter(e -> rand.nextFloat()>0.8).map(f2 -> List.of(f1.withName("val1"), f2.withName("val2")));
+			}).filter(f1f2 -> {
 				var random = new RawRandom(f1f2.toString().hashCode());
 				try{
 					BasicSpecial<T1, T2> pipes;

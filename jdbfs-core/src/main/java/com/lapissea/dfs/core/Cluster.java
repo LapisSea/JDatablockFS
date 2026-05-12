@@ -15,6 +15,7 @@ import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.ObjectID;
 import com.lapissea.dfs.objects.Reference;
@@ -186,6 +187,7 @@ public final class Cluster implements DataProvider{
 	}
 	
 	@IOInstance.StrFormat(name = false, curly = false, fNames = false)
+	@StructPipe.Special
 	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
 		ChunkPointer getVal();
 	}

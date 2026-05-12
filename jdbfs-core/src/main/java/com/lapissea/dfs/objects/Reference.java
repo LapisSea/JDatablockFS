@@ -13,9 +13,6 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
-import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
-import com.lapissea.iterableplus.Iters;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -221,4 +218,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	public String infoString(DataProvider provider) throws IOException{
 		return this + " / " + calcGlobalOffset(provider);
 	}
+	
+	@Override
+	public Reference clone(){ return new Reference(getPtr(), getOffset()); }
 }
