@@ -11,6 +11,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,8 +58,9 @@ public interface SpecializedGenerator{
 		}
 		
 		public static final class ConstantNeeded extends Exception{
-			public final AccessMap.ConstantRequest constant;
-			public ConstantNeeded(AccessMap.ConstantRequest constant){ this.constant = constant; }
+			public final List<AccessMap.ConstantRequest> constants;
+			public ConstantNeeded(AccessMap.ConstantRequest constant)   { this(List.of(constant)); }
+			public ConstantNeeded(Collection<ConstantRequest> constants){ this.constants = List.copyOf(constants); }
 		}
 		
 		private record GetInfo(String className, String fieldName){ }
@@ -70,7 +72,7 @@ public interface SpecializedGenerator{
 		
 		private int tmpFieldCount = 0;
 		
-		private List<Set<String>> temporaryStack = new ArrayList<>();
+		private final List<Set<String>> temporaryStack = new ArrayList<>();
 		
 		private boolean hasIOPool;
 		private boolean localObject;
@@ -196,6 +198,7 @@ public interface SpecializedGenerator{
 				}
 				case VirtualAccessor<?> virutal -> {
 					var name = localFields.get(field);
+					if(name == null) throw new MalformedJorth("Local field " + field.getName() + " does not exist");
 					writer.write("get #field {}", name);
 				}
 				default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
@@ -225,16 +228,9 @@ public interface SpecializedGenerator{
 			temporaryStack.add(new HashSet<>());
 		}
 		public void dropTemporary(CodeStream writer) throws MalformedJorth{
-			var fields = temporaryStack.removeLast();
-			if(fields.isEmpty()) return;
-			writer.write(
-				"""
-					template-for #name in {0} start
-						forget #field #name
-					end
-					""",
-				fields
-			);
+			for(String field : temporaryStack.removeLast()){
+				writer.write("forget #field " + field);
+			}
 		}
 		
 		private int uniqueCounter(){

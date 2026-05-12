@@ -27,10 +27,10 @@ import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -205,6 +205,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			
 			int bitOffset = 0;
 			
+			Set<AccessMap.ConstantRequest> constantsReq = null;
+			
 			for(var fi : group){
 				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
 				if(bits>31){
@@ -227,8 +229,24 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				bitOffset += bits;
 				
 				accessMap.markTemporary();
-				((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(writer, accessMap, field);
-				accessMap.dropTemporary(writer);
+				try{
+					((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(writer, accessMap, field);
+				}catch(AccessMap.ConstantNeeded e){
+					if(constantsReq == null) constantsReq = new LinkedHashSet<>();
+					constantsReq.addAll(e.constants);
+				}catch(Throwable e){
+					//codegen probably from last field
+					if(constantsReq != null){
+						throw new AccessMap.ConstantNeeded(constantsReq);
+					}
+					throw e;
+				}finally{
+					accessMap.dropTemporary(writer);
+				}
+			}
+			
+			if(constantsReq != null){
+				throw new AccessMap.ConstantNeeded(constantsReq);
 			}
 		}
 	}

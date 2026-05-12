@@ -10,6 +10,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -197,13 +198,17 @@ public interface ClassInfo{
 			queue.add(clazz);
 			while(!queue.isEmpty()){
 				var c = queue.pop();
-				Arrays.stream(c.getDeclaredMethods())
-				      .filter(f -> f.getName().equals(name))
-				      .forEach(f -> {
-					      var sig  = new Signature(name, Arrays.stream(f.getGenericParameterTypes()).map(JType::of).toList());
-					      var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
-					      result.add(info);
-				      });
+				for(Method f : c.getDeclaredMethods()){
+					if(f.getName().equals(name)){
+						var         parms = f.getGenericParameterTypes();
+						List<JType> list  = new ArrayList<>(parms.length);
+						for(Type type : parms) list.add(JType.of(type));
+						
+						var sig  = new Signature(name, list);
+						var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
+						result.add(info);
+					}
+				}
 				if(c.getSuperclass() != null) queue.add(c.getSuperclass());
 				queue.addAll(Arrays.asList(c.getInterfaces()));
 			}
@@ -211,11 +216,6 @@ public interface ClassInfo{
 			return List.copyOf(result);
 		}
 		
-		private ClassLoader getLoader(){
-			var loader = clazz.getClassLoader();
-			if(loader == null) loader = this.getClass().getClassLoader();
-			return loader;
-		}
 		private Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, List<JType> args) throws ReflectiveOperationException{
 			var method = searchMethods(type.getDeclaredMethods(), name, args);
 			if(method != null){

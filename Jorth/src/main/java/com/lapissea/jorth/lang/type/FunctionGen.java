@@ -830,28 +830,37 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		code().ended = true;
 	}
 	
-	private static final Map<GenericType, Class<?>> BOX_MAP = Map.of(
-		GenericType.BOOL, Boolean.class,
-		GenericType.BYTE, Byte.class,
-		GenericType.SHORT, Short.class,
-		GenericType.INT, Integer.class,
-		GenericType.LONG, Long.class,
-		GenericType.CHAR, Character.class,
-		GenericType.FLOAT, Float.class,
-		GenericType.DOUBLE, Double.class
+	
+	private static Map.Entry<GenericType, FunctionInfo> getBoxInfo(GenericType typ, Class<?> cls){
+		var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, cls.getClassLoader()), cls);
+		FunctionInfo info;
+		try{
+			info = cInfo.getFunction(new Signature("valueOf", List.of(typ)));
+		}catch(MalformedJorth e){
+			throw new RuntimeException(e);
+		}
+		return Map.entry(typ, info);
+	}
+	private static final Map<GenericType, FunctionInfo> BOX_MAP = Map.ofEntries(
+		getBoxInfo(GenericType.BOOL, Boolean.class),
+		getBoxInfo(GenericType.BYTE, Byte.class),
+		getBoxInfo(GenericType.SHORT, Short.class),
+		getBoxInfo(GenericType.INT, Integer.class),
+		getBoxInfo(GenericType.LONG, Long.class),
+		getBoxInfo(GenericType.CHAR, Character.class),
+		getBoxInfo(GenericType.FLOAT, Float.class),
+		getBoxInfo(GenericType.DOUBLE, Double.class)
 	);
 	
 	public void doBox() throws MalformedJorth{
 		var stack = code().stack;
 		var typ   = stack.peekLast();
 		
-		var boxedClass = BOX_MAP.get(typ);
-		if(boxedClass == null){
+		FunctionInfo boxFn = BOX_MAP.get(typ);
+		if(boxFn == null){
 			throw new MalformedJorth("Cannot box non-primitive type: " + typ);
 		}
-		
-		var cls = typeSource.byName(ClassName.of(boxedClass));
-		invokeOp(cls.getFunction(new Signature("valueOf", List.of(typ))), false);
+		invokeOp(boxFn, false);
 	}
 	
 	

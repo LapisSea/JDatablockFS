@@ -1177,7 +1177,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				//noinspection unchecked
 				return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
 			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-				var added = constants.add(e.constant);
+				var added = constants.addAll(e.constants);
 				if(!added){
 					throw new IllegalStateException("Accessor already added");
 				}

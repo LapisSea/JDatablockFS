@@ -323,11 +323,7 @@ public final class PipeCodeGen{
 					"""
 			);
 			
-			for(SpecializedGenerator generator : generators){
-				accessMap.markTemporary();
-				generator.injectReadField(writer, accessMap);
-				accessMap.dropTemporary(writer);
-			}
+			injectReadFields(writer, generators, accessMap);
 			
 		}else{
 			writer.write(
@@ -433,11 +429,7 @@ public final class PipeCodeGen{
 							name
 						);
 						
-						for(SpecializedGenerator generator : generators){
-							accessMap.markTemporary();
-							generator.injectReadField(writer, accessMap);
-							accessMap.dropTemporary(writer);
-						}
+						injectReadFields(writer, generators, accessMap);
 						
 						writer.write(
 							"""
@@ -449,7 +441,7 @@ public final class PipeCodeGen{
 					});
 					return new ConstantCallSite(target);
 				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-					constants.add(e.constant);
+					constants.addAll(e.constants);
 				}
 			}
 		}catch(UnsupportedCodeGenType e){
@@ -460,6 +452,31 @@ public final class PipeCodeGen{
 			return failedDoReadNew(lookup, name, objType);
 		}catch(Throwable t){
 			throw new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t);
+		}
+	}
+	
+	private static void injectReadFields(CodeStream writer, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constantsReq = null;
+		
+		for(SpecializedGenerator generator : generators){
+			accessMap.markTemporary();
+			try{
+				generator.injectReadField(writer, accessMap);
+			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
+				if(constantsReq == null) constantsReq = new LinkedHashSet<>();
+				constantsReq.addAll(e.constants);
+			}catch(Throwable e){
+				//codegen probably from last field
+				if(constantsReq != null){
+					throw new SpecializedGenerator.AccessMap.ConstantNeeded(constantsReq);
+				}
+				throw e;
+			}finally{
+				accessMap.dropTemporary(writer);
+			}
+		}
+		if(constantsReq != null){
+			throw new SpecializedGenerator.AccessMap.ConstantNeeded(constantsReq);
 		}
 	}
 	
@@ -527,7 +544,7 @@ public final class PipeCodeGen{
 					});
 					return new ConstantCallSite(target);
 				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-					constants.add(e.constant);
+					constants.addAll(e.constants);
 				}
 			}
 		}catch(UnsupportedCodeGenType e){
