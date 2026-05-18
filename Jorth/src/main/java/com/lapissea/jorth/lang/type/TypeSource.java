@@ -9,23 +9,6 @@ import java.util.Optional;
 
 public interface TypeSource{
 	
-	class Of2 implements TypeSource{
-		private final TypeSource a;
-		private final TypeSource b;
-		
-		public Of2(TypeSource a, TypeSource b){
-			this.a = a;
-			this.b = b;
-		}
-		
-		@Override
-		public Optional<ClassInfo> maybeByType(GenericType type){
-			var result = a.maybeByType(type);
-			if(result.isPresent()) return result;
-			return b.maybeByType(type);
-		}
-	}
-	
 	class OfClassLoader implements TypeSource{
 		private final TypeSource  parent;
 		private final ClassLoader classLoader;

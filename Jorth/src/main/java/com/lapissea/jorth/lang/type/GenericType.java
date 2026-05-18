@@ -30,6 +30,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	public static final GenericType BOOL   = new GenericType(ClassName.of(boolean.class));
 	public static final GenericType FLOAT  = new GenericType(ClassName.of(float.class));
 	public static final GenericType DOUBLE = new GenericType(ClassName.of(double.class));
+	public static final GenericType VOID   = new GenericType(ClassName.of(void.class));
 	
 	public static GenericType of(Type type){
 		return of0(null, type);
@@ -201,6 +202,20 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 			           .map(Object::toString)
 			           .collect(joining(", ", "<", ">"))
 		       );
+	}
+	
+	public GenericType withArgs(JType... args){
+		return withArgs(List.of(args));
+	}
+	public GenericType withArgs(Class<?>... args){
+		JType[] arr = new JType[args.length];
+		for(int i = 0; i<args.length; i++){
+			arr[i] = GenericType.of(args[i]);
+		}
+		return withArgs(List.of(arr));
+	}
+	public GenericType withArgs(List<JType> args){
+		return new GenericType(raw, typeArgName, dims, args);
 	}
 	
 	@Override

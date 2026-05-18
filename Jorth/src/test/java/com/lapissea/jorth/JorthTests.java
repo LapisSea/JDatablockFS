@@ -1,5 +1,8 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.redo.AccessSet;
+import com.lapissea.jorth.redo.FnArgs;
 import com.lapissea.util.LogUtil;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -97,6 +100,18 @@ public class JorthTests{
 						""",
 					typ);
 			}
+		}, classDefinition -> {
+			for(var typ : List.of(GenericType.STRING, GenericType.INT)){
+				var fn = classDefinition.function(
+					"compare",
+					new FnArgs().arg(typ, "arg1").arg(typ, "arg2"),
+					AccessSet.STATIC).returns(GenericType.BOOL);
+				fn.body()
+				  .get("arg1")
+				  .get("arg2")
+				  .equalityOp()
+				  .returnOp();
+			}
 		});
 		var testStr = cls.getMethod("compare", String.class, String.class);
 		UnsafeBiPredicate<String, String, ReflectiveOperationException> testStrFn = (a, b) -> {
@@ -144,6 +159,20 @@ public class JorthTests{
 						call toString
 					end
 					""");
+		}, cd -> {
+			var fn = cd.function("test", new FnArgs().arg(GenericType.INT, "index"), AccessSet.STATIC)
+			           .returns(GenericType.STRING);
+			fn.body()
+			  .get("index")
+			  .val(1)
+			  .ifEquality(code -> {
+				  code.val("ay")
+				      .returnOp();
+			  })
+			  .newObj(StringBuilder.class)
+			  .call("append", c -> c.val("lmao "))
+			  .call("append", c -> c.get("index"))
+			  .call("toString", 0);
 		});
 		
 		var test = cls.getMethod("test", int.class);
@@ -198,6 +227,29 @@ public class JorthTests{
 						static call #ThisClass report start 'end' end
 					end
 					""");
+		}, cd -> {
+			var list = cd.field("list", GenericType.of(List.class).withArgs(String.class))
+			             .staticFinal(e -> e.newObj(ArrayList.class));
+			
+			var report = cd.function("report", new FnArgs().arg(String.class, "str"), AccessSet.STATIC);
+			report.body()
+			      .get(list)
+			      .call("add", c -> c.get("str"))
+			      .pop();
+			
+			cd.function("test", new FnArgs().arg(int.class, "index"), AccessSet.STATIC)
+			  .body()
+			  .call(report, c -> c.val("start"))
+			  .get("index")
+			  .val(0)
+			  .ifEquality(code -> {
+				  code.call(report, c -> c.val("ay"));
+			  })
+			  .elseRun(code -> {
+				  code.call(report, c -> c.val("lmao"));
+			  })
+			  .call(report, c -> c.val("end"));
+			
 		});
 		//noinspection unchecked
 		var list = (List<String>)cls.getField("list").get(null);
