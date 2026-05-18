@@ -2,7 +2,6 @@ package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.redo.AccessSet;
-import com.lapissea.jorth.redo.FnArgs;
 import com.lapissea.util.LogUtil;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -102,15 +101,14 @@ public class JorthTests{
 			}
 		}, classDefinition -> {
 			for(var typ : List.of(GenericType.STRING, GenericType.INT)){
-				var fn = classDefinition.function(
-					"compare",
-					new FnArgs().arg(typ, "arg1").arg(typ, "arg2"),
-					AccessSet.STATIC).returns(GenericType.BOOL);
+				var fn = classDefinition.function("compare")
+				                        .access(AccessSet.STATIC)
+				                        .arg(typ, "arg1").arg(typ, "arg2")
+				                        .returns(GenericType.BOOL);
 				fn.body()
 				  .get("arg1")
 				  .get("arg2")
-				  .equalityOp()
-				  .returnOp();
+				  .equalityOp();
 			}
 		});
 		var testStr = cls.getMethod("compare", String.class, String.class);
@@ -160,7 +158,8 @@ public class JorthTests{
 					end
 					""");
 		}, cd -> {
-			var fn = cd.function("test", new FnArgs().arg(GenericType.INT, "index"), AccessSet.STATIC)
+			var fn = cd.function("test").access(AccessSet.STATIC)
+			           .arg(GenericType.INT, "index")
 			           .returns(GenericType.STRING);
 			fn.body()
 			  .get("index")
@@ -231,13 +230,14 @@ public class JorthTests{
 			var list = cd.field("list", GenericType.of(List.class).withArgs(String.class))
 			             .staticFinal(e -> e.newObj(ArrayList.class));
 			
-			var report = cd.function("report", new FnArgs().arg(String.class, "str"), AccessSet.STATIC);
+			var report = cd.function("report").access(AccessSet.STATIC)
+			               .arg(String.class, "str");
 			report.body()
 			      .get(list)
 			      .call("add", c -> c.get("str"))
 			      .pop();
 			
-			cd.function("test", new FnArgs().arg(int.class, "index"), AccessSet.STATIC)
+			cd.function("test").access(AccessSet.STATIC).arg(int.class, "index")
 			  .body()
 			  .call(report, c -> c.val("start"))
 			  .get("index")

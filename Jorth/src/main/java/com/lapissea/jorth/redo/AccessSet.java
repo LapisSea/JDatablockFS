@@ -2,6 +2,10 @@ package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.IllegalClassState;
 
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+
 public record AccessSet(boolean isAbstract, boolean isStatic, boolean isFinal){
 	public AccessSet{
 		if(isAbstract && isFinal){
@@ -29,5 +33,13 @@ public record AccessSet(boolean isAbstract, boolean isStatic, boolean isFinal){
 			isStatic || other.isStatic,
 			isFinal || other.isFinal
 		);
+	}
+	
+	public int flags(){
+		int res = 0;
+		if(isAbstract) res |= ACC_ABSTRACT;
+		if(isStatic) res |= ACC_STATIC;
+		if(isFinal) res |= ACC_FINAL;
+		return res;
 	}
 }
