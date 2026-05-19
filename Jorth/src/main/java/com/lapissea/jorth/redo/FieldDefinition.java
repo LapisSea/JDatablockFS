@@ -4,7 +4,6 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.FieldVisitor;
 
 public final class FieldDefinition{
 	
@@ -64,11 +63,12 @@ public final class FieldDefinition{
 		return visibility;
 	}
 	
-	public FieldVisitor visit(ClassWriter writer){
+	public void visit(ClassWriter writer){
 		var descriptor = type.jvmDescriptorStr();
 		var signature  = type.jvmSignatureStr();
+		var access     = visibility().flag|access().flags();
 		
-		var access = visibility().flag|access().flags();
-		return writer.visitField(access, name, descriptor, signature, null);
+		var fw = writer.visitField(access, name, descriptor, signature, null);
+		fw.visitEnd();
 	}
 }

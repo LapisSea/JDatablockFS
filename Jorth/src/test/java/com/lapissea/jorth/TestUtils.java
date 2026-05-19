@@ -66,7 +66,7 @@ public final class TestUtils{
 		
 		var classes = jorth.listClassFiles();
 		
-		byte[] cwf = null;
+		byte[] cwf;
 		try{
 			cwf = cw.getClassFile();
 		}catch(MalformedJorth e){

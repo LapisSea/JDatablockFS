@@ -62,11 +62,7 @@ public class CodeBlock{
 		if(local == null){
 			throw new IllegalArgumentException("Unknown localValue: " + localVal);
 		}
-		exec(new Insn.GetLocal(local.type.asGeneric(), localVal, local.index));
-	}
-	private void exec(Insn i) throws MalformedJorth{
-		i.simulate(typeSource, localStack);
-		insn.add(i);
+		insn.add(Insn.GetLocal.simulate(localStack, local.type.asGeneric(), localVal, local.index));
 	}
 	
 	public CodeBlock val(int val){
@@ -77,12 +73,13 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock equalityOp() throws MalformedJorth{
-		exec(new Insn.Equality());
+		insn.add(Insn.Equality.simulate(typeSource, localStack, true));
 		return this;
 	}
 	
-	public CodeBlock returnOp(){
-		throw new NotImplementedException();
+	public CodeBlock returnOp() throws MalformedJorth{
+		insn.add(Insn.ReturnOp.simulate(returnType, typeSource, localStack, true));
+		return this;
 	}
 	public CodeBlock ifTrue(UnsafeConsumer<CodeBlock, MalformedJorth> code){
 		throw new NotImplementedException();
@@ -117,7 +114,7 @@ public class CodeBlock{
 		throw new NotImplementedException();
 	}
 	public CodeBlock pop() throws MalformedJorth{
-		exec(Insn.PopOp.make(localStack));
+		insn.add(Insn.PopOp.simulate(localStack));
 		return this;
 	}
 	
@@ -128,7 +125,7 @@ public class CodeBlock{
 		}
 		//implicit return
 		if(!insn.isEmpty() && !(insn.getLast() instanceof Insn.ReturnOp)){
-			Insn.ReturnOp.make(returnType, typeSource, localStack).visit(fn);
+			Insn.ReturnOp.simulate(returnType, typeSource, localStack, false).visit(fn);
 		}
 	}
 }

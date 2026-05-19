@@ -162,7 +162,7 @@ public class ClassDefinition{
 		for(FunctionDefinition value : functions.values()){
 			value.visit(writer);
 		}
-		
+		writer.visitEnd();
 		return writer.toByteArray();
 	}
 	

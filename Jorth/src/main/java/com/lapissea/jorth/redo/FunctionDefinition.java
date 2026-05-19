@@ -132,6 +132,8 @@ public class FunctionDefinition{
 		
 		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, null);
 		body.visit(fn);
+		fn.visitMaxs(0, 0);
+		fn.visitEnd();
 	}
 	private static String makeFunSig(JType returnType, Collection<JType> args, boolean signature){
 		
