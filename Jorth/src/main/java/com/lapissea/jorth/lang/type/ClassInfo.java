@@ -321,6 +321,10 @@ public interface ClassInfo{
 			}
 			return constants;
 		}
+		@Override
+		public String toString(){
+			return clazz.getName();
+		}
 	}
 	
 	FieldInfo getField(String name) throws MalformedJorth;

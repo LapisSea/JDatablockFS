@@ -17,10 +17,59 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public sealed interface Insn{
+	
+	private static void emitStackInt(MethodVisitor writer, int value){
+		switch(value){
+			case 0 -> writer.visitInsn(ICONST_0);
+			case 1 -> writer.visitInsn(ICONST_1);
+			case 2 -> writer.visitInsn(ICONST_2);
+			case 3 -> writer.visitInsn(ICONST_3);
+			case 4 -> writer.visitInsn(ICONST_4);
+			case 5 -> writer.visitInsn(ICONST_5);
+			default -> writer.visitIntInsn(SIPUSH, value);
+		}
+	}
+	private static GenericType doEquality(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
+		stack.requireElements(2);
+		GenericType a = stack.pop();
+		GenericType b = stack.pop();
+		
+		if(!a.instanceOf(typeSource, b) && !b.instanceOf(typeSource, a)){
+			throw new MalformedJorth(a + " not compatible with " + b);
+		}
+		return a;
+	}
+	
+	record IVal(int val) implements Insn{
+		public static IVal simulate(TypeStack stack, int val){
+			stack.push(GenericType.INT);
+			return new IVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			Insn.emitStackInt(writer, val);
+		}
+	}
+	
+	record StrVal(String val) implements Insn{
+		public StrVal{
+			Objects.requireNonNull(val);
+		}
+		public static StrVal simulate(TypeStack stack, String val){
+			stack.push(GenericType.STRING);
+			return new StrVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitLdcInsn(val);
+		}
+	}
 	
 	record GetLocal(GenericType type, String name, int index) implements Insn{
 		public static GetLocal simulate(TypeStack stack, GenericType type, String name, int index){
@@ -36,13 +85,7 @@ public sealed interface Insn{
 	record Equality(GenericType type, boolean checkFor) implements Insn{
 		
 		public static Equality simulate(TypeSource typeSource, TypeStack stack, boolean checkFor) throws MalformedJorth{
-			stack.requireElements(2);
-			GenericType a = stack.pop();
-			GenericType b = stack.pop();
-			
-			if(!a.instanceOf(typeSource, b) && !b.instanceOf(typeSource, a)){
-				throw new MalformedJorth(a + " not compatible with " + b);
-			}
+			GenericType a = doEquality(typeSource, stack);
 			
 			stack.push(GenericType.BOOL);
 			return new Equality(a, checkFor);
@@ -112,8 +155,8 @@ public sealed interface Insn{
 	
 	record PopOp(int slots) implements Insn{
 		
-		static PopOp simulate(TypeStack localStack) throws MalformedJorth{
-			var bt = localStack.pop().getBaseType();
+		static PopOp simulate(TypeStack stack) throws MalformedJorth{
+			var bt = stack.pop().getBaseType();
 			return new PopOp(bt.slots);
 		}
 		
@@ -124,6 +167,129 @@ public sealed interface Insn{
 				case 2 -> POP2;
 				default -> throw new ShouldNeverHappenError();
 			});
+		}
+	}
+	
+	record DupOp(int slots) implements Insn{
+		
+		static DupOp simulate(TypeStack stack) throws MalformedJorth{
+			var e = stack.pop();
+			stack.push(e);
+			stack.push(e);
+			return new DupOp(e.getBaseType().slots);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(switch(slots){
+				case 1 -> DUP;
+				case 2 -> DUP2;
+				default -> throw new ShouldNeverHappenError();
+			});
+		}
+	}
+	
+	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements Insn{
+		
+		enum Type{
+			TRUE_BOOL,
+			EQUALITY
+		}
+		
+		static ConditionalJump simulate(TypeStack stack, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
+			CodeBlock nonTermTrue  = onTrue == null || onTrue.terminates()? null : onTrue;
+			CodeBlock nonTermFalse = onFalse == null || onFalse.terminates()? null : onFalse;
+			
+			if(nonTermTrue != null && nonTermFalse != null){
+				if(!nonTermTrue.stacksMatch(nonTermFalse)){
+					throw new MalformedJorth("True and false branches of conditional jump must have the same stack");
+				}
+			}
+			
+			var vType = switch(type){
+				case TRUE_BOOL -> {
+					var typ = stack.pop();
+					if(!typ.getBaseType().type.equals(boolean.class)){
+						throw new MalformedJorth("Condition must be boolean");
+					}
+					yield null;
+				}
+				case EQUALITY -> doEquality(typeSource, stack);
+			};
+			
+			if(nonTermTrue == null || nonTermFalse == null){
+				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
+				if(other != null && !other.stacksMatch(stack)){
+					throw new MalformedJorth("Conditional jump must have the same stack as the base." + other);
+				}
+			}
+			
+			return new ConditionalJump(type, vType, onTrue, onFalse);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			
+			Label endLabel   = new Label();
+			Label falseLabel = new Label();
+			
+			switch(type){
+				case TRUE_BOOL -> {
+					if(onTrue != null && onFalse != null){
+						writer.visitJumpInsn(IFEQ, falseLabel);
+						onTrue.visit(writer);
+						writer.visitJumpInsn(GOTO, endLabel);
+						writer.visitLabel(falseLabel);
+						onFalse.visit(writer);
+						writer.visitLabel(endLabel);
+					}else if(onTrue != null){
+						writer.visitJumpInsn(IFEQ, endLabel);
+						onTrue.visit(writer);
+						writer.visitLabel(endLabel);
+					}else{
+						writer.visitJumpInsn(IFNE, endLabel);
+						onFalse.visit(writer);
+						writer.visitLabel(endLabel);
+					}
+				}
+				case EQUALITY -> {
+					throw new NotImplementedException();
+				}
+			}
+		}
+	}
+	
+	record NewOp(GenericType type, boolean dup) implements Insn{
+		
+		static NewOp simulate(TypeStack stack, GenericType type, boolean dup) throws MalformedJorth{
+			switch(type.dims()){
+				case 0 -> { }
+				case 1 -> {
+					var arraySize = stack.pop();
+					if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type)){
+						throw new MalformedJorth("Array size is not an integer");
+					}
+				}
+				default -> throw new NotImplementedException("Multi array not implemented");//TODO
+			}
+			stack.push(type);
+			if(dup){
+				stack.push(type);
+			}
+			return new NewOp(type, dup);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			int op = switch(type.dims()){
+				case 0 -> NEW;
+				case 1 -> type.getPrimitiveType().isPresent()? NEWARRAY : ANEWARRAY;
+				default -> throw new NotImplementedException("Multi array not implemented");//TODO
+			};
+			writer.visitTypeInsn(op, type.raw().slashed());
+			if(dup){
+				writer.visitInsn(DUP);
+			}
 		}
 	}
 	

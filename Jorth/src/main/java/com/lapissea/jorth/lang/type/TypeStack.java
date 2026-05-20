@@ -50,7 +50,7 @@ public class TypeStack{
 	
 	public int size(){
 		if(parent == null) return stack.size();
-		return parent.size() + stack.size();
+		return stack.size() + parent.size();
 	}
 	
 	public void requireElements(int count) throws MalformedJorth{
@@ -72,5 +72,17 @@ public class TypeStack{
 		int localPos = pos - parent.size();
 		if(localPos<0) return parent.peek(pos);
 		return stack.get(localPos);
+	}
+	@Override
+	public TypeStack clone(){
+		var stack = new TypeStack(parent);
+		stack.stack.addAll(this.stack);
+		return stack;
+	}
+	
+	@Override
+	public boolean equals(Object obj){
+		return obj instanceof TypeStack other &&
+		       totalStack().toList().equals(other.totalStack().toList());
 	}
 }

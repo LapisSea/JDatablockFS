@@ -95,12 +95,12 @@ public class FunctionDefinition{
 		}
 		
 		
-		var body = new CodeBlock(owner.typeSource, this);
+		var body = new CodeBlock(null, owner.typeSource, this);
 		if(!access.isStatic()){
-			body.defineLocalValue("this", new GenericType(owner.name()));
+			body.defineLocalValue("this", new GenericType(owner.name()), false);
 		}
 		for(var e : args.entrySet()){
-			body.defineLocalValue(e.getKey(), e.getValue());
+			body.defineLocalValue(e.getKey(), e.getValue(), false);
 		}
 		return body;
 	}
