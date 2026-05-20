@@ -14,6 +14,7 @@ import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -108,7 +109,7 @@ public class ClassDefinition{
 			}
 			@Override
 			public ClassInfo superType() throws MalformedJorth{
-				throw NotImplementedException.infer();//TODO: implement .superType()
+				return typeSource.byType(extension);
 			}
 			@Override
 			public ClassType type(){
@@ -116,7 +117,7 @@ public class ClassDefinition{
 			}
 			@Override
 			public boolean isPrimitive(){
-				throw NotImplementedException.infer();//TODO: implement .isPrimitive()
+				return false;
 			}
 			@Override
 			public boolean isInterface(){
@@ -128,7 +129,7 @@ public class ClassDefinition{
 			}
 			@Override
 			public List<GenericType> interfaces(){
-				throw NotImplementedException.infer();//TODO: implement .interfaces()
+				return Collections.unmodifiableList(interfaces);
 			}
 			@Override
 			public List<Enum<?>> enumConstantNames(){
@@ -255,6 +256,9 @@ public class ClassDefinition{
 		return res;
 	}
 	
+	public FieldDefinition field(String name, Class<?> type){
+		return field(name, GenericType.of(type));
+	}
 	public FieldDefinition field(String name, JType type){
 		return fields.computeIfAbsent(name, n -> new FieldDefinition(this, n, type));
 	}

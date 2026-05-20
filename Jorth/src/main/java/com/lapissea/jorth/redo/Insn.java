@@ -190,6 +190,49 @@ public sealed interface Insn{
 		}
 	}
 	
+	record SwapOp(GenericType top, GenericType belowTop) implements Insn{
+		
+		static SwapOp simulate(TypeStack stack) throws MalformedJorth{
+			stack.requireElements(2);
+			var top      = stack.pop();
+			var belowTop = stack.pop();
+			
+			stack.push(top);
+			stack.push(belowTop);
+			return new SwapOp(top, belowTop);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(top.getBaseType().slots){
+				case 1 -> {
+					switch(belowTop.getBaseType().slots){
+						case 1 -> writer.visitInsn(SWAP);
+						case 2 -> {
+							writer.visitInsn(DUP_X2);
+							writer.visitInsn(POP);
+						}
+						default -> throw new NotImplementedException(belowTop.toString());
+					}
+				}
+				case 2 -> {
+					switch(belowTop.getBaseType().slots){
+						case 1 -> {
+							writer.visitInsn(DUP2_X1);
+							writer.visitInsn(POP2);
+						}
+						case 2 -> {
+							writer.visitInsn(DUP2_X2);
+							writer.visitInsn(POP2);
+						}
+						default -> throw new NotImplementedException(belowTop.toString());
+					}
+				}
+				default -> throw new NotImplementedException(top.toString());
+			}
+		}
+	}
+	
 	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements Insn{
 		
 		private static void checkBranches(TypeStack stack, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{

@@ -8,18 +8,7 @@ import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
-import com.lapissea.jorth.redo.Insn.ConditionalJump;
-import com.lapissea.jorth.redo.Insn.DupOp;
-import com.lapissea.jorth.redo.Insn.Equality;
-import com.lapissea.jorth.redo.Insn.GetFieldOp;
-import com.lapissea.jorth.redo.Insn.GetLocal;
-import com.lapissea.jorth.redo.Insn.IVal;
-import com.lapissea.jorth.redo.Insn.InvokeOp;
-import com.lapissea.jorth.redo.Insn.NewOp;
-import com.lapissea.jorth.redo.Insn.PopOp;
-import com.lapissea.jorth.redo.Insn.PutFieldOp;
-import com.lapissea.jorth.redo.Insn.ReturnOp;
-import com.lapissea.jorth.redo.Insn.StrVal;
+import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.ArrayList;
@@ -224,6 +213,9 @@ public class CodeBlock{
 	}
 	public CodeBlock dup() throws MalformedJorth{
 		return add(DupOp.simulate(localStack));
+	}
+	public CodeBlock swap() throws MalformedJorth{
+		return add(SwapOp.simulate(localStack));
 	}
 	
 	public void callSuper() throws MalformedJorth{

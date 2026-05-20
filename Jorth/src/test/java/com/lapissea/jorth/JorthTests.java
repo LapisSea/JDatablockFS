@@ -378,7 +378,19 @@ public class JorthTests{
 					end
 					""");
 		}, cd -> {
-			throw new NotImplementedException();
+			var ts = cd.field("testString", String.class);
+			
+			cd.function("toString").returns(String.class)
+			  .body()
+			  .get("this")
+			  .get(ts);
+			
+			cd.function("init").arg(String.class, "testString")
+			  .body()
+			  .get("testString")
+			  .get("this")
+			  .swap()
+			  .set(ts);
 		});
 		
 		var constr = cls.getConstructor();
