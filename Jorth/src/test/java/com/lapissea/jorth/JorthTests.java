@@ -1,7 +1,6 @@
 package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.type.GenericType;
-import com.lapissea.jorth.redo.AccessSet;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -103,7 +102,7 @@ public class JorthTests{
 		}, classDefinition -> {
 			for(var typ : List.of(GenericType.STRING, GenericType.INT)){
 				var fn = classDefinition.function("compare")
-				                        .access(AccessSet.STATIC)
+				                        .staticAcc()
 				                        .arg(typ, "arg1").arg(typ, "arg2")
 				                        .returns(GenericType.BOOL);
 				fn.body()
@@ -159,7 +158,7 @@ public class JorthTests{
 					end
 					""");
 		}, cd -> {
-			var fn = cd.function("test").access(AccessSet.STATIC)
+			var fn = cd.function("test").staticAcc()
 			           .arg(GenericType.INT, "index")
 			           .returns(GenericType.STRING);
 			fn.body()
@@ -231,14 +230,14 @@ public class JorthTests{
 			var list = cd.field("list", GenericType.of(List.class).withArgs(String.class))
 			             .staticFinal(e -> e.newObj(ArrayList.class));
 			
-			var report = cd.function("report").access(AccessSet.STATIC)
+			var report = cd.function("report").staticAcc()
 			               .arg(String.class, "str");
 			report.body()
 			      .get(list)
 			      .call("add", c -> c.get("str"))
 			      .pop();
 			
-			cd.function("test").access(AccessSet.STATIC).arg(int.class, "index")
+			cd.function("test").staticAcc().arg(int.class, "index")
 			  .body()
 			  .call(report, c -> c.val("start"))
 			  .get("index")
@@ -313,11 +312,11 @@ public class JorthTests{
 					""",
 				TestCls.class.getName());
 		}, cd -> {
-			cd.function("printToConsole").access(AccessSet.STATIC)
+			cd.function("printToConsole").staticAcc()
 			  .body()
 			  .call(LogUtil.class, "println", c -> c.val("AAAYYYY LMAO"));
 			
-			cd.function("testFlag").access(AccessSet.STATIC).arg(TestCls.class, "obj")
+			cd.function("testFlag").staticAcc().arg(TestCls.class, "obj")
 			  .body()
 			  .get("obj")
 			  .call("flag")

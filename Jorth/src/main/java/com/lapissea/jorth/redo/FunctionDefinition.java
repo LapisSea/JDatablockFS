@@ -61,6 +61,15 @@ public class FunctionDefinition{
 	public Visibility visibility(){
 		return visibility;
 	}
+	public FunctionDefinition staticAcc(){
+		return access(access.andStat());
+	}
+	public FunctionDefinition finalAcc(){
+		return access(access.andFin());
+	}
+	public FunctionDefinition abstractAcc(){
+		return access(access.andAbstr());
+	}
 	public FunctionDefinition access(AccessSet access){
 		if(this.access.isStatic() != access.isStatic()){
 			preBodyCheck();
@@ -126,7 +135,7 @@ public class FunctionDefinition{
 		}
 	}
 	
-	public void visit(ClassWriter writer) throws MalformedJorth{
+	public void visit(ClassWriter writer){
 		
 		var accessFlags = visibility.flag|access.flags();
 		
