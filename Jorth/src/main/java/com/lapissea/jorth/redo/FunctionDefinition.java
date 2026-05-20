@@ -45,6 +45,9 @@ public class FunctionDefinition{
 		return this;
 	}
 	
+	public FunctionDefinition returns(Class<?> type){
+		return returns(GenericType.of(type));
+	}
 	public FunctionDefinition returns(JType type){
 		preBodyCheck();
 		this.returnType = type;

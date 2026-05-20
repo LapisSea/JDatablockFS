@@ -52,14 +52,14 @@ public final class TestUtils{
 		StringJoiner tokenStr = new StringJoiner(" ");
 		var          jorth    = new Jorth(null, tokenStr::add);
 		try{
+			cw = new ClassDefinition(null);
+			generator2.accept(cw);
+			
 			try(var writer = jorth.writer()){
 				generator.accept(writer);
 			}finally{
 				LogUtil.println(tokenStr.toString());
 			}
-			
-			cw = new ClassDefinition(null);
-			generator2.accept(cw);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + className, e);
 		}

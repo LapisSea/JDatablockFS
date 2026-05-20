@@ -3,6 +3,7 @@ package com.lapissea.jorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.redo.AccessSet;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -311,6 +312,29 @@ public class JorthTests{
 					end
 					""",
 				TestCls.class.getName());
+		}, cd -> {
+			cd.function("printToConsole").access(AccessSet.STATIC)
+			  .body()
+			  .call(LogUtil.class, "println", c -> c.val("AAAYYYY LMAO"));
+			
+			cd.function("testFlag").access(AccessSet.STATIC).arg(TestCls.class, "obj")
+			  .body()
+			  .get("obj")
+			  .call("flag")
+			  .call(TestCls.class, "staticFlag", c -> { });
+			
+			cd.function("concatCal")
+			  .arg(String.class, "a").arg(String.class, "b").returns(String.class)
+			  .body()
+			  .newObj(StringBuilder.class, c -> c.get("a"))
+			  .call("append", c -> c.get("b"))
+			  .call("toString");
+			
+			cd.function("useCall").returns(String.class)
+			  .body()
+			  .get("this")
+			  .val("ay ")
+			  .call("concat", c -> c.val("lmao"));
 		});
 		TestCls test = new TestCls();
 		assertThat(test.flag).isFalse();
@@ -354,6 +378,8 @@ public class JorthTests{
 						set this testString
 					end
 					""");
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var constr = cls.getConstructor();
@@ -380,6 +406,8 @@ public class JorthTests{
 					public field 2dArray #String array array
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		for(Field field : cls.getFields()){
@@ -438,6 +466,8 @@ public class JorthTests{
 					public field b #String
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		var b = (DefaultAnn)cls.getField("b").getDeclaredAnnotations()[0];
@@ -458,6 +488,8 @@ public class JorthTests{
 					public field a #String
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		var a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		assertThat(a.value()).isEqualTo(RetentionPolicy.CLASS);
@@ -476,6 +508,8 @@ public class JorthTests{
 					public field testString #String
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
 		LogUtil.println((Object[])anns);
@@ -498,6 +532,8 @@ public class JorthTests{
 					public function test start end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		var anns = cls.getMethod("test").getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -520,6 +556,8 @@ public class JorthTests{
 					""",
 				className
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -544,6 +582,8 @@ public class JorthTests{
 				className,
 				ISayHello.class.getName()
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var constr = cls.getConstructor();
@@ -570,6 +610,8 @@ public class JorthTests{
 					end
 					""",
 				msg);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var constr = cls.getConstructor();
@@ -593,6 +635,8 @@ public class JorthTests{
 					end
 					""",
 				className);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		cls.getEnumConstants();
 		
@@ -613,6 +657,8 @@ public class JorthTests{
 					end
 					""",
 				className);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		assertThat(cls).isInterface();
 		var hello = cls.getMethod("hello");
@@ -632,6 +678,8 @@ public class JorthTests{
 					end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var expected = String.class;
@@ -662,6 +710,8 @@ public class JorthTests{
 				IStoreHello.class.getName(),
 				expectedStr
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var constr = cls.getConstructor();
@@ -680,6 +730,8 @@ public class JorthTests{
 					field optStr #Optional<#String>
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -705,6 +757,8 @@ public class JorthTests{
 					
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -760,6 +814,8 @@ public class JorthTests{
 					start end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		{
@@ -795,6 +851,8 @@ public class JorthTests{
 					final class child2 start end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var permits = cls.getPermittedSubclasses();
@@ -815,6 +873,8 @@ public class JorthTests{
 					end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var parms = cls.getTypeParameters();
@@ -842,6 +902,8 @@ public class JorthTests{
 					end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var meth  = cls.getMethod("takeArg", List.class);
@@ -869,6 +931,8 @@ public class JorthTests{
 					end
 					"""
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		var field = cls.getField("arg");
@@ -915,6 +979,8 @@ public class JorthTests{
 					""",
 				name, props
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName))
@@ -944,6 +1010,8 @@ public class JorthTests{
 					""",
 				name, names
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName)).containsExactlyInAnyOrderElementsOf(names);
@@ -1030,6 +1098,8 @@ public class JorthTests{
 					""",
 				name
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
@@ -1062,6 +1132,8 @@ public class JorthTests{
 					""",
 				name
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
@@ -1093,6 +1165,8 @@ public class JorthTests{
 					""",
 				name
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
@@ -1133,6 +1207,8 @@ public class JorthTests{
 					""",
 				name
 			);
+		}, cd -> {
+			throw new NotImplementedException();
 		});
 		
 		Object instO = cls.getConstructor().newInstance();

@@ -133,13 +133,25 @@ public class CodeBlock{
 		var block = createBlockFromHere(code);
 		return add(jump.withFalse(localStack, block));
 	}
+	
 	public CodeBlock newObj(Class<?> clazz) throws MalformedJorth{
-		return newObj(ClassName.of(clazz));
+		return newObj(ClassName.of(clazz), c -> { });
 	}
 	public CodeBlock newObj(ClassName clazz) throws MalformedJorth{
+		return newObj(clazz, c -> { });
+	}
+	public CodeBlock newObj(Class<?> clazz, CodeArg arguments) throws MalformedJorth{
+		return newObj(ClassName.of(clazz), arguments);
+	}
+	public CodeBlock newObj(ClassName clazz, CodeArg arguments) throws MalformedJorth{
 		add(NewOp.simulate(localStack, new GenericType(clazz), true));
-		var fn = resolveFunction(typeSource.byName(clazz), "<init>", List.of());
+		var args = doArgs(arguments);
+		var fn   = resolveFunction(typeSource.byName(clazz), "<init>", args);
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
+	}
+	
+	public CodeBlock call(String name) throws MalformedJorth{
+		return call(name, 0);
 	}
 	public CodeBlock call(String name, int argumentCount) throws MalformedJorth{
 		var stackSize = localStack.size();
@@ -154,13 +166,31 @@ public class CodeBlock{
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
 		var caller = typeSource.byType(localStack.peekLast());
 		
-		var mark = localStack.size();
-		gatherArguments.accept(this);
-		var args = readCallStack(mark);
+		var args = doArgs(gatherArguments);
 		
 		FunctionInfo fn = resolveFunction(caller, name, args);
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
+	
+	private List<JType> doArgs(CodeArg gatherArguments) throws MalformedJorth{
+		var mark = localStack.size();
+		gatherArguments.accept(this);
+		return readCallStack(mark);
+	}
+	
+	public CodeBlock call(Class<?> staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
+		return call(ClassName.of(staticCaller), name, gatherArguments);
+	}
+	public CodeBlock call(ClassName staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
+		var cl = typeSource.byName(staticCaller);
+		
+		var args = doArgs(gatherArguments);
+		
+		var fn = cl.getFunction(new FunctionInfo.Signature(name, args));
+		
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
+	}
+	
 	private List<JType> readCallStack(int mark) throws MalformedJorth{
 		var argCount = localStack.size() - mark;
 		if(argCount<0) throw new MalformedJorth("Negative stack delta inside arg block");
