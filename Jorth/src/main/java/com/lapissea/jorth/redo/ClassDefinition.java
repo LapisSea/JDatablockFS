@@ -50,13 +50,14 @@ public class ClassDefinition{
 	private      Visibility visibility;
 	public final TypeSource typeSource;
 	
-	private final Map<FunctionInfo.Signature, FunctionDefinition> functions  = new LinkedHashMap<>();
-	private final Map<String, FieldDefinition>                    fields     = new LinkedHashMap<>();
-	private final Set<ClassName>                                  permits    = new LinkedHashSet<>();
-	private final List<GenericType>                               interfaces = new ArrayList<>();
+	private final Map<FunctionInfo.Signature, FunctionDefinition> functions = new LinkedHashMap<>();
+	private final Map<String, FieldDefinition>                    fields    = new LinkedHashMap<>();
+	
+	private final Set<ClassName>    permits    = new LinkedHashSet<>();
+	private final List<GenericType> interfaces = new ArrayList<>();
+	private       GenericType       extension  = GenericType.OBJECT;
 	
 	public ClassDefinition(ClassLoader loader){
-		
 		var classLoader = loader == null? this.getClass().getClassLoader() : loader;
 		typeSource = TypeSource.of(this::generatedClassInfo, classLoader);
 	}
@@ -143,8 +144,7 @@ public class ClassDefinition{
 			try{
 				instanceInit()
 					.body()
-					.get("this")
-					.pop();
+					.callSuper();
 			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}
@@ -172,8 +172,6 @@ public class ClassDefinition{
 			case INTERFACE, ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
-		
-		var extension = GenericType.OBJECT;
 		
 		var signature = makeSignature(extension, interfaces, Map.of());
 		
@@ -274,6 +272,13 @@ public class ClassDefinition{
 		return this;
 	}
 	
+	public ClassDefinition extendsType(GenericType type){
+		extension = Objects.requireNonNull(type);
+		return this;
+	}
 	
 	public ClassName name(){ return name; }
+	public ClassInfo superType() throws MalformedJorth{
+		return typeSource.byName(extension.raw());
+	}
 }

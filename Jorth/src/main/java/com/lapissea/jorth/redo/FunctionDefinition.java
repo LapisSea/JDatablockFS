@@ -72,7 +72,9 @@ public class FunctionDefinition{
 	public JType returnType(){
 		return returnType;
 	}
-	
+	public ClassDefinition owner(){
+		return owner;
+	}
 	public CodeBlock body() throws MalformedJorth{
 		var b = body;
 		if(b == null) b = body = initBody();
@@ -93,7 +95,7 @@ public class FunctionDefinition{
 		}
 		
 		
-		var body = new CodeBlock(owner.typeSource, returnType);
+		var body = new CodeBlock(owner.typeSource, this);
 		if(!access.isStatic()){
 			body.defineLocalValue("this", new GenericType(owner.name()));
 		}

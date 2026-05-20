@@ -2,6 +2,8 @@ package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
@@ -23,12 +25,13 @@ public class CodeBlock{
 	
 	private final List<Insn> insn       = new ArrayList<>();
 	private final TypeStack  localStack = new TypeStack(null);
-	private final TypeSource typeSource;
-	private final JType      returnType;
 	
-	public CodeBlock(TypeSource typeSource, JType returnType){
+	private final TypeSource         typeSource;
+	private final FunctionDefinition fnOwner;
+	
+	public CodeBlock(TypeSource typeSource, FunctionDefinition fnOwner){
 		this.typeSource = typeSource;
-		this.returnType = returnType;
+		this.fnOwner = fnOwner;
 	}
 	
 	public void defineLocalValue(ArgInfo info) throws MalformedJorth{
@@ -78,7 +81,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock returnOp() throws MalformedJorth{
-		insn.add(Insn.ReturnOp.simulate(returnType, typeSource, localStack, true));
+		insn.add(Insn.ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
 		return this;
 	}
 	public CodeBlock ifTrue(UnsafeConsumer<CodeBlock, MalformedJorth> code){
@@ -94,6 +97,7 @@ public class CodeBlock{
 		return newObj(ClassName.of(clazz));
 	}
 	public CodeBlock newObj(ClassName clazz){
+		
 		throw new NotImplementedException();
 	}
 	public CodeBlock call(String name, int argumentCount){
@@ -125,7 +129,37 @@ public class CodeBlock{
 		}
 		//implicit return
 		if(!insn.isEmpty() && !(insn.getLast() instanceof Insn.ReturnOp)){
-			Insn.ReturnOp.simulate(returnType, typeSource, localStack, false).visit(fn);
+			Insn.ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
+		}
+	}
+	
+	public void callSuper() throws MalformedJorth{
+		get("this");
+		ClassInfo    parent  = fnOwner.owner().superType();
+		FunctionInfo superFn = resolveFunction(parent, fnOwner.name(), List.of());
+		insn.add(Insn.InvokeOp.simulate(localStack, typeSource, fnOwner.owner().name(), superFn, true));
+	}
+	
+	private FunctionInfo resolveFunction(ClassInfo cInfo, String functionName, List<JType> args) throws MalformedJorth{
+		try{
+			return cInfo.getFunction(new FunctionInfo.Signature(functionName, args));
+		}catch(MalformedJorth e){
+			return cInfo.getFunctionsByName(functionName).filter(f -> {
+				var argsF = f.argumentTypes();
+				if(argsF.size() != args.size()) return false;
+				for(int i = 0; i<argsF.size(); i++){
+					var a = argsF.get(i).asGeneric();
+					var b = args.get(i).asGeneric();
+					try{
+						if(!b.instanceOf(typeSource, a)){
+							return false;
+						}
+					}catch(MalformedJorth ex){
+						throw new RuntimeException(ex);
+					}
+				}
+				return true;
+			}).findAny().orElseThrow(() -> e);
 		}
 	}
 }
