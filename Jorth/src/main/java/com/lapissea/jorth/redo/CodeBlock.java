@@ -11,14 +11,15 @@ import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.redo.Insn.ConditionalJump;
 import com.lapissea.jorth.redo.Insn.DupOp;
 import com.lapissea.jorth.redo.Insn.Equality;
+import com.lapissea.jorth.redo.Insn.GetFieldOp;
 import com.lapissea.jorth.redo.Insn.GetLocal;
 import com.lapissea.jorth.redo.Insn.IVal;
 import com.lapissea.jorth.redo.Insn.InvokeOp;
 import com.lapissea.jorth.redo.Insn.NewOp;
 import com.lapissea.jorth.redo.Insn.PopOp;
+import com.lapissea.jorth.redo.Insn.PutFieldOp;
 import com.lapissea.jorth.redo.Insn.ReturnOp;
 import com.lapissea.jorth.redo.Insn.StrVal;
-import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.ArrayList;
@@ -78,8 +79,8 @@ public class CodeBlock{
 	}
 	
 	
-	public CodeBlock get(FieldDefinition field){
-		throw new NotImplementedException();
+	public CodeBlock get(FieldDefinition field) throws MalformedJorth{
+		return add(GetFieldOp.simulate(localStack, typeSource, field.getInfo()));
 	}
 	
 	public CodeBlock get(String localVal) throws MalformedJorth{
@@ -120,8 +121,17 @@ public class CodeBlock{
 		var block = createBlockFromHere(code);
 		return add(ConditionalJump.simulate(localStack, typeSource, type, block, null));
 	}
-	public CodeBlock elseRun(CodeArg code){
-		throw new NotImplementedException();
+	public CodeBlock elseRun(CodeArg code) throws MalformedJorth{
+		var lastInsn = insns.isEmpty()? null : insns.getLast();
+		if(!(lastInsn instanceof ConditionalJump jump)){
+			throw new MalformedJorth("Must be run after a conditional operation");
+		}
+		if(jump.onFalse() != null){
+			throw new MalformedJorth("Duplicate else call");
+		}
+		insns.removeLast();
+		var block = createBlockFromHere(code);
+		return add(jump.withFalse(localStack, block));
 	}
 	public CodeBlock newObj(Class<?> clazz) throws MalformedJorth{
 		return newObj(ClassName.of(clazz));
@@ -129,7 +139,7 @@ public class CodeBlock{
 	public CodeBlock newObj(ClassName clazz) throws MalformedJorth{
 		add(NewOp.simulate(localStack, new GenericType(clazz), true));
 		var fn = resolveFunction(typeSource.byName(clazz), "<init>", List.of());
-		return add(InvokeOp.simulate(localStack, typeSource, fnOwner.owner().name(), fn, false));
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(String name, int argumentCount) throws MalformedJorth{
 		var stackSize = localStack.size();
@@ -139,7 +149,7 @@ public class CodeBlock{
 		List<JType> args = argumentCount == 0? List.of() : readCallStack(mark);
 		
 		FunctionInfo fn = resolveFunction(caller, name, args);
-		return add(InvokeOp.simulate(localStack, typeSource, fnOwner.owner().name(), fn, false));
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
 		var caller = typeSource.byType(localStack.peekLast());
@@ -149,7 +159,7 @@ public class CodeBlock{
 		var args = readCallStack(mark);
 		
 		FunctionInfo fn = resolveFunction(caller, name, args);
-		return add(InvokeOp.simulate(localStack, typeSource, fnOwner.owner().name(), fn, false));
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	private List<JType> readCallStack(int mark) throws MalformedJorth{
 		var argCount = localStack.size() - mark;
@@ -161,15 +171,23 @@ public class CodeBlock{
 		return args;
 	}
 	
-	public CodeBlock call(FunctionDefinition fn, int argumentCount){
-		throw new NotImplementedException();
+	public CodeBlock call(FunctionDefinition fn) throws MalformedJorth{
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn.getInfo(), false));
 	}
-	public CodeBlock call(FunctionDefinition fn, CodeArg gatherArguments){
-		throw new NotImplementedException();
+	public CodeBlock call(FunctionDefinition fn, CodeArg gatherArguments) throws MalformedJorth{
+		var mark = localStack.size();
+		gatherArguments.accept(this);
+		var argCount = localStack.size() - mark;
+		
+		var fnArgs = fn.getArgs();
+		if(argCount != fnArgs.size()){
+			throw new MalformedJorth("Function argument takes " + fnArgs.size() + " but got " + argCount);
+		}
+		return call(fn);
 	}
 	
-	public void set(FieldDefinition field){
-		throw new NotImplementedException();
+	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
+		return add(PutFieldOp.simulate(localStack, typeSource, field.getInfo()));
 	}
 	public CodeBlock pop() throws MalformedJorth{
 		return add(PopOp.simulate(localStack));
@@ -182,21 +200,24 @@ public class CodeBlock{
 		get("this");
 		ClassInfo    parent  = fnOwner.owner().superType();
 		FunctionInfo superFn = resolveFunction(parent, fnOwner.name(), List.of());
-		add(InvokeOp.simulate(localStack, typeSource, fnOwner.owner().name(), superFn, true));
+		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
 	}
 	
+	private ClassName cName(){
+		return fnOwner.owner().name();
+	}
 	
 	public void visit(MethodVisitor fn){
 		for(Insn i : insns){
 			i.visit(fn);
 		}
-		//implicit return
-		if(!terminates()){
-			try{
-				ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
-			}catch(MalformedJorth e){
-				throw new RuntimeException("Failed to return", e);
-			}
+	}
+	void implicitReturn(MethodVisitor fn){
+		if(terminates()) return;
+		try{
+			ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to return on " + fnOwner, e);
 		}
 	}
 	

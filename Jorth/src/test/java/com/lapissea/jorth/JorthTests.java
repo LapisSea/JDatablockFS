@@ -196,7 +196,7 @@ public class JorthTests{
 			writer.addImports(ArrayList.class, List.class);
 			writer.write(
 				"""
-					public static field list #List<#String>
+					public static final field list #List<#String>
 					
 					public static function <clinit> start
 						new #ArrayList
@@ -242,10 +242,10 @@ public class JorthTests{
 			  .call(report, c -> c.val("start"))
 			  .get("index")
 			  .val(0)
-			  .ifEquality(code -> {
+			  .equalityOp()
+			  .ifTrue(code -> {
 				  code.call(report, c -> c.val("ay"));
-			  })
-			  .elseRun(code -> {
+			  }).elseRun(code -> {
 				  code.call(report, c -> c.val("lmao"));
 			  })
 			  .call(report, c -> c.val("end"));

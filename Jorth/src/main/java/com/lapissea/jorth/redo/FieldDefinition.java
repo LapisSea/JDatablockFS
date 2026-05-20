@@ -1,8 +1,11 @@
 package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 public final class FieldDefinition{
@@ -10,7 +13,7 @@ public final class FieldDefinition{
 	public final ClassDefinition owner;
 	public final String          name;
 	public final JType           type;
-	private      Visibility      visibility;
+	private      Visibility      visibility = Visibility.PUBLIC;
 	
 	private AccessSet access = AccessSet.DEFAULT;
 	
@@ -70,5 +73,29 @@ public final class FieldDefinition{
 		
 		var fw = writer.visitField(access, name, descriptor, signature, null);
 		fw.visitEnd();
+	}
+	public FieldInfo getInfo(){
+		return new FieldInfo(){
+			@Override
+			public boolean isEnumConstant(){
+				throw NotImplementedException.infer();//TODO: implement .isEnumConstant()
+			}
+			@Override
+			public boolean isStatic(){
+				return access.isStatic();
+			}
+			@Override
+			public ClassName owner(){
+				return owner.name();
+			}
+			@Override
+			public JType type(){
+				return type;
+			}
+			@Override
+			public String name(){
+				return name;
+			}
+		};
 	}
 }

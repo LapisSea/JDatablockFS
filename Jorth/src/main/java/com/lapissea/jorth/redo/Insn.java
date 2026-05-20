@@ -6,6 +6,7 @@ import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.jorth.lang.type.BaseType;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
@@ -191,12 +192,7 @@ public sealed interface Insn{
 	
 	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements Insn{
 		
-		enum Type{
-			TRUE_BOOL,
-			EQUALITY
-		}
-		
-		static ConditionalJump simulate(TypeStack stack, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
+		private static void checkBranches(TypeStack stack, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
 			CodeBlock nonTermTrue  = onTrue == null || onTrue.terminates()? null : onTrue;
 			CodeBlock nonTermFalse = onFalse == null || onFalse.terminates()? null : onFalse;
 			
@@ -206,6 +202,20 @@ public sealed interface Insn{
 				}
 			}
 			
+			if(nonTermTrue == null || nonTermFalse == null){
+				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
+				if(other != null && !other.stacksMatch(stack)){
+					throw new MalformedJorth("Conditional jump must have the same stack as the base." + other);
+				}
+			}
+		}
+		
+		enum Type{
+			TRUE_BOOL,
+			EQUALITY
+		}
+		
+		static ConditionalJump simulate(TypeStack stack, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
 			var vType = switch(type){
 				case TRUE_BOOL -> {
 					var typ = stack.pop();
@@ -216,14 +226,7 @@ public sealed interface Insn{
 				}
 				case EQUALITY -> doEquality(typeSource, stack);
 			};
-			
-			if(nonTermTrue == null || nonTermFalse == null){
-				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
-				if(other != null && !other.stacksMatch(stack)){
-					throw new MalformedJorth("Conditional jump must have the same stack as the base." + other);
-				}
-			}
-			
+			checkBranches(stack, onTrue, onFalse);
 			return new ConditionalJump(type, vType, onTrue, onFalse);
 		}
 		
@@ -256,6 +259,10 @@ public sealed interface Insn{
 					throw new NotImplementedException();
 				}
 			}
+		}
+		public ConditionalJump withFalse(TypeStack stack, CodeBlock onFalse) throws MalformedJorth{
+			checkBranches(stack, onTrue, onFalse);
+			return new ConditionalJump(type, vType, onTrue, onFalse);
 		}
 	}
 	
@@ -290,6 +297,54 @@ public sealed interface Insn{
 			if(dup){
 				writer.visitInsn(DUP);
 			}
+		}
+	}
+	
+	private static void popFieldOwner(TypeStack stack, TypeSource typeSource, FieldInfo field, ClassName owner) throws MalformedJorth{
+		if(field.isStatic()) return;
+		var stackOwnerType = stack.pop().raw();
+		if(!stackOwnerType.instanceOf(typeSource, owner)){
+			throw new ClassCastException(stackOwnerType + " not compatible with " + owner);
+		}
+	}
+	private static void fieldAccess(MethodVisitor writer, FieldInfo field, int accOp){
+		var type = field.type().asGeneric().withoutArgs();
+		writer.visitFieldInsn(accOp, field.owner().slashed(), field.name(), type.jvmDescriptorStr());
+	}
+	
+	record PutFieldOp(FieldInfo field) implements Insn{
+		
+		static PutFieldOp simulate(TypeStack stack, TypeSource typeSource, FieldInfo field) throws MalformedJorth{
+			stack.requireElements(field.isStatic()? 1 : 2);
+			var valueType = stack.pop().withoutArgs();
+			var type      = field.type().asGeneric().withoutArgs();
+			
+			if(!valueType.instanceOf(typeSource, type)){
+				throw new ClassCastException(valueType + " not compatible with " + type);
+			}
+			
+			Insn.popFieldOwner(stack, typeSource, field, field.owner());
+			return new PutFieldOp(field);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			fieldAccess(writer, field, field.isStatic()? PUTSTATIC : PUTFIELD);
+		}
+	}
+	
+	record GetFieldOp(FieldInfo field) implements Insn{
+		
+		static GetFieldOp simulate(TypeStack stack, TypeSource typeSource, FieldInfo field) throws MalformedJorth{
+			var type = field.type().asGeneric().withoutArgs();
+			Insn.popFieldOwner(stack, typeSource, field, field.owner());
+			stack.push(type);
+			return new GetFieldOp(field);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			fieldAccess(writer, field, field.isStatic()? GETSTATIC : GETFIELD);
 		}
 	}
 	

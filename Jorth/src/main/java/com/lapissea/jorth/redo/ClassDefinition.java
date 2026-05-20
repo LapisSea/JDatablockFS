@@ -82,7 +82,7 @@ public class ClassDefinition{
 	}
 	
 	private ClassInfo infoWrapper;
-	private ClassInfo getClassInfo(){
+	public ClassInfo getClassInfo(){
 		if(infoWrapper != null) return infoWrapper;
 		return infoWrapper = new ClassInfo(){
 			
@@ -104,7 +104,7 @@ public class ClassDefinition{
 			}
 			@Override
 			public ClassName name(){
-				throw NotImplementedException.infer();//TODO: implement .name()
+				return name;
 			}
 			@Override
 			public ClassInfo superType() throws MalformedJorth{
@@ -112,7 +112,7 @@ public class ClassDefinition{
 			}
 			@Override
 			public ClassType type(){
-				throw NotImplementedException.infer();//TODO: implement .type()
+				return type;
 			}
 			@Override
 			public boolean isPrimitive(){
@@ -142,9 +142,7 @@ public class ClassDefinition{
 		
 		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
 			try{
-				instanceInit()
-					.body()
-					.callSuper();
+				instanceInit().body().callSuper();
 			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}

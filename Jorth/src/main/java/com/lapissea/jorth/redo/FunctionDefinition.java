@@ -3,9 +3,11 @@ package com.lapissea.jorth.redo;
 import com.lapissea.jorth.exceptions.IllegalClassState;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 import java.util.ArrayList;
@@ -104,8 +106,8 @@ public class FunctionDefinition{
 		}
 		return body;
 	}
-	private FunctionInfo.Signature makeSignature(){
-		return new FunctionInfo.Signature(name, List.copyOf(args.values()));
+	public FunctionInfo.Signature makeSignature(){
+		return new FunctionInfo.Signature(name, getArgs());
 	}
 	
 	private void preBodyCheck(){
@@ -134,6 +136,7 @@ public class FunctionDefinition{
 		
 		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, null);
 		body.visit(fn);
+		body.implicitReturn(fn);
 		fn.visitMaxs(0, 0);
 		fn.visitEnd();
 	}
@@ -156,5 +159,49 @@ public class FunctionDefinition{
 		assert result.length() == len : result.length() + " " + len;
 		
 		return result.toString();
+	}
+	public List<JType> getArgs(){
+		return List.copyOf(args.values());
+	}
+	
+	public FunctionInfo getInfo(){
+		return new FunctionInfo(){
+			@Override
+			public boolean isStatic(){
+				return access.isStatic();
+			}
+			@Override
+			public boolean isFinal(){
+				return access().isFinal();
+			}
+			@Override
+			public Visibility visibility(){
+				return visibility;
+			}
+			@Override
+			public ClassInfo owner(){
+				return owner.getClassInfo();
+			}
+			@Override
+			public String name(){
+				return name;
+			}
+			@Override
+			public JType returnType(){
+				return returnType;
+			}
+			@Override
+			public List<JType> argumentTypes(){
+				return getArgs();
+			}
+			@Override
+			public Object defaultEnumValue(){
+				throw NotImplementedException.infer();//TODO: implement .defaultEnumValue()
+			}
+		};
+	}
+	@Override
+	public String toString(){
+		return owner.name() + "#" + makeSignature();
 	}
 }
