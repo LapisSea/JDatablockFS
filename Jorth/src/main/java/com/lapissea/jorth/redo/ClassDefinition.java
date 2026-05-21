@@ -46,9 +46,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	
 	private      ClassName  name;
-	private      ClassType  type;
-	private      AccessSet  access;
-	private      Visibility visibility;
+	private      ClassType  type       = ClassType.CLASS;
+	private      AccessSet  access     = AccessSet.DEFAULT;
+	private      Visibility visibility = Visibility.PUBLIC;
 	public final TypeSource typeSource;
 	
 	private final Map<FunctionInfo.Signature, FunctionDefinition> functions = new LinkedHashMap<>();
@@ -62,6 +62,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		var classLoader = loader == null? this.getClass().getClassLoader() : loader;
 		typeSource = TypeSource.of(this::generatedClassInfo, classLoader);
 	}
+	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
 		if(name == null) return Optional.empty();
 		var raw = type.raw();
@@ -70,16 +71,13 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		
 		if(type.dims()>0){
-			return makeArr(type);
+			try{
+				return Optional.of(new ClassInfo.OfArray(typeSource, type.withDims(type.dims() - 1)));
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
 		}
 		return Optional.of(getClassInfo());
-	}
-	private Optional<ClassInfo> makeArr(GenericType type){
-		try{
-			return Optional.of(new ClassInfo.OfArray(typeSource, type.withDims(type.dims() - 1)));
-		}catch(MalformedJorth e){
-			throw new RuntimeException(e);
-		}
 	}
 	
 	private ClassInfo infoWrapper;
@@ -166,6 +164,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	
 	private void visitClass(ClassWriter writer){
+		requireName();
 		int accessFlags = visibility.flag|switch(type){
 			case CLASS -> ACC_SUPER|(permits.isEmpty()? ACC_FINAL : 0);
 			case INTERFACE, ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE;
@@ -188,6 +187,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		for(AnnotationDefinition annotation : annotations){
 			annotation.visit(writer);
 		}
+	}
+	private void requireName(){
+		if(name == null) throw new IllegalStateException("Class name not defined");
 	}
 	
 	private static String makeSignature(GenericType extension, List<GenericType> interfaces, Map<ClassName, GenericType> typeArgs){
@@ -221,15 +223,35 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return signature.toString();
 	}
 	
-	public void start(ClassName name, ClassType type, AccessSet access, Visibility visibility){
-		this.name = Objects.requireNonNull(name);
+	public ClassDefinition name(ClassName className){
+		this.name = Objects.requireNonNull(className);
+		return this;
+	}
+	public ClassDefinition type(ClassType type){
 		this.type = Objects.requireNonNull(type);
-		this.access = Objects.requireNonNull(access);
-		this.visibility = Objects.requireNonNull(visibility);
+		if(type == ClassType.ENUM) initEnum();
+		return this;
 	}
 	
+	private void initEnum(){
+		requireName();
+		if(!extension.equals(GenericType.OBJECT)){
+			throw new IllegalArgumentException("Enum classes can not explicitly extend a type");
+		}
+		extension = GenericType.of(Enum.class).withArgs(new GenericType(name));
+	}
+	
+	public ClassDefinition access(AccessSet access){
+		this.access = Objects.requireNonNull(access);
+		return this;
+	}
+	public ClassDefinition visibility(Visibility visibility){
+		this.visibility = Objects.requireNonNull(visibility);
+		return this;
+	}
 	
 	FunctionDefinition getFunction(FunctionInfo.Signature signature){
+		requireName();
 		return functions.get(signature);
 	}
 	void updateSignature(FunctionInfo.Signature oldSignature, FunctionInfo.Signature signature, FunctionDefinition caller){
@@ -263,6 +285,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return field(name, GenericType.of(type));
 	}
 	public FieldDefinition field(String name, JType type){
+		requireName();
 		return fields.computeIfAbsent(name, n -> new FieldDefinition(this, n, type));
 	}
 	
@@ -277,6 +300,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return this;
 	}
 	
+	public ClassDefinition extendsType(Class<?> type){
+		return extendsType(GenericType.of(type));
+	}
 	public ClassDefinition extendsType(GenericType type){
 		extension = Objects.requireNonNull(type);
 		return this;

@@ -4,9 +4,6 @@ import com.github.difflib.DiffUtils;
 import com.github.difflib.UnifiedDiffUtils;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.lang.type.ClassType;
-import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.AccessSet;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
@@ -36,7 +33,7 @@ public final class TestUtils{
 			generator.accept(writer);
 			writer.wEnd();
 		}, cw -> {
-			cw.start(ClassName.dotted(className), ClassType.CLASS, AccessSet.DEFAULT, Visibility.PUBLIC);
+			cw.name(ClassName.dotted(className));
 			generator2.accept(cw);
 		});
 	}

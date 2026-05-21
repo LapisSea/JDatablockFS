@@ -3,8 +3,6 @@ package com.lapissea.jorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
-import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.AccessSet;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -582,8 +580,8 @@ public class JorthTests{
 				className
 			);
 		}, cd -> {
-			cd.start(ClassName.dotted(className), ClassType.CLASS, AccessSet.DEFAULT, Visibility.PUBLIC);
-			cd.annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
+			cd.name(ClassName.dotted(className))
+			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -609,7 +607,7 @@ public class JorthTests{
 				ISayHello.class.getName()
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(className)).extendsType(ISayHello.class);
 		});
 		
 		var constr = cls.getConstructor();
