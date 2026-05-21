@@ -26,7 +26,7 @@ import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
 
-public class ClassDefinition{
+public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	static{
 		Thread.startVirtualThread(() -> {
@@ -185,6 +185,9 @@ public class ClassDefinition{
 		}
 		
 		writer.visit(V19, accessFlags, name.slashed(), signature, extension.raw().slashed(), interfaceStrings);
+		for(AnnotationDefinition annotation : annotations){
+			annotation.visit(writer);
+		}
 	}
 	
 	private static String makeSignature(GenericType extension, List<GenericType> interfaces, Map<ClassName, GenericType> typeArgs){

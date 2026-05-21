@@ -8,7 +8,7 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
-public final class FieldDefinition{
+public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 	
 	public final ClassDefinition owner;
 	public final String          name;
@@ -72,6 +72,10 @@ public final class FieldDefinition{
 		var access     = visibility().flag|access().flags();
 		
 		var fw = writer.visitField(access, name, descriptor, signature, null);
+		for(AnnotationDefinition annotation : annotations){
+			annotation.visit(fw);
+		}
+		
 		fw.visitEnd();
 	}
 	public FieldInfo getInfo(){

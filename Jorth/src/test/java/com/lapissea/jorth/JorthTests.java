@@ -1,6 +1,10 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.AccessSet;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -480,7 +484,11 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.field("a", String.class)
+			  .annotation(DefaultAnn.class, a -> a.arg("value", 321));
+			
+			cd.field("b", String.class)
+			  .annotation(DefaultAnn.class);
 		});
 		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		var b = (DefaultAnn)cls.getField("b").getDeclaredAnnotations()[0];
@@ -502,7 +510,8 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.field("a", String.class)
+			  .annotation(EnumAnn.class, a -> a.arg("value", RetentionPolicy.CLASS));
 		});
 		var a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
 		assertThat(a.value()).isEqualTo(RetentionPolicy.CLASS);
@@ -522,7 +531,8 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.field("testString", String.class)
+			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
 		LogUtil.println((Object[])anns);
@@ -546,7 +556,9 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.function("test")
+			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141))
+			  .body();
 		});
 		var anns = cls.getMethod("test").getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -570,7 +582,8 @@ public class JorthTests{
 				className
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.start(ClassName.dotted(className), ClassType.CLASS, AccessSet.DEFAULT, Visibility.PUBLIC);
+			cd.annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);

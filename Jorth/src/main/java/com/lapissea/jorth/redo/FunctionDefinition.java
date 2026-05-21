@@ -16,7 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
-public class FunctionDefinition{
+public class FunctionDefinition extends AnnotationContainer<FunctionDefinition>{
 	
 	private final ClassDefinition owner;
 	private       AccessSet       access     = AccessSet.DEFAULT;
@@ -150,6 +150,9 @@ public class FunctionDefinition{
 		if(descriptor.equals(signature)) signature = null;
 		
 		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, null);
+		for(AnnotationDefinition annotation : annotations){
+			annotation.visit(fn);
+		}
 		body.visit(fn);
 		body.implicitReturn(fn);
 		fn.visitMaxs(0, 0);
