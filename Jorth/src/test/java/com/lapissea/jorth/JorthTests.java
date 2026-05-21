@@ -418,7 +418,9 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.field("noArray", String.class);
+			cd.field("1dArray", String[].class);
+			cd.field("2dArray", String[][].class);
 		});
 		
 		for(Field field : cls.getFields()){
@@ -622,7 +624,7 @@ public class JorthTests{
 					""",
 				msg);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.function("toString").returns(String.class).body().val(msg);
 		});
 		
 		var constr = cls.getConstructor();
@@ -690,7 +692,8 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.function("getCls").staticAcc().returns(Class.class, String.class)
+			  .body().val(String.class);
 		});
 		
 		var expected = String.class;
@@ -742,7 +745,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.field("optStr", GenericType.of(Optional.class).withArgs(String.class));
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();

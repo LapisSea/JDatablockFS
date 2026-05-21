@@ -45,6 +45,9 @@ public class FunctionDefinition{
 		return this;
 	}
 	
+	public FunctionDefinition returns(Class<?> type, Class<?>... genericArgs){
+		return returns(GenericType.of(type).withArgs(genericArgs));
+	}
 	public FunctionDefinition returns(Class<?> type){
 		return returns(GenericType.of(type));
 	}

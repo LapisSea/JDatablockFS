@@ -20,6 +20,7 @@ import org.objectweb.asm.MethodVisitor;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -69,6 +70,18 @@ public sealed interface Insn{
 		@Override
 		public void visit(MethodVisitor writer){
 			writer.visitLdcInsn(val);
+		}
+	}
+	
+	record ClassVal(GenericType type) implements Insn{
+		public static ClassVal simulate(TypeStack stack, ClassName clazz){
+			var type = new GenericType(clazz);
+			stack.push(new GenericType(ClassName.of(Class.class), Optional.empty(), 0, List.of(type)));
+			return new ClassVal(type);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitLdcInsn(org.objectweb.asm.Type.getType(type.jvmSignatureStr()));
 		}
 	}
 	
