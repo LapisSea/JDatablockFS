@@ -11,35 +11,13 @@ import com.lapissea.jorth.lang.Preload;
 import com.lapissea.jorth.lang.Token;
 import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.Tokenizer;
-import com.lapissea.jorth.lang.type.Access;
-import com.lapissea.jorth.lang.type.AnnGen;
-import com.lapissea.jorth.lang.type.BaseType;
-import com.lapissea.jorth.lang.type.ClassGen;
-import com.lapissea.jorth.lang.type.ClassInfo;
-import com.lapissea.jorth.lang.type.ClassType;
-import com.lapissea.jorth.lang.type.FunctionGen;
-import com.lapissea.jorth.lang.type.GenericType;
-import com.lapissea.jorth.lang.type.JType;
-import com.lapissea.jorth.lang.type.KeyedEnum;
-import com.lapissea.jorth.lang.type.Operation;
-import com.lapissea.jorth.lang.type.TypeSource;
-import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.lang.type.*;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.objectweb.asm.Type;
 
 import java.lang.reflect.Array;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -420,7 +398,7 @@ public final class Jorth extends CodeDestination{
 				
 				tInfo.getFunctions().filter(m -> {
 					if(m.name().equals("annotationType")) return false;
-					var n = m.owner().name();
+					var n = m.ownerInfo().name();
 					return n.equals(annType);
 				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType().asGeneric(), f.defaultEnumValue())));
 				

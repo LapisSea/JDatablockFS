@@ -7,7 +7,6 @@ import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 import java.util.ArrayList;
@@ -16,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
-public class FunctionDefinition extends AnnotationContainer<FunctionDefinition>{
+public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> implements FunctionInfo{
 	
 	private final ClassDefinition owner;
 	private       AccessSet       access     = AccessSet.DEFAULT;
@@ -83,9 +82,11 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition>{
 	public AccessSet access(){
 		return access;
 	}
+	@Override
 	public String name(){
 		return name;
 	}
+	@Override
 	public JType returnType(){
 		return returnType;
 	}
@@ -185,42 +186,27 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition>{
 		return List.copyOf(args.keySet());
 	}
 	
-	public FunctionInfo getInfo(){
-		return new FunctionInfo(){
-			@Override
-			public boolean isStatic(){
-				return access.isStatic();
-			}
-			@Override
-			public boolean isFinal(){
-				return access().isFinal();
-			}
-			@Override
-			public Visibility visibility(){
-				return visibility;
-			}
-			@Override
-			public ClassInfo owner(){
-				return owner.getClassInfo();
-			}
-			@Override
-			public String name(){
-				return name;
-			}
-			@Override
-			public JType returnType(){
-				return returnType;
-			}
-			@Override
-			public List<JType> argumentTypes(){
-				return getArgs();
-			}
-			@Override
-			public Object defaultEnumValue(){
-				throw NotImplementedException.infer();//TODO: implement .defaultEnumValue()
-			}
-		};
+	@Override
+	public boolean isStatic(){
+		return access.isStatic();
 	}
+	@Override
+	public boolean isFinal(){
+		return access().isFinal();
+	}
+	@Override
+	public ClassInfo ownerInfo(){
+		return owner.getClassInfo();
+	}
+	@Override
+	public List<JType> argumentTypes(){
+		return getArgs();
+	}
+	@Override
+	public Object defaultEnumValue(){
+		throw new UnsupportedOperationException();
+	}
+	
 	@Override
 	public String toString(){
 		return owner.name() + "#" + makeSignature();

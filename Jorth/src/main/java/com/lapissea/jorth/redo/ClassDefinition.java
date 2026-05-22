@@ -97,7 +97,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 				if(method == null){
 					return typeSource.byType(extension).getFunction(signature);
 				}
-				return method.getInfo();
+				return method;
 			}
 			@Override
 			public Stream<? extends FunctionInfo> getFunctionsByName(String name){

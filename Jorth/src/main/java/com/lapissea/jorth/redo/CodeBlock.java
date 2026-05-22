@@ -11,11 +11,13 @@ import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class CodeBlock{
 	
@@ -72,7 +74,7 @@ public class CodeBlock{
 		return get("this").get(field);
 	}
 	public CodeBlock get(FieldDefinition field) throws MalformedJorth{
-		return add(GetFieldOp.simulate(localStack, typeSource, field.getInfo()));
+		return add(GetFieldOp.simulate(localStack, typeSource, field));
 	}
 	
 	public CodeBlock get(String localVal) throws MalformedJorth{
@@ -224,7 +226,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock call(FunctionDefinition fn) throws MalformedJorth{
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn.getInfo(), false));
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(FunctionDefinition fn, CodeArg gatherArguments) throws MalformedJorth{
 		var mark = localStack.size();
@@ -242,7 +244,7 @@ public class CodeBlock{
 		return get("this").swap().set(field);
 	}
 	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
-		return add(PutFieldOp.simulate(localStack, typeSource, field.getInfo()));
+		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
 	public CodeBlock pop() throws MalformedJorth{
 		return add(PopOp.simulate(localStack));
@@ -342,4 +344,31 @@ public class CodeBlock{
 	public CodeBlock setArrayElement() throws MalformedJorth{
 		return add(PutElementOp.simulate(localStack, typeSource));
 	}
+	
+	public static class BootstrapFnBuilder{
+		private ClassName         owner;
+		private String            functionName;
+		private List<GenericType> extraArgs=new ArrayList<>();
+		
+		public BootstrapFnBuilder caller(Class<?> owner, String functionName){
+			return caller(ClassName.of(owner), functionName);
+		}
+		public BootstrapFnBuilder caller(ClassName owner, String functionName){
+			this.owner = owner;
+			this.functionName = functionName;
+		}
+		
+		public BootstrapFnBuilder arg(Class<?> arg){
+			return arg(GenericType.of(arg));
+		}
+		public BootstrapFnBuilder arg(GenericType arg){
+			extraArgs.add(arg);
+			return this;
+		}
+	}
+	
+	public CodeBlock callVirtual(Consumer<BootstrapFnBuilder> bootstrap ) throws MalformedJorth{
+	return add()
+	}
+	
 }

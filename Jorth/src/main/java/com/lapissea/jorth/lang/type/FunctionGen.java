@@ -16,17 +16,7 @@ import org.objectweb.asm.MethodVisitor;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -490,7 +480,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public void invokeOp(FunctionInfo function, boolean superCall) throws MalformedJorth{
-		var owner = function.owner();
+		var owner = function.ownerInfo();
 		var name  = function.name();
 		
 		int callOp;
@@ -996,7 +986,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return visibility;
 	}
 	@Override
-	public ClassInfo owner(){
+	public ClassInfo ownerInfo(){
 		return owner;
 	}
 	@Override

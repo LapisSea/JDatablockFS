@@ -83,7 +83,7 @@ public interface FunctionInfo{
 			return Visibility.PRIVATE;
 		}
 		@Override
-		public ClassInfo owner(){
+		public ClassInfo ownerInfo(){
 			return owner;
 		}
 		@Override
@@ -153,7 +153,7 @@ public interface FunctionInfo{
 			return Visibility.PRIVATE;
 		}
 		@Override
-		public ClassInfo owner(){
+		public ClassInfo ownerInfo(){
 			return owner;
 		}
 		@Override
@@ -186,7 +186,7 @@ public interface FunctionInfo{
 	boolean isFinal();
 	Visibility visibility();
 	
-	ClassInfo owner();
+	ClassInfo ownerInfo();
 	String name();
 	JType returnType();
 	List<JType> argumentTypes();

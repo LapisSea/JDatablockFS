@@ -588,7 +588,7 @@ public sealed interface Insn{
 	record InvokeOp(FunctionInfo function, boolean superCall, ClassName caller) implements Insn{
 		
 		static InvokeOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FunctionInfo function, boolean superCall) throws MalformedJorth{
-			ClassInfo owner = function.owner();
+			ClassInfo owner = function.ownerInfo();
 			String    name  = function.name();
 			
 			var returnType = function.returnType();
@@ -619,7 +619,7 @@ public sealed interface Insn{
 		
 		@Override
 		public void visit(MethodVisitor writer){
-			ClassInfo owner = function.owner();
+			ClassInfo owner = function.ownerInfo();
 			String    name  = function.name();
 			
 			

@@ -9,7 +9,7 @@ import org.objectweb.asm.ClassWriter;
 
 import static org.objectweb.asm.Opcodes.ACC_ENUM;
 
-public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
+public final class FieldDefinition extends AnnotationContainer<FieldDefinition> implements FieldInfo{
 	
 	public final ClassDefinition owner;
 	public final String          name;
@@ -88,28 +88,21 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 		
 		fw.visitEnd();
 	}
-	public FieldInfo getInfo(){
-		return new FieldInfo(){
-			@Override
-			public boolean isEnumConstant(){
-				return isEnumConstant;
-			}
-			@Override
-			public boolean isStatic(){
-				return access.isStatic();
-			}
-			@Override
-			public ClassName owner(){
-				return owner.name();
-			}
-			@Override
-			public JType type(){
-				return type;
-			}
-			@Override
-			public String name(){
-				return name;
-			}
-		};
+	
+	@Override
+	public boolean isStatic(){
+		return access.isStatic();
+	}
+	@Override
+	public ClassName owner(){
+		return owner.name();
+	}
+	@Override
+	public JType type(){
+		return type;
+	}
+	@Override
+	public String name(){
+		return name;
 	}
 }
