@@ -181,6 +181,9 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition>{
 	public List<JType> getArgs(){
 		return List.copyOf(args.values());
 	}
+	public List<String> getArgNames(){
+		return List.copyOf(args.keySet());
+	}
 	
 	public FunctionInfo getInfo(){
 		return new FunctionInfo(){

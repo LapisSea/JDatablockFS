@@ -94,6 +94,18 @@ public class CodeBlock{
 	public CodeBlock val(int val) throws MalformedJorth{
 		return add(IVal.simulate(localStack, val));
 	}
+	public CodeBlock val(long val) throws MalformedJorth{
+		return add(LVal.simulate(localStack, val));
+	}
+	public CodeBlock val(float val) throws MalformedJorth{
+		return add(FVal.simulate(localStack, val));
+	}
+	public CodeBlock val(double val) throws MalformedJorth{
+		return add(DVal.simulate(localStack, val));
+	}
+	public CodeBlock val(boolean val) throws MalformedJorth{
+		return add(BVal.simulate(localStack, val));
+	}
 	public CodeBlock val(String val) throws MalformedJorth{
 		return add(StrVal.simulate(localStack, val));
 	}
@@ -226,6 +238,9 @@ public class CodeBlock{
 		return call(fn);
 	}
 	
+	public CodeBlock setThis(FieldDefinition field) throws MalformedJorth{
+		return get("this").swap().set(field);
+	}
 	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
 		return add(PutFieldOp.simulate(localStack, typeSource, field.getInfo()));
 	}
@@ -239,9 +254,25 @@ public class CodeBlock{
 		return add(SwapOp.simulate(localStack));
 	}
 	
-	public void callSuper() throws MalformedJorth{
-		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), fnOwner.getArgs());
+	public void callSuper(CodeArg gatherArguments) throws MalformedJorth{
+		get("this");
+		var          args    = doArgs(gatherArguments);
+		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args);
 		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+	}
+	/**
+	 * Calls super of the current function. The function has to be static. It will automatically gather all arguments and pass them.
+	 *
+	 * @return
+	 * @throws MalformedJorth
+	 */
+	public CodeBlock callSuperAutoPass() throws MalformedJorth{
+		get("this");
+		for(String argName : fnOwner.getArgNames()){
+			get(argName);
+		}
+		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), fnOwner.getArgs());
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
 	}
 	
 	private ClassName cName(){

@@ -54,6 +54,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private final Map<FunctionInfo.Signature, FunctionDefinition> functions = new LinkedHashMap<>();
 	private final Map<String, FieldDefinition>                    fields    = new LinkedHashMap<>();
 	
+	private final Map<String, GenericType> typeArgs = new LinkedHashMap<>();
+	
 	private final Set<ClassName>    permits    = new LinkedHashSet<>();
 	private final List<GenericType> interfaces = new ArrayList<>();
 	private       GenericType       extension  = GenericType.OBJECT;
@@ -173,7 +175,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private void ensureConstructor(){
 		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
 			try{
-				instanceInit().body().get("this").callSuper();
+				instanceInit().body().callSuperAutoPass();
 			}catch(MalformedJorth e){
 				throw new RuntimeException(e);
 			}
@@ -244,6 +246,16 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		this.name = Objects.requireNonNull(className);
 		return this;
 	}
+	public ClassDefinition arg(Class<?> type, String name){
+		return arg(GenericType.of(type), name);
+	}
+	public ClassDefinition arg(GenericType type, String name){
+		type = type.withTypeArgName(ClassName.dotted(name));
+		if(typeArgs.put(Objects.requireNonNull(name), Objects.requireNonNull(type)) != null){
+			throw new IllegalArgumentException("Duplicate argument " + name);
+		}
+		return this;
+	}
 	public ClassDefinition type(ClassType type) throws MalformedJorth{
 		if(this.type == ClassType.ENUM) throw new MalformedJorth("Can not change type from enum");
 		this.type = Objects.requireNonNull(type);
@@ -265,10 +277,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			.arg(String.class, "name")
 			.arg(int.class, "ordinal")
 			.body()
-			.get("this")
-			.get("name")
-			.get("ordinal")
-			.callSuper();
+			.callSuperAutoPass();
 		
 		function("values")
 			.returns(vType)
@@ -393,5 +402,12 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	public FieldDefinition enumConstant(String constantName) throws MalformedJorth{
 		if(type != ClassType.ENUM) throw new MalformedJorth("Can not add enum constant on " + type);
 		return field(constantName, new GenericType(name)).asEnumConstant();
+	}
+	public GenericType getArg(String name){
+		var arg = typeArgs.get(name);
+		if(arg == null){
+			throw new IllegalArgumentException("No argument found with name " + name);
+		}
+		return arg;
 	}
 }

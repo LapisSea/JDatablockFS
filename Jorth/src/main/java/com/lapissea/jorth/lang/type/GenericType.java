@@ -250,6 +250,10 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	public GenericType withDims(int dims){
 		return new GenericType(raw, typeArgName, dims, args);
 	}
+	public GenericType withTypeArgName(ClassName typeArgName){
+		Objects.requireNonNull(typeArgName);
+		return new GenericType(raw, Optional.of(typeArgName), dims, args);
+	}
 	
 	public GenericType arrayType(){
 		return withDims(dims + 1);

@@ -26,17 +26,6 @@ import static org.objectweb.asm.Opcodes.*;
 
 public sealed interface Insn{
 	
-	private static void emitStackInt(MethodVisitor writer, int value){
-		switch(value){
-			case 0 -> writer.visitInsn(ICONST_0);
-			case 1 -> writer.visitInsn(ICONST_1);
-			case 2 -> writer.visitInsn(ICONST_2);
-			case 3 -> writer.visitInsn(ICONST_3);
-			case 4 -> writer.visitInsn(ICONST_4);
-			case 5 -> writer.visitInsn(ICONST_5);
-			default -> writer.visitIntInsn(SIPUSH, value);
-		}
-	}
 	private static GenericType doEquality(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
 		stack.requireElements(2);
 		GenericType a = stack.pop();
@@ -49,13 +38,96 @@ public sealed interface Insn{
 	}
 	
 	record IVal(int val) implements Insn{
+		public static void emit(MethodVisitor writer, int value){
+			switch(value){
+				case 0 -> writer.visitInsn(ICONST_0);
+				case 1 -> writer.visitInsn(ICONST_1);
+				case 2 -> writer.visitInsn(ICONST_2);
+				case 3 -> writer.visitInsn(ICONST_3);
+				case 4 -> writer.visitInsn(ICONST_4);
+				case 5 -> writer.visitInsn(ICONST_5);
+				default -> writer.visitIntInsn(SIPUSH, value);
+			}
+		}
+		
 		public static IVal simulate(TypeStack stack, int val){
 			stack.push(GenericType.INT);
 			return new IVal(val);
 		}
 		@Override
 		public void visit(MethodVisitor writer){
-			Insn.emitStackInt(writer, val);
+			emit(writer, val);
+		}
+	}
+	
+	record LVal(long val) implements Insn{
+		public static void emit(MethodVisitor writer, long value){
+			switch((int)value){
+				case 0 -> writer.visitInsn(LCONST_0);
+				case 1 -> writer.visitInsn(LCONST_1);
+				default -> writer.visitLdcInsn(value);
+			}
+		}
+		
+		public static LVal simulate(TypeStack stack, long val){
+			stack.push(GenericType.LONG);
+			return new LVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record FVal(float val) implements Insn{
+		public static void emit(MethodVisitor writer, float value){
+			if(value == 0.0f) writer.visitInsn(FCONST_0);
+			else if(value == 1.0f) writer.visitInsn(FCONST_1);
+			else if(value == 2.0f) writer.visitInsn(FCONST_2);
+			else writer.visitLdcInsn(value);
+		}
+		
+		public static FVal simulate(TypeStack stack, float val){
+			stack.push(GenericType.FLOAT);
+			return new FVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record DVal(double val) implements Insn{
+		public static void emit(MethodVisitor writer, double value){
+			if(value == 0.0d) writer.visitInsn(DCONST_0);
+			else if(value == 1.0d) writer.visitInsn(DCONST_1);
+			else writer.visitLdcInsn(value);
+		}
+		public static DVal simulate(TypeStack stack, double val){
+			stack.push(GenericType.DOUBLE);
+			return new DVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
+		}
+	}
+	
+	record BVal(boolean val) implements Insn{
+		public static void emit(MethodVisitor writer, boolean value){
+			if(value){
+				writer.visitInsn(ICONST_1);
+			}else{
+				writer.visitInsn(ICONST_0);
+			}
+		}
+		public static BVal simulate(TypeStack stack, boolean val){
+			stack.push(GenericType.BOOL);
+			return new BVal(val);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			emit(writer, val);
 		}
 	}
 	

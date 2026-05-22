@@ -684,7 +684,8 @@ public class JorthTests{
 					""",
 				className);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.type(ClassType.INTERFACE).name(ClassName.dotted(className));
+			cd.function("hello").returns(String.class);
 		});
 		assertThat(cls).isInterface();
 		var hello = cls.getMethod("hello");
@@ -738,7 +739,10 @@ public class JorthTests{
 				expectedStr
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(className)).extendsType(IStoreHello.class);
+			cd.instanceInit()
+			  .body()
+			  .callSuper(c -> c.val(expectedStr));
 		});
 		
 		var constr = cls.getConstructor();
@@ -785,7 +789,14 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			var optStr = cd.field("optStr", GenericType.of(Optional.class).withArgs(String.class));
+			
+			cd.function("set")
+			  .arg(GenericType.of(Optional.class).withArgs(String.class), "optStr")
+			  .body()
+			  .get("this")
+			  .get("optStr")
+			  .set(optStr);
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -901,7 +912,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
 		});
 		
 		var parms = cls.getTypeParameters();
@@ -930,7 +941,9 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
+			
+			cd.function("takeArg").arg(GenericType.of(List.class).withArgs(cd.getArg("T")), "tList");
 		});
 		
 		var meth  = cls.getMethod("takeArg", List.class);
@@ -1007,7 +1020,20 @@ public class JorthTests{
 				name, props
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name));
+			
+			for(Prop prop : props){
+				cd.field(prop.name, prop.type);
+			}
+			var body = cd.instanceInit().body().callSuperAutoPass();
+			for(Prop prop : props){
+				switch(prop.defaultVal){
+					case Integer v -> body.val(v);
+					case Float v -> body.val(v);
+					default -> throw new NotImplementedException(prop.defaultVal.getClass().getTypeName());
+				}
+				body.setThis(cd.getField(prop.name));
+			}
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName))
@@ -1038,7 +1064,10 @@ public class JorthTests{
 				name, names
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name));
+			for(String s : names){
+				cd.field(s, int.class);
+			}
 		});
 		
 		assertThat(Arrays.stream(cls.getFields()).map(Field::getName)).containsExactlyInAnyOrderElementsOf(names);
@@ -1137,7 +1166,7 @@ public class JorthTests{
 		assertThat(inst.apply(1)).isEqualTo(name + " 1");
 		assertThat(inst.apply(69)).isEqualTo(name + " 69");
 	}
-	@Test
+	@Test(dependsOnMethods = "simpleInterface")
 	void incrementInt() throws Exception{
 		var name = "incrementTest";
 		var cls = generateAndLoadInstance(name, writer -> {
@@ -1170,7 +1199,7 @@ public class JorthTests{
 		assertThat(inst.applyAsInt(10)).isEqualTo(12);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(0);
 	}
-	@Test
+	@Test(dependsOnMethods = "simpleInterface")
 	void incrementDouble() throws Exception{
 		var name = "incrementTestDouble";
 		var cls = generateAndLoadInstance(name, writer -> {
@@ -1204,7 +1233,7 @@ public class JorthTests{
 		assertThat(inst.applyAsDouble(-2)).isEqualTo(0.125);
 	}
 	
-	@Test
+	@Test(dependsOnMethods = "simpleInterface")
 	void variables() throws Exception{
 		var name = "variables";
 		var cls = generateAndLoadInstance(name, writer -> {
