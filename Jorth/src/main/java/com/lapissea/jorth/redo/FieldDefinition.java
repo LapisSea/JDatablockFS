@@ -5,8 +5,9 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
+
+import static org.objectweb.asm.Opcodes.ACC_ENUM;
 
 public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 	
@@ -14,6 +15,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 	public final String          name;
 	public final JType           type;
 	private      Visibility      visibility = Visibility.PUBLIC;
+	private      boolean         isEnumConstant;
 	
 	private AccessSet access = AccessSet.DEFAULT;
 	
@@ -47,6 +49,14 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 	public FieldDefinition staticFinal(CodeArg init) throws MalformedJorth{
 		return staticFinal().init(init);
 	}
+	public FieldDefinition asEnumConstant(){
+		isEnumConstant = true;
+		return staticFinal();
+	}
+	public boolean isEnumConstant(){
+		return isEnumConstant;
+	}
+	
 	private FieldDefinition init(CodeArg init) throws MalformedJorth{
 		var body = owner.staticInit().body();
 		init.accept(body);
@@ -69,7 +79,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 	public void visit(ClassWriter writer){
 		var descriptor = type.jvmDescriptorStr();
 		var signature  = type.jvmSignatureStr();
-		var access     = visibility().flag|access().flags();
+		var access     = visibility().flag|access().flags()|(isEnumConstant? ACC_ENUM : 0);
 		
 		var fw = writer.visitField(access, name, descriptor, signature, null);
 		for(AnnotationDefinition annotation : annotations){
@@ -82,7 +92,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition>{
 		return new FieldInfo(){
 			@Override
 			public boolean isEnumConstant(){
-				throw NotImplementedException.infer();//TODO: implement .isEnumConstant()
+				return isEnumConstant;
 			}
 			@Override
 			public boolean isStatic(){

@@ -91,7 +91,11 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 			@Override
 			public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{
-				throw NotImplementedException.infer();//TODO: implement .getFunction()
+				var method = functions.get(signature);
+				if(method == null){
+					return typeSource.byType(extension).getFunction(signature);
+				}
+				return method.getInfo();
 			}
 			@Override
 			public Stream<? extends FunctionInfo> getFunctionsByName(String name){
@@ -139,12 +143,15 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	public byte[] getClassFile() throws MalformedJorth{
 		
-		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
-			try{
-				instanceInit().body().callSuper();
-			}catch(MalformedJorth e){
-				throw new RuntimeException(e);
+		switch(type){
+			case CLASS -> {
+				ensureConstructor();
 			}
+			case INTERFACE -> { }
+			case ENUM -> {
+				enumValuesInit();
+			}
+			case ANNOTATION -> { }
 		}
 		
 		
@@ -161,6 +168,16 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		writer.visitEnd();
 		return writer.toByteArray();
+	}
+	
+	private void ensureConstructor(){
+		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
+			try{
+				instanceInit().body().get("this").callSuper();
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 	private void visitClass(ClassWriter writer){
@@ -227,18 +244,68 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		this.name = Objects.requireNonNull(className);
 		return this;
 	}
-	public ClassDefinition type(ClassType type){
+	public ClassDefinition type(ClassType type) throws MalformedJorth{
+		if(this.type == ClassType.ENUM) throw new MalformedJorth("Can not change type from enum");
 		this.type = Objects.requireNonNull(type);
 		if(type == ClassType.ENUM) initEnum();
 		return this;
 	}
 	
-	private void initEnum(){
+	private void initEnum() throws MalformedJorth{
 		requireName();
 		if(!extension.equals(GenericType.OBJECT)){
 			throw new IllegalArgumentException("Enum classes can not explicitly extend a type");
 		}
 		extension = GenericType.of(Enum.class).withArgs(new GenericType(name));
+		
+		var vType = new GenericType(name).arrayType();
+		var vals  = field("$VALUES", vType).visibility(Visibility.PRIVATE).staticFinal();
+		
+		instanceInit()
+			.arg(String.class, "name")
+			.arg(int.class, "ordinal")
+			.body()
+			.get("this")
+			.get("name")
+			.get("ordinal")
+			.callSuper();
+		
+		function("values")
+			.returns(vType)
+			.staticAcc()
+			.body()
+			.get(vals)
+			.call("clone")
+			.cast(vType);
+	}
+	
+	
+	private void enumValuesInit() throws MalformedJorth{
+		var vType = new GenericType(name).arrayType();
+		var fun   = staticInit().body();
+		
+		var constants = fields.values().stream().filter(FieldDefinition::isEnumConstant).toList();
+		
+		
+		fun.val(constants.size());
+		fun.newObj(ClassName.slashed(vType.jvmDescriptorStr()));
+		
+		for(int i1 = 0; i1<constants.size(); i1++){
+			int i     = i1;
+			var field = constants.get(i);
+			if(!field.isEnumConstant()) continue;
+			
+			fun.dup();//array dup
+			fun.val(i);//[i] = ...
+			
+			fun.newObj(name, e -> e.val(field.name).val(i));// new enum(name,ordinal)
+			
+			fun.dup();
+			fun.set(field);// Enum.NAME=obj
+			fun.setArrayElement();
+		}
+		
+		fun.set(getField("$VALUES"));
 	}
 	
 	public ClassDefinition access(AccessSet access){
@@ -263,8 +330,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 	}
 	
-	public FunctionDefinition staticInit(){
-		return function("<clinit>").access(AccessSet.STATIC).visibility(Visibility.PUBLIC);
+	public FunctionDefinition staticInit() throws MalformedJorth{
+		var fn = function("<clinit>").access(AccessSet.STATIC).visibility(Visibility.PUBLIC);
+		fn.body();
+		return fn;
 	}
 	public FunctionDefinition instanceInit(){
 		return function("<init>").visibility(Visibility.PUBLIC);
@@ -289,6 +358,14 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return fields.computeIfAbsent(name, n -> new FieldDefinition(this, n, type));
 	}
 	
+	public FieldDefinition getField(String name){
+		var f = fields.get(name);
+		if(f == null){
+			throw new IllegalArgumentException("No field found with name " + name);
+		}
+		return f;
+	}
+	
 	public ClassDefinition permits(ClassName name) throws MalformedJorth{
 		if(!permits.add(name)){
 			throw new MalformedJorth(name.dotted() + " already permitted");
@@ -311,5 +388,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	public ClassName name(){ return name; }
 	public ClassInfo superType() throws MalformedJorth{
 		return typeSource.byName(extension.raw());
+	}
+	
+	public FieldDefinition enumConstant(String constantName) throws MalformedJorth{
+		if(type != ClassType.ENUM) throw new MalformedJorth("Can not add enum constant on " + type);
+		return field(constantName, new GenericType(name)).asEnumConstant();
 	}
 }

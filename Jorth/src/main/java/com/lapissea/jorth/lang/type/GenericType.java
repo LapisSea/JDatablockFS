@@ -20,17 +20,40 @@ import static java.util.stream.Collectors.joining;
 
 public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args) implements JType{
 	
-	public static final GenericType OBJECT = new GenericType(ClassName.of(Object.class));
-	public static final GenericType STRING = new GenericType(ClassName.of(String.class));
-	public static final GenericType BYTE   = new GenericType(ClassName.of(byte.class));
-	public static final GenericType CHAR   = new GenericType(ClassName.of(char.class));
-	public static final GenericType SHORT  = new GenericType(ClassName.of(short.class));
-	public static final GenericType INT    = new GenericType(ClassName.of(int.class));
-	public static final GenericType LONG   = new GenericType(ClassName.of(long.class));
-	public static final GenericType BOOL   = new GenericType(ClassName.of(boolean.class));
-	public static final GenericType FLOAT  = new GenericType(ClassName.of(float.class));
-	public static final GenericType DOUBLE = new GenericType(ClassName.of(double.class));
-	public static final GenericType VOID   = new GenericType(ClassName.of(void.class));
+	public static final GenericType OBJECT = GenericType.of(Object.class);
+	public static final GenericType STRING = GenericType.of(String.class);
+	public static final GenericType BYTE   = GenericType.of(byte.class);
+	public static final GenericType CHAR   = GenericType.of(char.class);
+	public static final GenericType SHORT  = GenericType.of(short.class);
+	public static final GenericType INT    = GenericType.of(int.class);
+	public static final GenericType LONG   = GenericType.of(long.class);
+	public static final GenericType BOOL   = GenericType.of(boolean.class);
+	public static final GenericType FLOAT  = GenericType.of(float.class);
+	public static final GenericType DOUBLE = GenericType.of(double.class);
+	public static final GenericType VOID   = GenericType.of(void.class);
+	
+	public static GenericType of(ClassName name){
+		var any = name.any();
+		if(any.length()<3 || any.charAt(0) != '[' || any.charAt(any.length() - 1) != ';'){
+			return new GenericType(name);
+		}
+		return parseArray(name);
+	}
+	private static GenericType parseArray(ClassName name){
+		var dotted    = name.dotted();
+		int arrayDims = 0;
+		while(arrayDims<dotted.length() - 1 && dotted.charAt(arrayDims) == '['){
+			arrayDims++;
+		}
+		var nameStart = arrayDims;
+		var type      = dotted.charAt(arrayDims);
+		if(type == 'L'){
+			nameStart++;
+		}
+		
+		dotted = dotted.substring(nameStart, dotted.length() - 1);
+		return new GenericType(ClassName.dotted(dotted), Optional.empty(), arrayDims, List.of());
+	}
 	
 	public static GenericType of(Type type){
 		return of0(null, type);
@@ -226,5 +249,9 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	
 	public GenericType withDims(int dims){
 		return new GenericType(raw, typeArgName, dims, args);
+	}
+	
+	public GenericType arrayType(){
+		return withDims(dims + 1);
 	}
 }

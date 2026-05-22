@@ -8,20 +8,7 @@ import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
-import com.lapissea.jorth.redo.Insn.ClassVal;
-import com.lapissea.jorth.redo.Insn.ConditionalJump;
-import com.lapissea.jorth.redo.Insn.DupOp;
-import com.lapissea.jorth.redo.Insn.Equality;
-import com.lapissea.jorth.redo.Insn.GetFieldOp;
-import com.lapissea.jorth.redo.Insn.GetLocal;
-import com.lapissea.jorth.redo.Insn.IVal;
-import com.lapissea.jorth.redo.Insn.InvokeOp;
-import com.lapissea.jorth.redo.Insn.NewOp;
-import com.lapissea.jorth.redo.Insn.PopOp;
-import com.lapissea.jorth.redo.Insn.PutFieldOp;
-import com.lapissea.jorth.redo.Insn.ReturnOp;
-import com.lapissea.jorth.redo.Insn.StrVal;
-import com.lapissea.jorth.redo.Insn.SwapOp;
+import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.ArrayList;
@@ -81,6 +68,9 @@ public class CodeBlock{
 	}
 	
 	
+	public CodeBlock getThis(FieldDefinition field) throws MalformedJorth{
+		return get("this").get(field);
+	}
 	public CodeBlock get(FieldDefinition field) throws MalformedJorth{
 		return add(GetFieldOp.simulate(localStack, typeSource, field.getInfo()));
 	}
@@ -93,6 +83,9 @@ public class CodeBlock{
 	private void doGetLocal(String localVal) throws MalformedJorth{
 		Local local = localValues.get(localVal);
 		if(local == null){
+			if(localVal.equals("this") && fnOwner.access().isStatic()){
+				throw new MalformedJorth("Cannot get 'this' from a static function");
+			}
 			throw new MalformedJorth("Unknown localValue: " + localVal);
 		}
 		add(GetLocal.simulate(localStack, local.type.asGeneric(), localVal, local.index));
@@ -152,7 +145,16 @@ public class CodeBlock{
 		return newObj(ClassName.of(clazz), arguments);
 	}
 	public CodeBlock newObj(ClassName clazz, CodeArg arguments) throws MalformedJorth{
-		add(NewOp.simulate(localStack, new GenericType(clazz), true));
+		var type = GenericType.of(clazz);
+		if(type.dims() != 0){
+			add(NewOp.simulate(localStack, type, false));
+			var args = doArgs(arguments);
+			if(args.size() != 0){
+				throw new MalformedJorth("Cannot pass arguments to an array type");
+			}
+			return this;
+		}
+		add(NewOp.simulate(localStack, type, true));
 		var args = doArgs(arguments);
 		var fn   = resolveFunction(typeSource.byName(clazz), "<init>", args);
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
@@ -238,9 +240,7 @@ public class CodeBlock{
 	}
 	
 	public void callSuper() throws MalformedJorth{
-		get("this");
-		ClassInfo    parent  = fnOwner.owner().superType();
-		FunctionInfo superFn = resolveFunction(parent, fnOwner.name(), List.of());
+		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), fnOwner.getArgs());
 		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
 	}
 	
@@ -303,5 +303,12 @@ public class CodeBlock{
 	}
 	public boolean stacksMatch(TypeStack localStack){
 		return this.localStack.equals(localStack);
+	}
+	
+	public CodeBlock cast(GenericType type) throws MalformedJorth{
+		return add(CastOp.simulate(localStack, typeSource, type));
+	}
+	public CodeBlock setArrayElement() throws MalformedJorth{
+		return add(PutElementOp.simulate(localStack, typeSource));
 	}
 }

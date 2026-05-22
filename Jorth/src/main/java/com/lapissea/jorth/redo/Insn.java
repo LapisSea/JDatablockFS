@@ -85,6 +85,88 @@ public sealed interface Insn{
 		}
 	}
 	
+	record PrimitiveCastOp(GenericType from, GenericType to) implements Insn{
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			if(from.equals(GenericType.LONG) && to.equals(GenericType.INT)){
+				writer.visitInsn(L2I);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.LONG)){
+				writer.visitInsn(I2L);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BYTE)){
+				writer.visitInsn(I2B);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.CHAR)){
+				writer.visitInsn(I2C);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.SHORT)){
+				writer.visitInsn(I2S);
+			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BOOL)){
+				emitIntToTruthy(writer);
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.BOOL)){
+				writer.visitInsn(LCONST_0);
+				writer.visitInsn(LCMP);
+				emitIntToTruthy(writer);
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.FLOAT)){
+				writer.visitInsn(L2F);
+			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.DOUBLE)){
+				writer.visitInsn(L2D);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.INT)){
+				writer.visitInsn(F2I);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.LONG)){
+				writer.visitInsn(F2L);
+			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.DOUBLE)){
+				writer.visitInsn(F2D);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.INT)){
+				writer.visitInsn(D2I);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.LONG)){
+				writer.visitInsn(D2L);
+			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.FLOAT)){
+				writer.visitInsn(D2F);
+			}else{
+				throw new UnsupportedOperationException("Unsupported primitive cast: " + from + " -> " + to);
+			}
+		}
+		
+		private void emitIntToTruthy(MethodVisitor writer){
+			Label isTrue = new Label();
+			Label end    = new Label();
+			
+			// if int != 0, jump to true
+			writer.visitJumpInsn(IFNE, isTrue);
+			writer.visitInsn(ICONST_0);
+			writer.visitJumpInsn(GOTO, end);
+			
+			writer.visitLabel(isTrue);
+			writer.visitInsn(ICONST_1);
+			writer.visitLabel(end);
+		}
+	}
+	
+	record CastOp(GenericType type) implements Insn{
+		public static Insn simulate(TypeStack stack, TypeSource typeSource, GenericType type) throws MalformedJorth{
+			var stackType = stack.pop();
+			
+			if(type.equals(stackType)){
+				stack.push(type);
+				return null;
+			}
+			
+			if(stackType.getBaseType() != BaseType.OBJ && type.getBaseType() != BaseType.OBJ){
+				stack.push(type);
+				return new PrimitiveCastOp(stackType, type);
+			}
+			
+			if(!type.instanceOf(typeSource, stackType)){
+				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
+			}
+			stack.push(type);
+			return new CastOp(type);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitTypeInsn(CHECKCAST, type.dims() == 0? type.raw().slashed() : type.jvmDescriptorStr());
+		}
+	}
+	
 	record GetLocal(GenericType type, String name, int index) implements Insn{
 		public static GetLocal simulate(TypeStack stack, GenericType type, String name, int index){
 			stack.push(type);
@@ -403,6 +485,33 @@ public sealed interface Insn{
 			fieldAccess(writer, field, field.isStatic()? GETSTATIC : GETFIELD);
 		}
 	}
+	
+	
+	record PutElementOp(GenericType element) implements Insn{
+		
+		static PutElementOp simulate(TypeStack stack, TypeSource typeSource) throws MalformedJorth{
+			GenericType element = stack.pop();
+			GenericType index   = stack.pop();
+			GenericType array   = stack.pop();
+			
+			if(!index.getBaseType().arrayIndexCompatible){
+				throw new MalformedJorth(index + " can not be used as array index");
+			}
+			if(array.dims() == 0){
+				throw new MalformedJorth(array + " is not an array");
+			}
+			if(!element.instanceOf(typeSource, array.withDims(array.dims() - 1))){
+				throw new MalformedJorth("can not store " + element + " in " + array);
+			}
+			return new PutElementOp(element);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(element.getBaseType().arrayStoreOP);
+		}
+	}
+	
 	
 	record InvokeOp(FunctionInfo function, boolean superCall, ClassName caller) implements Insn{
 		

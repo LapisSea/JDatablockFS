@@ -9,16 +9,7 @@ import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
@@ -92,6 +83,20 @@ public final class ClassGen implements ClassInfo, Endable{
 			writer.visitPermittedSubclass(permit.slashed());
 		}
 		writeAnnotations(anns, writer::visitAnnotation);
+		
+		if(type == ClassType.ENUM){
+			try{
+				defineField(
+					Visibility.PRIVATE,
+					EnumSet.of(Access.STATIC, Access.FINAL),
+					List.of(),
+					new GenericType(name).arrayType(),
+					"$VALUES"
+				);
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 	private static String makeSignature(GenericType extension, List<GenericType> interfaces, Map<ClassName, GenericType> typeArgs){
@@ -164,13 +169,6 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	private void generateEnumBoilerplate() throws MalformedJorth{
 		var arrType = new GenericType(name, Optional.empty(), 1, List.of());
-		defineField(
-			Visibility.PRIVATE,
-			EnumSet.of(Access.STATIC, Access.FINAL),
-			List.of(),
-			arrType,
-			"$VALUES"
-		);
 		{
 			var fun = defineFunction(
 				"values",

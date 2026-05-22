@@ -87,7 +87,7 @@ public final class ClassName{
 	
 	@Override
 	public String toString(){
-		return dotted();
+		return GenericType.of(this).toString();
 	}
 	
 	@Override

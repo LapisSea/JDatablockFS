@@ -384,8 +384,7 @@ public class JorthTests{
 			
 			cd.function("toString").returns(String.class)
 			  .body()
-			  .get("this")
-			  .get(ts);
+			  .getThis(ts);
 			
 			cd.function("init").arg(String.class, "testString")
 			  .body()
@@ -660,7 +659,10 @@ public class JorthTests{
 					""",
 				className);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(className))
+			  .type(ClassType.ENUM);
+			cd.enumConstant("FOO");
+			cd.enumConstant("BAR");
 		});
 		cls.getEnumConstants();
 		

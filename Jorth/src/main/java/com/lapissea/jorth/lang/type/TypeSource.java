@@ -67,10 +67,10 @@ public interface TypeSource{
 	Optional<ClassInfo> maybeByType(GenericType type);
 	
 	default Optional<ClassInfo> maybeByName(ClassName name){
-		return maybeByType(new GenericType(name));
+		return maybeByType(GenericType.of(name));
 	}
 	default ClassInfo byName(ClassName name) throws MalformedJorth{
-		return byType(new GenericType(name));
+		return byType(GenericType.of(name));
 	}
 	default ClassInfo byType(GenericType type) throws MalformedJorth{
 		if(!type.args().isEmpty()) type = type.withoutArgs();
