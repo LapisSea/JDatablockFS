@@ -14,7 +14,7 @@ import java.util.Objects;
 
 public class AnnotationDefinition{
 	
-	private final ClassName           type;
+	public final  ClassName           type;
 	private final Map<String, Object> args = new LinkedHashMap<>();
 	
 	public AnnotationDefinition(ClassName type){

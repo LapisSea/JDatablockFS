@@ -211,4 +211,8 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> 
 	public String toString(){
 		return owner.name() + "#" + makeSignature();
 	}
+	public FunctionDefinition override() throws MalformedJorth{
+		var info = owner.getFunctionOverride(makeSignature());
+		return returns(info.returnType()).annotation(Override.class);
+	}
 }

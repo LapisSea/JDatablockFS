@@ -1155,7 +1155,12 @@ public class JorthTests{
 				name
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name)).implement(GenericType.of(IntFunction.class).withArgs(String.class));
+			cd.function("apply").arg(int.class, "num").override()
+			  .body()
+			  .callVirtual(b -> b.caller(TestBootstrap.class, "bootstrap").arg(Class.class, ClassName.dotted(name)),
+			               fn -> fn.name("makeString").arg(int.class).returns(String.class),
+			               c -> c.get("num"));
 		});
 		
 		Object instO = cls.getConstructor().newInstance();

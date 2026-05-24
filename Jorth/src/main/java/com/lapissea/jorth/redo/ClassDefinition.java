@@ -410,4 +410,14 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		return arg;
 	}
+	public FunctionInfo getFunctionOverride(FunctionInfo.Signature signature) throws MalformedJorth{
+		for(GenericType iType : interfaces){
+			try{
+				var info = typeSource.byType(iType);
+				return info.getFunction(signature);
+			}catch(MalformedJorth ignore){ }
+		}
+		var info = typeSource.byType(extension);
+		return info.getFunction(signature);
+	}
 }

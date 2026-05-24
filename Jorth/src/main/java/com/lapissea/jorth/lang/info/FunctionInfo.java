@@ -23,8 +23,8 @@ public interface FunctionInfo{
 		}
 		public Signature(String name, List<JType> args){
 			this.name = name;
-			var argTmp = List.copyOf(args);
-			var copy   = false;
+			List<JType> argTmp = List.copyOf(args);
+			var         copy   = false;
 			for(int i = 0; i<argTmp.size(); i++){
 				if(argTmp.get(i).hasArgs()) continue;
 				if(!copy) argTmp = new ArrayList<>(argTmp);

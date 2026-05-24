@@ -11,7 +11,6 @@ import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -345,30 +344,22 @@ public class CodeBlock{
 		return add(PutElementOp.simulate(localStack, typeSource));
 	}
 	
-	public static class BootstrapFnBuilder{
-		private ClassName         owner;
-		private String            functionName;
-		private List<GenericType> extraArgs=new ArrayList<>();
+	public CodeBlock callVirtual(Consumer<BootstrapFn> bootstrap, Consumer<CallingFn> fnDef, CodeArg arguments) throws MalformedJorth{
+		List<JType> args = doArgs(arguments);
 		
-		public BootstrapFnBuilder caller(Class<?> owner, String functionName){
-			return caller(ClassName.of(owner), functionName);
+		var boot = new BootstrapFn();
+		var fn   = new CallingFn();
+		bootstrap.accept(boot);
+		fnDef.accept(fn);
+		
+		if(boot.owner == null){
+			throw new MalformedJorth("Bootstrap function must be specified");
 		}
-		public BootstrapFnBuilder caller(ClassName owner, String functionName){
-			this.owner = owner;
-			this.functionName = functionName;
+		if(fn.name == null){
+			throw new MalformedJorth("Calling function name must be specified");
 		}
 		
-		public BootstrapFnBuilder arg(Class<?> arg){
-			return arg(GenericType.of(arg));
-		}
-		public BootstrapFnBuilder arg(GenericType arg){
-			extraArgs.add(arg);
-			return this;
-		}
-	}
-	
-	public CodeBlock callVirtual(Consumer<BootstrapFnBuilder> bootstrap ) throws MalformedJorth{
-	return add()
+		return add(VirtualCallOp.simulate(localStack, typeSource, boot, fn, args));
 	}
 	
 }

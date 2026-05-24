@@ -12,6 +12,11 @@ abstract class AnnotationContainer<SELF>{
 	protected List<AnnotationDefinition> annotations = new ArrayList<>();
 	
 	public SELF annotation(AnnotationDefinition ann){
+		for(AnnotationDefinition annotation : annotations){
+			if(annotation.type.equals(ann.type)){
+				throw new IllegalStateException("Duplicate annotation " + ann.type);
+			}
+		}
 		annotations.add(ann);
 		//noinspection unchecked
 		return (SELF)this;

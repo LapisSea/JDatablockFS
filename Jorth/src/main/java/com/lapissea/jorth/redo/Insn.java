@@ -14,13 +14,20 @@ import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -667,6 +674,107 @@ public sealed interface Insn{
 			assert result.length() == len : result.length() + " " + len;
 			
 			return result.toString();
+		}
+	}
+	
+	record VirtualCallOp(
+		FunctionInfo.Signature callingSignature, GenericType callingReturnType, Handle bootstrapHandle, Object[] bootstrapArgs
+	) implements Insn{
+		
+		static VirtualCallOp simulate(TypeStack stack, TypeSource typeSource, BootstrapFn boot, CallingFn callingFn, List<JType> args) throws MalformedJorth{
+			if(args.size() != callingFn.args.size()){
+				throw new MalformedJorth(
+					"Call args size mismatch:\n\t" +
+					"Requested: " + callingFn.args + "\n\t" +
+					"But got:   " + args
+				);
+			}
+			for(int i = 0; i<args.size(); i++){
+				var argType = args.get(i);
+				var defType = callingFn.args.get(i);
+				if(!argType.asGeneric().instanceOf(typeSource, defType.asGeneric())){
+					throw new MalformedJorth(
+						"Argument " + i + " does not satisfy type of argument. Is " + argType.asGeneric() + " but " + defType.asGeneric() + " is required"
+					);
+				}
+			}
+			
+			for(int i = 0; i<args.size(); i++){
+				stack.pop();
+			}
+			
+			if(callingFn.returns != null){
+				stack.push(callingFn.returns.asGeneric());
+			}
+			
+			List<JType> bArgs = new ArrayList<>(3 + boot.bootstrapStaticArgs.size());
+			bArgs.add(GenericType.of(MethodHandles.Lookup.class));
+			bArgs.add(GenericType.of(String.class));
+			bArgs.add(GenericType.of(MethodType.class));
+			for(var arg : boot.bootstrapStaticArgs){
+				bArgs.add(arg.type());
+			}
+			
+			ClassInfo    bootstrapClass = typeSource.byName(boot.owner);
+			FunctionInfo bootstrapFn    = pickBootstrapFunction(typeSource, boot, bootstrapClass, bArgs);
+			
+			Handle bsmh = new Handle(
+				H_INVOKESTATIC,
+				boot.owner.slashed(),
+				boot.functionName,
+				InvokeOp.makeFunSig(bootstrapFn.returnType(), bootstrapFn.argumentTypes(), false),
+				bootstrapFn.ownerInfo().isInterface()
+			);
+			
+			var staticArgs = boot.bootstrapStaticArgs.stream().map(BootstrapFn.StaticArg::value).toArray();
+			
+			return new VirtualCallOp(new FunctionInfo.Signature(callingFn.name, callingFn.args), callingFn.returns, bsmh, staticArgs);
+		}
+		private static FunctionInfo pickBootstrapFunction(TypeSource typeSource, BootstrapFn bootstrap, ClassInfo bc, List<JType> bArgs) throws MalformedJorth{
+			var fns = bc.getFunctionsByName(bootstrap.functionName).filter(e -> {
+				if(!e.returnType().equals(JType.of(CallSite.class))){
+					return false;
+				}
+				var argTypes = e.argumentTypes();
+				if(argTypes.size() != bArgs.size()){
+					return false;
+				}
+				for(int i = 0; i<bArgs.size(); i++){
+					var argType = bArgs.get(i).asGeneric();
+					var fnType  = argTypes.get(i).asGeneric();
+					try{
+						if(!argType.instanceOf(typeSource, fnType)){
+							return false;
+						}
+					}catch(MalformedJorth ex){
+						throw UtilL.uncheckedThrow(ex);
+					}
+				}
+				return true;
+			}).toList();
+			
+			if(fns.isEmpty()){
+				throw new MalformedJorth(
+					"No valid boostrap function found for " + bootstrap.owner + "." +
+					bootstrap.functionName + bArgs.stream()
+					                              .map(Object::toString)
+					                              .collect(Collectors.joining(", ", "(", ")"))
+				);
+			}
+			if(fns.size() != 1){
+				throw new MalformedJorth("Ambiguous boostrap function found for " + bootstrap.owner + "#" + bootstrap.functionName);
+			}
+			return fns.getFirst();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInvokeDynamicInsn(
+				callingSignature.name(),
+				InvokeOp.makeFunSig(callingReturnType, callingSignature.args(), false),
+				bootstrapHandle,
+				bootstrapArgs
+			);
 		}
 	}
 	
