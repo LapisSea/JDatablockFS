@@ -794,9 +794,8 @@ public class JorthTests{
 			cd.function("set")
 			  .arg(GenericType.of(Optional.class).withArgs(String.class), "optStr")
 			  .body()
-			  .get("this")
 			  .get("optStr")
-			  .set(optStr);
+			  .setThis(optStr);
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
