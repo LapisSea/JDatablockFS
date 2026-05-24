@@ -92,6 +92,22 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 		}
 	}
 	
+	
+	Wildcard WILDCARD = new Wildcard(List.of(), List.of());
+	
+	static Wildcard upper(Class<?> type){
+		return upper(GenericType.of(type));
+	}
+	static Wildcard lower(Class<?> type){
+		return lower(GenericType.of(type));
+	}
+	static Wildcard upper(JType type){
+		return new Wildcard(List.of(), List.of(type));
+	}
+	static Wildcard lower(JType type){
+		return new Wildcard(List.of(type), List.of());
+	}
+	
 	static JType of(Type type){
 		return of(null, type);
 	}

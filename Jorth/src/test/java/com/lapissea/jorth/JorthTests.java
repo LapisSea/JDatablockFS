@@ -3,6 +3,7 @@ package com.lapissea.jorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -852,7 +853,12 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.function("upper")
+			  .arg(GenericType.of(List.class).withArgs(JType.upper(Typ.class)), "arg").body();
+			cd.function("lower")
+			  .arg(GenericType.of(List.class).withArgs(JType.lower(Typ.class)), "arg").body();
+			cd.function("wild")
+			  .arg(GenericType.of(List.class).withArgs(JType.WILDCARD), "arg").body();
 		});
 		
 		{
