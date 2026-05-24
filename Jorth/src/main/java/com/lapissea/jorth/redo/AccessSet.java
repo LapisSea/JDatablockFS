@@ -18,6 +18,9 @@ public record AccessSet(boolean isAbstract, boolean isStatic, boolean isFinal){
 	public static final AccessSet STATIC   = new AccessSet(false, true, false);
 	public static final AccessSet FINAL    = new AccessSet(false, false, true);
 	
+	public AccessSet withoutAbstr(){
+		return new AccessSet(false, isStatic, isFinal);
+	}
 	public AccessSet andAbstr(){
 		return new AccessSet(true, isStatic, isFinal);
 	}

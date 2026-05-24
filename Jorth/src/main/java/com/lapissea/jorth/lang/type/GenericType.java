@@ -251,8 +251,12 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 		return new GenericType(raw, typeArgName, dims, args);
 	}
 	public GenericType withTypeArgName(ClassName typeArgName){
+		return withTypeArgName(Optional.of(typeArgName));
+	}
+	public GenericType withTypeArgName(Optional<ClassName> typeArgName){
 		Objects.requireNonNull(typeArgName);
-		return new GenericType(raw, Optional.of(typeArgName), dims, args);
+		if(this.typeArgName.equals(typeArgName)) return this;
+		return new GenericType(raw, typeArgName, dims, args);
 	}
 	
 	public GenericType arrayType(){

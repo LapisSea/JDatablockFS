@@ -15,10 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
-public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> implements FunctionInfo{
+public final class FunctionDefinition extends AnnotationContainer<FunctionDefinition> implements FunctionInfo{
 	
 	private final ClassDefinition owner;
-	private       AccessSet       access     = AccessSet.DEFAULT;
+	private       AccessSet       access     = AccessSet.ABSTRACT;
 	private       Visibility      visibility = Visibility.PUBLIC;
 	
 	private final String                       name;
@@ -38,9 +38,7 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> 
 	}
 	public FunctionDefinition arg(JType type, String name){
 		preBodyCheck();
-		var oldSignature = makeSignature();
 		args.put(name, type);
-		owner.updateSignature(oldSignature, makeSignature(), this);
 		return this;
 	}
 	
@@ -76,6 +74,9 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> 
 		if(this.access.isStatic() != access.isStatic()){
 			preBodyCheck();
 		}
+		if(access.isAbstract() && body != null){
+			throw new IllegalStateException("Can not make function abstract when it has a body!");
+		}
 		this.access = Objects.requireNonNull(access);
 		return this;
 	}
@@ -100,12 +101,9 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> 
 	}
 	
 	private CodeBlock initBody() throws MalformedJorth{
+		access(access.withoutAbstr());
+		var existing = owner.finalize(this);
 		
-		if(args.isEmpty()){
-			owner.updateSignature(null, makeSignature(), this);
-		}
-		
-		var existing = owner.getFunction(makeSignature());
 		if(existing != this && existing != null){
 			checkVal(returnType, existing.returnType);
 			checkVal(access.isStatic(), existing.access.isStatic());
@@ -154,9 +152,11 @@ public class FunctionDefinition extends AnnotationContainer<FunctionDefinition> 
 		for(AnnotationDefinition annotation : annotations){
 			annotation.visit(fn);
 		}
-		body.visit(fn);
-		body.implicitReturn(fn);
-		fn.visitMaxs(0, 0);
+		if(body != null){
+			body.visit(fn);
+			body.implicitReturn(fn);
+			fn.visitMaxs(0, 0);
+		}
 		fn.visitEnd();
 	}
 	private static String makeFunSig(JType returnType, Collection<JType> args, boolean signature){

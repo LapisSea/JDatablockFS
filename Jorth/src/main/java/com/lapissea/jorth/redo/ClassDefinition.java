@@ -51,10 +51,11 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private      Visibility visibility = Visibility.PUBLIC;
 	public final TypeSource typeSource;
 	
-	private final Map<FunctionInfo.Signature, FunctionDefinition> functions = new LinkedHashMap<>();
-	private final Map<String, FieldDefinition>                    fields    = new LinkedHashMap<>();
+	private final List<FunctionDefinition>                        danglingFunctions = new ArrayList<>();
+	private final Map<FunctionInfo.Signature, FunctionDefinition> functions         = new LinkedHashMap<>();
+	private final Map<String, FieldDefinition>                    fields            = new LinkedHashMap<>();
 	
-	private final Map<String, GenericType> typeArgs = new LinkedHashMap<>();
+	private final Map<ClassName, GenericType> typeArgs = new LinkedHashMap<>();
 	
 	private final Set<ClassName>    permits    = new LinkedHashSet<>();
 	private final List<GenericType> interfaces = new ArrayList<>();
@@ -168,6 +169,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		for(FunctionDefinition value : functions.values()){
 			value.visit(writer);
 		}
+		for(FunctionDefinition value : danglingFunctions){
+			value.visit(writer);
+		}
 		writer.visitEnd();
 		return writer.toByteArray();
 	}
@@ -190,7 +194,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
 		
-		var signature = makeSignature(extension, interfaces, Map.of());
+		var signature = makeSignature(extension, interfaces, typeArgs);
 		
 		
 		String[] interfaceStrings;
@@ -216,7 +220,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		if(!typeArgs.isEmpty()){
 			len += 2;
 			for(var e : typeArgs.entrySet()){
-				len += e.getKey().any().length() + 1 + e.getValue().jvmSignatureLen();
+				len += e.getKey().any().length() + 1 + e.getValue().withTypeArgName(Optional.empty()).jvmSignatureLen();
 			}
 		}
 		for(var interf : interfaces){
@@ -229,7 +233,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			signature.append('<');
 			for(var e : typeArgs.entrySet()){
 				signature.append(e.getKey()).append(':');
-				e.getValue().jvmSignature(signature);
+				e.getValue().withTypeArgName(Optional.empty()).jvmSignature(signature);
 			}
 			signature.append('>');
 		}
@@ -247,11 +251,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return this;
 	}
 	public ClassDefinition arg(Class<?> type, String name){
-		return arg(GenericType.of(type), name);
+		return arg(GenericType.of(type), ClassName.dotted(name));
 	}
-	public ClassDefinition arg(GenericType type, String name){
-		type = type.withTypeArgName(ClassName.dotted(name));
-		if(typeArgs.put(Objects.requireNonNull(name), Objects.requireNonNull(type)) != null){
+	public ClassDefinition arg(GenericType type, ClassName name){
+		if(typeArgs.put(Objects.requireNonNull(name), type.withTypeArgName(name)) != null){
 			throw new IllegalArgumentException("Duplicate argument " + name);
 		}
 		return this;
@@ -328,15 +331,14 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	FunctionDefinition getFunction(FunctionInfo.Signature signature){
 		requireName();
-		return functions.get(signature);
+		var res = functions.get(signature);
+		if(res != null) return res;
+		return danglingFunctions.stream().filter(f -> f.makeSignature().equals(signature)).findFirst().orElse(null);
 	}
-	void updateSignature(FunctionInfo.Signature oldSignature, FunctionInfo.Signature signature, FunctionDefinition caller){
-		if(!functions.containsKey(signature)){
-			functions.put(signature, caller);
-		}
-		if(oldSignature != null){
-			functions.remove(oldSignature);
-		}
+	FunctionDefinition finalize(FunctionDefinition fn){
+		var signature = fn.makeSignature();
+		danglingFunctions.remove(fn);
+		return functions.putIfAbsent(signature, fn);
 	}
 	
 	public FunctionDefinition staticInit() throws MalformedJorth{
@@ -348,14 +350,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return function("<init>").visibility(Visibility.PUBLIC);
 	}
 	public FunctionDefinition function(String name){
-		return new FunctionDefinition(this, name);
-	}
-	
-	private List<JType> toJTypes(List<ArgInfo> args){
-		var res = new ArrayList<JType>(args.size());
-		for(var arg : args){
-			res.add(arg.type());
-		}
+		var res = new FunctionDefinition(this, name);
+		danglingFunctions.add(res);
 		return res;
 	}
 	
@@ -404,6 +400,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return field(constantName, new GenericType(name)).asEnumConstant();
 	}
 	public GenericType getArg(String name){
+		return getArg(ClassName.dotted(name));
+	}
+	public GenericType getArg(ClassName name){
 		var arg = typeArgs.get(name);
 		if(arg == null){
 			throw new IllegalArgumentException("No argument found with name " + name);

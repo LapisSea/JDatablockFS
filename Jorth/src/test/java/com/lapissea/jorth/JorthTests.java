@@ -106,7 +106,7 @@ public class JorthTests{
 				var fn = classDefinition.function("compare")
 				                        .staticAcc()
 				                        .arg(typ, "arg1").arg(typ, "arg2")
-				                        .returns(GenericType.BOOL);
+				                        .returns(boolean.class);
 				fn.body()
 				  .get("arg1")
 				  .get("arg2")
@@ -942,7 +942,9 @@ public class JorthTests{
 		}, cd -> {
 			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
 			
-			cd.function("takeArg").arg(GenericType.of(List.class).withArgs(cd.getArg("T")), "tList");
+			cd.function("takeArg")
+			  .arg(GenericType.of(List.class).withArgs(cd.getArg("T")), "tList")
+			  .body();
 		});
 		
 		var meth  = cls.getMethod("takeArg", List.class);
@@ -971,7 +973,8 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
+			cd.field("arg", cd.getArg("T"));
 		});
 		
 		var field = cls.getField("arg");
