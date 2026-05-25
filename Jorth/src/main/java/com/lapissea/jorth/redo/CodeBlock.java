@@ -362,4 +362,10 @@ public class CodeBlock{
 		return add(VirtualCallOp.simulate(localStack, typeSource, boot, fn, args));
 	}
 	
+	public CodeBlock add(int val) throws MalformedJorth{
+		return add(Increment.simulate(localStack, val));
+	}
+	public CodeBlock add(double val) throws MalformedJorth{
+		return add(Increment.simulate(localStack, val));
+	}
 }

@@ -377,6 +377,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		return this;
 	}
+	public ClassDefinition implement(Class<?> interfaceSig) throws MalformedJorth{
+		return implement(GenericType.of(interfaceSig));
+	}
 	public ClassDefinition implement(GenericType interfaceSig) throws MalformedJorth{
 		interfaces.add(interfaceSig);
 		return this;

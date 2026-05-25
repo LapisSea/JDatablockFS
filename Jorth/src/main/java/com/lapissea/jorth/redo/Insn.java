@@ -778,5 +778,56 @@ public sealed interface Insn{
 		}
 	}
 	
+	record Increment(Number val, BaseType type) implements Insn{
+		
+		public static Increment simulate(TypeStack stack, int val) throws MalformedJorth{
+			var      type = stack.peekLast();
+			BaseType typ;
+			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
+			   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
+				typ = BaseType.INT;
+			}else if(type.equals(GenericType.LONG)) typ = BaseType.LONG;
+			else if(type.equals(GenericType.FLOAT)) typ = BaseType.FLOAT;
+			else if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
+			else{
+				throw new IllegalArgumentException("Cannot increment stack value of type: " + type + " by int");
+			}
+			return new Increment(val, typ);
+		}
+		public static Increment simulate(TypeStack stack, double val) throws MalformedJorth{
+			var      type = stack.peekLast();
+			BaseType typ;
+			if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
+			else{
+				throw new IllegalArgumentException("Cannot increment stack value of type: " + type + " by double");
+			}
+			return new Increment(val, typ);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type){
+				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN -> throw new IllegalStateException();
+				case INT -> {
+					// pop top int, add constant
+					IVal.emit(writer, val.intValue());
+					writer.visitInsn(IADD);
+				}
+				case LONG -> {
+					LVal.emit(writer, val.longValue());
+					writer.visitInsn(LADD);
+				}
+				case FLOAT -> {
+					FVal.emit(writer, val.floatValue());
+					writer.visitInsn(FADD);
+				}
+				case DOUBLE -> {
+					DVal.emit(writer, val.doubleValue());
+					writer.visitInsn(DADD);
+				}
+			}
+		}
+	}
+	
 	void visit(MethodVisitor writer);
 }

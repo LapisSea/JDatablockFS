@@ -1202,7 +1202,11 @@ public class JorthTests{
 				name
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name)).implement(IntUnaryOperator.class);
+			cd.function("applyAsInt").arg(int.class, "num").override()
+			  .body()
+			  .get("num")
+			  .add(2);
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
@@ -1235,7 +1239,11 @@ public class JorthTests{
 				name
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name)).implement(DoubleUnaryOperator.class);
+			cd.function("applyAsDouble").arg(double.class, "num").override()
+			  .body()
+			  .get("num")
+			  .add(2.125);
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
@@ -1246,7 +1254,7 @@ public class JorthTests{
 		assertThat(inst.applyAsDouble(-2)).isEqualTo(0.125);
 	}
 	
-	@Test(dependsOnMethods = "simpleInterface")
+	@Test(dependsOnMethods = "incrementInt")
 	void variables() throws Exception{
 		var name = "variables";
 		var cls = generateAndLoadInstance(name, writer -> {
