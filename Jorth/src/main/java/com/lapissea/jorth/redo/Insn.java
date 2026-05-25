@@ -565,6 +565,22 @@ public sealed interface Insn{
 		}
 	}
 	
+	record PutLocalVarOp(BaseType type, int index) implements Insn{
+		
+		static PutLocalVarOp simulate(TypeStack stack, TypeSource typeSource, GenericType fieldType, int fieldIndex) throws MalformedJorth{
+			var type = stack.pop();
+			if(!type.instanceOf(typeSource, fieldType)){
+				throw new MalformedJorth("Tried to set local field of type " + fieldType + " to " + type);
+			}
+			return new PutLocalVarOp(fieldType.getBaseType(), fieldIndex);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitVarInsn(type.storeOp, index);
+		}
+	}
+	
 	
 	record PutElementOp(GenericType element) implements Insn{
 		

@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 
 public class CodeBlock{
 	
-	private record Local(JType type, int index, boolean canRemove){ }
+	private record Local(String name, JType type, int index, boolean canRemove){ }
 	
 	private final Map<String, Local> localValues = new HashMap<>();
 	
@@ -51,14 +51,14 @@ public class CodeBlock{
 			throw new MalformedJorth("Duplicated localValue: " + name);
 		}
 		int index = allocateNewSlot();
-		localValues.put(name, new Local(type, index, canRemove));
+		localValues.put(name, new Local(name, type, index, canRemove));
 	}
 	
 	private CodeBlock createBlockFromHere(CodeArg code) throws MalformedJorth{
 		var block = new CodeBlock(localStack, typeSource, fnOwner);
 		for(var e : localValues.entrySet()){
 			var v = e.getValue();
-			block.localValues.put(e.getKey(), v.canRemove? new Local(v.type, v.index, false) : v);
+			block.localValues.put(e.getKey(), v.canRemove? new Local(v.name, v.type, v.index, false) : v);
 		}
 		code.accept(block);
 		return block;
@@ -82,14 +82,18 @@ public class CodeBlock{
 	}
 	
 	private void doGetLocal(String localVal) throws MalformedJorth{
+		Local local = getLocal(localVal);
+		add(GetLocal.simulate(localStack, local.type.asGeneric(), localVal, local.index));
+	}
+	private Local getLocal(String localVal) throws MalformedJorth{
 		Local local = localValues.get(localVal);
 		if(local == null){
 			if(localVal.equals("this") && fnOwner.access().isStatic()){
-				throw new MalformedJorth("Cannot get 'this' from a static function");
+				throw new MalformedJorth("Cannot use 'this' from a static function");
 			}
 			throw new MalformedJorth("Unknown localValue: " + localVal);
 		}
-		add(GetLocal.simulate(localStack, local.type.asGeneric(), localVal, local.index));
+		return local;
 	}
 	
 	public CodeBlock val(int val) throws MalformedJorth{
@@ -245,6 +249,11 @@ public class CodeBlock{
 	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
 		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
+	public CodeBlock set(String varName) throws MalformedJorth{
+		Local local = getLocal(varName);
+		return add(PutLocalVarOp.simulate(localStack, typeSource, local.type.asGeneric(), local.index));
+	}
+	
 	public CodeBlock pop() throws MalformedJorth{
 		return add(PopOp.simulate(localStack));
 	}
@@ -362,6 +371,13 @@ public class CodeBlock{
 		return add(VirtualCallOp.simulate(localStack, typeSource, boot, fn, args));
 	}
 	
+	public CodeBlock var(Class<?> type, String name) throws MalformedJorth{
+		return var(GenericType.of(type), name);
+	}
+	public CodeBlock var(GenericType type, String name) throws MalformedJorth{
+		defineLocalValue(name, type, true);
+		return this;
+	}
 	public CodeBlock add(int val) throws MalformedJorth{
 		return add(Increment.simulate(localStack, val));
 	}

@@ -1285,7 +1285,17 @@ public class JorthTests{
 				name
 			);
 		}, cd -> {
-			throw new NotImplementedException();
+			cd.name(ClassName.dotted(name)).implement(IntSupplier.class);
+			cd.function("getAsInt").override()
+			  .body()
+			  .var(int.class, "a")
+			  .var(int.class, "b")
+			  .val(1)
+			  .set("a")
+			  .val(2)
+			  .set("b")
+			  .get("a")
+			  .add(4);
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
