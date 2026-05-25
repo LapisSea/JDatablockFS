@@ -4,6 +4,7 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -27,7 +28,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntFunction;
 import java.util.function.IntSupplier;
@@ -1088,42 +1088,17 @@ public class JorthTests{
 		                                 Class<?> passType) throws Throwable{
 			var cname = lookup.lookupClass().getName() + "&_" + name;
 			
-			var tokenStr = new StringJoiner(" ");
-			var jorth    = new Jorth(null, tokenStr::add);
+			var cd = new ClassDefinition(null);
+			cd.name(ClassName.dotted(cname));
+			cd.function(name).staticAcc().arg(int.class, "num").returns(String.class)
+			  .body()
+			  .newObj(StringBuilder.class, c -> c.val(passType.getName() + " "))
+			  .call("append", c -> c.get("num"))
+			  .call("toString");
 			
-			try(var writer = jorth.writer()){
-				writer.write(
-					"""
-						class {} start
-						
-						public static function {}
-							arg num int
-							returns #String
-						start
-							new #StringBuilder start
-								'{} '
-							end
-							dup
-							call append start
-								get #arg num
-							end
-							call toString
-							return
-						end
-						
-						end
-						""",
-					cname,
-					name,
-					passType.getName()
-				);
-			}finally{
-				LogUtil.println(tokenStr.toString());
-			}
-			
-			var          bb        = jorth.getClassFile(cname);
-			var          implClass = lookup.defineHiddenClass(bb, true);
-			MethodHandle target    = implClass.unreflect(implClass.lookupClass().getMethod(name, int.class));
+			byte[]               bb        = cd.getClassFile();
+			MethodHandles.Lookup implClass = lookup.defineHiddenClass(bb, true);
+			MethodHandle         target    = implClass.unreflect(implClass.lookupClass().getMethod(name, int.class));
 			return new ConstantCallSite(target);
 		}
 		

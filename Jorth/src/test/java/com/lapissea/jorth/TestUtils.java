@@ -70,6 +70,31 @@ public final class TestUtils{
 			throw new RuntimeException(e);
 		}
 		var cwfOld = jorth.getClassFile(className);
+		compareClasses(cwf, cwfOld);
+		
+		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
+			@Override
+			protected Class<?> findClass(String name) throws ClassNotFoundException{
+				if(classes.contains(name)){
+					var byt = jorth.getClassFile(name);
+					BytecodeUtils.printClass(byt);
+					
+					return defineClass(name, ByteBuffer.wrap(byt), null);
+				}
+				return super.findClass(name);
+			}
+		};
+		
+		var cls = Class.forName(className, true, loader);
+		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName() + " " + className);
+		
+		LogUtil.println("Compiled:", cls);
+		LogUtil.println("========================================================================");
+		LogUtil.println();
+		return cls;
+	}
+	
+	public static void compareClasses(byte[] cwf, byte[] cwfOld){
 		if(!Arrays.equals(cwf, cwfOld)){
 			List<String> originalLines = Arrays.asList(BytecodeUtils.classToString(cwfOld).split("\n"));
 			List<String> revisedLines  = Arrays.asList(BytecodeUtils.classToString(cwf).split("\n"));
@@ -96,27 +121,6 @@ public final class TestUtils{
 			System.out.println(str);
 			throw new AssertionError("Class files not equal");
 		}
-		
-		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
-			@Override
-			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				if(classes.contains(name)){
-					var byt = jorth.getClassFile(name);
-					BytecodeUtils.printClass(byt);
-					
-					return defineClass(name, ByteBuffer.wrap(byt), null);
-				}
-				return super.findClass(name);
-			}
-		};
-		
-		var cls = Class.forName(className, true, loader);
-		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName() + " " + className);
-		
-		LogUtil.println("Compiled:", cls);
-		LogUtil.println("========================================================================");
-		LogUtil.println();
-		return cls;
 	}
 	
 }

@@ -61,9 +61,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private final List<GenericType> interfaces = new ArrayList<>();
 	private       GenericType       extension  = GenericType.OBJECT;
 	
-	public ClassDefinition(ClassLoader loader){
-		var classLoader = loader == null? this.getClass().getClassLoader() : loader;
-		typeSource = TypeSource.of(this::generatedClassInfo, classLoader);
+	public ClassDefinition(ClassLoader classLoader){
+		typeSource = TypeSource.of(this::generatedClassInfo, classLoader == null? this.getClass().getClassLoader() : classLoader);
 	}
 	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
