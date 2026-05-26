@@ -35,6 +35,7 @@ import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceMulti;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -881,7 +882,7 @@ public class JorthTests{
 	
 	@Test
 	void sealedClass() throws Exception{
-		var cls = generateAndLoadInstance("SealedClass", writer -> {
+		var cls = generateAndLoadInstanceMulti("SealedClass", writer -> {
 			writer.write(
 				"""
 					permits child1
@@ -894,8 +895,16 @@ public class JorthTests{
 					final class child2 start end
 					"""
 			);
-		}, cd -> {
-			throw new NotImplementedException();
+		}, (name, cd) -> {
+			cd.name(ClassName.dotted(name));
+			switch(name){
+				case "SealedClass" -> {
+					cd.permits(ClassName.dotted("child1")).permits(ClassName.dotted("child2"));
+				}
+				case "child1", "child2" -> {
+					cd.finalAcc().extendsType(GenericType.of(ClassName.dotted("SealedClass")));
+				}
+			}
 		});
 		
 		var permits = cls.getPermittedSubclasses();

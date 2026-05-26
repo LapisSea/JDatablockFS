@@ -206,6 +206,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		
 		writer.visit(V19, accessFlags, name.slashed(), signature, extension.raw().slashed(), interfaceStrings);
+		for(var permit : permits){
+			writer.visitPermittedSubclass(permit.slashed());
+		}
 		for(AnnotationDefinition annotation : annotations){
 			annotation.visit(writer);
 		}
@@ -319,6 +322,18 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		fun.set(getField("$VALUES"));
 	}
 	
+	public ClassDefinition staticAcc(){
+		return access(access.andStat());
+	}
+	public ClassDefinition finalAcc(){
+		return access(access.andFin());
+	}
+	public ClassDefinition abstractAcc(){
+		return access(access.andAbstr());
+	}
+	public AccessSet access(){
+		return access;
+	}
 	public ClassDefinition access(AccessSet access){
 		this.access = Objects.requireNonNull(access);
 		return this;

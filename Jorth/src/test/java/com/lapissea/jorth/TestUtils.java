@@ -7,6 +7,7 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.nio.ByteBuffer;
@@ -77,6 +78,62 @@ public final class TestUtils{
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				if(classes.contains(name)){
 					var byt = jorth.getClassFile(name);
+					BytecodeUtils.printClass(byt);
+					
+					return defineClass(name, ByteBuffer.wrap(byt), null);
+				}
+				return super.findClass(name);
+			}
+		};
+		
+		var cls = Class.forName(className, true, loader);
+		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName() + " " + className);
+		
+		LogUtil.println("Compiled:", cls);
+		LogUtil.println("========================================================================");
+		LogUtil.println();
+		return cls;
+	}
+	
+	static Class<?> generateAndLoadInstanceMulti(
+		String className,
+		UnsafeConsumer<CodeStream, MalformedJorth> generator,
+		UnsafeBiConsumer<String, ClassDefinition, MalformedJorth> generator2
+	) throws ReflectiveOperationException{
+		
+		
+		StringJoiner tokenStr = new StringJoiner(" ");
+		var          jorth    = new Jorth(null, tokenStr::add);
+		try{
+			try(var writer = jorth.writer()){
+				generator.accept(writer);
+			}finally{
+				LogUtil.println(tokenStr.toString());
+			}
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to generate class " + className, e);
+		}
+		
+		var classes = jorth.listClassFiles();
+		
+		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
+			@Override
+			protected Class<?> findClass(String name) throws ClassNotFoundException{
+				if(classes.contains(name)){
+					
+					byte[] cwf;
+					try{
+						ClassDefinition cw;
+						cw = new ClassDefinition(this);
+						generator2.accept(name, cw);
+						cwf = cw.getClassFile();
+					}catch(Throwable e){
+						e.printStackTrace();
+						throw new RuntimeException(e);
+					}
+					
+					var byt = jorth.getClassFile(name);
+					compareClasses(cwf, byt);
 					BytecodeUtils.printClass(byt);
 					
 					return defineClass(name, ByteBuffer.wrap(byt), null);
