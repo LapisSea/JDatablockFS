@@ -391,4 +391,7 @@ public class CodeBlock{
 	public CodeBlock bitShiftLeft() throws MalformedJorth{
 		return add(BitShiftLeft.simulate(localStack));
 	}
+	public CodeBlock bitAnd() throws MalformedJorth{
+		return add(BitAnd.simulate(localStack));
+	}
 }

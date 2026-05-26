@@ -1370,4 +1370,24 @@ public class JorthTests{
 		assertThat(inst.applyAsInt(10)).isEqualTo(10<<2);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2<<2);
 	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitAnd() throws Exception{
+		var name = "logicalAnd";
+		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+			writer.write(
+				"""
+					get #arg num
+					5 bit-and
+					""",
+				name
+			);
+		}, cb -> {
+			cb.get("num")
+			  .val(5)
+			  .bitAnd();
+		});
+		assertThat(inst.applyAsInt(7)).isEqualTo(7&5);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2&5);
+	}
 }

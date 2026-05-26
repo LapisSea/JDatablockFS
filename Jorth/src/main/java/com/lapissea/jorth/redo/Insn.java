@@ -913,5 +913,30 @@ public sealed interface Insn{
 		}
 	}
 	
+	record BitAnd(boolean isLong) implements Insn{
+		
+		public static BitAnd simulate(TypeStack stack) throws MalformedJorth{
+			var a = stack.pop();
+			var b = stack.pop();
+			
+			var isLong = a.equals(GenericType.LONG);
+			
+			if(!a.equals(GenericType.INT) && !isLong){
+				throw new MalformedJorth("For bit-and, the stack must have 2 elements of int or long are: " + a + " and " + b);
+			}
+			if(!a.equals(b)){
+				throw new MalformedJorth("For bit-and, the last 2 stack elements must have the same type but are: " + a + " and " + b);
+			}
+			
+			stack.push(a);
+			return new BitAnd(isLong);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(isLong? LAND : IAND);
+		}
+	}
+	
 	void visit(MethodVisitor writer);
 }
