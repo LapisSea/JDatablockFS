@@ -37,6 +37,7 @@ import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
+import static com.lapissea.jorth.TestUtils.autoName;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceMulti;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
@@ -87,9 +88,7 @@ public class JorthTests{
 	@Test
 	void comparisonTest() throws ReflectiveOperationException{
 		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
 			for(var typ : List.of("#String", "int")){
 				writer.write(
@@ -143,10 +142,7 @@ public class JorthTests{
 	
 	@Test
 	void ifTest() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
 				"""
 					static function test
@@ -195,9 +191,7 @@ public class JorthTests{
 	
 	@Test
 	void ifElseTest() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$IfElse";
-		
+		var className = autoName();
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.addImportAs(className, "ThisClass");
 			writer.addImports(ArrayList.class, List.class);
@@ -355,10 +349,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
 			writer.write(
 				"""
@@ -411,10 +402,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldArrayClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
 			writer.write(
 				"""
@@ -471,10 +459,7 @@ public class JorthTests{
 	
 	@Test
 	void defaultAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(DefaultAnn.class, "Ann");
 			writer.write(
 				"""
@@ -500,10 +485,7 @@ public class JorthTests{
 	
 	@Test
 	void enumAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(EnumAnn.class, "Ann");
 			writer.write(
 				"""
@@ -521,10 +503,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
 				"""
@@ -546,10 +525,7 @@ public class JorthTests{
 	
 	@Test
 	void methodAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
 				"""
@@ -571,9 +547,7 @@ public class JorthTests{
 	}
 	@Test
 	void classAnnotation() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
+		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
@@ -597,9 +571,7 @@ public class JorthTests{
 	
 	@Test
 	void overrideClass() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		
+		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
@@ -626,9 +598,7 @@ public class JorthTests{
 	@Test
 	void dummyClass() throws ReflectiveOperationException{
 		var msg = "Ayyyy it works!";
-		
-		var className = "jorth.Gen$$";
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
 				"""
 					function toString
@@ -676,8 +646,7 @@ public class JorthTests{
 	
 	@Test
 	<T extends Enum<T>> void simpleInterface() throws ReflectiveOperationException{
-		
-		var className = "test.Interf";
+		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
@@ -700,7 +669,7 @@ public class JorthTests{
 	
 	@Test
 	void getClassRef() throws ReflectiveOperationException{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
 				"""
 					static function getCls
@@ -722,8 +691,7 @@ public class JorthTests{
 	}
 	@Test
 	void superArgs() throws ReflectiveOperationException{
-		
-		var className   = "jorth.Gen$$";
+		var className   = autoName();
 		var expectedStr = "Hi from super";
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
@@ -759,7 +727,7 @@ public class JorthTests{
 	
 	@Test
 	void genericFieldDefine() throws Exception{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImport(Optional.class);
 			writer.write(
 				"""
@@ -778,7 +746,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "genericFieldDefine")
 	void genericField() throws Exception{
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImport(Optional.class);
 			writer.write(
 				"""
@@ -837,7 +805,7 @@ public class JorthTests{
 			assertThat(typ.getUpperBounds()).containsExactly(Object.class);
 		}
 		
-		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImport(List.class);
 			writer.addImport(Typ.class);
 			writer.write(
@@ -1118,7 +1086,7 @@ public class JorthTests{
 	
 	@Test
 	void virtualCall() throws Exception{
-		var name = "VCall";
+		var name = autoName();
 		var cls = generateAndLoadInstance(name, writer -> {
 			writer.addImport(IntFunction.class);
 			writer.addImportAs(TestBootstrap.class, "TestBootstrap");
@@ -1168,14 +1136,12 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementInt() throws Exception{
-		var name = "incrementTest";
-		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
 			writer.write(
 				"""
 					get #arg num
 					inc 2
-					""",
-				name
+					"""
 			);
 		}, cb -> {
 			cb.get("num")
@@ -1187,7 +1153,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementDouble() throws Exception{
-		var name = "incrementTestDouble";
+		var name = autoName();
 		var cls = generateAndLoadInstance(name, writer -> {
 			writer.addImport(DoubleUnaryOperator.class);
 			writer.write(
@@ -1225,7 +1191,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "incrementInt")
 	void variables() throws Exception{
-		var name = "variables";
+		var name = autoName();
 		var cls = generateAndLoadInstance(name, writer -> {
 			writer.addImport(IntSupplier.class);
 			writer.write(
@@ -1314,14 +1280,12 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRight() throws Exception{
-		var name = "bitShiftRight";
-		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
 			writer.write(
 				"""
 					get #arg num
 					2 bit-shift-r
-					""",
-				name
+					"""
 			);
 		}, cb -> {
 			cb.get("num")
@@ -1333,14 +1297,12 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRightLogical() throws Exception{
-		var name = "bitShiftRightLogical";
-		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
 			writer.write(
 				"""
 					get #arg num
 					2 bit-shift-rl
-					""",
-				name
+					"""
 			);
 		}, cb -> {
 			cb.get("num")
@@ -1353,14 +1315,12 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftLeft() throws Exception{
-		var name = "bitShiftLeft";
-		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
 			writer.write(
 				"""
 					get #arg num
 					2 bit-shift-l
-					""",
-				name
+					"""
 			);
 		}, cb -> {
 			cb.get("num")
@@ -1373,14 +1333,12 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitAnd() throws Exception{
-		var name = "logicalAnd";
-		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
 			writer.write(
 				"""
 					get #arg num
 					5 bit-and
-					""",
-				name
+					"""
 			);
 		}, cb -> {
 			cb.get("num")

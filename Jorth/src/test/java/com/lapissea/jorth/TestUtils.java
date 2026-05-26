@@ -18,6 +18,15 @@ import java.util.stream.Collectors;
 
 public final class TestUtils{
 	
+	public static String autoName(){
+		return "test.CL_" + StackWalker.getInstance().walk(
+			s -> s.skip(1)
+			      .findFirst()
+			      .map(StackWalker.StackFrame::getMethodName)
+			      .orElse("Unknown")
+		);
+	}
+	
 	static Class<?> generateAndLoadInstanceSimple(
 		String className,
 		UnsafeConsumer<CodeStream, MalformedJorth> generator,
