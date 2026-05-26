@@ -216,7 +216,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				
 				writer.write("get #field {}", rawBits);
 				if(bitOffset>0){
-					writer.write("{} bit-shift-ll", bitOffset);
+					writer.write("{} bit-shift-rl", bitOffset);
 				}
 				writer.write(
 					"""

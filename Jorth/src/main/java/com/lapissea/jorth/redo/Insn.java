@@ -845,5 +845,73 @@ public sealed interface Insn{
 		}
 	}
 	
+	record BitShiftLeft(BaseType type) implements Insn{
+		
+		public static BitShiftLeft simulate(TypeStack stack) throws MalformedJorth{
+			var offset = stack.pop();
+			if(!offset.equals(GenericType.INT)){
+				throw new MalformedJorth("The bit shift amount must be an int but is: " + offset);
+			}
+			var      value = stack.pop();
+			BaseType typ;
+			if(value.equals(GenericType.INT)){
+				typ = BaseType.INT;
+			}else if(value.equals(GenericType.LONG)){
+				typ = BaseType.LONG;
+			}else{
+				throw new IllegalArgumentException("Cannot bit shift stack value of type: " + value);
+			}
+			stack.push(value);
+			return new BitShiftLeft(typ);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type){
+				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN, FLOAT, DOUBLE -> throw new IllegalStateException();
+				case INT -> {
+					writer.visitInsn(ISHL);
+				}
+				case LONG -> {
+					writer.visitInsn(LSHL);
+				}
+			}
+		}
+	}
+	
+	record BitShiftRight(BaseType type, boolean logical) implements Insn{
+		
+		public static BitShiftRight simulate(TypeStack stack, boolean logical) throws MalformedJorth{
+			var offset = stack.pop();
+			if(!offset.equals(GenericType.INT)){
+				throw new MalformedJorth("The bit shift amount must be an int but is: " + offset);
+			}
+			var      value = stack.pop();
+			BaseType typ;
+			if(value.equals(GenericType.INT)){
+				typ = BaseType.INT;
+			}else if(value.equals(GenericType.LONG)){
+				typ = BaseType.LONG;
+			}else{
+				throw new IllegalArgumentException("Cannot bit shift stack value of type: " + value);
+			}
+			stack.push(value);
+			return new BitShiftRight(typ, logical);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			switch(type){
+				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN, FLOAT, DOUBLE -> throw new IllegalStateException();
+				case INT -> {
+					writer.visitInsn(logical? IUSHR : ISHR);
+				}
+				case LONG -> {
+					writer.visitInsn(logical? LUSHR : LSHR);
+				}
+			}
+		}
+	}
+	
 	void visit(MethodVisitor writer);
 }

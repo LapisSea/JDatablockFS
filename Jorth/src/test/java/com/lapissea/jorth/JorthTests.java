@@ -1,12 +1,15 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.redo.ClassDefinition;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -1166,37 +1169,19 @@ public class JorthTests{
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementInt() throws Exception{
 		var name = "incrementTest";
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(IntUnaryOperator.class);
+		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
 			writer.write(
 				"""
-					implements #IntUnaryOperator
-					class {0} start
-						@ #Override
-						public function applyAsInt
-							arg num int
-							returns int
-						start
-							get #arg num
-							inc 2
-							return
-						end
-					end
+					get #arg num
+					inc 2
 					""",
 				name
 			);
-		}, cd -> {
-			cd.name(ClassName.dotted(name)).implement(IntUnaryOperator.class);
-			cd.function("applyAsInt").arg(int.class, "num").override()
-			  .body()
-			  .get("num")
+		}, cb -> {
+			cb.get("num")
 			  .add(2);
 		});
 		
-		Object instO = cls.getConstructor().newInstance();
-		
-		assertThat(instO).isInstanceOf(IntUnaryOperator.class);
-		var inst = (IntUnaryOperator)instO;
 		assertThat(inst.applyAsInt(10)).isEqualTo(12);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(0);
 	}
@@ -1287,5 +1272,102 @@ public class JorthTests{
 		assertThat(instO).isInstanceOf(IntSupplier.class);
 		var inst = (IntSupplier)instO;
 		assertThat(inst.getAsInt()).isEqualTo(5);
+	}
+	
+	static IntUnaryOperator generateAndLoadIntUnaryOperator(
+		String name,
+		UnsafeConsumer<CodeStream, MalformedJorth> generator,
+		UnsafeConsumer<CodeBlock, MalformedJorth> generator2
+	) throws ReflectiveOperationException{
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.addImport(IntUnaryOperator.class);
+			writer.write(
+				"""
+					implements #IntUnaryOperator
+					class {0} start
+						@ #Override
+						public function applyAsInt
+							arg num int
+							returns int
+						start
+					""",
+				name
+			);
+			generator.accept(writer);
+			writer.write(
+				"""
+						end
+					end
+					"""
+			);
+		}, cd -> {
+			cd.name(ClassName.dotted(name)).implement(IntUnaryOperator.class);
+			var fn = cd.function("applyAsInt").arg(int.class, "num").override().body();
+			generator2.accept(fn);
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		
+		assertThat(instO).isInstanceOf(IntUnaryOperator.class);
+		return (IntUnaryOperator)instO;
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftRight() throws Exception{
+		var name = "bitShiftRight";
+		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+			writer.write(
+				"""
+					get #arg num
+					2 bit-shift-r
+					""",
+				name
+			);
+		}, cb -> {
+			cb.get("num")
+			  .val(2)
+			  .bitShiftRight(false);
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10>>2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2>>2);
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftRightLogical() throws Exception{
+		var name = "bitShiftRightLogical";
+		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+			writer.write(
+				"""
+					get #arg num
+					2 bit-shift-rl
+					""",
+				name
+			);
+		}, cb -> {
+			cb.get("num")
+			  .val(2)
+			  .bitShiftRight(true);
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10 >>> 2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2 >>> 2);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void bitShiftLeft() throws Exception{
+		var name = "bitShiftLeft";
+		var inst = generateAndLoadIntUnaryOperator(name, writer -> {
+			writer.write(
+				"""
+					get #arg num
+					2 bit-shift-l
+					""",
+				name
+			);
+		}, cb -> {
+			cb.get("num")
+			  .val(2)
+			  .bitShiftLeft();
+		});
+		assertThat(inst.applyAsInt(10)).isEqualTo(10<<2);
+		assertThat(inst.applyAsInt(-2)).isEqualTo(-2<<2);
 	}
 }

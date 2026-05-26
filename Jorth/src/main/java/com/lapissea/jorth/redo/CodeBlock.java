@@ -384,4 +384,11 @@ public class CodeBlock{
 	public CodeBlock add(double val) throws MalformedJorth{
 		return add(Increment.simulate(localStack, val));
 	}
+	
+	public CodeBlock bitShiftRight(boolean logical) throws MalformedJorth{
+		return add(BitShiftRight.simulate(localStack, logical));
+	}
+	public CodeBlock bitShiftLeft() throws MalformedJorth{
+		return add(BitShiftLeft.simulate(localStack));
+	}
 }
