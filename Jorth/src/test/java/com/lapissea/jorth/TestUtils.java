@@ -5,15 +5,18 @@ import com.github.difflib.UnifiedDiffUtils;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 public final class TestUtils{
@@ -189,4 +192,59 @@ public final class TestUtils{
 		}
 	}
 	
+	public record TArg(String name, Class<?> type){ }
+	
+	public record InterfaceTemplate<T>(Class<T> type, String functionName, List<TArg> args, Type returns){ }
+	
+	public static final InterfaceTemplate<IntUnaryOperator> INT_UNARY_OPERATOR = new InterfaceTemplate<>(
+		IntUnaryOperator.class, "applyAsInt", List.of(new TArg("num", int.class)), int.class
+	);
+	
+	public static <T> T generateInterface(
+		String name,
+		InterfaceTemplate<T> template,
+		UnsafeConsumer<CodeStream, MalformedJorth> generator,
+		UnsafeConsumer<CodeBlock, MalformedJorth> generator2
+	) throws ReflectiveOperationException{
+		var cls = generateAndLoadInstance(name, writer -> {
+			writer.write(
+				"""
+					implements {}
+					class {} start
+						@ #Override
+						public function {}
+						{}
+						{}
+						start
+					""",
+				template.type,
+				name,
+				template.functionName,
+				template.args.stream().map(e -> "arg " + e.name() + " " + JorthUtils.toJorthGeneric(e.type())).collect(Collectors.joining("\n")),
+				(template.returns != null? "returns " + JorthUtils.toJorthGeneric(template.returns) : "")
+			);
+			
+			generator.accept(writer);
+			writer.write(
+				"""
+						end
+					end
+					"""
+			);
+		}, cd -> {
+			cd.name(ClassName.dotted(name)).implement(template.type);
+			var fn = cd.function(template.functionName);
+			for(var arg : template.args){
+				fn.arg(arg.type(), arg.name());
+			}
+			if(template.returns != null){
+				fn.returns(template.returns);
+			}
+			fn.annotation(Override.class);
+			generator2.accept(fn.body());
+		});
+		
+		Object instO = cls.getConstructor().newInstance();
+		return template.type.cast(instO);
+	}
 }

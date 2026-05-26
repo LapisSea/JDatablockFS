@@ -9,6 +9,7 @@ import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
 import org.objectweb.asm.ClassWriter;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -45,7 +46,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	public FunctionDefinition returns(Class<?> type, Class<?>... genericArgs){
 		return returns(GenericType.of(type).withArgs(genericArgs));
 	}
-	public FunctionDefinition returns(Class<?> type){
+	public FunctionDefinition returns(Type type){
 		return returns(GenericType.of(type));
 	}
 	public FunctionDefinition returns(JType type){

@@ -1,15 +1,12 @@
 package com.lapissea.jorth;
 
-import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.redo.ClassDefinition;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -34,13 +31,9 @@ import java.util.Set;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntFunction;
 import java.util.function.IntSupplier;
-import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
-import static com.lapissea.jorth.TestUtils.autoName;
-import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
-import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceMulti;
-import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
+import static com.lapissea.jorth.TestUtils.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class JorthTests{
@@ -1136,7 +1129,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementInt() throws Exception{
-		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
 			writer.write(
 				"""
 					get #arg num
@@ -1240,47 +1233,9 @@ public class JorthTests{
 		assertThat(inst.getAsInt()).isEqualTo(5);
 	}
 	
-	static IntUnaryOperator generateAndLoadIntUnaryOperator(
-		String name,
-		UnsafeConsumer<CodeStream, MalformedJorth> generator,
-		UnsafeConsumer<CodeBlock, MalformedJorth> generator2
-	) throws ReflectiveOperationException{
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(IntUnaryOperator.class);
-			writer.write(
-				"""
-					implements #IntUnaryOperator
-					class {0} start
-						@ #Override
-						public function applyAsInt
-							arg num int
-							returns int
-						start
-					""",
-				name
-			);
-			generator.accept(writer);
-			writer.write(
-				"""
-						end
-					end
-					"""
-			);
-		}, cd -> {
-			cd.name(ClassName.dotted(name)).implement(IntUnaryOperator.class);
-			var fn = cd.function("applyAsInt").arg(int.class, "num").override().body();
-			generator2.accept(fn);
-		});
-		
-		Object instO = cls.getConstructor().newInstance();
-		
-		assertThat(instO).isInstanceOf(IntUnaryOperator.class);
-		return (IntUnaryOperator)instO;
-	}
-	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRight() throws Exception{
-		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
 			writer.write(
 				"""
 					get #arg num
@@ -1297,7 +1252,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRightLogical() throws Exception{
-		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
 			writer.write(
 				"""
 					get #arg num
@@ -1315,7 +1270,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftLeft() throws Exception{
-		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
 			writer.write(
 				"""
 					get #arg num
@@ -1333,7 +1288,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitAnd() throws Exception{
-		var inst = generateAndLoadIntUnaryOperator(autoName(), writer -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
 			writer.write(
 				"""
 					get #arg num
