@@ -385,11 +385,25 @@ public class CodeBlock{
 		return add(Increment.simulate(localStack, val));
 	}
 	
+	public CodeBlock bitShiftRight(boolean logical, int val) throws MalformedJorth{
+		return val(val).bitShiftRight(logical);
+	}
 	public CodeBlock bitShiftRight(boolean logical) throws MalformedJorth{
 		return add(BitShiftRight.simulate(localStack, logical));
 	}
+	public CodeBlock bitShiftLeft(int val) throws MalformedJorth{
+		return val(val).bitShiftLeft();
+	}
 	public CodeBlock bitShiftLeft() throws MalformedJorth{
 		return add(BitShiftLeft.simulate(localStack));
+	}
+	public CodeBlock bitAnd(int val) throws MalformedJorth{
+		if(localStack.peekLast().equals(GenericType.LONG)){
+			val((long)val);
+		}else{
+			val(val);
+		}
+		return bitAnd();
 	}
 	public CodeBlock bitAnd() throws MalformedJorth{
 		return add(BitAnd.simulate(localStack));

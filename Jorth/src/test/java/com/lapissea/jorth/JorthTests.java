@@ -1244,8 +1244,7 @@ public class JorthTests{
 			);
 		}, cb -> {
 			cb.get("num")
-			  .val(2)
-			  .bitShiftRight(false);
+			  .bitShiftRight(false, 2);
 		});
 		assertThat(inst.applyAsInt(10)).isEqualTo(10>>2);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2>>2);
@@ -1261,8 +1260,7 @@ public class JorthTests{
 			);
 		}, cb -> {
 			cb.get("num")
-			  .val(2)
-			  .bitShiftRight(true);
+			  .bitShiftRight(true, 2);
 		});
 		assertThat(inst.applyAsInt(10)).isEqualTo(10 >>> 2);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2 >>> 2);
@@ -1279,8 +1277,7 @@ public class JorthTests{
 			);
 		}, cb -> {
 			cb.get("num")
-			  .val(2)
-			  .bitShiftLeft();
+			  .bitShiftLeft(2);
 		});
 		assertThat(inst.applyAsInt(10)).isEqualTo(10<<2);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2<<2);
@@ -1297,8 +1294,7 @@ public class JorthTests{
 			);
 		}, cb -> {
 			cb.get("num")
-			  .val(5)
-			  .bitAnd();
+			  .bitAnd(5);
 		});
 		assertThat(inst.applyAsInt(7)).isEqualTo(7&5);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2&5);
