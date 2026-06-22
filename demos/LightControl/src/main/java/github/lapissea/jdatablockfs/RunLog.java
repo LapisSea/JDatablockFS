@@ -119,23 +119,33 @@ public final class RunLog{
 				command = s.nextLine();
 			}
 		});
-		
-		var dbFile  = IOInterface.build().withFile("./sensorInfo.db").build();
-		var cluster = Cluster.initOrOpen(dbFile);
-		
-		IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
-		
-		if(!stamps.isEmpty()){
-			var iter = stamps.listIterator(stamps.size());
-			while(iter.hasPrevious()){
-				var val = iter.ioPrevious().value;
-				if(val instanceof LightValue.Lux v){
-					monitorLuxTarget = v.getDisplayLux();
-					monitorLux = monitorLuxTarget - 3;
-					break;
+		IOInterface dbFile = IOInterface.build().withFile("./sensorInfo.db").build();
+		Cluster     cluster;
+		try{
+			cluster = Cluster.initOrOpen(dbFile);
+			
+			IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
+			
+			if(!stamps.isEmpty()){
+				var iter = stamps.listIterator(stamps.size());
+				while(iter.hasPrevious()){
+					var val = iter.ioPrevious().value;
+					if(val instanceof LightValue.Lux v){
+						monitorLuxTarget = v.getDisplayLux();
+						monitorLux = monitorLuxTarget - 3;
+						break;
+					}
 				}
 			}
+			stamps.add(new LightStamp(Instant.now(), new LightValue.Lux(0)));
+			stamps.removeLast();
+		}catch(Throwable e){
+			e.printStackTrace();
+			dbFile.setIOSize(0);
+			cluster = Cluster.initOrOpen(dbFile);
 		}
+		
+		IOList<LightStamp> stamps = cluster.roots().request("lightLog", IOList.class, LightStamp.class);
 		
 		var iArgs = Iters.of(args);
 		var ip    = iArgs.findFirst().orElseThrow(() -> new IllegalArgumentException("Please provide IP"));
@@ -146,7 +156,8 @@ public final class RunLog{
 		if(iArgs.noneEquals("singleReport")){
 			startMonitorControl();
 		}
-		var serverURI     = URI.create("http://" + ip + ":42069");
+		var serverURI = URI.create("http://" + ip + ":42069");
+		LogUtil.println("Connecting to " + serverURI);
 		var cookieManager = new CookieManager();
 		
 		if(iArgs.anyMatch(e -> e.startsWith("user="))){
@@ -159,8 +170,16 @@ public final class RunLog{
 			cookieManager.getCookieStore().add(serverURI, cookie);
 		}
 		
-		try(var client = HttpClient.newBuilder().cookieHandler(cookieManager).build()){
+		try(var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).cookieHandler(cookieManager).build()){
 			HttpRequest request = HttpRequest.newBuilder().uri(serverURI).GET().build();
+			
+			while(true){
+				if(requestValue(client, request) instanceof LightValue.Lux){
+					break;
+				}
+				LogUtil.println("Waiting for pulse...");
+				Thread.sleep(Duration.ofSeconds(10));
+			}
 			
 			LogUtil.println("Starting logging...");
 			Instant last = Instant.now();
