@@ -8,7 +8,7 @@ import com.lapissea.jorth.lang.type.TypeSource;
 public final class ClassName{
 	
 	public static ClassName of(Class<?> t){
-		return dotted(t.getName());
+		return new ClassName(t.getName(), null);
 	}
 	
 	public static ClassName dotted(String s){

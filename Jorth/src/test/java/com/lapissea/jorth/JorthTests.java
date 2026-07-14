@@ -1218,10 +1218,8 @@ public class JorthTests{
 			  .body()
 			  .var(int.class, "a")
 			  .var(int.class, "b")
-			  .val(1)
-			  .set("a")
-			  .val(2)
-			  .set("b")
+			  .set("a", 1)
+			  .set("b", 2)
 			  .get("a")
 			  .add(4);
 		});

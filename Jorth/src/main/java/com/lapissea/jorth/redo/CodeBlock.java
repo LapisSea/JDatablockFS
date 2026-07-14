@@ -96,37 +96,21 @@ public class CodeBlock{
 		return local;
 	}
 	
-	public CodeBlock val(int val) throws MalformedJorth{
-		return add(IVal.simulate(localStack, val));
-	}
-	public CodeBlock val(long val) throws MalformedJorth{
-		return add(LVal.simulate(localStack, val));
-	}
-	public CodeBlock val(float val) throws MalformedJorth{
-		return add(FVal.simulate(localStack, val));
-	}
-	public CodeBlock val(double val) throws MalformedJorth{
-		return add(DVal.simulate(localStack, val));
-	}
-	public CodeBlock val(boolean val) throws MalformedJorth{
-		return add(BVal.simulate(localStack, val));
-	}
-	public CodeBlock val(String val) throws MalformedJorth{
-		return add(StrVal.simulate(localStack, val));
-	}
-	public CodeBlock val(Class<?> val) throws MalformedJorth{
-		return val(ClassName.of(val));
-	}
-	public CodeBlock val(ClassName val) throws MalformedJorth{
-		return add(ClassVal.simulate(localStack, val));
-	}
+	public CodeBlock val(int val) throws MalformedJorth      { return add(IVal.simulate(localStack, val)); }
+	public CodeBlock val(long val) throws MalformedJorth     { return add(LVal.simulate(localStack, val)); }
+	public CodeBlock val(float val) throws MalformedJorth    { return add(FVal.simulate(localStack, val)); }
+	public CodeBlock val(double val) throws MalformedJorth   { return add(DVal.simulate(localStack, val)); }
+	public CodeBlock val(boolean val) throws MalformedJorth  { return add(BVal.simulate(localStack, val)); }
+	public CodeBlock val(String val) throws MalformedJorth   { return add(StrVal.simulate(localStack, val)); }
+	public CodeBlock val(Class<?> val) throws MalformedJorth { return val(ClassName.of(val)); }
+	public CodeBlock val(ClassName val) throws MalformedJorth{ return add(ClassVal.simulate(localStack, val)); }
 	
 	public CodeBlock equalityOp() throws MalformedJorth{
 		return add(Equality.simulate(typeSource, localStack, true));
 	}
 	
-	public CodeBlock returnOp() throws MalformedJorth{
-		return add(ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
+	public void returnOp() throws MalformedJorth{
+		add(ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
 	}
 	public CodeBlock ifTrue(CodeArg code) throws MalformedJorth{
 		return trueBlock(code, ConditionalJump.Type.TRUE_BOOL);
@@ -246,9 +230,27 @@ public class CodeBlock{
 	public CodeBlock setThis(FieldDefinition field) throws MalformedJorth{
 		return get("this").swap().set(field);
 	}
+	
+	public CodeBlock set(FieldDefinition field, int val) throws MalformedJorth      { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, long val) throws MalformedJorth     { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, float val) throws MalformedJorth    { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, double val) throws MalformedJorth   { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, boolean val) throws MalformedJorth  { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, String val) throws MalformedJorth   { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, Class<?> val) throws MalformedJorth { return val(val).set(field); }
+	public CodeBlock set(FieldDefinition field, ClassName val) throws MalformedJorth{ return val(val).set(field); }
 	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
 		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
+	
+	public CodeBlock set(String varName, int val) throws MalformedJorth      { return val(val).set(varName); }
+	public CodeBlock set(String varName, long val) throws MalformedJorth     { return val(val).set(varName); }
+	public CodeBlock set(String varName, float val) throws MalformedJorth    { return val(val).set(varName); }
+	public CodeBlock set(String varName, double val) throws MalformedJorth   { return val(val).set(varName); }
+	public CodeBlock set(String varName, boolean val) throws MalformedJorth  { return val(val).set(varName); }
+	public CodeBlock set(String varName, String val) throws MalformedJorth   { return val(val).set(varName); }
+	public CodeBlock set(String varName, Class<?> val) throws MalformedJorth { return val(val).set(varName); }
+	public CodeBlock set(String varName, ClassName val) throws MalformedJorth{ return val(val).set(varName); }
 	public CodeBlock set(String varName) throws MalformedJorth{
 		Local local = getLocal(varName);
 		return add(PutLocalVarOp.simulate(localStack, typeSource, local.type.asGeneric(), local.index));
