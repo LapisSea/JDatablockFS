@@ -30,6 +30,7 @@ import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -184,13 +185,12 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		var type = Objects.requireNonNull(getType());
+		var res  = accessMap.temporaryLocalField(type, writer, body);
 		
 		accessMap.preSet(getAccessor(), writer);
 		if(nullable()){
-			var type = Objects.requireNonNull(getType());
-			var res  = accessMap.temporaryLocalField(type, writer);
-			
 			accessMap.get(isNull, writer);
 			
 			writer.write(
@@ -214,6 +214,22 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 			callReadTyp(writer, accessMap);
 		}
 		accessMap.set(getAccessor(), writer);
+		
+		accessMap.set(getAccessor(), body, b -> {
+			if(nullable()){
+				accessMap.get(isNull, b);
+				b.ifTrue(e -> {
+					e.nullVal(type).set(res);
+				}).elseRun(e -> {
+					callReadTyp(b, accessMap);
+					if(type != Object.class) b.cast(type);
+					b.set(res);
+				});
+				b.get(res);
+			}else{
+				callReadTyp(b, accessMap);
+			}
+		});
 	}
 	
 	private void callReadTyp(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
@@ -228,5 +244,14 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 				end
 				"""
 		);
+	}
+	private void callReadTyp(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(CodeUtils.class, "dynamic_readTyp", b -> {
+			accessMap.getFieldRef(this, b);
+			accessMap.get(typeID, b);
+			b.get("provider")
+			 .get("src")
+			 .get("genericContext");
+		});
 	}
 }

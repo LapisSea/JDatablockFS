@@ -25,6 +25,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -135,10 +136,10 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{ }
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		
 		if(nullable()){
-			var res = accessMap.temporaryLocalField(Objects.requireNonNull(getType()), writer);
+			var res = accessMap.temporaryLocalField(Objects.requireNonNull(getType()), writer, body);
 			accessMap.get(id, writer);
 			writer.write(
 				"""
@@ -171,6 +172,20 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 			accessMap.preSet(getAccessor(), writer);
 			writer.write("get #field {}", res);
 			accessMap.set(getAccessor(), writer);
+			
+			
+			accessMap.get(id, body);
+			body.val(0).ifEquality(b -> {
+				b.nullVal(getType()).set(res);
+			}).elseRun(b -> {
+				b.get("provider")
+				 .call("getTypeDb")
+				 .call("fromID", args -> accessMap.get(id, args))
+				 .call("generic", args -> args.get("provider").call("getTypeDb"))
+				 .cast(getType())
+				 .set(res);
+			});
+			accessMap.set(getAccessor(), body, e -> e.get(res));
 		}else{
 			
 			accessMap.preSet(getAccessor(), writer);
@@ -194,6 +209,15 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 				getType()
 			);
 			accessMap.set(getAccessor(), writer);
+			
+			
+			accessMap.set(getAccessor(), body, b -> {
+				b.get("provider")
+				 .call("getTypeDb")
+				 .call("fromID", args -> accessMap.get(id, args))
+				 .call("generic", args -> args.get("provider").call("getTypeDb"))
+				 .cast(getType());
+			});
 		}
 		
 		

@@ -2,7 +2,7 @@ package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.type.BaseType;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
@@ -328,6 +328,22 @@ public sealed interface Insn{
 		}
 	}
 	
+	record ThrowOp() implements Insn{
+		private static final GenericType THROWABLE = GenericType.of(Throwable.class);
+		static ThrowOp simulate(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
+			var popped = stack.pop();
+			if(!popped.instanceOf(typeSource, THROWABLE)){
+				throw new MalformedJorth("Throws needs " + THROWABLE + " but " + popped + " is on stack");
+			}
+			return new ThrowOp();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(ATHROW);
+		}
+	}
+	
 	record PopOp(int slots) implements Insn{
 		
 		static PopOp simulate(TypeStack stack) throws MalformedJorth{
@@ -604,6 +620,29 @@ public sealed interface Insn{
 		@Override
 		public void visit(MethodVisitor writer){
 			writer.visitInsn(element.getBaseType().arrayStoreOP);
+		}
+	}
+	
+	record GetElementOp(GenericType element) implements Insn{
+		
+		static GetElementOp simulate(TypeStack stack, TypeSource typeSource) throws MalformedJorth{
+			var index = stack.pop();
+			if(!index.equals(GenericType.INT)){
+				throw new MalformedJorth("The index of the array element must be an integer but is: " + index);
+			}
+			var array = stack.pop();
+			if(array.dims() == 0){
+				throw new MalformedJorth("The array element type must have at least one dimension but is: " + array);
+			}
+			var elementType = array.withDims(array.dims() - 1);
+			stack.push(elementType);
+			
+			return new GetElementOp(elementType);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(element.getBaseType().arrayLoadOP);
 		}
 	}
 	
@@ -935,6 +974,31 @@ public sealed interface Insn{
 		@Override
 		public void visit(MethodVisitor writer){
 			writer.visitInsn(isLong? LAND : IAND);
+		}
+	}
+	
+	record NullConstant() implements Insn{
+		
+		public static NullConstant simulate(TypeStack stack, GenericType type){
+			stack.push(type);
+			return new NullConstant();
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(ACONST_NULL);
+		}
+	}
+	
+	record InlineBlock(CodeBlock block) implements Insn{
+		
+		public static InlineBlock simulate(CodeBlock block){
+			return new InlineBlock(block);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			block.visit(writer);
 		}
 	}
 	

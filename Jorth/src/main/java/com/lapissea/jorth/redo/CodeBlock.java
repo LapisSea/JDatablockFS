@@ -1,9 +1,11 @@
 package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.type.ClassInfo;
+import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
@@ -36,6 +38,15 @@ public class CodeBlock{
 		this.fnOwner = fnOwner;
 	}
 	
+	
+	public TypeSource getTypeSource(){
+		return typeSource;
+	}
+	
+	public ClassName getTypeDef(String name){
+		return fnOwner.owner().getTypeDef(name);
+	}
+	
 	private CodeBlock add(Insn insn) throws MalformedJorth{
 		if(terminates()){
 			throw new MalformedJorth("This code block has terminated");
@@ -44,7 +55,15 @@ public class CodeBlock{
 		return this;
 	}
 	
-	public void defineLocalValue(String name, JType type, boolean canRemove) throws MalformedJorth{
+	public CodeBlock scope(CodeArg code) throws MalformedJorth{
+		var block = createBlockFromHere(code);
+		for(GenericType typ : block.localStack.getLocalPortion()){
+			localStack.push(typ);
+		}
+		return add(InlineBlock.simulate(block));
+	}
+	
+	void defineLocalValue(String name, JType type, boolean canRemove) throws MalformedJorth{
 		Objects.requireNonNull(name);
 		Objects.requireNonNull(type);
 		if(localValues.containsKey(name)){
@@ -69,10 +88,19 @@ public class CodeBlock{
 	}
 	
 	
-	public CodeBlock getThis(FieldDefinition field) throws MalformedJorth{
+	public CodeBlock get(Class<?> declaringClass, String fieldName) throws MalformedJorth{
+		return get(ClassName.of(declaringClass), fieldName);
+	}
+	public CodeBlock get(ClassName declaringClass, String fieldName) throws MalformedJorth{
+		var type          = typeSource.byName(declaringClass);
+		var accessorField = type.getField(fieldName);
+		return get(accessorField);
+	}
+	
+	public CodeBlock getThis(FieldInfo field) throws MalformedJorth{
 		return get("this").get(field);
 	}
-	public CodeBlock get(FieldDefinition field) throws MalformedJorth{
+	public CodeBlock get(FieldInfo field) throws MalformedJorth{
 		return add(GetFieldOp.simulate(localStack, typeSource, field));
 	}
 	
@@ -91,7 +119,7 @@ public class CodeBlock{
 			if(localVal.equals("this") && fnOwner.access().isStatic()){
 				throw new MalformedJorth("Cannot use 'this' from a static function");
 			}
-			throw new MalformedJorth("Unknown localValue: " + localVal);
+			throw new MissingLocalField("Unknown localValue: " + localVal);
 		}
 		return local;
 	}
@@ -112,12 +140,22 @@ public class CodeBlock{
 	public void returnOp() throws MalformedJorth{
 		add(ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
 	}
+	public void throwOp() throws MalformedJorth{
+		add(ThrowOp.simulate(typeSource, localStack));
+	}
+	public CodeBlock ifFalse(CodeArg code) throws MalformedJorth{
+		return falseBlock(code, ConditionalJump.Type.TRUE_BOOL);
+	}
 	public CodeBlock ifTrue(CodeArg code) throws MalformedJorth{
 		return trueBlock(code, ConditionalJump.Type.TRUE_BOOL);
 	}
 	public CodeBlock ifEquality(CodeArg code) throws MalformedJorth{
 		return equalityOp().ifTrue(code);
 //		return trueBlock(code, ConditionalJump.Type.EQUALITY);
+	}
+	private CodeBlock falseBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
+		var block = createBlockFromHere(code);
+		return add(ConditionalJump.simulate(localStack, typeSource, type, null, block));
 	}
 	private CodeBlock trueBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
 		var block = createBlockFromHere(code);
@@ -189,6 +227,9 @@ public class CodeBlock{
 		return readCallStack(mark);
 	}
 	
+	public CodeBlock call(Class<?> staticCaller, String name) throws MalformedJorth{
+		return call(ClassName.of(staticCaller), name, e -> { });
+	}
 	public CodeBlock call(Class<?> staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
 		return call(ClassName.of(staticCaller), name, gatherArguments);
 	}
@@ -227,19 +268,27 @@ public class CodeBlock{
 		return call(fn);
 	}
 	
-	public CodeBlock setThis(FieldDefinition field) throws MalformedJorth{
+	public CodeBlock set(Class<?> declaringClass, String fieldName) throws MalformedJorth{
+		return set(ClassName.of(declaringClass), fieldName);
+	}
+	public CodeBlock set(ClassName declaringClass, String fieldName) throws MalformedJorth{
+		var type = typeSource.byName(declaringClass);
+		return set(type.getField(fieldName));
+	}
+	
+	public CodeBlock setThis(FieldInfo field) throws MalformedJorth{
 		return get("this").swap().set(field);
 	}
 	
-	public CodeBlock set(FieldDefinition field, int val) throws MalformedJorth      { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, long val) throws MalformedJorth     { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, float val) throws MalformedJorth    { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, double val) throws MalformedJorth   { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, boolean val) throws MalformedJorth  { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, String val) throws MalformedJorth   { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, Class<?> val) throws MalformedJorth { return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field, ClassName val) throws MalformedJorth{ return val(val).set(field); }
-	public CodeBlock set(FieldDefinition field) throws MalformedJorth{
+	public CodeBlock set(FieldInfo field, int val) throws MalformedJorth      { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, long val) throws MalformedJorth     { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, float val) throws MalformedJorth    { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, double val) throws MalformedJorth   { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, boolean val) throws MalformedJorth  { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, String val) throws MalformedJorth   { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, Class<?> val) throws MalformedJorth { return val(val).set(field); }
+	public CodeBlock set(FieldInfo field, ClassName val) throws MalformedJorth{ return val(val).set(field); }
+	public CodeBlock set(FieldInfo field) throws MalformedJorth{
 		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
 	
@@ -266,11 +315,11 @@ public class CodeBlock{
 		return add(SwapOp.simulate(localStack));
 	}
 	
-	public void callSuper(CodeArg gatherArguments) throws MalformedJorth{
+	public CodeBlock callSuper(CodeArg gatherArguments) throws MalformedJorth{
 		get("this");
 		var          args    = doArgs(gatherArguments);
 		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args);
-		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
 	}
 	/**
 	 * Calls super of the current function. The function has to be static. It will automatically gather all arguments and pass them.
@@ -348,11 +397,16 @@ public class CodeBlock{
 		return this.localStack.equals(localStack);
 	}
 	
+	public CodeBlock cast(Class<?> type) throws MalformedJorth { return cast(ClassName.of(type)); }
+	public CodeBlock cast(ClassName type) throws MalformedJorth{ return cast(GenericType.of(type)); }
 	public CodeBlock cast(GenericType type) throws MalformedJorth{
 		return add(CastOp.simulate(localStack, typeSource, type));
 	}
 	public CodeBlock setArrayElement() throws MalformedJorth{
 		return add(PutElementOp.simulate(localStack, typeSource));
+	}
+	public CodeBlock getArrayElement() throws MalformedJorth{
+		return add(GetElementOp.simulate(localStack, typeSource));
 	}
 	
 	public CodeBlock callVirtual(Consumer<BootstrapFn> bootstrap, Consumer<CallingFn> fnDef, CodeArg arguments) throws MalformedJorth{
@@ -380,6 +434,18 @@ public class CodeBlock{
 		defineLocalValue(name, type, true);
 		return this;
 	}
+	public CodeBlock forgetVar(String name){
+		var var = localValues.get(name);
+		if(var == null){
+			throw new IllegalArgumentException("No local variable named " + name);
+		}
+		if(!var.canRemove){
+			throw new IllegalArgumentException("Cannot remove local variable " + name);
+		}
+		localValues.remove(name);
+		return this;
+	}
+	
 	public CodeBlock add(int val) throws MalformedJorth{
 		return add(Increment.simulate(localStack, val));
 	}
@@ -407,7 +473,55 @@ public class CodeBlock{
 		}
 		return bitAnd();
 	}
+	public CodeBlock bitAnd(long val) throws MalformedJorth{
+		if(localStack.peekLast().equals(GenericType.LONG)){
+			val(val);
+		}else{
+			val(Math.toIntExact(val));
+		}
+		return bitAnd();
+	}
 	public CodeBlock bitAnd() throws MalformedJorth{
 		return add(BitAnd.simulate(localStack));
 	}
+	
+	public CodeBlock nullVal(Class<?> type) throws MalformedJorth { return nullVal(ClassName.of(type)); }
+	public CodeBlock nullVal(ClassName type) throws MalformedJorth{ return nullVal(GenericType.of(type)); }
+	public CodeBlock nullVal(GenericType type) throws MalformedJorth{
+		return add(NullConstant.simulate(localStack, type));
+	}
+	
+	public CodeBlock box() throws MalformedJorth{
+		class Boxes{
+			private static Map.Entry<GenericType, FunctionInfo> getBoxInfo(GenericType typ, Class<?> cls){
+				var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, cls.getClassLoader()), cls);
+				FunctionInfo info;
+				try{
+					info = cInfo.getFunction(new FunctionInfo.Signature("valueOf", List.of(typ)));
+				}catch(MalformedJorth e){
+					throw new RuntimeException(e);
+				}
+				return Map.entry(typ, info);
+			}
+			private static final Map<GenericType, FunctionInfo> MAP = Map.ofEntries(
+				getBoxInfo(GenericType.BOOL, Boolean.class),
+				getBoxInfo(GenericType.BYTE, Byte.class),
+				getBoxInfo(GenericType.SHORT, Short.class),
+				getBoxInfo(GenericType.INT, Integer.class),
+				getBoxInfo(GenericType.LONG, Long.class),
+				getBoxInfo(GenericType.CHAR, Character.class),
+				getBoxInfo(GenericType.FLOAT, Float.class),
+				getBoxInfo(GenericType.DOUBLE, Double.class)
+			);
+		}
+		
+		var typ = localStack.peekLast();
+		
+		FunctionInfo boxFn = Boxes.MAP.get(typ);
+		if(boxFn == null){
+			throw new MalformedJorth("Cannot box non-primitive type: " + typ);
+		}
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), boxFn, false));
+	}
+	
 }

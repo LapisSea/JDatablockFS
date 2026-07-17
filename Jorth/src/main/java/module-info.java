@@ -2,6 +2,7 @@ module Jorth {
 	requires jlapisutil;
 	requires org.objectweb.asm;
 	requires org.objectweb.asm.util;
+	requires io.github.javadiffutils;
 	
 	exports com.lapissea.jorth;
 	exports com.lapissea.jorth.exceptions;
@@ -9,6 +10,8 @@ module Jorth {
 	opens com.lapissea.jorth to jlapisutil;
 	opens com.lapissea.jorth.lang to jlapisutil;
 	opens com.lapissea.jorth.lang.type to jlapisutil;
-	opens com.lapissea.jorth.lang.info to jlapisutil;
 	opens com.lapissea.jorth.exceptions to jlapisutil;
+	exports com.lapissea.jorth.redo;
+	exports com.lapissea.jorth.lang;
+	exports com.lapissea.jorth.lang.type;
 }

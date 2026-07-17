@@ -1,22 +1,21 @@
 package com.lapissea.jorth;
 
-import com.github.difflib.DiffUtils;
-import com.github.difflib.UnifiedDiffUtils;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.jorth.redo.CodeBlock;
-import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class TestUtils{
@@ -34,7 +33,7 @@ public final class TestUtils{
 		String className,
 		UnsafeConsumer<CodeStream, MalformedJorth> generator,
 		UnsafeConsumer<ClassDefinition, MalformedJorth> generator2
-	) throws ReflectiveOperationException{
+	) throws ReflectiveOperationException, MalformedJorth{
 		return generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
@@ -55,35 +54,26 @@ public final class TestUtils{
 		String className,
 		UnsafeConsumer<CodeStream, MalformedJorth> generator,
 		UnsafeConsumer<ClassDefinition, MalformedJorth> generator2
-	) throws ReflectiveOperationException{
+	) throws ReflectiveOperationException, MalformedJorth{
 		
-		ClassDefinition cw;
 		
 		StringJoiner tokenStr = new StringJoiner(" ");
 		var          jorth    = new Jorth(null, tokenStr::add);
-		try{
-			cw = new ClassDefinition(null);
-			generator2.accept(cw);
-			
-			try(var writer = jorth.writer()){
-				generator.accept(writer);
-			}finally{
-				LogUtil.println(tokenStr.toString());
-			}
-		}catch(MalformedJorth e){
-			throw new RuntimeException("Failed to generate class " + className, e);
+		
+		ClassDefinition cw = new ClassDefinition(null);
+		generator2.accept(cw);
+		
+		try(var writer = jorth.writer()){
+			generator.accept(writer);
+		}finally{
+			LogUtil.println(tokenStr.toString());
 		}
 		
 		var classes = jorth.listClassFiles();
 		
-		byte[] cwf;
-		try{
-			cwf = cw.getClassFile();
-		}catch(MalformedJorth e){
-			throw new RuntimeException(e);
-		}
-		var cwfOld = jorth.getClassFile(className);
-		compareClasses(cwf, cwfOld);
+		byte[] cwf    = cw.getClassFile();
+		var    cwfOld = jorth.getClassFile(className);
+		BytecodeUtils.compareClasses(cwf, cwfOld);
 		
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
@@ -135,8 +125,7 @@ public final class TestUtils{
 					
 					byte[] cwf;
 					try{
-						ClassDefinition cw;
-						cw = new ClassDefinition(this);
+						ClassDefinition cw = new ClassDefinition(this);
 						generator2.accept(name, cw);
 						cwf = cw.getClassFile();
 					}catch(Throwable e){
@@ -145,7 +134,7 @@ public final class TestUtils{
 					}
 					
 					var byt = jorth.getClassFile(name);
-					compareClasses(cwf, byt);
+					BytecodeUtils.compareClasses(cwf, byt);
 					BytecodeUtils.printClass(byt);
 					
 					return defineClass(name, ByteBuffer.wrap(byt), null);
@@ -163,41 +152,29 @@ public final class TestUtils{
 		return cls;
 	}
 	
-	public static void compareClasses(byte[] cwf, byte[] cwfOld){
-		if(!Arrays.equals(cwf, cwfOld)){
-			List<String> originalLines = Arrays.asList(BytecodeUtils.classToString(cwfOld).split("\n"));
-			List<String> revisedLines  = Arrays.asList(BytecodeUtils.classToString(cwf).split("\n"));
-			var diff = UnifiedDiffUtils.generateUnifiedDiff(
-				"Original bytecode",
-				"New bytecode",
-				originalLines,
-				DiffUtils.diff(originalLines, revisedLines),
-				Integer.MAX_VALUE/2
-			);
-			
-			var str = diff.stream().map(line -> {
-				
-				if(line.startsWith("+") && !line.startsWith("+++")){
-					return (ConsoleColors.GREEN + line + ConsoleColors.RESET);
-				}else if(line.startsWith("-") && !line.startsWith("---")){
-					return (ConsoleColors.RED + line + ConsoleColors.RESET);
-				}else if(line.startsWith("@@") || line.startsWith("---") || line.startsWith("+++")){
-					return (ConsoleColors.CYAN + line + ConsoleColors.RESET);
-				}else{
-					return (line);
-				}
-			}).collect(Collectors.joining("\n"));
-			System.out.println(str);
-			throw new AssertionError("Class files not equal");
-		}
+	private static Type parm(Type raw, Type... parms){
+		return new ParameterizedType(){
+			@Override
+			public Type[] getActualTypeArguments(){ return parms; }
+			@Override
+			public Type getRawType(){ return raw; }
+			@Override
+			public Type getOwnerType(){ return null; }
+		};
 	}
 	
 	public record TArg(String name, Class<?> type){ }
 	
-	public record InterfaceTemplate<T>(Class<T> type, String functionName, List<TArg> args, Type returns){ }
+	public record InterfaceTemplate<T>(Type type, String functionName, List<TArg> args, Type returns){ }
 	
 	public static final InterfaceTemplate<IntUnaryOperator> INT_UNARY_OPERATOR = new InterfaceTemplate<>(
 		IntUnaryOperator.class, "applyAsInt", List.of(new TArg("num", int.class)), int.class
+	);
+	public static final InterfaceTemplate<Supplier<String>> STRING_SUPPLIER    = new InterfaceTemplate<>(
+		parm(Supplier.class, String.class), "get", List.of(), Object.class
+	);
+	public static final InterfaceTemplate<IntSupplier>      INT_SUPPLIER       = new InterfaceTemplate<>(
+		IntSupplier.class, "getAsInt", List.of(), int.class
 	);
 	
 	public static <T> T generateInterface(
@@ -205,7 +182,7 @@ public final class TestUtils{
 		InterfaceTemplate<T> template,
 		UnsafeConsumer<CodeStream, MalformedJorth> generator,
 		UnsafeConsumer<CodeBlock, MalformedJorth> generator2
-	) throws ReflectiveOperationException{
+	) throws ReflectiveOperationException, MalformedJorth{
 		var cls = generateAndLoadInstance(name, writer -> {
 			writer.write(
 				"""
@@ -245,6 +222,12 @@ public final class TestUtils{
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
-		return template.type.cast(instO);
+		Class<?> type = switch(template.type){
+			case Class<?> c -> c;
+			case ParameterizedType pt -> (Class<?>)pt.getRawType();
+			default -> throw new IllegalStateException("Unexpected value: " + template.type);
+		};
+		//noinspection unchecked
+		return (T)type.cast(instO);
 	}
 }

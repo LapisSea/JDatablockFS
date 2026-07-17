@@ -11,6 +11,8 @@ import com.lapissea.iterableplus.IterableLongPP;
 import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeArg;
+import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -202,6 +204,19 @@ public enum NumberSize{
 			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
 		}
 	}
+	public void readFloatConst(CodeBlock target) throws MalformedJorth{
+		readFloatConst(target, e -> e.get("src"));
+	}
+	public void readFloatConst(CodeBlock target, CodeArg getContentReader) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.val(0F);
+			case SHORT, INT -> {
+				getContentReader.accept(target);
+				target.call("readFloat" + bytes);
+			}
+			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		}
+	}
 	/**
 	 * Stack: pops NumberSize, pushes float
 	 */
@@ -214,6 +229,12 @@ public enum NumberSize{
 				""",
 			getContentReader
 		);
+	}
+	public static void readFloatDyn(CodeBlock body) throws MalformedJorth{
+		readFloatDyn(body, e -> e.get("src"));
+	}
+	public static void readFloatDyn(CodeBlock body, CodeArg getContentReader) throws MalformedJorth{
+		body.call("readFloat", getContentReader);
 	}
 	
 	public long read(ContentReader in) throws IOException{
@@ -242,6 +263,26 @@ public enum NumberSize{
 				target.write("{} call {}", getContentReader, (signed? "readInt" : "readUnsignedInt") + bytes);
 			}
 			case LONG -> target.write("{} call readInt8", getContentReader);
+		}
+	}
+	public void readConst(CodeBlock target, boolean signed) throws MalformedJorth{
+		readConst(target, e -> e.get("src"), signed);
+	}
+	public void readConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.val(0L);
+			case BYTE, SHORT, SMALL_INT -> {
+				getContentReader.accept(target);
+				target.call("readWord", args -> args.val(bytes));
+			}
+			case INT, BIG_INT, SMALL_LONG -> {
+				getContentReader.accept(target);
+				target.call((signed? "readInt" : "readUnsignedInt") + bytes);
+			}
+			case LONG -> {
+				getContentReader.accept(target);
+				target.call("readInt8");
+			}
 		}
 	}
 	
@@ -274,6 +315,28 @@ public enum NumberSize{
 	}
 	
 	/**
+	 * Stack: pops ContentReader, pushes int
+	 */
+	public void readIntConst(CodeBlock target, boolean signed) throws MalformedJorth{
+		readIntConst(target, e -> e.get("src"), signed);
+	}
+	public void readIntConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		switch(this){
+			case VOID -> target.val(0);
+			case BYTE, SHORT, SMALL_INT -> {
+				getContentReader.accept(target);
+				target.call((signed? "readInt" : "readUnsignedInt") + bytes);
+			}
+			case INT -> {
+				getContentReader.accept(target);
+				if(signed) target.call("readInt4");
+				else target.call("readUnsignedInt4").cast(int.class);
+			}
+			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		}
+	}
+	
+	/**
 	 * Stack: pops NumberSize, pushes int
 	 */
 	public static void readIntDyn(CodeStream target, String getContentReader, boolean signed) throws MalformedJorth{
@@ -287,6 +350,13 @@ public enum NumberSize{
 			getContentReader
 		);
 	}
+	public static void readIntDyn(CodeBlock target, boolean signed) throws MalformedJorth{
+		readIntDyn(target, e -> e.get("src"), signed);
+	}
+	public static void readIntDyn(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		target.call(signed? "readIntSigned" : "readInt", getContentReader);
+	}
+	
 	/**
 	 * Stack: pops NumberSize, pushes long
 	 */
@@ -300,6 +370,12 @@ public enum NumberSize{
 			signed? "readSigned" : "read",
 			getContentReader
 		);
+	}
+	public static void readDyn(CodeBlock target, boolean signed) throws MalformedJorth{
+		readDyn(target, e -> e.get("src"), signed);
+	}
+	public static void readDyn(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
+		target.call(signed? "readSigned" : "read", getContentReader);
 	}
 	
 	public void skip(ContentReader in) throws IOException{

@@ -1,7 +1,6 @@
-package com.lapissea.jorth.lang.info;
+package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;

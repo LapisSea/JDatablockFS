@@ -1,11 +1,12 @@
 package com.lapissea.jorth.lang.type;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
+import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.Keyword;
 import com.lapissea.jorth.lang.TokenSource;
-import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -364,14 +365,14 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	public void getLocalFieldOp(String member) throws MalformedJorth{
 		var info = localFields.get(member);
 		if(info == null){
-			throw new MalformedJorth("Local field " + member + " does not exist");
+			throw new MissingLocalField(member + " does not exist");
 		}
 		code().loadLocalFieldIns(info);
 	}
 	public void setLocalFieldOp(String member) throws MalformedJorth{
 		var info = localFields.get(member);
 		if(info == null){
-			throw new MalformedJorth("Local field " + member + " does not exist");
+			throw new MissingLocalField(member + " does not exist");
 		}
 		code().storeLocalFieldIns(info);
 	}

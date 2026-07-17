@@ -19,16 +19,16 @@ public record AccessSet(boolean isAbstract, boolean isStatic, boolean isFinal){
 	public static final AccessSet FINAL    = new AccessSet(false, false, true);
 	
 	public AccessSet withoutAbstr(){
-		return new AccessSet(false, isStatic, isFinal);
+		return !isAbstract? this : new AccessSet(false, isStatic, isFinal);
 	}
 	public AccessSet andAbstr(){
-		return new AccessSet(true, isStatic, isFinal);
+		return isAbstract? this : new AccessSet(true, isStatic, isFinal);
 	}
 	public AccessSet andStat(){
-		return new AccessSet(isAbstract, true, isFinal);
+		return isStatic? this : new AccessSet(isAbstract, true, isFinal);
 	}
 	public AccessSet andFin(){
-		return new AccessSet(isAbstract, isStatic, true);
+		return isFinal? this : new AccessSet(isAbstract, isStatic, true);
 	}
 	public AccessSet join(AccessSet other){
 		return new AccessSet(

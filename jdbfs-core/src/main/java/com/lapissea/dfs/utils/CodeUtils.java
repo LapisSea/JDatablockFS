@@ -11,6 +11,7 @@ import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -26,15 +27,16 @@ public interface CodeUtils{
 		BitFieldMerger.readIntegrityBits(raw, totalBits, readBits);
 	}
 	
-	static void readBytesFromSrc(CodeStream writer, int bytes) throws MalformedJorth{
+	static void readBytesFromSrc(CodeStream writer, CodeBlock body, int bytes) throws MalformedJorth{
 		var ns = NumberSize.FLAG_INFO.filter(e -> e.bytes == bytes).findFirst().orElseThrow();
-		readBytesFromSrc(writer, ns);
+		readBytesFromSrc(writer, body, ns);
 	}
-	static void readBytesFromSrc(CodeStream writer, NumberSize size) throws MalformedJorth{
+	static void readBytesFromSrc(CodeStream writer, CodeBlock body, NumberSize size) throws MalformedJorth{
 		size.readConst(writer, "get #arg src", false);
+		size.readConst(body, a -> a.get("src"), false);
 	}
 	
-	static void rawBitsToValidatedBits(CodeStream writer, int bytes, int bits) throws MalformedJorth{
+	static void rawBitsToValidatedBits(CodeStream writer, CodeBlock body, int bytes, int bits) throws MalformedJorth{
 		//Check integrity bits
 		var oneBits = bytes*8 - bits;
 		
@@ -46,8 +48,8 @@ public interface CodeUtils{
 			throw new IllegalStateException("More bits than bytes*8");
 		}
 		
-		var checkMask = BitUtils.makeMask(oneBits)<<bits;
-		var valueMask = BitUtils.makeMask(bits);
+		long checkMask = BitUtils.makeMask(oneBits)<<bits;
+		long valueMask = BitUtils.makeMask(bits);
 		
 		writer.write(
 			"""
@@ -63,6 +65,14 @@ public interface CodeUtils{
 		);
 		
 		writer.write("{}L bit-and", valueMask);
+		
+		body.call(UtilL.class, "checkFlag", args -> args.dup().val(checkMask))
+		    .ifFalse(branch -> {
+			    branch.newObj(IOException.class, e -> e.val("Illegal enum integrity bits"))
+			          .throwOp();
+		    })
+		    .bitAnd(valueMask);
+		
 	}
 	
 }

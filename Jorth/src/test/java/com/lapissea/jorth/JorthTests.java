@@ -1,5 +1,6 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
@@ -79,7 +80,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void comparisonTest() throws ReflectiveOperationException{
+	void comparisonTest() throws Exception{
 		
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
@@ -134,7 +135,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void ifTest() throws ReflectiveOperationException{
+	void ifTest() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
 				"""
@@ -183,7 +184,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void ifElseTest() throws ReflectiveOperationException{
+	void ifElseTest() throws Exception{
 		var className = autoName();
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.addImportAs(className, "ThisClass");
@@ -260,7 +261,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void functionCallTest() throws ReflectiveOperationException{
+	void functionCallTest() throws Exception{
 		
 		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
 			writer.addImport(LogUtil.class);
@@ -341,7 +342,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldClass() throws ReflectiveOperationException{
+	void fieldClass() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
 			writer.write(
@@ -394,7 +395,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldArrayClass() throws ReflectiveOperationException{
+	void fieldArrayClass() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			
 			writer.write(
@@ -451,7 +452,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void defaultAnnotation() throws ReflectiveOperationException{
+	void defaultAnnotation() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(DefaultAnn.class, "Ann");
 			writer.write(
@@ -477,7 +478,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void enumAnnotation() throws ReflectiveOperationException{
+	void enumAnnotation() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(EnumAnn.class, "Ann");
 			writer.write(
@@ -495,7 +496,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldAnnotation() throws ReflectiveOperationException{
+	void fieldAnnotation() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
@@ -517,7 +518,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void methodAnnotation() throws ReflectiveOperationException{
+	void methodAnnotation() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
@@ -539,7 +540,7 @@ public class JorthTests{
 		assertThat(ann.value()).isEqualTo(141);
 	}
 	@Test
-	void classAnnotation() throws ReflectiveOperationException{
+	void classAnnotation() throws Exception{
 		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.addImportAs(MultiAnn.class, "Ann");
@@ -563,7 +564,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void overrideClass() throws ReflectiveOperationException{
+	void overrideClass() throws Exception{
 		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
@@ -589,7 +590,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void dummyClass() throws ReflectiveOperationException{
+	void dummyClass() throws Exception{
 		var msg = "Ayyyy it works!";
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
@@ -614,7 +615,7 @@ public class JorthTests{
 	
 	@SuppressWarnings("unchecked")
 	@Test
-	<T extends Enum<T>> void simpleEnum() throws ReflectiveOperationException{
+	<T extends Enum<T>> void simpleEnum() throws Exception{
 		
 		var className = "com.lapissea.jorth.WtfIsMyEnumAAA";
 		var cls = generateAndLoadInstance(className, writer -> {
@@ -638,7 +639,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	<T extends Enum<T>> void simpleInterface() throws ReflectiveOperationException{
+	<T extends Enum<T>> void simpleInterface() throws Exception{
 		var className = autoName();
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
@@ -661,7 +662,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void getClassRef() throws ReflectiveOperationException{
+	void getClassRef() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
 			writer.write(
 				"""
@@ -683,7 +684,7 @@ public class JorthTests{
 		assertThat(actual).isEqualTo(expected);
 	}
 	@Test
-	void superArgs() throws ReflectiveOperationException{
+	void superArgs() throws Exception{
 		var className   = autoName();
 		var expectedStr = "Hi from super";
 		var cls = generateAndLoadInstance(className, writer -> {
@@ -866,7 +867,7 @@ public class JorthTests{
 					cd.permits(ClassName.dotted("child1")).permits(ClassName.dotted("child2"));
 				}
 				case "child1", "child2" -> {
-					cd.finalAcc().extendsType(GenericType.of(ClassName.dotted("SealedClass")));
+					cd.finalAcc().extendsType(ClassName.dotted("SealedClass"));
 				}
 			}
 		});
@@ -1296,5 +1297,76 @@ public class JorthTests{
 		});
 		assertThat(inst.applyAsInt(7)).isEqualTo(7&5);
 		assertThat(inst.applyAsInt(-2)).isEqualTo(-2&5);
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface")
+	void nullVal() throws Exception{
+		var inst = generateInterface(autoName(), STRING_SUPPLIER, writer -> {
+			writer.write(
+				"""
+					null start #String end
+					"""
+			);
+		}, cb -> cb.nullVal(String.class));
+		String res = inst.get();
+		assertThat(res).isNull();
+	}
+	
+	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
+	void forgetLocalA() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> {
+			writer.write(
+				"""
+					field a int
+					1
+					set #field a
+					forget #field a
+					get #field a
+					"""
+			);
+		}, cb -> cb.nullVal(String.class));
+		inst.getAsInt();
+	}
+	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
+	void forgetLocalB() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> { }, cb -> cb.scope(code -> {
+			code.var(int.class, "a")
+			    .set("a", 1);
+		}).get("a"));
+		inst.getAsInt();
+	}
+	@Test(dependsOnMethods = "simpleInterface")
+	void forgetLocalThen() throws Exception{
+		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> {
+			writer.write(
+				"""
+					field a int
+					1
+					set #field a
+					
+					field b int
+					2
+					set #field b
+					forget #field b
+					
+					field c int
+					3
+					set #field c
+					get #field c
+					"""
+			);
+		}, cb -> {
+			cb.var(int.class, "a")
+			  .set("a", 1)
+			  .scope(code -> {
+				  code.var(int.class, "b")
+				      .set("b", 2);
+			  })
+			  .var(int.class, "c")
+			  .set("c", 3)
+			  .get("c");
+		});
+		int res = inst.getAsInt();
+		assertThat(res).isEqualTo(3);
 	}
 }

@@ -52,6 +52,8 @@ import com.lapissea.iterableplus.Match;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -66,17 +68,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.ParameterizedType;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalLong;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -1148,7 +1140,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 				
 				var jorth = new Jorth(type.getClassLoader(), log);
+				var cw    = new ClassDefinition(type.getClassLoader());
 				try(var writer = jorth.writer()){
+					
+					cw.typeDef("GeneratorPipeClass", this.getClass());
+					cw.typeDef("ObjType", type);
+					cw.typeDef("ThisClass", ClassName.dotted(className));
 					
 					writer.addImportAs(this.getClass(), "GeneratorPipeClass");
 					writer.addImportAs(type, "ObjType");
@@ -1160,7 +1157,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					);
 					
 					try{
-						pipeWriter.writePipeClass(writer, constants, type);
+						pipeWriter.writePipeClass(writer, constants, cw, type);
 					}catch(UnsupportedCodeGenType e){
 						if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
 							Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
@@ -1171,6 +1168,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 				
 				bytecode = jorth.getClassFile(className);
+				var bytecodeNew = cw.getClassFile();
+				BytecodeUtils.compareClasses(bytecodeNew, bytecode);
 				
 				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 				var cls    = access.defineClass(type, bytecode, true);

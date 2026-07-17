@@ -73,6 +73,11 @@ public class TypeStack{
 		if(localPos<0) return parent.peek(pos);
 		return stack.get(localPos);
 	}
+	
+	public List<GenericType> getLocalPortion(){
+		return stack;
+	}
+	
 	@Override
 	public TypeStack clone(){
 		var stack = new TypeStack(parent);

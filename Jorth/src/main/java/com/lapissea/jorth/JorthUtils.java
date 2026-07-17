@@ -12,7 +12,7 @@ import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public class JorthUtils{
+public final class JorthUtils{
 	
 	private static Type extractFromVarType(TypeVariable<?> c){
 		var bounds = c.getBounds();

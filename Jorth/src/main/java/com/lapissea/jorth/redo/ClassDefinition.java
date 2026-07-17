@@ -2,7 +2,7 @@ package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.FieldInfo;
@@ -13,8 +13,10 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -60,6 +62,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private final Set<ClassName>    permits    = new LinkedHashSet<>();
 	private final List<GenericType> interfaces = new ArrayList<>();
 	private       GenericType       extension  = GenericType.OBJECT;
+	
+	private Map<String, ClassName> typeDefinitions = new HashMap<>();
 	
 	public ClassDefinition(ClassLoader classLoader){
 		typeSource = TypeSource.of(this::generatedClassInfo, classLoader == null? this.getClass().getClassLoader() : classLoader);
@@ -307,7 +311,6 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		for(int i1 = 0; i1<constants.size(); i1++){
 			int i     = i1;
 			var field = constants.get(i);
-			if(!field.isEnumConstant()) continue;
 			
 			fun.dup();//array dup
 			fun.val(i);//[i] = ...
@@ -391,6 +394,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		}
 		return this;
 	}
+	public ClassDefinition implement(Type interfaceSig) throws MalformedJorth{
+		return implement(GenericType.of(interfaceSig));
+	}
 	public ClassDefinition implement(Class<?> interfaceSig) throws MalformedJorth{
 		return implement(GenericType.of(interfaceSig));
 	}
@@ -400,6 +406,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	
 	public ClassDefinition extendsType(Class<?> type){
+		return extendsType(GenericType.of(type));
+	}
+	public ClassDefinition extendsType(ClassName type){
 		return extendsType(GenericType.of(type));
 	}
 	public ClassDefinition extendsType(GenericType type){
@@ -436,4 +445,20 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		var info = typeSource.byType(extension);
 		return info.getFunction(signature);
 	}
+	
+	public ClassName getTypeDef(String name){
+		var res = typeDefinitions.get(name);
+		if(res == null) throw new IllegalStateException("No type definition found with name " + name);
+		return res;
+	}
+	public void typeDef(String name, Class<?> type){
+		typeDef(name, ClassName.of(type));
+	}
+	public void typeDef(String name, ClassName type){
+		var old = typeDefinitions.put(name, type);
+		if(old != null){
+			throw new IllegalArgumentException("Type definition " + name + " already defined");
+		}
+	}
+	
 }

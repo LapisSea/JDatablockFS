@@ -21,6 +21,7 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.util.List;
@@ -148,7 +149,7 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		set(ioPool, instance, data);
 	}
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		if(compression != null){
 			throw new UnsupportedCodeGenType("Compression variation not implemented");
 		}
@@ -166,6 +167,11 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		accessMap.get(arraySize, writer);
 		writer.wEnd();
 		accessMap.set(getAccessor(), writer);
+		
+		accessMap.set(getAccessor(), body, b -> {
+			b.get("src")
+			 .call("readInts1", e -> accessMap.get(arraySize, e));
+		});
 	}
 	
 	@Override
