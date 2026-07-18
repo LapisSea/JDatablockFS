@@ -18,6 +18,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -98,12 +99,12 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		return Optional.of('"' + val + '"');
 	}
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		if(!nullable()){
 			throw new ShouldNeverHappenError();
 		}
 		
-		var result = accessMap.temporaryLocalField(String.class, writer);
+		var result = accessMap.temporaryLocalField(String.class, writer, body);
 		accessMap.get(isNull, writer);
 		writer.write(
 			"""
@@ -128,5 +129,16 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		writer.write("get #field {}", result);
 		accessMap.set(getAccessor(), writer);
 		
+		accessMap.get(isNull, body);
+		body.ifTrue(b -> {
+			b.nullVal(String.class)
+			 .set(result);
+		}).elseRun(b -> {
+			b.get(AutoText.class, "STR_PIPE")
+			 .call("readNew", args -> args.get("provider").get("src").nullVal(GenericContext.class))
+			 .cast(String.class)
+			 .set(result);
+		});
+		accessMap.set(getAccessor(), body, e -> e.get(result));
 	}
 }

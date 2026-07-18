@@ -20,6 +20,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.util.List;
@@ -121,7 +122,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		accessMap.preSet(getAccessor(), writer);
 		writer.write("static call {} of start", ChunkPointer.class);
 		if(dynamicSize == null){
@@ -132,5 +133,16 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 		}
 		writer.wEnd();
 		accessMap.set(getAccessor(), writer);
+		
+		accessMap.set(getAccessor(), body, b -> {
+			b.call(ChunkPointer.class, "of", args -> {
+				if(dynamicSize == null){
+					maxSize.size.readConst(args, false);
+				}else{
+					accessMap.get(dynamicSize.field, args);
+					NumberSize.readDyn(args, false);
+				}
+			});
+		});
 	}
 }

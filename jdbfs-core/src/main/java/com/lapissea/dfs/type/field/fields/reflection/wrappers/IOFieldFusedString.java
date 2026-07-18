@@ -9,16 +9,7 @@ import com.lapissea.dfs.objects.text.Encoding;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.field.Annotations;
-import com.lapissea.dfs.type.field.BehaviourSupport;
-import com.lapissea.dfs.type.field.FieldNames;
-import com.lapissea.dfs.type.field.FieldSet;
-import com.lapissea.dfs.type.field.IOField;
-import com.lapissea.dfs.type.field.IOFieldTools;
-import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.SpecializedGenerator;
-import com.lapissea.dfs.type.field.StoragePool;
-import com.lapissea.dfs.type.field.VirtualFieldDefinition;
+import com.lapissea.dfs.type.field.*;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -27,6 +18,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.nio.CharBuffer;
@@ -193,10 +185,10 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-		accessMap.preSet(getAccessor(), writer);
+	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		var cb = accessMap.temporaryLocalField(CharBuffer.class, writer, body);
 		
-		var cb = accessMap.temporaryLocalField(CharBuffer.class, writer);
+		accessMap.preSet(getAccessor(), writer);
 		
 		writer.write("static call {} allocate start", CharBuffer.class);
 		accessMap.get(charCountField, writer);
@@ -237,5 +229,25 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 			, cb);
 		
 		accessMap.set(getAccessor(), writer);
+		
+		accessMap.set(getAccessor(), body, b -> {
+			
+			b.call(CharBuffer.class, "allocate", args -> accessMap.get(charCountField, args))
+			 .set(cb);
+			
+			accessMap.get(encodingField, b);
+			b.call("read", args -> {
+				args.newObj(LimitedContentReader.class, a -> {
+					a.get("src");
+					accessMap.get(bytesField, a);
+					a.cast(long.class);
+				});
+				args.get(cb);
+			});
+			
+			b.get(cb)
+			 .call("flip")
+			 .call("toString");
+		});
 	}
 }

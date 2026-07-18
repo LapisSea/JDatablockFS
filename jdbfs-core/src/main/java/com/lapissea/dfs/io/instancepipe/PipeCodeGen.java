@@ -67,26 +67,28 @@ public final class PipeCodeGen{
 					var name = "eArr_" + i + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
 					enumArrs.add(new EArr(type, name));
 					writer.write("private static final field {} {}", name, type.arrayType());
-					accessMap.addEnumArray(type, "#ThisClass", name);
+					accessMap.addEnumArray(type, cw.getTypeDef("ThisClass"), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldAcc(var accessor) -> {
 					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
 					accessors.add(new Acc(accessor, name));
 					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
-					accessMap.addAccessorField(accessor, "#ThisClass", name);
+					accessMap.addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldRef(var ioField) -> {
 					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 					fieldRefs.add(new FRef(ioField, name));
 					writer.write("private static final field {} {}<#ObjType>", name, IOField.class);
-					accessMap.addFieldRefField(ioField, "#ThisClass", name);
+					accessMap.addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
 					writer.write("public static final field {} {}", name, type);
+					cw.field(name, type);
 				}
 			}
 		}
 		
+		cw.staticInit();
 		writer.write("public static function <clinit> start");
 		
 		if(!accessors.isEmpty()){
@@ -168,7 +170,7 @@ public final class PipeCodeGen{
 				enumArr.type, enumArr.name
 			);
 			
-			cw.field(enumArr.name, enumArr.type)
+			cw.field(enumArr.name, enumArr.type.arrayType())
 			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(enumArr.type, "values"));
 		}
 		
@@ -177,7 +179,13 @@ public final class PipeCodeGen{
 			writer.write("set #ThisClass {}", debugField.name());
 			
 			cw.field(debugField.name(), debugField.type())
-			  .visibility(Visibility.PUBLIC).staticFinal(e -> e.val(debugField.initCode()));
+			  .visibility(Visibility.PUBLIC).staticFinal(e -> {
+				  if(debugField.type() == boolean.class){ // TODO: Ugly hack. Make initCode propert type
+					  e.val(Boolean.parseBoolean(debugField.initCode()));
+				  }else{
+					  e.val(debugField.initCode());
+				  }
+			  });
 		}
 		
 		writer.wEnd();
@@ -291,6 +299,12 @@ public final class PipeCodeGen{
 				}
 				
 				writer.wEnd();
+				
+				body.newObj(body.getTypeDef("ObjType"), args -> {
+					for(IOField<?, ?> field : fields){
+						accessMap.get(field, args);
+					}
+				});
 			}
 		}
 	}
@@ -307,11 +321,12 @@ public final class PipeCodeGen{
 				start
 				"""
 		);
-		var body = cw.function("readNew").visibility(Visibility.PROTECTED).override()
+		var body = cw.function("readNew").visibility(Visibility.PROTECTED)
 		             .arg(DataProvider.class, "provider")
 		             .arg(ContentReader.class, "src")
 		             .arg(GenericContext.class, "genericContext")
 		             .returns(IOInstance.class)
+		             .annotation(Override.class)
 		             .body();
 		
 		if(generators != null){
@@ -366,6 +381,7 @@ public final class PipeCodeGen{
 				end
 				"""
 		);
+		body.returnOp();
 	}
 	static void overwrite_doRead(CodeStream writer, ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		writer.write(
@@ -385,13 +401,14 @@ public final class PipeCodeGen{
 		ClassName   objType        = cw.getTypeDef("ObjType");
 		GenericType objVarPoolType = GenericType.of(VarPool.class).withArgs(objType);
 		
-		var body = cw.function("doRead").visibility(Visibility.PROTECTED).override()
+		var body = cw.function("doRead").visibility(Visibility.PROTECTED)
 		             .arg(objVarPoolType, "ioPool")
 		             .arg(DataProvider.class, "provider")
 		             .arg(ContentReader.class, "src")
 		             .arg(IOInstance.class, "instance")
 		             .arg(GenericContext.class, "genericContext")
 		             .returns(IOInstance.class)
+		             .annotation(Override.class)
 		             .body();
 		if(generators != null){
 			accessMap.setup(true, false);
@@ -466,6 +483,7 @@ public final class PipeCodeGen{
 				end
 				"""
 		);
+		body.returnOp();
 	}
 	
 	private static <T extends IOInstance<T>> ConstantCallSite failedDoReadNew(MethodHandles.Lookup lookup, String name, Class<T> objType){
@@ -677,6 +695,7 @@ public final class PipeCodeGen{
 								end
 								"""
 						);
+						body.returnOp();
 					});
 					return new ConstantCallSite(target);
 				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
@@ -722,12 +741,14 @@ public final class PipeCodeGen{
 			StructPipe.STATE_DONE
 		);
 		
-		cw.extendsType(cw.getTypeDef("GeneratorPipeClass"))
+		var superType = GenericType.of(cw.getTypeDef("GeneratorPipeClass")).withArgs(cw.getTypeDef("ObjType"));
+		cw.name(cw.getTypeDef("ThisClass")).extendsType(superType)
 		  .implement(StructPipe.SpecializedImplementation.class);
 		
 		cw.instanceInit()
 		  .body()
-		  .callSuper(c -> c.call(Struct.class, "of", c2 -> c2.val(cw.name())));
+		  .callSuper(c -> c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType")))
+		                   .val(StructPipe.STATE_DONE));
 		
 		cw.function("getGenericType").visibility(Visibility.PUBLIC)
 		  .returns(Class.class)

@@ -114,7 +114,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		
 		var body = new CodeBlock(null, owner.typeSource, this);
 		if(!access.isStatic()){
-			body.defineLocalValue("this", new GenericType(owner.name()), false);
+			body.defineLocalValue("this", new GenericType(Objects.requireNonNull(owner.name(), "Class name must be defined before using a function")), false);
 		}
 		for(var e : args.entrySet()){
 			body.defineLocalValue(e.getKey(), e.getValue(), false);

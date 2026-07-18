@@ -8,6 +8,7 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.CodeArg;
 import com.lapissea.jorth.redo.CodeBlock;
@@ -68,7 +69,7 @@ public interface SpecializedGenerator{
 			public ConstantNeeded(Collection<ConstantRequest> constants){ this.constants = List.copyOf(constants); }
 		}
 		
-		private record GetInfo(String className, String fieldName){ }
+		private record GetInfo(ClassName className, String fieldName){ }
 		
 		private final Map<FieldAccessor<?>, String>            localFields    = new HashMap<>();
 		private final Map<FieldAccessor<?>, AccessMap.GetInfo> accessorFields = new HashMap<>();
@@ -99,6 +100,7 @@ public interface SpecializedGenerator{
 						body.dup();
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
+								args.accept(body);
 								body.set(declaringClass, name);
 							}
 							case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {
@@ -111,8 +113,14 @@ public interface SpecializedGenerator{
 							localFields.put(field, name);
 							body.var(field.getType(), name);
 						}
+						args.accept(body);
 						var localFieldName = localFields.get(field);
-						body.set(localFieldName);
+						try{
+							body.set(localFieldName);
+						}catch(MissingLocalField e){
+							body.var(field.getType(), localFieldName);
+							body.set(localFieldName);
+						}
 					}
 				}
 				case VirtualAccessor<?> virutal -> {
@@ -122,8 +130,14 @@ public interface SpecializedGenerator{
 						body.var(field.getType(), name);
 					}
 					
+					args.accept(body);
 					var localFieldName = localFields.get(field);
-					body.set(localFieldName);
+					try{
+						body.set(localFieldName);
+					}catch(MissingLocalField e){
+						body.var(field.getType(), localFieldName);
+						body.set(localFieldName);
+					}
 					if(hasIOPool){
 						var accessorInfo = accessorFields.get(field);
 						if(accessorInfo == null){
@@ -137,7 +151,7 @@ public interface SpecializedGenerator{
 						else fnName = "set";
 						
 						body.get("ioPool")
-						    .call(fnName, a -> a.get(ClassName.dotted(accessorInfo.className), accessorInfo.fieldName)
+						    .call(fnName, a -> a.get(accessorInfo.className, accessorInfo.fieldName)
 						                        .get(localFieldName));
 					}
 				}
@@ -230,7 +244,7 @@ public interface SpecializedGenerator{
 			if(info == null){
 				throw new NotImplementedException("GENERATE ENUM ON THE FLY");
 			}
-			code.get(ClassName.dotted(info.className), info.fieldName);
+			code.get(info.className, info.fieldName);
 		}
 		public <E extends Enum<E>> void getFieldRef(IOField<?, ?> field, CodeStream writer) throws MalformedJorth, AccessMap.ConstantNeeded{
 			var info = fieldRefFields.get(field);
@@ -244,7 +258,7 @@ public interface SpecializedGenerator{
 			if(info == null){
 				throw new NotImplementedException("GENERATE ENUM ON THE FLY");
 			}
-			block.get(ClassName.dotted(info.className), info.fieldName);
+			block.get(info.className, info.fieldName);
 		}
 		
 		public void get(IOField<?, ?> field, CodeStream writer) throws MalformedJorth{
@@ -309,13 +323,13 @@ public interface SpecializedGenerator{
 				default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 			}
 		}
-		public void addAccessorField(FieldAccessor<?> accessor, String className, String fieldName){
+		public void addAccessorField(FieldAccessor<?> accessor, ClassName className, String fieldName){
 			accessorFields.put(accessor, new AccessMap.GetInfo(className, fieldName));
 		}
-		public void addFieldRefField(IOField<?, ?> accessor, String className, String fieldName){
+		public void addFieldRefField(IOField<?, ?> accessor, ClassName className, String fieldName){
 			fieldRefFields.put(accessor, new AccessMap.GetInfo(className, fieldName));
 		}
-		public void addEnumArray(Class<?> type, String className, String fieldName){
+		public void addEnumArray(Class<?> type, ClassName className, String fieldName){
 			enumArrays.put(type, new AccessMap.GetInfo(className, fieldName));
 		}
 		

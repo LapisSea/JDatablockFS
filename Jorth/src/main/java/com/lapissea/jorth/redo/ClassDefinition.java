@@ -14,16 +14,7 @@ import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -93,7 +84,11 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			
 			@Override
 			public FieldInfo getField(String name) throws MalformedJorth{
-				throw NotImplementedException.infer();//TODO: implement .getField()
+				var n = fields.get(name);
+				if(n == null){
+					throw new MalformedJorth("Field " + name + " does not exist in " + ClassDefinition.this.name);
+				}
+				return n;
 			}
 			@Override
 			public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{

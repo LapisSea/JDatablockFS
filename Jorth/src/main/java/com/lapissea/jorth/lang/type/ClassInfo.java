@@ -239,13 +239,25 @@ public interface ClassInfo{
 			Method res = null;
 			for(Method m : methods){
 				if(m.getName().equals(name)
-				   && parameterTypes.equals(Arrays.stream(m.getParameterTypes()).map(JType::of).toList())
+				   && parametersMatch(parameterTypes, m)
 				   && (res == null
 				       || (res.getReturnType() != m.getReturnType()
 				           && res.getReturnType().isAssignableFrom(m.getReturnType()))))
 					res = m;
 			}
 			return res;
+		}
+		private static boolean parametersMatch(List<JType> parameterTypes, Method m){
+			if(m.getParameterCount() != parameterTypes.size()) return false;
+			var mParms = m.getParameterTypes();
+			for(int i = 0; i<mParms.length; i++){
+				var mParm      = JType.of(mParms[i]);
+				var targetParm = parameterTypes.get(i);
+				if(!mParm.equals(targetParm)){
+					return false;
+				}
+			}
+			return true;
 		}
 		private boolean checkArgs(Class<?>[] margs, List<JType> args, Throwable[] fail){
 			if(margs.length != args.size()) return false;
