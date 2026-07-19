@@ -6,7 +6,6 @@ import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.NumberSize;
-import com.lapissea.dfs.run.TempClassGen.VisiblityGen;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
@@ -23,6 +22,7 @@ import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RunMark;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.LogUtil;
 import org.testng.annotations.Test;
 
@@ -39,7 +39,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
@@ -83,10 +82,10 @@ public final class StructFuzzTest{
 		);
 	}
 	
-	private static final List<VisiblityGen> ALL_VIS = List.copyOf(EnumSet.allOf(VisiblityGen.class));
-	private static VisiblityGen getVisibility(RandomGenerator rand){
+	private static final List<Visibility> ALL_VIS = List.copyOf(EnumSet.allOf(Visibility.class));
+	private static Visibility getVisibility(RandomGenerator rand){
 		if(rand.nextInt(5) == 0){
-			return VisiblityGen.PUBLIC;
+			return Visibility.PUBLIC;
 		}
 		return ALL_VIS.get(rand.nextInt(ALL_VIS.size()));
 	}
@@ -180,7 +179,7 @@ public final class StructFuzzTest{
 	
 	@org.testng.annotations.DataProvider
 	Object[][] finVis(){
-		return Iters.from(VisiblityGen.class)
+		return Iters.from(Visibility.class)
 		            .flatMap(v -> List.of(new Object[]{true, v}, new Object[]{false, v}))
 		            .toArray(Object[].class);
 	}
@@ -188,12 +187,13 @@ public final class StructFuzzTest{
 	private final Set<TempClassGen.ClassGen> simpleEncounter = new HashSet<>();
 	
 	@Test(groups = "earlyCheck", dataProvider = "finVis")
-	void simpleGenClass(boolean isFinal, VisiblityGen visiblity) throws ReflectiveOperationException, IOException{
+	void simpleGenClass(boolean isFinal, Visibility visiblity) throws ReflectiveOperationException, IOException{
 		var gen = new TempClassGen.ClassGen(
 			"testBefore",
 			List.of(new TempClassGen.FieldGen("f1", visiblity, isFinal, int.class, anns(IOVal), RandomGenerator::nextInt)),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
+			List.of(),
 			List.of(),
 			List.of());
 		testType(gen);
@@ -201,7 +201,7 @@ public final class StructFuzzTest{
 	}
 	
 	@Test(groups = "earlyCheck", dataProvider = "finVis")
-	void twoStringsSNullable(boolean isFinal, VisiblityGen visiblity) throws ReflectiveOperationException, IOException{
+	void twoStringsSNullable(boolean isFinal, Visibility visiblity) throws ReflectiveOperationException, IOException{
 		
 		var gen = new TempClassGen.ClassGen(
 			"TwoStrings",
@@ -212,6 +212,7 @@ public final class StructFuzzTest{
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of(Annotations.makeVal(IOInstance.Order.class, new String[]{"s1", "s2"})),
+			List.of(),
 			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
@@ -222,11 +223,12 @@ public final class StructFuzzTest{
 		var gen = new TempClassGen.ClassGen(
 			"InstantTyp",
 			List.of(
-				new TempClassGen.FieldGen("i1", VisiblityGen.PUBLIC, false, Instant.class, anns(IOVal, Nullable),
+				new TempClassGen.FieldGen("i1", Visibility.PUBLIC, false, Instant.class, anns(IOVal, Nullable),
 				                          r -> Instant.ofEpochSecond(r.nextInt(1000)))
 			),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
+			List.of(),
 			List.of(),
 			List.of());
 		testType(gen);
@@ -354,6 +356,7 @@ public final class StructFuzzTest{
 			constructors,
 			IOInstance.Managed.class,
 			annotations,
+			List.of(),
 			List.of());
 	}
 }

@@ -12,6 +12,10 @@ import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.LateInit;
 import org.testng.annotations.Test;
 
@@ -49,10 +53,30 @@ public class VersioningTests{
 		);
 	}
 	
+	private static void writeIOManagedClass(ClassDefinition cw, String className, List<Prop> props) throws MalformedJorth{
+		cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(ClassName.dotted(className)));
+		cw.name(ClassName.dotted(className));
+		for(Prop prop : props){
+			cw.field(prop.name, prop.type);
+		}
+		
+		var init = cw.instanceInit().body()
+		             .callSuper(e -> { });
+		
+		for(Prop prop : props){
+			init.val(prop.val)
+			    .setThis(prop.name);
+		}
+	}
+	
 	private static final ClassLoader SHADOW_CL = TestUtils.makeShadowClassLoader(Map.of(
 		A.class.getName(), name -> {
 			return Jorth.generateClass(null, name, code -> {
 				writeIOManagedClass(code, name, List.of(
+					new Prop("a", int.class, 1)
+				));
+			}, cw -> {
+				writeIOManagedClass(cw, name, List.of(
 					new Prop("a", int.class, 1)
 				));
 			});
@@ -68,6 +92,11 @@ public class VersioningTests{
 						end
 						""",
 					name);
+			}, cw -> {
+				cw.type(ClassType.ENUM);
+				cw.enumConstant("FOO");
+				cw.enumConstant("John");
+				cw.enumConstant("BAR");
 			});
 		}
 	));

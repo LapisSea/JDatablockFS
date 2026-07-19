@@ -4,6 +4,7 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.redo.AnnotationContainer;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
@@ -12,6 +13,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -108,6 +110,17 @@ public final class JorthUtils{
 			if(any[0]) writer.wEnd();
 			else writer.write("@ {!}", ann.annotationType().getName());
 			part.close();
+		}
+	}
+	
+	public static void writeAnnotations(AnnotationContainer<?> target, Iterable<? extends Annotation> annotations) throws MalformedJorth{
+		Set<Class<?>> annTypes = new HashSet<>();
+		for(var ann : annotations){
+			if(!annTypes.add(ann.annotationType())) continue;
+			
+			LinkedHashMap<String, Object> args = new LinkedHashMap<>();
+			scanAnnotation(ann, args::put);
+			target.annotation(ann.annotationType(), args);
 		}
 	}
 	

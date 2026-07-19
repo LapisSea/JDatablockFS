@@ -19,6 +19,11 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.ClassDefinition;
+import com.lapissea.jorth.redo.FieldDefinition;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
@@ -142,6 +147,55 @@ public final class BuilderProxyCompiler{
 					concreteClass, fields, IOInstance.class);
 				
 				writer.wEnd();
+			}, cw -> {
+				
+				var fields = type.getRealFields();
+				
+				var parms = baseClass.getTypeParameters();
+				for(var parm : parms){
+					var bounds = parm.getBounds();
+					if(bounds.length != 1){
+						throw new NotImplementedException("Implement multi bound type variable");
+					}
+					cw.genericArg(bounds[0], parm.getName());
+				}
+				var proxyCName = ClassName.dotted(proxyName);
+				cw.extendsType(GenericType.of(ProxyBuilder.class).withArgs(proxyCName))
+				  .name(proxyCName)
+				  .visibility(Visibility.PUBLIC).finalAcc();
+				
+				var structType = GenericType.of(Struct.class).withArgs(proxyCName);
+				cw.field("$V_STRUCT", structType).staticAcc().visibility(Visibility.PRIVATE);
+				
+				cw.function("$STRUCT").returns(structType).staticAcc().visibility(Visibility.PRIVATE)
+				  .body()
+				  .call(Objects.class, "isNull", e -> e.get(proxyCName, "$V_STRUCT"))
+				  .ifTrue(block -> {
+					  block.call(Struct.class, "of", a -> a.val(proxyCName))
+					       .set(proxyCName, "$V_STRUCT");
+				  })
+				  .get(proxyCName, "$V_STRUCT");
+				
+				for(IOField<T, ?> field : fields){
+					writeField(cw, field.getAccessor());
+				}
+				
+				var init = cw.instanceInit()
+				             .body()
+				             .callSuper(args -> args.call(proxyCName, "$STRUCT"));
+				
+				for(String fName : fields.byType(ChunkPointer.class).map(IOField::getName)){
+					init.get(ChunkPointer.class, "NULL")
+					    .setThis(fName);
+				}
+				
+				cw.function("build").returns(IOInstance.class)
+				  .body()
+				  .newObj(concreteClass, args -> {
+					  for(IOField<T, ?> field : fields){
+						  args.getThis(field.getName());
+					  }
+				  });
 			}, log);
 			
 			ClassGenerationCommons.dumpClassName(proxyName, clazzBytes);
@@ -165,5 +219,9 @@ public final class BuilderProxyCompiler{
 		JorthUtils.writeAnnotations(writer, field.getAnnotations().values());
 		writer.write("public field {!} {}", field.getName(), field.getGenericType(null));
 		
+	}
+	private static void writeField(ClassDefinition cw, FieldAccessor<?> field) throws MalformedJorth{
+		FieldDefinition f = cw.field(field.getName(), field.getGenericType(null));
+		JorthUtils.writeAnnotations(f, field.getAnnotations().values());
 	}
 }

@@ -381,7 +381,7 @@ public class JorthTests{
 			  .get("testString")
 			  .get("this")
 			  .swap()
-			  .set(ts);
+			  .setField(ts);
 		});
 		
 		var constr = cls.getConstructor();
@@ -891,7 +891,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 		});
 		
 		var parms = cls.getTypeParameters();
@@ -920,7 +920,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 			
 			cd.function("takeArg")
 			  .arg(GenericType.of(List.class).withArgs(cd.getArg("T")), "tList")
@@ -953,7 +953,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.name(ClassName.dotted("ParmClass")).arg(CharSequence.class, "T");
+			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 			cd.field("arg", cd.getArg("T"));
 		});
 		

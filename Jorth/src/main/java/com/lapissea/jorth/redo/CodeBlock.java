@@ -113,6 +113,9 @@ public class CodeBlock{
 		return get(accessorField);
 	}
 	
+	public CodeBlock getThis(String fieldName) throws MalformedJorth{
+		return getThis(fnOwner.owner().getField(fieldName));
+	}
 	public CodeBlock getThis(FieldInfo field) throws MalformedJorth{
 		return get("this").get(field);
 	}
@@ -138,6 +141,20 @@ public class CodeBlock{
 			throw new MissingLocalField("Unknown localValue: " + localVal);
 		}
 		return local;
+	}
+	
+	public CodeBlock val(Object val) throws MalformedJorth{
+		return switch(val){
+			case Integer v -> val(v);
+			case Long v -> val(v);
+			case Float v -> val(v);
+			case Double v -> val(v);
+			case Boolean v -> val(v);
+			case String v -> val(v);
+			case Class<?> v -> val(v);
+			case ClassName v -> val(v);
+			default -> throw new MalformedJorth("Invalid value: " + val);
+		};
 	}
 	
 	public CodeBlock val(int val) throws MalformedJorth      { return add(IVal.simulate(localStack, val)); }
@@ -244,7 +261,10 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock call(Class<?> staticCaller, String name) throws MalformedJorth{
-		return call(ClassName.of(staticCaller), name, e -> { });
+		return call(ClassName.of(staticCaller), name);
+	}
+	public CodeBlock call(ClassName staticCaller, String name) throws MalformedJorth{
+		return call(staticCaller, name, e -> { });
 	}
 	public CodeBlock call(Class<?> staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
 		return call(ClassName.of(staticCaller), name, gatherArguments);
@@ -289,22 +309,25 @@ public class CodeBlock{
 	}
 	public CodeBlock set(ClassName declaringClass, String fieldName) throws MalformedJorth{
 		var type = typeSource.byName(declaringClass);
-		return set(type.getField(fieldName));
+		return setField(type.getField(fieldName));
 	}
 	
+	public CodeBlock setThis(String fieldName) throws MalformedJorth{
+		return setThis(fnOwner.owner().getField(fieldName));
+	}
 	public CodeBlock setThis(FieldInfo field) throws MalformedJorth{
-		return get("this").swap().set(field);
+		return get("this").swap().setField(field);
 	}
 	
-	public CodeBlock set(FieldInfo field, int val) throws MalformedJorth      { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, long val) throws MalformedJorth     { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, float val) throws MalformedJorth    { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, double val) throws MalformedJorth   { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, boolean val) throws MalformedJorth  { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, String val) throws MalformedJorth   { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, Class<?> val) throws MalformedJorth { return val(val).set(field); }
-	public CodeBlock set(FieldInfo field, ClassName val) throws MalformedJorth{ return val(val).set(field); }
-	public CodeBlock set(FieldInfo field) throws MalformedJorth{
+	public CodeBlock set(FieldInfo field, int val) throws MalformedJorth      { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, long val) throws MalformedJorth     { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, float val) throws MalformedJorth    { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, double val) throws MalformedJorth   { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, boolean val) throws MalformedJorth  { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, String val) throws MalformedJorth   { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, Class<?> val) throws MalformedJorth { return val(val).setField(field); }
+	public CodeBlock set(FieldInfo field, ClassName val) throws MalformedJorth{ return val(val).setField(field); }
+	public CodeBlock setField(FieldInfo field) throws MalformedJorth{
 		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
 	

@@ -5,9 +5,10 @@ import com.lapissea.jorth.lang.ClassName;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
-abstract class AnnotationContainer<SELF>{
+public abstract class AnnotationContainer<SELF>{
 	
 	protected List<AnnotationDefinition> annotations = new ArrayList<>();
 	
@@ -24,6 +25,14 @@ abstract class AnnotationContainer<SELF>{
 	public SELF annotation(Class<? extends Annotation> ann){
 		return annotation(new AnnotationDefinition(ClassName.of(ann)));
 	}
+	public SELF annotation(Class<? extends Annotation> ann, Map<String, Object> args){
+		return annotation(ann, a -> {
+			for(Map.Entry<String, Object> e : args.entrySet()){
+				a.arg(e.getKey(), e.getValue());
+			}
+		});
+	}
+	
 	public SELF annotation(Class<? extends Annotation> ann, Consumer<AnnotationDefinition> init){
 		var annV = new AnnotationDefinition(ClassName.of(ann));
 		init.accept(annV);

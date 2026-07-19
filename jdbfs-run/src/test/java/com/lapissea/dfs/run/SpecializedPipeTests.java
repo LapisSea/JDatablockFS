@@ -33,6 +33,8 @@ import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -531,9 +533,10 @@ public class SpecializedPipeTests{
 	private static Class<IOInstance<?>> makeFieldClass(List<FieldDef> fieldDefs, boolean special, int specialDelay){
 		var fields = new ArrayList<TempClassGen.FieldGen>();
 		var fns    = new ArrayList<UnsafeConsumer<CodeStream, MalformedJorth>>();
+		var fns2   = new ArrayList<UnsafeConsumer<ClassDefinition, MalformedJorth>>();
 		for(FieldDef field : fieldDefs){
 			fields.add(new TempClassGen.FieldGen(
-				field.name, TempClassGen.VisiblityGen.PRIVATE, field.finalMod, field.type,
+				field.name, Visibility.PRIVATE, field.finalMod, field.type,
 				Iters.concat1N(Annotations.make(IOValue.class), field.annotations).toList(),
 				field.generator
 			));
@@ -543,7 +546,7 @@ public class SpecializedPipeTests{
 			if(field.getter){
 				var getCounterName = field.name + "_getCount";
 				fields.add(new TempClassGen.FieldGen(
-					getCounterName, TempClassGen.VisiblityGen.PRIVATE, false, int.class,
+					getCounterName, Visibility.PRIVATE, false, int.class,
 					List.of(), null
 				));
 				fns.add(code -> code.write(
@@ -561,13 +564,34 @@ public class SpecializedPipeTests{
 						""",
 					IOValue.class, upper, field.name, field.type, getCounterName
 				));
+				fns2.add(cw -> {
+					cw.function("get" + upper)
+					  .annotation(IOValue.class)
+					  .returns(field.type)
+					  .body()
+					  .getThis(getCounterName)
+					  .add(1)
+					  .setThis(getCounterName)
+					  .getThis(field.name);
+				});
 			}
 			if(field.setter){
 				var setCounter = field.name + "_setCount";
 				fields.add(new TempClassGen.FieldGen(
-					setCounter, TempClassGen.VisiblityGen.PRIVATE, false, int.class,
+					setCounter, Visibility.PRIVATE, false, int.class,
 					List.of(), null
 				));
+				fns2.add(cw -> {
+					cw.function("set" + upper)
+					  .annotation(IOValue.class)
+					  .arg(field.type, "val")
+					  .body()
+					  .getThis(setCounter)
+					  .add(1)
+					  .setThis(setCounter)
+					  .get("val")
+					  .setThis(field.name);
+				});
 				fns.add(code -> code.write(
 					"""
 						@ {0}
@@ -600,7 +624,8 @@ public class SpecializedPipeTests{
 			       new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			annotations,
-			fns
+			fns,
+			fns2
 		));
 	}
 }

@@ -125,7 +125,7 @@ public final class PipeCodeGen{
 				var type = GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType"));
 				cinit.call("requireByName", e -> e.val(acc.accessor.getName()))
 				     .call("getAccessor").cast(VirtualAccessor.class)
-				     .set(cw.field(acc.name, type).visibility(Visibility.PRIVATE).staticFinal());
+				     .setField(cw.field(acc.name, type).visibility(Visibility.PRIVATE).staticFinal());
 			}
 			
 		}
@@ -158,7 +158,7 @@ public final class PipeCodeGen{
 					cinit.dup();
 				}
 				cinit.call("requireByName", e -> e.val(acc.field.getName()))
-				     .set(cw.field(acc.name, IOField.class).visibility(Visibility.PRIVATE).staticFinal());
+				     .setField(cw.field(acc.name, IOField.class).visibility(Visibility.PRIVATE).staticFinal());
 			}
 		}
 		

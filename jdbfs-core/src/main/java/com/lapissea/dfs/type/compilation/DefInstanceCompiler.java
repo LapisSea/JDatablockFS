@@ -27,6 +27,7 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -45,18 +46,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringJoiner;
-import java.util.WeakHashMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -91,6 +81,13 @@ public final class DefInstanceCompiler{
 								end
 								"""
 						);
+					}, cw -> {
+						cw.name(ClassName.dotted("A"));
+						cw.field("a", String.class);
+						cw.function("a").arg(int.class, "a")
+						  .returns(int.class)
+						  .body()
+						  .get("a");
 					});
 				}catch(MalformedJorth e){
 					e.printStackTrace();

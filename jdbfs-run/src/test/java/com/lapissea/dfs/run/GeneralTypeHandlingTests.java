@@ -30,6 +30,7 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import org.testng.Assert;
@@ -636,9 +637,10 @@ public class GeneralTypeHandlingTests{
 	<T extends IOInstance<T>> boolean[] loadTestClass(){
 		var def = new TempClassGen.ClassGen(
 			"testunload",
-			List.of(new TempClassGen.FieldGen("hi", TempClassGen.VisiblityGen.PUBLIC, false, int.class, List.of(Annotations.make(IOValue.class)), null)),
+			List.of(new TempClassGen.FieldGen("hi", Visibility.PUBLIC, false, int.class, List.of(Annotations.make(IOValue.class)), null)),
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
+			List.of(),
 			List.of(),
 			List.of());
 		//noinspection unchecked

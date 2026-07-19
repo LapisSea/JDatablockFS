@@ -9,6 +9,10 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.ClassDefinition;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
@@ -27,6 +31,7 @@ public final class TempClassGen{
 	
 	public interface CodePart{
 		void write(CodeStream dest);
+		void write2(CodeBlock body);
 	}
 	
 	public sealed interface CtorType{
@@ -41,14 +46,8 @@ public final class TempClassGen{
 		record All() implements CtorType{ }
 	}
 	
-	public enum VisiblityGen{
-		PRIVATE,
-		PROTECTED,
-		PUBLIC
-	}
-	
 	public record FieldGen(
-		String name, VisiblityGen visibility, boolean isFinal, Type type,
+		String name, Visibility visibility, boolean isFinal, Type type,
 		Iterable<Annotation> annotations, Function<RandomGenerator, Object> generator
 	){
 		@Override
@@ -83,7 +82,8 @@ public final class TempClassGen{
 		Set<CtorType> constructors,
 		Class<?> parent,
 		List<Annotation> annotations,
-		List<UnsafeConsumer<CodeStream, MalformedJorth>> extras
+		List<UnsafeConsumer<CodeStream, MalformedJorth>> extras,
+		List<UnsafeConsumer<ClassDefinition, MalformedJorth>> extras2
 	){
 		public ClassGen{
 			Objects.requireNonNull(name);
@@ -91,6 +91,7 @@ public final class TempClassGen{
 			Objects.requireNonNull(constructors);
 			Objects.requireNonNull(annotations);
 			Objects.requireNonNull(extras);
+			Objects.requireNonNull(extras2);
 		}
 		
 		@Override
@@ -107,7 +108,7 @@ public final class TempClassGen{
 			       "\n}";
 		}
 		public ClassGen withName(String name){
-			return new ClassGen(name, fields, constructors, parent, annotations, List.of());
+			return new ClassGen(name, fields, constructors, parent, annotations, List.of(), List.of());
 		}
 	}
 	
@@ -198,6 +199,59 @@ public final class TempClassGen{
 				}
 				
 				code.wEnd();
+			}, cw -> {
+				JorthUtils.writeAnnotations(cw, classGen.annotations);
+				if(classGen.parent != null){
+					cw.extendsType(classGen.parent);
+				}
+				cw.name(ClassName.dotted(classGen.name));
+				
+				cw.staticInit()
+				  .body()
+				  .call(IOInstance.Managed.class, "registerAccess", args -> {
+					  args.val(ClassName.dotted(providerName(classGen.name)));
+				  });
+				
+				for(FieldGen field : classGen.fields){
+					var f = cw.field(field.name, field.type).visibility(field.visibility);
+					if(field.isFinal) f.finalAcc();
+					JorthUtils.writeAnnotations(f, field.annotations);
+				}
+				
+				for(var ctor : classGen.constructors){
+					switch(ctor){
+						case CtorType.All ignored -> writeFieldsCtor(cw, classGen.fields);
+						case CtorType.Empty empty -> {
+							var body = cw.instanceInit()
+							             .body()
+							             .callSuper(e -> { });
+							
+							for(var e : empty.values.entrySet()){
+								var name = e.getKey();
+								if(Iters.from(classGen.fields).map(FieldGen::name).noneEquals(name)){
+									throw new IllegalArgumentException(name + " is not a field");
+								}
+								var val = e.getValue();
+								if(val instanceof CodePart block){
+									block.write2(body);
+								}else{
+									body.val(val);
+								}
+								body.setThis(name);
+							}
+						}
+						case CtorType.Some(var names) -> {
+							List<FieldGen> list = new ArrayList<>(names.size());
+							for(String name : names){
+								list.add(classGen.fields.stream().filter(e -> e.name.equals(name)).findFirst().orElseThrow());
+							}
+							writeFieldsCtor(cw, list);
+						}
+					}
+					for(var extra : classGen.extras2){
+						extra.accept(cw);
+					}
+				}
 			}, log);
 			if(log != null){
 				Log.log("Jorth code for TempClassGen:\n" + log.output());
@@ -224,6 +278,20 @@ public final class TempClassGen{
 				end
 				""", fields);
 	}
+	private static void writeFieldsCtor(ClassDefinition cw, List<FieldGen> fields) throws MalformedJorth{
+		var init = cw.instanceInit();
+		
+		for(FieldGen field : fields){
+			init.arg(field.type, field.name);
+		}
+		var body = init.body()
+		               .callSuper(e -> { });
+		
+		for(FieldGen field : fields){
+			body.get(field.name)
+			    .setThis(field.name);
+		}
+	}
 	
 	private static String providerName(String name){
 		return name + "€LookupProvider";
@@ -243,6 +311,11 @@ public final class TempClassGen{
 							end
 						end
 						""", name);
+			}, cw -> {
+				cw.implement(Supplier.class).name(ClassName.dotted(name));
+				cw.function("get").returns(Object.class)
+				  .body()
+				  .call(MethodHandles.class, "lookup");
 			});
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class", e);

@@ -32,6 +32,7 @@ import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.iterableplus.OptionalPP;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -233,10 +234,11 @@ public final class TestUtils{
 		return TempClassGen.gen(new TempClassGen.ClassGen(
 			className,
 			Iters.from(props).map(p -> new TempClassGen.FieldGen(
-				p.name, TempClassGen.VisiblityGen.PUBLIC, false, p.type, List.of(ioVal), null
+				p.name, Visibility.PUBLIC, false, p.type, List.of(ioVal), null
 			)).toList(),
 			Set.of(new TempClassGen.CtorType.Empty(Iters.from(props).nonNullProps(Prop::val).toMap(Prop::name, Prop::val))),
 			IOInstance.Managed.class,
+			List.of(),
 			List.of(),
 			List.of()));
 	}

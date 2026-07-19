@@ -251,10 +251,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		this.name = Objects.requireNonNull(className);
 		return this;
 	}
-	public ClassDefinition arg(Class<?> type, String name){
-		return arg(GenericType.of(type), ClassName.dotted(name));
+	public ClassDefinition genericArg(Type type, String name){
+		return genericArg(GenericType.of(type), ClassName.dotted(name));
 	}
-	public ClassDefinition arg(GenericType type, ClassName name){
+	public ClassDefinition genericArg(GenericType type, ClassName name){
 		if(typeArgs.put(Objects.requireNonNull(name), type.withTypeArgName(name)) != null){
 			throw new IllegalArgumentException("Duplicate argument " + name);
 		}
@@ -313,11 +313,11 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			fun.newObj(name, e -> e.val(field.name).val(i));// new enum(name,ordinal)
 			
 			fun.dup();
-			fun.set(field);// Enum.NAME=obj
+			fun.setField(field);// Enum.NAME=obj
 			fun.setArrayElement();
 		}
 		
-		fun.set(getField("$VALUES"));
+		fun.setField(getField("$VALUES"));
 	}
 	
 	public ClassDefinition staticAcc(){
@@ -367,8 +367,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return res;
 	}
 	
-	public FieldDefinition field(String name, Class<?> type){
-		return field(name, GenericType.of(type));
+	public FieldDefinition field(String name, Type type){
+		return field(name, JType.of(type));
 	}
 	public FieldDefinition field(String name, JType type){
 		requireName();
@@ -392,7 +392,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	public ClassDefinition implement(Type interfaceSig) throws MalformedJorth{
 		return implement(GenericType.of(interfaceSig));
 	}
-	public ClassDefinition implement(Class<?> interfaceSig) throws MalformedJorth{
+	public ClassDefinition implement(ClassName interfaceSig) throws MalformedJorth{
 		return implement(GenericType.of(interfaceSig));
 	}
 	public ClassDefinition implement(GenericType interfaceSig) throws MalformedJorth{

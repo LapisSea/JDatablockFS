@@ -9,6 +9,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -93,6 +95,34 @@ public final class WrapperStructs{
 						""",
 					className, type, typeName
 				);
+			}, cw -> {
+				var cType = ClassName.dotted(className);
+				
+				cw.extendsType(GenericType.of(Wrapper.class).withArgs(cType))
+				  .finalAcc();
+				
+				var val = cw.field("val", type).annotation(IOValue.class);
+				cw.instanceInit().body().callSuperAutoPass();
+				
+				cw.instanceInit()
+				  .arg(cType, "val")
+				  .body()
+				  .callSuper(e -> { })
+				  .get("val")
+				  .setThis(val);
+				
+				cw.function("get")
+				  .returns(Object.class)
+				  .body()
+				  .getThis(val);
+				
+				cw.function("toString").override()
+				  .body()
+				  .newObj(StringBuilder.class)
+				  .call("append", args -> args.val("WrapperOf€" + type.getTypeName() + "{"))
+				  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
+				  .call("append", args -> args.val("}"))
+				  .call("toString");
 			});
 			
 			var lookup = MethodHandles.privateLookupIn(WrapperStructs.class, MethodHandles.lookup());

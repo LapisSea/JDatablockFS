@@ -60,7 +60,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	private FieldDefinition init(CodeArg init) throws MalformedJorth{
 		var body = owner.staticInit().body();
 		init.accept(body);
-		body.set(this);
+		body.setField(this);
 		return this;
 	}
 	

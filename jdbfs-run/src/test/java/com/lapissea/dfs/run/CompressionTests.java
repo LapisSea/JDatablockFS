@@ -8,11 +8,13 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.lang.ClassName;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
+import java.util.Map;
 
 import static com.lapissea.dfs.run.TestUtils.randomBatch;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,6 +83,13 @@ public class CompressionTests{
 						public field data byte array
 					end
 					""", name, type);
+		}, cw -> {
+			cw.extendsType(IOInstance.Managed.class)
+			  .name(ClassName.dotted(name));
+			
+			cw.field("data", byte[].class)
+			  .annotation(IOCompression.class, Map.of("value", type))
+			  .annotation(IOValue.class);
 		});
 		
 		//noinspection unchecked

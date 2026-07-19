@@ -12,6 +12,7 @@ import com.lapissea.jorth.lang.Token;
 import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.jorth.lang.Tokenizer;
 import com.lapissea.jorth.lang.type.*;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.objectweb.asm.Type;
@@ -26,10 +27,10 @@ import static com.lapissea.util.ConsoleColors.*;
 
 public final class Jorth extends CodeDestination{
 	
-	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws MalformedJorth{
-		return generateClass(classLoader, className, generator, null);
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator, UnsafeConsumer<ClassDefinition, MalformedJorth> generator2) throws MalformedJorth{
+		return generateClass(classLoader, className, generator, generator2, null);
 	}
-	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator, Consumer<CharSequence> printBack) throws MalformedJorth{
+	public static byte[] generateClass(ClassLoader classLoader, String className, UnsafeConsumer<CodeStream, MalformedJorth> generator, UnsafeConsumer<ClassDefinition, MalformedJorth> generator2, Consumer<CharSequence> printBack) throws MalformedJorth{
 		Objects.requireNonNull(className);
 		Objects.requireNonNull(generator);
 		
@@ -38,7 +39,15 @@ public final class Jorth extends CodeDestination{
 			generator.accept(writer);
 		}
 		
-		return jorth.getClassFile(className);
+		ClassDefinition cw = new ClassDefinition(classLoader);
+		generator2.accept(cw);
+		
+		var oldCl = jorth.getClassFile(className);
+		var newCl = cw.getClassFile();
+		
+		BytecodeUtils.compareClasses(newCl, oldCl);
+		
+		return oldCl;
 	}
 	
 	static{
@@ -60,12 +69,12 @@ public final class Jorth extends CodeDestination{
 	private final List<GenericType>      interfaces  = new ArrayList<>();
 	private final List<ClassName>        permits     = new ArrayList<>();
 	private final EnumSet<Access>        accessSet   = EnumSet.noneOf(Access.class);
-	private final Map<ClassName, AnnGen> annotations = new HashMap<>();
+	private final Map<ClassName, AnnGen> annotations = new LinkedHashMap<>();
 	
-	private final Map<ClassName, GenericType> typeArgs = new HashMap<>();
+	private final Map<ClassName, GenericType> typeArgs = new LinkedHashMap<>();
 	
-	private final Map<String, ClassName>   imports = new HashMap<>();
-	private final Map<ClassName, ClassGen> classes = new HashMap<>();
+	private final Map<String, ClassName>   imports = new LinkedHashMap<>();
+	private final Map<ClassName, ClassGen> classes = new LinkedHashMap<>();
 	
 	private final Function<ClassName, ClassName> importsFun = this::resolveImport;
 	private final Deque<EndableCode>             endStack   = new ArrayDeque<>();
@@ -394,7 +403,7 @@ public final class Jorth extends CodeDestination{
 				
 				record EnumValue(GenericType type, Object val){ }
 				
-				var typeMap = new HashMap<String, EnumValue>();
+				var typeMap = new LinkedHashMap<String, EnumValue>();
 				
 				tInfo.getFunctions().filter(m -> {
 					if(m.name().equals("annotationType")) return false;
@@ -404,7 +413,7 @@ public final class Jorth extends CodeDestination{
 				
 				var hasStart = optionalStart(source);
 				
-				var args = new HashMap<String, Object>();
+				var args = new LinkedHashMap<String, Object>();
 				
 				if(hasStart){
 					while(!source.consumeTokenIf(Token.KWord.class, w -> w.keyword() == Keyword.END)){

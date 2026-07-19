@@ -2,6 +2,7 @@ package com.lapissea.jorth.redo;
 
 import com.lapissea.jorth.exceptions.IllegalClassState;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.GenericType;
@@ -34,7 +35,10 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		this.name = Objects.requireNonNull(name);
 	}
 	
-	public FunctionDefinition arg(Class<?> type, String name){
+	public FunctionDefinition arg(Type type, String name){
+		return arg(GenericType.of(type), name);
+	}
+	public FunctionDefinition arg(ClassName type, String name){
 		return arg(GenericType.of(type), name);
 	}
 	public FunctionDefinition arg(JType type, String name){
