@@ -557,7 +557,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, body);
+						accessMap.get(getDynamicSize().field, b);
 						b.call("skip", e -> e.get("src"))
 						 .nullVal(Character.class)
 						 .set(tmpInt);

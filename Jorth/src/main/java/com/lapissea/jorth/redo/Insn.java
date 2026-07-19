@@ -3,6 +3,7 @@ package com.lapissea.jorth.redo;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
+import com.lapissea.jorth.lang.LocalsArray;
 import com.lapissea.jorth.lang.type.BaseType;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.ClassType;
@@ -247,9 +248,9 @@ public sealed interface Insn{
 	}
 	
 	record GetLocal(GenericType type, String name, int index) implements Insn{
-		public static GetLocal simulate(TypeStack stack, GenericType type, String name, int index){
-			stack.push(type);
-			return new GetLocal(type, name, index);
+		public static GetLocal simulate(TypeStack stack, LocalsArray.Local local){
+			stack.push(local.type());
+			return new GetLocal(local.type(), local.name(), local.index());
 		}
 		@Override
 		public void visit(MethodVisitor writer){
@@ -583,12 +584,13 @@ public sealed interface Insn{
 	
 	record PutLocalVarOp(BaseType type, int index) implements Insn{
 		
-		static PutLocalVarOp simulate(TypeStack stack, TypeSource typeSource, GenericType fieldType, int fieldIndex) throws MalformedJorth{
-			var type = stack.pop();
+		static PutLocalVarOp simulate(TypeStack stack, TypeSource typeSource, LocalsArray.Local local) throws MalformedJorth{
+			var fieldType = local.type();
+			var type      = stack.pop();
 			if(!type.instanceOf(typeSource, fieldType)){
 				throw new MalformedJorth("Tried to set local field of type " + fieldType + " to " + type);
 			}
-			return new PutLocalVarOp(fieldType.getBaseType(), fieldIndex);
+			return new PutLocalVarOp(fieldType.getBaseType(), local.index());
 		}
 		
 		@Override

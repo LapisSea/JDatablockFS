@@ -221,9 +221,9 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 				b.ifTrue(e -> {
 					e.nullVal(type).set(res);
 				}).elseRun(e -> {
-					callReadTyp(b, accessMap);
-					if(type != Object.class) b.cast(type);
-					b.set(res);
+					callReadTyp(e, accessMap);
+					if(type != Object.class) e.cast(type);
+					e.set(res);
 				});
 				b.get(res);
 			}else{

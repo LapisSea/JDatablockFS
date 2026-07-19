@@ -117,7 +117,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 			body.defineLocalValue("this", new GenericType(Objects.requireNonNull(owner.name(), "Class name must be defined before using a function")), false);
 		}
 		for(var e : args.entrySet()){
-			body.defineLocalValue(e.getKey(), e.getValue(), false);
+			body.defineLocalValue(e.getKey(), e.getValue().asGeneric(), false);
 		}
 		return body;
 	}

@@ -4,6 +4,8 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
+import com.lapissea.jorth.lang.LocalsArray;
+import com.lapissea.jorth.lang.LocalsArray.Local;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.GenericType;
@@ -14,23 +16,23 @@ import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class CodeBlock{
 	
-	private record Local(String name, JType type, int index, boolean canRemove){ }
-	
-	private final Map<String, Local> localValues = new HashMap<>();
+	private final LocalsArray localValues = new LocalsArray();
 	
 	private final List<Insn> insns = new ArrayList<>();
 	private final TypeStack  localStack;
 	
 	private final TypeSource         typeSource;
 	private final FunctionDefinition fnOwner;
+	
+	private boolean addingChild;
 	
 	public CodeBlock(TypeStack baseStack, TypeSource typeSource, FunctionDefinition fnOwner){
 		localStack = new TypeStack(baseStack);
@@ -48,10 +50,14 @@ public class CodeBlock{
 	}
 	
 	private CodeBlock add(Insn insn) throws MalformedJorth{
+		if(addingChild){
+			throw new IllegalAccessError("Should not modify parent while in a lambda");
+		}
 		if(terminates()){
 			throw new MalformedJorth("This code block has terminated");
 		}
-		insns.add(Objects.requireNonNull(insn));
+		// null means NOOP
+		if(insn != null) insns.add(insn);
 		return this;
 	}
 	
@@ -63,30 +69,40 @@ public class CodeBlock{
 		return add(InlineBlock.simulate(block));
 	}
 	
-	void defineLocalValue(String name, JType type, boolean canRemove) throws MalformedJorth{
+	void defineLocalValue(String name, GenericType type, boolean canRemove) throws MalformedJorth{
 		Objects.requireNonNull(name);
 		Objects.requireNonNull(type);
-		if(localValues.containsKey(name)){
+		if(localValues.has(name)){
 			throw new MalformedJorth("Duplicated localValue: " + name);
 		}
-		int index = allocateNewSlot();
-		localValues.put(name, new Local(name, type, index, canRemove));
+		int index = localValues.findSlot(type.getBaseType().slots);
+		addLocal(new Local(name, type, index, canRemove));
+	}
+	
+	private void addLocal(Local local){
+		localValues.add(local);
+	}
+	private void removeLocal(Local local){
+		localValues.remove(local);
 	}
 	
 	private CodeBlock createBlockFromHere(CodeArg code) throws MalformedJorth{
 		var block = new CodeBlock(localStack, typeSource, fnOwner);
-		for(var e : localValues.entrySet()){
-			var v = e.getValue();
-			block.localValues.put(e.getKey(), v.canRemove? new Local(v.name, v.type, v.index, false) : v);
+		for(var v : localValues){
+			block.addLocal(v.withoutRemoval());
 		}
-		code.accept(block);
+		guardedBlock(code, block);
 		return block;
 	}
 	
-	private int allocateNewSlot(){
-		return localValues.values().stream().mapToInt(i -> i.index() + i.type.getBaseType().slots).max().orElse(0);
+	private void guardedBlock(CodeArg code, CodeBlock block) throws MalformedJorth{
+		addingChild = true;
+		try{
+			code.accept(block);
+		}finally{
+			addingChild = false;
+		}
 	}
-	
 	
 	public CodeBlock get(Class<?> declaringClass, String fieldName) throws MalformedJorth{
 		return get(ClassName.of(declaringClass), fieldName);
@@ -111,7 +127,7 @@ public class CodeBlock{
 	
 	private void doGetLocal(String localVal) throws MalformedJorth{
 		Local local = getLocal(localVal);
-		add(GetLocal.simulate(localStack, local.type.asGeneric(), localVal, local.index));
+		add(GetLocal.simulate(localStack, local));
 	}
 	private Local getLocal(String localVal) throws MalformedJorth{
 		Local local = localValues.get(localVal);
@@ -302,7 +318,7 @@ public class CodeBlock{
 	public CodeBlock set(String varName, ClassName val) throws MalformedJorth{ return val(val).set(varName); }
 	public CodeBlock set(String varName) throws MalformedJorth{
 		Local local = getLocal(varName);
-		return add(PutLocalVarOp.simulate(localStack, typeSource, local.type.asGeneric(), local.index));
+		return add(PutLocalVarOp.simulate(localStack, typeSource, local));
 	}
 	
 	public CodeBlock pop() throws MalformedJorth{
@@ -386,7 +402,7 @@ public class CodeBlock{
 	@Override
 	protected CodeBlock clone() throws CloneNotSupportedException{
 		CodeBlock cloned = new CodeBlock(this.localStack.clone(), this.typeSource, this.fnOwner);
-		cloned.localValues.putAll(this.localValues);
+		localValues.forEach(cloned::addLocal);
 		cloned.insns.addAll(this.insns);
 		return cloned;
 	}
@@ -434,15 +450,12 @@ public class CodeBlock{
 		defineLocalValue(name, type, true);
 		return this;
 	}
-	public CodeBlock forgetVar(String name){
-		var var = localValues.get(name);
-		if(var == null){
-			throw new IllegalArgumentException("No local variable named " + name);
+	public CodeBlock forgetVar(String name) throws MalformedJorth{
+		Local local = localValues.getForce(name);
+		if(!local.canRemove()){
+			throw new MalformedJorth("Cannot remove local variable " + name);
 		}
-		if(!var.canRemove){
-			throw new IllegalArgumentException("Cannot remove local variable " + name);
-		}
-		localValues.remove(name);
+		removeLocal(local);
 		return this;
 	}
 	
@@ -522,6 +535,11 @@ public class CodeBlock{
 			throw new MalformedJorth("Cannot box non-primitive type: " + typ);
 		}
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), boxFn, false));
+	}
+	
+	@Override
+	public String toString(){
+		return insns.reversed().stream().limit(10).toList().reversed().stream().map(Object::toString).collect(Collectors.joining("\n"));
 	}
 	
 }

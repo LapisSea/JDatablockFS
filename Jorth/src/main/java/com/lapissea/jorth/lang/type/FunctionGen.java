@@ -1,14 +1,13 @@
 package com.lapissea.jorth.lang.type;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.Keyword;
+import com.lapissea.jorth.lang.LocalsArray;
 import com.lapissea.jorth.lang.TokenSource;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
@@ -17,9 +16,16 @@ import org.objectweb.asm.MethodVisitor;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -258,8 +264,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private record LocalFieldInfo(int index, GenericType type){ }
 	
-	private final Map<String, LocalFieldInfo> localFields    = new HashMap<>();
-	private final Set<Integer>                freeLocalSlots = new HashSet<>();
+	private final LocalsArray localFields = new LocalsArray();
 	
 	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, JType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		this.owner = owner;
@@ -363,18 +368,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		doGet(member, owner);
 	}
 	public void getLocalFieldOp(String member) throws MalformedJorth{
-		var info = localFields.get(member);
-		if(info == null){
-			throw new MissingLocalField(member + " does not exist");
-		}
-		code().loadLocalFieldIns(info);
+		var info = localFields.getForce(member);
+		code().loadLocalFieldIns(of(info));
+	}
+	private LocalFieldInfo of(LocalsArray.Local local){
+		return new LocalFieldInfo(local.index(), local.type());
 	}
 	public void setLocalFieldOp(String member) throws MalformedJorth{
-		var info = localFields.get(member);
-		if(info == null){
-			throw new MissingLocalField(member + " does not exist");
-		}
-		code().storeLocalFieldIns(info);
+		var info = localFields.getForce(member);
+		code().storeLocalFieldIns(of(info));
 	}
 	
 	private void doGet(String member, ClassInfo owner) throws MalformedJorth{
@@ -473,11 +475,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		loadLocalFieldIns("this");
 	}
 	public void loadLocalFieldIns(String name) throws MalformedJorth{
-		var field = localFields.get(name);
-		if(field == null){
-			throw new MalformedJorth("Missing local field " + name);
-		}
-		code().loadLocalFieldIns(field);
+		var field = localFields.getForce(name);
+		code().loadLocalFieldIns(of(field));
 	}
 	
 	public void invokeOp(FunctionInfo function, boolean superCall) throws MalformedJorth{
@@ -1050,42 +1049,18 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public void defineField(String name, GenericType type) throws MalformedJorth{
-		if(localFields.containsKey(name)){
+		if(localFields.has(name)){
 			throw new MalformedJorth("The field named " + name + " already exists");
 		}
 		var slots = type.getBaseType().slots;
 		
-		int index;
-		find:
-		{
-			for(int slot : freeLocalSlots){
-				if(IntStream.range(slot, slot + slots).allMatch(freeLocalSlots::contains)){
-					IntStream.range(slot, slot + slots).forEach(freeLocalSlots::remove);
-					index = slot;
-					break find;
-				}
-			}
-			index = allocateNewSlot();
-		}
+		int index = localFields.findSlot(slots);
 		
-		localFields.put(name, new LocalFieldInfo(index, type));
-	}
-	private int allocateNewSlot(){
-		return localFields.values().stream().mapToInt(i -> i.index() + i.type.getBaseType().slots).max().orElse(0);
+		localFields.add(new LocalsArray.Local(name, type, index, true));
 	}
 	
 	public void forgetField(String name) throws MalformedJorth{
-		var field = localFields.remove(name);
-		if(field == null){
-			throw new MalformedJorth("The field named " + name + " does not exist");
-		}
-		var slots = field.type.getBaseType().slots;
-		
-		for(int i = 0; i<slots; i++){
-			if(!freeLocalSlots.add(field.index + i)){
-				throw new ShouldNeverHappenError("Corrupted local free slots");
-			}
-		}
+		localFields.remove(localFields.getForce(name));
 	}
 	
 	public void arrayGetOp() throws MalformedJorth{

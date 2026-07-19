@@ -8,7 +8,6 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.CodeArg;
 import com.lapissea.jorth.redo.CodeBlock;
@@ -72,6 +71,7 @@ public interface SpecializedGenerator{
 		private record GetInfo(ClassName className, String fieldName){ }
 		
 		private final Map<FieldAccessor<?>, String>            localFields    = new HashMap<>();
+		private final Map<FieldAccessor<?>, String>            localFields2   = new HashMap<>();
 		private final Map<FieldAccessor<?>, AccessMap.GetInfo> accessorFields = new HashMap<>();
 		private final Map<IOField<?, ?>, AccessMap.GetInfo>    fieldRefFields = new HashMap<>();
 		private final Map<Class<?>, AccessMap.GetInfo>         enumArrays     = new HashMap<>();
@@ -90,6 +90,7 @@ public interface SpecializedGenerator{
 			this.localObject = localObject;
 			tmpFieldCount = 0;
 			localFields.clear();
+			localFields2.clear();
 			temporaryStack.clear();
 		}
 		
@@ -108,36 +109,29 @@ public interface SpecializedGenerator{
 							}
 						}
 					}else{
-						if(!localFields.containsKey(field)){
+						args.accept(body);
+						
+						if(!localFields2.containsKey(field)){
 							var name = "initVal_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
-							localFields.put(field, name);
+							localFields2.put(field, name);
 							body.var(field.getType(), name);
 						}
-						args.accept(body);
-						var localFieldName = localFields.get(field);
-						try{
-							body.set(localFieldName);
-						}catch(MissingLocalField e){
-							body.var(field.getType(), localFieldName);
-							body.set(localFieldName);
-						}
+						var localFieldName = localFields2.get(field);
+						body.set(localFieldName);
 					}
 				}
 				case VirtualAccessor<?> virutal -> {
-					if(!localFields.containsKey(field)){
+					args.accept(body);
+					
+					if(!localFields2.containsKey(field)){
 						var name = "virt_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
-						localFields.put(field, name);
+						localFields2.put(field, name);
 						body.var(field.getType(), name);
 					}
 					
-					args.accept(body);
-					var localFieldName = localFields.get(field);
-					try{
-						body.set(localFieldName);
-					}catch(MissingLocalField e){
-						body.var(field.getType(), localFieldName);
-						body.set(localFieldName);
-					}
+					var localFieldName = localFields2.get(field);
+					body.set(localFieldName);
+					
 					if(hasIOPool){
 						var accessorInfo = accessorFields.get(field);
 						if(accessorInfo == null){
@@ -299,7 +293,7 @@ public interface SpecializedGenerator{
 			switch(field){
 				case FieldAccessor.FieldOrMethod fom -> {
 					if(localObject){
-						var localFieldName = localFields.get(field);
+						var localFieldName = localFields2.get(field);
 						Objects.requireNonNull(localFieldName);
 						body.get(localFieldName);
 						return;
@@ -316,7 +310,7 @@ public interface SpecializedGenerator{
 					}
 				}
 				case VirtualAccessor<?> virutal -> {
-					var name = localFields.get(field);
+					var name = localFields2.get(field);
 					if(name == null) throw new MalformedJorth("Local field " + field.getName() + " does not exist");
 					body.get(name);
 				}

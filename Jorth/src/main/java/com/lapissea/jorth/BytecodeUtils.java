@@ -7,7 +7,6 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.util.TraceClassVisitor;
 
-import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
@@ -17,32 +16,24 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public final class BytecodeUtils{
-	private static final Path   JAVAP_TEMP_FILE = createJavapTempFile();
-	private static final String JAVAP_EXE       = resolveJavapExe();
-	
-	private static Path createJavapTempFile(){
-		try{
-			var dir = Files.createTempDirectory("classdiff");
-			return dir.resolve("Dump.class");
-		}catch(Exception e){
-			return Path.of(System.getProperty("java.io.tmpdir"), "classdiff-dump.class");
-		}
-	}
-	
-	private static String resolveJavapExe(){
-		boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
-		return System.getProperty("java.home") + File.separator + "bin" + File.separator + (win? "javap.exe" : "javap");
-	}
+	private static Path JAVAP_TEMP_FILE;
 	
 	private static synchronized String javapDump(byte[] classBytes){
-		try{
-			if(!new File(JAVAP_EXE).exists()){
-				return "javap not found at " + JAVAP_EXE + " (running on a JRE instead of a JDK?)";
+		Path tmpFile = JAVAP_TEMP_FILE;
+		if(tmpFile == null){
+			try{
+				var dir = Files.createTempDirectory("classdiff");
+				tmpFile = dir.resolve("Dump.class");
+			}catch(Exception e){
+				tmpFile = Path.of(System.getProperty("java.io.tmpdir"), "classdiff-dump.class");
 			}
+			JAVAP_TEMP_FILE = tmpFile;
+		}
+		
+		try{
+			Files.write(tmpFile, classBytes);
 			
-			Files.write(JAVAP_TEMP_FILE, classBytes);
-			
-			var proc = new ProcessBuilder(JAVAP_EXE, "-v", "-p", "-c", "-s", "-constants", JAVAP_TEMP_FILE.toString())
+			var proc = new ProcessBuilder("javap", "-v", "-p", "-c", "-s", "-constants", tmpFile.toString())
 				           .redirectErrorStream(true).start();
 			String out;
 			try(var in = proc.getInputStream()){

@@ -24,9 +24,11 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOUnsafeValue;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.fuzz.Plan;
+import com.lapissea.fuzz.RunMark;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
@@ -43,6 +45,7 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -92,7 +95,7 @@ public class SpecializedPipeTests{
 		}
 	}
 	
-	@org.testng.annotations.DataProvider
+	@org.testng.annotations.DataProvider(parallel = true)
 	Object[][] fieldVariations(){
 		var all = fieldPermutations();
 		return all.flatMapArray(e -> new Object[][]{{e, true}, {e, false}}).toArray(Object[].class);
@@ -364,16 +367,22 @@ public class SpecializedPipeTests{
 		
 	}
 	
+	sealed interface FieldAction{
+		record Add(int index) implements FieldAction{ }
+	}
 	
 	@Test(dependsOnMethods = {"testType", "aBunchOfFlags"})
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testMultiFuzz() throws LockedFlagSet{
 		var allFields = fieldPermutations().stream().toList();
-		
-		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
-			(r, actionIndex, mark) -> {
-				int fieldCount = r.nextInt(2, 30);
-				var ids        = Iters.rand(r, fieldCount, 0, allFields.size()).box().bake();
-				var fields     = ids.map(allFields::get).enumerate((i, e) -> e.withName("val" + i)).toList();
+		var fuz = new FuzzingRunner<>(new FuzzingStateEnv.Marked<List<Integer>, FieldAction, Exception>(){
+			@Override
+			public void applyAction(List<Integer> ids, long actionIndex, FieldAction a, RunMark mark) throws Exception{
+				
+				switch(a){
+					case FieldAction.Add(var i) -> ids.add(i);
+				}
+				
+				var fields = Iters.from(ids).map(allFields::get).enumerate((i, e) -> e.withName("val" + i)).toList();
 				
 				if(mark.action(actionIndex)){
 					LogUtil.println("Failed on IDS:", ids);
@@ -381,7 +390,7 @@ public class SpecializedPipeTests{
 					int i = 0;
 				}
 				
-				var random = new RawRandom(fields.toString().hashCode());
+				var random = new RawRandom(actionIndex*1234);
 				
 				BasicSpecial<T1, T2> pipes;
 				try{
@@ -396,9 +405,18 @@ public class SpecializedPipeTests{
 					doIOTest(fields, pipes.specialPipe(), pipes.basicPipe(), random);
 				}
 			}
-		), FuzzingRunner::noopAction);
+			@Override
+			public List<Integer> create(RandomGenerator random, long sequenceIndex, RunMark mark) throws Exception{
+				return new ArrayList<>();
+			}
+		}, rng -> {
+			return new FieldAction.Add(rng.nextInt(allFields.size()));
+		});
+
+//		fuz.runAndAssert("EhiCBS9IBUqHIAgGMR4");
+		
 		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
-			FuzzingUtils.stableRun(Plan.start(fuz, 123, 5_000, 1), "testMultiFuzz");
+			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(160)), 123, 15_000, 30), "testMultiFuzz");
 		}
 	}
 	

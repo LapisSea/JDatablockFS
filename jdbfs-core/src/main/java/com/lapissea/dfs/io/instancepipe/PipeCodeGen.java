@@ -68,18 +68,21 @@ public final class PipeCodeGen{
 					enumArrs.add(new EArr(type, name));
 					writer.write("private static final field {} {}", name, type.arrayType());
 					accessMap.addEnumArray(type, cw.getTypeDef("ThisClass"), name);
+					cw.field(name, type.arrayType());
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldAcc(var accessor) -> {
 					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
 					accessors.add(new Acc(accessor, name));
 					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
 					accessMap.addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
+					cw.field(name, GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")));
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldRef(var ioField) -> {
 					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 					fieldRefs.add(new FRef(ioField, name));
 					writer.write("private static final field {} {}<#ObjType>", name, IOField.class);
 					accessMap.addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
+					cw.field(name, GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")));
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
 					writer.write("public static final field {} {}", name, type);
@@ -123,7 +126,6 @@ public final class PipeCodeGen{
 				cinit.call("requireByName", e -> e.val(acc.accessor.getName()))
 				     .call("getAccessor").cast(VirtualAccessor.class)
 				     .set(cw.field(acc.name, type).visibility(Visibility.PRIVATE).staticFinal());
-				cinit.call("cast", e -> e.val(cw.getTypeDef("ObjType")));
 			}
 			
 		}
@@ -747,8 +749,10 @@ public final class PipeCodeGen{
 		
 		cw.instanceInit()
 		  .body()
-		  .callSuper(c -> c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType")))
-		                   .val(StructPipe.STATE_DONE));
+		  .callSuper(c -> {
+			  c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType")))
+			   .val(StructPipe.STATE_DONE);
+		  });
 		
 		cw.function("getGenericType").visibility(Visibility.PUBLIC)
 		  .returns(Class.class)
