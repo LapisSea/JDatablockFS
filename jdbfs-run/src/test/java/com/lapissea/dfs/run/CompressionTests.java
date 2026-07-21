@@ -87,7 +87,7 @@ public class CompressionTests{
 			cw.extendsType(IOInstance.Managed.class)
 			  .name(ClassName.dotted(name));
 			
-			cw.field("data", byte[].class)
+			cw.field(byte[].class, "data")
 			  .annotation(IOCompression.class, Map.of("value", type))
 			  .annotation(IOValue.class);
 		});

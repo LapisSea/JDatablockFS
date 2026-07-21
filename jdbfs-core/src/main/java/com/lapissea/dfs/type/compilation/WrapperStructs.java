@@ -102,7 +102,7 @@ public final class WrapperStructs{
 				cw.name(cType).extendsType(GenericType.of(Wrapper.class).withArgs(cType))
 				  .finalAcc();
 				
-				var val = cw.field("val", type).annotation(IOValue.class).visibility(Visibility.PRIVATE);
+				var val = cw.field(type, "val").annotation(IOValue.class).visibility(Visibility.PRIVATE);
 				cw.instanceInit().body().callSuperAutoPass();
 				
 				cw.instanceInit()

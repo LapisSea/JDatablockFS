@@ -165,7 +165,7 @@ public final class BuilderProxyCompiler{
 				  .visibility(Visibility.PUBLIC).finalAcc();
 				
 				var structType = GenericType.of(Struct.class).withArgs(proxyCName);
-				cw.field("$V_STRUCT", structType).staticAcc().visibility(Visibility.PRIVATE);
+				cw.field(structType, "$V_STRUCT").staticAcc().visibility(Visibility.PRIVATE);
 				
 				cw.function("$STRUCT").returns(structType).staticAcc().visibility(Visibility.PRIVATE)
 				  .body()
@@ -221,7 +221,7 @@ public final class BuilderProxyCompiler{
 		
 	}
 	private static void writeField(ClassDefinition cw, FieldAccessor<?> field) throws MalformedJorth{
-		FieldDefinition f = cw.field(field.getName(), field.getGenericType(null));
+		FieldDefinition f = cw.field(field.getGenericType(null), field.getName());
 		JorthUtils.writeAnnotations(f, field.getAnnotations().values());
 	}
 }

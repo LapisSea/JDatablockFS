@@ -213,7 +213,7 @@ public final class TempClassGen{
 				  });
 				
 				for(FieldGen field : classGen.fields){
-					var f = cw.field(field.name, field.type).visibility(field.visibility);
+					var f = cw.field(field.type, field.name).visibility(field.visibility);
 					if(field.isFinal) f.finalAcc();
 					JorthUtils.writeAnnotations(f, field.annotations);
 				}

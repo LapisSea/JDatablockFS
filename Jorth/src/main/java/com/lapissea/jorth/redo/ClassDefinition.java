@@ -3,17 +3,12 @@ package com.lapissea.jorth.redo;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
-import com.lapissea.jorth.lang.type.ClassInfo;
-import com.lapissea.jorth.lang.type.ClassType;
-import com.lapissea.jorth.lang.type.FieldInfo;
-import com.lapissea.jorth.lang.type.GenericType;
-import com.lapissea.jorth.lang.type.JType;
-import com.lapissea.jorth.lang.type.TypeSource;
-import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.lang.type.*;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -143,7 +138,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	
 	public byte[] getClassFile() throws MalformedJorth{
-		
+		requireName();
 		switch(type){
 			case CLASS -> {
 				ensureConstructor();
@@ -251,6 +246,13 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		this.name = Objects.requireNonNull(className);
 		return this;
 	}
+	public ClassDefinition genericArg(TypeVariable<?> tVar){
+		var bounds = tVar.getBounds();
+		if(bounds.length != 1){
+			throw new NotImplementedException("Implement multi bound type variable");
+		}
+		return genericArg(bounds[0], tVar.getName());
+	}
 	public ClassDefinition genericArg(Type type, String name){
 		return genericArg(GenericType.of(type), ClassName.dotted(name));
 	}
@@ -275,7 +277,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		extension = GenericType.of(Enum.class).withArgs(new GenericType(name));
 		
 		var vType = new GenericType(name).arrayType();
-		var vals  = field("$VALUES", vType).visibility(Visibility.PRIVATE).staticFinal();
+		var vals  = field(vType, "$VALUES").visibility(Visibility.PRIVATE).staticFinal();
 		
 		instanceInit()
 			.arg(String.class, "name")
@@ -367,10 +369,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return res;
 	}
 	
-	public FieldDefinition field(String name, Type type){
-		return field(name, JType.of(type));
+	public FieldDefinition field(Type type, String name){
+		return field(JType.of(type), name);
 	}
-	public FieldDefinition field(String name, JType type){
+	public FieldDefinition field(JType type, String name){
 		requireName();
 		return fields.computeIfAbsent(name, n -> new FieldDefinition(this, n, type));
 	}
@@ -418,7 +420,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	public FieldDefinition enumConstant(String constantName) throws MalformedJorth{
 		if(type != ClassType.ENUM) throw new MalformedJorth("Can not add enum constant on " + type);
-		return field(constantName, new GenericType(name)).asEnumConstant();
+		return field(new GenericType(name), constantName).asEnumConstant();
 	}
 	public GenericType getArg(String name){
 		return getArg(ClassName.dotted(name));

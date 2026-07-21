@@ -222,7 +222,7 @@ public class JorthTests{
 					end
 					""");
 		}, cd -> {
-			var list = cd.field("list", GenericType.of(List.class).withArgs(String.class))
+			var list = cd.field(GenericType.of(List.class).withArgs(String.class), "list")
 			             .staticFinal(e -> e.newObj(ArrayList.class));
 			
 			var report = cd.function("report").staticAcc()
@@ -370,7 +370,7 @@ public class JorthTests{
 					end
 					""");
 		}, cd -> {
-			var ts = cd.field("testString", String.class);
+			var ts = cd.field(String.class, "testString");
 			
 			cd.function("toString").returns(String.class)
 			  .body()
@@ -406,9 +406,9 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.field("noArray", String.class);
-			cd.field("1dArray", String[].class);
-			cd.field("2dArray", String[][].class);
+			cd.field(String.class, "noArray");
+			cd.field(String[].class, "1dArray");
+			cd.field(String[][].class, "2dArray");
 		});
 		
 		for(Field field : cls.getFields()){
@@ -465,10 +465,10 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.field("a", String.class)
+			cd.field(String.class, "a")
 			  .annotation(DefaultAnn.class, a -> a.arg("value", 321));
 			
-			cd.field("b", String.class)
+			cd.field(String.class, "b")
 			  .annotation(DefaultAnn.class);
 		});
 		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
@@ -488,7 +488,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.field("a", String.class)
+			cd.field(String.class, "a")
 			  .annotation(EnumAnn.class, a -> a.arg("value", RetentionPolicy.CLASS));
 		});
 		var a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
@@ -506,7 +506,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.field("testString", String.class)
+			cd.field(String.class, "testString")
 			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
@@ -729,7 +729,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			cd.field("optStr", GenericType.of(Optional.class).withArgs(String.class));
+			cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
 		});
 		
 		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
@@ -756,7 +756,7 @@ public class JorthTests{
 					"""
 			);
 		}, cd -> {
-			var optStr = cd.field("optStr", GenericType.of(Optional.class).withArgs(String.class));
+			var optStr = cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
 			
 			cd.function("set")
 			  .arg(GenericType.of(Optional.class).withArgs(String.class), "optStr")
@@ -954,7 +954,7 @@ public class JorthTests{
 			);
 		}, cd -> {
 			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
-			cd.field("arg", cd.getArg("T"));
+			cd.field(cd.getArg("T"), "arg");
 		});
 		
 		var field = cls.getField("arg");
@@ -1005,7 +1005,7 @@ public class JorthTests{
 			cd.name(ClassName.dotted(name));
 			
 			for(Prop prop : props){
-				cd.field(prop.name, prop.type);
+				cd.field(prop.type, prop.name);
 			}
 			var body = cd.instanceInit().body().callSuperAutoPass();
 			for(Prop prop : props){
@@ -1048,7 +1048,7 @@ public class JorthTests{
 		}, cd -> {
 			cd.name(ClassName.dotted(name));
 			for(String s : names){
-				cd.field(s, int.class);
+				cd.field(int.class, s);
 			}
 		});
 		

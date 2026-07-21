@@ -373,7 +373,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		cw.name(genClassName);
 		if(extend && !def.isSealed()){
 			var structType = GenericType.of(Struct.class).withArgs(genClassName);
-			var vStruct    = cw.field("$V_STRUCT", structType).visibility(Visibility.PRIVATE).staticAcc();
+			var vStruct    = cw.field(structType, "$V_STRUCT").visibility(Visibility.PRIVATE).staticAcc();
 			
 			cw.function("$STRUCT").visibility(Visibility.PRIVATE).staticAcc()
 			  .returns(structType)
@@ -400,7 +400,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		}
 		
 		for(var field : fields){
-			var f = cw.field(field.name, field.type.generic(db))
+			var f = cw.field(field.type.generic(db), field.name)
 			          .visibility(Visibility.PRIVATE)
 			          .annotation(IOValue.class);
 			

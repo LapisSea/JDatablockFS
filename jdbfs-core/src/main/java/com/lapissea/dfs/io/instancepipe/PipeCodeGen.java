@@ -68,25 +68,25 @@ public final class PipeCodeGen{
 					enumArrs.add(new EArr(type, name));
 					writer.write("private static final field {} {}", name, type.arrayType());
 					accessMap.addEnumArray(type, cw.getTypeDef("ThisClass"), name);
-					cw.field(name, type.arrayType());
+					cw.field(type.arrayType(), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldAcc(var accessor) -> {
 					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
 					accessors.add(new Acc(accessor, name));
 					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
 					accessMap.addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
-					cw.field(name, GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")));
+					cw.field(GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldRef(var ioField) -> {
 					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 					fieldRefs.add(new FRef(ioField, name));
 					writer.write("private static final field {} {}<#ObjType>", name, IOField.class);
 					accessMap.addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
-					cw.field(name, GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")));
+					cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
 					writer.write("public static final field {} {}", name, type);
-					cw.field(name, type);
+					cw.field(type, name);
 				}
 			}
 		}
@@ -125,7 +125,7 @@ public final class PipeCodeGen{
 				var type = GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType"));
 				cinit.call("requireByName", e -> e.val(acc.accessor.getName()))
 				     .call("getAccessor").cast(VirtualAccessor.class)
-				     .setField(cw.field(acc.name, type).visibility(Visibility.PRIVATE).staticFinal());
+				     .setField(cw.field(type, acc.name).visibility(Visibility.PRIVATE).staticFinal());
 			}
 			
 		}
@@ -158,7 +158,7 @@ public final class PipeCodeGen{
 					cinit.dup();
 				}
 				cinit.call("requireByName", e -> e.val(acc.field.getName()))
-				     .setField(cw.field(acc.name, IOField.class).visibility(Visibility.PRIVATE).staticFinal());
+				     .setField(cw.field(IOField.class, acc.name).visibility(Visibility.PRIVATE).staticFinal());
 			}
 		}
 		
@@ -172,7 +172,7 @@ public final class PipeCodeGen{
 				enumArr.type, enumArr.name
 			);
 			
-			cw.field(enumArr.name, enumArr.type.arrayType())
+			cw.field(enumArr.type.arrayType(), enumArr.name)
 			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(enumArr.type, "values"));
 		}
 		
@@ -180,7 +180,7 @@ public final class PipeCodeGen{
 			writer.write(debugField.initCode());
 			writer.write("set #ThisClass {}", debugField.name());
 			
-			cw.field(debugField.name(), debugField.type())
+			cw.field(debugField.type(), debugField.name())
 			  .visibility(Visibility.PUBLIC).staticFinal(e -> {
 				  if(debugField.type() == boolean.class){ // TODO: Ugly hack. Make initCode propert type
 					  e.val(Boolean.parseBoolean(debugField.initCode()));
