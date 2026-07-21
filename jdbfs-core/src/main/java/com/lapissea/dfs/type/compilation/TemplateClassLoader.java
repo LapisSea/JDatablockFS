@@ -401,6 +401,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		
 		for(var field : fields){
 			var f = cw.field(field.name, field.type.generic(db))
+			          .visibility(Visibility.PRIVATE)
 			          .annotation(IOValue.class);
 			
 			for(var annO : field.annotations){

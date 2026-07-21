@@ -64,6 +64,11 @@ public interface FunctionInfo{
 		}
 		
 		@Override
+		public boolean isVarargs(){
+			return method.isVarArgs();
+		}
+		
+		@Override
 		public boolean isStatic(){
 			return Modifier.isStatic(method.getModifiers());
 		}
@@ -134,6 +139,10 @@ public interface FunctionInfo{
 		}
 		
 		@Override
+		public boolean isVarargs(){
+			return ctor.isVarArgs();
+		}
+		@Override
 		public boolean isStatic(){
 			return Modifier.isStatic(ctor.getModifiers());
 		}
@@ -180,6 +189,8 @@ public interface FunctionInfo{
 	static FunctionInfo of(TypeSource source, Constructor<?> method){
 		return new OfConstructor(source, method);
 	}
+	
+	boolean isVarargs();
 	
 	boolean isStatic();
 	boolean isFinal();

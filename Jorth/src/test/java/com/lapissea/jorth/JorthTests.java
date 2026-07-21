@@ -507,7 +507,7 @@ public class JorthTests{
 			);
 		}, cd -> {
 			cd.field("testString", String.class)
-			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
 		var anns = cls.getFields()[0].getDeclaredAnnotations();
 		LogUtil.println((Object[])anns);
@@ -529,7 +529,7 @@ public class JorthTests{
 			);
 		}, cd -> {
 			cd.function("test")
-			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141))
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"))
 			  .body();
 		});
 		var anns = cls.getMethod("test").getAnnotations();
@@ -553,7 +553,7 @@ public class JorthTests{
 			);
 		}, cd -> {
 			cd.name(ClassName.dotted(className))
-			  .annotation(MultiAnn.class, ann -> ann.arg("lol", "xD").arg("value", 141));
+			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
 		var anns = cls.getAnnotations();
 		LogUtil.println((Object[])anns);
@@ -1113,7 +1113,7 @@ public class JorthTests{
 			);
 		}, cd -> {
 			cd.name(ClassName.dotted(name)).implement(GenericType.of(IntFunction.class).withArgs(String.class));
-			cd.function("apply").arg(int.class, "num").override()
+			cd.function("apply").arg(int.class, "num").returns(Object.class).annotation(Override.class)
 			  .body()
 			  .callVirtual(b -> b.caller(TestBootstrap.class, "bootstrap").arg(Class.class, ClassName.dotted(name)),
 			               fn -> fn.name("makeString").arg(int.class).returns(String.class),

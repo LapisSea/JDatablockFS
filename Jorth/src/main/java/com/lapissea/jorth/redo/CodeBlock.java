@@ -145,11 +145,11 @@ public class CodeBlock{
 	
 	public CodeBlock val(Object val) throws MalformedJorth{
 		return switch(val){
-			case Integer v -> val(v);
-			case Long v -> val(v);
-			case Float v -> val(v);
-			case Double v -> val(v);
-			case Boolean v -> val(v);
+			case Integer v -> val((int)v);
+			case Long v -> val((long)v);
+			case Float v -> val((float)v);
+			case Double v -> val((double)v);
+			case Boolean v -> val((boolean)v);
 			case String v -> val(v);
 			case Class<?> v -> val(v);
 			case ClassName v -> val(v);

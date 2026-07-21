@@ -677,7 +677,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 						}
 					}
 					return true;
-				}).findAny().orElseThrow(() -> e);
+				}).findAny().orElseThrow(() -> {
+					e.addSuppressed(new Throwable("Did not find any fuzzy arg functions"));
+					return e;
+				});
 			}
 			
 			invokeOp(info, superCall);
@@ -989,6 +992,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitInsn(isLong? LAND : IAND);
 	}
 	
+	@Override
+	public boolean isVarargs(){
+		return false;
+	}
 	@Override
 	public boolean isStatic(){
 		return access.contains(Access.STATIC);

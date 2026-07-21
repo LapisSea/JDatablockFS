@@ -35,6 +35,11 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		this.name = Objects.requireNonNull(name);
 	}
 	
+	@Override
+	public boolean isVarargs(){
+		return false;//TODO: implement varargs flag
+	}
+	
 	public FunctionDefinition arg(Type type, String name){
 		return arg(GenericType.of(type), name);
 	}

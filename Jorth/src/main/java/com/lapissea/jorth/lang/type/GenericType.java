@@ -97,7 +97,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 			}
 			stack.add(var);
 			var bounds = var.getBounds()[0];
-			return of0(stack, bounds);
+			return of0(stack, bounds).withTypeArgName(ClassName.dotted(var.getName()));
 		}
 		if(type instanceof WildcardType w){
 			var up = w.getUpperBounds();
@@ -194,7 +194,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 		if(thisInfo != null) return true;
 		
 		//Instance of an object and not primitive, always true
-		if(right.equals(GenericType.OBJECT)) return true;
+		if(right.withTypeArgName(Optional.empty()).equals(GenericType.OBJECT)) return true;
 		
 		if(dims != right.dims) return false;
 		

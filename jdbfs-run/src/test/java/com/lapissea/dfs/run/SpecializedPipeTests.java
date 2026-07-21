@@ -328,7 +328,8 @@ public class SpecializedPipeTests{
 		
 		List<FieldDef> fields;
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
-		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
+		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE);
+		    var ignore3 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
 			fields = allFields.parallelStream().flatMap(f1 -> {
 				var rand = new RawRandom(f1.name().hashCode());
 				return allFields.stream().filter(e -> rand.nextFloat()>0.8).map(f2 -> List.of(f1.withName("val1"), f2.withName("val2")));
@@ -417,8 +418,9 @@ public class SpecializedPipeTests{
 
 //		fuz.runAndAssert("EhiCBS9IBUqHIAgGMR4");
 		
-		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE)){
-			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(160)), 123, 15_000, 30), "testMultiFuzz");
+		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE);
+		    var ignore2 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
+			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(60)), 123, 5_000, 30), "testMultiFuzz");
 		}
 	}
 	

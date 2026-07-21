@@ -11,6 +11,7 @@ import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -98,14 +99,14 @@ public final class WrapperStructs{
 			}, cw -> {
 				var cType = ClassName.dotted(className);
 				
-				cw.extendsType(GenericType.of(Wrapper.class).withArgs(cType))
+				cw.name(cType).extendsType(GenericType.of(Wrapper.class).withArgs(cType))
 				  .finalAcc();
 				
-				var val = cw.field("val", type).annotation(IOValue.class);
+				var val = cw.field("val", type).annotation(IOValue.class).visibility(Visibility.PRIVATE);
 				cw.instanceInit().body().callSuperAutoPass();
 				
 				cw.instanceInit()
-				  .arg(cType, "val")
+				  .arg(type, "val")
 				  .body()
 				  .callSuper(e -> { })
 				  .get("val")
@@ -119,7 +120,7 @@ public final class WrapperStructs{
 				cw.function("toString").override()
 				  .body()
 				  .newObj(StringBuilder.class)
-				  .call("append", args -> args.val("WrapperOf€" + type.getTypeName() + "{"))
+				  .call("append", args -> args.val("WrapperOf€" + type.getSimpleName() + "{"))
 				  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
 				  .call("append", args -> args.val("}"))
 				  .call("toString");

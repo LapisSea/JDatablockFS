@@ -57,7 +57,7 @@ public class VersioningTests{
 		cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(ClassName.dotted(className)));
 		cw.name(ClassName.dotted(className));
 		for(Prop prop : props){
-			cw.field(prop.name, prop.type);
+			cw.field(prop.name, prop.type).annotation(IOValue.class);
 		}
 		
 		var init = cw.instanceInit().body()
@@ -93,7 +93,7 @@ public class VersioningTests{
 						""",
 					name);
 			}, cw -> {
-				cw.type(ClassType.ENUM);
+				cw.name(ClassName.dotted(name)).type(ClassType.ENUM);
 				cw.enumConstant("FOO");
 				cw.enumConstant("John");
 				cw.enumConstant("BAR");
