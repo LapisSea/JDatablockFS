@@ -1,13 +1,9 @@
 package com.lapissea.dfs.type.compilation;
 
-import com.lapissea.dfs.type.SupportedPrimitive;
-import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.AnnotationContainer;
 import com.lapissea.jorth.redo.CodeArg;
 import com.lapissea.jorth.redo.CodeBlock;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;
@@ -81,41 +77,6 @@ public final class JorthUtils{
 		}
 	}
 	
-	public static void writeAnnotations(CodeStream writer, Iterable<? extends Annotation> annotations) throws MalformedJorth{
-		Set<Class<?>> annTypes = new HashSet<>();
-		for(var ann : annotations){
-			if(!annTypes.add(ann.annotationType())) continue;
-			
-			var part = writer.codePart();
-			
-			boolean[] any = {false};
-			
-			scanAnnotation(ann, (name, value) -> {
-				if(!any[0]){
-					any[0] = true;
-					writer.write("@ {!} start", ann.annotationType().getName());
-				}
-				
-				writer.write("{!} {}", name, switch(value){
-					case null -> "null";
-					case String s -> "'" + s.replace("'", "\\'") + "'";
-					case Enum<?> e -> e.name();
-					case Boolean v -> v.toString();
-					case Class<?> c -> c.getName();
-					case Number n -> {
-						if(SupportedPrimitive.isAny(n.getClass())) yield n + "";
-						throw new UnsupportedOperationException();
-					}
-					case String[] strs -> Iters.from(strs).joinAsStr(" ", "[", "]", s -> "'" + s.replace("'", "\\'") + "'");
-					default -> throw new NotImplementedException(value.getClass() + "");
-				});
-			});
-			if(any[0]) writer.wEnd();
-			else writer.write("@ {!}", ann.annotationType().getName());
-			part.close();
-		}
-	}
-	
 	public static void writeAnnotations(AnnotationContainer<?> target, Iterable<? extends Annotation> annotations) throws MalformedJorth{
 		Set<Class<?>> annTypes = new HashSet<>();
 		for(var ann : annotations){
@@ -127,43 +88,15 @@ public final class JorthUtils{
 		}
 	}
 	
-	static void nullCheckDup(CodeStream writer) throws MalformedJorth{
-		nullCheck(writer, "dup");
-	}
 	static void nullCheckDup(CodeBlock body) throws MalformedJorth{
 		nullCheck(body, CodeBlock::dup);
-	}
-	static void nullCheckDup(CodeStream writer, String message) throws MalformedJorth{
-		nullCheck(writer, "dup", message);
 	}
 	static void nullCheckDup(CodeBlock body, String message) throws MalformedJorth{
 		nullCheck(body, CodeBlock::dup, message);
 	}
-	static void nullCheck(CodeStream writer, CharSequence getFragment) throws MalformedJorth{
-		writer.write(
-			"""
-				static call #Objects requireNonNull start
-					{}
-				end
-				pop
-				""",
-			getFragment
-		);
-	}
 	static void nullCheck(CodeBlock body, CodeArg getArg) throws MalformedJorth{
 		body.call(Objects.class, "requireNonNull", getArg)
 		    .pop();
-	}
-	static void nullCheck(CodeStream writer, CharSequence getFragment, String message) throws MalformedJorth{
-		writer.write(
-			"""
-				static call #Objects requireNonNull start
-					{} '{}'
-				end
-				pop
-				""",
-			getFragment, message
-		);
 	}
 	static void nullCheck(CodeBlock body, CodeArg getArg, String message) throws MalformedJorth{
 		body.call(Objects.class, "requireNonNull", args -> {

@@ -1,14 +1,14 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.lang.type.Access;
-import com.lapissea.jorth.lang.type.ClassGen;
 import com.lapissea.jorth.lang.type.ClassType;
-import com.lapissea.jorth.lang.type.FunctionGen;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.ClassDefinition;
+import com.lapissea.jorth.redo.FieldDefinition;
+import com.lapissea.jorth.redo.FunctionDefinition;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
 import org.objectweb.asm.ClassWriter;
@@ -19,7 +19,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -78,12 +77,14 @@ public final class Preload{
 		});
 		Thread.startVirtualThread(() -> {
 			try{
-				var cg = new ClassGen(TypeSource.of(null, Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), List.of(), Set.of(), List.of(), Map.of());
-				cg.defineField(Visibility.PUBLIC, Set.of(), Set.of(), GenericType.OBJECT, "");
-				var fun = new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, List.of(), List.of());
-				fun.getThisOp("");
-				fun.end();
-				cg.end();
+				ClassDefinition cw = new ClassDefinition(null);
+				cw.field(Object.class, "test").visibility(Visibility.PUBLIC);
+				
+				cw.function("fn").returns(Object.class)
+				  .body()
+				  .newObj(Object.class);
+				
+				cw.getClassFile();
 			}catch(Throwable e){
 				e.printStackTrace();
 			}
@@ -94,13 +95,12 @@ public final class Preload{
 			Set<Class<?>> added = Collections.synchronizedSet(new HashSet<>());
 			
 			for(var cls : List.of(
-				Jorth.class,
-				GenericType.class, Tokenizer.class,
-				Keyword.class, ClassType.class, Visibility.class, Access.class,
-				Token.class, TypeSource.class,
-				ClassGen.class,
-				ClassGen.FieldGen.class,
-				FunctionGen.class,
+				GenericType.class,
+				ClassType.class, Visibility.class, Access.class,
+				TypeSource.class,
+				ClassDefinition.class,
+				FunctionDefinition.class,
+				FieldDefinition.class,
 				Pattern.class, UtilL.class, NanoTimer.Simple.class,
 				Optional.class, TypeStack.class,
 				
