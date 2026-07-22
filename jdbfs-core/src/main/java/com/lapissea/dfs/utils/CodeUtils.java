@@ -9,7 +9,6 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.UtilL;
@@ -27,16 +26,15 @@ public interface CodeUtils{
 		BitFieldMerger.readIntegrityBits(raw, totalBits, readBits);
 	}
 	
-	static void readBytesFromSrc(CodeStream writer, CodeBlock body, int bytes) throws MalformedJorth{
+	static void readBytesFromSrc(CodeBlock body, int bytes) throws MalformedJorth{
 		var ns = NumberSize.FLAG_INFO.filter(e -> e.bytes == bytes).findFirst().orElseThrow();
-		readBytesFromSrc(writer, body, ns);
+		readBytesFromSrc(body, ns);
 	}
-	static void readBytesFromSrc(CodeStream writer, CodeBlock body, NumberSize size) throws MalformedJorth{
-		size.readConst(writer, "get #arg src", false);
+	static void readBytesFromSrc(CodeBlock body, NumberSize size) throws MalformedJorth{
 		size.readConst(body, a -> a.get("src"), false);
 	}
 	
-	static void rawBitsToValidatedBits(CodeStream writer, CodeBlock body, int bytes, int bits) throws MalformedJorth{
+	static void rawBitsToValidatedBits(CodeBlock body, int bytes, int bits) throws MalformedJorth{
 		//Check integrity bits
 		var oneBits = bytes*8 - bits;
 		
@@ -50,21 +48,6 @@ public interface CodeUtils{
 		
 		long checkMask = BitUtils.makeMask(oneBits)<<bits;
 		long valueMask = BitUtils.makeMask(bits);
-		
-		writer.write(
-			"""
-				static call {} checkFlag start
-					dup
-					{}L
-				end
-				if not start
-					new {} start 'Illegal enum integrity bits' end
-					throw
-				end
-				""", UtilL.class, checkMask, IOException.class
-		);
-		
-		writer.write("{}L bit-and", valueMask);
 		
 		body.call(UtilL.class, "checkFlag", args -> args.dup().val(checkMask))
 		    .ifFalse(branch -> {

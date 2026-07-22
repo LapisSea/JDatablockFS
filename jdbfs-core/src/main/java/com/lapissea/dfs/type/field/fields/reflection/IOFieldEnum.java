@@ -15,7 +15,6 @@ import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 
@@ -97,18 +96,8 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	}
 	
 	@Override
-	public void injectReadFieldFromBits(CodeStream writer, CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		if(nullable()) throw new UnsupportedCodeGenType("Nullable enum not implemented yet");
-		
-		accessMap.preSet(getAccessor(), writer);
-		accessMap.getEnumArray(enumUniverse.type, writer);
-		writer.write(
-			"""
-				get #field {}
-				array-get
-				""",
-			bitsFieldName);
-		accessMap.set(getAccessor(), writer);
 		
 		accessMap.set(getAccessor(), body, code -> {
 			accessMap.getEnumArray(enumUniverse.type, code);

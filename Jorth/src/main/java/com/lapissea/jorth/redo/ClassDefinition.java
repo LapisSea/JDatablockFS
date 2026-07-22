@@ -3,7 +3,13 @@ package com.lapissea.jorth.redo;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
-import com.lapissea.jorth.lang.type.*;
+import com.lapissea.jorth.lang.type.ClassInfo;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.FieldInfo;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.JType;
+import com.lapissea.jorth.lang.type.TypeSource;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 

@@ -42,10 +42,6 @@ public class JorthTests{
 		boolean test(T t, U u) throws E;
 	}
 	
-	static{
-		Thread.startVirtualThread(() -> new Jorth(null, null));
-	}
-	
 	public static class TestCls{
 		boolean flag = false;
 		static boolean staticFlag = false;
@@ -82,24 +78,7 @@ public class JorthTests{
 	@Test
 	void comparisonTest() throws Exception{
 		
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			
-			for(var typ : List.of("#String", "int")){
-				writer.write(
-					"""
-						static function compare
-							arg arg1 {0}
-							arg arg2 {0}
-							returns boolean
-						start
-							get #arg arg1
-							get #arg arg2
-							==
-						end
-						""",
-					typ);
-			}
-		}, classDefinition -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), classDefinition -> {
 			for(var typ : List.of(GenericType.STRING, GenericType.INT)){
 				var fn = classDefinition.function("compare")
 				                        .staticAcc()
@@ -136,25 +115,7 @@ public class JorthTests{
 	
 	@Test
 	void ifTest() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.write(
-				"""
-					static function test
-						arg index int
-						returns #String
-					start
-						get #arg index 1 ==
-						if start
-							'ay'
-							return
-						end
-						new #StringBuilder
-						call append start 'lmao ' end
-						call append start get #arg index end
-						call toString
-					end
-					""");
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			var fn = cd.function("test").staticAcc()
 			           .arg(GenericType.INT, "index")
 			           .returns(GenericType.STRING);
@@ -186,42 +147,7 @@ public class JorthTests{
 	@Test
 	void ifElseTest() throws Exception{
 		var className = autoName();
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.addImportAs(className, "ThisClass");
-			writer.addImports(ArrayList.class, List.class);
-			writer.write(
-				"""
-					public static final field list #List<#String>
-					
-					public static function <clinit> start
-						new #ArrayList
-						set #ThisClass list
-					end
-					
-					static function report
-						arg str #String
-					start
-						get #ThisClass list
-						call add start
-							get #arg str
-						end
-						pop
-					end
-					
-					static function test
-						arg index int
-					start
-						static call #ThisClass report start 'start' end
-						get #arg index 0 ==
-						if start
-							static call #ThisClass report start 'ay' end
-						end else start
-							static call #ThisClass report start 'lmao' end
-						end
-						static call #ThisClass report start 'end' end
-					end
-					""");
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(className, cd -> {
 			var list = cd.field(GenericType.of(List.class).withArgs(String.class), "list")
 			             .staticFinal(e -> e.newObj(ArrayList.class));
 			
@@ -263,50 +189,7 @@ public class JorthTests{
 	@Test
 	void functionCallTest() throws Exception{
 		
-		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
-			writer.addImport(LogUtil.class);
-			writer.addImportAs(TestCls.class, "TestCls");
-			writer.write(
-				"""
-					
-					static function printToConsole
-					start
-						static call #LogUtil println start
-							'AAAYYYY LMAO'
-						end
-					end
-					
-					static function testFlag
-						arg obj #TestCls
-					start
-						get #arg obj
-						call flag
-					
-						static call {} staticFlag
-					end
-					
-					function concatCal
-						arg a #String
-						arg b #String
-						returns #String
-					start
-						new #StringBuilder start get #arg a end
-						call append start get #arg b end
-						call toString
-					end
-					
-					function useCall
-						returns #String
-					start
-						get this this
-						'ay '
-						call concat start
-							'lmao'
-						end
-					end
-					""",
-				TestCls.class.getName());
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", cd -> {
 			cd.function("printToConsole").staticAcc()
 			  .body()
 			  .call(LogUtil.class, "println", c -> c.val("AAAYYYY LMAO"));
@@ -343,33 +226,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldClass() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			
-			writer.write(
-				"""
-					public field testString #String
-					"""
-			);
-			
-			writer.write(
-				"""
-					function toString
-						returns #String
-					start
-						get this testString
-					end
-					""");
-			
-			writer.write(
-				"""
-					function init
-						arg testString #String
-					start
-						get #arg testString
-						set this testString
-					end
-					""");
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			var ts = cd.field(String.class, "testString");
 			
 			cd.function("toString").returns(String.class)
@@ -396,16 +253,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldArrayClass() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			
-			writer.write(
-				"""
-					public field noArray #String
-					public field 1dArray #String array
-					public field 2dArray #String array array
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.field(String.class, "noArray");
 			cd.field(String[].class, "1dArray");
 			cd.field(String[][].class, "2dArray");
@@ -453,18 +301,7 @@ public class JorthTests{
 	
 	@Test
 	void defaultAnnotation() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImportAs(DefaultAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 321 end
-					public field a #String
-					
-					@ #Ann
-					public field b #String
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.field(String.class, "a")
 			  .annotation(DefaultAnn.class, a -> a.arg("value", 321));
 			
@@ -479,15 +316,7 @@ public class JorthTests{
 	
 	@Test
 	void enumAnnotation() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImportAs(EnumAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value CLASS end
-					public field a #String
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.field(String.class, "a")
 			  .annotation(EnumAnn.class, a -> a.arg("value", RetentionPolicy.CLASS));
 		});
@@ -497,15 +326,7 @@ public class JorthTests{
 	
 	@Test
 	void fieldAnnotation() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public field testString #String
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.field(String.class, "testString")
 			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
@@ -519,15 +340,7 @@ public class JorthTests{
 	
 	@Test
 	void methodAnnotation() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public function test start end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("test")
 			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"))
 			  .body();
@@ -542,16 +355,7 @@ public class JorthTests{
 	@Test
 	void classAnnotation() throws Exception{
 		var className = autoName();
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.addImportAs(MultiAnn.class, "Ann");
-			writer.write(
-				"""
-					@ #Ann start value 141 lol 'xD' end
-					public class {!} start end
-					""",
-				className
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(className, cd -> {
 			cd.name(ClassName.dotted(className))
 			  .annotation(MultiAnn.class, ann -> ann.arg("value", 141).arg("lol", "xD"));
 		});
@@ -566,17 +370,7 @@ public class JorthTests{
 	@Test
 	void overrideClass() throws Exception{
 		var className = autoName();
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					extends {!1}
-					public class {!0} start
-					end
-					""",
-				className,
-				ISayHello.class.getName()
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(className, cd -> {
 			cd.name(ClassName.dotted(className)).extendsType(ISayHello.class);
 		});
 		
@@ -592,17 +386,7 @@ public class JorthTests{
 	@Test
 	void dummyClass() throws Exception{
 		var msg = "Ayyyy it works!";
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.write(
-				"""
-					function toString
-						returns #String
-					start
-						'{}'
-					end
-					""",
-				msg);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("toString").returns(String.class).body().val(msg);
 		});
 		
@@ -618,16 +402,7 @@ public class JorthTests{
 	<T extends Enum<T>> void simpleEnum() throws Exception{
 		
 		var className = "com.lapissea.jorth.WtfIsMyEnumAAA";
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					public enum {!} start
-						enum FOO
-						enum BAR
-					end
-					""",
-				className);
-		}, cd -> {
+		var cls = generateAndLoadInstance(className, cd -> {
 			cd.name(ClassName.dotted(className))
 			  .type(ClassType.ENUM);
 			cd.enumConstant("FOO");
@@ -641,17 +416,7 @@ public class JorthTests{
 	@Test
 	<T extends Enum<T>> void simpleInterface() throws Exception{
 		var className = autoName();
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					public interface {!} start
-						function hello
-							returns #String
-						end
-					end
-					""",
-				className);
-		}, cd -> {
+		var cls = generateAndLoadInstance(className, cd -> {
 			cd.type(ClassType.INTERFACE).name(ClassName.dotted(className));
 			cd.function("hello").returns(String.class);
 		});
@@ -663,17 +428,7 @@ public class JorthTests{
 	
 	@Test
 	void getClassRef() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.write(
-				"""
-					static function getCls
-						returns #Class<#String>
-					start
-						class #String
-					end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("getCls").staticAcc().returns(Class.class, String.class)
 			  .body().val(String.class);
 		});
@@ -687,25 +442,7 @@ public class JorthTests{
 	void superArgs() throws Exception{
 		var className   = autoName();
 		var expectedStr = "Hi from super";
-		var cls = generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					extends {!1}
-					public class {!0} start
-					
-						function <init> start
-							super start
-								'{2}'
-							end
-						end
-					
-					end
-					""",
-				className,
-				IStoreHello.class.getName(),
-				expectedStr
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(className, cd -> {
 			cd.name(ClassName.dotted(className)).extendsType(IStoreHello.class);
 			cd.instanceInit()
 			  .body()
@@ -721,14 +458,7 @@ public class JorthTests{
 	
 	@Test
 	void genericFieldDefine() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImport(Optional.class);
-			writer.write(
-				"""
-					field optStr #Optional<#String>
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
 		});
 		
@@ -740,22 +470,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "genericFieldDefine")
 	void genericField() throws Exception{
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImport(Optional.class);
-			writer.write(
-				"""
-					field optStr #Optional<#String>
-					
-					function set
-						arg optStr #Optional<#String>
-					start
-						get #arg optStr
-						set this optStr
-					end
-					
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			var optStr = cd.field(GenericType.of(Optional.class).withArgs(String.class), "optStr");
 			
 			cd.function("set")
@@ -799,26 +514,7 @@ public class JorthTests{
 			assertThat(typ.getUpperBounds()).containsExactly(Object.class);
 		}
 		
-		var cls = generateAndLoadInstanceSimple(autoName(), writer -> {
-			writer.addImport(List.class);
-			writer.addImport(Typ.class);
-			writer.write(
-				"""
-					
-					function upper
-						arg arg #List<? extends #JorthTests.Typ>
-					start end
-					
-					function lower
-						arg arg #List<? super #JorthTests.Typ>
-					start end
-					
-					function wild
-						arg arg #List<?>
-					start end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("upper")
 			  .arg(GenericType.of(List.class).withArgs(JType.upper(Typ.class)), "arg").body();
 			cd.function("lower")
@@ -847,20 +543,7 @@ public class JorthTests{
 	
 	@Test
 	void sealedClass() throws Exception{
-		var cls = generateAndLoadInstanceMulti("SealedClass", writer -> {
-			writer.write(
-				"""
-					permits child1
-					permits child2
-					public class SealedClass start end
-					
-					extends SealedClass
-					final class child1 start end
-					extends SealedClass
-					final class child2 start end
-					"""
-			);
-		}, (name, cd) -> {
+		var cls = generateAndLoadInstanceMulti(List.of("SealedClass", "child1", "child2"), (name, cd) -> {
 			cd.name(ClassName.dotted(name));
 			switch(name){
 				case "SealedClass" -> {
@@ -879,18 +562,7 @@ public class JorthTests{
 	
 	@Test
 	void parmClass() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.addImport(List.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-					end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
 			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 		});
 		
@@ -903,23 +575,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "parmClass")
 	void parmClassFun() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.addImport(List.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-						function takeArg
-							arg tList #List<T>
-						start
-						end
-					
-					end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
 			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 			
 			cd.function("takeArg")
@@ -940,19 +596,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "parmClass")
 	void parmClassField() throws Exception{
-		var cls = generateAndLoadInstance("ParmClass", writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					type-arg T #CharSequence
-					public class ParmClass start
-					
-						field arg T
-					
-					end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance("ParmClass", cd -> {
 			cd.name(ClassName.dotted("ParmClass")).genericArg(CharSequence.class, "T");
 			cd.field(cd.getArg("T"), "arg");
 		});
@@ -980,28 +624,7 @@ public class JorthTests{
 	void templateFor(List<Prop> props) throws Exception{
 		
 		var name = "Props" + props.stream().map(Prop::name).collect(Collectors.joining());
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					class {0} start
-					
-						template-for #field in {1} start
-							public field #field.name #field.type
-						end
-					
-						function <init> start
-							super
-					
-							template-for #field in {1} start
-								#field.defaultVal set this #field.name
-							end
-						end
-					end
-					""",
-				name, props
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name));
 			
 			for(Prop prop : props){
@@ -1032,20 +655,7 @@ public class JorthTests{
 	void templateForRaw() throws Exception{
 		var names = Set.of("a", "b", "c");
 		var name  = "Props";
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(CharSequence.class);
-			writer.write(
-				"""
-					class {0} start
-					
-						template-for #name in {1} start
-							public field #name int
-						end
-					end
-					""",
-				name, names
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name));
 			for(String s : names){
 				cd.field(int.class, s);
@@ -1081,37 +691,7 @@ public class JorthTests{
 	@Test
 	void virtualCall() throws Exception{
 		var name = autoName();
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(IntFunction.class);
-			writer.addImportAs(TestBootstrap.class, "TestBootstrap");
-			
-			// calling function is the final function that is returned from boostrap
-			writer.write(
-				"""
-					implements #IntFunction<#String>
-					class {0} start
-						@ #Override
-						public function apply
-							arg num int
-							returns #Object
-						start
-							call-virtual
-								bootstrap-fn #TestBootstrap bootstrap
-									arg #Class {0}
-								calling-fn makeString start
-									arg int
-									returns #String
-								end
-							start
-								get #arg num
-							end
-							return
-						end
-					end
-					""",
-				name
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name)).implement(GenericType.of(IntFunction.class).withArgs(String.class));
 			cd.function("apply").arg(int.class, "num").returns(Object.class).annotation(Override.class)
 			  .body()
@@ -1130,14 +710,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementInt() throws Exception{
-		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
-			writer.write(
-				"""
-					get #arg num
-					inc 2
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
 			cb.get("num")
 			  .add(2);
 		});
@@ -1148,26 +721,7 @@ public class JorthTests{
 	@Test(dependsOnMethods = "simpleInterface")
 	void incrementDouble() throws Exception{
 		var name = autoName();
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(DoubleUnaryOperator.class);
-			writer.write(
-				"""
-					implements #DoubleUnaryOperator
-					class {0} start
-						@ #Override
-						public function applyAsDouble
-							arg num double
-							returns double
-						start
-							get #arg num
-							inc 2.125
-							return
-						end
-					end
-					""",
-				name
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name)).implement(DoubleUnaryOperator.class);
 			cd.function("applyAsDouble").arg(double.class, "num").override()
 			  .body()
@@ -1186,34 +740,7 @@ public class JorthTests{
 	@Test(dependsOnMethods = "incrementInt")
 	void variables() throws Exception{
 		var name = autoName();
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.addImport(IntSupplier.class);
-			writer.write(
-				"""
-					implements #IntSupplier
-					class {0} start
-						@ #Override
-						public function getAsInt
-							returns int
-						start
-							field a int
-							field b int
-					
-							1
-							set #field a
-					
-							2
-							set #field b
-					
-							get #field a
-							inc 4
-							return
-						end
-					end
-					""",
-				name
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name)).implement(IntSupplier.class);
 			cd.function("getAsInt").override()
 			  .body()
@@ -1234,14 +761,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRight() throws Exception{
-		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
-			writer.write(
-				"""
-					get #arg num
-					2 bit-shift-r
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
 			cb.get("num")
 			  .bitShiftRight(false, 2);
 		});
@@ -1250,14 +770,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftRightLogical() throws Exception{
-		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
-			writer.write(
-				"""
-					get #arg num
-					2 bit-shift-rl
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
 			cb.get("num")
 			  .bitShiftRight(true, 2);
 		});
@@ -1267,14 +780,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitShiftLeft() throws Exception{
-		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
-			writer.write(
-				"""
-					get #arg num
-					2 bit-shift-l
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
 			cb.get("num")
 			  .bitShiftLeft(2);
 		});
@@ -1284,14 +790,7 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void bitAnd() throws Exception{
-		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, writer -> {
-			writer.write(
-				"""
-					get #arg num
-					5 bit-and
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_UNARY_OPERATOR, cb -> {
 			cb.get("num")
 			  .bitAnd(5);
 		});
@@ -1301,35 +800,22 @@ public class JorthTests{
 	
 	@Test(dependsOnMethods = "simpleInterface")
 	void nullVal() throws Exception{
-		var inst = generateInterface(autoName(), STRING_SUPPLIER, writer -> {
-			writer.write(
-				"""
-					null start #String end
-					"""
-			);
-		}, cb -> cb.nullVal(String.class));
-		String res = inst.get();
+		var    inst = generateInterface(autoName(), STRING_SUPPLIER, cb -> cb.nullVal(String.class));
+		String res  = inst.get();
 		assertThat(res).isNull();
 	}
 	
 	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
 	void forgetLocalA() throws Exception{
-		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> {
-			writer.write(
-				"""
-					field a int
-					1
-					set #field a
-					forget #field a
-					get #field a
-					"""
-			);
-		}, cb -> cb.nullVal(String.class));
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> cb.var(int.class, "a")
+		                                                               .set("a", 1)
+		                                                               .forgetVar("a")
+		                                                               .get("a"));
 		inst.getAsInt();
 	}
 	@Test(dependsOnMethods = "simpleInterface", expectedExceptions = MissingLocalField.class)
 	void forgetLocalB() throws Exception{
-		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> { }, cb -> cb.scope(code -> {
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> cb.scope(code -> {
 			code.var(int.class, "a")
 			    .set("a", 1);
 		}).get("a"));
@@ -1337,25 +823,7 @@ public class JorthTests{
 	}
 	@Test(dependsOnMethods = "simpleInterface")
 	void forgetLocalThen() throws Exception{
-		var inst = generateInterface(autoName(), INT_SUPPLIER, writer -> {
-			writer.write(
-				"""
-					field a int
-					1
-					set #field a
-					
-					field b int
-					2
-					set #field b
-					forget #field b
-					
-					field c int
-					3
-					set #field c
-					get #field c
-					"""
-			);
-		}, cb -> {
+		var inst = generateInterface(autoName(), INT_SUPPLIER, cb -> {
 			cb.var(int.class, "a")
 			  .set("a", 1)
 			  .scope(code -> {

@@ -19,7 +19,6 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 
@@ -149,24 +148,13 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		set(ioPool, instance, data);
 	}
 	@Override
-	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		if(compression != null){
 			throw new UnsupportedCodeGenType("Compression variation not implemented");
 		}
 		if(nullable()){
 			throw new UnsupportedCodeGenType("Nullable variation not implemented");
 		}
-		
-		accessMap.preSet(getAccessor(), writer);
-		writer.write(
-			"""
-				get #arg src
-				call readInts1 start
-				"""
-		);
-		accessMap.get(arraySize, writer);
-		writer.wEnd();
-		accessMap.set(getAccessor(), writer);
 		
 		accessMap.set(getAccessor(), body, b -> {
 			b.get("src")

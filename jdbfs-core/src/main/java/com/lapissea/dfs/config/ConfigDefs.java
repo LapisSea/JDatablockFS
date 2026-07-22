@@ -5,7 +5,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.logging.Log.LogLevel;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.compilation.FieldCompiler.AccessType;
-import com.lapissea.dfs.type.compilation.JorthLogger.CodeLog;
+
 import com.lapissea.util.LogUtil;
 
 import java.net.URL;
@@ -23,8 +23,6 @@ import static com.lapissea.dfs.logging.Log.LogLevel.TRACE;
 import static com.lapissea.dfs.logging.Log.LogLevel.WARN;
 import static com.lapissea.dfs.type.compilation.FieldCompiler.AccessType.UNSAFE;
 import static com.lapissea.dfs.type.compilation.FieldCompiler.AccessType.VAR_HANDLE;
-import static com.lapissea.dfs.type.compilation.JorthLogger.CodeLog.FALSE;
-import static com.lapissea.dfs.type.compilation.JorthLogger.CodeLog.TRUE;
 
 public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
@@ -110,7 +108,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FBool          CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
 	Flag.FBool          CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
 	Flag.FBool          CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
-	Flag.FEnum<CodeLog> CLASSGEN_PRINT_BYTECODE        = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
+	Flag.FBool          CLASSGEN_PRINT_BYTECODE        = flagB("classGen.printBytecode", CLASSGEN_DEBUG);
 	Flag.FStrOptional   CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	

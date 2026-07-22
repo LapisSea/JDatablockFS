@@ -9,7 +9,6 @@ import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
-import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
@@ -17,8 +16,6 @@ import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
@@ -26,7 +23,7 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.jorth.redo.CodeArg;
 import com.lapissea.jorth.redo.CodeBlock;
-import com.lapissea.util.function.UnsafeBiConsumer;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
@@ -41,7 +38,7 @@ public final class PipeCodeGen{
 	
 	public interface PipeWriter<T extends IOInstance<T>>{
 		void writePipeClass(
-			CodeStream writer, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, ClassDefinition cw, Class<T> type
+			Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, ClassDefinition cw, Class<T> type
 		) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType;
 	}
 	
@@ -50,7 +47,7 @@ public final class PipeCodeGen{
 		
 		record Constructor(FieldSet<?> fields) implements ConstructionStrategy{ }
 	}
-	static void writeConstants(CodeStream writer, ClassDefinition cw, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
+	static void writeConstants(ClassDefinition cw, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
 		record Acc(FieldAccessor<?> accessor, String name){ }
 		record FRef(IOField<?, ?> field, String name){ }
 		record EArr(Class<?> type, String name){ }
@@ -65,53 +62,30 @@ public final class PipeCodeGen{
 				case SpecializedGenerator.AccessMap.ConstantRequest.EnumArr(var type) -> {
 					var name = "eArr_" + i + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
 					enumArrs.add(new EArr(type, name));
-					writer.write("private static final field {} {}", name, type.arrayType());
 					accessMap.addEnumArray(type, cw.getTypeDef("ThisClass"), name);
 					cw.field(type.arrayType(), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldAcc(var accessor) -> {
 					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
 					accessors.add(new Acc(accessor, name));
-					writer.write("private static final field {} {}<#ObjType>", name, VirtualAccessor.class);
 					accessMap.addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
 					cw.field(GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.FieldRef(var ioField) -> {
 					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 					fieldRefs.add(new FRef(ioField, name));
-					writer.write("private static final field {} {}<#ObjType>", name, IOField.class);
 					accessMap.addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
 					cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name);
 				}
 				case SpecializedGenerator.AccessMap.ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
-					writer.write("public static final field {} {}", name, type);
 					cw.field(type, name);
 				}
 			}
 		}
 		
 		cw.staticInit();
-		writer.write("public static function <clinit> start");
 		
 		if(!accessors.isEmpty()){
-			writer.write(
-				"""
-						static call #Struct of start
-							class #ObjType
-							{}
-						end
-						call getFields
-					""", Struct.STATE_FIELD_MAKE);
-			for(var it = accessors.iterator(); it.hasNext(); ){
-				var acc = it.next();
-				if(it.hasNext()){
-					writer.write("dup");
-				}
-				writer.write("call requireByName start '{}' end", acc.accessor.getName());
-				writer.write("call getAccessor cast {}", VirtualAccessor.class);
-				writer.write("set #ThisClass {}", acc.name);
-			}
-			
 			var cinit = cw.staticInit().body()
 			              .call(Struct.class, "of", e -> e.val(cw.getTypeDef("ObjType")).val(Struct.STATE_FIELD_MAKE))
 			              .call("getFields");
@@ -130,23 +104,6 @@ public final class PipeCodeGen{
 		}
 		
 		if(!fieldRefs.isEmpty()){
-			writer.write(
-				"""
-						static call #Struct of start
-							class #ObjType
-							{}
-						end
-						call getFields
-					""", Struct.STATE_FIELD_MAKE);
-			for(var it = fieldRefs.iterator(); it.hasNext(); ){
-				var acc = it.next();
-				if(it.hasNext()){
-					writer.write("dup");
-				}
-				writer.write("call requireByName start '{}' end", acc.field.getName());
-				writer.write("set #ThisClass {}", acc.name);
-			}
-			
 			var cinit = cw.staticInit().body()
 			              .call(Struct.class, "of", e -> e.val(cw.getTypeDef("ObjType")).val(Struct.STATE_FIELD_MAKE))
 			              .call("getFields");
@@ -163,22 +120,11 @@ public final class PipeCodeGen{
 		
 		
 		for(EArr enumArr : enumArrs){
-			writer.write(
-				"""
-					static call {} values
-					set #ThisClass {}
-					""",
-				enumArr.type, enumArr.name
-			);
-			
 			cw.field(enumArr.type.arrayType(), enumArr.name)
 			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(enumArr.type, "values"));
 		}
 		
 		for(var debugField : Iters.from(constants).instancesOf(SpecializedGenerator.AccessMap.ConstantRequest.DebugField.class)){
-			writer.write(debugField.initCode());
-			writer.write("set #ThisClass {}", debugField.name());
-			
 			cw.field(debugField.type(), debugField.name())
 			  .visibility(Visibility.PUBLIC).staticFinal(e -> {
 				  if(debugField.type() == boolean.class){ // TODO: Ugly hack. Make initCode propert type
@@ -188,48 +134,26 @@ public final class PipeCodeGen{
 				  }
 			  });
 		}
-		
-		writer.wEnd();
 	}
-	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeBiConsumer<CodeStream, ClassDefinition, Throwable> generateFn) throws Throwable{
+	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<ClassDefinition, Throwable> generateFn) throws Throwable{
 		var c     = lookup.lookupClass();
 		var cname = c.getName();
 		
 		cname = (c.isHidden()? cname.substring(0, cname.lastIndexOf('/')) : cname) + "&_" + fnName;
 		
-		var log   = JorthLogger.make();
-		var jorth = new Jorth(lookup.lookupClass().getClassLoader(), log);
-		var cw    = new ClassDefinition(lookup.lookupClass().getClassLoader());
-		jorth.addImportAs(cname, "ThisClass");
+		var cw = new ClassDefinition(lookup.lookupClass().getClassLoader());
 		cw.typeDef("ThisClass", ClassName.dotted(cname));
-		try{
-			try(var writer = jorth.writer()){
-				writer.addImports(
-					VarPool.class, DataProvider.class, ContentReader.class,
-					GenericContext.class, Struct.class, IOInstance.class
-				);
-				writer.write("class #ThisClass start");
-				cw.name(ClassName.dotted(cname));
-				generateFn.accept(writer, cw);
-				writer.wEnd();
-			}
-			
-			var bb = jorth.getClassFile(cname, cw);
-			
-			var implClass = lookup.defineHiddenClass(bb, true, MethodHandles.Lookup.ClassOption.NESTMATE);
-			var method = Iters.from(implClass.lookupClass().getMethods())
-			                  .filter(e -> e.getName().equals(fnName))
-			                  .getFirst();
-			
-			return implClass.unreflect(method);
-		}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-			log = null;
-			throw e;
-		}finally{
-			if(log != null){
-				Log.log("Generated jorth for bootstrap implementation:\n" + log.output());
-			}
-		}
+		cw.name(ClassName.dotted(cname));
+		generateFn.accept(cw);
+		
+		var bb = cw.getClassFile();
+		
+		var implClass = lookup.defineHiddenClass(bb, true, MethodHandles.Lookup.ClassOption.NESTMATE);
+		var method = Iters.from(implClass.lookupClass().getMethods())
+		                  .filter(e -> e.getName().equals(fnName))
+		                  .getFirst();
+		
+		return implClass.unreflect(method);
 	}
 	static <T extends IOInstance<T>> List<SpecializedGenerator> getSpecializedGenerators(Class<T> objType, Collection<IOField<T, ?>> fields) throws UnsupportedCodeGenType{
 		List<SpecializedGenerator> generators = new ArrayList<>(fields.size());
@@ -265,12 +189,11 @@ public final class PipeCodeGen{
 		return new ConstructionStrategy.Setters();
 	}
 	static void makeAndReadObj(
-		CodeStream writer, CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, ConstructionStrategy strategy
+		CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, ConstructionStrategy strategy
 	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> {
 				accessMap.setup(false, false);
-				writer.write("new #ObjType");
 				body.newObj(body.getTypeDef("ObjType"));
 			}
 			case ConstructionStrategy.Constructor ignore -> {
@@ -281,24 +204,16 @@ public final class PipeCodeGen{
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
 			try{
-				generator.injectReadField(writer, body, accessMap);
+				generator.injectReadField(body, accessMap);
 			}catch(UnsupportedCodeGenType e){
 				throw new UnsupportedCodeGenType("Failed to generate code for: " + generator, e);
 			}
-			accessMap.dropTemporary(writer, body);
+			accessMap.dropTemporary(body);
 		}
 		
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> { }
 			case ConstructionStrategy.Constructor(var fields) -> {
-				writer.write("new #ObjType start");
-				
-				for(IOField<?, ?> field : fields){
-					accessMap.get(field, writer);
-				}
-				
-				writer.wEnd();
-				
 				body.newObj(body.getTypeDef("ObjType"), args -> {
 					for(IOField<?, ?> field : fields){
 						accessMap.get(field, args);
@@ -307,19 +222,8 @@ public final class PipeCodeGen{
 			}
 		}
 	}
-	static void overwrite_readNew(CodeStream writer, ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, Struct<?> type)
+	static void overwrite_readNew(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, Struct<?> type)
 		throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
-		writer.write(
-			"""
-				@ #Override
-				protected function readNew
-					arg provider #DataProvider
-					arg src #ContentReader
-					arg genericContext #GenericContext
-					returns #IOInstance
-				start
-				"""
-		);
 		var body = cw.function("readNew").visibility(Visibility.PROTECTED)
 		             .arg(DataProvider.class, "provider")
 		             .arg(ContentReader.class, "src")
@@ -329,35 +233,8 @@ public final class PipeCodeGen{
 		             .body();
 		
 		if(generators != null){
-			makeAndReadObj(writer, body, generators, accessMap, getStrategy(type));
+			makeAndReadObj(body, generators, accessMap, getStrategy(type));
 		}else{
-			writer.write(
-				"""
-					call-virtual
-						bootstrap-fn #GeneratorPipeClass bootstrapReadNew
-							arg #Class #ObjType
-						calling-fn readNew start
-							arg #DataProvider
-							arg #ContentReader
-							arg #GenericContext
-							returns #IOInstance
-						end
-					start
-						get #arg provider
-						get #arg src
-						get #arg genericContext
-					end
-					dup null ==
-					if start
-						super start
-							get #arg provider
-							get #arg src
-							get #arg genericContext
-						end
-						return
-					end
-					"""
-			);
 			CodeArg getArgs = c -> c.get("provider")
 			                        .get("src")
 			                        .get("genericContext");
@@ -374,28 +251,9 @@ public final class PipeCodeGen{
 			    .nullVal(IOInstance.class)
 			    .ifEquality(code -> code.callSuper(getArgs).returnOp());
 		}
-		writer.write(
-			"""
-					return
-				end
-				"""
-		);
 		body.returnOp();
 	}
-	static void overwrite_doRead(CodeStream writer, ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
-		writer.write(
-			"""
-				@ #Override
-				protected function doRead
-					arg ioPool #VarPool<#ObjType>
-					arg provider #DataProvider
-					arg src #ContentReader
-					arg instance #IOInstance
-					arg genericContext #GenericContext
-					returns #IOInstance
-				start
-				"""
-		);
+	static void overwrite_doRead(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		
 		ClassName   objType        = cw.getTypeDef("ObjType");
 		GenericType objVarPoolType = GenericType.of(VarPool.class).withArgs(objType);
@@ -412,50 +270,11 @@ public final class PipeCodeGen{
 		if(generators != null){
 			accessMap.setup(true, false);
 			
-			writer.write(
-				"""
-					get #arg instance
-					cast #ObjType
-					"""
-			);
 			body.get("instance")
 			    .cast(objType);
-			injectReadFields(writer, body, generators, accessMap);
+			injectReadFields(body, generators, accessMap);
 			
 		}else{
-			writer.write(
-				"""
-					call-virtual
-						bootstrap-fn #GeneratorPipeClass bootstrapDoRead
-							arg #Class #ObjType
-						calling-fn doRead start
-							arg #VarPool<#ObjType>
-							arg #DataProvider
-							arg #ContentReader
-							arg #ObjType
-							arg #GenericContext
-							returns #ObjType
-						end
-					start
-						get #arg ioPool
-						get #arg provider
-						get #arg src
-						get #arg instance cast #ObjType
-						get #arg genericContext
-					end
-					dup null ==
-					if start
-						super start
-							get #arg ioPool
-							get #arg provider
-							get #arg src
-							get #arg instance cast #ObjType
-							get #arg genericContext
-						end
-						return
-					end
-					"""
-			);
 			CodeArg getArgs = c -> c.get("ioPool")
 			                        .get("provider")
 			                        .get("src")
@@ -476,35 +295,13 @@ public final class PipeCodeGen{
 			    .nullVal(IOInstance.class)
 			    .ifEquality(block -> block.callSuper(getArgs).returnOp());
 		}
-		writer.write(
-			"""
-					return
-				end
-				"""
-		);
 		body.returnOp();
 	}
 	
 	private static <T extends IOInstance<T>> ConstantCallSite failedDoReadNew(MethodHandles.Lookup lookup, String name, Class<T> objType){
 		try{
-			return new ConstantCallSite(makeImpl(lookup, name, (writer, cw) -> {
-				writer.addImportAs(objType, "ObjType");
+			return new ConstantCallSite(makeImpl(lookup, name, (cw) -> {
 				cw.typeDef("ObjType", ClassName.of(objType));
-				writer.write(
-					"""
-						public static function {}
-							arg ioPool #VarPool<#ObjType>
-							arg provider #DataProvider
-							arg src #ContentReader
-							arg instance #ObjType
-							arg genericContext #GenericContext
-							returns #ObjType
-						start
-							null start #ObjType end
-							return
-						end
-						""", name
-				);
 				cw.function(name)
 				  .arg(GenericType.of(VarPool.class).withArgs(objType), "ioPool")
 				  .arg(DataProvider.class, "provider")
@@ -531,31 +328,16 @@ public final class PipeCodeGen{
 			
 			while(true){
 				try{
-					var target = makeImpl(lookup, "bootstrapDoRead", (writer, cw) -> {
-						writer.addImportAs(objType, "ObjType");
+					var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
 						cw.typeDef("ObjType", objType);
 						
 						var accessMap = new SpecializedGenerator.AccessMap();
 						accessMap.setup(true, false);
 						
-						writeConstants(writer, cw, constants, accessMap);
+						writeConstants(cw, constants, accessMap);
 						
 						Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
 						
-						writer.write(
-							"""
-								public static function bootstrapDoRead
-									arg ioPool #VarPool<#ObjType>
-									arg provider #DataProvider
-									arg src #ContentReader
-									arg instance #ObjType
-									arg genericContext #GenericContext
-									returns #ObjType
-								start
-									get #arg instance
-								""",
-							name
-						);
 						var bootstrapDoRead =
 							cw.function("bootstrapDoRead").visibility(Visibility.PUBLIC).staticAcc()
 							  .arg(GenericType.of(VarPool.class).withArgs(objType), "ioPool")
@@ -567,15 +349,7 @@ public final class PipeCodeGen{
 						
 						CodeBlock body = bootstrapDoRead.body().get("instance");
 						
-						injectReadFields(writer, body, generators, accessMap);
-						
-						writer.write(
-							"""
-									return
-								end
-								"""
-						);
-						
+						injectReadFields(body, generators, accessMap);
 					});
 					return new ConstantCallSite(target);
 				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
@@ -593,13 +367,13 @@ public final class PipeCodeGen{
 		}
 	}
 	
-	private static void injectReadFields(CodeStream writer, CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	private static void injectReadFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		Set<SpecializedGenerator.AccessMap.ConstantRequest> constantsReq = null;
 		
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
 			try{
-				generator.injectReadField(writer, body, accessMap);
+				generator.injectReadField(body, accessMap);
 			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
 				if(constantsReq == null) constantsReq = new LinkedHashSet<>();
 				constantsReq.addAll(e.constants);
@@ -610,7 +384,7 @@ public final class PipeCodeGen{
 				}
 				throw e;
 			}finally{
-				accessMap.dropTemporary(writer, body);
+				accessMap.dropTemporary(body);
 			}
 		}
 		if(constantsReq != null){
@@ -620,22 +394,8 @@ public final class PipeCodeGen{
 	
 	private static <T extends IOInstance<T>> ConstantCallSite failedReadNew(MethodHandles.Lookup lookup, String name, Class<T> objType){
 		try{
-			return new ConstantCallSite(makeImpl(lookup, name, (writer, body) -> {
-				writer.addImportAs(objType, "ObjType");
+			return new ConstantCallSite(makeImpl(lookup, name, body -> {
 				body.typeDef("ObjType", objType);
-				writer.write(
-					"""
-						public static function {}
-							arg provider #DataProvider
-							arg src #ContentReader
-							arg genericContext #GenericContext
-							returns #IOInstance
-						start
-							null start #IOInstance end
-							return
-						end
-						""", name
-				);
 				body.function(name).staticAcc()
 				    .arg(DataProvider.class, "provider")
 				    .arg(ContentReader.class, "src")
@@ -661,24 +421,13 @@ public final class PipeCodeGen{
 			
 			while(true){
 				try{
-					var target = makeImpl(lookup, name, (writer, cw) -> {
-						writer.addImportAs(objType, "ObjType");
+					var target = makeImpl(lookup, name, cw -> {
 						cw.typeDef("ObjType", objType);
 						var accessMap = new SpecializedGenerator.AccessMap();
 						
-						writeConstants(writer, cw, constants, accessMap);
+						writeConstants(cw, constants, accessMap);
 						
 						ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
-						writer.write(
-							"""
-								public static function {}
-									arg provider #DataProvider
-									arg src #ContentReader
-									arg genericContext #GenericContext
-									returns #IOInstance
-								start
-								""", name
-						);
 						var body = cw.function(name).staticAcc()
 						             .arg(DataProvider.class, "provider")
 						             .arg(ContentReader.class, "src")
@@ -686,14 +435,8 @@ public final class PipeCodeGen{
 						             .returns(IOInstance.class)
 						             .body();
 						
-						makeAndReadObj(writer, body, generators, accessMap, strategy);
+						makeAndReadObj(body, generators, accessMap, strategy);
 						
-						writer.write(
-							"""
-									return
-								end
-								"""
-						);
 						body.returnOp();
 					});
 					return new ConstantCallSite(target);
@@ -711,35 +454,7 @@ public final class PipeCodeGen{
 			throw new RuntimeException("Failed to generate specialized implementation for " + objType.getTypeName(), t);
 		}
 	}
-	static void defaultClassDef(CodeStream writer, ClassDefinition cw) throws MalformedJorth{
-		writer.write(
-			"""
-				extends #GeneratorPipeClass<#ObjType>
-				implements {}
-				public class #ThisClass start
-				""",
-			StructPipe.SpecializedImplementation.class
-		);
-		writer.write(
-			"""
-				public function <init> start
-					super start
-						static call #Struct of start
-							class #ObjType
-						end
-						{!}
-					end
-				end
-				
-				public function getGenericType
-					returns #Class
-				start
-					class #GeneratorPipeClass
-				end
-				""",
-			StructPipe.STATE_DONE
-		);
-		
+	static void defaultClassDef(ClassDefinition cw) throws MalformedJorth{
 		var superType = GenericType.of(cw.getTypeDef("GeneratorPipeClass")).withArgs(cw.getTypeDef("ObjType"));
 		cw.name(cw.getTypeDef("ThisClass")).extendsType(superType)
 		  .implement(StructPipe.SpecializedImplementation.class);
@@ -757,19 +472,19 @@ public final class PipeCodeGen{
 	}
 	
 	public static void standardPipeImpl(
-		CodeStream writer, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants,
+		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants,
 		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
 		List<SpecializedGenerator> generators
 	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 		var accessMap = new SpecializedGenerator.AccessMap();
-		writeConstants(writer, cw, constants, accessMap);
+		writeConstants(cw, constants, accessMap);
 		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		
-		overwrite_doRead(writer, cw, noCtor? generators : null, accessMap);
+		overwrite_doRead(cw, noCtor? generators : null, accessMap);
 		
 		if(!noCtor){
-			overwrite_readNew(writer, cw, generators, accessMap, type);
+			overwrite_readNew(cw, generators, accessMap, type);
 		}
 	}
 }

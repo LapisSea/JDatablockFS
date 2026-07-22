@@ -15,7 +15,6 @@ import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.StagedInit;
 import com.lapissea.dfs.type.SupportedPrimitive;
-import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.IOField;
@@ -328,7 +327,7 @@ public class SpecializedPipeTests{
 		
 		List<FieldDef> fields;
 		try(var ignore = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
-		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE);
+		    var ignore2 = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
 		    var ignore3 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
 			fields = allFields.parallelStream().flatMap(f1 -> {
 				var rand = new RawRandom(f1.name().hashCode());
@@ -418,7 +417,7 @@ public class SpecializedPipeTests{
 
 //		fuz.runAndAssert("EhiCBS9IBUqHIAgGMR4");
 		
-		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(JorthLogger.CodeLog.FALSE);
+		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
 		    var ignore2 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
 			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(60)), 123, 5_000, 30), "testMultiFuzz");
 		}

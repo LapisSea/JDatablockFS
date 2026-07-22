@@ -28,7 +28,6 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 
@@ -185,35 +184,9 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 		var type = Objects.requireNonNull(getType());
-		var res  = accessMap.temporaryLocalField(type, writer, body);
-		
-		accessMap.preSet(getAccessor(), writer);
-		if(nullable()){
-			accessMap.get(isNull, writer);
-			
-			writer.write(
-				"""
-					if start
-						null start {} end
-						set #field {}
-					end else start
-					""", type, res
-			);
-			callReadTyp(writer, accessMap);
-			if(type != Object.class) writer.write("cast {}", type);
-			writer.write(
-				"""
-						set #field {}
-					end
-					""", res
-			);
-			writer.write("get #field {}", res);
-		}else{
-			callReadTyp(writer, accessMap);
-		}
-		accessMap.set(getAccessor(), writer);
+		var res  = accessMap.temporaryLocalField(type, body);
 		
 		accessMap.set(getAccessor(), body, b -> {
 			if(nullable()){
@@ -232,19 +205,6 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 		});
 	}
 	
-	private void callReadTyp(CodeStream writer, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-		writer.write("static call {} dynamic_readTyp start", CodeUtils.class);
-		accessMap.getFieldRef(this, writer);
-		accessMap.get(typeID, writer);
-		writer.write(
-			"""
-					get #field provider
-					get #field src
-					get #field genericContext
-				end
-				"""
-		);
-	}
 	private void callReadTyp(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		body.call(CodeUtils.class, "dynamic_readTyp", b -> {
 			accessMap.getFieldRef(this, b);

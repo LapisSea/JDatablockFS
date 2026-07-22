@@ -267,8 +267,8 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
-		return Match.of((writer, constants, cw, type) -> {
-			PipeCodeGen.defaultClassDef(writer, cw);
+		return Match.of((constants, cw, type) -> {
+			PipeCodeGen.defaultClassDef(cw);
 			
 			boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
 			constants.add(new ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", hasReadyStruct + ""));
@@ -288,9 +288,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(writer, constants, type, cw, getType(), generators);
-			
-			writer.wEnd();
+			PipeCodeGen.standardPipeImpl(constants, type, cw, getType(), generators);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

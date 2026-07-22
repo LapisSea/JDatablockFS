@@ -29,7 +29,6 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
-import com.lapissea.dfs.type.compilation.JorthLogger;
 import com.lapissea.dfs.type.compilation.helpers.ProxyBuilder;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
@@ -49,8 +48,6 @@ import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
-import com.lapissea.jorth.BytecodeUtils;
-import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
@@ -1133,41 +1130,28 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
 		
 		while(true){
-			var    log      = JorthLogger.make();
 			byte[] bytecode = null;
 			try{
 				var type      = getType().getConcreteType();
 				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 				
-				var jorth = new Jorth(type.getClassLoader(), log);
-				var cw    = new ClassDefinition(type.getClassLoader());
-				try(var writer = jorth.writer()){
-					
-					cw.typeDef("GeneratorPipeClass", this.getClass());
-					cw.typeDef("ObjType", type);
-					cw.typeDef("ThisClass", ClassName.dotted(className));
-					
-					writer.addImportAs(this.getClass(), "GeneratorPipeClass");
-					writer.addImportAs(type, "ObjType");
-					writer.addImportAs(className, "ThisClass");
-					writer.addImports(
-						Struct.class,
-						VarPool.class, DataProvider.class, ContentReader.class,
-						GenericContext.class, IOInstance.class
-					);
-					
-					try{
-						pipeWriter.writePipeClass(writer, constants, cw, type);
-					}catch(UnsupportedCodeGenType e){
-						if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
-							Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
-							return Match.empty();
-						}
-						throw new UnsupportedOperationException("The struct was selected for optimized pipe implementation but it is not supported", e);
+				var cw = new ClassDefinition(type.getClassLoader());
+				
+				cw.typeDef("GeneratorPipeClass", this.getClass());
+				cw.typeDef("ObjType", type);
+				cw.typeDef("ThisClass", ClassName.dotted(className));
+				
+				try{
+					pipeWriter.writePipeClass(constants, cw, type);
+				}catch(UnsupportedCodeGenType e){
+					if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
+						Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
+						return Match.empty();
 					}
+					throw new UnsupportedOperationException("The struct was selected for optimized pipe implementation but it is not supported", e);
 				}
 				
-				bytecode = jorth.getClassFile(className, cw);
+				bytecode = cw.getClassFile();
 				
 				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 				var cls    = access.defineClass(type, bytecode, true);
@@ -1178,7 +1162,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				if(!added){
 					throw new IllegalStateException("Accessor already added");
 				}
-				log = null;
 			}catch(MalformedJorth e){
 				throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
 			}catch(AccessProvider.Defunct e){
@@ -1187,11 +1170,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
 			}catch(NotImplementedException e){
 				throw new UnsupportedOperationException("Can not create specialized pipe for type: " + getType().getType().getTypeName() + " because one of the fields has an unimplemented variant", e);
-			}finally{
-				if(log != null){
-					Log.log("Generated jorth for buildSpecializedImplementation:\n" + log.output());
-					if(bytecode != null) BytecodeUtils.printClass(bytecode);
-				}
 			}
 		}
 	}

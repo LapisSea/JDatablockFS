@@ -16,7 +16,6 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 
@@ -185,53 +184,10 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 	}
 	
 	@Override
-	public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-		var cb = accessMap.temporaryLocalField(CharBuffer.class, writer, body);
-		
-		accessMap.preSet(getAccessor(), writer);
-		
-		writer.write("static call {} allocate start", CharBuffer.class);
-		accessMap.get(charCountField, writer);
-		writer.write(
-			"""
-					end
-				set #field {}
-				""",
-			cb
-		);
-		
-		accessMap.get(encodingField, writer);
-		writer.write(
-			"""
-				call read start
-					new {} start
-						get #arg src
-				""",
-			LimitedContentReader.class
-		);
-		accessMap.get(bytesField, writer);
-		writer.write(
-			"""
-						cast long
-						end
-					get #field {}
-				end
-				""",
-			cb
-		);
-		
-		writer.write(
-			"""
-				get #field {}
-				call flip
-				call toString
-				"""
-			, cb);
-		
-		accessMap.set(getAccessor(), writer);
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		var cb = accessMap.temporaryLocalField(CharBuffer.class, body);
 		
 		accessMap.set(getAccessor(), body, b -> {
-			
 			b.call(CharBuffer.class, "allocate", args -> accessMap.get(charCountField, args))
 			 .set(cb);
 			

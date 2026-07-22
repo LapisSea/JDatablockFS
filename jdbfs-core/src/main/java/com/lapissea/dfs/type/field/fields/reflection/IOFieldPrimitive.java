@@ -34,7 +34,6 @@ import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -165,19 +164,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
 				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
 			}
-			
-			accessMap.preSet(getAccessor(), writer);
-			writer.write(
-				"""
-					get #arg src
-					call readFloat8
-					"""
-			);
-			accessMap.set(getAccessor(), writer);
 			
 			accessMap.set(getAccessor(), body, code -> {
 				code.get("src").call("readFloat8");
@@ -236,31 +226,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
 			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
 				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
 			}
 			
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Double.class, writer, body);
-				
-				accessMap.get(isNull, writer);
-				writer.write(
-					"""
-						if start
-							get #arg src
-							call skipExact start {0}L end
-							null start #Double end
-							set #field {1}
-						end else start
-							get #arg src
-							call readFloat8
-							box
-							set #field {1}
-						end
-						""",
-					maxSize.size.bytes, tmpInt
-				);
+				var tmpInt = accessMap.temporaryLocalField(Double.class, body);
 				
 				accessMap.get(isNull, body);
 				body.ifTrue(branch -> {
@@ -275,22 +247,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					      .set(tmpInt);
 				});
 				
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, code -> code.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				writer.write(
-					"""
-						get #arg src
-						call readFloat8
-						box
-						"""
-				);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, code -> code.get("src").call("readFloat8").box());
 			}
 		}
@@ -387,19 +345,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock block, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			if(getDynamicSize() == null){
-				maxSize.size.readIntConst(writer, "get #arg src", false);
-			}else{
-				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				NumberSize.readIntDyn(writer, "get #arg src", false);
-			}
-			
-			writer.write("cast char");
-			accessMap.set(getAccessor(), writer);
-			
-			
+		public void injectReadField(CodeBlock block, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), block, code -> {
 				if(getDynamicSize() == null){
 					maxSize.size.readIntConst(code, false);
@@ -500,30 +446,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Character.class, writer, body);
+				var tmpInt = accessMap.temporaryLocalField(Character.class, body);
 				if(getDynamicSize() == null){
-					accessMap.get(isNull, writer);
-					writer.write(
-						"""
-							if start
-								get #arg src
-								call skipExact start {}L end
-								null start #Character end
-								set #field {}
-							end else start
-							""",
-						maxSize.size.bytes, tmpInt
-					);
-					maxSize.size.readIntConst(writer, "get #arg src", false);
-					writer.write(
-						"""
-								cast char box
-								set #field {}
-							end
-							""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
@@ -535,26 +461,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.cast(char.class).box().set(tmpInt);
 					});
 				}else{
-					accessMap.get(isNull, writer);
-					writer.write("if start");
-					accessMap.get(getDynamicSize().field, writer);
-					writer.write(
-						"""
-								call skip start
-									get #arg src
-								end
-								null start #Character end
-								set #field {}
-							end else start
-							""", tmpInt);
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", false);
-					writer.write(
-						"""
-								cast char box
-								set #field {}
-							end""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						accessMap.get(getDynamicSize().field, b);
@@ -567,22 +473,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.cast(char.class).box().set(tmpInt);
 					});
 				}
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, c -> c.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(writer, "get #arg src", false);
-				}else{
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", false);
-				}
-				writer.write("cast char box");
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, c -> {
 					if(getDynamicSize() == null){
 						maxSize.size.readIntConst(c, false);
@@ -593,7 +485,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					c.cast(char.class).box();
 				});
 			}
-			
+
 		}
 	}
 	
@@ -607,14 +499,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, SHORT, INT);
 		}
 		
-		protected void readRawFloat(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
-			if(getDynamicSize() == null){
-				maxSize.size.readFloatConst(writer, "get #arg src");
-			}else{
-				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				NumberSize.readFloatDyn(writer, "get #arg src");
-			}
-		}
 		protected void readRawFloat(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 			if(getDynamicSize() == null){
 				maxSize.size.readFloatConst(body);
@@ -662,30 +546,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Float.class, writer, body);
+				var tmpInt = accessMap.temporaryLocalField(Float.class, body);
 				if(getDynamicSize() == null){
-					accessMap.get(isNull, writer);
-					writer.write(
-						"""
-							if start
-								get #arg src
-								call skipExact start {0}L end
-								null start #Float end
-								set #field {1}
-							end else start
-							""",
-						maxSize.size.bytes, tmpInt
-					);
-					maxSize.size.readFloatConst(writer, "get #arg src");
-					writer.write(
-						"""
-								box
-								set #field {}
-							end
-							""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
@@ -697,26 +561,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.box().set(tmpInt);
 					});
 				}else{
-					accessMap.get(isNull, writer);
-					writer.write("if start");
-					accessMap.get(getDynamicSize().field, writer);
-					writer.write(
-						"""
-								call skip start
-									get #arg src
-								end
-								null start #Float end
-								set #field {}
-							end else start
-							""", tmpInt);
-					accessMap.get(getDynamicSize().field, writer);
-					readFloatDyn(writer, "get #arg src");
-					writer.write(
-						"""
-								box
-								set #field {}
-							end""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						accessMap.get(getDynamicSize().field, b);
@@ -724,21 +568,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						 .nullVal(Float.class).set(tmpInt);
 					}).elseRun(b -> {
 						accessMap.get(getDynamicSize().field, b);
-						readFloatDyn(writer, "get #arg src");
+						readFloatDyn(b);
 						b.box().set(tmpInt);
 					});
 				}
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, c -> c.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				readRawFloat(writer, accessMap);
-				writer.write("box");
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, c -> {
 					readRawFloat(c, accessMap);
 					c.box();
@@ -813,11 +648,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			readRawFloat(writer, accessMap);
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, c -> {
 				readRawFloat(c, accessMap);
 			});
@@ -877,14 +708,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return val;
 		}
 		
-		protected void readLong(CodeStream writer, AccessMap accessMap) throws MalformedJorth{
-			if(getDynamicSize() == null){
-				maxSize.size.readConst(writer, "get #arg src", !unsigned);
-			}else{
-				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				NumberSize.readDyn(writer, "get #arg src", !unsigned);
-			}
-		}
 		protected void readLong(CodeBlock writer, AccessMap accessMap) throws MalformedJorth{
 			if(getDynamicSize() == null){
 				maxSize.size.readConst(writer, !unsigned);
@@ -938,11 +761,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			readLong(writer, accessMap);
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, c -> {
 				readLong(c, accessMap);
 			});
@@ -1023,31 +842,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
 			if(nullable()){
-				
-				var tmpInt = accessMap.temporaryLocalField(Long.class, writer, body);
+
+				var tmpInt = accessMap.temporaryLocalField(Long.class, body);
 				if(getDynamicSize() == null){
-					accessMap.get(isNull, writer);
-					writer.write(
-						"""
-							if start
-								get #arg src
-								call skipExact start {}L end
-								null start #Long end
-								set #field {}
-							end else start
-							""",
-						maxSize.size.bytes, tmpInt
-					);
-					maxSize.size.readConst(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								box
-								set #field {}
-							end
-							""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
@@ -1059,26 +858,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.box().set(tmpInt);
 					});
 				}else{
-					accessMap.get(isNull, writer);
-					writer.write("if start");
-					accessMap.get(getDynamicSize().field, writer);
-					writer.write(
-						"""
-								call skip start
-									get #arg src
-								end
-								null start #Long end
-								set #field {}
-							end else start
-							""", tmpInt);
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					NumberSize.readDyn(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								box
-								set #field {}
-							end""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						accessMap.get(getDynamicSize().field, b);
@@ -1090,19 +869,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						NumberSize.readDyn(b, !unsigned);
 						b.box().set(tmpInt);
 					});
-					
+
 				}
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				readLong(writer, accessMap);
-				writer.write("box");
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, e -> {
 					readLong(e, accessMap);
 					e.box();
@@ -1231,30 +1001,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Integer.class, writer, body);
+				var tmpInt = accessMap.temporaryLocalField(Integer.class, body);
 				if(getDynamicSize() == null){
-					accessMap.get(isNull, writer);
-					writer.write(
-						"""
-							if start
-								get #arg src
-								call skipExact start {}L end
-								null start #Integer end
-								set #field {}
-							end else start
-							""",
-						maxSize.size.bytes, tmpInt
-					);
-					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								box
-								set #field {}
-							end
-							""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
@@ -1266,26 +1016,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.box().set(tmpInt);
 					});
 				}else{
-					accessMap.get(isNull, writer);
-					writer.write("if start");
-					accessMap.get(getDynamicSize().field, writer);
-					writer.write(
-						"""
-								call skip start
-									get #arg src
-								end
-								null start #Integer end
-								set #field {}
-							end else start
-							""", tmpInt);
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								box
-								set #field {}
-							end""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						accessMap.get(getDynamicSize().field, b);
@@ -1297,22 +1027,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						b.box().set(tmpInt);
 					});
 				}
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-				}else{
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", !unsigned);
-				}
-				writer.write("box");
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, e -> {
 					if(getDynamicSize() == null){
 						maxSize.size.readIntConst(e, !unsigned);
@@ -1323,7 +1039,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					e.box();
 				});
 			}
-			
+
 		}
 	}
 	
@@ -1367,16 +1083,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			if(getDynamicSize() == null){
-				maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-			}else{
-				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				NumberSize.readIntDyn(writer, "get #arg src", !unsigned);
-			}
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, e -> {
 				if(getDynamicSize() == null){
 					maxSize.size.readIntConst(e, !unsigned);
@@ -1468,17 +1175,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			if(getDynamicSize() == null){
-				maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-			}else{
-				accessMap.get(getDynamicSize().field.getAccessor(), writer);
-				NumberSize.readIntDyn(writer, "get #arg src", !unsigned);
-			}
-			writer.write("cast short");
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, b -> {
 				if(getDynamicSize() == null){
 					maxSize.size.readIntConst(b, !unsigned);
@@ -1577,65 +1274,24 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var val = get(ioPool, instance);
 			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
 		}
-		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Short.class, writer, body);
+				var tmpInt = accessMap.temporaryLocalField(Short.class, body);
 				if(getDynamicSize() == null){
-					accessMap.get(isNull, writer);
-					writer.write(
-						"""
-							if start
-								get #arg src
-								call skipExact start {}L end
-								null start #Short end
-								set #field {}
-							end else start
-							""",
-						maxSize.size.bytes, tmpInt
-					);
-					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								cast short box
-								set #field {}
-							end
-							""", tmpInt);
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
 						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
 						 .nullVal(Short.class)
 						 .set(tmpInt);
+
 					}).elseRun(b -> {
 						maxSize.size.readIntConst(b, !unsigned);
 						b.cast(short.class).box()
 						 .set(tmpInt);
 					});
 				}else{
-					accessMap.get(isNull, writer);
-					writer.write("if start");
-					accessMap.get(getDynamicSize().field, writer);
-					writer.write(
-						"""
-								call skip start
-									get #arg src
-								end
-								null start #Short end
-								set #field {}
-							end else start
-							""", tmpInt);
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", !unsigned);
-					writer.write(
-						"""
-								cast short box
-								set #field {}
-							end""", tmpInt);
-					
-					
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						accessMap.get(getDynamicSize().field, b);
@@ -1649,22 +1305,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 						 .set(tmpInt);
 					});
 				}
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(writer, "get #arg src", !unsigned);
-				}else{
-					accessMap.get(getDynamicSize().field.getAccessor(), writer);
-					readIntDyn(writer, "get #arg src", !unsigned);
-				}
-				writer.write("cast short box");
-				accessMap.set(getAccessor(), writer);
-				
 				accessMap.set(getAccessor(), body, b -> {
 					if(getDynamicSize() == null){
 						maxSize.size.readIntConst(b, !unsigned);
@@ -1675,7 +1317,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					b.cast(short.class).box();
 				});
 			}
-			
+
 		}
 	}
 	
@@ -1725,15 +1367,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			writer.write(
-				"""
-					get #arg src
-					call readInt1
-					""");
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, b -> {
 				b.get("src").call("readInt1");
 			});
@@ -1827,32 +1461,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
+		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded{
 			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Byte.class, writer, body);
-				
-				accessMap.get(isNull, writer);
-				writer.write(
-					"""
-						if start
-							get #arg src
-							call skipExact start {0}L end
-							null start #Byte end
-							set #field {1}
-						end else start
-							get #arg src
-							call readInt1
-							box
-							set #field {1}
-						end
-						""",
-					maxSize.size.bytes, tmpInt
-				);
-				
-				accessMap.preSet(getAccessor(), writer);
-				writer.write("get #field {}", tmpInt);
-				accessMap.set(getAccessor(), writer);
-				
+				var tmpInt = accessMap.temporaryLocalField(Byte.class, body);
+
 				accessMap.get(isNull, body);
 				body.ifTrue(b -> {
 					b.get("src").call("skipExact", e -> e.val((long)maxSize.size.bytes))
@@ -1864,20 +1476,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				});
 				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
 			}else{
-				accessMap.preSet(getAccessor(), writer);
-				writer.write(
-					"""
-						get #arg src
-						call readInt1
-						box
-						"""
-				);
-				accessMap.set(getAccessor(), writer);
 				accessMap.set(getAccessor(), body, e -> {
 					e.get("src").call("readInt1").box();
 				});
 			}
-			
+
 		}
 	}
 	
@@ -1943,16 +1546,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadFieldFromBits(CodeStream writer, CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
-			accessMap.preSet(getAccessor(), writer);
-			writer.write(
-				"""
-					get #field {}
-					cast boolean
-					""",
-				bitsFieldName);
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
 			accessMap.set(getAccessor(), body, e -> {
 				e.get(bitsFieldName).cast(boolean.class);
 			});
@@ -2045,44 +1639,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadFieldFromBits(CodeStream writer, CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
-			
-			accessMap.preSet(getAccessor(), writer);
-			var name = accessMap.temporaryLocalField(Boolean.class, writer, body);
-			if(nullable()){
-				writer.write(
-					"""
-						get #field {2}
-						3 ==
-						if start
-							new {0} start 'Boolean field got a null true value. This is illegal and could point to a corrupted file' end
-							throw
-						end
-						
-						get #field {2}
-						2 ==
-						if start
-							null start #Boolean end
-							set #field {1}
-						end else start
-							get #field {2}
-							cast boolean
-							box
-							set #field {1}
-						end
-						get #field {1}
-						""", IOException.class, name, bitsFieldName
-				);
-			}else{
-				writer.write(
-					"""
-						get #field {}
-						cast boolean
-						box
-						""", bitsFieldName);
-			}
-			accessMap.set(getAccessor(), writer);
-			
+		public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded{
+
+			var name = accessMap.temporaryLocalField(Boolean.class, body);
 			accessMap.set(getAccessor(), body, base -> {
 				if(nullable()){
 					base.get(bitsFieldName)
@@ -2106,8 +1665,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					    .cast(boolean.class).box();
 				}
 			});
-			
-			
+
+
 		}
 	}
 	

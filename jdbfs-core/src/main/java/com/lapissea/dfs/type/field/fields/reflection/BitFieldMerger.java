@@ -25,7 +25,6 @@ import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.TextUtil;
@@ -177,8 +176,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			src.skipExact(bytes);
 		}
 		@Override
-		public void injectReadField(CodeStream writer, CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
-			var rawBits = accessMap.temporaryLocalField(long.class, writer, body);
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+			var rawBits = accessMap.temporaryLocalField(long.class, body);
 			
 			int totalBits = 0;
 			for(var fi : group){
@@ -188,24 +187,15 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				totalBits += Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
 			}
 			
-			CodeUtils.readBytesFromSrc(writer, body, numSize);
+			CodeUtils.readBytesFromSrc(body, numSize);
 			if(numSize.bits() != totalBits){
-				writer.write(
-					"""
-						static call {} readIntegrityBits start
-							dup
-							{} {}
-						end
-						""",
-					CodeUtils.class, numSize.bits(), totalBits);
 				var tb = totalBits;
 				body.call(CodeUtils.class, "readIntegrityBits", args -> args.dup().val(numSize.bits()).val(tb));
 			}
 			
-			writer.write("set #field {}", rawBits);
 			body.set(rawBits);
 			
-			var field = accessMap.temporaryLocalField(int.class, writer, body);
+			var field = accessMap.temporaryLocalField(int.class, body);
 			
 			int bitOffset = 0;
 			
@@ -217,18 +207,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 					throw new UnsupportedCodeGenType("Long bits field");
 				}
 				var mask = BitUtils.makeMask(bits);
-				
-				writer.write("get #field {}", rawBits);
-				if(bitOffset>0){
-					writer.write("{} bit-shift-rl", bitOffset);
-				}
-				writer.write(
-					"""
-						cast int
-						{} bit-and
-						set #field {}
-						""",
-					mask, field);
 				
 				body.get(rawBits);
 				if(bitOffset>0){
@@ -242,7 +220,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				
 				accessMap.markTemporary();
 				try{
-					((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(writer, body, accessMap, field);
+					((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(body, accessMap, field);
 				}catch(AccessMap.ConstantNeeded e){
 					if(constantsReq == null) constantsReq = new LinkedHashSet<>();
 					constantsReq.addAll(e.constants);
@@ -253,7 +231,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 					}
 					throw e;
 				}finally{
-					accessMap.dropTemporary(writer, body);
+					accessMap.dropTemporary(body);
 				}
 			}
 			

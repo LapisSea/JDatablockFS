@@ -5,7 +5,6 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -13,7 +12,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
@@ -32,61 +30,28 @@ public final class TestUtils{
 	
 	static Class<?> generateAndLoadInstanceSimple(
 		String className,
-		UnsafeConsumer<CodeStream, MalformedJorth> generator,
-		UnsafeConsumer<ClassDefinition, MalformedJorth> generator2
+		UnsafeConsumer<ClassDefinition, MalformedJorth> generator
 	) throws ReflectiveOperationException, MalformedJorth{
-		return generateAndLoadInstance(className, writer -> {
-			writer.write(
-				"""
-					public class {!} start
-					""",
-				className
-			);
-			
-			generator.accept(writer);
-			writer.wEnd();
-		}, cw -> {
+		return generateAndLoadInstance(className, cw -> {
 			cw.name(ClassName.dotted(className));
-			generator2.accept(cw);
+			generator.accept(cw);
 		});
 	}
 	
 	static Class<?> generateAndLoadInstance(
 		String className,
-		UnsafeConsumer<CodeStream, MalformedJorth> generator,
-		UnsafeConsumer<ClassDefinition, MalformedJorth> generator2
+		UnsafeConsumer<ClassDefinition, MalformedJorth> generator
 	) throws ReflectiveOperationException, MalformedJorth{
 		
-		
-		StringJoiner tokenStr = new StringJoiner(" ");
-		var          jorth    = new Jorth(null, tokenStr::add);
-		
 		ClassDefinition cw = new ClassDefinition(null);
-		generator2.accept(cw);
-		
-		try(var writer = jorth.writer()){
-			generator.accept(writer);
-		}finally{
-			LogUtil.println(tokenStr.toString());
-		}
-		
-		var classes = jorth.listClassFiles();
+		generator.accept(cw);
+		byte[] byt = cw.getClassFile();
 		
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				if(classes.contains(name)){
-					if(!ClassName.dotted(name).equals(cw.name())){
-						throw new NotImplementedException("Multi class generation for cw");
-					}
-					byte[] byt;
-					try{
-						byt = jorth.getClassFile(name, cw);
-					}catch(MalformedJorth e){
-						throw new RuntimeException(e);
-					}
+				if(ClassName.dotted(name).equals(cw.name())){
 					BytecodeUtils.printClass(byt);
-					
 					return defineClass(name, ByteBuffer.wrap(byt), null);
 				}
 				return super.findClass(name);
@@ -103,36 +68,22 @@ public final class TestUtils{
 	}
 	
 	static Class<?> generateAndLoadInstanceMulti(
-		String className,
-		UnsafeConsumer<CodeStream, MalformedJorth> generator,
-		UnsafeBiConsumer<String, ClassDefinition, MalformedJorth> generator2
+		List<String> classes,
+		UnsafeBiConsumer<String, ClassDefinition, MalformedJorth> generator
 	) throws ReflectiveOperationException{
 		
-		
-		StringJoiner tokenStr = new StringJoiner(" ");
-		var          jorth    = new Jorth(null, tokenStr::add);
-		try{
-			try(var writer = jorth.writer()){
-				generator.accept(writer);
-			}finally{
-				LogUtil.println(tokenStr.toString());
-			}
-		}catch(MalformedJorth e){
-			throw new RuntimeException("Failed to generate class " + className, e);
-		}
-		
-		var classes = jorth.listClassFiles();
+		var classNames = classes.stream().map(ClassName::dotted).collect(Collectors.toSet());
 		
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				if(classes.contains(name)){
+				if(classNames.contains(ClassName.slashed(name))){
 					
 					byte[] byt;
 					try{
 						ClassDefinition cw = new ClassDefinition(this);
-						generator2.accept(name, cw);
-						byt = jorth.getClassFile(name, cw);
+						generator.accept(name, cw);
+						byt = cw.getClassFile();
 					}catch(Throwable e){
 						e.printStackTrace();
 						throw new RuntimeException(e);
@@ -145,6 +96,8 @@ public final class TestUtils{
 				return super.findClass(name);
 			}
 		};
+		
+		var className = classes.getFirst();
 		
 		var cls = Class.forName(className, true, loader);
 		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName() + " " + className);
@@ -183,35 +136,9 @@ public final class TestUtils{
 	public static <T> T generateInterface(
 		String name,
 		InterfaceTemplate<T> template,
-		UnsafeConsumer<CodeStream, MalformedJorth> generator,
-		UnsafeConsumer<CodeBlock, MalformedJorth> generator2
+		UnsafeConsumer<CodeBlock, MalformedJorth> generator
 	) throws ReflectiveOperationException, MalformedJorth{
-		var cls = generateAndLoadInstance(name, writer -> {
-			writer.write(
-				"""
-					implements {}
-					class {} start
-						@ #Override
-						public function {}
-						{}
-						{}
-						start
-					""",
-				template.type,
-				name,
-				template.functionName,
-				template.args.stream().map(e -> "arg " + e.name() + " " + JorthUtils.toJorthGeneric(e.type())).collect(Collectors.joining("\n")),
-				(template.returns != null? "returns " + JorthUtils.toJorthGeneric(template.returns) : "")
-			);
-			
-			generator.accept(writer);
-			writer.write(
-				"""
-						end
-					end
-					"""
-			);
-		}, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name)).implement(template.type);
 			var fn = cd.function(template.functionName);
 			for(var arg : template.args){
@@ -221,7 +148,7 @@ public final class TestUtils{
 				fn.returns(template.returns);
 			}
 			fn.annotation(Override.class);
-			generator2.accept(fn.body());
+			generator.accept(fn.body());
 		});
 		
 		Object instO = cls.getConstructor().newInstance();
