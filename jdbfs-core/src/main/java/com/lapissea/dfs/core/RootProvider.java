@@ -167,10 +167,10 @@ public interface RootProvider extends DataProvider.Holder{
 		return t.cast(val);
 	}
 	
-	default <T> T request(long id, Class<?> raw, Class<?>... args) throws IOException                  { return request(ObjectID.of(id), raw, args); }
-	default <T> T request(byte id, Class<?> raw, Class<?>... args) throws IOException                  { return request(ObjectID.of(id), raw, args); }
-	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException                { return request(ObjectID.of(id), raw, args); }
-	default <T> T request(ObjectID id, Class<?> raw, Class<?>... args) throws IOException              { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }
+	default <T> T request(long id, Class<?> raw, Type... args) throws IOException                      { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(byte id, Class<?> raw, Type... args) throws IOException                      { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(String id, Class<?> raw, Type... args) throws IOException                    { return request(ObjectID.of(id), raw, args); }
+	default <T> T request(ObjectID id, Class<?> raw, Type... args) throws IOException                  { return this.<T>builder(id).withType(IOType.of(raw, args)).request(); }
 	
 	default <T extends IOInstance<T>> T request(long id, Struct<T> type) throws IOException            { return request(ObjectID.of(id), type); }
 	default <T extends IOInstance<T>> T request(byte id, Struct<T> type) throws IOException            { return request(ObjectID.of(id), type); }

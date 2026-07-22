@@ -1,5 +1,7 @@
 package com.lapissea.dfs.run;
 
+import com.lapissea.dfs.SyntheticParameterizedType;
+import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.objects.collections.IOList;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -7,7 +9,9 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,6 +35,15 @@ public class TypeGenTests{
 	@IOInstance.StrFormat.Custom("@num")
 	interface MissingGetter extends IOInstance.Def<MissingGetter>{
 		void setNum(int num);
+	}
+	
+	@IOInstance.StrFormat.Custom("@val @val2")
+	@IOInstance.Order({"val", "val2"})
+	interface MissingGetterGeneric<T, T2 extends Number> extends IOInstance.Def<MissingGetterGeneric<T, T2>>{
+		@IOValue.Generic
+		void setVal(T val);
+		@IOValue.Generic
+		void setVal2(T2 val2);
 	}
 	
 	@Test
@@ -75,6 +88,24 @@ public class TypeGenTests{
 		assertThat(simpleInstance.toString()).isEqualTo(a + "");
 		simpleInstance.setNum(b);
 		assertThat(simpleInstance.toString()).isEqualTo(b + "");
+	}
+	@Test
+	void missingGetterGeneric() throws IOException{
+		var data = Cluster.emptyMem();
+		
+		IOList<MissingGetterGeneric<Long, Integer>> list =
+			data.roots().request(0, IOList.class, SyntheticParameterizedType.of(
+				MissingGetterGeneric.class,
+				List.of(Long.class, Integer.class)
+			));
+		
+		list.add(IOInstance.Def.of(MissingGetterGeneric.class, 123L, 12));
+		list.add(IOInstance.Def.of(MissingGetterGeneric.class, 124L, 13));
+		list.add(IOInstance.Def.of(MissingGetterGeneric.class, 125L, 14));
+		
+		var strs = list.mapped(Object::toString).toList();
+		
+		assertThat(strs).containsExactly("123 12", "124 13", "125 14");
 	}
 	
 }
