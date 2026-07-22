@@ -5,6 +5,7 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -71,15 +72,19 @@ public final class TestUtils{
 		
 		var classes = jorth.listClassFiles();
 		
-		byte[] cwf    = cw.getClassFile();
-		var    cwfOld = jorth.getClassFile(className);
-		BytecodeUtils.compareClasses(cwf, cwfOld);
-		
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				if(classes.contains(name)){
-					var byt = jorth.getClassFile(name);
+					if(!ClassName.dotted(name).equals(cw.name())){
+						throw new NotImplementedException("Multi class generation for cw");
+					}
+					byte[] byt;
+					try{
+						byt = jorth.getClassFile(name, cw);
+					}catch(MalformedJorth e){
+						throw new RuntimeException(e);
+					}
 					BytecodeUtils.printClass(byt);
 					
 					return defineClass(name, ByteBuffer.wrap(byt), null);
@@ -123,18 +128,16 @@ public final class TestUtils{
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				if(classes.contains(name)){
 					
-					byte[] cwf;
+					byte[] byt;
 					try{
 						ClassDefinition cw = new ClassDefinition(this);
 						generator2.accept(name, cw);
-						cwf = cw.getClassFile();
+						byt = jorth.getClassFile(name, cw);
 					}catch(Throwable e){
 						e.printStackTrace();
 						throw new RuntimeException(e);
 					}
 					
-					var byt = jorth.getClassFile(name);
-					BytecodeUtils.compareClasses(cwf, byt);
 					BytecodeUtils.printClass(byt);
 					
 					return defineClass(name, ByteBuffer.wrap(byt), null);

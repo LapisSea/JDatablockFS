@@ -17,7 +17,6 @@ import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualAccessor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -215,9 +214,7 @@ public final class PipeCodeGen{
 				writer.wEnd();
 			}
 			
-			var bb    = jorth.getClassFile(cname);
-			var bbNew = cw.getClassFile();
-			BytecodeUtils.compareClasses(bbNew, bb);
+			var bb = jorth.getClassFile(cname, cw);
 			
 			var implClass = lookup.defineHiddenClass(bb, true, MethodHandles.Lookup.ClassOption.NESTMATE);
 			var method = Iters.from(implClass.lookupClass().getMethods())

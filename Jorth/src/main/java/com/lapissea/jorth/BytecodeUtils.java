@@ -99,7 +99,7 @@ public final class BytecodeUtils{
 				return (line);
 			}
 		}).collect(Collectors.joining("\n"));
-		System.out.println(str);
+		System.err.println(str);
 		throw new AssertionError("Class files not equal");
 	}
 	private static List<String> makeDiff(List<String> originalLines, List<String> revisedLines){

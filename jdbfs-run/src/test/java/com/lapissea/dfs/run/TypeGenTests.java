@@ -7,9 +7,12 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
+import java.lang.invoke.MethodHandles;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TypeGenTests{
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 	
 	interface DefaultImplType extends IOInstance.Def<DefaultImplType>{
 		@IONullability(IONullability.Mode.NULLABLE)
@@ -23,6 +26,11 @@ public class TypeGenTests{
 		@IOValue.Generic
 		Object getDyn();
 		void setDyn(Object a);
+	}
+	
+	@IOInstance.StrFormat.Custom("@num")
+	interface MissingGetter extends IOInstance.Def<MissingGetter>{
+		void setNum(int num);
 	}
 	
 	@Test
@@ -53,6 +61,20 @@ public class TypeGenTests{
 			simpleInstance.setDyn(b);
 			assertThat(simpleInstance).extracting("dyn").isEqualTo(b);
 		}
+	}
+	
+	@Test
+	void missingGetter(){
+		Struct<MissingGetter> struct = Struct.of(MissingGetter.class);
+		
+		var simpleInstance = struct.emptyConstructor().make();
+		
+		var a = 69;
+		var b = 420;
+		simpleInstance.setNum(a);
+		assertThat(simpleInstance.toString()).isEqualTo(a + "");
+		simpleInstance.setNum(b);
+		assertThat(simpleInstance.toString()).isEqualTo(b + "");
 	}
 	
 }

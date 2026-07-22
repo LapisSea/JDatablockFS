@@ -1025,6 +1025,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return args.values().stream().map(a -> a.type).toList();
 	}
 	@Override
+	public List<ClassName> getThrownExceptions(){
+		return List.of();
+	}
+	@Override
 	public Object defaultEnumValue(){
 		return null;
 	}

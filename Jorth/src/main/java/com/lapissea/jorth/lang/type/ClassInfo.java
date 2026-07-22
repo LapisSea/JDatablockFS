@@ -132,6 +132,7 @@ public interface ClassInfo{
 			Method method = null;
 			try{
 				method = getDeepDeclaredMethod(clazz, signature.name(), signature.args());
+				if(method == null) throw new ReflectiveOperationException("Could not find method");
 			}catch(ReflectiveOperationException e){
 				funs:
 				for(var info : findByName(signature.name())){

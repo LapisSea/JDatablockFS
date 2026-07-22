@@ -26,11 +26,11 @@ public abstract class AnnotationContainer<SELF>{
 		return annotation(new AnnotationDefinition(ClassName.of(ann)));
 	}
 	public SELF annotation(Class<? extends Annotation> ann, Map<String, Object> args){
-		return annotation(ann, a -> {
-			for(Map.Entry<String, Object> e : args.entrySet()){
-				a.arg(e.getKey(), e.getValue());
-			}
-		});
+		var annV = new AnnotationDefinition(ClassName.of(ann));
+		for(Map.Entry<String, Object> e : args.entrySet()){
+			annV.arg(e.getKey(), e.getValue());
+		}
+		return annotation(annV);
 	}
 	
 	public SELF annotation(Class<? extends Annotation> ann, Consumer<AnnotationDefinition> init){

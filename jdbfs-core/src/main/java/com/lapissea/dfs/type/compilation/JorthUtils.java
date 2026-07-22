@@ -5,6 +5,8 @@ import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.AnnotationContainer;
+import com.lapissea.jorth.redo.CodeArg;
+import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
@@ -15,6 +17,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -127,8 +130,14 @@ public final class JorthUtils{
 	static void nullCheckDup(CodeStream writer) throws MalformedJorth{
 		nullCheck(writer, "dup");
 	}
+	static void nullCheckDup(CodeBlock body) throws MalformedJorth{
+		nullCheck(body, CodeBlock::dup);
+	}
 	static void nullCheckDup(CodeStream writer, String message) throws MalformedJorth{
 		nullCheck(writer, "dup", message);
+	}
+	static void nullCheckDup(CodeBlock body, String message) throws MalformedJorth{
+		nullCheck(body, CodeBlock::dup, message);
 	}
 	static void nullCheck(CodeStream writer, CharSequence getFragment) throws MalformedJorth{
 		writer.write(
@@ -141,6 +150,10 @@ public final class JorthUtils{
 			getFragment
 		);
 	}
+	static void nullCheck(CodeBlock body, CodeArg getArg) throws MalformedJorth{
+		body.call(Objects.class, "requireNonNull", getArg)
+		    .pop();
+	}
 	static void nullCheck(CodeStream writer, CharSequence getFragment, String message) throws MalformedJorth{
 		writer.write(
 			"""
@@ -151,6 +164,13 @@ public final class JorthUtils{
 				""",
 			getFragment, message
 		);
+	}
+	static void nullCheck(CodeBlock body, CodeArg getArg, String message) throws MalformedJorth{
+		body.call(Objects.class, "requireNonNull", args -> {
+			    getArg.accept(args);
+			    args.val(message);
+		    })
+		    .pop();
 	}
 	
 }

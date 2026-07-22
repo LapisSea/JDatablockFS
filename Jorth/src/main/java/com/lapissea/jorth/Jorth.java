@@ -42,12 +42,7 @@ public final class Jorth extends CodeDestination{
 		ClassDefinition cw = new ClassDefinition(classLoader);
 		generator2.accept(cw);
 		
-		var oldCl = jorth.getClassFile(className);
-		var newCl = cw.getClassFile();
-		
-		BytecodeUtils.compareClasses(newCl, oldCl);
-		
-		return oldCl;
+		return jorth.getClassFile(className, cw);
 	}
 	
 	static{
@@ -842,7 +837,7 @@ public final class Jorth extends CodeDestination{
 	public Set<String> listClassFiles(){
 		return classes.keySet().stream().map(ClassName::dotted).collect(Collectors.toSet());
 	}
-	public byte[] getClassFile(String name){
+	public byte[] getClassFile(String name, ClassDefinition cw) throws MalformedJorth{
 		var cls = classes.get(ClassName.dotted(Tokenizer.escape(name)));
 		if(cls == null){
 			throw new IllegalArgumentException(name + " is not defined");
@@ -852,6 +847,10 @@ public final class Jorth extends CodeDestination{
 		if(file == null){
 			throw new IllegalStateException("Class " + name + " not ended");
 		}
+		
+		var newBytecode = cw.getClassFile();
+		
+		BytecodeUtils.compareClasses(newBytecode, file);
 		
 		return file;
 	}

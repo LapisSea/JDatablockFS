@@ -12,7 +12,9 @@ import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -24,8 +26,9 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	private       Visibility      visibility = Visibility.PUBLIC;
 	
 	private final String                       name;
-	private final LinkedHashMap<String, JType> args = new LinkedHashMap<>();
+	private final LinkedHashMap<String, JType> args             = new LinkedHashMap<>();
 	private       JType                        returnType;
+	private       List<ClassName>              thrownExceptions = Collections.emptyList();
 	
 	private CodeBlock body;
 	
@@ -63,7 +66,14 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		this.returnType = type;
 		return this;
 	}
-	
+	public FunctionDefinition throwsException(Class<?>... exceptions){
+		return throwsException(Arrays.stream(exceptions).map(ClassName::of).toList());
+	}
+	public FunctionDefinition throwsException(List<ClassName> exceptions){
+		preBodyCheck();
+		this.thrownExceptions = Collections.unmodifiableList(exceptions);
+		return this;
+	}
 	public FunctionDefinition visibility(Visibility visibility){
 		this.visibility = Objects.requireNonNull(visibility);
 		return this;
@@ -158,7 +168,9 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		
 		if(descriptor.equals(signature)) signature = null;
 		
-		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, null);
+		String[] exceptions = thrownExceptions.isEmpty()? null :
+		                      thrownExceptions.stream().map(ClassName::slashed).toArray(String[]::new);
+		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, exceptions);
 		for(AnnotationDefinition annotation : annotations){
 			annotation.visit(fn);
 		}
@@ -223,6 +235,10 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	}
 	public FunctionDefinition override() throws MalformedJorth{
 		var info = owner.getFunctionOverride(makeSignature());
-		return returns(info.returnType()).annotation(Override.class);
+		return returns(info.returnType()).throwsException(info.getThrownExceptions()).annotation(Override.class);
+	}
+	@Override
+	public List<ClassName> getThrownExceptions(){
+		return thrownExceptions;
 	}
 }

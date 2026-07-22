@@ -419,7 +419,7 @@ public class CodeBlock{
 	public boolean terminates(){
 		if(insns.isEmpty()) return false;
 		Insn last = insns.getLast();
-		return last instanceof ReturnOp;
+		return last instanceof ReturnOp || last instanceof ThrowOp;
 	}
 	
 	@Override

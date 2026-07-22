@@ -11,6 +11,7 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -234,10 +235,14 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	public GenericType withArgs(ClassName... args){
 		return withArgs(Arrays.stream(args).<JType>map(GenericType::of).toList());
 	}
-	public GenericType withArgs(Class<?>... args){
-		JType[] arr = new JType[args.length];
-		for(int i = 0; i<args.length; i++){
-			arr[i] = GenericType.of(args[i]);
+	public GenericType withArgs(Type... args){
+		return withArgs(Arrays.asList(args));
+	}
+	public GenericType withArgs(Collection<Type> args){
+		JType[] arr = new JType[args.size()];
+		int     i   = 0;
+		for(Type arg : args){
+			arr[i++] = GenericType.of(arg);
 		}
 		return withArgs(List.of(arr));
 	}

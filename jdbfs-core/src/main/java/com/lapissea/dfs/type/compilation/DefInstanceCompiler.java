@@ -28,6 +28,7 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.jorth.redo.ClassDefinition;
@@ -39,7 +40,15 @@ import com.lapissea.util.UtilL;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.*;
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -198,13 +207,17 @@ public final class DefInstanceCompiler{
 			
 			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 			
-			var log   = JorthLogger.make();
+			var log = JorthLogger.make();
+			var cw  = new ClassDefinition(interf.getClassLoader());
+			
 			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
 			try{
 				
 				try(var writer = jorth.writer()){
 					writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
+					writeAnnotations(cw, Arrays.asList(interf.getAnnotations()));
 					writer.addImportAs(completionName, "typ.impl");
+					cw.typeDef("typ.impl", ClassName.dotted(completionName));
 					
 					var parms = interf.getTypeParameters();
 					for(var parm : parms){
@@ -213,6 +226,7 @@ public final class DefInstanceCompiler{
 							throw new NotImplementedException("Implement multi bound type variable");
 						}
 						writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+						cw.genericArg(parm);
 					}
 					
 					String parmsStr;
@@ -222,23 +236,27 @@ public final class DefInstanceCompiler{
 					writer.write("implements {!}{}", interf.getName(), parmsStr);
 					writer.write("interface #typ.impl start");
 					
-					unmappedClassFn(writer, interf);
+					cw.implement(GenericType.of(interf).withArgs(parms));
+					cw.type(ClassType.INTERFACE).name(ClassName.dotted(completionName));
+					
+					unmappedClassFn(writer, cw, interf);
 					
 					for(String name : missingGetters){
 						writer.write(
 							"""
 								function {!0}
-									{1} returns
+									returns {1}
 								end
 								""",
 							style.mapGetter(name),
 							setterMap.get(name).type()
 						);
+						cw.function(style.mapGetter(name)).returns(setterMap.get(name).type());
 					}
 					writer.wEnd();
 				}
 				
-				var file = jorth.getClassFile(completionName);
+				var file = jorth.getClassFile(completionName, cw);
 				
 				ClassGenerationCommons.dumpClassName(completionName, file);
 				if(log != null){
@@ -565,6 +583,7 @@ public final class DefInstanceCompiler{
 		var log = JorthLogger.make();
 		try{
 			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
+			var cw    = new ClassDefinition(interf.getClassLoader());
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");
@@ -573,6 +592,10 @@ public final class DefInstanceCompiler{
 				ChunkPointer.class, IOInstance.Managed.class,
 				UnsupportedOperationException.class
 			);
+			var typImpl = ClassName.dotted(implName);
+			cw.typeDef("typ.impl", typImpl);
+			cw.typeDef("typ.interf", interf);
+			
 			
 			try(var writer = jorth.writer()){
 				
@@ -587,9 +610,11 @@ public final class DefInstanceCompiler{
 						throw new NotImplementedException("Implement multi bound type variable");
 					}
 					writer.write("type-arg {!} {}", parm.getName(), bounds[0]);
+					cw.genericArg(parm);
 				}
 				
 				writer.write("implements #typ.interf" + parmsStr);
+				cw.implement(GenericType.of(interf).withArgs(parms));
 				
 				writer.write(
 					"""
@@ -597,14 +622,17 @@ public final class DefInstanceCompiler{
 						public class #typ.impl start
 						""", parmsStr);
 				
-				defineStatics(writer, completion.base);
+				cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(GenericType.of(typImpl).withArgs(parms)))
+				  .name(typImpl);
+				
+				defineStatics(writer, cw, completion.base);
 				
 				for(var info : fieldInfo){
 					if(isFieldIncluded(includeNames, info.name)){
-						defineField(writer, info);
-						implementUserAccess(writer, info, humanName);
+						defineField(writer, cw, info);
+						implementUserAccess(writer, cw, info, humanName);
 					}else{
-						defineNoField(writer, info);
+						defineNoField(writer, cw, info);
 					}
 				}
 				
@@ -617,12 +645,12 @@ public final class DefInstanceCompiler{
 					     IOFieldTools.isNullable(f) ||
 					     List.of(ChunkPointer.class, Optional.class).contains(Utils.typeToRaw(f.type))
 				)){
-					generateDefaultConstructor(writer, includedFields);
+					generateDefaultConstructor(writer, cw, includedFields);
 				}
 				
-				generateDataConstructor(writer, orderedFields, includeNames, humanName);//All fields constructor
+				generateDataConstructor(writer, cw, orderedFields, includeNames, humanName);//All fields constructor
 				if(includeNames.isPresent()){
-					generateDataConstructor(writer, includedOrdered, includeNames, humanName);//Included only fields constructor
+					generateDataConstructor(writer, cw, includedOrdered, includeNames, humanName);//Included only fields constructor
 				}
 				
 				readOnlyConstructor:
@@ -646,19 +674,23 @@ public final class DefInstanceCompiler{
 						}
 					}
 					
-					generateDataConstructor(writer, Match.of(dataFields), Match.empty(), humanName);
+					generateDataConstructor(writer, cw, Match.of(dataFields), Match.empty(), humanName);
 				}
 				
 				if(specials.set instanceof Some(var setFn)){
+					
+					var set = cw.function(setFn.getName());
 					
 					for(FieldInfo info : orderedFields.orElseThrow()){
 						writer.write(
 							"arg {!} {}",
 							info.name,
 							info.type);
+						set.arg(info.type, info.name);
 					}
 					
 					writer.write("public function {} start", setFn.getName());
+					var body = set.body();
 					
 					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("get #arg {!}", info.name);
@@ -666,16 +698,22 @@ public final class DefInstanceCompiler{
 							JorthUtils.nullCheckDup(writer, fieldNullMsg(info, humanName));
 						}
 						writer.write("set this {!}", info.name);
+						
+						body.get(info.name);
+						if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+							JorthUtils.nullCheckDup(body, fieldNullMsg(info, humanName));
+						}
+						body.setThis(info.name);
 					}
 					writer.wEnd();
 				}
 				
-				generateSpecialToString(interf, writer, specials);
+				generateSpecialToString(interf, writer, cw, specials);
 				
 				writer.wEnd();
 			}
 			
-			var file = jorth.getClassFile(implName);
+			var file = jorth.getClassFile(implName, cw);
 			ClassGenerationCommons.dumpClassName(implName, file);
 			if(log != null){
 				Log.log(log.output());
@@ -693,7 +731,7 @@ public final class DefInstanceCompiler{
 		}
 	}
 	
-	private static void unmappedClassFn(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
+	private static void unmappedClassFn(CodeStream writer, ClassDefinition cw, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
 				public static function {}
@@ -704,6 +742,9 @@ public final class DefInstanceCompiler{
 				""",
 			GET_UNMAPPED_CLASS_FN, baseClazz
 		);
+		
+		cw.function(GET_UNMAPPED_CLASS_FN).returns(Class.class).staticAcc()
+		  .body().val(baseClazz);
 	}
 	
 	private static boolean isFieldIncluded(Match<Set<String>> includeNames, String name){
@@ -713,16 +754,16 @@ public final class DefInstanceCompiler{
 		};
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, ClassDefinition cw, Specials specials) throws MalformedJorth{
 		if(specials.toStr instanceof Some(var toStr)){
-			generateSpecialToString(interf, writer, toStr);
+			generateSpecialToString(interf, writer, cw, toStr);
 		}
 		if(specials.toShortStr instanceof Some(var toShortStr)){
-			generateSpecialToString(interf, writer, toShortStr);
+			generateSpecialToString(interf, writer, cw, toShortStr);
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, ClassDefinition cw, Method method) throws MalformedJorth{
 		writer.write(
 			"""
 				public function {!0}
@@ -735,9 +776,13 @@ public final class DefInstanceCompiler{
 				""",
 			method.getName(),
 			interf.getName());
+		
+		cw.function(method.getName()).returns(String.class)
+		  .body()
+		  .call(interf, method.getName(), args -> args.get("this"));
 	}
 	
-	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
+	private static void generateDefaultConstructor(CodeStream writer, ClassDefinition cw, List<FieldInfo> fieldInfo) throws MalformedJorth{
 		writer.write(
 			"""
 				public function <init>
@@ -746,6 +791,10 @@ public final class DefInstanceCompiler{
 						static call #typ.impl $STRUCT
 					end
 				""");
+		
+		var init = cw.instanceInit()
+		             .body()
+		             .callSuper(e -> e.call(e.getTypeDef("typ.impl"), "$STRUCT"));
 		
 		for(FieldInfo info : fieldInfo){
 			if(info.type == ChunkPointer.class){
@@ -756,10 +805,19 @@ public final class DefInstanceCompiler{
 				writer.write("set this {!}", info.name);
 			}
 		}
+		for(FieldInfo info : fieldInfo){
+			if(info.type == ChunkPointer.class){
+				init.get(ChunkPointer.class, "NULL")
+				    .setThis(info.name);
+			}else if(Utils.typeToRaw(info.type) == Optional.class){
+				init.call(Optional.class, "empty")
+				    .setThis(info.name);
+			}
+		}
 		writer.wEnd();
 	}
 	
-	private static void generateDataConstructor(CodeStream writer, Match<List<FieldInfo>> oOrderedFields, Match<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
+	private static void generateDataConstructor(CodeStream writer, ClassDefinition cw, Match<List<FieldInfo>> oOrderedFields, Match<Set<String>> includeNames, String baseClassSimpleName) throws MalformedJorth{
 		if(!(oOrderedFields instanceof Some(var orderedFields)) || orderedFields.isEmpty()){
 			return;
 		}
@@ -778,9 +836,19 @@ public final class DefInstanceCompiler{
 			Iters.rangeMap(0, orderedFields.size(), i -> new SimpleEntry<>("arg" + i, orderedFields.get(i).type))
 		);
 		
+		var init = cw.instanceInit();
+		for(int i = 0; i<orderedFields.size(); i++){
+			init.arg(orderedFields.get(i).type, "arg" + i);
+		}
+		var body = init.body()
+		               .callSuper(args -> args.call(cw.getTypeDef("typ.impl"), "$STRUCT"));
+		
+		
+		
 		for(int i = 0; i<orderedFields.size(); i++){
 			FieldInfo info     = orderedFields.get(i);
 			boolean   included = isFieldIncluded(includeNames, info.name);
+			var       argName  = "arg" + i;
 			
 			boolean nullCheck;
 			if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
@@ -793,15 +861,19 @@ public final class DefInstanceCompiler{
 			if(!included){
 				if(nullCheck){
 					JorthUtils.nullCheck(writer, "get #arg arg" + i, fieldNullMsg(info, baseClassSimpleName));
+					JorthUtils.nullCheck(body, e -> e.get(argName), fieldNullMsg(info, baseClassSimpleName));
 				}
 				continue;
 			}
 			
 			writer.write("get #arg arg" + i);
+			body.get(argName);
 			if(nullCheck){
 				JorthUtils.nullCheckDup(writer, fieldNullMsg(info, baseClassSimpleName));
+				JorthUtils.nullCheckDup(body, fieldNullMsg(info, baseClassSimpleName));
 			}
 			writer.write("set this {!}", info.name);
+			body.setThis(info.name);
 		}
 		writer.wEnd();
 	}
@@ -855,7 +927,7 @@ public final class DefInstanceCompiler{
 		return Match.of(ordered);
 	}
 	
-	private static void defineStatics(CodeStream writer, Class<?> baseClazz) throws MalformedJorth{
+	private static void defineStatics(CodeStream writer, ClassDefinition cw, Class<?> baseClazz) throws MalformedJorth{
 		writer.write(
 			"""
 				private static field $V_STRUCT #Struct
@@ -878,10 +950,21 @@ public final class DefInstanceCompiler{
 				""",
 			Objects.class);
 		
-		unmappedClassFn(writer, baseClazz);
+		var vStruct = cw.field(Struct.class, "$V_STRUCT").staticAcc().visibility(Visibility.PRIVATE);
+		
+		cw.function("$STRUCT").returns(Struct.class).staticAcc().visibility(Visibility.PRIVATE)
+		  .body()
+		  .call(Objects.class, "isNull", args -> args.get(vStruct))
+		  .ifTrue(b -> {
+			  b.call(Struct.class, "of", args -> args.val(args.getTypeDef("typ.impl")))
+			   .setField(vStruct);
+		  })
+		  .get(vStruct);
+		
+		unmappedClassFn(writer, cw, baseClazz);
 	}
 	
-	private static void implementUserAccess(CodeStream writer, FieldInfo info, String classHumanName) throws MalformedJorth{
+	private static void implementUserAccess(CodeStream writer, ClassDefinition cw, FieldInfo info, String classHumanName) throws MalformedJorth{
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
 			var setter = info.setter.orElseThrow();
@@ -905,6 +988,11 @@ public final class DefInstanceCompiler{
 			info.type,
 			info.name
 		);
+		cw.function(getterName).returns(info.type)
+		  .annotation(IOValue.class, Map.of("name", info.name))
+		  .annotation(Override.class)
+		  .body()
+		  .getThis(info.name);
 		
 		if(setterName.isPresent()){
 			writer.write(
@@ -932,6 +1020,20 @@ public final class DefInstanceCompiler{
 					""",
 				info.name
 			);
+			
+			var body = cw.function(setterName.get())
+			             .arg(info.type, "val")
+			             .annotation(IOValue.class, Map.of("name", info.name))
+			             .annotation(Override.class)
+			             .body()
+			             .get("val");
+			
+			if(info.type == ChunkPointer.class || Utils.typeToRaw(info.type) == Optional.class){
+				JorthUtils.nullCheckDup(body, fieldNullMsg(info, classHumanName));
+			}
+			
+			body.setThis(info.name);
+			
 		}
 	}
 	
@@ -939,7 +1041,7 @@ public final class DefInstanceCompiler{
 		return '"' + classHumanName + "." + info.name + "\" can not be null!";
 	}
 	
-	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorth{
+	private static void defineNoField(CodeStream writer, ClassDefinition cw, FieldInfo info) throws MalformedJorth{
 		var getterName = info.getter.map(v -> v.method().getName()).orElseGet(() -> "get" + TextUtil.firstToUpperCase(info.name));
 		var setterName = info.setter.map(v -> v.method().getName()).orElseGet(() -> "set" + TextUtil.firstToUpperCase(info.name));
 		
@@ -963,6 +1065,11 @@ public final class DefInstanceCompiler{
 			getterName,
 			info.type
 		);
+		var getter = cw.function(getterName).returns(info.type);
+		writeAnnotations(getter, anns);
+		getter.body()
+		      .newObj(UnsupportedOperationException.class)
+		      .throwOp();
 		
 		writeAnnotations(writer, List.of(valAnn));
 		writer.write(
@@ -977,9 +1084,14 @@ public final class DefInstanceCompiler{
 			setterName,
 			info.type
 		);
+		var setter = cw.function(setterName).arg(info.type, "arg0");
+		writeAnnotations(setter, List.of(valAnn));
+		setter.body()
+		      .newObj(UnsupportedOperationException.class)
+		      .throwOp();
 	}
 	
-	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
+	private static void defineField(CodeStream writer, ClassDefinition cw, FieldInfo info) throws MalformedJorth{
 		writeAnnotations(writer, info.annotations);
 		writer.write(
 			"private {} field {!} {}",
@@ -987,6 +1099,9 @@ public final class DefInstanceCompiler{
 			info.name,
 			info.type
 		);
+		var f = cw.field(info.type, info.name).visibility(Visibility.PRIVATE);
+		if(info.setter.isEmpty()) f.finalAcc();
+		writeAnnotations(f, info.annotations);
 	}
 	
 	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, Collection<FieldStub> getters, Collection<FieldStub> setters){

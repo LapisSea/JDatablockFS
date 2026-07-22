@@ -1167,9 +1167,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					}
 				}
 				
-				bytecode = jorth.getClassFile(className);
-				var bytecodeNew = cw.getClassFile();
-				BytecodeUtils.compareClasses(bytecodeNew, bytecode);
+				bytecode = jorth.getClassFile(className, cw);
 				
 				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 				var cls    = access.defineClass(type, bytecode, true);

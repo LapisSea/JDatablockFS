@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -103,6 +104,10 @@ public interface FunctionInfo{
 		public List<JType> argumentTypes(){
 			return args;
 		}
+		@Override
+		public List<ClassName> getThrownExceptions(){
+			return Arrays.stream(method.getExceptionTypes()).map(ClassName::of).toList();
+		}
 		private Object  defaultEnumValue;
 		private boolean defaultEnumValueCached;
 		
@@ -178,6 +183,10 @@ public interface FunctionInfo{
 			return args;
 		}
 		@Override
+		public List<ClassName> getThrownExceptions(){
+			return Arrays.stream(ctor.getExceptionTypes()).map(ClassName::of).toList();
+		}
+		@Override
 		public Object defaultEnumValue(){
 			return null;
 		}
@@ -200,6 +209,7 @@ public interface FunctionInfo{
 	String name();
 	JType returnType();
 	List<JType> argumentTypes();
+	List<ClassName> getThrownExceptions();
 	Object defaultEnumValue();
 	
 	default Signature makeSignature(){
