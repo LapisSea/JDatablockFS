@@ -481,6 +481,13 @@ public class CodeBlock{
 		removeLocal(local);
 		return this;
 	}
+	public boolean hasVar(String name){
+		return localValues.get(name) != null;
+	}
+	public CodeBlock setIntoNewVar(String name) throws MalformedJorth{
+		var type = localStack.peekLast();
+		return var(type, name).set(name);
+	}
 	
 	public CodeBlock add(int val) throws MalformedJorth{
 		return add(Increment.simulate(localStack, val));

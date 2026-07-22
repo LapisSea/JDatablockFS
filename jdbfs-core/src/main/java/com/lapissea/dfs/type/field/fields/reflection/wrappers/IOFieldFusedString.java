@@ -184,7 +184,7 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 	}
 	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		var cb = accessMap.temporaryLocalField(CharBuffer.class, body);
 		
 		accessMap.set(getAccessor(), body, b -> {

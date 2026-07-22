@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.iterableplus.Match;
+import com.lapissea.jorth.lang.type.Visibility;
 
 import java.io.IOException;
 import java.lang.invoke.CallSite;
@@ -114,11 +115,12 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
-		return Match.of((constants, cw, type) -> {
+		return Match.of((cw, type) -> {
 			PipeCodeGen.defaultClassDef(cw);
 			
 			boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
-			constants.add(new SpecializedGenerator.AccessMap.ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", hasReadyStruct + ""));
+			cw.field(boolean.class, "DEBUG_READY_READ")
+			  .visibility(Visibility.PUBLIC).staticFinal(e -> e.val(hasReadyStruct));
 			
 			List<SpecializedGenerator> generators;
 			if(hasReadyStruct){
@@ -131,7 +133,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(constants, type, cw, getType(), generators);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

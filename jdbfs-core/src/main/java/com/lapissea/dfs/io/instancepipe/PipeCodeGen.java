@@ -13,8 +13,6 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
-import com.lapissea.dfs.type.field.VirtualAccessor;
-import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
@@ -30,110 +28,18 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 public final class PipeCodeGen{
 	
 	public interface PipeWriter<T extends IOInstance<T>>{
-		void writePipeClass(
-			Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, ClassDefinition cw, Class<T> type
-		) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType;
+		void writePipeClass(ClassDefinition cw, Class<T> type) throws MalformedJorth, UnsupportedCodeGenType;
 	}
 	
 	sealed interface ConstructionStrategy{
 		record Setters() implements ConstructionStrategy{ }
 		
 		record Constructor(FieldSet<?> fields) implements ConstructionStrategy{ }
-	}
-	static void writeConstants(ClassDefinition cw, Set<SpecializedGenerator.AccessMap.ConstantRequest> constants, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
-		record Acc(FieldAccessor<?> accessor, String name){ }
-		record FRef(IOField<?, ?> field, String name){ }
-		record EArr(Class<?> type, String name){ }
-		List<Acc>  accessors = new ArrayList<>();
-		List<FRef> fieldRefs = new ArrayList<>();
-		List<EArr> enumArrs  = new ArrayList<>();
-		
-		int i = -1;
-		for(SpecializedGenerator.AccessMap.ConstantRequest constant : constants){
-			i++;
-			switch(constant){
-				case SpecializedGenerator.AccessMap.ConstantRequest.EnumArr(var type) -> {
-					var name = "eArr_" + i + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
-					enumArrs.add(new EArr(type, name));
-					accessMap.addEnumArray(type, cw.getTypeDef("ThisClass"), name);
-					cw.field(type.arrayType(), name);
-				}
-				case SpecializedGenerator.AccessMap.ConstantRequest.FieldAcc(var accessor) -> {
-					var name = "acc_" + i + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
-					accessors.add(new Acc(accessor, name));
-					accessMap.addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
-					cw.field(GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")), name);
-				}
-				case SpecializedGenerator.AccessMap.ConstantRequest.FieldRef(var ioField) -> {
-					var name = "fieldRef_" + i + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
-					fieldRefs.add(new FRef(ioField, name));
-					accessMap.addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
-					cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name);
-				}
-				case SpecializedGenerator.AccessMap.ConstantRequest.DebugField(Class<?> type, String name, String ignore) -> {
-					cw.field(type, name);
-				}
-			}
-		}
-		
-		cw.staticInit();
-		
-		if(!accessors.isEmpty()){
-			var cinit = cw.staticInit().body()
-			              .call(Struct.class, "of", e -> e.val(cw.getTypeDef("ObjType")).val(Struct.STATE_FIELD_MAKE))
-			              .call("getFields");
-			
-			for(var it = accessors.iterator(); it.hasNext(); ){
-				var acc = it.next();
-				if(it.hasNext()){
-					cinit.dup();
-				}
-				var type = GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType"));
-				cinit.call("requireByName", e -> e.val(acc.accessor.getName()))
-				     .call("getAccessor").cast(VirtualAccessor.class)
-				     .setField(cw.field(type, acc.name).visibility(Visibility.PRIVATE).staticFinal());
-			}
-			
-		}
-		
-		if(!fieldRefs.isEmpty()){
-			var cinit = cw.staticInit().body()
-			              .call(Struct.class, "of", e -> e.val(cw.getTypeDef("ObjType")).val(Struct.STATE_FIELD_MAKE))
-			              .call("getFields");
-			
-			for(var it = fieldRefs.iterator(); it.hasNext(); ){
-				var acc = it.next();
-				if(it.hasNext()){
-					cinit.dup();
-				}
-				cinit.call("requireByName", e -> e.val(acc.field.getName()))
-				     .setField(cw.field(IOField.class, acc.name).visibility(Visibility.PRIVATE).staticFinal());
-			}
-		}
-		
-		
-		for(EArr enumArr : enumArrs){
-			cw.field(enumArr.type.arrayType(), enumArr.name)
-			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(enumArr.type, "values"));
-		}
-		
-		for(var debugField : Iters.from(constants).instancesOf(SpecializedGenerator.AccessMap.ConstantRequest.DebugField.class)){
-			cw.field(debugField.type(), debugField.name())
-			  .visibility(Visibility.PUBLIC).staticFinal(e -> {
-				  if(debugField.type() == boolean.class){ // TODO: Ugly hack. Make initCode propert type
-					  e.val(Boolean.parseBoolean(debugField.initCode()));
-				  }else{
-					  e.val(debugField.initCode());
-				  }
-			  });
-		}
 	}
 	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<ClassDefinition, Throwable> generateFn) throws Throwable{
 		var c     = lookup.lookupClass();
@@ -189,15 +95,15 @@ public final class PipeCodeGen{
 		return new ConstructionStrategy.Setters();
 	}
 	static void makeAndReadObj(
-		CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, ConstructionStrategy strategy
-	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		ClassDefinition cw, CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, ConstructionStrategy strategy
+	) throws MalformedJorth, UnsupportedCodeGenType{
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> {
-				accessMap.setup(false, false);
+				accessMap.setup(cw, false, false);
 				body.newObj(body.getTypeDef("ObjType"));
 			}
 			case ConstructionStrategy.Constructor ignore -> {
-				accessMap.setup(false, true);
+				accessMap.setup(cw, false, true);
 			}
 		}
 		
@@ -223,7 +129,7 @@ public final class PipeCodeGen{
 		}
 	}
 	static void overwrite_readNew(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap, Struct<?> type)
-		throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		throws MalformedJorth, UnsupportedCodeGenType{
 		var body = cw.function("readNew").visibility(Visibility.PROTECTED)
 		             .arg(DataProvider.class, "provider")
 		             .arg(ContentReader.class, "src")
@@ -233,7 +139,7 @@ public final class PipeCodeGen{
 		             .body();
 		
 		if(generators != null){
-			makeAndReadObj(body, generators, accessMap, getStrategy(type));
+			makeAndReadObj(cw, body, generators, accessMap, getStrategy(type));
 		}else{
 			CodeArg getArgs = c -> c.get("provider")
 			                        .get("src")
@@ -253,7 +159,7 @@ public final class PipeCodeGen{
 		}
 		body.returnOp();
 	}
-	static void overwrite_doRead(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	static void overwrite_doRead(ClassDefinition cw, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		
 		ClassName   objType        = cw.getTypeDef("ObjType");
 		GenericType objVarPoolType = GenericType.of(VarPool.class).withArgs(objType);
@@ -268,7 +174,7 @@ public final class PipeCodeGen{
 		             .annotation(Override.class)
 		             .body();
 		if(generators != null){
-			accessMap.setup(true, false);
+			accessMap.setup(cw, true, false);
 			
 			body.get("instance")
 			    .cast(objType);
@@ -321,41 +227,32 @@ public final class PipeCodeGen{
 		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
 	){
 		Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
 		
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
 			
-			while(true){
-				try{
-					var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
-						cw.typeDef("ObjType", objType);
-						
-						var accessMap = new SpecializedGenerator.AccessMap();
-						accessMap.setup(true, false);
-						
-						writeConstants(cw, constants, accessMap);
-						
-						Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
-						
-						var bootstrapDoRead =
-							cw.function("bootstrapDoRead").visibility(Visibility.PUBLIC).staticAcc()
-							  .arg(GenericType.of(VarPool.class).withArgs(objType), "ioPool")
-							  .arg(DataProvider.class, "provider")
-							  .arg(ContentReader.class, "src")
-							  .arg(objType, "instance")
-							  .arg(GenericContext.class, "genericContext")
-							  .returns(objType);
-						
-						CodeBlock body = bootstrapDoRead.body().get("instance");
-						
-						injectReadFields(body, generators, accessMap);
-					});
-					return new ConstantCallSite(target);
-				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-					constants.addAll(e.constants);
-				}
-			}
+			var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
+				cw.typeDef("ObjType", objType);
+				
+				var accessMap = new SpecializedGenerator.AccessMap();
+				accessMap.setup(cw, true, false);
+				
+				Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
+				
+				var bootstrapDoRead =
+					cw.function("bootstrapDoRead").visibility(Visibility.PUBLIC).staticAcc()
+					  .arg(GenericType.of(VarPool.class).withArgs(objType), "ioPool")
+					  .arg(DataProvider.class, "provider")
+					  .arg(ContentReader.class, "src")
+					  .arg(objType, "instance")
+					  .arg(GenericContext.class, "genericContext")
+					  .returns(objType);
+				
+				CodeBlock body = bootstrapDoRead.body().get("instance");
+				
+				injectReadFields(body, generators, accessMap);
+			});
+			return new ConstantCallSite(target);
 		}catch(UnsupportedCodeGenType e){
 			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
 				throw new RuntimeException("Failed to make specialized generators for " + objType.getTypeName());
@@ -367,28 +264,14 @@ public final class PipeCodeGen{
 		}
 	}
 	
-	private static void injectReadFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constantsReq = null;
-		
+	private static void injectReadFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
 			try{
 				generator.injectReadField(body, accessMap);
-			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-				if(constantsReq == null) constantsReq = new LinkedHashSet<>();
-				constantsReq.addAll(e.constants);
-			}catch(Throwable e){
-				//codegen probably from last field
-				if(constantsReq != null){
-					throw new SpecializedGenerator.AccessMap.ConstantNeeded(constantsReq);
-				}
-				throw e;
 			}finally{
 				accessMap.dropTemporary(body);
 			}
-		}
-		if(constantsReq != null){
-			throw new SpecializedGenerator.AccessMap.ConstantNeeded(constantsReq);
 		}
 	}
 	
@@ -415,35 +298,26 @@ public final class PipeCodeGen{
 	){
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
 		
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
 			
-			while(true){
-				try{
-					var target = makeImpl(lookup, name, cw -> {
-						cw.typeDef("ObjType", objType);
-						var accessMap = new SpecializedGenerator.AccessMap();
-						
-						writeConstants(cw, constants, accessMap);
-						
-						ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
-						var body = cw.function(name).staticAcc()
-						             .arg(DataProvider.class, "provider")
-						             .arg(ContentReader.class, "src")
-						             .arg(GenericContext.class, "genericContext")
-						             .returns(IOInstance.class)
-						             .body();
-						
-						makeAndReadObj(body, generators, accessMap, strategy);
-						
-						body.returnOp();
-					});
-					return new ConstantCallSite(target);
-				}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-					constants.addAll(e.constants);
-				}
-			}
+			var target = makeImpl(lookup, name, cw -> {
+				cw.typeDef("ObjType", objType);
+				var accessMap = new SpecializedGenerator.AccessMap();
+				
+				ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
+				var body = cw.function(name).staticAcc()
+				             .arg(DataProvider.class, "provider")
+				             .arg(ContentReader.class, "src")
+				             .arg(GenericContext.class, "genericContext")
+				             .returns(IOInstance.class)
+				             .body();
+				
+				makeAndReadObj(cw, body, generators, accessMap, strategy);
+				
+				body.returnOp();
+			});
+			return new ConstantCallSite(target);
 		}catch(UnsupportedCodeGenType e){
 			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
 				throw new RuntimeException("Failed to make specialized generators for " + objType.getTypeName());
@@ -472,12 +346,10 @@ public final class PipeCodeGen{
 	}
 	
 	public static void standardPipeImpl(
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants,
 		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
 		List<SpecializedGenerator> generators
-	) throws MalformedJorth, SpecializedGenerator.AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	) throws MalformedJorth, UnsupportedCodeGenType{
 		var accessMap = new SpecializedGenerator.AccessMap();
-		writeConstants(cw, constants, accessMap);
 		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		

@@ -184,7 +184,7 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	}
 	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		var type = Objects.requireNonNull(getType());
 		var res  = accessMap.temporaryLocalField(type, body);
 		

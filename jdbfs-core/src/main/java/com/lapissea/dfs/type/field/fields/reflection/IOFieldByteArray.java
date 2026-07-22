@@ -148,7 +148,7 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		set(ioPool, instance, data);
 	}
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		if(compression != null){
 			throw new UnsupportedCodeGenType("Compression variation not implemented");
 		}

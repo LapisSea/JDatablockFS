@@ -30,7 +30,6 @@ import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -176,7 +175,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			src.skipExact(bytes);
 		}
 		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 			var rawBits = accessMap.temporaryLocalField(long.class, body);
 			
 			int totalBits = 0;
@@ -199,8 +198,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			
 			int bitOffset = 0;
 			
-			Set<AccessMap.ConstantRequest> constantsReq = null;
-			
 			for(var fi : group){
 				int bits = Math.toIntExact(fi.getSizeDescriptor().requireFixed(WordSpace.BIT));
 				if(bits>31){
@@ -221,22 +218,9 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				accessMap.markTemporary();
 				try{
 					((SpecializedGenerator.OnBitSpace<?>)fi).injectReadFieldFromBits(body, accessMap, field);
-				}catch(AccessMap.ConstantNeeded e){
-					if(constantsReq == null) constantsReq = new LinkedHashSet<>();
-					constantsReq.addAll(e.constants);
-				}catch(Throwable e){
-					//codegen probably from last field
-					if(constantsReq != null){
-						throw new AccessMap.ConstantNeeded(constantsReq);
-					}
-					throw e;
 				}finally{
 					accessMap.dropTemporary(body);
 				}
-			}
-			
-			if(constantsReq != null){
-				throw new AccessMap.ConstantNeeded(constantsReq);
 			}
 		}
 	}

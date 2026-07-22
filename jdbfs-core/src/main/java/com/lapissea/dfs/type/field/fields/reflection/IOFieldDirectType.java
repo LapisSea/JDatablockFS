@@ -135,7 +135,7 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{ }
 	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		
 		if(nullable()){
 			var res = accessMap.temporaryLocalField(Objects.requireNonNull(getType()), body);

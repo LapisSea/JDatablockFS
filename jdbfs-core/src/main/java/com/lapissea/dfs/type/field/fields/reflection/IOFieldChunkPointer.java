@@ -121,7 +121,7 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 	}
 	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.set(getAccessor(), body, b -> {
 			b.call(ChunkPointer.class, "of", args -> {
 				if(dynamicSize == null){

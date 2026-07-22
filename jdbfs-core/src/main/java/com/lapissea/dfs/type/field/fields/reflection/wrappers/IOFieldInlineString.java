@@ -98,7 +98,7 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		return Optional.of('"' + val + '"');
 	}
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		if(!nullable()){
 			throw new ShouldNeverHappenError();
 		}

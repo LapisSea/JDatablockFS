@@ -3,17 +3,20 @@ package com.lapissea.dfs.type.field;
 import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitUtils;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.jorth.redo.CodeArg;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,13 +27,13 @@ import java.util.Set;
 public interface SpecializedGenerator{
 	
 	interface OnBitSpace<T extends IOInstance<T>> extends SpecializedGenerator{
-		void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType;
+		void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, UnsupportedCodeGenType;
 		
 		SizeDescriptor<T> getSizeDescriptor();
 		FieldAccessor<T> getAccessor();
 		
 		@Override
-		default void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+		default void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 			var bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
 			var bytes = BitUtils.bitsToBytes(bits);
 			var name  = accessMap.temporaryLocalField(bits<32? int.class : long.class, body);
@@ -49,22 +52,6 @@ public interface SpecializedGenerator{
 	
 	final class AccessMap{
 		
-		public sealed interface ConstantRequest{
-			record FieldAcc(FieldAccessor<?> val) implements AccessMap.ConstantRequest{ }
-			
-			record EnumArr(Class<? extends Enum<?>> type) implements AccessMap.ConstantRequest{ }
-			
-			record FieldRef(IOField<?, ?> type) implements AccessMap.ConstantRequest{ }
-			
-			record DebugField(Class<?> type, String name, String initCode) implements AccessMap.ConstantRequest{ }
-		}
-		
-		public static final class ConstantNeeded extends Exception{
-			public final List<AccessMap.ConstantRequest> constants;
-			public ConstantNeeded(AccessMap.ConstantRequest constant)   { this(List.of(constant)); }
-			public ConstantNeeded(Collection<ConstantRequest> constants){ this.constants = List.copyOf(constants); }
-		}
-		
 		private record GetInfo(ClassName className, String fieldName){ }
 		
 		private final Map<FieldAccessor<?>, String>            localFields    = new HashMap<>();
@@ -75,6 +62,9 @@ public interface SpecializedGenerator{
 		
 		private int tmpFieldCount = 0;
 		
+		private ClassDefinition constantClassDest;
+		private int             constantIndex = 0;
+		
 		private final List<Set<String>> temporaryStack = new ArrayList<>();
 		
 		/// indicates that if any field requires the (var) io pool
@@ -82,16 +72,18 @@ public interface SpecializedGenerator{
 		/// indicates that the object being built has its fields in local variables, not a builder
 		private boolean localObject;
 		
-		public void setup(boolean hasIOPool, boolean localObject){
+		public void setup(ClassDefinition constantClassDest, boolean hasIOPool, boolean localObject){
+			this.constantClassDest = constantClassDest;
 			this.hasIOPool = hasIOPool;
 			this.localObject = localObject;
 			tmpFieldCount = 0;
+			constantIndex = 0;
 			localFields.clear();
 			localFields2.clear();
 			temporaryStack.clear();
 		}
 		
-		public void set(FieldAccessor<?> field, CodeBlock body, CodeArg args) throws MalformedJorth, AccessMap.ConstantNeeded{
+		public void set(FieldAccessor<?> field, CodeBlock body, CodeArg args) throws MalformedJorth{
 			switch(field){
 				case FieldAccessor.FieldOrMethod fom -> {
 					if(!localObject){
@@ -130,10 +122,7 @@ public interface SpecializedGenerator{
 					body.set(localFieldName);
 					
 					if(hasIOPool){
-						var accessorInfo = accessorFields.get(field);
-						if(accessorInfo == null){
-							throw new AccessMap.ConstantNeeded(new AccessMap.ConstantRequest.FieldAcc(field));
-						}
+						var    accessorInfo = getOrCreateAccessorInfo(field);
 						String fnName;
 						if(field.getType() == long.class) fnName = "setLong";
 						else if(field.getType() == int.class) fnName = "setInt";
@@ -149,17 +138,78 @@ public interface SpecializedGenerator{
 				default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 			}
 		}
+		
+		private GetInfo getOrCreateAccessorInfo(FieldAccessor<?> field) throws MalformedJorth{
+			var accessorInfo = accessorFields.get(field);
+			if(accessorInfo == null){
+				return createFieldAccessorConstant(field);
+			}
+			return accessorInfo;
+		}
+		
+		private void createEnumConstant(Class<? extends Enum<?>> type) throws MalformedJorth{
+			var cw   = constantClassDest;
+			var name = "eArr_" + (constantIndex++) + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
+			cw.field(type.arrayType(), name)
+			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(type, "values"));
+			
+			addEnumArray(type, cw.getTypeDef("ThisClass"), name);
+		}
+		
+		private GetInfo createFieldAccessorConstant(FieldAccessor<?> accessor) throws MalformedJorth{
+			var cw   = constantClassDest;
+			var name = "acc_" + (constantIndex++) + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
+			
+			var field = cw.field(GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")), name)
+			              .visibility(Visibility.PRIVATE).staticFinal();
+			
+			var cinit = cw.staticInit().body();
+			getObjField(cinit, cw, accessor.getName());
+			cinit.call("getAccessor").cast(VirtualAccessor.class)
+			     .setField(field);
+			
+			return addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
+		}
+		private GetInfo createFieldRefConstant(IOField<?, ?> ioField) throws MalformedJorth{
+			var cw   = constantClassDest;
+			var name = "fieldRef_" + (constantIndex++) + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
+			
+			var field = cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name)
+			              .visibility(Visibility.PRIVATE).staticFinal();
+			
+			var cinit = cw.staticInit().body();
+			getObjField(cinit, cw, ioField.getName());
+			cinit.setField(field);
+			
+			return addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
+		}
+		
+		private static void getObjField(CodeBlock cinit, ClassDefinition cw, String name) throws MalformedJorth{
+			getObjFields(cinit, cw);
+			cinit.call("requireByName", e -> e.val(name));
+		}
+		private static void getObjFields(CodeBlock cinit, ClassDefinition cw) throws MalformedJorth{
+			if(!cinit.hasVar("objFields")){
+				cinit.call(Struct.class, "of", e -> e.val(cw.getTypeDef("ObjType")).val(Struct.STATE_FIELD_MAKE))
+				     .call("getFields")
+				     .setIntoNewVar("objFields");
+			}
+			cinit.get("objFields");
+		}
+		
 		public <E extends Enum<E>> void getEnumArray(Class<E> type, CodeBlock code) throws MalformedJorth{
 			var info = enumArrays.get(type);
 			if(info == null){
-				throw new NotImplementedException("GENERATE ENUM ON THE FLY");
+				createEnumConstant(type);
+				info = Objects.requireNonNull(enumArrays.get(type));
 			}
 			code.get(info.className, info.fieldName);
 		}
+		
 		public <E extends Enum<E>> void getFieldRef(IOField<?, ?> field, CodeBlock block) throws MalformedJorth{
 			var info = fieldRefFields.get(field);
 			if(info == null){
-				throw new NotImplementedException("GENERATE ENUM ON THE FLY");
+				info = createFieldRefConstant(field);
 			}
 			block.get(info.className, info.fieldName);
 		}
@@ -195,11 +245,15 @@ public interface SpecializedGenerator{
 				default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 			}
 		}
-		public void addAccessorField(FieldAccessor<?> accessor, ClassName className, String fieldName){
-			accessorFields.put(accessor, new AccessMap.GetInfo(className, fieldName));
+		private AccessMap.GetInfo addAccessorField(FieldAccessor<?> accessor, ClassName className, String fieldName){
+			var info = new AccessMap.GetInfo(className, fieldName);
+			accessorFields.put(accessor, info);
+			return info;
 		}
-		public void addFieldRefField(IOField<?, ?> accessor, ClassName className, String fieldName){
-			fieldRefFields.put(accessor, new AccessMap.GetInfo(className, fieldName));
+		private GetInfo addFieldRefField(IOField<?, ?> accessor, ClassName className, String fieldName){
+			var info = new AccessMap.GetInfo(className, fieldName);
+			fieldRefFields.put(accessor, info);
+			return info;
 		}
 		public void addEnumArray(Class<?> type, ClassName className, String fieldName){
 			enumArrays.put(type, new AccessMap.GetInfo(className, fieldName));
@@ -229,5 +283,5 @@ public interface SpecializedGenerator{
 		}
 	}
 	
-	void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType;
+	void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType;
 }

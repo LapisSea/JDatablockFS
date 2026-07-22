@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.utils.ReadWriteClosableLock;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -193,18 +194,19 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
-		return Match.of((constants, cw, type) -> {
+		return Match.of((cw, type) -> {
 			if(type != getType().getType()){
 				throw new AssertionError();
 			}
 			PipeCodeGen.defaultClassDef(cw);
 			
 			//Always true, varying pipe needs object info, can't generate fields on the fly so delegation is not possible
-			constants.add(new SpecializedGenerator.AccessMap.ConstantRequest.DebugField(boolean.class, "DEBUG_READY_READ", "true"));
+			cw.field(boolean.class, "DEBUG_READY_READ")
+			  .visibility(Visibility.PUBLIC).staticFinal(e -> e.val(true));
 			
 			List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(type, getSpecificFields());
 			
-			PipeCodeGen.standardPipeImpl(constants, type, cw, getType(), generators);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators);
 		});
 	}
 }

@@ -35,7 +35,6 @@ import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
-import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.StoragePool;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
@@ -1127,50 +1126,40 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			return Match.empty();
 		}
 		
-		Set<SpecializedGenerator.AccessMap.ConstantRequest> constants = new LinkedHashSet<>();
-		
-		while(true){
-			byte[] bytecode = null;
+		try{
+			var type      = getType().getConcreteType();
+			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
+			
+			var cw = new ClassDefinition(type.getClassLoader());
+			
+			cw.typeDef("GeneratorPipeClass", this.getClass());
+			cw.typeDef("ObjType", type);
+			cw.typeDef("ThisClass", ClassName.dotted(className));
+			
 			try{
-				var type      = getType().getConcreteType();
-				var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
-				
-				var cw = new ClassDefinition(type.getClassLoader());
-				
-				cw.typeDef("GeneratorPipeClass", this.getClass());
-				cw.typeDef("ObjType", type);
-				cw.typeDef("ThisClass", ClassName.dotted(className));
-				
-				try{
-					pipeWriter.writePipeClass(constants, cw, type);
-				}catch(UnsupportedCodeGenType e){
-					if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
-						Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
-						return Match.empty();
-					}
-					throw new UnsupportedOperationException("The struct was selected for optimized pipe implementation but it is not supported", e);
+				pipeWriter.writePipeClass(cw, type);
+			}catch(UnsupportedCodeGenType e){
+				if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
+					Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
+					return Match.empty();
 				}
-				
-				bytecode = cw.getClassFile();
-				
-				var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
-				var cls    = access.defineClass(type, bytecode, true);
-				//noinspection unchecked
-				return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
-			}catch(SpecializedGenerator.AccessMap.ConstantNeeded e){
-				var added = constants.addAll(e.constants);
-				if(!added){
-					throw new IllegalStateException("Accessor already added");
-				}
-			}catch(MalformedJorth e){
-				throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
-			}catch(AccessProvider.Defunct e){
-				throw new ShouldNeverHappenError(e);
-			}catch(ReflectiveOperationException e){
-				throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
-			}catch(NotImplementedException e){
-				throw new UnsupportedOperationException("Can not create specialized pipe for type: " + getType().getType().getTypeName() + " because one of the fields has an unimplemented variant", e);
+				throw new UnsupportedOperationException("The struct was selected for optimized pipe implementation but it is not supported", e);
 			}
+			
+			byte[] bytecode = cw.getClassFile();
+			
+			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
+			var cls    = access.defineClass(type, bytecode, true);
+			//noinspection unchecked
+			return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
+		}catch(MalformedJorth e){
+			throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
+		}catch(AccessProvider.Defunct e){
+			throw new ShouldNeverHappenError(e);
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException("Failed to instantiate specialized pipe for type: " + getType().getType().getTypeName(), e);
+		}catch(NotImplementedException e){
+			throw new UnsupportedOperationException("Can not create specialized pipe for type: " + getType().getType().getTypeName() + " because one of the fields has an unimplemented variant", e);
 		}
 	}
 	

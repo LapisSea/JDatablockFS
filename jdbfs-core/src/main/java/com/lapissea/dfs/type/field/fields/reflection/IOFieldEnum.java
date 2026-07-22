@@ -96,7 +96,7 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 	}
 	
 	@Override
-	public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, AccessMap.ConstantNeeded, UnsupportedCodeGenType{
+	public void injectReadFieldFromBits(CodeBlock body, AccessMap accessMap, String bitsFieldName) throws MalformedJorth, UnsupportedCodeGenType{
 		if(nullable()) throw new UnsupportedCodeGenType("Nullable enum not implemented yet");
 		
 		accessMap.set(getAccessor(), body, code -> {
