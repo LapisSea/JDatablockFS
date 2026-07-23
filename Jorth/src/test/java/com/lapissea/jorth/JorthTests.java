@@ -337,9 +337,8 @@ public class JorthTests{
 			
 			cd.function("init").arg(String.class, "testString")
 			  .body()
-			  .get("testString")
 			  .get("this")
-			  .swap()
+			  .get("testString")
 			  .setField(ts);
 		});
 		

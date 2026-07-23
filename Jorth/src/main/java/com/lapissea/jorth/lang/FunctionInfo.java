@@ -119,6 +119,10 @@ public interface FunctionInfo{
 			}
 			return defaultEnumValue;
 		}
+		@Override
+		public String toString(){
+			return method.toString();
+		}
 	}
 	
 	class OfConstructor implements FunctionInfo{
@@ -189,6 +193,10 @@ public interface FunctionInfo{
 		@Override
 		public Object defaultEnumValue(){
 			return null;
+		}
+		@Override
+		public String toString(){
+			return ctor.toString();
 		}
 	}
 	

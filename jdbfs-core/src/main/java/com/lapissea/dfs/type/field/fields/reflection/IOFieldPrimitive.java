@@ -37,6 +37,7 @@ import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -51,7 +52,7 @@ import java.util.function.BiFunction;
 import static com.lapissea.dfs.objects.NumberSize.*;
 import static com.lapissea.dfs.type.WordSpace.BIT;
 
-public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
+public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage implements FieldUsage{
@@ -118,9 +119,70 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}).orElseThrow(() -> new IllegalArgumentException(field.getType().getName() + " is not a primitive"));
 	}
 	
-	public abstract static sealed class FDoubleBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double> implements SpecializedGenerator{
+	interface ReadOp{
+		void readConst(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth;
+	}
+	
+	protected class StandardOps{
+		
+		private final IOFieldPrimitive.FBoolean<T> isNull;
+		private final ReadOp                       readOp;
+		
+		StandardOps(FBoolean<T> isNull, ReadOp readOp){
+			this.isNull = isNull;
+			this.readOp = readOp;
+		}
+		
+		protected void readField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
+			var type = getAccessor().getType();
+			if(nullable()){
+				var tmpInt = accessMap.temporaryLocalField(type, body);
+				if(getDynamicSize() == null){
+					accessMap.get(isNull, body);
+					body.ifTrue(b -> {
+						b.get("src")
+						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
+						 .nullVal(type)
+						 .set(tmpInt);
+					}).elseRun(b -> {
+						readOp.readConst(b, accessMap);
+						if(!type.isPrimitive()) b.box();
+						b.set(tmpInt);
+					});
+				}else{
+					accessMap.get(isNull, body);
+					body.ifTrue(b -> {
+						accessMap.get(getDynamicSize().field, b);
+						b.call("skip", e -> e.get("src"))
+						 .nullVal(type).set(tmpInt);
+					}).elseRun(b -> {
+						readOp.readConst(b, accessMap);
+						if(!type.isPrimitive()) b.box();
+						b.set(tmpInt);
+					});
+				}
+				accessMap.set(getAccessor(), body, c -> c.get(tmpInt));
+			}else{
+				accessMap.set(getAccessor(), body, c -> {
+					readOp.readConst(c, accessMap);
+					if(!type.isPrimitive()) c.box();
+				});
+			}
+		}
+	}
+	
+	public abstract static sealed class FDoubleBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
 		private FDoubleBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (target, accessMap) -> {
+				if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
+					throw UtilL.uncheckedThrow(new UnsupportedCodeGenType("For now doubles can only be 8 bytes"));//TODO: proper checked throw
+				}
+				target.get("src").call("readFloat8");
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -137,7 +199,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FDouble<T extends IOInstance<T>> extends FDoubleBase<T>{
 		
-		private FDouble(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private FDouble(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
 		
 		@Override
 		protected IOField<T, Double> withVaryingSize(VaryingSize size){
@@ -161,17 +226,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void set(VarPool<T> ioPool, T instance, Double value){
 			setValue(ioPool, instance, value);
-		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
-				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
-			}
-			
-			accessMap.set(getAccessor(), body, code -> {
-				code.get("src").call("readFloat8");
-			});
 		}
 		
 		@Override
@@ -207,6 +261,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		@Override
 		protected IOField<T, Double> withVaryingSize(VaryingSize size){
@@ -224,35 +279,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				}
 			}));
 		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-			if(getDynamicSize() != null || getSizeDescriptor().requireFixed(WordSpace.BYTE) != 8){
-				throw new UnsupportedCodeGenType("For now doubles can only be 8 bytes");
-			}
-			
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Double.class, body);
-				
-				accessMap.get(isNull, body);
-				body.ifTrue(branch -> {
-					branch.get("src")
-					      .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-					      .nullVal(Double.class)
-					      .set(tmpInt);
-				}).elseRun(branch -> {
-					branch.get("src")
-					      .call("readFloat8")
-					      .box()
-					      .set(tmpInt);
-				});
-				
-				accessMap.set(getAccessor(), body, code -> code.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, code -> code.get("src").call("readFloat8").box());
-			}
-		}
-		
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
@@ -291,9 +317,21 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public abstract static sealed class FCharBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character> implements SpecializedGenerator{
+	public abstract static sealed class FCharBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
 		
 		private FCharBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, false);
+				}else{
+					accessMap.get(getDynamicSize().field.getAccessor(), body);
+					NumberSize.readIntDyn(body, false);
+				}
+				body.cast(char.class);
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -317,7 +355,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FChar<T extends IOInstance<T>> extends FCharBase<T>{
 		
-		private FChar(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private FChar(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
 		
 		@Override
 		protected IOField<T, Character> withVaryingSize(VaryingSize size){
@@ -341,20 +382,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void set(VarPool<T> ioPool, T instance, Character value){
 			setValue(ioPool, instance, value);
-		}
-		
-		
-		@Override
-		public void injectReadField(CodeBlock block, AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), block, code -> {
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(code, false);
-				}else{
-					accessMap.get(getDynamicSize().field.getAccessor(), code);
-					NumberSize.readIntDyn(code, false);
-				}
-				code.cast(char.class);
-			});
 		}
 		
 		@Override
@@ -393,6 +420,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		
 		@Override
@@ -444,68 +472,26 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var val = get(ioPool, instance);
 			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
 		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Character.class, body);
-				if(getDynamicSize() == null){
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-						 .nullVal(Character.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						maxSize.size.readIntConst(b, false);
-						b.cast(char.class).box().set(tmpInt);
-					});
-				}else{
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						b.call("skip", e -> e.get("src"))
-						 .nullVal(Character.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						accessMap.get(getDynamicSize().field.getAccessor(), b);
-						readIntDyn(b, false);
-						b.cast(char.class).box().set(tmpInt);
-					});
-				}
-				accessMap.set(getAccessor(), body, c -> c.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, c -> {
-					if(getDynamicSize() == null){
-						maxSize.size.readIntConst(c, false);
-					}else{
-						accessMap.get(getDynamicSize().field, c);
-						readIntDyn(c, false);
-					}
-					c.cast(char.class).box();
-				});
-			}
-			
-		}
 	}
 	
-	
-	private abstract static sealed class FFloatBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float> implements SpecializedGenerator{
+	private abstract static sealed class FFloatBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
 		
 		private FFloatBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readFloatConst(body);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readFloatDyn(body);
+				}
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, SHORT, INT);
-		}
-		
-		protected void readRawFloat(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			if(getDynamicSize() == null){
-				maxSize.size.readFloatConst(body);
-			}else{
-				accessMap.get(getDynamicSize().field, body);
-				NumberSize.readFloatDyn(body);
-			}
 		}
 		
 		@Override
@@ -527,6 +513,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		@Override
 		protected IOField<T, Float> withVaryingSize(VaryingSize size){
@@ -544,43 +531,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				}
 			}));
 		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Float.class, body);
-				if(getDynamicSize() == null){
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-						 .nullVal(Float.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						maxSize.size.readFloatConst(b);
-						b.box().set(tmpInt);
-					});
-				}else{
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						b.call("skip", e -> e.get("src"))
-						 .nullVal(Float.class).set(tmpInt);
-					}).elseRun(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						readFloatDyn(b);
-						b.box().set(tmpInt);
-					});
-				}
-				accessMap.set(getAccessor(), body, c -> c.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, c -> {
-					readRawFloat(c, accessMap);
-					c.box();
-				});
-			}
-		}
-		
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
@@ -621,7 +571,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FFloat<T extends IOInstance<T>> extends FFloatBase<T>{
 		
-		private FFloat(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private FFloat(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
 		
 		@Override
 		protected IOField<T, Float> withVaryingSize(VaryingSize size){
@@ -648,13 +601,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), body, c -> {
-				readRawFloat(c, accessMap);
-			});
-		}
-		
-		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size = getSafeSize(ioPool, instance, INT);
 			size.writeFloat(dest, getValue(ioPool, instance));
@@ -676,7 +622,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public abstract static sealed class FLongBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long> implements SpecializedGenerator{
+	public abstract static sealed class FLongBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
 		protected final boolean unsigned;
 		
@@ -684,6 +630,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readDyn(body, !unsigned);
+				}
+			});
+		}
+		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.allOf(NumberSize.class);
@@ -708,20 +666,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return val;
 		}
 		
-		protected void readLong(CodeBlock writer, AccessMap accessMap) throws MalformedJorth{
-			if(getDynamicSize() == null){
-				maxSize.size.readConst(writer, !unsigned);
-			}else{
-				accessMap.get(getDynamicSize().field, writer);
-				NumberSize.readDyn(writer, !unsigned);
-			}
-		}
 	}
 	
 	public static final class FLong<T extends IOInstance<T>> extends FLongBase<T>{
 		
 		private FLong(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
+			initStd(null);
 		}
 		
 		@Override
@@ -761,13 +712,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), body, c -> {
-				readLong(c, accessMap);
-			});
-		}
-		
-		@Override
 		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
@@ -798,6 +742,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		@Override
 		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
@@ -842,45 +787,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				
-				var tmpInt = accessMap.temporaryLocalField(Long.class, body);
-				if(getDynamicSize() == null){
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-						 .nullVal(Long.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						maxSize.size.readConst(b, !unsigned);
-						b.box().set(tmpInt);
-					});
-				}else{
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						b.call("skip", e -> e.get("src"))
-						 .nullVal(Long.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						NumberSize.readDyn(b, !unsigned);
-						b.box().set(tmpInt);
-					});
-					
-				}
-				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, e -> {
-					readLong(e, accessMap);
-					e.box();
-				});
-			}
-		}
-		
-		@Override
 		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = get(ioPool, instance);
 			if(val == null) return Optional.empty();
@@ -893,7 +799,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public abstract static sealed class FIntBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer> implements SpecializedGenerator{
+	public abstract static sealed class FIntBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
 		
 		protected final boolean unsigned;
 		
@@ -901,6 +807,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readIntDyn(body, !unsigned);
+				}
+			});
+		}
+		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			var all = EnumSet.allOf(NumberSize.class);
@@ -948,6 +866,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		
 		@Override
@@ -1000,53 +919,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
 		}
 		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Integer.class, body);
-				if(getDynamicSize() == null){
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-						 .nullVal(Integer.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						maxSize.size.readIntConst(b, !unsigned);
-						b.box().set(tmpInt);
-					});
-				}else{
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						b.call("skip", e -> e.get("src"))
-						 .nullVal(Integer.class).set(tmpInt);
-					}).elseRun(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						readIntDyn(b, !unsigned);
-						b.box().set(tmpInt);
-					});
-				}
-				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, e -> {
-					if(getDynamicSize() == null){
-						maxSize.size.readIntConst(e, !unsigned);
-					}else{
-						accessMap.get(getDynamicSize().field, e);
-						readIntDyn(e, !unsigned);
-					}
-					e.box();
-				});
-			}
-			
-		}
 	}
 	
 	public static final class FInt<T extends IOInstance<T>> extends FIntBase<T>{
 		
 		private FInt(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
+			initStd(null);
 		}
 		@Override
 		protected IOField<T, Integer> withVaryingSize(VaryingSize size){ return new FInt<>(getAccessor(), size); }
@@ -1083,18 +962,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), body, e -> {
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(e, !unsigned);
-				}else{
-					accessMap.get(getDynamicSize().field, e);
-					NumberSize.readIntDyn(e, !unsigned);
-				}
-			});
-		}
-		
-		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1) == getValue(ioPool2, inst2);
 		}
@@ -1104,7 +971,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public abstract static sealed class FShortBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short> implements SpecializedGenerator{
+	public abstract static sealed class FShortBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
 		
 		protected final boolean unsigned;
 		
@@ -1112,6 +979,19 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			super(field, size);
 			unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 		}
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				if(getDynamicSize() == null){
+					maxSize.size.readIntConst(body, !unsigned);
+				}else{
+					accessMap.get(getDynamicSize().field, body);
+					NumberSize.readIntDyn(body, !unsigned);
+				}
+				body.cast(short.class);
+			});
+		}
+		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			var all = EnumSet.allOf(NumberSize.class);
@@ -1149,6 +1029,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private FShort(FieldAccessor<T> field, VaryingSize size){
 			super(field, size);
+			initStd(null);
 		}
 		@Override
 		protected IOField<T, Short> withVaryingSize(VaryingSize size){
@@ -1172,19 +1053,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void set(VarPool<T> ioPool, T instance, Short value){
 			setValue(ioPool, instance, value);
-		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), body, b -> {
-				if(getDynamicSize() == null){
-					maxSize.size.readIntConst(b, !unsigned);
-				}else{
-					accessMap.get(getDynamicSize().field, b);
-					NumberSize.readIntDyn(b, !unsigned);
-				}
-				b.cast(short.class);
-			});
 		}
 		
 		@Override
@@ -1223,6 +1091,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		
 		@Override
@@ -1274,56 +1143,17 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var val = get(ioPool, instance);
 			return val == null? Integer.MAX_VALUE : Integer.hashCode(val);
 		}
-		@Override
-		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Short.class, body);
-				if(getDynamicSize() == null){
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
-						 .nullVal(Short.class)
-						 .set(tmpInt);
-						
-					}).elseRun(b -> {
-						maxSize.size.readIntConst(b, !unsigned);
-						b.cast(short.class).box()
-						 .set(tmpInt);
-					});
-				}else{
-					accessMap.get(isNull, body);
-					body.ifTrue(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						b.call("skip", a -> a.get("src"))
-						 .nullVal(Short.class)
-						 .set(tmpInt);
-					}).elseRun(b -> {
-						accessMap.get(getDynamicSize().field, b);
-						readIntDyn(b, !unsigned);
-						b.cast(short.class).box()
-						 .set(tmpInt);
-					});
-				}
-				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, b -> {
-					if(getDynamicSize() == null){
-						maxSize.size.readIntConst(b, !unsigned);
-					}else{
-						accessMap.get(getDynamicSize().field, b);
-						readIntDyn(b, !unsigned);
-					}
-					b.cast(short.class).box();
-				});
-			}
-			
-		}
 	}
 	
-	public abstract static sealed class FByteBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte> implements SpecializedGenerator{
+	public abstract static sealed class FByteBase<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
 		protected FByteBase(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		
+		protected void initStd(IOFieldPrimitive.FBoolean<T> isNull){
+			std = new StandardOps(isNull, (body, accessMap) -> {
+				body.get("src").call("readInt1");
+			});
+		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -1340,7 +1170,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FByte<T extends IOInstance<T>> extends FByteBase<T>{
 		
-		private FByte(FieldAccessor<T> field, VaryingSize size){ super(field, size); }
+		private FByte(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
+			initStd(null);
+		}
 		
 		@Override
 		protected IOField<T, Byte> withVaryingSize(VaryingSize size){
@@ -1364,13 +1197,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void set(VarPool<T> ioPool, T instance, Byte value){
 			setValue(ioPool, instance, value);
-		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-			accessMap.set(getAccessor(), body, b -> {
-				b.get("src").call("readInt1");
-			});
 		}
 		
 		@Override
@@ -1408,6 +1234,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			if(nullable()){
 				isNull = fields.requireExactBoolean(FieldNames.nullFlag(getAccessor()));
 			}
+			initStd(isNull);
 		}
 		
 		@Override
@@ -1458,29 +1285,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			var val = get(ioPool, instance);
 			return val == null? 0 : Byte.hashCode(val);
-		}
-		
-		@Override
-		public void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
-			if(nullable()){
-				var tmpInt = accessMap.temporaryLocalField(Byte.class, body);
-				
-				accessMap.get(isNull, body);
-				body.ifTrue(b -> {
-					b.get("src").call("skipExact", e -> e.val((long)maxSize.size.bytes))
-					 .nullVal(Byte.class)
-					 .set(tmpInt);
-				}).elseRun(b -> {
-					b.get("src").call("readInt1").box()
-					 .set(tmpInt);
-				});
-				accessMap.set(getAccessor(), body, e -> e.get(tmpInt));
-			}else{
-				accessMap.set(getAccessor(), body, e -> {
-					e.get("src").call("readInt1").box();
-				});
-			}
-			
 		}
 	}
 	
@@ -1674,6 +1478,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected final VaryingSize      maxSize;
 	private         DynamicFieldSize dynamicSize;
 	
+	protected StandardOps std;
+	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
 		var maxAllowed = maxAllowed();
@@ -1727,6 +1533,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size = getSize(ioPool, instance);
 		size.skip(src);
+	}
+	
+	@Override
+	public final void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
+		std.readField(body, accessMap);
 	}
 	
 	protected abstract EnumSet<NumberSize> allowedSizes();

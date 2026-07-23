@@ -448,10 +448,20 @@ public sealed interface Insn{
 				}
 			}
 			
-			if(nonTermTrue == null || nonTermFalse == null){
+			if(nonTermTrue != null && nonTermFalse != null){
+				if(!nonTermTrue.stacksMatch(nonTermFalse)){
+					throw new MalformedJorth(
+						"Conditional jump of 2 blocks must have the same stacks:\n" +
+						"  true:  " + nonTermTrue.stackView() + "\n" +
+						"  false: " + nonTermFalse.stackView());
+				}
+			}else if(nonTermTrue != null || nonTermFalse != null){
 				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
-				if(other != null && !other.stacksMatch(stack)){
-					throw new MalformedJorth("Conditional jump must have the same stack as the base." + other);
+				if(!other.stacksMatch(stack)){
+					throw new MalformedJorth(
+						"Conditional jump must have the same stack as the base:\n" +
+						"  base:   " + stack + "\n" +
+						"  branch: " + other.stackView());
 				}
 			}
 		}

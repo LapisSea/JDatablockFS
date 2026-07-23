@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
 
 public class CodeBlock{
 	
+	private enum FreezeReason{
+		EDITING_CHILD,
+		FINISHED_EDITING;
+	}
+	
 	private final LocalsArray localValues = new LocalsArray();
 	
 	private final List<Insn> insns = new ArrayList<>();
@@ -32,7 +37,7 @@ public class CodeBlock{
 	private final TypeSource         typeSource;
 	private final FunctionDefinition fnOwner;
 	
-	private boolean addingChild;
+	private FreezeReason freezeReason;
 	
 	public CodeBlock(TypeStack baseStack, TypeSource typeSource, FunctionDefinition fnOwner){
 		localStack = new TypeStack(baseStack);
@@ -50,9 +55,7 @@ public class CodeBlock{
 	}
 	
 	private CodeBlock add(Insn insn) throws MalformedJorth{
-		if(addingChild){
-			throw new IllegalAccessError("Should not modify parent while in a lambda");
-		}
+		checkFreeze();
 		if(terminates()){
 			throw new MalformedJorth("This code block has terminated");
 		}
@@ -61,7 +64,20 @@ public class CodeBlock{
 		return this;
 	}
 	
+	private void checkFreeze(){
+		if(freezeReason != null){
+			deny();
+		}
+	}
+	private void deny(){
+		throw new IllegalAccessError(switch(freezeReason){
+			case EDITING_CHILD -> "Should not modify parent while in a lambda";
+			case FINISHED_EDITING -> "The block is no longer editable";
+		});
+	}
+	
 	public CodeBlock scope(CodeArg code) throws MalformedJorth{
+		checkFreeze();
 		var block = createBlockFromHere(code);
 		for(GenericType typ : block.localStack.getLocalPortion()){
 			localStack.push(typ);
@@ -96,11 +112,11 @@ public class CodeBlock{
 	}
 	
 	private void guardedBlock(CodeArg code, CodeBlock block) throws MalformedJorth{
-		addingChild = true;
+		freezeReason = FreezeReason.EDITING_CHILD;
 		try{
 			code.accept(block);
 		}finally{
-			addingChild = false;
+			freezeReason = null;
 		}
 	}
 	
@@ -438,6 +454,10 @@ public class CodeBlock{
 		return this.localStack.equals(localStack);
 	}
 	
+	public List<GenericType> stackView(){
+		return localStack.totalStack().toList();
+	}
+	
 	public CodeBlock cast(Class<?> type) throws MalformedJorth { return cast(ClassName.of(type)); }
 	public CodeBlock cast(ClassName type) throws MalformedJorth{ return cast(GenericType.of(type)); }
 	public CodeBlock cast(GenericType type) throws MalformedJorth{
@@ -537,6 +557,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock box() throws MalformedJorth{
+		checkFreeze();
 		class Boxes{
 			private static Map.Entry<GenericType, FunctionInfo> getBoxInfo(GenericType typ, Class<?> cls){
 				var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, cls.getClassLoader()), cls);
