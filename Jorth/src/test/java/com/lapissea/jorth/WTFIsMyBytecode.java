@@ -81,4 +81,10 @@ public class WTFIsMyBytecode<ARG>{
 	public static boolean i2b(int thing){
 		return thing != 0;
 	}
+	
+	public static void ifEquals(Object a, Object b){
+		if(a != b){
+			System.out.println("Equals");
+		}
+	}
 }

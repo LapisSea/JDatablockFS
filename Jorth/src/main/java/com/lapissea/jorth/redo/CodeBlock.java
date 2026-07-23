@@ -183,8 +183,10 @@ public class CodeBlock{
 		return trueBlock(code, ConditionalJump.Type.TRUE_BOOL);
 	}
 	public CodeBlock ifEquality(CodeArg code) throws MalformedJorth{
-		return equalityOp().ifTrue(code);
-//		return trueBlock(code, ConditionalJump.Type.EQUALITY);
+		return trueBlock(code, ConditionalJump.Type.EQUALITY);
+	}
+	public CodeBlock ifNotEquality(CodeArg code) throws MalformedJorth{
+		return falseBlock(code, ConditionalJump.Type.EQUALITY);
 	}
 	private CodeBlock falseBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
 		var block = createBlockFromHere(code);
@@ -419,7 +421,7 @@ public class CodeBlock{
 	public boolean terminates(){
 		if(insns.isEmpty()) return false;
 		Insn last = insns.getLast();
-		return last instanceof ReturnOp || last instanceof ThrowOp;
+		return last instanceof TerminatingInsn t && t.terminates();
 	}
 	
 	@Override

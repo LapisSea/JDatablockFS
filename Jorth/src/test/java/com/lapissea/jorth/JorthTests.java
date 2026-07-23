@@ -186,6 +186,108 @@ public class JorthTests{
 		assertThat(list).containsExactly("start", "lmao", "end");
 	}
 	
+	@DataProvider
+	Object[][] equalityTypes(){
+		return new Object[][]{
+			{Object.class, new Object(), new Object(), false},
+			{Object.class, "same", "same", true},
+			{int.class, 1, 2, false},
+			{int.class, 42, 42, true},
+			{long.class, 1L, 2L, false},
+			{long.class, 999L, 999L, true},
+			{float.class, 1.0f, 2.0f, false},
+			{float.class, 3.14f, 3.14f, true},
+			{double.class, 1.0, 2.0, false},
+			{double.class, 2.718, 2.718, true},
+			{boolean.class, true, false, false},
+			{boolean.class, true, true, true},
+			{char.class, 'a', 'b', false},
+			{char.class, 'x', 'x', true},
+			{byte.class, (byte)1, (byte)2, false},
+			{byte.class, (byte)7, (byte)7, true},
+			{short.class, (short)1, (short)2, false},
+			{short.class, (short)10, (short)10, true},
+			};
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifEqualsBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .val(2);
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 1 : 2;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifNotEqualsBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifNotEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .val(2);
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 2 : 1;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(dataProvider = "equalityTypes")
+	void ifEqualsElseBranch(Class<?> type, Object arg1, Object arg2, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(type, "a").arg(type, "b")
+			           .returns(int.class);
+			fn.body()
+			  .get("a")
+			  .get("b")
+			  .ifEquality(code -> {
+				  code.val(1)
+				      .returnOp();
+			  })
+			  .elseRun(code -> {
+				  code.val(2)
+				      .returnOp();
+			  });
+		});
+		
+		var method    = cls.getMethod("check", type, type);
+		int generated = (int)method.invoke(null, arg1, arg2);
+		
+		int expected = expectedEqual? 1 : 2;
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
 	@Test
 	void functionCallTest() throws Exception{
 		

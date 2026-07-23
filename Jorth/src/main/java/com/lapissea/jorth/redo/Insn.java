@@ -34,6 +34,10 @@ import static org.objectweb.asm.Opcodes.*;
 
 public sealed interface Insn{
 	
+	sealed interface TerminatingInsn extends Insn{
+		boolean terminates();
+	}
+	
 	private static GenericType doEquality(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
 		stack.requireElements(2);
 		GenericType a = stack.pop();
@@ -305,7 +309,7 @@ public sealed interface Insn{
 		}
 	}
 	
-	record ReturnOp(BaseType typ) implements Insn{
+	record ReturnOp(BaseType typ) implements TerminatingInsn{
 		
 		static ReturnOp simulate(JType returnType, TypeSource typeSource, TypeStack stack, boolean modifyStack) throws MalformedJorth{
 			if(returnType != null){
@@ -327,9 +331,13 @@ public sealed interface Insn{
 		public void visit(MethodVisitor writer){
 			writer.visitInsn(typ.returnOp);
 		}
+		@Override
+		public boolean terminates(){
+			return true;
+		}
 	}
 	
-	record ThrowOp() implements Insn{
+	record ThrowOp() implements TerminatingInsn{
 		private static final GenericType THROWABLE = GenericType.of(Throwable.class);
 		static ThrowOp simulate(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
 			var popped = stack.pop();
@@ -342,6 +350,10 @@ public sealed interface Insn{
 		@Override
 		public void visit(MethodVisitor writer){
 			writer.visitInsn(ATHROW);
+		}
+		@Override
+		public boolean terminates(){
+			return true;
 		}
 	}
 	
@@ -424,7 +436,7 @@ public sealed interface Insn{
 		}
 	}
 	
-	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements Insn{
+	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements TerminatingInsn{
 		
 		private static void checkBranches(TypeStack stack, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
 			CodeBlock nonTermTrue  = onTrue == null || onTrue.terminates()? null : onTrue;
@@ -490,13 +502,49 @@ public sealed interface Insn{
 					}
 				}
 				case EQUALITY -> {
-					throw new NotImplementedException();
+					var bt = vType.getBaseType();
+					if(bt.cmpOp != -1){
+						writer.visitInsn(bt.cmpOp);
+					}
+					if(onTrue != null && onFalse != null){
+						if(bt.cmpOp != -1){
+							writer.visitJumpInsn(IFNE, falseLabel);
+						}else{
+							writer.visitJumpInsn(bt.neJumpOp, falseLabel);
+						}
+						onTrue.visit(writer);
+						writer.visitJumpInsn(GOTO, endLabel);
+						writer.visitLabel(falseLabel);
+						onFalse.visit(writer);
+						writer.visitLabel(endLabel);
+					}else if(onTrue != null){
+						if(bt.cmpOp != -1){
+							writer.visitJumpInsn(IFNE, endLabel);
+						}else{
+							writer.visitJumpInsn(bt.neJumpOp, endLabel);
+						}
+						onTrue.visit(writer);
+						writer.visitLabel(endLabel);
+					}else{
+						if(bt.cmpOp != -1){
+							writer.visitJumpInsn(IFEQ, endLabel);
+						}else{
+							writer.visitJumpInsn(bt.eqJumpOp, endLabel);
+						}
+						onFalse.visit(writer);
+						writer.visitLabel(endLabel);
+					}
 				}
 			}
 		}
 		public ConditionalJump withFalse(TypeStack stack, CodeBlock onFalse) throws MalformedJorth{
 			checkBranches(stack, onTrue, onFalse);
 			return new ConditionalJump(type, vType, onTrue, onFalse);
+		}
+		@Override
+		public boolean terminates(){
+			return onTrue != null && onTrue.terminates() &&
+			       onFalse != null && onFalse.terminates();
 		}
 	}
 	
@@ -992,7 +1040,7 @@ public sealed interface Insn{
 		}
 	}
 	
-	record InlineBlock(CodeBlock block) implements Insn{
+	record InlineBlock(CodeBlock block) implements TerminatingInsn{
 		
 		public static InlineBlock simulate(CodeBlock block){
 			return new InlineBlock(block);
@@ -1001,6 +1049,10 @@ public sealed interface Insn{
 		@Override
 		public void visit(MethodVisitor writer){
 			block.visit(writer);
+		}
+		@Override
+		public boolean terminates(){
+			return block.terminates();
 		}
 	}
 	
