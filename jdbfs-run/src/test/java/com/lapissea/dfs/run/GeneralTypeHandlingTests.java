@@ -641,7 +641,6 @@ public class GeneralTypeHandlingTests{
 			Set.of(new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of(),
-			List.of(),
 			List.of());
 		//noinspection unchecked
 		var typ = (Class<T>)TempClassGen.gen(def);

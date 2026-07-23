@@ -194,7 +194,6 @@ public final class StructFuzzTest{
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of(),
-			List.of(),
 			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
@@ -212,7 +211,6 @@ public final class StructFuzzTest{
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
 			List.of(Annotations.makeVal(IOInstance.Order.class, new String[]{"s1", "s2"})),
-			List.of(),
 			List.of());
 		testType(gen);
 		simpleEncounter.add(gen);
@@ -228,7 +226,6 @@ public final class StructFuzzTest{
 			),
 			Set.of(new TempClassGen.CtorType.All(), new TempClassGen.CtorType.Empty()),
 			IOInstance.Managed.class,
-			List.of(),
 			List.of(),
 			List.of());
 		testType(gen);
@@ -356,7 +353,6 @@ public final class StructFuzzTest{
 			constructors,
 			IOInstance.Managed.class,
 			annotations,
-			List.of(),
 			List.of());
 	}
 }

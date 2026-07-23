@@ -55,7 +55,6 @@ public interface SpecializedGenerator{
 		private record GetInfo(ClassName className, String fieldName){ }
 		
 		private final Map<FieldAccessor<?>, String>            localFields    = new HashMap<>();
-		private final Map<FieldAccessor<?>, String>            localFields2   = new HashMap<>();
 		private final Map<FieldAccessor<?>, AccessMap.GetInfo> accessorFields = new HashMap<>();
 		private final Map<IOField<?, ?>, AccessMap.GetInfo>    fieldRefFields = new HashMap<>();
 		private final Map<Class<?>, AccessMap.GetInfo>         enumArrays     = new HashMap<>();
@@ -79,7 +78,6 @@ public interface SpecializedGenerator{
 			tmpFieldCount = 0;
 			constantIndex = 0;
 			localFields.clear();
-			localFields2.clear();
 			temporaryStack.clear();
 		}
 		
@@ -100,25 +98,25 @@ public interface SpecializedGenerator{
 					}else{
 						args.accept(body);
 						
-						if(!localFields2.containsKey(field)){
+						if(!localFields.containsKey(field)){
 							var name = "initVal_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
-							localFields2.put(field, name);
+							localFields.put(field, name);
 							body.var(field.getType(), name);
 						}
-						var localFieldName = localFields2.get(field);
+						var localFieldName = localFields.get(field);
 						body.set(localFieldName);
 					}
 				}
 				case VirtualAccessor<?> virutal -> {
 					args.accept(body);
 					
-					if(!localFields2.containsKey(field)){
+					if(!localFields.containsKey(field)){
 						var name = "virt_" + field.getName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
-						localFields2.put(field, name);
+						localFields.put(field, name);
 						body.var(field.getType(), name);
 					}
 					
-					var localFieldName = localFields2.get(field);
+					var localFieldName = localFields.get(field);
 					body.set(localFieldName);
 					
 					if(hasIOPool){
@@ -221,7 +219,7 @@ public interface SpecializedGenerator{
 			switch(field){
 				case FieldAccessor.FieldOrMethod fom -> {
 					if(localObject){
-						var localFieldName = localFields2.get(field);
+						var localFieldName = localFields.get(field);
 						Objects.requireNonNull(localFieldName);
 						body.get(localFieldName);
 						return;
@@ -238,7 +236,7 @@ public interface SpecializedGenerator{
 					}
 				}
 				case VirtualAccessor<?> virutal -> {
-					var name = localFields2.get(field);
+					var name = localFields.get(field);
 					if(name == null) throw new MalformedJorth("Local field " + field.getName() + " does not exist");
 					body.get(name);
 				}
