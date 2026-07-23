@@ -99,11 +99,11 @@ public final class PipeCodeGen{
 	) throws MalformedJorth, UnsupportedCodeGenType{
 		switch(strategy){
 			case ConstructionStrategy.Setters ignore -> {
-				accessMap.setup(cw, false, false);
+				accessMap.setup(false, false);
 				body.newObj(body.getTypeDef("ObjType"));
 			}
 			case ConstructionStrategy.Constructor ignore -> {
-				accessMap.setup(cw, false, true);
+				accessMap.setup(false, true);
 			}
 		}
 		
@@ -174,7 +174,7 @@ public final class PipeCodeGen{
 		             .annotation(Override.class)
 		             .body();
 		if(generators != null){
-			accessMap.setup(cw, true, false);
+			accessMap.setup(true, false);
 			
 			body.get("instance")
 			    .cast(objType);
@@ -234,8 +234,8 @@ public final class PipeCodeGen{
 			var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
 				cw.typeDef("ObjType", objType);
 				
-				var accessMap = new SpecializedGenerator.AccessMap();
-				accessMap.setup(cw, true, false);
+				var accessMap = new SpecializedGenerator.AccessMap(cw);
+				accessMap.setup(true, false);
 				
 				Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
 				
@@ -303,7 +303,7 @@ public final class PipeCodeGen{
 			
 			var target = makeImpl(lookup, name, cw -> {
 				cw.typeDef("ObjType", objType);
-				var accessMap = new SpecializedGenerator.AccessMap();
+				var accessMap = new SpecializedGenerator.AccessMap(cw);
 				
 				ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
 				var body = cw.function(name).staticAcc()
@@ -349,7 +349,7 @@ public final class PipeCodeGen{
 		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
 		List<SpecializedGenerator> generators
 	) throws MalformedJorth, UnsupportedCodeGenType{
-		var accessMap = new SpecializedGenerator.AccessMap();
+		var accessMap = new SpecializedGenerator.AccessMap(cw);
 		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		

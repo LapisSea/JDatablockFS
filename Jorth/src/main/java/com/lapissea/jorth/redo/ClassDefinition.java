@@ -101,11 +101,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 			@Override
 			public Stream<? extends FunctionInfo> getFunctionsByName(String name){
-				throw NotImplementedException.infer();//TODO: implement .getFunctionsByName()
-			}
-			@Override
-			public Stream<? extends FunctionInfo> getFunctions(){
-				throw NotImplementedException.infer();//TODO: implement .getFunctions()
+				return Stream.concat(
+					functions.values().stream().filter(f -> f.name().equals(name)),
+					danglingFunctions.stream().filter(f -> f.name().equals(name) && !functions.containsKey(f.makeSignature()))
+				);
 			}
 			@Override
 			public ClassName name(){
@@ -125,19 +124,13 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 			@Override
 			public boolean isInterface(){
-				throw NotImplementedException.infer();//TODO: implement .isInterface()
+				return type == ClassType.INTERFACE || type == ClassType.ANNOTATION;
 			}
 			@Override
-			public boolean isFinal(){
-				throw NotImplementedException.infer();//TODO: implement .isFinal()
-			}
+			public boolean isFinal(){ return access.isFinal(); }
 			@Override
 			public List<GenericType> interfaces(){
 				return Collections.unmodifiableList(interfaces);
-			}
-			@Override
-			public List<Enum<?>> enumConstantNames(){
-				throw NotImplementedException.infer();//TODO: implement .enumConstantNames()
 			}
 		};
 	}
@@ -270,7 +263,13 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	public ClassDefinition type(ClassType type) throws MalformedJorth{
 		if(this.type == ClassType.ENUM) throw new MalformedJorth("Can not change type from enum");
+		if(access.isFinal() && !type.canBeFinal){
+			throw new MalformedJorth("Can not make a final " + type);
+		}
 		this.type = Objects.requireNonNull(type);
+		if(type.mustBeFinal){
+			finalAcc();
+		}
 		if(type == ClassType.ENUM) initEnum();
 		return this;
 	}
@@ -331,7 +330,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	public ClassDefinition staticAcc(){
 		return access(access.andStat());
 	}
-	public ClassDefinition finalAcc(){
+	public ClassDefinition finalAcc() throws MalformedJorth{
+		if(!type.canBeFinal){
+			throw new MalformedJorth("Can not make " + type + " final");
+		}
 		return access(access.andFin());
 	}
 	public ClassDefinition abstractAcc(){

@@ -59,10 +59,10 @@ public interface SpecializedGenerator{
 		private final Map<IOField<?, ?>, AccessMap.GetInfo>    fieldRefFields = new HashMap<>();
 		private final Map<Class<?>, AccessMap.GetInfo>         enumArrays     = new HashMap<>();
 		
-		private int tmpFieldCount = 0;
+		private int tmpFieldCount;
 		
-		private ClassDefinition constantClassDest;
-		private int             constantIndex = 0;
+		private final ClassDefinition cw;
+		private       int             constantIndex;
 		
 		private final List<Set<String>> temporaryStack = new ArrayList<>();
 		
@@ -71,12 +71,12 @@ public interface SpecializedGenerator{
 		/// indicates that the object being built has its fields in local variables, not a builder
 		private boolean localObject;
 		
-		public void setup(ClassDefinition constantClassDest, boolean hasIOPool, boolean localObject){
-			this.constantClassDest = constantClassDest;
+		public AccessMap(ClassDefinition cw){ this.cw = cw; }
+		
+		public void setup(boolean hasIOPool, boolean localObject){
 			this.hasIOPool = hasIOPool;
 			this.localObject = localObject;
 			tmpFieldCount = 0;
-			constantIndex = 0;
 			localFields.clear();
 			temporaryStack.clear();
 		}
@@ -146,7 +146,6 @@ public interface SpecializedGenerator{
 		}
 		
 		private void createEnumConstant(Class<? extends Enum<?>> type) throws MalformedJorth{
-			var cw   = constantClassDest;
 			var name = "eArr_" + (constantIndex++) + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
 			cw.field(type.arrayType(), name)
 			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(type, "values"));
@@ -155,7 +154,6 @@ public interface SpecializedGenerator{
 		}
 		
 		private GetInfo createFieldAccessorConstant(FieldAccessor<?> accessor) throws MalformedJorth{
-			var cw   = constantClassDest;
 			var name = "acc_" + (constantIndex++) + "_" + accessor.getName().replaceAll("[^A-Za-z]", "");
 			
 			var field = cw.field(GenericType.of(VirtualAccessor.class).withArgs(cw.getTypeDef("ObjType")), name)
@@ -169,7 +167,6 @@ public interface SpecializedGenerator{
 			return addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
 		}
 		private GetInfo createFieldRefConstant(IOField<?, ?> ioField) throws MalformedJorth{
-			var cw   = constantClassDest;
 			var name = "fieldRef_" + (constantIndex++) + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 			
 			var field = cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name)

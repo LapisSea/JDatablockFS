@@ -10,6 +10,8 @@ import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
 import org.objectweb.asm.ClassWriter;
 
+import static org.objectweb.asm.Opcodes.ACC_VARARGS;
+
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +31,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	private final LinkedHashMap<String, JType> args             = new LinkedHashMap<>();
 	private       JType                        returnType;
 	private       List<ClassName>              thrownExceptions = Collections.emptyList();
+	private       boolean                      varargs;
 	
 	private CodeBlock body;
 	
@@ -40,7 +43,12 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	
 	@Override
 	public boolean isVarargs(){
-		return false;//TODO: implement varargs flag
+		return varargs;
+	}
+	public FunctionDefinition varargs(){
+		preBodyCheck();
+		this.varargs = true;
+		return this;
 	}
 	
 	public FunctionDefinition arg(Type type, String name){
@@ -159,7 +167,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	
 	public void visit(ClassWriter writer){
 		
-		var accessFlags = visibility.flag|access.flags();
+		var accessFlags = visibility.flag|access.flags()|(varargs? ACC_VARARGS : 0);
 		
 		var argTypes = new ArrayList<JType>(args.values());
 		
