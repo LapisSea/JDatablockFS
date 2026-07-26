@@ -36,7 +36,7 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	
 	public static GenericType of(ClassName name){
 		var any = name.any();
-		if(any.length()<3 || any.charAt(0) != '[' || any.charAt(any.length() - 1) != ';'){
+		if(any.isEmpty() || any.charAt(0) != '['){
 			return new GenericType(name);
 		}
 		return parseArray(name);
@@ -47,14 +47,21 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 		while(arrayDims<dotted.length() - 1 && dotted.charAt(arrayDims) == '['){
 			arrayDims++;
 		}
-		var nameStart = arrayDims;
-		var type      = dotted.charAt(arrayDims);
-		if(type == 'L'){
-			nameStart++;
-		}
 		
-		dotted = dotted.substring(nameStart, dotted.length() - 1);
-		return new GenericType(ClassName.dotted(dotted), Optional.empty(), arrayDims, List.of());
+		var component = switch(dotted.charAt(arrayDims)){
+			case 'L' -> dotted.substring(arrayDims + 1, dotted.length() - 1);
+			case 'I' -> "int";
+			case 'J' -> "long";
+			case 'Z' -> "boolean";
+			case 'B' -> "byte";
+			case 'C' -> "char";
+			case 'S' -> "short";
+			case 'F' -> "float";
+			case 'D' -> "double";
+			default -> throw new IllegalArgumentException("Unknown array component descriptor: " + dotted);
+		};
+		
+		return new GenericType(ClassName.dotted(component), Optional.empty(), arrayDims, List.of());
 	}
 	
 	public static GenericType of(Type type){

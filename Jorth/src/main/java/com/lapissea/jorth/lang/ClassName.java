@@ -16,6 +16,9 @@ public final class ClassName{
 		return new ClassName(s, null);
 	}
 	private static void checkValid(String s, char c){
+		if(s.isEmpty()){
+			throw new IllegalArgumentException("Class name can't be empty");
+		}
 		int index = 0;
 		while(true){
 			int i = s.indexOf(c, index);

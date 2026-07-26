@@ -159,7 +159,7 @@ public class GeneralTests{
 	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
 		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
-		}, false);
+		}, true);
 	}
 	
 	@Test(dataProvider = "lists", groups = "lists", dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)

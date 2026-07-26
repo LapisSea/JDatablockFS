@@ -204,6 +204,14 @@ public class CodeBlock{
 	public CodeBlock ifNotEquality(CodeArg code) throws MalformedJorth{
 		return falseBlock(code, ConditionalJump.Type.EQUALITY);
 	}
+	public CodeBlock ifIsNull(CodeArg code) throws MalformedJorth{
+		var type = localStack.peekLast();
+		return nullVal(type).ifEquality(code);
+	}
+	public CodeBlock ifIsNotNull(CodeArg code) throws MalformedJorth{
+		var type = localStack.peekLast();
+		return nullVal(type).ifNotEquality(code);
+	}
 	private CodeBlock falseBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
 		var block = createBlockFromHere(code);
 		return add(ConditionalJump.simulate(localStack, typeSource, type, null, block));
@@ -458,7 +466,7 @@ public class CodeBlock{
 		return localStack.totalStack().toList();
 	}
 	
-	public CodeBlock cast(Class<?> type) throws MalformedJorth { return cast(ClassName.of(type)); }
+	public CodeBlock cast(Class<?> type) throws MalformedJorth { return cast(GenericType.of(type)); }
 	public CodeBlock cast(ClassName type) throws MalformedJorth{ return cast(GenericType.of(type)); }
 	public CodeBlock cast(GenericType type) throws MalformedJorth{
 		return add(CastOp.simulate(localStack, typeSource, type));
@@ -556,6 +564,39 @@ public class CodeBlock{
 		return add(NullConstant.simulate(localStack, type));
 	}
 	
+	public CodeBlock unbox() throws MalformedJorth{
+		checkFreeze();
+		class Boxes{
+			private static Map.Entry<GenericType, FunctionInfo> getInfo(Class<?> boxTyp, String fnName){
+				var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, boxTyp.getClassLoader()), boxTyp);
+				FunctionInfo info;
+				try{
+					info = cInfo.getFunction(new FunctionInfo.Signature(fnName, List.of()));
+				}catch(MalformedJorth e){
+					throw new RuntimeException(e);
+				}
+				return Map.entry(GenericType.of(boxTyp), info);
+			}
+			private static final Map<GenericType, FunctionInfo> MAP = Map.ofEntries(
+				getInfo(Boolean.class, "booleanValue"),
+				getInfo(Byte.class, "byteValue"),
+				getInfo(Short.class, "shortValue"),
+				getInfo(Integer.class, "intValue"),
+				getInfo(Long.class, "longValue"),
+				getInfo(Character.class, "charValue"),
+				getInfo(Float.class, "floatValue"),
+				getInfo(Double.class, "doubleValue")
+			);
+		}
+		
+		var typ = localStack.peekLast();
+		
+		FunctionInfo boxFn = Boxes.MAP.get(typ);
+		if(boxFn == null){
+			throw new MalformedJorth("Cannot unbox type: " + typ);
+		}
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), boxFn, false));
+	}
 	public CodeBlock box() throws MalformedJorth{
 		checkFreeze();
 		class Boxes{

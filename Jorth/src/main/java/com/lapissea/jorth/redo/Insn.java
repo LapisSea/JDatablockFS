@@ -171,43 +171,75 @@ public sealed interface Insn{
 	
 	record PrimitiveCastOp(GenericType from, GenericType to) implements Insn{
 		
+		private enum StackKind{INT, LONG, FLOAT, DOUBLE}
+		
+		private static StackKind stackKind(GenericType t){
+			if(t.equals(GenericType.LONG)) return StackKind.LONG;
+			if(t.equals(GenericType.FLOAT)) return StackKind.FLOAT;
+			if(t.equals(GenericType.DOUBLE)) return StackKind.DOUBLE;
+			if(List.of(GenericType.BOOL, GenericType.BYTE, GenericType.SHORT, GenericType.CHAR, GenericType.INT).contains(t)){
+				return StackKind.INT;
+			}
+			throw new IllegalStateException(t + "");
+		}
+		
 		@Override
 		public void visit(MethodVisitor writer){
-			if(from.equals(GenericType.LONG) && to.equals(GenericType.INT)){
-				writer.visitInsn(L2I);
-			}else if(from.equals(GenericType.INT) && to.equals(GenericType.LONG)){
-				writer.visitInsn(I2L);
-			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BYTE)){
-				writer.visitInsn(I2B);
-			}else if(from.equals(GenericType.INT) && to.equals(GenericType.CHAR)){
-				writer.visitInsn(I2C);
-			}else if(from.equals(GenericType.INT) && to.equals(GenericType.SHORT)){
-				writer.visitInsn(I2S);
-			}else if(from.equals(GenericType.INT) && to.equals(GenericType.BOOL)){
-				emitIntToTruthy(writer);
-			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.BOOL)){
-				writer.visitInsn(LCONST_0);
-				writer.visitInsn(LCMP);
-				emitIntToTruthy(writer);
-			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.FLOAT)){
-				writer.visitInsn(L2F);
-			}else if(from.equals(GenericType.LONG) && to.equals(GenericType.DOUBLE)){
-				writer.visitInsn(L2D);
-			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.INT)){
-				writer.visitInsn(F2I);
-			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.LONG)){
-				writer.visitInsn(F2L);
-			}else if(from.equals(GenericType.FLOAT) && to.equals(GenericType.DOUBLE)){
-				writer.visitInsn(F2D);
-			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.INT)){
-				writer.visitInsn(D2I);
-			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.LONG)){
-				writer.visitInsn(D2L);
-			}else if(from.equals(GenericType.DOUBLE) && to.equals(GenericType.FLOAT)){
-				writer.visitInsn(D2F);
-			}else{
-				throw new UnsupportedOperationException("Unsupported primitive cast: " + from + " -> " + to);
+			if(from.equals(to)) return;
+			
+			if(to.equals(GenericType.BOOL)){
+				emitToTruthy(writer, stackKind(from));
+				return;
 			}
+			
+			var fromKind = stackKind(from);
+			var toKind   = stackKind(to);
+			
+			if(fromKind != toKind){
+				writer.visitInsn(categoryConvertOp(fromKind, toKind));
+			}
+			
+			if(toKind == StackKind.INT){
+				if(to.equals(GenericType.BYTE)) writer.visitInsn(I2B);
+				else if(to.equals(GenericType.CHAR)) writer.visitInsn(I2C);
+				else if(to.equals(GenericType.SHORT)) writer.visitInsn(I2S);
+			}
+		}
+		
+		private static int categoryConvertOp(StackKind from, StackKind to){
+			return switch(from){
+				case INT -> toOp(to, -1, I2L, I2F, I2D);
+				case LONG -> toOp(to, L2I, -1, L2F, L2D);
+				case FLOAT -> toOp(to, F2I, F2L, -1, F2D);
+				case DOUBLE -> toOp(to, D2I, D2L, D2F, -1);
+			};
+		}
+		private static int toOp(StackKind to, int intOp, int longOp, int floatOp, int doubleOp){
+			return switch(to){
+				case INT -> intOp;
+				case LONG -> longOp;
+				case FLOAT -> floatOp;
+				case DOUBLE -> doubleOp;
+			};
+		}
+		
+		private void emitToTruthy(MethodVisitor writer, StackKind fromKind){
+			switch(fromKind){
+				case LONG -> {
+					writer.visitInsn(LCONST_0);
+					writer.visitInsn(LCMP);
+				}
+				case FLOAT -> {
+					writer.visitInsn(FCONST_0);
+					writer.visitInsn(FCMPL);
+				}
+				case DOUBLE -> {
+					writer.visitInsn(DCONST_0);
+					writer.visitInsn(DCMPL);
+				}
+				case INT -> { /* already an int; compare directly below */ }
+			}
+			emitIntToTruthy(writer);
 		}
 		
 		private void emitIntToTruthy(MethodVisitor writer){
@@ -239,7 +271,7 @@ public sealed interface Insn{
 				return new PrimitiveCastOp(stackType, type);
 			}
 			
-			if(!type.instanceOf(typeSource, stackType)){
+			if(!type.instanceOf(typeSource, stackType) && !stackType.instanceOf(typeSource, type)){
 				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
 			}
 			stack.push(type);
@@ -377,8 +409,7 @@ public sealed interface Insn{
 	record DupOp(int slots) implements Insn{
 		
 		static DupOp simulate(TypeStack stack) throws MalformedJorth{
-			var e = stack.pop();
-			stack.push(e);
+			var e = stack.peekLast();
 			stack.push(e);
 			return new DupOp(e.getBaseType().slots);
 		}
@@ -450,33 +481,26 @@ public sealed interface Insn{
 			
 			if(nonTermTrue != null && nonTermFalse != null){
 				if(!nonTermTrue.stacksMatch(nonTermFalse)){
-					throw new MalformedJorth(
-						"Conditional jump of 2 blocks must have the same stacks:\n" +
-						"  true:  " + nonTermTrue.stackView() + "\n" +
-						"  false: " + nonTermFalse.stackView());
+					throw new MalformedJorth("Conditional jump of 2 blocks must have the same stacks:\n" + "  true:  " + nonTermTrue.stackView() + "\n" + "  false: " + nonTermFalse.stackView());
 				}
 			}else if(nonTermTrue != null || nonTermFalse != null){
 				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
 				if(!other.stacksMatch(stack)){
-					throw new MalformedJorth(
-						"Conditional jump must have the same stack as the base:\n" +
-						"  base:   " + stack + "\n" +
-						"  branch: " + other.stackView());
+					throw new MalformedJorth("Conditional jump must have the same stack as the base:\n" + "  base:   " + stack + "\n" + "  branch: " + other.stackView());
 				}
 			}
 		}
 		
 		enum Type{
-			TRUE_BOOL,
-			EQUALITY
+			TRUE_BOOL, EQUALITY
 		}
 		
 		static ConditionalJump simulate(TypeStack stack, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
 			var vType = switch(type){
 				case TRUE_BOOL -> {
 					var typ = stack.pop();
-					if(!typ.getBaseType().type.equals(boolean.class)){
-						throw new MalformedJorth("Condition must be boolean");
+					if(typ.getBaseType() != BaseType.BOOLEAN){
+						throw new MalformedJorth("Condition must be boolean but is " + typ);
 					}
 					yield null;
 				}
@@ -553,8 +577,7 @@ public sealed interface Insn{
 		}
 		@Override
 		public boolean terminates(){
-			return onTrue != null && onTrue.terminates() &&
-			       onFalse != null && onFalse.terminates();
+			return onTrue != null && onTrue.terminates() && onFalse != null && onFalse.terminates();
 		}
 	}
 	
@@ -755,10 +778,7 @@ public sealed interface Insn{
 				callOp = INVOKEINTERFACE;
 			}else{
 				//https://stackoverflow.com/a/13764338
-				if(superCall ||
-				   name.equals("<init>") ||
-				   (function.visibility() == Visibility.PRIVATE && owner.name().equals(caller))
-				){
+				if(superCall || name.equals("<init>") || (function.visibility() == Visibility.PRIVATE && owner.name().equals(caller))){
 					callOp = INVOKESPECIAL;
 				}else{
 					callOp = INVOKEVIRTUAL;
@@ -792,25 +812,18 @@ public sealed interface Insn{
 		}
 	}
 	
-	record VirtualCallOp(
-		FunctionInfo.Signature callingSignature, GenericType callingReturnType, Handle bootstrapHandle, Object[] bootstrapArgs
-	) implements Insn{
+	record VirtualCallOp(FunctionInfo.Signature callingSignature, GenericType callingReturnType, Handle bootstrapHandle,
+	                     Object[] bootstrapArgs) implements Insn{
 		
 		static VirtualCallOp simulate(TypeStack stack, TypeSource typeSource, BootstrapFn boot, CallingFn callingFn, List<JType> args) throws MalformedJorth{
 			if(args.size() != callingFn.args.size()){
-				throw new MalformedJorth(
-					"Call args size mismatch:\n\t" +
-					"Requested: " + callingFn.args + "\n\t" +
-					"But got:   " + args
-				);
+				throw new MalformedJorth("Call args size mismatch:\n\t" + "Requested: " + callingFn.args + "\n\t" + "But got:   " + args);
 			}
 			for(int i = 0; i<args.size(); i++){
 				var argType = args.get(i);
 				var defType = callingFn.args.get(i);
 				if(!argType.asGeneric().instanceOf(typeSource, defType.asGeneric())){
-					throw new MalformedJorth(
-						"Argument " + i + " does not satisfy type of argument. Is " + argType.asGeneric() + " but " + defType.asGeneric() + " is required"
-					);
+					throw new MalformedJorth("Argument " + i + " does not satisfy type of argument. Is " + argType.asGeneric() + " but " + defType.asGeneric() + " is required");
 				}
 			}
 			
@@ -833,13 +846,7 @@ public sealed interface Insn{
 			ClassInfo    bootstrapClass = typeSource.byName(boot.owner);
 			FunctionInfo bootstrapFn    = pickBootstrapFunction(typeSource, boot, bootstrapClass, bArgs);
 			
-			Handle bsmh = new Handle(
-				H_INVOKESTATIC,
-				boot.owner.slashed(),
-				boot.functionName,
-				InvokeOp.makeFunSig(bootstrapFn.returnType(), bootstrapFn.argumentTypes(), false),
-				bootstrapFn.ownerInfo().isInterface()
-			);
+			Handle bsmh = new Handle(H_INVOKESTATIC, boot.owner.slashed(), boot.functionName, InvokeOp.makeFunSig(bootstrapFn.returnType(), bootstrapFn.argumentTypes(), false), bootstrapFn.ownerInfo().isInterface());
 			
 			var staticArgs = boot.bootstrapStaticArgs.stream().map(BootstrapFn.StaticArg::value).toArray();
 			
@@ -869,12 +876,7 @@ public sealed interface Insn{
 			}).toList();
 			
 			if(fns.isEmpty()){
-				throw new MalformedJorth(
-					"No valid boostrap function found for " + bootstrap.owner + "." +
-					bootstrap.functionName + bArgs.stream()
-					                              .map(Object::toString)
-					                              .collect(Collectors.joining(", ", "(", ")"))
-				);
+				throw new MalformedJorth("No valid boostrap function found for " + bootstrap.owner + "." + bootstrap.functionName + bArgs.stream().map(Object::toString).collect(Collectors.joining(", ", "(", ")")));
 			}
 			if(fns.size() != 1){
 				throw new MalformedJorth("Ambiguous boostrap function found for " + bootstrap.owner + "#" + bootstrap.functionName);
@@ -884,12 +886,7 @@ public sealed interface Insn{
 		
 		@Override
 		public void visit(MethodVisitor writer){
-			writer.visitInvokeDynamicInsn(
-				callingSignature.name(),
-				InvokeOp.makeFunSig(callingReturnType, callingSignature.args(), false),
-				bootstrapHandle,
-				bootstrapArgs
-			);
+			writer.visitInvokeDynamicInsn(callingSignature.name(), InvokeOp.makeFunSig(callingReturnType, callingSignature.args(), false), bootstrapHandle, bootstrapArgs);
 		}
 	}
 	
@@ -898,8 +895,7 @@ public sealed interface Insn{
 		public static Increment simulate(TypeStack stack, int val) throws MalformedJorth{
 			var      type = stack.peekLast();
 			BaseType typ;
-			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
-			   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
+			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) || type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
 				typ = BaseType.INT;
 			}else if(type.equals(GenericType.LONG)) typ = BaseType.LONG;
 			else if(type.equals(GenericType.FLOAT)) typ = BaseType.FLOAT;
