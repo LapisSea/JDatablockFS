@@ -2,8 +2,6 @@ package com.lapissea.jorth;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.redo.ClassDefinition;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;

@@ -15,12 +15,12 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.PerKeyLock;
 import com.lapissea.dfs.utils.WeakKeyValueMap;
 import com.lapissea.jorth.BytecodeUtils;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.FieldDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.ClassDefinition;
-import com.lapissea.jorth.redo.FieldDefinition;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 

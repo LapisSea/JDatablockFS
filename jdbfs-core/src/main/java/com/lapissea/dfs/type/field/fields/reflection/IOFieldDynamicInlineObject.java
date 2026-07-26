@@ -28,8 +28,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.lang.reflect.Type;

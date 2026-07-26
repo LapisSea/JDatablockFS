@@ -14,13 +14,13 @@ import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.ClassDefinition;
-import com.lapissea.jorth.redo.CodeArg;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.invoke.ConstantCallSite;

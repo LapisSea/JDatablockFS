@@ -9,11 +9,11 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
-import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.LateInit;
 import org.testng.annotations.Test;
 

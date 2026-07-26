@@ -1,4 +1,4 @@
-package com.lapissea.jorth.redo;
+package com.lapissea.jorth;
 
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 
 import static org.objectweb.asm.Opcodes.*;
 
-public sealed interface Insn{
+sealed interface Insn{
 	
 	sealed interface TerminatingInsn extends Insn{
 		boolean terminates();

@@ -7,11 +7,11 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.BytecodeUtils;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -49,37 +49,37 @@ public final class WrapperStructs{
 		ConfigDefs.CompLogLevel.SMALL.log("Generated wrapper for {}#purple", type.getTypeName());
 		var typeName  = makeTypeName(type);
 		var className = WrapperStructs.class.getPackageName() + "." + Wrapper.class.getSimpleName() + "€" + typeName;
-	try{
-		var cw = new ClassDefinition(FieldCompiler.class.getClassLoader());
-		var cType = ClassName.dotted(className);
-		
-		cw.name(cType).extendsType(GenericType.of(Wrapper.class).withArgs(cType))
-		  .finalAcc();
-		
-		var val = cw.field(type, "val").annotation(IOValue.class).visibility(Visibility.PRIVATE);
-		cw.instanceInit().body().callSuperAutoPass();
-		
-		cw.instanceInit()
-		  .arg(type, "val")
-		  .body()
-		  .callSuper(e -> { })
-		  .get("val")
-		  .setThis(val);
-		
-		cw.function("get")
-		  .returns(Object.class)
-		  .body()
-		  .getThis(val);
-		
-		cw.function("toString").override()
-		  .body()
-		  .newObj(StringBuilder.class)
-		  .call("append", args -> args.val("WrapperOf€" + type.getSimpleName() + "{"))
-		  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
-		  .call("append", args -> args.val("}"))
-		  .call("toString");
-		
-		var file = cw.getClassFile();
+		try{
+			var cw    = new ClassDefinition(FieldCompiler.class.getClassLoader());
+			var cType = ClassName.dotted(className);
+			
+			cw.name(cType).extendsType(GenericType.of(Wrapper.class).withArgs(cType))
+			  .finalAcc();
+			
+			var val = cw.field(type, "val").annotation(IOValue.class).visibility(Visibility.PRIVATE);
+			cw.instanceInit().body().callSuperAutoPass();
+			
+			cw.instanceInit()
+			  .arg(type, "val")
+			  .body()
+			  .callSuper(e -> { })
+			  .get("val")
+			  .setThis(val);
+			
+			cw.function("get")
+			  .returns(Object.class)
+			  .body()
+			  .getThis(val);
+			
+			cw.function("toString").override()
+			  .body()
+			  .newObj(StringBuilder.class)
+			  .call("append", args -> args.val("WrapperOf€" + type.getSimpleName() + "{"))
+			  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
+			  .call("append", args -> args.val("}"))
+			  .call("toString");
+			
+			var file = cw.getClassFile();
 			
 			var lookup = MethodHandles.privateLookupIn(WrapperStructs.class, MethodHandles.lookup());
 			try{

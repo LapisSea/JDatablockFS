@@ -1,5 +1,6 @@
-package com.lapissea.jorth.redo;
+package com.lapissea.jorth;
 
+import com.lapissea.jorth.Insn.*;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
@@ -12,7 +13,6 @@ import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
-import com.lapissea.jorth.redo.Insn.*;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.ArrayList;

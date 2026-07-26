@@ -5,7 +5,6 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
-import com.lapissea.jorth.redo.ClassDefinition;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;

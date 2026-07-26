@@ -9,8 +9,8 @@ import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;

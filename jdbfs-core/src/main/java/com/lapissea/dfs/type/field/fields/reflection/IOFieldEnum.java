@@ -15,8 +15,8 @@ import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.lapissea.jorth.redo;
+package com.lapissea.jorth;
 
 import com.lapissea.jorth.exceptions.IllegalClassState;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -10,8 +10,6 @@ import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
 import org.objectweb.asm.ClassWriter;
 
-import static org.objectweb.asm.Opcodes.ACC_VARARGS;
-
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +18,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+
+import static org.objectweb.asm.Opcodes.ACC_VARARGS;
 
 public final class FunctionDefinition extends AnnotationContainer<FunctionDefinition> implements FunctionInfo{
 	

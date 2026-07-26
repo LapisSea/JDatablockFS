@@ -7,8 +7,8 @@ import com.lapissea.dfs.type.field.annotations.IOCompression;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
+import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.lang.ClassName;
-import com.lapissea.jorth.redo.ClassDefinition;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -72,7 +72,7 @@ public class CompressionTests{
 	<T extends IOInstance<T>> void typeIntegrity(IOCompression.Type type) throws Exception{
 		
 		var name = CompressionTests.class.getPackageName() + ".Holder$" + type;
-		var cw = new ClassDefinition(null);
+		var cw   = new ClassDefinition(null);
 		cw.extendsType(IOInstance.Managed.class)
 		  .name(ClassName.dotted(name));
 		cw.field(byte[].class, "data")

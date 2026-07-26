@@ -1,9 +1,9 @@
 package com.lapissea.dfs.type.compilation;
 
+import com.lapissea.jorth.AnnotationContainer;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.AnnotationContainer;
-import com.lapissea.jorth.redo.CodeArg;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;

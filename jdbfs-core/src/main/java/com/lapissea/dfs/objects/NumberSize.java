@@ -9,9 +9,9 @@ import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.iterableplus.IterableIntPP;
 import com.lapissea.iterableplus.IterableLongPP;
 import com.lapissea.iterableplus.OptionalPP;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.CodeArg;
-import com.lapissea.jorth.redo.CodeBlock;
 
 import java.io.IOException;
 import java.math.BigInteger;

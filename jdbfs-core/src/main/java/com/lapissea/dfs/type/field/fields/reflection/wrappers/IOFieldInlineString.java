@@ -16,8 +16,8 @@ import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package com.lapissea.jorth.redo;
+package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.type.JType;
 

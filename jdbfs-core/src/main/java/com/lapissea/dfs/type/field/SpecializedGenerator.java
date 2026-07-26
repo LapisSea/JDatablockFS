@@ -7,13 +7,13 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.utils.CodeUtils;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.jorth.redo.ClassDefinition;
-import com.lapissea.jorth.redo.CodeArg;
-import com.lapissea.jorth.redo.CodeBlock;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.ArrayList;
