@@ -39,7 +39,7 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 This shows a very simple list of ipv6 and their cordinates on earth. (made up data)
 
-_You can find the complete code of the example in `/jdatablockfs.run/src/main/java/com/lapissea/cfs/run/examples/IPs.java`_
+_You can find the complete code of the example in `jdbfs-run/src/main/java/com/lapissea/dfs/run/examples/IPs.java`_
 
 ```java
 //Setting up classes
@@ -116,7 +116,7 @@ This is just an interface. It infers the fields from the contents of the interfa
   `static String toString(<type> instance){...}` can be added to write a custom toString
 - `static IP of(...)` is just a convenience function that is completely optional. It just makes it more pleasing to manually make an instance. It is a replacement for `new IP(...)`
 
-Note that this creates implementation(s) as needed. This may provide a performance increase and clarity in a context where only partial access to data is needed. (such as finding an object by a spesific field) This is because manually creating a perfect instance is annoying and clumsy. Simply defining what fields you need offloads the annoying bolierplate work to the code generation mechanism inside the library.
+Note that this creates implementation(s) as needed. This may provide a performance increase and clarity in a context where only partial access to data is needed. (such as finding an object by a specific field) This is because manually creating a perfect instance is annoying and clumsy. Simply defining what fields you need offloads the annoying bolierplate work to the code generation mechanism inside the library.
 
 NOTE: You *can* create your own implementation of an interface like this, but it is best for the internals of this library to do that for you.
 
@@ -162,10 +162,10 @@ Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree
 
 | Location           | Description                                                                                                                                                                                                                                                                                                                                                                                      | Functionality_breakdown                                                                              |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| jdatablockfs.core  | The core functionality of the library.<br/> This is the dependency to be linked in a production.<br/>Is very light weight. There is no big libraries attached. Danger of dependency conflicts or straight bloat is minimal.                                                                                                                                                                      | - Providing core interfaces<br/>- Memory management<br/>- Type engine<br/>- Serialization of data    |
-| jdatablockfs.tools | This is where optional features and debugging tools are housed. Things like DisplayHost (a tool for visually viewing a file) is located.<br/>If there is a problem with a file or manual inspection of a file is needed then this is a dependency to be linked.<br/>This contains quite a bit of dependencies like gson, lwjgl and more.                                                         | - Visual debugging and inspection<br/>- IPC logging of memory events<br/>                            |
-| jdatablockfs.run   | This is where examples, relatively realistic usage cases and tests are housed.<br/>This should not really be used as a dependency. If you want to run the examples, do so directly.                                                                                                                                                                                                              | - Providing examples<br/>- Sanity checking the design<br/>- exposing flaws while developing features |
-| Jorth              | This is an independent library whose only job is to compile streams of text in to bytecode at runtime. This could be considered a custom language but should not be used anywhere outside the internals of this projects as the compiler is not tested or secured or considered a good language. If you need to generate bytecode at runtime, please use the ASM library directly or contact me. | - Generation of bytecode at runtime without manual ASM                                               |
+| jdbfs-core  | The core functionality of the library.<br/> This is the dependency to be linked in a production.<br/>Is very light weight. There is no big libraries attached. Danger of dependency conflicts or straight bloat is minimal.                                                                                                                                                                      | - Providing core interfaces<br/>- Memory management<br/>- Type engine<br/>- Serialization of data    |
+| jdbfs-tools | This is where optional features and debugging tools are housed. Things like DisplayHost (a tool for visually viewing a file) is located.<br/>If there is a problem with a file or manual inspection of a file is needed then this is a dependency to be linked.<br/>This contains quite a bit of dependencies like gson, lwjgl and more.                                                         | - Visual debugging and inspection<br/>- IPC logging of memory events<br/>                            |
+| jdbfs-run   | This is where examples, relatively realistic usage cases and tests are housed.<br/>This should not really be used as a dependency. If you want to run the examples, do so directly.                                                                                                                                                                                                              | - Providing examples<br/>- Sanity checking the design<br/>- exposing flaws while developing features |
+| Jorth              | This is an independent library that provides a builder-pattern DSL for generating JVM bytecode at runtime. It wraps ASM with a fluent API that manages type tracking, stack manipulation, and local variable scopes. Should not be used outside the internals of this project. If you need to generate bytecode at runtime, please use the ASM library directly or contact me. | - Generation of bytecode at runtime without manual ASM                                               |
 
 ---
 
@@ -180,13 +180,13 @@ ___Note: Documentation is unfinished!!___
 - `Cluster`: This acts like the root for a file. It takes an `IOInterface` and provides access to objects inside. Use `Cluster.init(...)` to create a new empty cluster on an IOInterface
 - `IOInterface`: An interface that provides the lowest level interactions that are required for functioning of this library.
 - `MemoryData`: An in memory implementation of IOInterface. Creation example: `MemoryData.of(new byte[]{1,2,3})`
-- `IOFileData`: An implementation of IOInterface. Maps to `java.io.File` (WARNING: This is unfinished, please use MemoryData for now)
+- `FileMemoryMappedData` / `FileRandomAccessData`: File-backed implementations of IOInterface. Map to `java.io.File`.
 
 
 - `IOInstance`: Class that is required to extend any object that needs to be stored. Fields and setters/getters inside it can be marked with `@IOValue` to be marked as things that should be stored
 - `IOInstance.Unmanaged` Class that is like
   `IOInstance` except its contents may be unmanaged. Aka it has to manage the serialization, allocation of data and description of references and data types manually. A normal IOInstance is fully managed. Other parts of the library fully manage its data but in limited ways. Things like self referencing nodes, Lists, Maps, Sets or any more complicated data structure probably should be Unmanaged as such structures require more control than a base IOInstance can provide (and can do more efficient IO operations like reading a specific field). There are limitations to an unmanaged instance. Since it may contain code, it can not be serialized and its class has to be available in the classpath in order for a file to be (fully) readable. On the same note, since there is custom behaviour, the library can not make certain assumptions about the object like an exact size (
-  `@IOValueUnmanaged` may help with this) or if copying or reallocation of an instance can be performed.
+  `@IOUnmanagedValueInfo` may help with this) or if copying or reallocation of an instance can be performed.
 
 
 - `IOList`: A disk based `List`. It has implementations similar to `ArrayList` and `LinkedList`
@@ -213,9 +213,7 @@ ___Note: Documentation is unfinished!!___
 - `@IODependency.NumSize`: This annotation has the same effect as `IODependency.VirtualNumSize` except it does not create a virtual field but references the name of another field.
 -
 
-`@IOType.Dynamic`: This annotation enables the field to have a value whose class does not match the field exactly. This freedom comes at the cost of needing an extra typeID virtual field and any stored value will need to have its class layout stored on file what can create a lot of non-useful data. Use this annotation only when needed.
-
-- `@IOValueUnmanaged`: This annotation can be used on static methods inside an `IOInstance.Unmanaged` to mark that function as a static unmanaged field factory.
+- `@IOUnmanagedValueInfo`: This annotation can be used on static methods inside an `IOInstance.Unmanaged` to mark that function as a static unmanaged field factory.
 
 ---
 
