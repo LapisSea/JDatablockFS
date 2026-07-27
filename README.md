@@ -131,7 +131,7 @@ Simply paste this in to your pom.xml
 <dependencies>
 	<dependency>
 		<groupId>lapissea.jdatablockfs</groupId>
-		<artifactId>core</artifactId>
+		<artifactId>jdbfs-core</artifactId>
 		<version>1.0</version>
 	</dependency>
 </dependencies>
@@ -153,7 +153,7 @@ Simply paste this in to your pom.xml
 </repositories>
 ```
 
-Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `lapissea.jdatablockfs` with the id `core` and the
+Or manually add the `https://raw.githubusercontent.com/LapisSea/maven-snaps/tree/master/repo/` reposetory and add an artifact with the group `lapissea.jdatablockfs` with the id `jdbfs-core` and the
 `1.0` version.
 
 ---
