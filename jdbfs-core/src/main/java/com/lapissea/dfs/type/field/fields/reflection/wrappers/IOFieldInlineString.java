@@ -103,17 +103,14 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 			throw new ShouldNeverHappenError();
 		}
 		
-		var result = accessMap.temporaryLocalField(String.class, body);
-		accessMap.get(isNull, body);
-		body.ifTrue(b -> {
-			b.nullVal(String.class)
-			 .set(result);
-		}).elseRun(b -> {
-			b.get(AutoText.class, "STR_PIPE")
-			 .call("readNew", args -> args.get("provider").get("src").nullVal(GenericContext.class))
-			 .cast(String.class)
-			 .set(result);
+		accessMap.set(getAccessor(), body, bod -> {
+			accessMap.get(isNull, bod);
+			bod.ifTrue(b -> b.nullVal(String.class))
+			   .elseRun(b -> {
+				   b.get(AutoText.class, "STR_PIPE")
+				    .call("readNew", args -> args.get("provider").get("src").nullVal(GenericContext.class))
+				    .cast(String.class);
+			   });
 		});
-		accessMap.set(getAccessor(), body, e -> e.get(result));
 	}
 }

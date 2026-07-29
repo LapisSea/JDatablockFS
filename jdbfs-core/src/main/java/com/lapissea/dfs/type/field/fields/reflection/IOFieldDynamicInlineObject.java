@@ -186,19 +186,15 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		var type = Objects.requireNonNull(getType());
-		var res  = accessMap.temporaryLocalField(type, body);
 		
 		accessMap.set(getAccessor(), body, b -> {
 			if(nullable()){
 				accessMap.get(isNull, b);
-				b.ifTrue(e -> {
-					e.nullVal(type).set(res);
-				}).elseRun(e -> {
-					callReadTyp(e, accessMap);
-					if(type != Object.class) e.cast(type);
-					e.set(res);
-				});
-				b.get(res);
+				b.ifTrue(e -> e.nullVal(type))
+				 .elseRun(e -> {
+					 callReadTyp(e, accessMap);
+					 if(type != Object.class) e.cast(type);
+				 });
 			}else{
 				callReadTyp(b, accessMap);
 			}

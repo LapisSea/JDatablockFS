@@ -19,6 +19,7 @@ import com.lapissea.util.UtilL;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
@@ -36,6 +37,10 @@ sealed interface Insn{
 	
 	sealed interface TerminatingInsn extends Insn{
 		boolean terminates();
+	}
+	
+	sealed interface BranchingInsn extends Insn{
+		void merge(TypeStack stack) throws MalformedJorth;
 	}
 	
 	private static GenericType doEquality(TypeSource typeSource, TypeStack stack) throws MalformedJorth{
@@ -467,35 +472,14 @@ sealed interface Insn{
 		}
 	}
 	
-	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse) implements TerminatingInsn{
-		
-		private static void checkBranches(TypeStack stack, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
-			CodeBlock nonTermTrue  = onTrue == null || onTrue.terminates()? null : onTrue;
-			CodeBlock nonTermFalse = onFalse == null || onFalse.terminates()? null : onFalse;
-			
-			if(nonTermTrue != null && nonTermFalse != null){
-				if(!nonTermTrue.stacksMatch(nonTermFalse)){
-					throw new MalformedJorth("True and false branches of conditional jump must have the same stack");
-				}
-			}
-			
-			if(nonTermTrue != null && nonTermFalse != null){
-				if(!nonTermTrue.stacksMatch(nonTermFalse)){
-					throw new MalformedJorth("Conditional jump of 2 blocks must have the same stacks:\n" + "  true:  " + nonTermTrue.stackView() + "\n" + "  false: " + nonTermFalse.stackView());
-				}
-			}else if(nonTermTrue != null || nonTermFalse != null){
-				var other = nonTermTrue == null? nonTermFalse : nonTermTrue;
-				if(!other.stacksMatch(stack)){
-					throw new MalformedJorth("Conditional jump must have the same stack as the base:\n" + "  base:   " + stack + "\n" + "  branch: " + other.stackView());
-				}
-			}
-		}
+	record ConditionalJump(Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse,
+	                       BranchPoint end) implements TerminatingInsn, BranchingInsn{
 		
 		enum Type{
 			TRUE_BOOL, EQUALITY
 		}
 		
-		static ConditionalJump simulate(TypeStack stack, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
+		static ConditionalJump simulate(TypeStack stack, CodeBlock caller, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
 			var vType = switch(type){
 				case TRUE_BOOL -> {
 					var typ = stack.pop();
@@ -506,8 +490,10 @@ sealed interface Insn{
 				}
 				case EQUALITY -> doEquality(typeSource, stack);
 			};
-			checkBranches(stack, onTrue, onFalse);
-			return new ConditionalJump(type, vType, onTrue, onFalse);
+			var branch = new BranchPoint();
+			branch.addIngoing(onTrue != null? onTrue : caller);
+			branch.addIngoing(onFalse != null? onFalse : caller);
+			return new ConditionalJump(type, vType, onTrue, onFalse, branch);
 		}
 		
 		@Override
@@ -516,68 +502,78 @@ sealed interface Insn{
 			Label endLabel   = new Label();
 			Label falseLabel = new Label();
 			
+			int toFalseOp;
+			int toTrueOp;
 			switch(type){
 				case TRUE_BOOL -> {
-					if(onTrue != null && onFalse != null){
-						writer.visitJumpInsn(IFEQ, falseLabel);
-						onTrue.visit(writer);
-						writer.visitJumpInsn(GOTO, endLabel);
-						writer.visitLabel(falseLabel);
-						onFalse.visit(writer);
-						writer.visitLabel(endLabel);
-					}else if(onTrue != null){
-						writer.visitJumpInsn(IFEQ, endLabel);
-						onTrue.visit(writer);
-						writer.visitLabel(endLabel);
-					}else{
-						writer.visitJumpInsn(IFNE, endLabel);
-						onFalse.visit(writer);
-						writer.visitLabel(endLabel);
-					}
+					toFalseOp = Opcodes.IFEQ;
+					toTrueOp = Opcodes.IFNE;
 				}
 				case EQUALITY -> {
 					var bt = vType.getBaseType();
 					if(bt.cmpOp != -1){
 						writer.visitInsn(bt.cmpOp);
-					}
-					if(onTrue != null && onFalse != null){
-						if(bt.cmpOp != -1){
-							writer.visitJumpInsn(IFNE, falseLabel);
-						}else{
-							writer.visitJumpInsn(bt.neJumpOp, falseLabel);
-						}
-						onTrue.visit(writer);
-						writer.visitJumpInsn(GOTO, endLabel);
-						writer.visitLabel(falseLabel);
-						onFalse.visit(writer);
-						writer.visitLabel(endLabel);
-					}else if(onTrue != null){
-						if(bt.cmpOp != -1){
-							writer.visitJumpInsn(IFNE, endLabel);
-						}else{
-							writer.visitJumpInsn(bt.neJumpOp, endLabel);
-						}
-						onTrue.visit(writer);
-						writer.visitLabel(endLabel);
+						toFalseOp = Opcodes.IFNE;
+						toTrueOp = Opcodes.IFEQ;
 					}else{
-						if(bt.cmpOp != -1){
-							writer.visitJumpInsn(IFEQ, endLabel);
-						}else{
-							writer.visitJumpInsn(bt.eqJumpOp, endLabel);
-						}
-						onFalse.visit(writer);
-						writer.visitLabel(endLabel);
+						toFalseOp = bt.neJumpOp;
+						toTrueOp = bt.eqJumpOp;
 					}
 				}
+				default -> throw new NotImplementedException(type.toString());
+			}
+			if(onTrue != null && onFalse != null){
+				writer.visitJumpInsn(toFalseOp, falseLabel);
+				onTrue.visit(writer);
+				writer.visitJumpInsn(GOTO, endLabel);
+				writer.visitLabel(falseLabel);
+				onFalse.visit(writer);
+				writer.visitLabel(endLabel);
+			}else if(onTrue != null){
+				writer.visitJumpInsn(toFalseOp, endLabel);
+				onTrue.visit(writer);
+				writer.visitLabel(endLabel);
+			}else{
+				writer.visitJumpInsn(toTrueOp, endLabel);
+				onFalse.visit(writer);
+				writer.visitLabel(endLabel);
 			}
 		}
-		public ConditionalJump withFalse(TypeStack stack, CodeBlock onFalse) throws MalformedJorth{
-			checkBranches(stack, onTrue, onFalse);
-			return new ConditionalJump(type, vType, onTrue, onFalse);
+		public ConditionalJump withFalse(CodeBlock caller, CodeBlock onFalse){
+			var branch = new BranchPoint();
+			branch.addIngoing(onTrue != null? onTrue : caller);
+			branch.addIngoing(onFalse != null? onFalse : caller);
+			return new ConditionalJump(type, vType, onTrue, onFalse, branch);
 		}
 		@Override
 		public boolean terminates(){
 			return onTrue != null && onTrue.terminates() && onFalse != null && onFalse.terminates();
+		}
+		
+		@Override
+		public void merge(TypeStack stack) throws MalformedJorth{
+			end.validateMerge();
+			var stackO = end.getOutgoingTypeStack();
+			if(stackO.isPresent()){
+				var s     = stackO.get();
+				var total = stack.totalStack().toList();
+				try{
+					int mark = 0;
+					for(int end = Math.min(s.size(), total.size()); mark<end; mark++){
+						if(!s.get(mark).equals(total.get(mark))){
+							break;
+						}
+					}
+					for(int i = mark; i<total.size(); i++){
+						stack.pop();
+					}
+					for(int i = mark; i<s.size(); i++){
+						stack.push(s.get(i));
+					}
+				}catch(Exception e){
+					throw new MalformedJorth("Failed merging new stack of:\n  " + s + " into\n  " + total);
+				}
+			}
 		}
 	}
 	

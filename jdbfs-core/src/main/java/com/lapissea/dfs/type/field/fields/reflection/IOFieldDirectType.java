@@ -30,7 +30,6 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
@@ -138,20 +137,17 @@ public final class IOFieldDirectType<T extends IOInstance<T>> extends NullFlagCo
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		
 		if(nullable()){
-			var res = accessMap.temporaryLocalField(Objects.requireNonNull(getType()), body);
-			
-			accessMap.get(id, body);
-			body.val(0).ifEquality(b -> {
-				b.nullVal(getType()).set(res);
-			}).elseRun(b -> {
-				b.get("provider")
-				 .call("getTypeDb")
-				 .call("fromID", args -> accessMap.get(id, args))
-				 .call("generic", args -> args.get("provider").call("getTypeDb"))
-				 .cast(getType())
-				 .set(res);
+			accessMap.set(getAccessor(), body, e -> {
+				accessMap.get(id, body);
+				body.val(0).ifEquality(b -> b.nullVal(getType()))
+				    .elseRun(b -> {
+					    b.get("provider")
+					     .call("getTypeDb")
+					     .call("fromID", args -> accessMap.get(id, args))
+					     .call("generic", args -> args.get("provider").call("getTypeDb"))
+					     .cast(getType());
+				    });
 			});
-			accessMap.set(getAccessor(), body, e -> e.get(res));
 		}else{
 			accessMap.set(getAccessor(), body, b -> {
 				b.get("provider")

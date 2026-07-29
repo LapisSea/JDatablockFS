@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 public class CodeBlock{
 	
-	private enum FreezeReason{
+	enum FreezeReason{
 		EDITING_CHILD,
 		FINISHED_EDITING;
 	}
@@ -64,6 +64,23 @@ public class CodeBlock{
 		return this;
 	}
 	
+	private void preInsn() throws MalformedJorth{
+		preInsn(true);
+	}
+	private void preInsn(boolean checkBranch) throws MalformedJorth{
+		if(terminates()){
+			throw new MalformedJorth("This code block has terminated");
+		}
+		checkFreeze();
+		if(checkBranch) mergeBranch();
+	}
+	
+	private void mergeBranch() throws MalformedJorth{
+		if(!insns.isEmpty() && insns.getLast() instanceof BranchingInsn branching){
+			branching.merge(localStack);
+		}
+	}
+	
 	private void checkFreeze(){
 		if(freezeReason != null){
 			deny();
@@ -77,7 +94,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock scope(CodeArg code) throws MalformedJorth{
-		checkFreeze();
+		preInsn();
 		var block = createBlockFromHere(code);
 		for(GenericType typ : block.localStack.getLocalPortion()){
 			localStack.push(typ);
@@ -108,6 +125,7 @@ public class CodeBlock{
 			block.addLocal(v.withoutRemoval());
 		}
 		guardedBlock(code, block);
+		block.mergeBranch();
 		return block;
 	}
 	
@@ -124,6 +142,7 @@ public class CodeBlock{
 		return get(ClassName.of(declaringClass), fieldName);
 	}
 	public CodeBlock get(ClassName declaringClass, String fieldName) throws MalformedJorth{
+		preInsn();
 		var type          = typeSource.byName(declaringClass);
 		var accessorField = type.getField(fieldName);
 		return get(accessorField);
@@ -136,18 +155,16 @@ public class CodeBlock{
 		return get("this").get(field);
 	}
 	public CodeBlock get(FieldInfo field) throws MalformedJorth{
+		preInsn();
 		return add(GetFieldOp.simulate(localStack, typeSource, field));
 	}
 	
 	public CodeBlock get(String localVal) throws MalformedJorth{
-		doGetLocal(localVal);
-		return this;
+		preInsn();
+		Local local = getLocal(localVal);
+		return add(GetLocal.simulate(localStack, local));
 	}
 	
-	private void doGetLocal(String localVal) throws MalformedJorth{
-		Local local = getLocal(localVal);
-		add(GetLocal.simulate(localStack, local));
-	}
 	private Local getLocal(String localVal) throws MalformedJorth{
 		Local local = localValues.get(localVal);
 		if(local == null){
@@ -173,23 +190,50 @@ public class CodeBlock{
 		};
 	}
 	
-	public CodeBlock val(int val) throws MalformedJorth      { return add(IVal.simulate(localStack, val)); }
-	public CodeBlock val(long val) throws MalformedJorth     { return add(LVal.simulate(localStack, val)); }
-	public CodeBlock val(float val) throws MalformedJorth    { return add(FVal.simulate(localStack, val)); }
-	public CodeBlock val(double val) throws MalformedJorth   { return add(DVal.simulate(localStack, val)); }
-	public CodeBlock val(boolean val) throws MalformedJorth  { return add(BVal.simulate(localStack, val)); }
-	public CodeBlock val(String val) throws MalformedJorth   { return add(StrVal.simulate(localStack, val)); }
-	public CodeBlock val(Class<?> val) throws MalformedJorth { return val(ClassName.of(val)); }
-	public CodeBlock val(ClassName val) throws MalformedJorth{ return add(ClassVal.simulate(localStack, val)); }
+	public CodeBlock val(int val) throws MalformedJorth{
+		preInsn();
+		return add(IVal.simulate(localStack, val));
+	}
+	public CodeBlock val(long val) throws MalformedJorth{
+		preInsn();
+		return add(LVal.simulate(localStack, val));
+	}
+	public CodeBlock val(float val) throws MalformedJorth{
+		preInsn();
+		return add(FVal.simulate(localStack, val));
+	}
+	public CodeBlock val(double val) throws MalformedJorth{
+		preInsn();
+		return add(DVal.simulate(localStack, val));
+	}
+	public CodeBlock val(boolean val) throws MalformedJorth{
+		preInsn();
+		return add(BVal.simulate(localStack, val));
+	}
+	public CodeBlock val(String val) throws MalformedJorth{
+		preInsn();
+		return add(StrVal.simulate(localStack, val));
+	}
+	public CodeBlock val(Class<?> val) throws MalformedJorth{
+		preInsn();
+		return val(ClassName.of(val));
+	}
+	public CodeBlock val(ClassName val) throws MalformedJorth{
+		preInsn();
+		return add(ClassVal.simulate(localStack, val));
+	}
 	
 	public CodeBlock equalityOp() throws MalformedJorth{
+		preInsn();
 		return add(Equality.simulate(typeSource, localStack, true));
 	}
 	
 	public void returnOp() throws MalformedJorth{
+		preInsn();
 		add(ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
 	}
 	public void throwOp() throws MalformedJorth{
+		preInsn();
 		add(ThrowOp.simulate(typeSource, localStack));
 	}
 	public CodeBlock ifFalse(CodeArg code) throws MalformedJorth{
@@ -213,14 +257,17 @@ public class CodeBlock{
 		return nullVal(type).ifNotEquality(code);
 	}
 	private CodeBlock falseBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
+		preInsn();
 		var block = createBlockFromHere(code);
-		return add(ConditionalJump.simulate(localStack, typeSource, type, null, block));
+		return add(ConditionalJump.simulate(localStack, this, typeSource, type, null, block));
 	}
 	private CodeBlock trueBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
+		preInsn();
 		var block = createBlockFromHere(code);
-		return add(ConditionalJump.simulate(localStack, typeSource, type, block, null));
+		return add(ConditionalJump.simulate(localStack, this, typeSource, type, block, null));
 	}
 	public CodeBlock elseRun(CodeArg code) throws MalformedJorth{
+		preInsn(false);
 		var lastInsn = insns.isEmpty()? null : insns.getLast();
 		if(!(lastInsn instanceof ConditionalJump jump)){
 			throw new MalformedJorth("Must be run after a conditional operation");
@@ -230,7 +277,7 @@ public class CodeBlock{
 		}
 		insns.removeLast();
 		var block = createBlockFromHere(code);
-		return add(jump.withFalse(localStack, block));
+		return add(jump.withFalse(this, block));
 	}
 	
 	public CodeBlock newObj(Class<?> clazz) throws MalformedJorth{
@@ -243,6 +290,7 @@ public class CodeBlock{
 		return newObj(ClassName.of(clazz), arguments);
 	}
 	public CodeBlock newObj(ClassName clazz, CodeArg arguments) throws MalformedJorth{
+		preInsn();
 		var type = GenericType.of(clazz);
 		if(type.dims() != 0){
 			add(NewOp.simulate(localStack, type, false));
@@ -262,6 +310,7 @@ public class CodeBlock{
 		return call(name, 0);
 	}
 	public CodeBlock call(String name, int argumentCount) throws MalformedJorth{
+		preInsn();
 		var stackSize = localStack.size();
 		var mark      = stackSize - argumentCount;
 		var caller    = typeSource.byType(localStack.peek(mark - 1));
@@ -272,6 +321,7 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
+		preInsn();
 		var caller = typeSource.byType(localStack.peekLast());
 		
 		var args = doArgs(gatherArguments);
@@ -283,6 +333,7 @@ public class CodeBlock{
 	private List<JType> doArgs(CodeArg gatherArguments) throws MalformedJorth{
 		var mark = localStack.size();
 		gatherArguments.accept(this);
+		mergeBranch();
 		return readCallStack(mark);
 	}
 	
@@ -296,6 +347,7 @@ public class CodeBlock{
 		return call(ClassName.of(staticCaller), name, gatherArguments);
 	}
 	public CodeBlock call(ClassName staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
+		preInsn();
 		var cl = typeSource.byName(staticCaller);
 		
 		var args = doArgs(gatherArguments);
@@ -316,6 +368,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock call(FunctionDefinition fn) throws MalformedJorth{
+		preInsn();
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(FunctionDefinition fn, CodeArg gatherArguments) throws MalformedJorth{
@@ -354,6 +407,7 @@ public class CodeBlock{
 	public CodeBlock set(FieldInfo field, Class<?> val) throws MalformedJorth { return val(val).setField(field); }
 	public CodeBlock set(FieldInfo field, ClassName val) throws MalformedJorth{ return val(val).setField(field); }
 	public CodeBlock setField(FieldInfo field) throws MalformedJorth{
+		preInsn();
 		return add(PutFieldOp.simulate(localStack, typeSource, field));
 	}
 	
@@ -366,21 +420,26 @@ public class CodeBlock{
 	public CodeBlock set(String varName, Class<?> val) throws MalformedJorth { return val(val).set(varName); }
 	public CodeBlock set(String varName, ClassName val) throws MalformedJorth{ return val(val).set(varName); }
 	public CodeBlock set(String varName) throws MalformedJorth{
+		preInsn();
 		Local local = getLocal(varName);
 		return add(PutLocalVarOp.simulate(localStack, typeSource, local));
 	}
 	
 	public CodeBlock pop() throws MalformedJorth{
+		preInsn();
 		return add(PopOp.simulate(localStack));
 	}
 	public CodeBlock dup() throws MalformedJorth{
+		preInsn();
 		return add(DupOp.simulate(localStack));
 	}
 	public CodeBlock swap() throws MalformedJorth{
+		preInsn();
 		return add(SwapOp.simulate(localStack));
 	}
 	
 	public CodeBlock callSuper(CodeArg gatherArguments) throws MalformedJorth{
+		preInsn();
 		get("this");
 		var          args    = doArgs(gatherArguments);
 		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args);
@@ -393,6 +452,7 @@ public class CodeBlock{
 	 * @throws MalformedJorth
 	 */
 	public CodeBlock callSuperAutoPass() throws MalformedJorth{
+		preInsn();
 		get("this");
 		for(String argName : fnOwner.getArgNames()){
 			get(argName);
@@ -413,6 +473,7 @@ public class CodeBlock{
 	void implicitReturn(MethodVisitor fn){
 		if(terminates()) return;
 		try{
+			checkFreeze();
 			ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to return on " + fnOwner, e);
@@ -469,16 +530,20 @@ public class CodeBlock{
 	public CodeBlock cast(Class<?> type) throws MalformedJorth { return cast(GenericType.of(type)); }
 	public CodeBlock cast(ClassName type) throws MalformedJorth{ return cast(GenericType.of(type)); }
 	public CodeBlock cast(GenericType type) throws MalformedJorth{
+		preInsn();
 		return add(CastOp.simulate(localStack, typeSource, type));
 	}
 	public CodeBlock setArrayElement() throws MalformedJorth{
+		preInsn();
 		return add(PutElementOp.simulate(localStack, typeSource));
 	}
 	public CodeBlock getArrayElement() throws MalformedJorth{
+		preInsn();
 		return add(GetElementOp.simulate(localStack, typeSource));
 	}
 	
 	public CodeBlock callVirtual(Consumer<BootstrapFn> bootstrap, Consumer<CallingFn> fnDef, CodeArg arguments) throws MalformedJorth{
+		preInsn();
 		List<JType> args = doArgs(arguments);
 		
 		var boot = new BootstrapFn();
@@ -520,9 +585,11 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock add(int val) throws MalformedJorth{
+		preInsn();
 		return add(Increment.simulate(localStack, val));
 	}
 	public CodeBlock add(double val) throws MalformedJorth{
+		preInsn();
 		return add(Increment.simulate(localStack, val));
 	}
 	
@@ -530,12 +597,14 @@ public class CodeBlock{
 		return val(val).bitShiftRight(logical);
 	}
 	public CodeBlock bitShiftRight(boolean logical) throws MalformedJorth{
+		preInsn();
 		return add(BitShiftRight.simulate(localStack, logical));
 	}
 	public CodeBlock bitShiftLeft(int val) throws MalformedJorth{
 		return val(val).bitShiftLeft();
 	}
 	public CodeBlock bitShiftLeft() throws MalformedJorth{
+		preInsn();
 		return add(BitShiftLeft.simulate(localStack));
 	}
 	public CodeBlock bitAnd(int val) throws MalformedJorth{
@@ -555,17 +624,19 @@ public class CodeBlock{
 		return bitAnd();
 	}
 	public CodeBlock bitAnd() throws MalformedJorth{
+		preInsn();
 		return add(BitAnd.simulate(localStack));
 	}
 	
 	public CodeBlock nullVal(Class<?> type) throws MalformedJorth { return nullVal(ClassName.of(type)); }
 	public CodeBlock nullVal(ClassName type) throws MalformedJorth{ return nullVal(GenericType.of(type)); }
 	public CodeBlock nullVal(GenericType type) throws MalformedJorth{
+		preInsn();
 		return add(NullConstant.simulate(localStack, type));
 	}
 	
 	public CodeBlock unbox() throws MalformedJorth{
-		checkFreeze();
+		preInsn();
 		class Boxes{
 			private static Map.Entry<GenericType, FunctionInfo> getInfo(Class<?> boxTyp, String fnName){
 				var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, boxTyp.getClassLoader()), boxTyp);
@@ -598,7 +669,7 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), boxFn, false));
 	}
 	public CodeBlock box() throws MalformedJorth{
-		checkFreeze();
+		preInsn();
 		class Boxes{
 			private static Map.Entry<GenericType, FunctionInfo> getBoxInfo(GenericType typ, Class<?> cls){
 				var          cInfo = new ClassInfo.OfClass(TypeSource.of(null, cls.getClassLoader()), cls);
@@ -636,4 +707,11 @@ public class CodeBlock{
 		return insns.reversed().stream().limit(10).toList().reversed().stream().map(Object::toString).collect(Collectors.joining("\n"));
 	}
 	
+	public void lockEditing(){
+		checkFreeze();
+		freezeReason = FreezeReason.FINISHED_EDITING;
+	}
+	FreezeReason getFreezeReason(){
+		return freezeReason;
+	}
 }

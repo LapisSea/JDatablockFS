@@ -1,5 +1,7 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.exceptions.IllegalConditionalMerge;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.exceptions.MissingLocalField;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
@@ -285,6 +287,140 @@ public class JorthTests{
 		int expected = expectedEqual? 1 : 2;
 		
 		assertThat(generated).isEqualTo(expected);
+	}
+	
+	
+	@DataProvider
+	Object[][] ifMergeCases(){
+		
+		return new Object[][]{
+			{true, true, true, true},
+			{true, true, true, false},
+			{true, false, true, true},
+			{true, false, true, false},
+			{true, false, false, true},
+			{true, false, false, false},
+			{false, true, true, true},
+			{false, true, true, false},
+			{false, false, true, true},
+			{false, false, true, false},
+			};
+	}
+	
+	@Test(dataProvider = "ifMergeCases")
+	void ifElseConditionalMergeTest(boolean returnsInTrue, boolean returnsInFalse, boolean hasFalse, boolean expectedEqual) throws Exception{
+		var name = autoName();
+		var cls = generateAndLoadInstanceSimple(name, cd -> {
+			var fn = cd.function("check").staticAcc()
+			           .arg(int.class, "a")
+			           .returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+				    if(returnsInTrue) code.returnOp();
+			    });
+			if(hasFalse){
+				body.elseRun(code -> {
+					code.val(2);
+					if(returnsInFalse) code.returnOp();
+				});
+			}else{
+				body.val(2);
+			}
+			if(!returnsInTrue || !returnsInFalse){
+				body.returnOp();
+			}
+		});
+		
+		var method    = cls.getMethod("check", int.class);
+		int generated = (int)method.invoke(null, expectedEqual? 3 : 4);
+		int expected  = expectedEqual? 1 : 2;
+		
+		
+		assertThat(generated).isEqualTo(expected);
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackCountMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    })
+			    .elseRun(code -> { });
+			body.returnOp();
+		});
+	}
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackCountMismatchThrows2() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    });
+			body.returnOp();
+		});
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifBranchStackTypeMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+			    })
+			    .elseRun(code -> {
+				    code.val(1L);
+			    });
+			body.returnOp();
+		});
+	}
+	
+	@Test(expectedExceptions = IllegalConditionalMerge.class)
+	void ifNoElseImplicitMergeMismatchThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			// no else: implicit false-branch is "entry stack unchanged" —
+			// true-branch pushing a value with nothing consuming it after must fail
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1); // extra int left on stack, no else to match it against
+			    });
+			body.returnOp();
+		});
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = ".*block has terminated.*")
+	void bothBranchesTerminateThenUnreachableAccessThrows() throws Exception{
+		var name = autoName();
+		generateAndLoadInstanceSimple(name, cd -> {
+			var fn   = cd.function("check").staticAcc().arg(int.class, "a").returns(int.class);
+			var body = fn.body();
+			body.get("a").val(3)
+			    .ifEquality(code -> {
+				    code.val(1);
+				    code.returnOp();
+			    })
+			    .elseRun(code -> {
+				    code.val(2);
+				    code.returnOp();
+			    });
+			// both branches terminate — this point is unreachable;
+			// trying to keep building here (or requiring a final implicit return) should fail
+			body.returnOp();
+		});
 	}
 	
 	@Test
