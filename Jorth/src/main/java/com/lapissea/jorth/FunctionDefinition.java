@@ -184,7 +184,14 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		}
 		if(body != null){
 			body.visit(fn);
-			body.implicitReturn(fn);
+			if(!body.terminates()){
+				try{
+					body.mergeBranch();
+				}catch(MalformedJorth e){
+					throw new RuntimeException("Failed to merge branch before returning on " + this, e);
+				}
+				body.implicitReturn(fn);
+			}
 			fn.visitMaxs(0, 0);
 		}
 		fn.visitEnd();

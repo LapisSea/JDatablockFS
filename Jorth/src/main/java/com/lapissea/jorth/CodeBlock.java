@@ -75,7 +75,7 @@ public class CodeBlock{
 		if(checkBranch) mergeBranch();
 	}
 	
-	private void mergeBranch() throws MalformedJorth{
+	void mergeBranch() throws MalformedJorth{
 		if(!insns.isEmpty() && insns.getLast() instanceof BranchingInsn branching){
 			branching.merge(localStack);
 		}
