@@ -1130,7 +1130,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var type      = getType().getConcreteType();
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 			
-			var cw = new ClassDefinition(type.getClassLoader());
+			var cw = ClassDefinition.hiddenNestmate(type);
 			
 			cw.typeDef("GeneratorPipeClass", this.getClass());
 			cw.typeDef("ObjType", type);

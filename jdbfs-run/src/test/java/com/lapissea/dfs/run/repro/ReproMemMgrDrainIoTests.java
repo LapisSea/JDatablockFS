@@ -52,12 +52,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * identifying the two park locations.
  */
 public class ReproMemMgrDrainIoTests{
-
-	@Test(timeOut = 90_000)
+	
+	@Test(timeOut = 5_000)
 	void freeListDrainDeadlocksThreadOpeningNestedChain() throws Exception{
 		var cluster = Cluster.init(MemoryData.empty());
 		var mm      = cluster.getMemoryManager();
-
+		
 		// Physical layout (each submit appends right after the previous chunk):
 		//   [ a: live ] [ f1: to be freed ] [ d: live ] [ b: to be freed, cap>=32 ] [ c: live, LAST ]
 		// d between f1 and b keeps the two freed chunks from being merged into one free chunk.
@@ -66,7 +66,7 @@ public class ReproMemMgrDrainIoTests{
 		Chunk d  = AllocateTicket.bytes(16).submit(cluster);
 		Chunk b  = AllocateTicket.bytes(64).submit(cluster);
 		Chunk c  = AllocateTicket.bytes(16).submit(cluster);
-
+		
 		// Sanity: this layout must deterministically drive tryPopFree() into the
 		// free-list compaction / drain branch (PersistentMemoryManager.java:349-384), so the
 		// test exercises the drain no matter what. Without these, a "pass" would be vacuous.
@@ -77,15 +77,15 @@ public class ReproMemMgrDrainIoTests{
 		assertThat(b.checkLastPhysical()).as("b must NOT be the last physical chunk (c is)").isFalse();
 		assertThat(c.checkLastPhysical()).as("c must be the last physical chunk (drain requires it)").isTrue();
 		assertThat(b.getCapacity()).as("drain filter: last free chunk needs capacity >= 32").isGreaterThanOrEqualTo(32);
-		assertThat(b.getCapacity()).as("drain filter: lastFree.capacity >= 2 * toMove.size").isGreaterThanOrEqualTo(2 * c.getSize());
-
+		assertThat(b.getCapacity()).as("drain filter: lastFree.capacity >= 2 * toMove.size").isGreaterThanOrEqualTo(2*c.getSize());
+		
 		var outerOpen = new CountDownLatch(1);
 		var goNested  = new CountDownLatch(1);
 		var f1Freed   = new CountDownLatch(1);
-
+		
 		var aError = new AtomicReference<Throwable>();
 		var bError = new AtomicReference<Throwable>();
-
+		
 		// Thread A: "dereferencing a reference while the parent's ChunkChainIO is open".
 		// Opens an OUTER chain and keeps it open, then opens a NESTED chain.
 		var aThread = new Thread(() -> {
@@ -108,7 +108,7 @@ public class ReproMemMgrDrainIoTests{
 		}, "repro-thread-A");
 		aThread.start();
 		assertThat(outerOpen.await(10, TimeUnit.SECONDS)).as("A should open its outer chain").isTrue();
-
+		
 		// Thread B: frees f1 first (free list becomes [f1], size 1 -> no drain branch), then b
 		// (free list becomes [f1, b] -> tryPopFree() enters the drain: drainIO=true, spin until
 		// every other thread's chain stack is empty -> hangs for as long as A holds a chain).
@@ -123,36 +123,36 @@ public class ReproMemMgrDrainIoTests{
 		}, "repro-thread-B");
 		bThread.start();
 		assertThat(f1Freed.await(10, TimeUnit.SECONDS)).as("B should free f1").isTrue();
-
+		
 		// B is now inside the drain spin loop (it sleeps 0.1s per iteration; reaching it from the
 		// second free() call is a sub-millisecond path on MemoryData). Let A open the nested chain
 		// so it hits drainIO==true in notifyStart().
 		Thread.sleep(750);
 		goNested.countDown();
-
+		
 		// If the code were correct, both threads would finish promptly.
 		bThread.join(30_000);
 		aThread.join(20_000);
-
+		
 		// Any exception inside the worker threads would be a harness problem, not the reported bug.
 		assertThat(bError.get()).as("free thread must not fail unexpectedly (harness issue, not BUG-41)").isNull();
 		assertThat(aError.get()).as("reader thread must not fail unexpectedly (harness issue, not BUG-41)").isNull();
-
+		
 		// KEY ASSERTION: with this layout the drain is guaranteed to run, and a thread that holds an
 		// open chain while opening a nested one must not deadlock with it.
 		// BUG-41 present: B alive (spinning in the tryPopFree() drain, PersistentMemoryManager.java:371-384)
 		// AND A alive (parked in notifyStart->block(), PersistentMemoryManager.java:134-137,161-164)
 		// -> this assertion fails, printing both stacks to identify the two park locations.
 		assertThat(bThread.isAlive() || aThread.isAlive()).as(
-			"DEADLOCK (BUG-41): the free-list drain and a nested chain open deadlocked. " +
-			"B (freeing) alive=%b: its drain spins until every other thread's chain stack is empty, " +
-			"which can never happen while A holds an open chain. " +
-			"A (reading) alive=%b: its nested ChunkChainIO open parks in notifyStart->block() waiting for " +
-			"drainIO to be cleared - by the very drain that is waiting for A's stack. Stacks:\n--- B ---\n%s--- A ---\n%s",
-			bThread.isAlive(), aThread.isAlive(), stackOf(bThread), stackOf(aThread))
-		   .isFalse();
+			                                                  "DEADLOCK (BUG-41): the free-list drain and a nested chain open deadlocked. " +
+			                                                  "B (freeing) alive=%b: its drain spins until every other thread's chain stack is empty, " +
+			                                                  "which can never happen while A holds an open chain. " +
+			                                                  "A (reading) alive=%b: its nested ChunkChainIO open parks in notifyStart->block() waiting for " +
+			                                                  "drainIO to be cleared - by the very drain that is waiting for A's stack. Stacks:\n--- B ---\n%s--- A ---\n%s",
+			                                                  bThread.isAlive(), aThread.isAlive(), stackOf(bThread), stackOf(aThread))
+		                                                  .isFalse();
 	}
-
+	
 	private static String stackOf(Thread t){
 		var sb = new StringBuilder();
 		sb.append(t.getName()).append(t.isAlive()? " [alive]" : " [terminated]").append('\n');

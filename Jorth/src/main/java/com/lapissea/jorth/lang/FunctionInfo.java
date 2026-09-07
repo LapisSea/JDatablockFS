@@ -79,13 +79,7 @@ public interface FunctionInfo{
 		}
 		@Override
 		public Visibility visibility(){
-			if(Modifier.isPublic(method.getModifiers())){
-				return Visibility.PUBLIC;
-			}
-			if(Modifier.isProtected(method.getModifiers())){
-				return Visibility.PROTECTED;
-			}
-			return Visibility.PRIVATE;
+			return Visibility.ofModifiers(method.getModifiers());
 		}
 		@Override
 		public ClassInfo ownerInfo(){
@@ -161,13 +155,7 @@ public interface FunctionInfo{
 		}
 		@Override
 		public Visibility visibility(){
-			if(Modifier.isPublic(ctor.getModifiers())){
-				return Visibility.PRIVATE;
-			}
-			if(Modifier.isProtected(ctor.getModifiers())){
-				return Visibility.PROTECTED;
-			}
-			return Visibility.PRIVATE;
+			return Visibility.ofModifiers(ctor.getModifiers());
 		}
 		@Override
 		public ClassInfo ownerInfo(){

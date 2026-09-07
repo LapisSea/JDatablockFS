@@ -64,6 +64,24 @@ public interface TypeSource{
 		return new OfClassLoader(parent, classLoader);
 	}
 	
+	static TypeSource ofNestmate(TypeSource parent, Class<?> definitionHost){
+		return new OfClassLoader(parent, definitionHost.getClassLoader()){
+			@Override
+			public boolean areNestmates(ClassName caller, ClassName owner){
+				var callerName    = caller.dotted();
+				var callerPackage = callerName.substring(0, Math.max(0, callerName.lastIndexOf('.')));
+				if(!callerPackage.equals(definitionHost.getPackageName())) return false;
+				try{
+					return definitionHost.isNestmateOf(Class.forName(owner.dotted(), false, definitionHost.getClassLoader()));
+				}catch(ClassNotFoundException e){
+					return false;
+				}
+			}
+		};
+	}
+	
+	default boolean areNestmates(ClassName caller, ClassName owner){ return false; }
+	
 	Optional<ClassInfo> maybeByType(GenericType type);
 	
 	default Optional<ClassInfo> maybeByName(ClassName name){

@@ -65,6 +65,10 @@ public interface ClassInfo{
 			return false;
 		}
 		@Override
+		public boolean isPublic(){
+			return true;
+		}
+		@Override
 		public boolean isFinal(){
 			return true;
 		}
@@ -281,6 +285,10 @@ public interface ClassInfo{
 			return clazz.isInterface();
 		}
 		@Override
+		public boolean isPublic(){
+			return Modifier.isPublic(clazz.getModifiers());
+		}
+		@Override
 		public boolean isFinal(){
 			return Modifier.isFinal(clazz.getModifiers());
 		}
@@ -312,6 +320,7 @@ public interface ClassInfo{
 	boolean isPrimitive();
 	boolean isInterface();
 	
+	boolean isPublic();
 	boolean isFinal();
 	List<GenericType> interfaces();
 }

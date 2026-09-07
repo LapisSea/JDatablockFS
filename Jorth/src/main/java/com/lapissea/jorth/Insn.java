@@ -625,8 +625,10 @@ sealed interface Insn{
 	
 	record PutFieldOp(FieldInfo field) implements Insn{
 		
-		static PutFieldOp simulate(TypeStack stack, TypeSource typeSource, FieldInfo field) throws MalformedJorth{
+		static PutFieldOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FieldInfo field) throws MalformedJorth{
 			stack.requireElements(field.isStatic()? 1 : 2);
+			MemberAccess.check(typeSource, caller, field.owner(), field.name(), field.visibility(),
+			                   field.isStatic()? null : stack.peek(stack.size() - 2), false);
 			var valueType = stack.pop().withoutArgs();
 			var type      = field.type().asGeneric().withoutArgs();
 			
@@ -646,7 +648,9 @@ sealed interface Insn{
 	
 	record GetFieldOp(FieldInfo field) implements Insn{
 		
-		static GetFieldOp simulate(TypeStack stack, TypeSource typeSource, FieldInfo field) throws MalformedJorth{
+		static GetFieldOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FieldInfo field) throws MalformedJorth{
+			MemberAccess.check(typeSource, caller, field.owner(), field.name(), field.visibility(),
+			                   field.isStatic()? null : stack.peekLast(), false);
 			var type = field.type().asGeneric().withoutArgs();
 			Insn.popFieldOwner(stack, typeSource, field, field.owner());
 			stack.push(type);
@@ -734,6 +738,10 @@ sealed interface Insn{
 			
 			var returnType = function.returnType();
 			var argTypes   = function.argumentTypes();
+			stack.requireElements(argTypes.size() + (function.isStatic()? 0 : 1));
+			MemberAccess.check(typeSource, caller, owner.name(), name, function.visibility(),
+			                   function.isStatic()? null : stack.peek(stack.size() - argTypes.size() - 1),
+			                   name.equals("<init>"));
 			
 			for(int i = argTypes.size() - 1; i>=0; i--){
 				var popped = stack.pop();

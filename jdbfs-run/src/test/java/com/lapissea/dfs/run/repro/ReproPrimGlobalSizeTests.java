@@ -8,6 +8,7 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -68,10 +69,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ReproPrimGlobalSizeTests{
 	
-	static{
+	@BeforeClass
+	void checkDebugValidation(){
 		assertThat(GlobalConfig.DEBUG_VALIDATION)
 			.as("This test requires GlobalConfig.DEBUG_VALIDATION to be OFF (release-mode write path). "
-			   + "Run mvn with -DenableAssertions=false (DEBUG_VALIDATION derives from the JVM assertion status).")
+			    + "Run mvn with -DenableAssertions=false (DEBUG_VALIDATION derives from the JVM assertion status).")
 			.isFalse();
 	}
 	
@@ -115,7 +117,7 @@ public class ReproPrimGlobalSizeTests{
 	@Test
 	void controlProperSizeRoundTrips(){
 		var obj = new NumSizeTestType();
-		obj.value     = 500;
+		obj.value = 500;
 		obj.valueSize = NumberSize.SHORT;//500 fits an unsigned short (needs >= 2 bytes) -> no truncation possible
 		var read = roundTrip(NumSizeTestType.class, obj);
 		
@@ -132,7 +134,7 @@ public class ReproPrimGlobalSizeTests{
 	@Test
 	void userManagedNumSizeTooSmallSilentlyTruncates(){
 		var obj = new NumSizeTestType();
-		obj.value     = 500;
+		obj.value = 500;
 		obj.valueSize = NumberSize.BYTE;//TOO SMALL: unsigned BYTE holds 0..255, 500 needs >= 2 bytes
 		var read = roundTrip(NumSizeTestType.class, obj);
 		

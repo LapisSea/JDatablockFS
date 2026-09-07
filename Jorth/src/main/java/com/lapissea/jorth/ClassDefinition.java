@@ -61,6 +61,17 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		typeSource = TypeSource.of(this::generatedClassInfo, classLoader == null? this.getClass().getClassLoader() : classLoader);
 	}
 	
+	/**
+	 * Builds bytecode intended for defineHiddenClass with NESTMATE using a lookup
+	 * on definitionHost. The caller must use that definition context when loading.
+	 */
+	public static ClassDefinition hiddenNestmate(Class<?> definitionHost){
+		return new ClassDefinition(definitionHost);
+	}
+	private ClassDefinition(Class<?> definitionHost){
+		typeSource = TypeSource.ofNestmate(this::generatedClassInfo, Objects.requireNonNull(definitionHost));
+	}
+	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
 		if(name == null) return Optional.empty();
 		var raw = type.raw();
@@ -128,6 +139,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 			@Override
 			public boolean isFinal(){ return access.isFinal(); }
+			@Override
+			public boolean isPublic(){ return visibility == Visibility.PUBLIC; }
 			@Override
 			public List<GenericType> interfaces(){
 				return Collections.unmodifiableList(interfaces);

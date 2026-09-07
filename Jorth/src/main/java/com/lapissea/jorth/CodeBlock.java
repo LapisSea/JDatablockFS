@@ -156,7 +156,7 @@ public class CodeBlock{
 	}
 	public CodeBlock get(FieldInfo field) throws MalformedJorth{
 		preInsn();
-		return add(GetFieldOp.simulate(localStack, typeSource, field));
+		return add(GetFieldOp.simulate(localStack, typeSource, cName(), field));
 	}
 	
 	public CodeBlock get(String localVal) throws MalformedJorth{
@@ -408,7 +408,7 @@ public class CodeBlock{
 	public CodeBlock set(FieldInfo field, ClassName val) throws MalformedJorth{ return val(val).setField(field); }
 	public CodeBlock setField(FieldInfo field) throws MalformedJorth{
 		preInsn();
-		return add(PutFieldOp.simulate(localStack, typeSource, field));
+		return add(PutFieldOp.simulate(localStack, typeSource, cName(), field));
 	}
 	
 	public CodeBlock set(String varName, int val) throws MalformedJorth      { return val(val).set(varName); }
