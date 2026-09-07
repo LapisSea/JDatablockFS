@@ -42,22 +42,21 @@ public class AnnotationDefinition{
 	}
 	private void visit(AnnotationVisitor annWriter){
 		for(var e : args.entrySet()){
-			String argName  = e.getKey();
-			Object argValue = e.getValue();
-			if(argValue.getClass().isArray()){
-				var arrAnn = annWriter.visitArray(argName);
-				for(int i = 0; i<Array.getLength(argValue); i++){
-					arrAnn.visit(null, Array.get(argValue, i));
-				}
-				arrAnn.visitEnd();
-				
-			}else if(argValue instanceof Enum<?> eVal){
-				annWriter.visitEnum(argName, GenericType.of(eVal.getClass()).jvmSignatureStr(), eVal.name());
-			}else{
-				annWriter.visit(argName, argValue);
-			}
-			
+			visitValue(annWriter, e.getKey(), e.getValue());
 		}
 		annWriter.visitEnd();
+	}
+	private static void visitValue(AnnotationVisitor writer, String name, Object value){
+		if(value.getClass().isArray()){
+			var arrayWriter = writer.visitArray(name);
+			for(int i = 0; i<Array.getLength(value); i++){
+				visitValue(arrayWriter, null, Array.get(value, i));
+			}
+			arrayWriter.visitEnd();
+		}else if(value instanceof Enum<?> enumValue){
+			writer.visitEnum(name, GenericType.of(enumValue.getDeclaringClass()).jvmDescriptorStr(), enumValue.name());
+		}else{
+			writer.visit(name, value);
+		}
 	}
 }
