@@ -26,7 +26,7 @@ public interface FunctionInfo{
 			List<JType> argTmp = List.copyOf(args);
 			var         copy   = false;
 			for(int i = 0; i<argTmp.size(); i++){
-				if(argTmp.get(i).hasArgs()) continue;
+				if(!argTmp.get(i).hasArgs()) continue;
 				if(!copy) argTmp = new ArrayList<>(argTmp);
 				copy = true;
 				argTmp.set(i, argTmp.get(i).withoutArgs());

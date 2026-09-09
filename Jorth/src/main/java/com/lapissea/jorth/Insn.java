@@ -57,14 +57,14 @@ sealed interface Insn{
 	
 	record IVal(int val) implements Insn{
 		public static void emit(MethodVisitor writer, int value){
-			switch(value){
-				case 0 -> writer.visitInsn(ICONST_0);
-				case 1 -> writer.visitInsn(ICONST_1);
-				case 2 -> writer.visitInsn(ICONST_2);
-				case 3 -> writer.visitInsn(ICONST_3);
-				case 4 -> writer.visitInsn(ICONST_4);
-				case 5 -> writer.visitInsn(ICONST_5);
-				default -> writer.visitIntInsn(SIPUSH, value);
+			if(value>=-1 && value<=5){
+				writer.visitInsn(ICONST_0 + value);
+			}else if(value>=Byte.MIN_VALUE && value<=Byte.MAX_VALUE){
+				writer.visitIntInsn(BIPUSH, value);
+			}else if(value>=Short.MIN_VALUE && value<=Short.MAX_VALUE){
+				writer.visitIntInsn(SIPUSH, value);
+			}else{
+				writer.visitLdcInsn(value);
 			}
 		}
 		
@@ -905,7 +905,7 @@ sealed interface Insn{
 			else if(type.equals(GenericType.FLOAT)) typ = BaseType.FLOAT;
 			else if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
 			else{
-				throw new IllegalArgumentException("Cannot increment stack value of type: " + type + " by int");
+				throw new MalformedJorth("Cannot increment stack value of type: " + type + " by int");
 			}
 			return new Increment(val, typ);
 		}
@@ -914,7 +914,7 @@ sealed interface Insn{
 			BaseType typ;
 			if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
 			else{
-				throw new IllegalArgumentException("Cannot increment stack value of type: " + type + " by double");
+				throw new MalformedJorth("Cannot increment stack value of type: " + type + " by double");
 			}
 			return new Increment(val, typ);
 		}
@@ -958,7 +958,7 @@ sealed interface Insn{
 			}else if(value.equals(GenericType.LONG)){
 				typ = BaseType.LONG;
 			}else{
-				throw new IllegalArgumentException("Cannot bit shift stack value of type: " + value);
+				throw new MalformedJorth("Cannot bit shift stack value of type: " + value);
 			}
 			stack.push(value);
 			return new BitShiftLeft(typ);
@@ -992,7 +992,7 @@ sealed interface Insn{
 			}else if(value.equals(GenericType.LONG)){
 				typ = BaseType.LONG;
 			}else{
-				throw new IllegalArgumentException("Cannot bit shift stack value of type: " + value);
+				throw new MalformedJorth("Cannot bit shift stack value of type: " + value);
 			}
 			stack.push(value);
 			return new BitShiftRight(typ, logical);

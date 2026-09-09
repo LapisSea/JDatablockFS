@@ -240,7 +240,8 @@ public interface ClassInfo{
 				var argS = args.get(i).asGeneric();
 				
 				if(argS.equals(GenericType.OBJECT)){
-					return argC == Object.class;
+					if(argC != Object.class) return false;
+					continue;
 				}
 				
 				var bt = BaseType.of(argC.getName());
