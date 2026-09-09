@@ -72,7 +72,7 @@ public class CompressionTests{
 	<T extends IOInstance<T>> void typeIntegrity(IOCompression.Type type) throws Exception{
 		
 		var name = CompressionTests.class.getPackageName() + ".Holder$" + type;
-		var cw   = new ClassDefinition(null);
+		var cw   = new ClassDefinition(null).finalAcc();
 		cw.extendsType(IOInstance.Managed.class)
 		  .name(ClassName.dotted(name));
 		cw.field(byte[].class, "data")

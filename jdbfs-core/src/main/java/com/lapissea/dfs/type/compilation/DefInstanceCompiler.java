@@ -530,7 +530,7 @@ public final class DefInstanceCompiler{
 			cw.implement(GenericType.of(interf).withArgs(parms));
 			
 			cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(GenericType.of(typImpl).withArgs(parms)))
-			  .name(typImpl);
+			  .name(typImpl).finalAcc();
 			
 			defineStatics(cw, completion.base);
 			

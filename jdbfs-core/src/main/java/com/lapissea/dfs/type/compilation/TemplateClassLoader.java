@@ -219,6 +219,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		if(extend) cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(genClassName));
 		
 		cw.name(genClassName);
+		if(!def.isSealed()) cw.finalAcc();
 		if(extend && !def.isSealed()){
 			var structType = GenericType.of(Struct.class).withArgs(genClassName);
 			var vStruct    = cw.field(structType, "$V_STRUCT").visibility(Visibility.PRIVATE).staticAcc();

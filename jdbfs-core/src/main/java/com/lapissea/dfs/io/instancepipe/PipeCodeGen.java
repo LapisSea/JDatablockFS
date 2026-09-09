@@ -47,7 +47,7 @@ public final class PipeCodeGen{
 		
 		cname = (c.isHidden()? cname.substring(0, cname.lastIndexOf('/')) : cname) + "&_" + fnName;
 		
-		var cw = ClassDefinition.hiddenNestmate(lookup.lookupClass());
+		var cw = ClassDefinition.hiddenNestmate(lookup.lookupClass()).finalAcc();
 		cw.typeDef("ThisClass", ClassName.dotted(cname));
 		cw.name(ClassName.dotted(cname));
 		generateFn.accept(cw);

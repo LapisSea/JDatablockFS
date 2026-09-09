@@ -131,7 +131,7 @@ public final class TempClassGen{
 	}
 	private static byte[] makeClass(ClassLoader cl, ClassGen classGen){
 		try{
-			var cw = new ClassDefinition(cl);
+			var cw = new ClassDefinition(cl).finalAcc();
 			JorthUtils.writeAnnotations(cw, classGen.annotations);
 			if(classGen.parent != null){
 				cw.extendsType(classGen.parent);
@@ -210,7 +210,7 @@ public final class TempClassGen{
 	}
 	private static byte[] makeAccessClass(ClassLoader cl, String name){
 		try{
-			var cw = new ClassDefinition(cl);
+			var cw = new ClassDefinition(cl).finalAcc();
 			cw.implement(Supplier.class).name(ClassName.dotted(name));
 			cw.function("get").returns(Object.class)
 			  .body()

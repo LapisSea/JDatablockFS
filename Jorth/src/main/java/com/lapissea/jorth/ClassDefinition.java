@@ -194,7 +194,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 		});
 	}
-
+	
 	private void ensureConstructor() throws MalformedJorth{
 		if(functions.values().stream().noneMatch(FunctionDefinition::isConstructor)){
 			instanceInit().body().callSuperAutoPass();
@@ -204,7 +204,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	private void visitClass(ClassWriter writer){
 		requireName();
 		int accessFlags = visibility.flag|switch(type){
-			case CLASS -> ACC_SUPER|(permits.isEmpty()? ACC_FINAL : 0);
+			case CLASS -> ACC_SUPER|(access.flags()&(ACC_FINAL|ACC_ABSTRACT));
 			case INTERFACE -> ACC_ABSTRACT|ACC_INTERFACE;
 			case ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE|ACC_ANNOTATION;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;

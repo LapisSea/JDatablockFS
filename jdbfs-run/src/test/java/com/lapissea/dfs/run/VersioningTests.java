@@ -29,7 +29,7 @@ public class VersioningTests{
 	
 	private static void writeIOManagedClass(ClassDefinition cw, String className, List<Prop> props) throws MalformedJorth{
 		cw.extendsType(GenericType.of(IOInstance.Managed.class).withArgs(ClassName.dotted(className)));
-		cw.name(ClassName.dotted(className));
+		cw.name(ClassName.dotted(className)).finalAcc();
 		for(Prop prop : props){
 			cw.field(prop.type, prop.name).annotation(IOValue.class);
 		}
