@@ -77,6 +77,46 @@ public class JorthTests{
 		}
 	}
 	
+	@Test
+	void explicitPrimitiveConversions() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var takeLong = cd.function("takeLong").staticAcc().arg(long.class, "x").returns(long.class);
+			takeLong.body().get("x").returnOp();
+			var takeInteger = cd.function("takeInteger").staticAcc().arg(Integer.class, "x").returns(Integer.class);
+			takeInteger.body().get("x").returnOp();
+			cd.function("returnLong").staticAcc().returns(long.class).body().val(5).cast(long.class).returnOp();
+			cd.function("callLong").staticAcc().returns(long.class).body().val(5).cast(long.class).call(takeLong);
+			cd.function("callInteger").staticAcc().returns(Integer.class).body().val(5).box().call(takeInteger);
+		});
+		assertThat(cls.getMethod("returnLong").invoke(null)).isEqualTo(5L);
+		assertThat(cls.getMethod("callLong").invoke(null)).isEqualTo(5L);
+		assertThat(cls.getMethod("callInteger").invoke(null)).isEqualTo(5);
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class)
+	void returnRequiresExplicitWidening() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd ->
+			cd.function("run").staticAcc().returns(long.class).body().val(5).returnOp());
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class)
+	void callRequiresExplicitWidening() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			var target = cd.function("target").staticAcc().arg(long.class, "x").returns(long.class);
+			target.body().get("x");
+			cd.function("run").staticAcc().returns(long.class).body().val(5).call(target);
+		});
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class)
+	void callRequiresExplicitBoxing() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			var target = cd.function("target").staticAcc().arg(Integer.class, "x").returns(Integer.class);
+			target.body().get("x");
+			cd.function("run").staticAcc().returns(Integer.class).body().val(5).call(target);
+		});
+	}
+
 	public static class AutoPassSuper{
 		public int doubleAndAdd(int x){
 			return x*2 + 1;
