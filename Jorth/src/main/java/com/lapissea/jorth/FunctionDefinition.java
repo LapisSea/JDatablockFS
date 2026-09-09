@@ -130,6 +130,8 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		return b;
 	}
 	
+	boolean ranInstanceInitializers;
+	
 	private CodeBlock initBody() throws MalformedJorth{
 		access(access.withoutAbstr());
 		if(isEnumConstructor()) owner.validateEnumConstructor(this);
@@ -159,7 +161,8 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		if(isEnumConstructor()) body.enumSuper(hiddenName, hiddenOrdinal);
 		return body;
 	}
-	boolean isEnumConstructor(){ return owner.getType() == ClassType.ENUM && name.equals("<init>"); }
+	public boolean isConstructor(){ return name.equals("<init>"); }
+	boolean isEnumConstructor(){ return owner.getType() == ClassType.ENUM && isConstructor(); }
 	public FunctionInfo.Signature makeSignature(){
 		return new FunctionInfo.Signature(name, getArgs());
 	}
@@ -179,6 +182,16 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	
 	public void visit(ClassWriter writer) throws MalformedJorth{
 		
+		Insn.ReturnOp implicitReturn = null;
+		if(body != null && !body.terminates()){
+			try{
+				body.mergeBranch();
+			}catch(MalformedJorth e){
+				throw new MalformedJorth("Failed to merge branch before returning on " + this, e);
+			}
+			implicitReturn = body.prepareImplicitReturn();
+		}
+
 		var accessFlags = visibility.flag|access.flags()|(varargs? ACC_VARARGS : 0);
 		
 		var argTypes = getArgs();
@@ -195,15 +208,11 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 			annotation.visit(fn);
 		}
 		if(body != null){
-			body.visit(fn);
-			if(!body.terminates()){
-				try{
-					body.mergeBranch();
-				}catch(MalformedJorth e){
-					throw new MalformedJorth("Failed to merge branch before returning on " + this, e);
-				}
-				body.implicitReturn(fn);
+			if(isConstructor() && !ranInstanceInitializers){
+				body.visitConstructorPrefix(fn);
 			}
+			body.visit(fn);
+			if(implicitReturn != null) implicitReturn.visit(fn);
 			fn.visitMaxs(0, 0);
 		}
 		fn.visitEnd();

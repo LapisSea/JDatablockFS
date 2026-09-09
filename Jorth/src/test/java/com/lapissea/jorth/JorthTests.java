@@ -466,7 +466,7 @@ public class JorthTests{
 	
 	private static void generateLazyBlock(CodeArg code) throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("test.LazyBlockTermination"));
-		cd.function("run").staticAcc().returns(int.class).body().lazyBlock(code);
+		cd.function("run").staticAcc().returns(int.class).body().lazyBlock(code).val(0);
 		cd.getClassFile();
 	}
 	

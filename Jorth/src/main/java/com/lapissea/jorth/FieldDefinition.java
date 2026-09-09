@@ -16,6 +16,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	public final JType           type;
 	private      Visibility      visibility = Visibility.PUBLIC;
 	CodeArg enumConstantInit;
+	CodeArg instanceInitializer;
 	
 	private AccessSet access = AccessSet.DEFAULT;
 	
@@ -58,6 +59,10 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	}
 	
 	private FieldDefinition init(CodeArg init) throws MalformedJorth{
+		if(!isStatic()){
+			instanceInitializer = init;
+			return this;
+		}
 		var body = owner.staticInit().body();
 		init.accept(body);
 		body.setField(this);

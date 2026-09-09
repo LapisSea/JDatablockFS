@@ -185,8 +185,18 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return writer.toByteArray();
 	}
 	
+	void initializeInstanceFields(CodeBlock body) throws MalformedJorth{
+		body.lazyBlock(code -> {
+			for(var field : fields.values()){
+				if(field.instanceInitializer == null) continue;
+				field.instanceInitializer.accept(code);
+				code.setThis(field);
+			}
+		});
+	}
+
 	private void ensureConstructor() throws MalformedJorth{
-		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
+		if(functions.values().stream().noneMatch(FunctionDefinition::isConstructor)){
 			instanceInit().body().callSuperAutoPass();
 		}
 	}
@@ -339,10 +349,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	
 	private void ensureEnumConstructor() throws MalformedJorth{
-		if(danglingFunctions.stream().anyMatch(f -> f.name().equals("<init>"))){
+		if(danglingFunctions.stream().anyMatch(FunctionDefinition::isConstructor)){
 			throw new MalformedJorth("Define enum constructor bodies before constants");
 		}
-		if(functions.values().stream().noneMatch(f -> f.name().equals("<init>"))){
+		if(functions.values().stream().noneMatch(FunctionDefinition::isConstructor)){
 			instanceInit().body();
 		}
 	}

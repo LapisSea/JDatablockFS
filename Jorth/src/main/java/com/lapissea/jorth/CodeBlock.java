@@ -497,7 +497,12 @@ public class CodeBlock{
 		get("this");
 		var          args    = doArgs(gatherArguments);
 		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args);
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		if(fnOwner.isConstructor()){
+			fnOwner.ranInstanceInitializers = true;
+			fnOwner.owner().initializeInstanceFields(this);
+		}
+		return this;
 	}
 	/**
 	 * Calls super of the current method or constructor. Automatically passes all arguments in declaration order.
@@ -513,23 +518,41 @@ public class CodeBlock{
 			get(argName);
 		}
 		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), fnOwner.getArgs());
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		if(fnOwner.isConstructor()){
+			fnOwner.ranInstanceInitializers = true;
+			fnOwner.owner().initializeInstanceFields(this);
+		}
+		return this;
 	}
 	
 	private ClassName cName(){
 		return fnOwner.owner().name();
 	}
 	
+	void visitConstructorPrefix(MethodVisitor writer) throws MalformedJorth{
+		var prefix = new CodeBlock(null, typeSource, fnOwner);
+		prefix.defineLocalValue("this", new GenericType(cName()), false);
+		for(String argName : fnOwner.getArgNames()){
+			prefix.addLocal(getLocal(argName).withoutRemoval());
+		}
+		prefix.get("this");
+		var superFn = resolveFunction(fnOwner.owner().superType(), "<init>", List.of());
+		prefix.add(InvokeOp.simulate(prefix.localStack, typeSource, cName(), superFn, true));
+		fnOwner.owner().initializeInstanceFields(prefix);
+		prefix.visit(writer);
+	}
+
 	public void visit(MethodVisitor fn) throws MalformedJorth{
 		for(Insn i : insns){
 			i.visit(fn);
 		}
 	}
-	void implicitReturn(MethodVisitor fn) throws MalformedJorth{
-		if(terminates()) return;
+	ReturnOp prepareImplicitReturn() throws MalformedJorth{
+		if(terminates()) return null;
 		try{
 			checkFreeze();
-			ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
+			return ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false);
 		}catch(MalformedJorth e){
 			throw new MalformedJorth("Failed to return on " + fnOwner, e);
 		}
