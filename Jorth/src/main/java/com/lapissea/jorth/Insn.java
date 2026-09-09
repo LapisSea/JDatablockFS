@@ -899,6 +899,8 @@ sealed interface Insn{
 			BaseType typ;
 			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) || type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
 				typ = BaseType.INT;
+				stack.pop();
+				stack.push(GenericType.INT);
 			}else if(type.equals(GenericType.LONG)) typ = BaseType.LONG;
 			else if(type.equals(GenericType.FLOAT)) typ = BaseType.FLOAT;
 			else if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
