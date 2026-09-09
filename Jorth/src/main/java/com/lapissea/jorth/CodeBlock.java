@@ -253,6 +253,23 @@ public class CodeBlock{
 		return add(ClassVal.simulate(localStack, val));
 	}
 	
+	public CodeBlock greaterThanOp() throws MalformedJorth{
+		preInsn();
+		return add(NumericComparison.simulate(localStack, true, false));
+	}
+	public CodeBlock greaterThanOrEqualOp() throws MalformedJorth{
+		preInsn();
+		return add(NumericComparison.simulate(localStack, true, true));
+	}
+	public CodeBlock lessThanOp() throws MalformedJorth{
+		preInsn();
+		return add(NumericComparison.simulate(localStack, false, false));
+	}
+	public CodeBlock lessThanOrEqualOp() throws MalformedJorth{
+		preInsn();
+		return add(NumericComparison.simulate(localStack, false, true));
+	}
+	
 	public CodeBlock equalityOp() throws MalformedJorth{
 		preInsn();
 		return add(Equality.simulate(typeSource, localStack, true));
@@ -542,7 +559,7 @@ public class CodeBlock{
 		fnOwner.owner().initializeInstanceFields(prefix);
 		prefix.visit(writer);
 	}
-
+	
 	public void visit(MethodVisitor fn) throws MalformedJorth{
 		for(Insn i : insns){
 			i.visit(fn);

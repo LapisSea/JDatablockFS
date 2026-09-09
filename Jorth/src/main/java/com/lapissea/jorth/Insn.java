@@ -298,6 +298,56 @@ sealed interface Insn{
 		}
 	}
 	
+	/** Numeric relational comparison with Java binary numeric promotion. */
+	record NumericComparison(GenericType left, GenericType right, GenericType promoted,
+	                         boolean greater, boolean orEqual) implements Insn{
+		static NumericComparison simulate(TypeStack stack, boolean greater, boolean orEqual) throws MalformedJorth{
+			stack.requireElements(2);
+			var left = stack.peek(stack.size() - 2);
+			var right = stack.peekLast();
+			for(var type : List.of(left, right)){
+				switch(type.getBaseType()){
+					case BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE -> { }
+					default -> throw new MalformedJorth("Numeric comparison requires numeric primitives, got " + type);
+				}
+			}
+			var promoted = GenericType.INT;
+			for(var type : List.of(GenericType.DOUBLE, GenericType.FLOAT, GenericType.LONG)){
+				if(left.equals(type) || right.equals(type)){
+					promoted = type;
+					break;
+				}
+			}
+			stack.pop();
+			stack.pop();
+			stack.push(GenericType.BOOL);
+			return new NumericComparison(left, right, promoted, greater, orEqual);
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			new PrimitiveCastOp(right, promoted).visit(writer);
+			if(left.getBaseType().loadOp != promoted.getBaseType().loadOp){
+				new SwapOp(promoted, left).visit(writer);
+				new PrimitiveCastOp(left, promoted).visit(writer);
+				new SwapOp(promoted, promoted).visit(writer);
+			}
+			int ifNotOp;
+			if(promoted.equals(GenericType.INT)){
+				ifNotOp = greater? (orEqual? IF_ICMPLT : IF_ICMPLE) : (orEqual? IF_ICMPGT : IF_ICMPGE);
+			}else{
+				// NaN must make every relational comparison false.
+				writer.visitInsn(switch(promoted.getBaseType()){
+					case LONG -> LCMP;
+					case FLOAT -> greater? FCMPL : FCMPG;
+					case DOUBLE -> greater? DCMPL : DCMPG;
+					default -> throw new IllegalStateException(promoted.toString());
+				});
+				ifNotOp = greater? (orEqual? IFLT : IFLE) : (orEqual? IFGT : IFGE);
+			}
+			Equality.branchCompareToBool(writer, ifNotOp);
+		}
+	}
+
 	record Equality(GenericType type, boolean checkFor) implements Insn{
 		
 		public static Equality simulate(TypeSource typeSource, TypeStack stack, boolean checkFor) throws MalformedJorth{
@@ -333,7 +383,7 @@ sealed interface Insn{
 				}
 			}
 		}
-		private void branchCompareToBool(MethodVisitor writer, int ifNotOp){
+		private static void branchCompareToBool(MethodVisitor writer, int ifNotOp){
 			Label falseL = new Label();
 			writer.visitJumpInsn(ifNotOp, falseL);
 			writer.visitInsn(ICONST_1);
