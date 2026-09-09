@@ -78,6 +78,28 @@ public class JorthTests{
 	}
 	
 	@Test
+	void repeatedBodyCallsShareOneConcreteFunction() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			var fn = cd.function("run").staticAcc().arg(int.class, "value").returns(int.class);
+			assertThat(fn.access().isAbstract()).isTrue();
+
+			var body = fn.body();
+			assertThat(fn.access().isAbstract()).isFalse();
+			assertThat(cd.getClassInfo().getFunction(fn.makeSignature())).isSameAs(fn);
+			assertThat(fn.body()).isSameAs(body);
+
+			body.get("value");
+			fn.body().add(2);
+			fn.body().returnOp();
+			assertThat(fn.body()).isSameAs(body);
+		});
+		assertThat(cls.getDeclaredMethods()).hasSize(1);
+		var method = cls.getMethod("run", int.class);
+		assertThat(Modifier.isAbstract(method.getModifiers())).isFalse();
+		assertThat(method.invoke(null, 40)).isEqualTo(42);
+	}
+
+	@Test
 	void comparisonTest() throws Exception{
 		
 		var cls = generateAndLoadInstanceSimple(autoName(), classDefinition -> {

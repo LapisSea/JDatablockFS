@@ -73,23 +73,6 @@ public class JorthCoverageNegativeTests{
 	
 	// ------------------------------------------------------------------ MT-29
 	
-	// MT-29 — body() called twice on one function: NO exception is thrown today.
-	// SKIPPED: no guard (NEW) — FunctionDefinition.body() (FunctionDefinition.java:125-129)
-	// is idempotent: the second call returns the cached CodeBlock. A *redeclared* function
-	// with a disagreeing return type/static-ness throws IllegalClassState (unchecked,
-	// FunctionDefinition.java:160-166), never MalformedJorth. The KB's "calling twice
-	// throws" claim does not hold against the current source.
-	@Test(enabled = false)
-	void mt29_bodyCalledTwice() throws Exception{
-		// Re-enable once body() rejects a second call with the checked MalformedJorth.
-		var thrown = buildCapturing(cd -> {
-			var fn = cd.function("test").staticAcc().returns(int.class);
-			fn.body();
-			fn.body().val(42);
-		});
-		assertThat(thrown).isInstanceOf(MalformedJorth.class);
-	}
-	
 	// MT-29 — duplicate local name: var(int,"x") twice on the same block
 	@Test
 	void mt29_duplicateLocalName() throws Exception{
