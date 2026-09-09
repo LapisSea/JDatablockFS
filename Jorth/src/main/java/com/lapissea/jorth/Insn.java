@@ -1054,7 +1054,10 @@ sealed interface Insn{
 	
 	record NullConstant() implements Insn{
 		
-		public static NullConstant simulate(TypeStack stack, GenericType type){
+		public static NullConstant simulate(TypeStack stack, GenericType type) throws MalformedJorth{
+			if(type.getBaseType() != BaseType.OBJ || type.raw().any().equals("void")){
+				throw new MalformedJorth("For null constant, the type must be object but is: " + type);
+			}
 			stack.push(type);
 			return new NullConstant();
 		}

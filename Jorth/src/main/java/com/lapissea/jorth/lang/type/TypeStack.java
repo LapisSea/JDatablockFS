@@ -65,7 +65,10 @@ public class TypeStack{
 		}
 		return stack.getLast();
 	}
-	public GenericType peek(int pos){
+	public GenericType peek(int pos) throws MalformedJorth{
+		if(pos<0 || pos>=size()){
+			throw new MalformedJorth("peek position " + pos + " is out of bounds for the stack of size " + size());
+		}
 		if(parent == null){
 			return stack.get(pos);
 		}

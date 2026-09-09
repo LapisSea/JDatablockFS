@@ -156,6 +156,7 @@ public sealed interface JType permits GenericType, JType.Wildcard{
 					yield lower.getFirst().asGeneric();
 				}
 				var upper = wild.upper;
+				if(upper.isEmpty()) yield GenericType.OBJECT;
 				if(upper.size() != 1) throw new UnsupportedOperationException();
 				yield upper.getFirst().asGeneric();
 			}

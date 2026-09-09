@@ -26,7 +26,7 @@ public interface TypeSource{
 				var res = parent.maybeByType(type);
 				if(res.isPresent()) return res;
 			}
-			var name   = type.raw().dotted();
+			var name   = type.jvmDescriptorStr();
 			var cached = cache.get(name);
 			if(cached != null) return cached;
 			

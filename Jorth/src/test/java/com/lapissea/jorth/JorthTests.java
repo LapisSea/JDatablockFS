@@ -7,6 +7,7 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
+import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.DataProvider;
@@ -77,6 +78,50 @@ public class JorthTests{
 		}
 	}
 	
+	@Test
+	void childStackCanInspectInheritedValuesAndConsumeOwnValues() throws MalformedJorth{
+		var parent = new TypeStack(null);
+		parent.push(GenericType.INT);
+		var child = new TypeStack(parent);
+		var sibling = new TypeStack(parent);
+		child.requireElements(1);
+		assertThat(child.peek(0)).isEqualTo(GenericType.INT);
+		assertThat(child.peekLast()).isEqualTo(GenericType.INT);
+		child.push(GenericType.STRING);
+		assertThat(child.pop()).isEqualTo(GenericType.STRING);
+		assertThat(child.totalStack()).containsExactly(GenericType.INT);
+		assertThat(parent.totalStack()).containsExactly(GenericType.INT);
+		assertThat(sibling.totalStack()).containsExactly(GenericType.INT);
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class,
+	      expectedExceptionsMessageRegExp = "can not pop values outside the code path")
+	void inheritedPopPreservesParentAndSiblingStacks() throws MalformedJorth{
+		var parent = new TypeStack(null);
+		parent.push(GenericType.INT);
+		var child = new TypeStack(parent);
+		var sibling = new TypeStack(parent);
+		try{
+			child.pop();
+		}finally{
+			assertThat(parent.totalStack()).containsExactly(GenericType.INT);
+			assertThat(sibling.totalStack()).containsExactly(GenericType.INT);
+			assertThat(child.totalStack()).containsExactly(GenericType.INT);
+		}
+	}
+
+	@Test
+	void branchesCanLoadAndConsumeLocals() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
+			cd.function("run").staticAcc().arg(String.class, "value").arg(boolean.class, "condition")
+			  .returns(int.class).body().get("condition")
+			  .ifTrue(b -> b.get("value").call("length").returnOp())
+			  .elseRun(b -> b.get("value").call("length").add(1).returnOp()));
+		var method = cls.getMethod("run", String.class, boolean.class);
+		assertThat(method.invoke(null, "hello", true)).isEqualTo(5);
+		assertThat(method.invoke(null, "hello", false)).isEqualTo(6);
+	}
+
 	@Test
 	void multidimensionalArrays() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
