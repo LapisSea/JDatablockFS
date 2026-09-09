@@ -80,11 +80,9 @@ sealed interface Insn{
 	
 	record LVal(long val) implements Insn{
 		public static void emit(MethodVisitor writer, long value){
-			switch((int)value){
-				case 0 -> writer.visitInsn(LCONST_0);
-				case 1 -> writer.visitInsn(LCONST_1);
-				default -> writer.visitLdcInsn(value);
-			}
+			if(value == 0L) writer.visitInsn(LCONST_0);
+			else if(value == 1L) writer.visitInsn(LCONST_1);
+			else writer.visitLdcInsn(value);
 		}
 		
 		public static LVal simulate(TypeStack stack, long val){
