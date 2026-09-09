@@ -199,7 +199,8 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		requireName();
 		int accessFlags = visibility.flag|switch(type){
 			case CLASS -> ACC_SUPER|(permits.isEmpty()? ACC_FINAL : 0);
-			case INTERFACE, ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE;
+			case INTERFACE -> ACC_ABSTRACT|ACC_INTERFACE;
+			case ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE|ACC_ANNOTATION;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
 		
@@ -288,6 +289,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			finalAcc();
 		}
 		if(type == ClassType.ENUM) initEnum();
+		if(type == ClassType.ANNOTATION){
+			var annotation = GenericType.of(java.lang.annotation.Annotation.class);
+			if(!interfaces.contains(annotation)) implement(annotation);
+		}
 		return this;
 	}
 	
