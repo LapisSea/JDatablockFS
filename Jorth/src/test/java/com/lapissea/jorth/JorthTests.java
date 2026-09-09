@@ -77,17 +77,44 @@ public class JorthTests{
 		}
 	}
 	
+	public static class AutoPassSuper{
+		public int doubleAndAdd(int x){
+			return x*2 + 1;
+		}
+	}
+	
+	@Test
+	void callSuperAutoPassForwardsArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.extendsType(AutoPassSuper.class);
+			cd.function("doubleAndAdd").arg(int.class, "x").returns(int.class)
+			  .body().callSuperAutoPass().add(1);
+		});
+		var instance = cls.getConstructor().newInstance();
+		assertThat(cls.getMethod("doubleAndAdd", int.class).invoke(instance, 41)).isEqualTo(41*2 + 1 + 1);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class,
+	      expectedExceptionsMessageRegExp = "Cannot use 'this' from a static function")
+	void callSuperAutoPassRejectsStaticContext() throws Exception{
+		generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.extendsType(AutoPassSuper.class);
+			cd.function("doubleAndAdd").staticAcc().arg(int.class, "x").returns(int.class)
+			  .body().callSuperAutoPass();
+		});
+	}
+	
 	@Test
 	void repeatedBodyCallsShareOneConcreteFunction() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			var fn = cd.function("run").staticAcc().arg(int.class, "value").returns(int.class);
 			assertThat(fn.access().isAbstract()).isTrue();
-
+			
 			var body = fn.body();
 			assertThat(fn.access().isAbstract()).isFalse();
 			assertThat(cd.getClassInfo().getFunction(fn.makeSignature())).isSameAs(fn);
 			assertThat(fn.body()).isSameAs(body);
-
+			
 			body.get("value");
 			fn.body().add(2);
 			fn.body().returnOp();
@@ -98,7 +125,7 @@ public class JorthTests{
 		assertThat(Modifier.isAbstract(method.getModifiers())).isFalse();
 		assertThat(method.invoke(null, 40)).isEqualTo(42);
 	}
-
+	
 	@Test
 	void comparisonTest() throws Exception{
 		
@@ -436,27 +463,27 @@ public class JorthTests{
 			throw e;
 		}
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
 	void lazyBlockRejectsReturn() throws Exception{
 		generateLazyBlock(b -> b.val(1).returnOp());
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
 	void lazyBlockRejectsTerminatingBranches() throws Exception{
 		generateLazyBlock(b -> b.val(true).ifTrue(c -> c.val(1).returnOp()).elseRun(c -> c.val(2).returnOp()));
 	}
-
+	
 	@Test
 	void lazyBlockAllowsFallthrough() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
-			cd.function("run").staticAcc().arg(int.class, "value").returns(int.class).body()
-			  .lazyBlock(b -> b.val(42).set("value"))
-			  .get("value").returnOp()
+			                                                    cd.function("run").staticAcc().arg(int.class, "value").returns(int.class).body()
+			                                                      .lazyBlock(b -> b.val(42).set("value"))
+			                                                      .get("value").returnOp()
 		);
 		assertThat(cls.getMethod("run", int.class).invoke(null, 0)).isEqualTo(42);
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = ".*block has terminated.*")
 	void bothBranchesTerminateThenUnreachableAccessThrows() throws Exception{
 		var name = autoName();

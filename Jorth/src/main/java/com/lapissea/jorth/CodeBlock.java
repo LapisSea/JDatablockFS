@@ -500,7 +500,7 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
 	}
 	/**
-	 * Calls super of the current function. The function has to be static. It will automatically gather all arguments and pass them.
+	 * Calls super of the current method or constructor. Automatically passes all arguments in declaration order.
 	 *
 	 * @return
 	 * @throws MalformedJorth
