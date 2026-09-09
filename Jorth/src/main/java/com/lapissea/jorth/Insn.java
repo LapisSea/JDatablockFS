@@ -576,15 +576,15 @@ sealed interface Insn{
 	record NewOp(GenericType type, boolean dup) implements Insn{
 		
 		static NewOp simulate(TypeStack stack, GenericType type, boolean dup) throws MalformedJorth{
-			switch(type.dims()){
-				case 0 -> { }
-				case 1 -> {
-					var arraySize = stack.pop();
-					if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type)){
-						throw new MalformedJorth("Array size is not an integer");
-					}
+			if(type.dims()<0 || type.dims()>255){
+				throw new MalformedJorth("Array dimensions must be between 0 and 255");
+			}
+			stack.requireElements(type.dims());
+			for(int i = 0; i<type.dims(); i++){
+				var arraySize = stack.pop();
+				if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type)){
+					throw new MalformedJorth("Array size is not an integer");
 				}
-				default -> throw new NotImplementedException("Multi array not implemented");//TODO
 			}
 			stack.push(type);
 			if(dup){
@@ -595,12 +595,29 @@ sealed interface Insn{
 		
 		@Override
 		public void visit(MethodVisitor writer){
-			int op = switch(type.dims()){
-				case 0 -> NEW;
-				case 1 -> type.getPrimitiveType().isPresent()? NEWARRAY : ANEWARRAY;
-				default -> throw new NotImplementedException("Multi array not implemented");//TODO
-			};
-			writer.visitTypeInsn(op, type.raw().slashed());
+			switch(type.dims()){
+				case 0 -> writer.visitTypeInsn(NEW, type.raw().slashed());
+				case 1 -> {
+					var component = type.withDims(0).getPrimitiveType().orElse(null);
+					if(component == null){
+						writer.visitTypeInsn(ANEWARRAY, type.raw().slashed());
+					}else{
+						int arrayType = switch(component){
+							case BOOLEAN -> T_BOOLEAN;
+							case CHAR -> T_CHAR;
+							case FLOAT -> T_FLOAT;
+							case DOUBLE -> T_DOUBLE;
+							case BYTE -> T_BYTE;
+							case SHORT -> T_SHORT;
+							case INT -> T_INT;
+							case LONG -> T_LONG;
+							default -> throw new IllegalStateException("Invalid primitive array component: " + component);
+						};
+						writer.visitIntInsn(NEWARRAY, arrayType);
+					}
+				}
+				default -> writer.visitMultiANewArrayInsn(type.jvmDescriptorStr(), type.dims());
+			}
 			if(dup){
 				writer.visitInsn(DUP);
 			}
