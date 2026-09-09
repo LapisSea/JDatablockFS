@@ -177,7 +177,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		}
 	}
 	
-	public void visit(ClassWriter writer){
+	public void visit(ClassWriter writer) throws MalformedJorth{
 		
 		var accessFlags = visibility.flag|access.flags()|(varargs? ACC_VARARGS : 0);
 		
@@ -200,7 +200,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 				try{
 					body.mergeBranch();
 				}catch(MalformedJorth e){
-					throw new RuntimeException("Failed to merge branch before returning on " + this, e);
+					throw new MalformedJorth("Failed to merge branch before returning on " + this, e);
 				}
 				body.implicitReturn(fn);
 			}

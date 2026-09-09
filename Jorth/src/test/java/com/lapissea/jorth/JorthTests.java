@@ -105,6 +105,18 @@ public class JorthTests{
 	}
 	
 	@Test
+	void voidReturnsIgnoreRemainingStackValues() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.function("implicit").staticAcc().body()
+			  .val(1).val(2L).val(3.0).val("incidental");
+			cd.function("explicit").staticAcc().body()
+			  .val(1).val(2L).val(3.0).val("incidental").returnOp();
+		});
+		assertThat(cls.getMethod("implicit").invoke(null)).isNull();
+		assertThat(cls.getMethod("explicit").invoke(null)).isNull();
+	}
+
+	@Test
 	void repeatedBodyCallsShareOneConcreteFunction() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			var fn = cd.function("run").staticAcc().arg(int.class, "value").returns(int.class);
@@ -455,13 +467,7 @@ public class JorthTests{
 	private static void generateLazyBlock(CodeArg code) throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("test.LazyBlockTermination"));
 		cd.function("run").staticAcc().returns(int.class).body().lazyBlock(code);
-		try{
-			cd.getClassFile();
-		}catch(RuntimeException e){
-			// Instruction emission wraps checked generation errors.
-			if(e.getCause() instanceof MalformedJorth cause) throw cause;
-			throw e;
-		}
+		cd.getClassFile();
 	}
 	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")

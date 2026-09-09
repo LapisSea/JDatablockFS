@@ -520,18 +520,18 @@ public class CodeBlock{
 		return fnOwner.owner().name();
 	}
 	
-	public void visit(MethodVisitor fn){
+	public void visit(MethodVisitor fn) throws MalformedJorth{
 		for(Insn i : insns){
 			i.visit(fn);
 		}
 	}
-	void implicitReturn(MethodVisitor fn){
+	void implicitReturn(MethodVisitor fn) throws MalformedJorth{
 		if(terminates()) return;
 		try{
 			checkFreeze();
 			ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, false).visit(fn);
 		}catch(MalformedJorth e){
-			throw new RuntimeException("Failed to return on " + fnOwner, e);
+			throw new MalformedJorth("Failed to return on " + fnOwner, e);
 		}
 	}
 	
@@ -539,22 +539,20 @@ public class CodeBlock{
 		try{
 			return cInfo.getFunction(new FunctionInfo.Signature(functionName, args));
 		}catch(MalformedJorth e){
-			return cInfo.getFunctionsByName(functionName).filter(f -> {
-				var argsF = f.argumentTypes();
-				if(argsF.size() != args.size()) return false;
+			var candidates = cInfo.getFunctionsByName(functionName).iterator();
+			candidates:
+			while(candidates.hasNext()){
+				var candidate = candidates.next();
+				var argsF     = candidate.argumentTypes();
+				if(argsF.size() != args.size()) continue;
 				for(int i = 0; i<argsF.size(); i++){
-					var a = argsF.get(i).asGeneric();
-					var b = args.get(i).asGeneric();
-					try{
-						if(!b.instanceOf(typeSource, a)){
-							return false;
-						}
-					}catch(MalformedJorth ex){
-						throw new RuntimeException(ex);
+					if(!args.get(i).asGeneric().instanceOf(typeSource, argsF.get(i).asGeneric())){
+						continue candidates;
 					}
 				}
-				return true;
-			}).findAny().orElseThrow(() -> e);
+				return candidate;
+			}
+			throw e;
 		}
 	}
 	

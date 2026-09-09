@@ -185,13 +185,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return writer.toByteArray();
 	}
 	
-	private void ensureConstructor(){
+	private void ensureConstructor() throws MalformedJorth{
 		if(functions.values().stream().noneMatch(e -> e.name().equals("<init>"))){
-			try{
-				instanceInit().body().callSuperAutoPass();
-			}catch(MalformedJorth e){
-				throw new RuntimeException(e);
-			}
+			instanceInit().body().callSuperAutoPass();
 		}
 	}
 	

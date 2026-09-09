@@ -11,10 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Negative/error-mode coverage (MT-29, MT-30) for the Jorth DSL, plus the MT-34
  * dead-code and unused-fixture audit (recorded as comments only, no executable test).
  *
- * Each negative test asserts the exact exception type the build throws. Where the
- * documented contract says checked MalformedJorth but the failure actually surfaces
- * as an unchecked wrapper (finalization inside getClassFile), the wrapper is asserted
- * and the MalformedJorth cause is pinned separately.
+ * Negative tests verify build-time validation failures.
  */
 public class JorthCoverageNegativeTests{
 	
@@ -156,35 +153,11 @@ public class JorthCoverageNegativeTests{
 	
 	// ------------------------------------------------------------------ MT-30
 	
-	// MT-30 — void method with a value left on the stack at the end: rejected at
-	// finalization, inside getClassFile() (FunctionDefinition.visit -> implicitReturn,
-	// FunctionDefinition.java:193). The checked MalformedJorth ("Returning nothing
-	// (void) but there are values ...", Insn.java:361) is wrapped in an unchecked
-	// RuntimeException("Failed to return on ...", CodeBlock.java:478-479), so that
-	// wrapper is what actually surfaces to the caller.
-	@Test
-	void mt30_voidMethodDanglingStack() throws Exception{
-		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.body().val(1));
-		assertThat(thrown).isInstanceOf(RuntimeException.class)
-			.hasMessageContaining("Failed to return on");
-		assertThat(thrown.getCause()).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Returning nothing (void)");
-	}
-	
-	// MT-30 — non-void method with an empty stack at the end (no implicit return
-	// possible): same finalization surface as above — the RuntimeException wraps the
-	// MalformedJorth raised by ReturnOp.simulate's stack peek (Insn.java:351-357).
-	@Test
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Failed to return on .*")
 	void mt30_nonVoidMethodEmptyStack() throws Exception{
-		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.returns(int.class).body());
-		assertThat(thrown).isInstanceOf(RuntimeException.class)
-			.hasMessageContaining("Failed to return on");
-		assertThat(thrown.getCause()).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Required at least 1");
+		generateAndLoadInstanceSimple(autoName(), cd -> cd.function("test").staticAcc().returns(int.class).body());
 	}
-	
+
 	// MT-30 — throwOp() with an empty stack: rejected at build time with the checked exception
 	@Test
 	void mt30_throwOpEmptyStack() throws Exception{

@@ -358,9 +358,6 @@ sealed interface Insn{
 				}
 				return new ReturnOp(popped.getBaseType());
 			}else{
-				if(!stack.isEmpty()){
-					throw new MalformedJorth("Returning nothing (void) but there are values " + stack + " on the stack");
-				}
 				return new ReturnOp(BaseType.VOID);
 			}
 		}
@@ -498,7 +495,7 @@ sealed interface Insn{
 		}
 		
 		@Override
-		public void visit(MethodVisitor writer){
+		public void visit(MethodVisitor writer) throws MalformedJorth{
 			
 			Label endLabel   = new Label();
 			Label falseLabel = new Label();
@@ -1058,7 +1055,7 @@ sealed interface Insn{
 		}
 		
 		@Override
-		public void visit(MethodVisitor writer){
+		public void visit(MethodVisitor writer) throws MalformedJorth{
 			block.visit(writer);
 		}
 		@Override
@@ -1074,12 +1071,8 @@ sealed interface Insn{
 		}
 		
 		@Override
-		public void visit(MethodVisitor writer){
-			try{
-				code.get().visit(writer);
-			}catch(MalformedJorth e){
-				throw new RuntimeException("A lazy block has failed to generate code", e);
-			}
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			code.get().visit(writer);
 		}
 		@Override
 		public boolean terminates(){
@@ -1087,5 +1080,5 @@ sealed interface Insn{
 		}
 	}
 	
-	void visit(MethodVisitor writer);
+	void visit(MethodVisitor writer) throws MalformedJorth;
 }
