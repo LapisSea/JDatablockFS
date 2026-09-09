@@ -122,6 +122,9 @@ public record GenericType(ClassName raw, Optional<ClassName> typeArgName, int di
 	public GenericType(ClassName raw, Optional<ClassName> typeArgName, int dims, List<JType> args){
 		this.raw = Objects.requireNonNull(raw);
 		this.typeArgName = Objects.requireNonNull(typeArgName);
+		if(typeArgName.isPresent() && (BaseType.ofPrimitive(raw) != null || raw.any().equals("void"))){
+			throw new IllegalArgumentException("Type variable bound must be a reference type: " + raw);
+		}
 		this.dims = dims;
 		this.args = List.copyOf(args);
 	}
