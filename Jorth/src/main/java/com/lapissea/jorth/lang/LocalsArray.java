@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-public class LocalsArray implements Iterable<LocalsArray.Local>{
+public class LocalsArray implements Iterable<LocalsArray.Local>, Cloneable{
 	
 	public record Local(String name, GenericType type, int index, boolean canRemove){
 		public Local{
@@ -60,5 +60,13 @@ public class LocalsArray implements Iterable<LocalsArray.Local>{
 	@Override
 	public Iterator<Local> iterator(){
 		return byIndex.values().iterator();
+	}
+	
+	@Override
+	public LocalsArray clone(){
+		var clone = new LocalsArray();
+		clone.localValues.putAll(localValues);
+		clone.byIndex.putAll(byIndex);
+		return clone;
 	}
 }

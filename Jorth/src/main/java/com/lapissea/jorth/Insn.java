@@ -16,6 +16,7 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -1063,6 +1064,26 @@ sealed interface Insn{
 		@Override
 		public boolean terminates(){
 			return block.terminates();
+		}
+	}
+	
+	record LazyBlock(UnsafeSupplier<CodeBlock, MalformedJorth> code) implements TerminatingInsn{
+		
+		public static LazyBlock simulate(UnsafeSupplier<CodeBlock, MalformedJorth> code){
+			return new LazyBlock(code);
+		}
+		
+		@Override
+		public void visit(MethodVisitor writer){
+			try{
+				code.get().visit(writer);
+			}catch(MalformedJorth e){
+				throw new RuntimeException("A lazy block has failed to generate code", e);
+			}
+		}
+		@Override
+		public boolean terminates(){
+			return false;
 		}
 	}
 	

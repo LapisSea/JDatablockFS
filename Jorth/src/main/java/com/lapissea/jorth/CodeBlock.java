@@ -8,6 +8,7 @@ import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.LocalsArray;
 import com.lapissea.jorth.lang.LocalsArray.Local;
 import com.lapissea.jorth.lang.type.ClassInfo;
+import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
@@ -100,6 +101,35 @@ public class CodeBlock{
 			localStack.push(typ);
 		}
 		return add(InlineBlock.simulate(block));
+	}
+	
+	/**
+	 * Inserts at the current place a code block that will be evaluated at class generation time.
+	 * The block must preserve the stack and must not terminate.
+	 */
+	public CodeBlock lazyBlock(CodeArg code) throws MalformedJorth{
+		preInsn();
+		var stack = new TypeStack(null);
+		localStack.totalStack().forEach(stack::push);
+		var localValues = this.localValues.clone();
+		
+		return add(LazyBlock.simulate(() -> {
+			
+			var block = new CodeBlock(new TypeStack(stack), typeSource, fnOwner);
+			for(var v : localValues){
+				block.addLocal(v.withoutRemoval());
+			}
+			guardedBlock(code, block);
+			block.mergeBranch();
+			
+			if(block.terminates()){
+				throw new MalformedJorth("lazyBlock must not terminate");
+			}
+			if(!block.stacksMatch(stack)){
+				throw new MalformedJorth("lazyBlock must not change stack");
+			}
+			return block;
+		}));
 	}
 	
 	void defineLocalValue(String name, GenericType type, boolean canRemove) throws MalformedJorth{
@@ -290,8 +320,14 @@ public class CodeBlock{
 		return newObj(ClassName.of(clazz), arguments);
 	}
 	public CodeBlock newObj(ClassName clazz, CodeArg arguments) throws MalformedJorth{
+		return newObj(clazz, arguments, false);
+	}
+	CodeBlock newObj(ClassName clazz, CodeArg arguments, boolean enumConstant) throws MalformedJorth{
 		preInsn();
 		var type = GenericType.of(clazz);
+		if(!enumConstant && type.dims() == 0 && typeSource.byName(clazz).type() == ClassType.ENUM){
+			throw new MalformedJorth("Enum instances can only be created by enumConstant: " + clazz);
+		}
 		if(type.dims() != 0){
 			add(NewOp.simulate(localStack, type, false));
 			var args = doArgs(arguments);
@@ -306,10 +342,16 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	
+	private void checkEnumConstructorCall(String name) throws MalformedJorth{
+		if(fnOwner.isEnumConstructor() && name.equals("<init>")){
+			throw new MalformedJorth("Explicit constructor calls are not supported in enum constructors");
+		}
+	}
 	public CodeBlock call(String name) throws MalformedJorth{
 		return call(name, 0);
 	}
 	public CodeBlock call(String name, int argumentCount) throws MalformedJorth{
+		checkEnumConstructorCall(name);
 		preInsn();
 		var stackSize = localStack.size();
 		var mark      = stackSize - argumentCount;
@@ -321,6 +363,7 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
+		checkEnumConstructorCall(name);
 		preInsn();
 		var caller = typeSource.byType(localStack.peekLast());
 		
@@ -347,6 +390,7 @@ public class CodeBlock{
 		return call(ClassName.of(staticCaller), name, gatherArguments);
 	}
 	public CodeBlock call(ClassName staticCaller, String name, CodeArg gatherArguments) throws MalformedJorth{
+		checkEnumConstructorCall(name);
 		preInsn();
 		var cl = typeSource.byName(staticCaller);
 		
@@ -368,6 +412,7 @@ public class CodeBlock{
 	}
 	
 	public CodeBlock call(FunctionDefinition fn) throws MalformedJorth{
+		checkEnumConstructorCall(fn.name());
 		preInsn();
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
@@ -438,7 +483,16 @@ public class CodeBlock{
 		return add(SwapOp.simulate(localStack));
 	}
 	
+	void enumSuper(String name, String ordinal) throws MalformedJorth{
+		callSuperInternal(b -> b.get(name).get(ordinal));
+		removeLocal(getLocal(name));
+		removeLocal(getLocal(ordinal));
+	}
 	public CodeBlock callSuper(CodeArg gatherArguments) throws MalformedJorth{
+		if(fnOwner.isEnumConstructor()) throw new MalformedJorth("Enum constructor superclass call is supplied by Jorth");
+		return callSuperInternal(gatherArguments);
+	}
+	private CodeBlock callSuperInternal(CodeArg gatherArguments) throws MalformedJorth{
 		preInsn();
 		get("this");
 		var          args    = doArgs(gatherArguments);
@@ -452,6 +506,7 @@ public class CodeBlock{
 	 * @throws MalformedJorth
 	 */
 	public CodeBlock callSuperAutoPass() throws MalformedJorth{
+		if(fnOwner.isEnumConstructor()) throw new MalformedJorth("Enum constructor superclass call is supplied by Jorth");
 		preInsn();
 		get("this");
 		for(String argName : fnOwner.getArgNames()){

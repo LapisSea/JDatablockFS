@@ -5,6 +5,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.FunctionInfo;
 import com.lapissea.jorth.lang.type.ClassInfo;
+import com.lapissea.jorth.lang.type.ClassType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.Visibility;
@@ -39,6 +40,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	public FunctionDefinition(ClassDefinition owner, String name){
 		this.owner = Objects.requireNonNull(owner);
 		this.name = Objects.requireNonNull(name);
+		if(isEnumConstructor()) visibility = Visibility.PRIVATE;
 	}
 	
 	@Override
@@ -130,6 +132,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	
 	private CodeBlock initBody() throws MalformedJorth{
 		access(access.withoutAbstr());
+		if(isEnumConstructor()) owner.validateEnumConstructor(this);
 		var existing = owner.finalize(this);
 		
 		if(existing != this && existing != null){
@@ -143,11 +146,20 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		if(!access.isStatic()){
 			body.defineLocalValue("this", new GenericType(Objects.requireNonNull(owner.name(), "Class name must be defined before using a function")), false);
 		}
+		String hiddenName = "€enum€name", hiddenOrdinal = "€enum€ordinal";
+		if(isEnumConstructor()){
+			while(args.containsKey(hiddenName)) hiddenName += "€";
+			while(args.containsKey(hiddenOrdinal)) hiddenOrdinal += "€";
+			body.defineLocalValue(hiddenName, GenericType.of(String.class), false);
+			body.defineLocalValue(hiddenOrdinal, GenericType.INT, false);
+		}
 		for(var e : args.entrySet()){
 			body.defineLocalValue(e.getKey(), e.getValue().asGeneric(), false);
 		}
+		if(isEnumConstructor()) body.enumSuper(hiddenName, hiddenOrdinal);
 		return body;
 	}
+	boolean isEnumConstructor(){ return owner.getType() == ClassType.ENUM && name.equals("<init>"); }
 	public FunctionInfo.Signature makeSignature(){
 		return new FunctionInfo.Signature(name, getArgs());
 	}
@@ -169,7 +181,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		
 		var accessFlags = visibility.flag|access.flags()|(varargs? ACC_VARARGS : 0);
 		
-		var argTypes = new ArrayList<JType>(args.values());
+		var argTypes = getArgs();
 		
 		var descriptor = makeFunSig(returnType, argTypes, false);
 		var signature  = makeFunSig(returnType, argTypes, true);
@@ -217,7 +229,12 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		return result.toString();
 	}
 	public List<JType> getArgs(){
-		return List.copyOf(args.values());
+		if(!isEnumConstructor()) return List.copyOf(args.values());
+		var types = new ArrayList<JType>(args.size() + 2);
+		types.add(GenericType.of(String.class));
+		types.add(GenericType.INT);
+		types.addAll(args.values());
+		return List.copyOf(types);
 	}
 	public List<String> getArgNames(){
 		return List.copyOf(args.keySet());

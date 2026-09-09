@@ -15,7 +15,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	public final String          name;
 	public final JType           type;
 	private      Visibility      visibility = Visibility.PUBLIC;
-	private      boolean         isEnumConstant;
+	CodeArg enumConstantInit;
 	
 	private AccessSet access = AccessSet.DEFAULT;
 	
@@ -49,12 +49,12 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	public FieldDefinition staticFinal(CodeArg init) throws MalformedJorth{
 		return staticFinal().init(init);
 	}
-	public FieldDefinition asEnumConstant(){
-		isEnumConstant = true;
+	public FieldDefinition asEnumConstant(CodeArg init){
+		enumConstantInit = init;
 		return staticFinal();
 	}
 	public boolean isEnumConstant(){
-		return isEnumConstant;
+		return enumConstantInit != null;
 	}
 	
 	private FieldDefinition init(CodeArg init) throws MalformedJorth{
@@ -79,7 +79,7 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	public void visit(ClassWriter writer){
 		var descriptor = type.jvmDescriptorStr();
 		var signature  = type.jvmSignatureStr();
-		var access     = visibility().flag|access().flags()|(isEnumConstant? ACC_ENUM : 0);
+		var access     = visibility().flag|access().flags()|(isEnumConstant()? ACC_ENUM : 0);
 		
 		var fw = writer.visitField(access, name, descriptor, signature, null);
 		for(AnnotationDefinition annotation : annotations){

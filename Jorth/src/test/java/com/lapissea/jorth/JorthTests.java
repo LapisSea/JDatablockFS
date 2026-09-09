@@ -30,6 +30,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.IntFunction;
 import java.util.function.IntSupplier;
@@ -402,6 +403,38 @@ public class JorthTests{
 		});
 	}
 	
+	private static void generateLazyBlock(CodeArg code) throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted("test.LazyBlockTermination"));
+		cd.function("run").staticAcc().returns(int.class).body().lazyBlock(code);
+		try{
+			cd.getClassFile();
+		}catch(RuntimeException e){
+			// Instruction emission wraps checked generation errors.
+			if(e.getCause() instanceof MalformedJorth cause) throw cause;
+			throw e;
+		}
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
+	void lazyBlockRejectsReturn() throws Exception{
+		generateLazyBlock(b -> b.val(1).returnOp());
+	}
+
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "lazyBlock must not terminate")
+	void lazyBlockRejectsTerminatingBranches() throws Exception{
+		generateLazyBlock(b -> b.val(true).ifTrue(c -> c.val(1).returnOp()).elseRun(c -> c.val(2).returnOp()));
+	}
+
+	@Test
+	void lazyBlockAllowsFallthrough() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
+			cd.function("run").staticAcc().arg(int.class, "value").returns(int.class).body()
+			  .lazyBlock(b -> b.val(42).set("value"))
+			  .get("value").returnOp()
+		);
+		assertThat(cls.getMethod("run", int.class).invoke(null, 0)).isEqualTo(42);
+	}
+
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = ".*block has terminated.*")
 	void bothBranchesTerminateThenUnreachableAccessThrows() throws Exception{
 		var name = autoName();
@@ -647,6 +680,197 @@ public class JorthTests{
 		cls.getEnumConstants();
 		
 		assertThat(EnumSet.allOf((Class<T>)cls).stream().map(Enum::name)).containsExactly("FOO", "BAR");
+	}
+	
+	@Test
+	void enumConstructorArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var code  = cd.field(int.class, "code").finalAcc();
+			var label = cd.field(String.class, "label").finalAcc();
+			// User parameters may have the same names as the JVM's implicit parameters.
+			cd.instanceInit().arg(String.class, "name")
+			  .arg(int.class, "ordinal").body()
+			  .get("this").get("name").setField(label)
+			  .get("this").get("ordinal").setField(code);
+			cd.enumConstant("OK", c -> c.val("Success").val(200));
+			cd.enumConstant("MISSING", c -> c.val("Not found").val(404));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(constants).hasSize(2);
+		for(int i = 0; i<constants.length; i++){
+			var constant = (Enum<?>)constants[i];
+			assertThat(constant.name()).isEqualTo(i == 0? "OK" : "MISSING");
+			assertThat(constant.ordinal()).isEqualTo(i);
+			assertThat(cls.getField("code").get(constant)).isEqualTo(i == 0? 200 : 404);
+			assertThat(cls.getField("label").get(constant)).isEqualTo(i == 0? "Success" : "Not found");
+		}
+		assertThat(cls.getDeclaredConstructors()).hasSize(1);
+		var constructor = cls.getDeclaredConstructors()[0];
+		assertThat(Modifier.isPrivate(constructor.getModifiers())).isTrue();
+		assertThat(constructor.getParameterTypes()).containsExactly(String.class, int.class, String.class, int.class);
+	}
+	
+	@Test
+	void enumConstructorOverloads() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var value = cd.field(int.class, "value").finalAcc();
+			cd.instanceInit().body()
+			  .get("this")
+			  .get("this").call("ordinal")
+			  .setField(value);
+			cd.instanceInit().arg(int.class, "value").body()
+			  .get("this").get("value").setField(value);
+			cd.instanceInit().arg(String.class, "value").body()
+			  .get("this").get("value").call("length").setField(value);
+			cd.enumConstant("DEFAULT");
+			cd.enumConstant("INTEGER", c -> c.val(42));
+			cd.enumConstant("STRING", c -> c.val("hello"));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("value").get(constants[0])).isEqualTo(0);
+		assertThat(cls.getField("value").get(constants[1])).isEqualTo(42);
+		assertThat(cls.getField("value").get(constants[2])).isEqualTo(5);
+		assertThat(cls.getDeclaredConstructors()).hasSize(3);
+	}
+	
+	@Test
+	void enumConstantsBeforeUserStaticInitialization() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var snapshot = cd.field(new GenericType(cd.name()).arrayType(), "snapshot").staticFinal();
+			// Declare this before the constants to ensure declaration order is irrelevant.
+			cd.staticInit().body()
+			  .call(cd.name(), "values")
+			  .setField(snapshot);
+			cd.enumConstant("FIRST");
+			cd.enumConstant("SECOND");
+		});
+		assertThat((Object[])cls.getField("snapshot").get(null)).containsExactly(cls.getEnumConstants());
+		var values = (Object[])cls.getMethod("values").invoke(null);
+		values[0] = null;
+		assertThat((Object[])cls.getMethod("values").invoke(null)).containsExactly(cls.getEnumConstants());
+	}
+	
+	private static final AtomicInteger enumArgumentCalls = new AtomicInteger();
+	public static int enumArgument(int value){
+		enumArgumentCalls.incrementAndGet();
+		return value;
+	}
+	
+	@Test
+	void enumArgumentExpressionsExecuteOnce() throws Exception{
+		enumArgumentCalls.set(0);
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var value = cd.field(int.class, "value").finalAcc();
+			cd.instanceInit().arg(int.class, "value").body()
+			  .get("this").get("value").setField(value);
+			cd.enumConstant("FIRST", c -> c.call(JorthTests.class, "enumArgument", a -> a.val(11)));
+			cd.enumConstant("SECOND", c -> c.call(JorthTests.class, "enumArgument", a -> a.val(22)));
+		});
+		assertThat(enumArgumentCalls.get()).isEqualTo(2);
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("value").get(constants[0])).isEqualTo(11);
+		assertThat(cls.getField("value").get(constants[1])).isEqualTo(22);
+		cls.getMethod("values").invoke(null);
+		cls.getMethod("values").invoke(null);
+		assertThat(enumArgumentCalls.get()).isEqualTo(2);
+	}
+	
+	@Test
+	void enumWideConstructorArguments() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
+			cd.type(ClassType.ENUM);
+			var large    = cd.field(long.class, "large").finalAcc();
+			var fraction = cd.field(double.class, "fraction").finalAcc();
+			cd.instanceInit().arg(long.class, "$enum$name")
+			  .arg(double.class, "$enum$ordinal")
+			  .body()
+			  .get("this").get("$enum$name").setField(large)
+			  .get("this").get("$enum$ordinal").setField(fraction);
+			cd.enumConstant("FIRST", c -> c.val(1234567890123L).val(1.25));
+			cd.enumConstant("SECOND", c -> c.val(-9876543210987L).val(-2.5));
+		});
+		var constants = cls.getEnumConstants();
+		assertThat(cls.getField("large").get(constants[0])).isEqualTo(1234567890123L);
+		assertThat(cls.getField("large").get(constants[1])).isEqualTo(-9876543210987L);
+		assertThat(cls.getField("fraction").get(constants[0])).isEqualTo(1.25);
+		assertThat(cls.getField("fraction").get(constants[1])).isEqualTo(-2.5);
+		assertThat(((Enum<?>)constants[0]).name()).isEqualTo("FIRST");
+		assertThat(((Enum<?>)constants[1]).ordinal()).isEqualTo(1);
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsExplicitConstructorInvocation() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body()
+		  .get("this").call("<init>", c -> c.val("ILLEGAL").val(0));
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsMissingConstructorMatch() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "value").body();
+		cd.enumConstant("MISSING");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsWrongConstructorArgument() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "value").body();
+		cd.enumConstant("WRONG", c -> c.val("text"));
+	}
+	
+	@Test
+	void emptyEnum() throws Exception{
+		var cls = generateAndLoadInstanceSimple(autoName(), cd -> cd.type(ClassType.ENUM));
+		assertThat(cls.getEnumConstants()).isEmpty();
+		assertThat((Object[])cls.getMethod("values").invoke(null)).isEmpty();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDuplicateConstructor() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().arg(int.class, "first").body();
+		cd.instanceInit().arg(int.class, "second").body();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsConstructorDeclaredAfterConstant() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("FIRST");
+		cd.instanceInit().arg(int.class, "value").body();
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsConstructorBodyDefinedAfterConstant() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body();
+		cd.instanceInit().arg(int.class, "value");
+		cd.enumConstant("FIRST");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDuplicateConstants() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("SAME");
+		cd.enumConstant("SAME");
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsDirectConstruction() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.enumConstant("ONLY");
+		cd.function("make").staticAcc().returns(new GenericType(cd.name())).body()
+		  .newObj(cd.name(), c -> c.val("ILLEGAL").val(0));
+	}
+	
+	@Test(expectedExceptions = MalformedJorth.class)
+	void enumRejectsExplicitSuperclassCall() throws Exception{
+		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
+		cd.instanceInit().body().callSuper(c -> c.val("ILLEGAL").val(0));
 	}
 	
 	@Test

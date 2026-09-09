@@ -9,6 +9,7 @@ import com.lapissea.jorth.lang.type.FieldInfo;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
+import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
@@ -106,6 +107,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{
 				var method = functions.get(signature);
 				if(method == null){
+					if(getType() == ClassType.ENUM && signature.name().equals("<init>")){
+						throw new MalformedJorth("Enum constructor does not exist: " + signature);
+					}
 					return typeSource.byType(extension).getFunction(signature);
 				}
 				return method;
@@ -157,7 +161,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			}
 			case INTERFACE -> { }
 			case ENUM -> {
-				enumValuesInit();
+				ensureEnumConstructor();
 			}
 			case ANNOTATION -> { }
 		}
@@ -297,11 +301,24 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		var vType = new GenericType(name).arrayType();
 		var vals  = field(vType, "$VALUES").visibility(Visibility.PRIVATE).staticFinal();
 		
-		instanceInit()
-			.arg(String.class, "name")
-			.arg(int.class, "ordinal")
-			.body()
-			.callSuperAutoPass();
+		staticInit().body().lazyBlock(enumInit -> {
+			var constants = fields.values().stream().filter(FieldDefinition::isEnumConstant).toList();
+			
+			for(int i = 0; i<constants.size(); i++){
+				FieldDefinition constant = constants.get(i);
+				try{
+					constructEnum(enumInit, constant, i);
+				}catch(Throwable e){
+					throw new MalformedJorth("Failed to initialize enum constant: " + constant.name, e);
+				}
+			}
+			
+			enumInit.val(constants.size()).newObj(ClassName.slashed(vType.jvmDescriptorStr()));
+			for(int i = 0; i<constants.size(); i++){
+				enumInit.dup().val(i).get(constants.get(i)).setArrayElement();
+			}
+			enumInit.setField(vals);
+		});
 		
 		function("values")
 			.returns(vType)
@@ -311,34 +328,35 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			.call("clone")
 			.cast(vType);
 	}
-	
-	
-	private void enumValuesInit() throws MalformedJorth{
-		var vType = new GenericType(name).arrayType();
-		var fun   = staticInit().body();
-		
-		var constants = fields.values().stream().filter(FieldDefinition::isEnumConstant).toList();
-		
-		
-		fun.val(constants.size());
-		fun.newObj(ClassName.slashed(vType.jvmDescriptorStr()));
-		
-		for(int i1 = 0; i1<constants.size(); i1++){
-			int i     = i1;
-			var field = constants.get(i);
-			
-			fun.dup();//array dup
-			fun.val(i);//[i] = ...
-			
-			fun.newObj(name, e -> e.val(field.name).val(i));// new enum(name,ordinal)
-			
-			fun.dup();
-			fun.setField(field);// Enum.NAME=obj
-			fun.setArrayElement();
-		}
-		
-		fun.setField(getField("$VALUES"));
+	private void constructEnum(CodeBlock enumInit, FieldDefinition constant, int ordinal) throws MalformedJorth{
+		enumInit.newObj(name(), b -> {
+			b.val(constant.name).val(ordinal);
+			constant.enumConstantInit.accept(b);
+		}, true);
+		enumInit.setField(constant);
 	}
+	
+	
+	private void ensureEnumConstructor() throws MalformedJorth{
+		if(danglingFunctions.stream().anyMatch(f -> f.name().equals("<init>"))){
+			throw new MalformedJorth("Define enum constructor bodies before constants");
+		}
+		if(functions.values().stream().noneMatch(f -> f.name().equals("<init>"))){
+			instanceInit().body();
+		}
+	}
+	void validateEnumConstructor(FunctionDefinition fn) throws MalformedJorth{
+		if(fields.values().stream().anyMatch(FieldDefinition::isEnumConstant)){
+			throw new MalformedJorth("Define enum constructors before constants");
+		}
+		if(functions.containsKey(fn.makeSignature())){
+			throw new MalformedJorth("Duplicate enum constructor " + fn.makeSignature());
+		}
+		if(fn.visibility() != Visibility.PRIVATE || fn.isStatic() || fn.isFinal() || fn.returnType() != null || fn.isVarargs()){
+			throw new MalformedJorth("Enum constructors must be private instance constructors without a return type or varargs");
+		}
+	}
+	
 	
 	public ClassDefinition staticAcc(){
 		return access(access.andStat());
@@ -382,7 +400,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return fn;
 	}
 	public FunctionDefinition instanceInit(){
-		return function("<init>").visibility(Visibility.PUBLIC);
+		return function("<init>").visibility(getType() == ClassType.ENUM? Visibility.PRIVATE : Visibility.PUBLIC);
 	}
 	public FunctionDefinition function(String name){
 		var res = new FunctionDefinition(this, name);
@@ -440,9 +458,25 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	
 	public FieldDefinition enumConstant(String constantName) throws MalformedJorth{
-		if(type != ClassType.ENUM) throw new MalformedJorth("Can not add enum constant on " + type);
-		return field(new GenericType(name), constantName).asEnumConstant();
+		return enumConstant(constantName, b -> { });
 	}
+	public FieldDefinition enumConstant(String constantName, CodeArg arguments) throws MalformedJorth{
+		if(type != ClassType.ENUM) throw new MalformedJorth("Can not add enum constant on " + type);
+		if(fields.containsKey(constantName)) throw new MalformedJorth("Duplicate enum constant " + constantName);
+		Objects.requireNonNull(arguments);
+		ensureEnumConstructor();
+		var ordinal = (int)fields.values().stream().filter(FieldDefinition::isEnumConstant).count();
+		var field   = new FieldDefinition(this, Objects.requireNonNull(constantName), new GenericType(name)).asEnumConstant(arguments);
+		
+		// Check if enum constructor is valid so it crashes right away
+		var dummy = new CodeBlock(new TypeStack(null), typeSource, new FunctionDefinition(this, "<clinit>"));
+		constructEnum(dummy, field, ordinal);
+		
+		fields.put(constantName, field);
+		
+		return field;
+	}
+	
 	public GenericType getArg(String name){
 		return getArg(ClassName.dotted(name));
 	}
@@ -478,5 +512,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 			throw new IllegalArgumentException("Type definition " + name + " already defined");
 		}
 	}
-	
+	public ClassType getType(){
+		return type;
+	}
 }
