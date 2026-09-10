@@ -13,11 +13,11 @@ public class JorthLoopJumpTests{
 		if(trace.size()>=100) throw new IllegalStateException("Loop exceeded trace limit");
 		trace.add(marker);
 	}
-
+	
 	private static void trace(CodeBlock code, int marker) throws MalformedJorth{
 		code.call(JorthLoopJumpTests.class, "appendTrace", args -> args.get("trace").val(marker));
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void breakSkipsNextCheckAndContinuesAfterLoop() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -41,7 +41,7 @@ public class JorthLoopJumpTests{
 		cls.getMethod("run", List.class).invoke(null, events);
 		assertThat(events).containsExactly(10, 20, 30, 50, 20, 30, 40, 60);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void continueSkipsRestOfBodyAndRechecksCondition() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -64,7 +64,7 @@ public class JorthLoopJumpTests{
 		cls.getMethod("run", List.class).invoke(null, events);
 		assertThat(events).containsExactly(10, 20, 30, 10, 20, 40, 10, 20, 40, 10, 50);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void bothBranchesCanJumpToDifferentLoopPoints() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -88,7 +88,7 @@ public class JorthLoopJumpTests{
 		cls.getMethod("run", List.class).invoke(null, events);
 		assertThat(events).containsExactly(10, 30, 10, 20, 40);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void nestedLoopsTargetNearestLoop() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -118,7 +118,7 @@ public class JorthLoopJumpTests{
 		cls.getMethod("run", List.class).invoke(null, events);
 		assertThat(events).containsExactly(10, 20, 30, 20, 40, 50, 10, 20, 30, 20, 40, 50, 10, 60);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void conditionCanConditionallyBreakOrContinue() throws Exception{
 		for(boolean breakInstead : new boolean[]{false, true}){

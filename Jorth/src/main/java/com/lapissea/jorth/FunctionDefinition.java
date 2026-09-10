@@ -162,7 +162,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		return body;
 	}
 	public boolean isConstructor(){ return name.equals("<init>"); }
-	boolean isEnumConstructor(){ return owner.getType() == ClassType.ENUM && isConstructor(); }
+	boolean isEnumConstructor()   { return owner.getType() == ClassType.ENUM && isConstructor(); }
 	public FunctionInfo.Signature makeSignature(){
 		return new FunctionInfo.Signature(name, getArgs());
 	}
@@ -191,7 +191,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 			}
 			implicitReturn = body.prepareImplicitReturn();
 		}
-
+		
 		var accessFlags = visibility.flag|access.flags()|(varargs? ACC_VARARGS : 0);
 		
 		var argTypes = getArgs();

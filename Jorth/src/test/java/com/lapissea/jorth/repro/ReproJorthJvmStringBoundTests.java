@@ -11,7 +11,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthJvmStringBoundTests{
-
+	
 	@DataProvider
 	Object[][] primitives(){
 		return new Object[][]{
@@ -19,19 +19,19 @@ public class ReproJorthJvmStringBoundTests{
 			{long.class}, {float.class}, {double.class}, {void.class}
 		};
 	}
-
+	
 	@Test(dataProvider = "primitives", expectedExceptions = IllegalArgumentException.class,
 	      expectedExceptionsMessageRegExp = "Type variable bound must be a reference type: .*")
 	void primitiveBoundIsRejected(Class<?> primitive){
 		GenericType.of(primitive).withTypeArgName(ClassName.dotted("T"));
 	}
-
+	
 	@Test(expectedExceptions = IllegalArgumentException.class,
 	      expectedExceptionsMessageRegExp = "Type variable bound must be a reference type: .*")
 	void directConstructionRejectsPrimitiveBound(){
 		new GenericType(GenericType.INT.raw(), Optional.of(ClassName.dotted("T")), 0, List.of());
 	}
-
+	
 	@Test
 	void referenceBoundPreservesVariableSignatureAndErasedDescriptor(){
 		var type = GenericType.of(Number.class).withTypeArgName(ClassName.dotted("T"));
@@ -40,14 +40,14 @@ public class ReproJorthJvmStringBoundTests{
 		assertEncoding(type.arrayType(), true, "[TT;");
 		assertEncoding(type.arrayType(), false, "[Ljava/lang/Number;");
 	}
-
+	
 	@Test
 	void plainPrimitivePreservesDescriptor(){
 		assertEncoding(GenericType.BYTE, true, "B");
 		assertEncoding(GenericType.BYTE, false, "B");
 		assertEncoding(GenericType.BYTE.arrayType(), true, "[B");
 	}
-
+	
 	private static void assertEncoding(GenericType type, boolean generics, String expected){
 		var text = new StringBuilder();
 		type.jvmString(text, generics);

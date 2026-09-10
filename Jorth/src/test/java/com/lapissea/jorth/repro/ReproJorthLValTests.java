@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthLValTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -31,12 +31,12 @@ public class ReproJorthLValTests{
 	@DataProvider
 	Object[][] constants(){
 		return new Object[][]{
-			{0L}, {1L}, {-1L}, {2L}, {1L << 32}, {(1L << 32) + 1},
-			{-(1L << 32)}, {-(1L << 32) + 1}, {1234567890123L},
+			{0L}, {1L}, {-1L}, {2L}, {1L<<32}, {(1L<<32) + 1},
+			{-(1L<<32)}, {-(1L<<32) + 1}, {1234567890123L},
 			{Long.MIN_VALUE}, {Long.MIN_VALUE + 1}, {Long.MAX_VALUE}
 		};
 	}
-
+	
 	@Test(dataProvider = "constants")
 	void longConstantsRoundTrip(long value) throws Exception{
 		var cls = generateAndLoad("test.LongConstant", cd -> {

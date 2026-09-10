@@ -44,7 +44,7 @@ public class JorthLoopTests{
 	
 	@Test
 	public void callbacksCannotEditParentAndAreClosedAfterBuilding() throws Exception{
-		var outer = definition().function("run").staticAcc().body();
+		var outer    = definition().function("run").staticAcc().body();
 		var captured = new CodeBlock[2];
 		outer.loop(check -> {
 			captured[0] = check;
@@ -98,7 +98,7 @@ public class JorthLoopTests{
 			appendTrace(code, 40);
 		});
 		var method = cls.getMethod("run", int.class, List.class);
-		var trace = new ArrayList<Integer>();
+		var trace  = new ArrayList<Integer>();
 		method.invoke(null, 3, trace);
 		assertThat(trace).containsExactly(10, 20, 30, 20, 31, 20, 32, 20, 40);
 		trace.clear();
@@ -108,7 +108,7 @@ public class JorthLoopTests{
 		method.invoke(null, 1, trace);
 		assertThat(trace).containsExactly(10, 20, 30, 20, 40);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void accumulatesSum() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -126,7 +126,7 @@ public class JorthLoopTests{
 			assertThat(sum.invoke(null, count)).isEqualTo(count<0? 0 : count*(count - 1)/2);
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void scopedLocalsExecuteWithDifferentTypes() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -144,7 +144,7 @@ public class JorthLoopTests{
 			  .var(String.class, "tmp").val("done").set("tmp")
 			  .get("trace").call("add", args -> args.get("tmp")).pop();
 		});
-		var run = cls.getMethod("run", int.class, List.class);
+		var run   = cls.getMethod("run", int.class, List.class);
 		var trace = new ArrayList<Object>();
 		run.invoke(null, 3, trace);
 		assertThat(trace).containsExactly(0, 10L, 1, 11L, 2, 12L, 3, "done");

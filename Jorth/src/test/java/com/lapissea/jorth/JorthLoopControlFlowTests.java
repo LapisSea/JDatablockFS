@@ -13,7 +13,7 @@ public class JorthLoopControlFlowTests{
 	private static void trace(CodeBlock code, int marker) throws MalformedJorth{
 		code.get("trace").call("add", args -> args.val(marker).box()).pop();
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void nestedLoopsWithBranchesInConditionAndBody() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
@@ -38,7 +38,7 @@ public class JorthLoopControlFlowTests{
 				  outer.get("i").add(1).set("i");
 			  });
 		});
-		var run = cls.getMethod("run", int.class, List.class);
+		var run    = cls.getMethod("run", int.class, List.class);
 		var events = new ArrayList<Integer>();
 		run.invoke(null, 2, events);
 		assertThat(events).containsExactly(10, 20, 30, 40, 30, 41, 30, 50, 10, 20, 30, 40, 30, 41, 30, 50, 10);
@@ -46,7 +46,7 @@ public class JorthLoopControlFlowTests{
 		run.invoke(null, 0, events);
 		assertThat(events).containsExactly(10);
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void conditionalExitsSkipBackEdgeAndPostLoop() throws Exception{
 		for(boolean exitInCheck : new boolean[]{false, true}){
@@ -76,7 +76,7 @@ public class JorthLoopControlFlowTests{
 				trace(code, 50);
 				code.get("i").returnOp();
 			});
-			var run = cls.getMethod("run", int.class, List.class);
+			var run    = cls.getMethod("run", int.class, List.class);
 			var events = new ArrayList<Integer>();
 			assertThat(run.invoke(null, 0, events)).isEqualTo(3);
 			assertThat(events).containsExactly(10, 20, 30, 40, 20, 30, 40, 20, 30, 40, 20, 50);
@@ -88,7 +88,7 @@ public class JorthLoopControlFlowTests{
 			assertThat(events).isEqualTo(exitInCheck? List.of(10, 20, 30, 40, 20, 80) : List.of(10, 20, 30, 40, 20, 30, 80));
 		}
 	}
-
+	
 	@Test(timeOut = 10000)
 	public void entirelyTerminatingBodyStillAllowsZeroIterations() throws Exception{
 		for(boolean throwInstead : new boolean[]{false, true}){
@@ -105,7 +105,7 @@ public class JorthLoopControlFlowTests{
 				trace(code, 30);
 				code.val(9).returnOp();
 			});
-			var run = cls.getMethod("run", boolean.class, List.class);
+			var run    = cls.getMethod("run", boolean.class, List.class);
 			var events = new ArrayList<Integer>();
 			assertThat(run.invoke(null, false, events)).isEqualTo(9);
 			assertThat(events).containsExactly(10, 30);

@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthNullPrimitiveTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -35,14 +35,14 @@ public class ReproJorthNullPrimitiveTests{
 			{long.class}, {float.class}, {double.class}, {void.class}
 		};
 	}
-
+	
 	@Test(dataProvider = "invalidNullTypes", expectedExceptions = MalformedJorth.class,
 	      expectedExceptionsMessageRegExp = "For null constant, the type must be object but is: .*")
 	void nullRejectsPrimitiveAndVoidTypes(Class<?> type) throws MalformedJorth{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("test.InvalidNull"));
 		cd.function("run").staticAcc().body().nullVal(type);
 	}
-
+	
 	@DataProvider
 	Object[][] referenceTypes(){
 		return new Object[][]{
@@ -50,11 +50,11 @@ public class ReproJorthNullPrimitiveTests{
 			{boolean[].class}, {String[].class}, {int[][].class}
 		};
 	}
-
+	
 	@Test(dataProvider = "referenceTypes")
 	void nullReferenceLoadsAndReturns(Class<?> type) throws Exception{
 		var cls = generateAndLoad("test.ReferenceNull", cd ->
-			cd.function("value").staticAcc().returns(type).body().nullVal(type));
+			                                                cd.function("value").staticAcc().returns(type).body().nullVal(type));
 		assertThat(cls.getMethod("value").invoke(null)).isNull();
 	}
 }

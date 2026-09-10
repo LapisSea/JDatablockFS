@@ -7,31 +7,36 @@ import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Constructor metadata must preserve all four JVM member visibility levels. */
+/**
+ * Constructor metadata must preserve all four JVM member visibility levels.
+ */
 public class ReproJorthCtorVisibilityTests{
 	public static class PublicCtor{
 		public PublicCtor(){ }
 	}
+	
 	static class ProtectedCtor{
 		protected ProtectedCtor(){ }
 	}
+	
 	static class PackageCtor{
 		PackageCtor(){ }
 	}
+	
 	static class PrivateCtor{
 		private PrivateCtor(){ }
 	}
-
+	
 	private static Visibility visibilityOf(Class<?> type) throws NoSuchMethodException{
 		var source = TypeSource.of(null, type.getClassLoader());
 		return new FunctionInfo.OfConstructor(source, type.getDeclaredConstructor()).visibility();
 	}
-
+	
 	@Test
 	void publicConstructorVisibilityShouldBePublic() throws NoSuchMethodException{
 		assertThat(visibilityOf(PublicCtor.class)).isEqualTo(Visibility.PUBLIC);
 	}
-
+	
 	@Test
 	void nonPublicConstructorVisibilityCorrect() throws NoSuchMethodException{
 		assertThat(visibilityOf(ProtectedCtor.class)).isEqualTo(Visibility.PROTECTED);

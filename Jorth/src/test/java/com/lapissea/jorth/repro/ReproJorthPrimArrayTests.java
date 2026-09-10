@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthPrimArrayTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -35,16 +35,16 @@ public class ReproJorthPrimArrayTests{
 	Object[][] arrays(){
 		var cases = new ArrayList<Object[]>();
 		for(var type : new Class<?>[]{boolean[].class, byte[].class, short[].class, char[].class,
-		                            int[].class, long[].class, float[].class, double[].class, String[].class}){
+		                              int[].class, long[].class, float[].class, double[].class, String[].class}){
 			for(int length : new int[]{0, 4}) cases.add(new Object[]{type, length});
 		}
 		return cases.toArray(Object[][]::new);
 	}
-
+	
 	@Test(dataProvider = "arrays")
 	void createsArrayWithCorrectTypeAndLength(Class<?> type, int length) throws Exception{
 		var cls = generateAndLoad("test.ArrayAllocation", cd ->
-			cd.function("make").staticAcc().returns(type).body().val(length).newObj(type));
+			                                                  cd.function("make").staticAcc().returns(type).body().val(length).newObj(type));
 		var result = cls.getMethod("make").invoke(null);
 		assertThat(result.getClass()).isEqualTo(type);
 		assertThat(Array.getLength(result)).isEqualTo(length);

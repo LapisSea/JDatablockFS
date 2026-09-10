@@ -80,8 +80,10 @@ public class TypeStack{
 	public List<GenericType> getLocalPortion(){
 		return stack;
 	}
-
-	/** Copies all inherited and local entries into an independent stack with no parent. */
+	
+	/**
+	 * Copies all inherited and local entries into an independent stack with no parent.
+	 */
 	public TypeStack copyFlat(){
 		var copy = new TypeStack(null);
 		totalStack().forEach(copy::push);

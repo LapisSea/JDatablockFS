@@ -82,7 +82,7 @@ public class JorthTests{
 	void childStackCanInspectInheritedValuesAndConsumeOwnValues() throws MalformedJorth{
 		var parent = new TypeStack(null);
 		parent.push(GenericType.INT);
-		var child = new TypeStack(parent);
+		var child   = new TypeStack(parent);
 		var sibling = new TypeStack(parent);
 		child.requireElements(1);
 		assertThat(child.peek(0)).isEqualTo(GenericType.INT);
@@ -93,13 +93,13 @@ public class JorthTests{
 		assertThat(parent.totalStack()).containsExactly(GenericType.INT);
 		assertThat(sibling.totalStack()).containsExactly(GenericType.INT);
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class,
 	      expectedExceptionsMessageRegExp = "can not pop values outside the code path")
 	void inheritedPopPreservesParentAndSiblingStacks() throws MalformedJorth{
 		var parent = new TypeStack(null);
 		parent.push(GenericType.INT);
-		var child = new TypeStack(parent);
+		var child   = new TypeStack(parent);
 		var sibling = new TypeStack(parent);
 		try{
 			child.pop();
@@ -109,19 +109,19 @@ public class JorthTests{
 			assertThat(child.totalStack()).containsExactly(GenericType.INT);
 		}
 	}
-
+	
 	@Test
 	void branchesCanLoadAndConsumeLocals() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd ->
-			cd.function("run").staticAcc().arg(String.class, "value").arg(boolean.class, "condition")
-			  .returns(int.class).body().get("condition")
-			  .ifTrue(b -> b.get("value").call("length").returnOp())
-			  .elseRun(b -> b.get("value").call("length").add(1).returnOp()));
+			                                                    cd.function("run").staticAcc().arg(String.class, "value").arg(boolean.class, "condition")
+			                                                      .returns(int.class).body().get("condition")
+			                                                      .ifTrue(b -> b.get("value").call("length").returnOp())
+			                                                      .elseRun(b -> b.get("value").call("length").add(1).returnOp()));
 		var method = cls.getMethod("run", String.class, boolean.class);
 		assertThat(method.invoke(null, "hello", true)).isEqualTo(5);
 		assertThat(method.invoke(null, "hello", false)).isEqualTo(6);
 	}
-
+	
 	@Test
 	void multidimensionalArrays() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
@@ -143,19 +143,19 @@ public class JorthTests{
 		assertThat(empty.length).isEqualTo(2);
 		for(var plane : empty) assertThat(plane).isEmpty();
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class)
 	void multidimensionalArrayRequiresAllLengths() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd ->
-			cd.function("run").staticAcc().body().val(2).newObj(int[][].class));
+			                                          cd.function("run").staticAcc().body().val(2).newObj(int[][].class));
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Array size is not an integer")
 	void multidimensionalArrayRejectsNonIntegerLength() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd ->
-			cd.function("run").staticAcc().body().val(2L).val(3).newObj(int[][].class));
+			                                          cd.function("run").staticAcc().body().val(2L).val(3).newObj(int[][].class));
 	}
-
+	
 	@Test
 	void explicitPrimitiveConversions() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
@@ -171,13 +171,13 @@ public class JorthTests{
 		assertThat(cls.getMethod("callLong").invoke(null)).isEqualTo(5L);
 		assertThat(cls.getMethod("callInteger").invoke(null)).isEqualTo(5);
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class)
 	void returnRequiresExplicitWidening() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd ->
-			cd.function("run").staticAcc().returns(long.class).body().val(5).returnOp());
+			                                          cd.function("run").staticAcc().returns(long.class).body().val(5).returnOp());
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class)
 	void callRequiresExplicitWidening() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd -> {
@@ -186,7 +186,7 @@ public class JorthTests{
 			cd.function("run").staticAcc().returns(long.class).body().val(5).call(target);
 		});
 	}
-
+	
 	@Test(expectedExceptions = MalformedJorth.class)
 	void callRequiresExplicitBoxing() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd -> {
@@ -195,7 +195,7 @@ public class JorthTests{
 			cd.function("run").staticAcc().returns(Integer.class).body().val(5).call(target);
 		});
 	}
-
+	
 	public static class AutoPassSuper{
 		public int doubleAndAdd(int x){
 			return x*2 + 1;
@@ -234,7 +234,7 @@ public class JorthTests{
 		assertThat(cls.getMethod("implicit").invoke(null)).isNull();
 		assertThat(cls.getMethod("explicit").invoke(null)).isNull();
 	}
-
+	
 	@Test
 	void repeatedBodyCallsShareOneConcreteFunction() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {

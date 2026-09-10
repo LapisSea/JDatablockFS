@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthSealedTests{
-
+	
 	private void defineHierarchy(String dottedName, ClassDefinition cd) throws MalformedJorth{
 		cd.name(ClassName.dotted(dottedName));
 		switch(dottedName){
@@ -26,15 +26,15 @@ public class ReproJorthSealedTests{
 			default -> throw new IllegalStateException("Unexpected class " + dottedName);
 		}
 	}
-
+	
 	private Map<String, Class<?>> generateAndLoad(
 		List<String> dottedNames,
 		UnsafeBiConsumer<String, ClassDefinition, MalformedJorth> generator
 	) throws Exception{
 		Set<String> slashedNames = dottedNames.stream()
-		                                     .map(n -> n.replace('.', '/'))
-		                                     .collect(Collectors.toSet());
-
+		                                      .map(n -> n.replace('.', '/'))
+		                                      .collect(Collectors.toSet());
+		
 		ClassLoader loader = new ClassLoader(ReproJorthSealedTests.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
@@ -45,7 +45,7 @@ public class ReproJorthSealedTests{
 				}
 				try{
 					String dotted = name.replace('/', '.');
-					var cd = new ClassDefinition(this);
+					var    cd     = new ClassDefinition(this);
 					generator.accept(dotted, cd);
 					byte[] bytes = cd.getClassFile();
 					return defineClass(dotted, bytes, 0, bytes.length);
@@ -54,18 +54,18 @@ public class ReproJorthSealedTests{
 				}
 			}
 		};
-
+		
 		Map<String, Class<?>> loaded = new LinkedHashMap<>();
 		for(String n : dottedNames){
 			loaded.put(n, Class.forName(n, true, loader));
 		}
 		return loaded;
 	}
-
+	
 	@Test
 	public void generatedClassWithPermitsIsSealed() throws Exception{
 		var classes = generateAndLoad(List.of("SealedClass", "child1", "child2"), this::defineHierarchy);
-		var parent = classes.get("SealedClass");
+		var parent  = classes.get("SealedClass");
 		assertThat(parent.isSealed()).isTrue();
 		assertThat(parent.getPermittedSubclasses())
 			.containsExactlyInAnyOrder(classes.get("child1"), classes.get("child2"));

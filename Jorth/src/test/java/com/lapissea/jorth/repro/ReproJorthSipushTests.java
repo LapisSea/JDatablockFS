@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthSipushTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -36,19 +36,19 @@ public class ReproJorthSipushTests{
 			{40000}, {70000}, {Integer.MAX_VALUE}
 		};
 	}
-
+	
 	@Test(dataProvider = "constants")
 	void integerConstantsRoundTrip(int value) throws Exception{
 		var cls = generateAndLoad("test.IntegerConstant", cd ->
-			cd.function("value").staticAcc().returns(int.class).body().val(value));
+			                                                  cd.function("value").staticAcc().returns(int.class).body().val(value));
 		assertThat(cls.getMethod("value").invoke(null)).isEqualTo(value);
 	}
-
+	
 	@Test(dataProvider = "constants")
 	void incrementsPreserveConstant(int value) throws Exception{
 		var cls = generateAndLoad("test.IntegerIncrement", cd ->
-			cd.function("add").staticAcc().arg(int.class, "x").returns(int.class)
-			  .body().get("x").add(value));
+			                                                   cd.function("add").staticAcc().arg(int.class, "x").returns(int.class)
+			                                                     .body().get("x").add(value));
 		assertThat(cls.getMethod("add", int.class).invoke(null, 7)).isEqualTo(7 + value);
 	}
 }

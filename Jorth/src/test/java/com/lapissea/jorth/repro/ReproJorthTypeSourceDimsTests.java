@@ -13,7 +13,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthTypeSourceDimsTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -38,11 +38,11 @@ public class ReproJorthTypeSourceDimsTests{
 			{int.class, new int[]{0, 1, 2}}, {int.class, new int[]{2, 1, 0}}
 		};
 	}
-
+	
 	@Test(dataProvider = "lookupOrders")
 	void cacheDistinguishesDimensions(Class<?> component, int[] order) throws MalformedJorth{
-		var source = TypeSource.of(null, getClass().getClassLoader());
-		var base = GenericType.of(component);
+		var source   = TypeSource.of(null, getClass().getClassLoader());
+		var base     = GenericType.of(component);
 		var resolved = new ClassInfo[3];
 		for(int dims : order){
 			resolved[dims] = source.byType(base.withDims(dims));
@@ -54,13 +54,13 @@ public class ReproJorthTypeSourceDimsTests{
 			assertThat(source.byType(base.withDims(dims))).isSameAs(resolved[dims]);
 		}
 	}
-
+	
 	@Test
 	void arrayLookupDoesNotHideComponentFields() throws Exception{
 		var cls = generateAndLoad("test.ArrayAndComponent", cd ->
-			cd.function("maxValue").staticAcc().returns(int.class).body()
-			  .val(3).newObj(Integer[].class).call("hashCode").pop()
-			  .get(Integer.class, "MAX_VALUE"));
+			                                                    cd.function("maxValue").staticAcc().returns(int.class).body()
+			                                                      .val(3).newObj(Integer[].class).call("hashCode").pop()
+			                                                      .get(Integer.class, "MAX_VALUE"));
 		assertThat(cls.getMethod("maxValue").invoke(null)).isEqualTo(Integer.MAX_VALUE);
 	}
 }

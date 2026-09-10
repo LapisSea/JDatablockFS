@@ -15,7 +15,9 @@ import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
-import static com.lapissea.jorth.TestUtils.*;
+import static com.lapissea.jorth.TestUtils.autoName;
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -27,18 +29,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 public class JorthCoverageTypeRefTests{
 	
-	/** Static target for the call(Class,String) zero-arg overload. */
+	/**
+	 * Static target for the call(Class,String) zero-arg overload.
+	 */
 	public static int answer(){
 		return 42;
 	}
-	/** Static target for the call(Class,String,CodeArg) overload. */
+	/**
+	 * Static target for the call(Class,String,CodeArg) overload.
+	 */
 	public static int sum(int a, int b){
 		return a + b;
 	}
 	
 	// ------------------------------------------------------------------ helpers
 	
-	/** Builds the class file without loading it, so the emitted bytes can be inspected. */
+	/**
+	 * Builds the class file without loading it, so the emitted bytes can be inspected.
+	 */
 	private static byte[] generateBytes(UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws MalformedJorth{
 		var cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(autoName()));
@@ -52,7 +60,7 @@ public class JorthCoverageTypeRefTests{
 	@Test
 	void mt22_typeDefForwardRef() throws Exception{
 		var cdRef = new ClassDefinition[1];
-		var builder = (UnsafeConsumer<ClassDefinition, MalformedJorth>) cd -> {
+		var builder = (UnsafeConsumer<ClassDefinition, MalformedJorth>)cd -> {
 			cdRef[0] = cd;
 			cd.typeDef("Foo", ClassName.dotted("test.Foo"));
 			cd.field(GenericType.of(ClassName.dotted("test.Foo")), "foo");
@@ -63,17 +71,17 @@ public class JorthCoverageTypeRefTests{
 		assertThat(cdRef[0].getTypeDef("Foo")).isEqualTo(ClassName.dotted("test.Foo"));
 		assertThat(((GenericType)cdRef[0].getField("foo").type()).raw()).isEqualTo(ClassName.dotted("test.Foo"));
 		assertThat(new String(bytes, StandardCharsets.UTF_8))
-		  .as("the field descriptor must reference the forward type by name")
-		  .contains("Ltest/Foo;");
+			.as("the field descriptor must reference the forward type by name")
+			.contains("Ltest/Foo;");
 		assertThat(cls).as("class must load despite the unresolved field type").isNotNull();
 		
 		assertThatThrownBy(() -> cdRef[0].getTypeDef("missing"))
-		  .isInstanceOf(IllegalStateException.class)
-		  .hasMessageContaining("No type definition found with name missing");
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("No type definition found with name missing");
 		
 		assertThatThrownBy(() -> cdRef[0].typeDef("Foo", ClassName.dotted("test.Bar")))
-		  .isInstanceOf(IllegalArgumentException.class)
-		  .hasMessageContaining("Type definition Foo already defined");
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Type definition Foo already defined");
 	}
 	
 	// MT-22 — lookup APIs: superType(), getArg(ClassName), getFunctionOverride(Signature)
@@ -87,22 +95,22 @@ public class JorthCoverageTypeRefTests{
 		cd.genericArg(GenericType.of(String.class), ClassName.dotted("T"));
 		assertThat(cd.getArg(ClassName.dotted("T")).raw()).isEqualTo(ClassName.dotted("java.lang.String"));
 		assertThatThrownBy(() -> cd.getArg(ClassName.dotted("missing")))
-		  .isInstanceOf(IllegalArgumentException.class)
-		  .hasMessageContaining("No argument found with name missing");
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("No argument found with name missing");
 		
 		cd.implement(Supplier.class);
 		var get = cd.getFunctionOverride(new FunctionInfo.Signature("get", List.of()));
 		assertThat(get.name()).isEqualTo("get");
 		assertThat(get.ownerInfo().name()).isEqualTo(ClassName.dotted("java.util.function.Supplier"));
 		assertThatThrownBy(() -> cd.getFunctionOverride(new FunctionInfo.Signature("nope", List.of())))
-		  .isInstanceOf(MalformedJorth.class)
-		  .hasMessageContaining("does not exist");
+			.isInstanceOf(MalformedJorth.class)
+			.hasMessageContaining("does not exist");
 	}
 	
 	// MT-22 — getClassInfo() live view: fields and functions added after obtaining the view are visible
 	@Test
 	void mt22_classInfoLiveView() throws Exception{
-		var cd   = new ClassDefinition(null);
+		var cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(autoName()));
 		var info = cd.getClassInfo();
 		
@@ -116,8 +124,8 @@ public class JorthCoverageTypeRefTests{
 		assertThat(info.getFunction(new FunctionInfo.Signature("liveFn", List.of()))).isSameAs(fn);
 		
 		assertThatThrownBy(() -> info.getField("missing"))
-		  .isInstanceOf(MalformedJorth.class)
-		  .hasMessageContaining("does not exist");
+			.isInstanceOf(MalformedJorth.class)
+			.hasMessageContaining("does not exist");
 	}
 	
 	// ------------------------------------------------------------------ MT-23
@@ -208,7 +216,7 @@ public class JorthCoverageTypeRefTests{
 	// MT-26 — genericArg(TypeVariable)/genericArg(GenericType,ClassName)/implement(ClassName)/extendsType(GenericType)
 	@Test
 	void mt26_classLevelTypeOverloads() throws Exception{
-		var e   = List.class.getTypeParameters()[0];
+		var e = List.class.getTypeParameters()[0];
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.genericArg(e);
 			cd.genericArg(GenericType.of(String.class), ClassName.dotted("S"));
@@ -261,8 +269,8 @@ public class JorthCoverageTypeRefTests{
 		assertThatThrownBy(() -> generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("test").staticAcc().returns(String.class)
 			  .body().callVirtual(b -> { },
-			                     fn -> fn.name("make").arg(int.class).returns(String.class),
-			                     c -> c.val(1));
+			                      fn -> fn.name("make").arg(int.class).returns(String.class),
+			                      c -> c.val(1));
 		})).isInstanceOf(MalformedJorth.class)
 		   .hasMessageContaining("Bootstrap function must be specified");
 	}
@@ -273,8 +281,8 @@ public class JorthCoverageTypeRefTests{
 		assertThatThrownBy(() -> generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("test").staticAcc().returns(String.class)
 			  .body().callVirtual(b -> b.caller(JorthTests.TestBootstrap.class, "bootstrap"),
-			                     fn -> fn.arg(int.class).returns(String.class),
-			                     c -> c.val(1));
+			                      fn -> fn.arg(int.class).returns(String.class),
+			                      c -> c.val(1));
 		})).isInstanceOf(MalformedJorth.class)
 		   .hasMessageContaining("Calling function name must be specified");
 	}
@@ -283,7 +291,7 @@ public class JorthCoverageTypeRefTests{
 	@Test
 	void mt27_callVirtualStaticArgClassConstant() throws Exception{
 		var name = autoName();
-		var cls  = generateAndLoadInstance(name, cd -> {
+		var cls = generateAndLoadInstance(name, cd -> {
 			cd.name(ClassName.dotted(name)).implement(GenericType.of(IntFunction.class).withArgs(String.class));
 			cd.function("apply").arg(int.class, "num").returns(Object.class).annotation(Override.class)
 			  .body()
@@ -307,11 +315,11 @@ public class JorthCoverageTypeRefTests{
 			var a = cd.function("a").staticAcc().arg(int.class, "n").returns(int.class);
 			var b = cd.function("b").staticAcc().arg(int.class, "n").returns(int.class);
 			a.body()
-			  .get("n").val(0).ifEquality(c -> c.val(0).returnOp())
-			  .call(b, c -> c.get("n").add(-1));
+			 .get("n").val(0).ifEquality(c -> c.val(0).returnOp())
+			 .call(b, c -> c.get("n").add(-1));
 			b.body()
-			  .get("n").val(0).ifEquality(c -> c.val(100).returnOp())
-			  .call(a, c -> c.get("n").add(-1));
+			 .get("n").val(0).ifEquality(c -> c.val(100).returnOp())
+			 .call(a, c -> c.get("n").add(-1));
 		});
 		
 		assertThat(cls.getMethod("a", int.class).invoke(null, 0)).isEqualTo(0);

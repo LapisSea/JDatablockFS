@@ -19,7 +19,7 @@ public enum Visibility{
 		if(Modifier.isPrivate(modifiers)) return PRIVATE;
 		return PACKAGE_PRIVATE;
 	}
-
+	
 	public final int flag;
 	
 	Visibility(int flag){

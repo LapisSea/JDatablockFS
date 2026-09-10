@@ -10,9 +10,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthWildcardAsGenericTests{
-
+	
 	public List<?> unbounded;
-
+	
 	@Test
 	void unboundedWildcardResolvesToObject(){
 		assertThat(JType.WILDCARD.asGeneric()).isEqualTo(GenericType.OBJECT);
@@ -22,7 +22,7 @@ public class ReproJorthWildcardAsGenericTests{
 		assertThat(JType.WILDCARD.jvmDescriptorStr()).isEqualTo("Ljava/lang/Object;");
 		assertThat(JType.WILDCARD.jvmDescriptorLen()).isEqualTo("Ljava/lang/Object;".length());
 	}
-
+	
 	@Test
 	void reflectedUnboundedWildcardMatchesExplicitWildcard() throws Exception{
 		var fieldType = (ParameterizedType)getClass().getField("unbounded").getGenericType();
@@ -31,7 +31,7 @@ public class ReproJorthWildcardAsGenericTests{
 		assertThat(reflected.jvmSignatureStr()).isEqualTo(JType.WILDCARD.jvmSignatureStr());
 		assertThat(reflected.jvmDescriptorStr()).isEqualTo(JType.WILDCARD.jvmDescriptorStr());
 	}
-
+	
 	@Test
 	void boundedWildcardsRetainExistingResolution(){
 		assertThat(JType.upper(Number.class).asGeneric()).isEqualTo(GenericType.of(Number.class));
@@ -39,7 +39,7 @@ public class ReproJorthWildcardAsGenericTests{
 		assertThat(JType.upper(Number.class).jvmSignatureStr()).isEqualTo("+Ljava/lang/Number;");
 		assertThat(JType.lower(String.class).jvmSignatureStr()).isEqualTo("-Ljava/lang/String;");
 	}
-
+	
 	@Test
 	void wildcardTypeArgumentKeepsWildcardSignature(){
 		var type = GenericType.of(List.class).withArgs(List.of(JType.WILDCARD));

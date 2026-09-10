@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthIncrementNarrowTests{
-
+	
 	private static Class<?> generateAndLoad(String className, UnsafeConsumer<ClassDefinition, MalformedJorth> generator) throws Exception{
 		ClassDefinition cd = new ClassDefinition(null);
 		cd.name(ClassName.dotted(className));
@@ -36,7 +36,7 @@ public class ReproJorthIncrementNarrowTests{
 			{char.class, (char)100}
 		};
 	}
-
+	
 	@Test(dataProvider = "narrowTypes")
 	void incrementProducesInt(Class<?> type, Object value) throws Exception{
 		var cls = generateAndLoad("test.IncrementResult", cd -> {
@@ -51,19 +51,19 @@ public class ReproJorthIncrementNarrowTests{
 		assertThat(cls.getMethod("local", type).invoke(null, value)).isEqualTo(300);
 		assertThat(cls.getMethod("zero", type).invoke(null, value)).isEqualTo(100);
 	}
-
+	
 	@Test(dataProvider = "narrowTypes", expectedExceptions = MalformedJorth.class)
 	void incrementRequiresCastToNarrowLocal(Class<?> type, Object value) throws Exception{
 		generateAndLoad("test.IncrementNarrowStore", cd ->
-			cd.function("run").staticAcc().arg(type, "value").body()
-			  .get("value").add(200).set("value"));
+			                                             cd.function("run").staticAcc().arg(type, "value").body()
+			                                               .get("value").add(200).set("value"));
 	}
-
+	
 	@Test(dataProvider = "narrowTypes")
 	void explicitCastAllowsNarrowStore(Class<?> type, Object value) throws Exception{
 		var cls = generateAndLoad("test.IncrementCast", cd ->
-			cd.function("run").staticAcc().arg(type, "value").returns(type).body()
-			  .get("value").add(200).cast(type).set("value").get("value"));
+			                                                cd.function("run").staticAcc().arg(type, "value").returns(type).body()
+			                                                  .get("value").add(200).cast(type).set("value").get("value"));
 		Object expected;
 		if(type == byte.class) expected = (byte)300;
 		else if(type == short.class) expected = (short)300;

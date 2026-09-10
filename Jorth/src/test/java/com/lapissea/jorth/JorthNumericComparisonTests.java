@@ -24,7 +24,8 @@ public class JorthNumericComparisonTests{
 		if(type == char.class) return new Object[]{(char)0, (char)1, Character.MAX_VALUE};
 		if(type == int.class) return new Object[]{Integer.MIN_VALUE, 0, 1, 16777217, Integer.MAX_VALUE};
 		if(type == long.class) return new Object[]{Long.MIN_VALUE, 0L, 1L, 16777217L, 9007199254740993L, Long.MAX_VALUE - 1, Long.MAX_VALUE};
-		if(type == float.class) return new Object[]{Float.NEGATIVE_INFINITY, -Float.MAX_VALUE, -0.0F, 0.0F, Float.MIN_VALUE, 1F, 16777216F, Float.MAX_VALUE, Float.POSITIVE_INFINITY, Float.NaN};
+		if(type == float.class)
+			return new Object[]{Float.NEGATIVE_INFINITY, -Float.MAX_VALUE, -0.0F, 0.0F, Float.MIN_VALUE, 1F, 16777216F, Float.MAX_VALUE, Float.POSITIVE_INFINITY, Float.NaN};
 		return new Object[]{Double.NEGATIVE_INFINITY, -Double.MAX_VALUE, -0.0D, 0.0D, Double.MIN_VALUE, 1D, 9007199254740992D, Double.MAX_VALUE, Double.POSITIVE_INFINITY, Double.NaN};
 	}
 	private static Number number(Object value){
@@ -34,28 +35,48 @@ public class JorthNumericComparisonTests{
 		var x = number(a);
 		var y = number(b);
 		if(left == double.class || right == double.class){
-			return switch(op){case 0 -> x.doubleValue()>y.doubleValue(); case 1 -> x.doubleValue()>=y.doubleValue(); case 2 -> x.doubleValue()<y.doubleValue(); default -> x.doubleValue()<=y.doubleValue();};
+			return switch(op){
+				case 0 -> x.doubleValue()>y.doubleValue();
+				case 1 -> x.doubleValue()>=y.doubleValue();
+				case 2 -> x.doubleValue()<y.doubleValue();
+				default -> x.doubleValue()<=y.doubleValue();
+			};
 		}
 		if(left == float.class || right == float.class){
-			return switch(op){case 0 -> x.floatValue()>y.floatValue(); case 1 -> x.floatValue()>=y.floatValue(); case 2 -> x.floatValue()<y.floatValue(); default -> x.floatValue()<=y.floatValue();};
+			return switch(op){
+				case 0 -> x.floatValue()>y.floatValue();
+				case 1 -> x.floatValue()>=y.floatValue();
+				case 2 -> x.floatValue()<y.floatValue();
+				default -> x.floatValue()<=y.floatValue();
+			};
 		}
-		return switch(op){case 0 -> x.longValue()>y.longValue(); case 1 -> x.longValue()>=y.longValue(); case 2 -> x.longValue()<y.longValue(); default -> x.longValue()<=y.longValue();};
+		return switch(op){
+			case 0 -> x.longValue()>y.longValue();
+			case 1 -> x.longValue()>=y.longValue();
+			case 2 -> x.longValue()<y.longValue();
+			default -> x.longValue()<=y.longValue();
+		};
 	}
 	@Test
 	public void numericComparisons() throws Exception{
 		var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
-			for(var left : TYPES) for(var right : TYPES) for(int op = 0; op<4; op++){
-				var body = cd.function("compare" + op).staticAcc().arg(left, "a").arg(right, "b").returns(boolean.class).body();
-				compare(body.get("a").get("b"), op).returnOp();
-			}
+			for(var left : TYPES)
+				for(var right : TYPES)
+					for(int op = 0; op<4; op++){
+						var body = cd.function("compare" + op).staticAcc().arg(left, "a").arg(right, "b").returns(boolean.class).body();
+						compare(body.get("a").get("b"), op).returnOp();
+					}
 		});
-		for(var left : TYPES) for(var right : TYPES) for(int op = 0; op<4; op++){
-			var method = cls.getMethod("compare" + op, left, right);
-			for(var a : values(left)) for(var b : values(right)){
-				assertThat(method.invoke(null, a, b)).as("%s %s, op %s: %s, %s", left, right, op, a, b)
-				                                      .isEqualTo(expected(left, right, a, b, op));
-			}
-		}
+		for(var left : TYPES)
+			for(var right : TYPES)
+				for(int op = 0; op<4; op++){
+					var method = cls.getMethod("compare" + op, left, right);
+					for(var a : values(left))
+						for(var b : values(right)){
+							assertThat(method.invoke(null, a, b)).as("%s %s, op %s: %s, %s", left, right, op, a, b)
+							                                     .isEqualTo(expected(left, right, a, b, op));
+						}
+				}
 	}
 	@Test
 	public void rejectsNonNumericOperandsAndUnderflow(){
@@ -64,7 +85,7 @@ public class JorthNumericComparisonTests{
 			for(var type : new Class<?>[]{boolean.class, Object.class, Integer.class, int[].class}){
 				for(boolean invalidLeft : new boolean[]{false, true}){
 					assertThatThrownBy(() -> {
-						var cd = new ClassDefinition(null);
+						var cd   = new ClassDefinition(null);
 						var body = cd.function("bad").staticAcc().arg(invalidLeft? type : int.class, "a").arg(invalidLeft? int.class : type, "b").body();
 						compare(body.get("a").get("b"), operation);
 					}).isInstanceOf(MalformedJorth.class).hasMessageContaining("numeric primitives");

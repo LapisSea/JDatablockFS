@@ -1130,7 +1130,7 @@ sealed interface Insn{
 			context.emitJump(writer, isBreak);
 		}
 	}
-
+	
 	record WhileLoop(LoopContext context, CodeBlock check, CodeBlock body) implements Insn{
 		static WhileLoop simulate(LoopContext context, CodeBlock check, CodeBlock body) throws MalformedJorth{
 			if(check.terminates()) throw new MalformedJorth("Loop check must not terminate");
@@ -1142,7 +1142,7 @@ sealed interface Insn{
 			context.visit(writer, check, body);
 		}
 	}
-
+	
 	record InlineBlock(CodeBlock block) implements TerminatingInsn{
 		
 		public static InlineBlock simulate(CodeBlock block){

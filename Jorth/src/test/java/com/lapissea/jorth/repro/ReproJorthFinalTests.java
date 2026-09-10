@@ -13,12 +13,12 @@ import java.util.function.BiConsumer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReproJorthFinalTests{
-
+	
 	@DataProvider
 	Object[][] classAccess(){
 		return new Object[][]{{AccessSet.DEFAULT}, {AccessSet.FINAL}, {AccessSet.ABSTRACT}};
 	}
-
+	
 	@Test(dataProvider = "classAccess")
 	void emittedModifiersMatchClassAccess(AccessSet access) throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("reprofinal.Base"));
@@ -28,14 +28,14 @@ public class ReproJorthFinalTests{
 		assertThat(Modifier.isAbstract(cls.getModifiers())).isEqualTo(access.isAbstract());
 		assertThat(cls.isSealed()).isFalse();
 	}
-
+	
 	@Test
 	void finalAccEmitsFinalClass() throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted("reprofinal.Final"));
 		cd.finalAcc();
 		assertThat(Modifier.isFinal(loadSingleClass("reprofinal.Final", cd.getClassFile()).getModifiers())).isTrue();
 	}
-
+	
 	@Test
 	void generatedBaseClassCanBeExtended() throws Exception{
 		var loader = newLoader(Set.of("reprofinal.HierBase", "reprofinal.HierChild"), (name, cd) -> {
@@ -43,12 +43,12 @@ public class ReproJorthFinalTests{
 				cd.extendsType(ClassName.dotted("reprofinal.HierBase"));
 			}
 		});
-		var base = Class.forName("reprofinal.HierBase", true, loader);
+		var base  = Class.forName("reprofinal.HierBase", true, loader);
 		var child = Class.forName("reprofinal.HierChild", true, loader);
 		assertThat(child.getSuperclass()).isSameAs(base);
 		assertThat(child.getConstructor().newInstance()).isInstanceOf(base);
 	}
-
+	
 	private static Class<?> loadSingleClass(String name, byte[] bytes) throws Exception{
 		var loader = new ClassLoader(ReproJorthFinalTests.class.getClassLoader()){
 			@Override
@@ -61,7 +61,7 @@ public class ReproJorthFinalTests{
 		};
 		return loader.loadClass(name);
 	}
-
+	
 	private static ClassLoader newLoader(Set<String> names, BiConsumer<String, ClassDefinition> generator){
 		return new ClassLoader(ReproJorthFinalTests.class.getClassLoader()){
 			@Override

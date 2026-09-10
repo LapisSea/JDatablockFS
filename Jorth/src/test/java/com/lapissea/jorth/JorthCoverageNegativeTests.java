@@ -4,13 +4,14 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.Test;
 
-import static com.lapissea.jorth.TestUtils.*;
+import static com.lapissea.jorth.TestUtils.autoName;
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Negative/error-mode coverage (MT-29, MT-30) for the Jorth DSL, plus the MT-34
  * dead-code and unused-fixture audit (recorded as comments only, no executable test).
- *
+ * <p>
  * Negative tests verify build-time validation failures.
  */
 public class JorthCoverageNegativeTests{
@@ -58,7 +59,9 @@ public class JorthCoverageNegativeTests{
 	
 	// ------------------------------------------------------------------ helpers
 	
-	/** Runs a full build (+load) and returns the first throwable, so tests can pin the exact type. */
+	/**
+	 * Runs a full build (+load) and returns the first throwable, so tests can pin the exact type.
+	 */
 	private static Throwable buildCapturing(UnsafeConsumer<ClassDefinition, MalformedJorth> generator){
 		try{
 			generateAndLoadInstanceSimple(autoName(), generator);
@@ -74,18 +77,18 @@ public class JorthCoverageNegativeTests{
 	@Test
 	void mt29_duplicateLocalName() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.body().var(int.class, "x").var(int.class, "x"));
+		                                    .body().var(int.class, "x").var(int.class, "x"));
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Duplicated localValue: x");
+		                  .hasMessageContaining("Duplicated localValue: x");
 	}
 	
 	// MT-29 — get("this") inside a static method
 	@Test
 	void mt29_thisInStaticFunction() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.body().get("this"));
+		                                    .body().get("this"));
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Cannot use 'this' from a static function");
+		                  .hasMessageContaining("Cannot use 'this' from a static function");
 	}
 	
 	// MT-29 — duplicate elseRun on the same conditional
@@ -99,56 +102,56 @@ public class JorthCoverageNegativeTests{
 			    .elseRun(c -> c.val(3));
 		});
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Duplicate else call");
+		                  .hasMessageContaining("Duplicate else call");
 	}
 	
 	// MT-29 — elseRun after a non-conditional instruction
 	@Test
 	void mt29_elseRunAfterNonConditional() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc().returns(int.class)
-			.body().val(1).elseRun(c -> c.val(2)));
+		                                    .body().val(1).elseRun(c -> c.val(2)));
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Must be run after a conditional operation");
+		                  .hasMessageContaining("Must be run after a conditional operation");
 	}
 	
 	// MT-29 — box() on a reference-type stack top
 	@Test
 	void mt29_boxNonPrimitive() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.arg(String.class, "s").returns(Integer.class)
-			.body().get("s").box());
+		                                    .arg(String.class, "s").returns(Integer.class)
+		                                    .body().get("s").box());
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Cannot box non-primitive");
+		                  .hasMessageContaining("Cannot box non-primitive");
 	}
 	
 	// MT-29 — unbox() on an int stack top
 	@Test
 	void mt29_unboxNonWrapper() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.arg(int.class, "x").returns(Integer.class)
-			.body().get("x").unbox());
+		                                    .arg(int.class, "x").returns(Integer.class)
+		                                    .body().get("x").unbox());
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Cannot unbox type");
+		                  .hasMessageContaining("Cannot unbox type");
 	}
 	
 	// MT-29 — val(Object) with an unsupported runtime type
 	@Test
 	void mt29_valInvalidObject() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.returns(Object.class)
-			.body().val((Object)new Object()));
+		                                    .returns(Object.class)
+		                                    .body().val((Object)new Object()));
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Invalid value");
+		                  .hasMessageContaining("Invalid value");
 	}
 	
 	// MT-29 — ifEquality with fewer than 2 elements on the stack
 	@Test
 	void mt29_ifEqualityInsufficientStack() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.arg(int.class, "a").returns(int.class)
-			.body().get("a").ifEquality(c -> c.val(1).returnOp()));
+		                                    .arg(int.class, "a").returns(int.class)
+		                                    .body().get("a").ifEquality(c -> c.val(1).returnOp()));
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Required at least 2");
+		                  .hasMessageContaining("Required at least 2");
 	}
 	
 	// ------------------------------------------------------------------ MT-30
@@ -157,14 +160,14 @@ public class JorthCoverageNegativeTests{
 	void mt30_nonVoidMethodEmptyStack() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd -> cd.function("test").staticAcc().returns(int.class).body());
 	}
-
+	
 	// MT-30 — throwOp() with an empty stack: rejected at build time with the checked exception
 	@Test
 	void mt30_throwOpEmptyStack() throws Exception{
 		var thrown = buildCapturing(cd -> cd.function("test").staticAcc()
-			.body().throwOp());
+		                                    .body().throwOp());
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Required at least 1");
+		                  .hasMessageContaining("Required at least 1");
 	}
 	
 	// MT-30 — building further insns after a returnOp inside the true branch, no-else
@@ -185,6 +188,6 @@ public class JorthCoverageNegativeTests{
 			body.returnOp();
 		});
 		assertThat(thrown).isInstanceOf(MalformedJorth.class)
-			.hasMessageContaining("Required at least 1");
+		                  .hasMessageContaining("Required at least 1");
 	}
 }
