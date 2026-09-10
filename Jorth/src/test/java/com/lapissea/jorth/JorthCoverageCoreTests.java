@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
+ * <h1>WARNING: This file is LLM generated and used for testing!</h1>
+ * <p>
  * Missing functional coverage (MT items) for core CodeBlock operations:
  * box/unbox, cast, array element access, throwOp, ifFalse/ifIsNull/ifIsNotNull,
  * dup/swap, setIntoNewVar, equalityOp and 2-slot locals.
@@ -262,8 +264,7 @@ public class JorthCoverageCoreTests{
 	void mt05_throwOp() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
 			cd.function("boom").staticAcc().body()
-			  .newObj(RuntimeException.class, c -> c.val("boom"))
-			  .throwOp();
+			  .throwNew(RuntimeException.class, "boom");
 		});
 		
 		try{

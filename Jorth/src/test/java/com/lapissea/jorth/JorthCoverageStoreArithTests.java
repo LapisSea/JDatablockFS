@@ -527,8 +527,7 @@ public class JorthCoverageStoreArithTests{
 			cd.function("boom").staticAcc()
 			  .throwsException(IllegalArgumentException.class)
 			  .body()
-			  .newObj(IllegalArgumentException.class, c -> c.val("boom"))
-			  .throwOp();
+			  .throwNew(IllegalArgumentException.class, "boom");
 		});
 		
 		try{

@@ -75,7 +75,7 @@ public class JorthLoopContractTests{
 	public void rejectsConditionsWithNoNormalCompletion(){
 		for(CodeArg terminate : new CodeArg[]{
 			CodeBlock::returnOp,
-			c -> c.nullVal(RuntimeException.class).throwOp()
+			c -> c.throwNew(RuntimeException.class)
 		}){
 			for(CodeArg check : new CodeArg[]{
 				terminate,

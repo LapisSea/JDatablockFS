@@ -51,28 +51,39 @@ public class JorthLoopControlFlowTests{
 	public void conditionalExitsSkipBackEdgeAndPostLoop() throws Exception{
 		for(boolean exitInCheck : new boolean[]{false, true}){
 			var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
-				CodeArg exits = b -> b.get("i").val(1).ifEquality(atOne -> {
-					atOne.get("mode").val(1).ifEquality(ret -> {
-						trace(ret, 70);
-						ret.val(123L).val(7).returnOp(); // Extra stack entries do not constrain an exiting path.
-					});
-					atOne.get("mode").val(2).ifEquality(thr -> {
-						trace(thr, 80);
-						thr.val(1.25D).newObj(IllegalStateException.class).throwOp();
-					});
-				});
-				var code = cd.function("run").staticAcc().arg(int.class, "mode").arg(List.class, "trace").returns(int.class).body();
+				CodeArg exits = b -> {
+					b.get("i").val(1)
+					 .ifEquality(atOne -> {
+						 atOne.get("mode").val(1)
+						      .ifEquality(ret -> {
+							      trace(ret, 70);
+							      ret.val(123L).val(7).returnOp(); // Extra stack entries do not constrain an exiting path.
+						      });
+						 atOne.get("mode").val(2)
+						      .ifEquality(thr -> {
+							      trace(thr, 80);
+							      thr.val(1.25D).throwNew(IllegalStateException.class);
+						      });
+					 });
+				};
+				var code = cd.function("run")
+				             .staticAcc()
+				             .arg(int.class, "mode")
+				             .arg(List.class, "trace")
+				             .returns(int.class)
+				             .body();
 				trace(code, 10);
-				code.var(int.class, "i").val(0).set("i").loop(check -> {
-					trace(check, 20);
-					if(exitInCheck) check.scope(exits);
-					check.get("i").val(3).lessThanOp();
-				}, body -> {
-					trace(body, 30);
-					if(!exitInCheck) body.scope(exits);
-					trace(body, 40);
-					body.get("i").add(1).set("i");
-				});
+				code.var(int.class, "i").val(0).set("i")
+				    .loop(check -> {
+					    trace(check, 20);
+					    if(exitInCheck) check.scope(exits);
+					    check.get("i").val(3).lessThanOp();
+				    }, body -> {
+					    trace(body, 30);
+					    if(!exitInCheck) body.scope(exits);
+					    trace(body, 40);
+					    body.get("i").add(1).set("i");
+				    });
 				trace(code, 50);
 				code.get("i").returnOp();
 			});
@@ -93,13 +104,18 @@ public class JorthLoopControlFlowTests{
 	public void entirelyTerminatingBodyStillAllowsZeroIterations() throws Exception{
 		for(boolean throwInstead : new boolean[]{false, true}){
 			var cls = TestUtils.generateAndLoadInstanceSimple(TestUtils.autoName(), cd -> {
-				var code = cd.function("run").staticAcc().arg(boolean.class, "enter").arg(List.class, "trace").returns(int.class).body();
+				var code = cd.function("run")
+				             .staticAcc()
+				             .arg(boolean.class, "enter")
+				             .arg(List.class, "trace")
+				             .returns(int.class)
+				             .body();
 				code.loop(check -> {
 					trace(check, 10);
 					check.get("enter");
 				}, body -> {
 					trace(body, 20);
-					if(throwInstead) body.newObj(IllegalStateException.class).throwOp();
+					if(throwInstead) body.throwNew(IllegalStateException.class);
 					else body.val(7).returnOp();
 				});
 				trace(code, 30);

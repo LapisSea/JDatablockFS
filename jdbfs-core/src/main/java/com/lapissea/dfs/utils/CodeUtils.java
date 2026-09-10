@@ -51,8 +51,7 @@ public interface CodeUtils{
 		
 		body.call(UtilL.class, "checkFlag", args -> args.dup().val(checkMask))
 		    .ifFalse(branch -> {
-			    branch.newObj(IOException.class, e -> e.val("Illegal enum integrity bits"))
-			          .throwOp();
+			    branch.throwNew(IOException.class, "Illegal enum integrity bits");
 		    })
 		    .bitAnd(valueMask);
 		

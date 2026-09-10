@@ -1445,8 +1445,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					base.get(bitsFieldName)
 					    .val(3)
 					    .ifEquality(b -> {
-						    b.newObj(IOException.class, e -> e.val("Boolean field got a null true value. This is illegal and could point to a corrupted file"))
-						     .throwOp();
+						    b.throwNew(IOException.class, "Boolean field got a null true value. This is illegal and could point to a corrupted file");
 					    })
 					    .get(bitsFieldName)
 					    .val(2)

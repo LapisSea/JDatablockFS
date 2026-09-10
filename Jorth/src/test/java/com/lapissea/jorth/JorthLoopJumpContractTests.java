@@ -59,7 +59,7 @@ public class JorthLoopJumpContractTests{
 				  b.get("i").add(1).set("i");
 				  b.lazyBlock(lazy -> lazy.get("i").val(2).lessThanOp().ifTrue(CodeBlock::continueOp));
 				  b.lazyBlock(lazy -> lazy.get("i").val(2).ifEquality(CodeBlock::breakOp));
-				  b.newObj(AssertionError.class).throwOp();
+				  b.throwNew(AssertionError.class);
 			  }).swap().pop().returnOp();
 		});
 		assertThat(cls.getMethod("run").invoke(null)).isEqualTo(1.25D);

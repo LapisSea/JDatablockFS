@@ -825,14 +825,12 @@ public final class DefInstanceCompiler{
 		var getter = cw.function(getterName).returns(info.type);
 		writeAnnotations(getter, anns);
 		getter.body()
-		      .newObj(UnsupportedOperationException.class)
-		      .throwOp();
+		      .throwNew(UnsupportedOperationException.class);
 		
 		var setter = cw.function(setterName).arg(info.type, "arg0");
 		writeAnnotations(setter, List.of(valAnn));
 		setter.body()
-		      .newObj(UnsupportedOperationException.class)
-		      .throwOp();
+		      .throwNew(UnsupportedOperationException.class);
 	}
 	
 	private static void defineField(ClassDefinition cw, FieldInfo info) throws MalformedJorth{
