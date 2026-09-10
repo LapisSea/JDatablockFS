@@ -419,6 +419,9 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return res;
 	}
 	
+	public FieldDefinition field(ClassName type, String name){
+		return field(GenericType.of(type), name);
+	}
 	public FieldDefinition field(Type type, String name){
 		return field(JType.of(type), name);
 	}

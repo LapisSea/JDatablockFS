@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
+import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E> implements SpecializedGenerator.OnBitSpace<T>{
 	
@@ -52,7 +53,12 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
-		defaultValue = enumUniverse.getFirst();
+		
+		if(enumUniverse.isEmpty() && getNullability() != NULLABLE){
+			throw new MalformedStruct("It is not possible to have non null enums with 0 values");
+		}
+		
+		defaultValue = enumUniverse.isEmpty()? null : enumUniverse.getFirst();
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){

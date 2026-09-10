@@ -11,6 +11,7 @@ import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.MemoryData;
+import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.objects.Blob;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
@@ -27,7 +28,13 @@ import com.lapissea.dfs.run.checked.CheckMap;
 import com.lapissea.dfs.run.checked.CheckSet;
 import com.lapissea.dfs.tools.logging.DataLogger;
 import com.lapissea.dfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.StagedInit;
+import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.annotations.IONullability;
+import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzSequence;
@@ -38,11 +45,17 @@ import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RNGEnum;
 import com.lapissea.fuzz.RNGType;
 import com.lapissea.fuzz.RunMark;
+import com.lapissea.jorth.ClassDefinition;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.ClassName;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
+import org.objectweb.asm.MethodTooLargeException;
 import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
@@ -58,12 +71,15 @@ import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -75,6 +91,7 @@ import static com.lapissea.dfs.run.FuzzingUtils.stableRunAndSave;
 import static com.lapissea.dfs.run.TestUtils.optionallyLogged;
 import static com.lapissea.dfs.run.TestUtils.optionallyLoggedMemory;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testng.AssertJUnit.assertEquals;
 
 public class SlowTests{
 	
@@ -843,6 +860,91 @@ public class SlowTests{
 			new FuzzSequenceSource.LenSeed(42069, 200_000, 500)
 //			() -> Stream.of(FuzzSequence.fromDataStick("REPLACE_ME"))
 		), "fuzzChainResize");
+	}
+	
+	
+	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
+	
+	@Test
+	<E extends Enum<E>, T extends IOInstance<T>> void literallyAllEnums(){
+		AtomicInteger maxSupportedSize = new AtomicInteger(10000);
+		IntStream.range(0, 10000).parallel().forEach(len -> {
+			if(len>maxSupportedSize.get()) return;
+			
+			var loader = new ClassLoader(getClass().getClassLoader()){
+				@Override
+				protected Class<?> findClass(String name) throws ClassNotFoundException{
+					try{
+						if(name.equals("test.Enum" + len)){
+							var def = new ClassDefinition(this);
+							def.name(ClassName.dotted("test.Enum" + len)).type(ClassType.ENUM);
+							
+							for(int i = 0; i<len; i++){
+								def.enumConstant("E" + i);
+							}
+							
+							var file = def.getClassFile();
+							
+							return defineClass("test.Enum" + len, file, 0, file.length);
+						}
+						if(name.equals("test.Holder" + len)){
+							var def = new ClassDefinition(this);
+							def.name(ClassName.dotted("test.Holder" + len))
+							   .extendsType(GenericType.of(IOInstance.Managed.class).withArgs(ClassName.dotted(name)));
+							
+							var field = def.field(ClassName.dotted("test.Enum" + len), "val").annotation(IOValue.class);
+							if(len == 0) field.annotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE));
+							
+							var file = def.getClassFile();
+							
+							return defineClass("test.Holder" + len, file, 0, file.length);
+						}
+						
+					}catch(MalformedJorth e){
+						throw new RuntimeException("Failed on enum size " + len, e);
+					}
+					
+					return super.findClass(name);
+				}
+			};
+			
+			try{
+				Class.forName("test.Enum" + len, true, loader);
+			}catch(ClassNotFoundException e){
+				throw new RuntimeException(e);
+			}catch(MethodTooLargeException e){
+				maxSupportedSize.set(len - 1);
+				LogUtil.println("Ignoring size of " + len);
+				return;
+			}
+			
+			try{
+				var cls = Class.forName("test.Holder" + len, true, loader);
+				
+				//noinspection unchecked
+				var struct = Struct.of((Class<T>)cls, StagedInit.STATE_DONE);
+				//noinspection unchecked
+				IOField<T, E> valF = (IOField<T, E>)struct.getFields().requireByName("val");
+				
+				var constants = valF.getType().getEnumConstants();
+				
+				assertEquals(constants.length, len);
+				if(len == 0){
+					var inst = struct.emptyConstructor().make();
+					TestUtils.checkPipeInOutEquality(StandardStructPipe.of(struct, StagedInit.STATE_DONE), inst);
+				}else{
+					for(int i = 0; i<10; i++){
+						var inst = struct.emptyConstructor().make();
+						var val  = constants[new Random().nextInt(constants.length)];
+						valF.set(null, inst, val);
+						
+						TestUtils.checkPipeInOutEquality(StandardStructPipe.of(struct, StagedInit.STATE_DONE), inst);
+					}
+				}
+			}catch(Throwable e){
+				throw new RuntimeException("Failed on enum size " + len, e);
+			}
+		});
 	}
 	
 }
