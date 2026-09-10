@@ -7,49 +7,61 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class BranchPoint{
 	
-	private final List<CodeBlock> ingoing  = new ArrayList<>();
-	private final List<CodeBlock> outgoing = new ArrayList<>();
-	
-	public void addIngoing(CodeBlock block){
-		Objects.requireNonNull(block);
-		ingoing.add(block);
+	public record Edge(String name, List<GenericType> stack, boolean reachesDestination){
+		public Edge{
+			Objects.requireNonNull(name);
+			stack = List.copyOf(stack);
+		}
+		public static Edge capture(String name, CodeBlock block){
+			return new Edge(name, block.stackView(), !block.terminates());
+		}
 	}
 	
-	public void addOutgoing(CodeBlock block){
-		Objects.requireNonNull(block);
-		block.lockEditing();
-		outgoing.add(block);
+	public static BranchPoint ofContract(String name, List<GenericType> contract){
+		return new BranchPoint(name, contract);
+	}
+	
+	private final String            name;
+	private final List<Edge>        ingoing = new ArrayList<>();
+	private       List<GenericType> contract;
+	
+	public BranchPoint(){
+		name = "branch merge";
+	}
+	private BranchPoint(String name, List<GenericType> contract){
+		this.name = Objects.requireNonNull(name);
+		this.contract = List.copyOf(contract);
+	}
+	
+	public void addIngoing(Edge edge){
+		ingoing.add(Objects.requireNonNull(edge));
+		if(contract == null && edge.reachesDestination()) contract = edge.stack();
+	}
+	public void addIngoing(CodeBlock block){
+		addIngoing(Edge.capture("incoming edge", block));
 	}
 	
 	public void validateMerge() throws IllegalConditionalMerge{
-		CodeBlock first = null;
-		for(CodeBlock block : ingoing){
-			if(block.terminates()) continue;
-			if(first == null){
-				first = block;
+		for(var edge : ingoing){
+			if(!edge.reachesDestination()){
 				continue;
 			}
-			if(!first.stacksMatch(block)){
+			// contract should never be null here
+			if(!contract.equals(edge.stack())){
 				throw new IllegalConditionalMerge(
-					"Stacks must match but there is:\n" +
-					ingoing.stream()
-					       .filter(e -> !e.terminates())
-					       .map(e -> e.stackView().toString())
-					       .collect(Collectors.joining("\n", "  ", ""))
+					"Stacks must match at " + name + " for " + edge.name() + ":\n" +
+					"  expected " + contract + "\n" +
+					"  actual   " + edge.stack()
 				);
 			}
 		}
 	}
 	
-	public Optional<List<GenericType>> getOutgoingTypeStack(){
-		for(CodeBlock block : ingoing){
-			if(block.terminates()) continue;
-			return Optional.of(block.stackView());
-		}
-		return Optional.empty();
+	public Optional<List<GenericType>> getOutgoingTypeStack() throws IllegalConditionalMerge{
+		validateMerge();
+		return ingoing.stream().anyMatch(Edge::reachesDestination)? Optional.of(contract) : Optional.empty();
 	}
 }

@@ -298,12 +298,14 @@ sealed interface Insn{
 		}
 	}
 	
-	/** Numeric relational comparison with Java binary numeric promotion. */
+	/**
+	 * Numeric relational comparison with Java binary numeric promotion.
+	 */
 	record NumericComparison(GenericType left, GenericType right, GenericType promoted,
 	                         boolean greater, boolean orEqual) implements Insn{
 		static NumericComparison simulate(TypeStack stack, boolean greater, boolean orEqual) throws MalformedJorth{
 			stack.requireElements(2);
-			var left = stack.peek(stack.size() - 2);
+			var left  = stack.peek(stack.size() - 2);
 			var right = stack.peekLast();
 			for(var type : List.of(left, right)){
 				switch(type.getBaseType()){
@@ -347,7 +349,7 @@ sealed interface Insn{
 			Equality.branchCompareToBool(writer, ifNotOp);
 		}
 	}
-
+	
 	record Equality(GenericType type, boolean checkFor) implements Insn{
 		
 		public static Equality simulate(TypeSource typeSource, TypeStack stack, boolean checkFor) throws MalformedJorth{
@@ -525,8 +527,8 @@ sealed interface Insn{
 			TRUE_BOOL, EQUALITY
 		}
 		
-		static ConditionalJump simulate(TypeStack stack, CodeBlock caller, TypeSource typeSource, Type type, CodeBlock onTrue, CodeBlock onFalse) throws MalformedJorth{
-			var vType = switch(type){
+		static GenericType consumeCondition(TypeStack stack, TypeSource typeSource, Type type) throws MalformedJorth{
+			return switch(type){
 				case TRUE_BOOL -> {
 					var typ = stack.pop();
 					if(typ.getBaseType() != BaseType.BOOLEAN){
@@ -536,9 +538,13 @@ sealed interface Insn{
 				}
 				case EQUALITY -> doEquality(typeSource, stack);
 			};
+		}
+		static ConditionalJump simulate(CodeBlock caller, Type type, GenericType vType, CodeBlock onTrue, CodeBlock onFalse){
 			var branch = new BranchPoint();
-			branch.addIngoing(onTrue != null? onTrue : caller);
-			branch.addIngoing(onFalse != null? onFalse : caller);
+			branch.addIngoing(onTrue != null? BranchPoint.Edge.capture("true branch", onTrue) :
+			                  new BranchPoint.Edge("true bypass", caller.stackView(), true));
+			branch.addIngoing(onFalse != null? BranchPoint.Edge.capture("false branch", onFalse) :
+			                  new BranchPoint.Edge("false bypass", caller.stackView(), true));
 			return new ConditionalJump(type, vType, onTrue, onFalse, branch);
 		}
 		
@@ -586,10 +592,7 @@ sealed interface Insn{
 			}
 		}
 		public ConditionalJump withFalse(CodeBlock caller, CodeBlock onFalse){
-			var branch = new BranchPoint();
-			branch.addIngoing(onTrue != null? onTrue : caller);
-			branch.addIngoing(onFalse != null? onFalse : caller);
-			return new ConditionalJump(type, vType, onTrue, onFalse, branch);
+			return simulate(caller, type, vType, onTrue, onFalse);
 		}
 		@Override
 		public boolean terminates(){
@@ -598,7 +601,6 @@ sealed interface Insn{
 		
 		@Override
 		public void merge(TypeStack stack) throws MalformedJorth{
-			end.validateMerge();
 			var stackO = end.getOutgoingTypeStack();
 			if(stackO.isPresent()){
 				var s     = stackO.get();
@@ -1118,6 +1120,29 @@ sealed interface Insn{
 		}
 	}
 	
+	record LoopJump(LoopContext context, boolean isBreak) implements TerminatingInsn{
+		@Override
+		public boolean terminates(){
+			return true;
+		}
+		@Override
+		public void visit(MethodVisitor writer){
+			context.emitJump(writer, isBreak);
+		}
+	}
+
+	record WhileLoop(LoopContext context, CodeBlock check, CodeBlock body) implements Insn{
+		static WhileLoop simulate(LoopContext context, CodeBlock check, CodeBlock body) throws MalformedJorth{
+			if(check.terminates()) throw new MalformedJorth("Loop check must not terminate");
+			context.complete(check, body);
+			return new WhileLoop(context, check, body);
+		}
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			context.visit(writer, check, body);
+		}
+	}
+
 	record InlineBlock(CodeBlock block) implements TerminatingInsn{
 		
 		public static InlineBlock simulate(CodeBlock block){

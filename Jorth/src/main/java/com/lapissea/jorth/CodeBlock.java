@@ -39,6 +39,7 @@ public class CodeBlock{
 	private final FunctionDefinition fnOwner;
 	
 	private FreezeReason freezeReason;
+	private LoopContext  loopContext;
 	
 	public CodeBlock(TypeStack baseStack, TypeSource typeSource, FunctionDefinition fnOwner){
 		localStack = new TypeStack(baseStack);
@@ -104,6 +105,22 @@ public class CodeBlock{
 	}
 	
 	/**
+	 * Builds a (while) loop. Both callbacks have local scopes.<br/>
+	 * The check must add one boolean to the stack, and normal body completion must preserve the entry stack.
+	 */
+	public CodeBlock loop(CodeArg check, CodeArg body) throws MalformedJorth{
+		preInsn();
+		Objects.requireNonNull(check, "check");
+		Objects.requireNonNull(body, "body");
+		var context    = new LoopContext(stackView());
+		var checkBlock = createBlockFromHere(check, context);
+		checkBlock.lockEditing();
+		var bodyBlock = createBlockFromHere(body, context);
+		bodyBlock.lockEditing();
+		return add(WhileLoop.simulate(context, checkBlock, bodyBlock));
+	}
+	
+	/**
 	 * Inserts at the current place a code block that will be evaluated at class generation time.
 	 * The block must preserve the stack and must not terminate.
 	 */
@@ -116,6 +133,7 @@ public class CodeBlock{
 		return add(LazyBlock.simulate(() -> {
 			
 			var block = new CodeBlock(new TypeStack(stack), typeSource, fnOwner);
+			block.loopContext = loopContext;
 			for(var v : localValues){
 				block.addLocal(v.withoutRemoval());
 			}
@@ -133,6 +151,7 @@ public class CodeBlock{
 	}
 	
 	void defineLocalValue(String name, GenericType type, boolean canRemove) throws MalformedJorth{
+		checkFreeze();
 		Objects.requireNonNull(name);
 		Objects.requireNonNull(type);
 		if(localValues.has(name)){
@@ -146,11 +165,16 @@ public class CodeBlock{
 		localValues.add(local);
 	}
 	private void removeLocal(Local local){
+		checkFreeze();
 		localValues.remove(local);
 	}
 	
 	private CodeBlock createBlockFromHere(CodeArg code) throws MalformedJorth{
-		var block = new CodeBlock(localStack, typeSource, fnOwner);
+		return createBlockFromHere(code, loopContext);
+	}
+	private CodeBlock createBlockFromHere(CodeArg code, LoopContext context) throws MalformedJorth{
+		var block = new CodeBlock(localStack.copyFlat(), typeSource, fnOwner);
+		block.loopContext = context;
 		for(var v : localValues){
 			block.addLocal(v.withoutRemoval());
 		}
@@ -275,9 +299,32 @@ public class CodeBlock{
 		return add(Equality.simulate(typeSource, localStack, true));
 	}
 	
+	public void breakOp() throws MalformedJorth{
+		loopJump(true);
+	}
+	public void continueOp() throws MalformedJorth{
+		loopJump(false);
+	}
+	private void loopJump(boolean isBreak) throws MalformedJorth{
+		preInsn();
+		if(loopContext == null) throw new MalformedJorth((isBreak? "break" : "continue") + " requires an enclosing loop");
+		loopContext.addJump(stackView(), isBreak);
+		add(new LoopJump(loopContext, isBreak));
+	}
+	
 	public void returnOp() throws MalformedJorth{
 		preInsn();
 		add(ReturnOp.simulate(fnOwner.returnType(), typeSource, localStack, true));
+	}
+	
+	public void throwNew(Class<? extends Throwable> type) throws MalformedJorth{
+		throwNew(type, args -> { });
+	}
+	public void throwNew(Class<? extends Throwable> type, String message) throws MalformedJorth{
+		throwNew(type, args -> args.val(message));
+	}
+	public void throwNew(Class<? extends Throwable> type, CodeArg args) throws MalformedJorth{
+		newObj(type, args).throwOp();
 	}
 	public void throwOp() throws MalformedJorth{
 		preInsn();
@@ -305,13 +352,17 @@ public class CodeBlock{
 	}
 	private CodeBlock falseBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
 		preInsn();
+		var vType = ConditionalJump.consumeCondition(localStack, typeSource, type);
 		var block = createBlockFromHere(code);
-		return add(ConditionalJump.simulate(localStack, this, typeSource, type, null, block));
+		block.lockEditing();
+		return add(ConditionalJump.simulate(this, type, vType, null, block));
 	}
 	private CodeBlock trueBlock(CodeArg code, ConditionalJump.Type type) throws MalformedJorth{
 		preInsn();
+		var vType = ConditionalJump.consumeCondition(localStack, typeSource, type);
 		var block = createBlockFromHere(code);
-		return add(ConditionalJump.simulate(localStack, this, typeSource, type, block, null));
+		block.lockEditing();
+		return add(ConditionalJump.simulate(this, type, vType, block, null));
 	}
 	public CodeBlock elseRun(CodeArg code) throws MalformedJorth{
 		preInsn(false);
@@ -324,6 +375,7 @@ public class CodeBlock{
 		}
 		insns.removeLast();
 		var block = createBlockFromHere(code);
+		block.lockEditing();
 		return add(jump.withFalse(this, block));
 	}
 	
@@ -607,6 +659,7 @@ public class CodeBlock{
 		CodeBlock cloned = new CodeBlock(this.localStack.clone(), this.typeSource, this.fnOwner);
 		localValues.forEach(cloned::addLocal);
 		cloned.insns.addAll(this.insns);
+		cloned.loopContext = loopContext;
 		return cloned;
 	}
 	public boolean stacksMatch(CodeBlock other){
@@ -677,6 +730,12 @@ public class CodeBlock{
 		return var(type, name).set(name);
 	}
 	
+	public CodeBlock inc(String var) throws MalformedJorth{
+		return inc(var, 1);
+	}
+	public CodeBlock inc(String var, int val) throws MalformedJorth{
+		return get(var).add(val).set(var);
+	}
 	public CodeBlock add(int val) throws MalformedJorth{
 		preInsn();
 		return add(Increment.simulate(localStack, val));
