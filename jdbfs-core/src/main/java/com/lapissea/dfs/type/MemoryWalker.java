@@ -204,6 +204,9 @@ public class MemoryWalker{
 					var nextField = true;
 					while(true){
 						cmd = cmds.cmd();
+						if(cmd<100){
+							throw new IllegalStateException("Data read as command");
+						}
 						if(cmd == UNMANAGED_REST){
 							cmds = unmanagedCmd(instance);
 							cmd = cmds.cmd();
@@ -225,7 +228,15 @@ public class MemoryWalker{
 							
 							if(skipBits>0) skipBits >>>= 1;
 							boolean skipBit = (skipBits&1) == 1;
-							if(skipBit) continue wh;
+							if(skipBit){
+								//TODO: Ugly edge case where the command type value gets read but sized flag is not skipped and it gets read as a command later.
+								// Proof that this whole thing needs to be simplified in to a less heavily optimized walk instruction interpreter
+								// that is a lot simpler and use codegen to create optimized walk sequences if that's really needed.
+								if(cmd == REF_FIELD || cmd == POTENTIAL_REF || cmd == DYNAMIC){
+									cmds.readBool();
+								}
+								continue wh;
+							}
 						}
 						
 						//repeat cmd cases

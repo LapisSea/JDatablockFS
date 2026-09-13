@@ -78,15 +78,22 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 		source.skip(getBitSize(nullable));
 	}
 	
+	T decodeOrdinal(int ordinal) throws IOException{
+		if(ordinal<0 || ordinal>=universe.length){
+			throw new IOException("Invalid ordinal " + ordinal + " for enum " + type.getName() + " with " + universe.length + " constants");
+		}
+		return universe[ordinal];
+	}
+
 	public T read(BitReader source) throws IOException{
-		return get((int)source.readBits(bitSize));
+		return decodeOrdinal((int)source.readBits(bitSize));
 	}
 	public T read(BitReader source, boolean nullable) throws IOException{
 		if(!nullable) return read(source);
 		
 		int ordinal = (int)source.readBits(nullableBitSize);
 		if(ordinal == 0) return null;
-		return get(ordinal - 1);
+		return decodeOrdinal(ordinal - 1);
 	}
 	
 	public void write(T source, BitWriter<?> dest) throws IOException{
@@ -131,7 +138,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 			long batch = src.readBits(batchSize*bitSize);
 			
 			for(int i = 0; i<batchSize; i++){
-				arr[i + start] = get((int)((batch >>> (i*bitSize))&mask));
+				arr[i + start] = decodeOrdinal((int)((batch >>> (i*bitSize))&mask));
 			}
 		}
 		

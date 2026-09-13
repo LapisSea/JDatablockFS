@@ -16,7 +16,7 @@ import java.util.OptionalDouble;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public final class ReproFuzzProgEtaTests{
+public final class FuzzProgressTests{
 	private record State(double progress, Optional<Duration> total, Optional<Duration> remaining,
 	                     Duration elapsed, OptionalDouble nanosPerOp, boolean hasFail){}
 

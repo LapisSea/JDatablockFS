@@ -29,7 +29,7 @@ public final class FileRandomAccessData extends ClosableIOData{
 	
 	public static void readInto(File file, IOInterface dest) throws IOException{
 		try(var in = new FileInputStream(file); var out = dest.io()){
-			var buff = new byte[MathUtil.snap((int)file.length(), 16, BATCH_BYTES)];
+			var buff = new byte[MathUtil.snap((int)Math.min(file.length(), (long)BATCH_BYTES), 16, BATCH_BYTES)];
 			int read;
 			while((read = in.read(buff))>=0){
 				out.write(buff, 0, read);

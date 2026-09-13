@@ -59,8 +59,8 @@ public abstract class StagedInit implements Stringify{
 	
 	public static final int STATE_ERROR = -2, STATE_NOT_STARTED = -1, STATE_START = 0, STATE_DONE = Integer.MAX_VALUE;
 	
-	private int      state    = STATE_NOT_STARTED;
-	private InitInfo initInfo = new InitInfo();
+	private volatile int      state    = STATE_NOT_STARTED;
+	private volatile InitInfo initInfo = new InitInfo();
 	
 	private Map<Integer, String> statesCache;
 	

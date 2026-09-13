@@ -229,7 +229,7 @@ public final class ChunkChainIO implements RandomIO{
 				
 				return this;
 			}
-			prev += chunk.getCapacity();
+			prev += chunk.getSize();
 			if(!chunk.hasNextPtr()) break;
 			chunk = Objects.requireNonNull(chunk.next());
 		}
@@ -527,7 +527,7 @@ public final class ChunkChainIO implements RandomIO{
 		Chunk chunk     = cursor;
 		{
 			long offset  = calcCursorOffset();
-			long cRem    = chunk.getSize() - offset;
+			long cRem    = chunk.getCapacity() - offset;
 			int  toWrite = (int)Math.min(remaining, cRem);
 			source.setPos(chunk.dataStart() + offset).fillZero(toWrite);
 			remaining -= toWrite;
@@ -535,7 +535,7 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		
 		while(remaining>0 && chunk != null){
-			long cRem = chunk.getSize();
+			long cRem = chunk.getCapacity();
 			if(cRem == 0 && !chunk.hasNextPtr()){
 				return;
 			}

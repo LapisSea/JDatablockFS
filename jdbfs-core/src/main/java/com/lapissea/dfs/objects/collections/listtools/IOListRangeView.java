@@ -7,11 +7,14 @@ import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.StringJoiner;
+import java.util.function.Consumer;
 
 public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	
@@ -40,6 +43,9 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	private long toLocalIndex(long index){
 		return index - from;
 	}
+	private void checkIndex(long index){
+		if(index<0 || index>=size()) throw new IndexOutOfBoundsException();
+	}
 	
 	@Override
 	public Class<T> elementType(){
@@ -58,23 +64,22 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	}
 	@Override
 	public T get(long index) throws IOException{
+		checkIndex(index);
 		return data.get(toGlobalIndex(index));
 	}
 	@Override
 	public void set(long index, T value) throws IOException{
+		checkIndex(index);
 		data.set(toGlobalIndex(index), value);
 	}
 	@Override
 	public void add(long index, T value) throws IOException{
+		if(index<0 || index>size()) throw new IndexOutOfBoundsException();
 		data.add(toGlobalIndex(index), value);
 	}
 	@Override
 	public void add(T value) throws IOException{
-		if(data.size()<=from) throw new IndexOutOfBoundsException();
-		if(data.size()>to - 1){
-			throw new IndexOutOfBoundsException();
-		}
-		add(size(), value);
+		data.add(Math.min(data.size(), to), value);
 	}
 	@Override
 	public void addAll(Collection<T> values) throws IOException{
@@ -91,7 +96,19 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	}
 	@Override
 	public Spliterator<T> spliterator(){
-		return data.spliterator(toGlobalIndex(0));
+		return new Spliterators.AbstractSpliterator<>(size(), Spliterator.ORDERED){
+			private final IOIterator<T> iter = IOListRangeView.this.iterator();
+			@Override
+			public boolean tryAdvance(Consumer<? super T> action){
+				try{
+					if(!iter.hasNext()) return false;
+					action.accept(iter.ioNext());
+					return true;
+				}catch(IOException e){
+					throw new UncheckedIOException(e);
+				}
+			}
+		};
 	}
 	@Override
 	public IOIterator.Iter<T> iterator(){
@@ -194,7 +211,8 @@ public final class IOListRangeView<T> implements IOList<T>, Wrapper<IOList<T>>{
 	}
 	@Override
 	public void clear() throws IOException{
-		for(long i = data.size() - 1; i>=from; i--){
+		var end = Math.min(data.size(), to);
+		for(long i = end - 1; i>=from; i--){
 			data.remove(i);
 		}
 	}

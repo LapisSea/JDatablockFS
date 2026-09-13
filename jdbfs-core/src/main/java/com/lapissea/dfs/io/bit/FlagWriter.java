@@ -34,7 +34,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		
 		if(size == NumberSize.BYTE){
 			var eSiz          = enumInfo.bitSize;
-			int integrityBits = ((1<<eSiz) - 1)<<eSiz;
+			int integrityBits = 0xFF&-(1<<eSiz);
 			
 			target.writeInt1(value.ordinal()|integrityBits);
 			return;

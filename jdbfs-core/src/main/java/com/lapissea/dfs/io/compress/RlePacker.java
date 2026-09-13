@@ -3,6 +3,7 @@ package com.lapissea.dfs.io.compress;
 import com.lapissea.dfs.io.content.WordIO;
 import com.lapissea.dfs.objects.NumberSize;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 public final class RlePacker implements Packer{
@@ -15,15 +16,22 @@ public final class RlePacker implements Packer{
 	private static final int MAX_PACK_SIZE = 0b111111;
 	
 	private static final class Packer{
-		private final byte[] data;
-		private       byte[] packed;
-		private       int    packedSize = 0;
-		private       byte[] raw        = new byte[32];
-		private       int    rawSize    = 0;
+		private final byte[]     data;
+		private final int        rawLen;
+		private final NumberSize rawSiz;
+		private final int        headerLen;
+		private       byte[]     packed;
+		private       int        packedSize;
+		private       byte[]     raw        = new byte[32];
+		private       int        rawSize    = 0;
 		
 		private Packer(byte[] data){
-			this.data = data;
-			packed = new byte[data.length/5];
+			this.data      = data;
+			this.rawLen    = data.length;
+			this.rawSiz    = NumberSize.bySize(rawLen);
+			this.headerLen = 1 + rawSiz.bytes;
+			packed         = new byte[rawLen/5 + headerLen];
+			packedSize     = headerLen;
 		}
 		
 		private byte[] compress(){
@@ -84,6 +92,8 @@ public final class RlePacker implements Packer{
 			return makeFinal();
 		}
 		private byte[] makeFinal(){
+			packed[0] = (byte)rawSiz.ordinal();
+			WordIO.setWord(rawLen, packed, 1, rawSiz.bytes);
 			return packed.length == packedSize? packed : Arrays.copyOf(packed, packedSize);
 		}
 		private void checkSiz(int extra){
@@ -140,61 +150,110 @@ public final class RlePacker implements Packer{
 	
 	private static final class Unpacker{
 		private final byte[] packedData;
+		private int headerRawLen;
+		private int blockStart;
 		
 		
 		private Unpacker(byte[] packedData){
 			this.packedData = packedData;
 		}
 		
-		private int readLen(NumberSize siz, int pos){
+		private void readHeader() throws IOException{
+			int ord = readByteAt(0);
+			if(ord < 1 || ord >= NumberSize.values().length){
+				throw new IOException("Corrupt RLE payload: invalid raw-length size ordinal " + ord);
+			}
+			var siz       = NumberSize.ordinal(ord);
+			int headerLen = 1 + siz.bytes;
+			if(headerLen > packedData.length){
+				throw new IOException("Corrupt RLE payload: raw-length field runs past end");
+			}
+			long rawLen = WordIO.getWord(packedData, 1, siz.bytes);
+			if(rawLen < 0 || rawLen > Integer.MAX_VALUE){
+				throw new IOException("Corrupt RLE payload: raw length out of range " + rawLen);
+			}
+			headerRawLen = (int)rawLen;
+			blockStart   = headerLen;
+		}
+		
+		private int readByteAt(int pos) throws IOException{
+			if(pos < 0 || pos >= packedData.length){
+				throw new IOException("Corrupt RLE payload: read past end at " + pos);
+			}
+			return packedData[pos]&0xFF;
+		}
+		private NumberSize numSize(int dataNum) throws IOException{
+			if(dataNum < 0 || dataNum >= NumberSize.values().length){
+				throw new IOException("Corrupt RLE payload: invalid dataNum " + dataNum);
+			}
+			return NumberSize.ordinal(dataNum);
+		}
+		private int readLen(NumberSize siz, int pos) throws IOException{
+			if(pos < 0 || pos + siz.bytes > packedData.length){
+				throw new IOException("Corrupt RLE payload: length field runs past end at " + pos);
+			}
 			return (int)WordIO.getWord(packedData, pos, siz.bytes);
 		}
 		
-		private int scanSize(){
-			int packedPos  = 0;
-			int rawSizeSum = 0;
+		private int scanSize() throws IOException{
+			int  packedPos  = blockStart;
+			long rawSizeSum = 0;
 			while(packedPos<packedData.length){
-				int head    = packedData[packedPos++]&0xFF;
+				int head    = readByteAt(packedPos++);
 				var blockId = head&0b11;
 				var dataNum = head>>2;
 				switch(blockId){
 					case REPEAT_1B -> {
-						var siz = NumberSize.ordinal(dataNum);
+						var siz = numSize(dataNum);
 						var len = readLen(siz, packedPos);
 						packedPos += 1 + siz.bytes;
 						rawSizeSum += len;
 					}
 					case REPEAT_1B_PACKED_LEN -> {
-						packedPos++;
+						readByteAt(packedPos++);
 						rawSizeSum += dataNum;
 					}
 					case RAW_BLOCK -> {
-						var siz = NumberSize.ordinal(dataNum);
+						var siz = numSize(dataNum);
 						var len = readLen(siz, packedPos);
+						if(packedPos + siz.bytes + len > packedData.length){
+							throw new IOException("Corrupt RLE payload: raw block runs past end");
+						}
 						packedPos += siz.bytes + len;
 						rawSizeSum += len;
 					}
 					case RAW_BLOCK_PACKED_LEN -> {
+						if(packedPos + dataNum > packedData.length){
+							throw new IOException("Corrupt RLE payload: raw packed-len block runs past end");
+						}
 						packedPos += dataNum;
 						rawSizeSum += dataNum;
 					}
 				}
 			}
-			return rawSizeSum;
+			if(rawSizeSum > Integer.MAX_VALUE){
+				throw new IOException("Corrupt RLE payload: decoded size overflows int");
+			}
+			return (int)rawSizeSum;
 		}
 		
 		private byte[] raw;
 		private int    rawPos    = 0;
 		private int    packedPos = 0;
 		
-		private byte[] decompress(){
+		private byte[] decompress() throws IOException{
 			//2 pass scan. First scan for size of compressed array then create it.
 			// Apparently faster in benchmarks
+			readHeader();
 			int size = scanSize();
+			if(size != headerRawLen){
+				throw new IOException("Corrupt RLE payload: decoded size " + size + " != declared raw length " + headerRawLen);
+			}
 			raw = new byte[size];
+			packedPos = blockStart;
 			
 			while(packedPos<packedData.length){
-				int head    = packedData[packedPos++]&0xFF;
+				int head    = readByteAt(packedPos++);
 				var blockId = head&0b11;
 				var dataNum = head>>2;
 				switch(blockId){
@@ -205,22 +264,31 @@ public final class RlePacker implements Packer{
 				}
 			}
 			
+			if(rawPos != size){
+				throw new IOException("Corrupt RLE payload: decoded size mismatch " + rawPos + " != " + size);
+			}
 			return raw;
 		}
-		private int readLenInc(int ordinal){
-			var siz = NumberSize.ordinal(ordinal);
+		private int readLenInc(int ordinal) throws IOException{
+			var siz = numSize(ordinal);
 			var len = readLen(siz, packedPos);
 			packedPos += siz.bytes;
 			return len;
 		}
-		private void copyIncByte(int len){
-			byte b = packedData[packedPos++];
+		private void copyIncByte(int len) throws IOException{
+			if(len < 0){
+				throw new IOException("Corrupt RLE payload: negative repeat length " + len);
+			}
+			byte b = (byte)readByteAt(packedPos++);
 			for(int i = rawPos, to = rawPos + len; i<to; i++){
 				raw[i] = b;
 			}
 			rawPos += len;
 		}
-		private void copyInc(int len){
+		private void copyInc(int len) throws IOException{
+			if(len < 0 || packedPos + len > packedData.length || rawPos + len > raw.length){
+				throw new IOException("Corrupt RLE payload: raw block out of bounds");
+			}
 			System.arraycopy(packedData, packedPos, raw, rawPos, len);
 			rawPos += len;
 			packedPos += len;
@@ -234,7 +302,7 @@ public final class RlePacker implements Packer{
 	}
 	
 	@Override
-	public byte[] unpack(byte[] packedData){
+	public byte[] unpack(byte[] packedData) throws IOException{
 		if(packedData.length == 0) return packedData;
 		return new Unpacker(packedData).decompress();
 	}

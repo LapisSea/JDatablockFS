@@ -33,17 +33,19 @@ public class BitInputStream implements BitReader, Closeable{
 			if(expectedBits>0){
 				int remainingExpected = (int)(expectedBits - (totalBits + bufferedBits));
 				if(remainingExpected>0){
-					var alreadyBuffered = bitsToBytes(bufferedBits);
-					var maxToRead       = 8 - alreadyBuffered;
-					var expectedBytes   = bitsToBytes(remainingExpected);
-					bytesToRead = Math.min(Math.max(bytesToRead, expectedBytes), maxToRead);
+					var expectedBytes = bitsToBytes(remainingExpected);
+					bytesToRead = Math.max(bytesToRead, expectedBytes);
 				}
 			}
+			
+			// `buffer` is a 64-bit long. Reading enough bytes to overflow it would silently drop the high bits (they shift past bit 63).
+			// Cap to what fits; the remaining bits are read by the split path in readBits (numOBits > bufferedBits).
+			bytesToRead = Math.min(bytesToRead, (64 - bufferedBits) >>> 3);
 			
 			if(bytesToRead == 1){
 				buffer |= (long)source.tryRead()<<bufferedBits;
 				bufferedBits += Byte.SIZE;
-			}else{
+			}else if(bytesToRead>1){
 				buffer |= source.readWord(bytesToRead)<<bufferedBits;
 				bufferedBits += bytesToRead*Byte.SIZE;
 			}
@@ -76,7 +78,9 @@ public class BitInputStream implements BitReader, Closeable{
 	
 	private void advance(int numOBits){
 		totalBits += numOBits;
-		buffer >>>= numOBits;
+		// The JVM masks long shift distances by 0x3F (JLS 15.19), so `buffer >>>= 64` is a no-op.
+		// Advancing by >=64 bits discards the entire 64-bit buffer.
+		buffer = numOBits>=64? 0 : buffer >>> numOBits;
 		bufferedBits -= numOBits;
 	}
 	

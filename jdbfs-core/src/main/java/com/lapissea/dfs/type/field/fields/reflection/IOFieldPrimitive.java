@@ -556,7 +556,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
-			return getValue(ioPool2, inst1) == getValue(ioPool1, inst2);
+			return getValue(ioPool1, inst1) == getValue(ioPool2, inst2);
 		}
 		@Override
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
@@ -678,7 +678,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		return getSafeSize(ioPool, instance, NumberSize.bySize(num, unsigned));
 	}
 	protected final NumberSize getSafeSize(VarPool<T> ioPool, T instance, NumberSize neededNum){
-		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
+		if(dynamicSize != null){
+			var val = dynamicSize.apply(ioPool, instance);
+			if(neededNum.greaterThan(val)) throw new VaryingSize.TooSmall(maxSize, neededNum);
+			return val;
+		}
 		return maxSize.safeSize(neededNum);
 	}
 	protected final NumberSize getSize(VarPool<T> ioPool, T instance){

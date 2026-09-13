@@ -3,6 +3,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -194,6 +195,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		}
 		
 		var type         = provider.getTypeDb().fromID(rootType, id);
+		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
 		var instancePipe = typeToPipe.get(type);
 		
 		return instancePipe.readNew(provider, src, makeContext(genericContext));
@@ -220,6 +222,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 		
 		var id   = getUniverseID(ioPool, instance);
 		var type = provider.getTypeDb().fromID(rootType, id);
+		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
 		
 		var instancePipe = typeToPipe.get(type);
 		

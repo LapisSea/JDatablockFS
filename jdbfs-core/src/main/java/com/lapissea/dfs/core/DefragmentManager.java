@@ -64,13 +64,16 @@ public class DefragmentManager{
 	private void pack(final Cluster cluster) throws IOException{
 		// traceCall();
 		
-		var freeChunks = cluster.getMemoryManager().getFreeChunks();
+		var  freeChunks = cluster.getMemoryManager().getFreeChunks();
+		long prevLast   = -1;
 		while(!freeChunks.isEmpty()){
 			Chunk last = freeChunks.getLast().dereference(cluster);
 			while(!last.checkLastPhysical()){
 				last = last.nextPhysical();
 			}
-			
+			long lp = last.getPtr().getValue();
+			if(lp == prevLast) break;
+			prevLast = lp;
 			var siz  = cluster.getSource().getIOSize();
 			var move = moveReference(cluster, last.getPtr(), t -> t.withApproval(c -> c.getPtr().getValue()<siz), true);
 			if(move.isEmpty()) break;
@@ -135,13 +138,15 @@ public class DefragmentManager{
 		
 		List<Chunk> toFree = new ArrayList<>();
 		var record = new MemoryWalker.PointerRecord(){
-			MoveBuffer move = new MoveBuffer();
+			MoveBuffer   move    = new MoveBuffer();
+			boolean      updated;
+			ChunkPointer destPtr = null;
 			@SuppressWarnings({"unchecked", "rawtypes"})
 			@Override
 			public <T extends IOInstance<T>> int log(
 				Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference, Holder holder) throws IOException{
 				var ptr = valueReference.getPtr();
-				if(!ptr.equals(toMove) || valueReference.getOffset() != 0){
+				if(!ptr.equals(toMove)){
 					return CONTINUE;
 				}
 				
@@ -154,18 +159,19 @@ public class DefragmentManager{
 					return END;
 				}
 				
-				var ch = ptr.dereference(cluster);
-				
-				Chunk newCh = copyCh(instanceReference, ch);
-				if(newCh == null){
-					return END;
+				if(destPtr == null){
+					var   ch    = ptr.dereference(cluster);
+					Chunk newCh = copyCh(instanceReference, ch);
+					if(newCh == null){
+						return END;
+					}
+					ch.addChainTo(toFree);
+					destPtr = newCh.getPtr();
+					move = new MoveBuffer(toMove, destPtr);
 				}
-				ch.addChainTo(toFree);
 				
-				var newPtr = newCh.getPtr();
-				field.setReference(instance, newPtr.makeReference());
-				move = new MoveBuffer(toMove, newPtr);
-				
+				field.setReference(instance, Reference.of(destPtr, valueReference.getOffset()));
+				updated = true;
 				return END|SAVE;
 			}
 			private Chunk copyCh(Reference instanceReference, Chunk ch) throws IOException{
@@ -190,16 +196,16 @@ public class DefragmentManager{
 				if(!value.equals(toMove)){
 					return CONTINUE;
 				}
-				var ch = value.dereference(cluster);
-				
-				Chunk newCh = copyCh(instanceReference, ch);
-				if(newCh == null){
-					return END;
+				if(destPtr == null){
+					var ch    = value.dereference(cluster);
+					var newCh = copyCh(instanceReference, ch);
+					if(newCh == null) return END;
+					ch.addChainTo(toFree);
+					destPtr = newCh.getPtr();
+					move = new MoveBuffer(toMove, destPtr);
 				}
-				
-				var newPtr = newCh.getPtr();
-				ch.addChainTo(toFree);
-				move = new MoveBuffer(toMove, newPtr);
+				var newPtr = destPtr;
+				updated = true;
 				
 				if(field.isReadOnly()){
 					holder.value = newPtr;
@@ -211,7 +217,11 @@ public class DefragmentManager{
 			}
 		};
 		
-		cluster.rootWalker(record, false).walk();
+		// Restart after each save so traversal uses the updated references and destination data.
+		do{
+			record.updated = false;
+			cluster.rootWalker(record, false).walk();
+		}while(record.updated);
 		
 		cluster.getMemoryManager().free(toFree);
 		return record.move;

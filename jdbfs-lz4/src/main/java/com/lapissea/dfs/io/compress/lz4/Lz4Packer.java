@@ -30,11 +30,9 @@ public abstract sealed class Lz4Packer implements Packer{
 		}
 	}
 	
-	static int readSiz(byte[] dest){
+	static int readSiz(byte[] dest) throws IOException{
 		try(var io = new ContentInputStream.BA(dest)){
 			return io.readUnsignedInt4Dynamic();
-		}catch(IOException e){
-			throw new RuntimeException(e);
 		}
 	}
 	
@@ -90,11 +88,22 @@ public abstract sealed class Lz4Packer implements Packer{
 	}
 	
 	@Override
-	public byte[] unpack(byte[] packedData){
+	public byte[] unpack(byte[] packedData) throws IOException{
 		class Decompressor{
 			private static final LZ4FastDecompressor INST = getFactory().fastDecompressor();
 		}
 		int orgLen = readSiz(packedData);
-		return Decompressor.INST.decompress(packedData, sizeBytes(orgLen), orgLen);
+		if(orgLen < 0){
+			throw new IOException("Corrupt LZ4 payload: negative original length " + orgLen);
+		}
+		int headerBytes = sizeBytes(orgLen);
+		if(packedData.length < headerBytes){
+			throw new IOException("Corrupt LZ4 payload: buffer shorter than its length header");
+		}
+		try{
+			return Decompressor.INST.decompress(packedData, headerBytes, orgLen);
+		}catch(RuntimeException e){
+			throw new IOException("Failed to decompress LZ4 payload", e);
+		}
 	}
 }

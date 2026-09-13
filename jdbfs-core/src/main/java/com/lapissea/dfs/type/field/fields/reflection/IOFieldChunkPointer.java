@@ -86,7 +86,12 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 		return maxSize.size;
 	}
 	private NumberSize getSafeSize(VarPool<T> ioPool, T instance, long num){
-		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
+		if(dynamicSize != null){
+			var val    = dynamicSize.apply(ioPool, instance);
+			var needed = NumberSize.bySize(num);
+			if(needed.greaterThan(val)) throw new VaryingSize.TooSmall(maxSize, needed);
+			return val;
+		}
 		return maxSize.safeNumber(num);
 	}
 	

@@ -194,12 +194,13 @@ public sealed interface IOTypeDB{
 			@Override
 			public <T> int toID(Class<T> rootType, Class<T> type, boolean record){
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
-				var universe = getUniverse(rootType);
-				var id       = universe.cl2id.get(type);
-				if(id == null){
-					id = universe.newId(type);
-				}
-				return id;
+				var universe = sealedMultiverse.get(rootType);
+				var id       = universe == null? null : universe.cl2id.get(type);
+				if(id != null) return id;
+				// record=false is a lookup: report the id a subsequent record=true would assign
+				// (the next free id) WITHOUT inserting it, so lookup-only callers see no mutation.
+				if(!record) return universe == null? 1 : universe.idCounter;
+				return getUniverse(rootType).newId(type);
 			}
 			
 			@Override
@@ -292,13 +293,20 @@ public sealed interface IOTypeDB{
 			private final Map<IOType, Integer> typToID;
 			
 			private static final class MemUniverse<T>{
-				private final Class<T>[]             id2cl;
+				private final Map<Integer, Class<T>> id2cl;
 				private final Map<Class<T>, Integer> cl2id;
+				private       int                    idCounter;
 				private MemUniverse(Map<Class<T>, Integer> cl2id){
-					this.cl2id = Map.copyOf(cl2id);
-					var maxId = Iters.values(this.cl2id).mapToInt(i -> i + 1).max(0);
-					id2cl = new Class[maxId];
-					this.cl2id.forEach((t, i) -> id2cl[i] = t);
+					this.cl2id = new HashMap<>(cl2id);
+					id2cl = new HashMap<>();
+					this.cl2id.forEach((t, i) -> id2cl.put(i, t));
+					idCounter = Iters.values(this.cl2id).mapToInt(i -> i + 1).max(1);
+				}
+				private int newId(Class<T> type){
+					var id = idCounter++;
+					cl2id.put(type, id);
+					id2cl.put(id, type);
+					return id;
 				}
 			}
 			
@@ -362,8 +370,8 @@ public sealed interface IOTypeDB{
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				if(universe == null) return null;
-				if(id>universe.id2cl.length || id<=0) return null;
-				return universe.id2cl[id];
+				if(id<=0) return null;
+				return universe.id2cl.get(id);
 			}
 			
 			@Override
@@ -371,7 +379,10 @@ public sealed interface IOTypeDB{
 				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
 				var universe = getUniverse(rootType);
 				if(universe == null) return -1;
-				return universe.cl2id.get(type);
+				var id = universe.cl2id.get(type);
+				if(id != null) return id;
+				if(!record) return -1;
+				return universe.newId(type);
 			}
 			
 			private IOType idToTyp(int id){

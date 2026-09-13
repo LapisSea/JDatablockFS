@@ -6,7 +6,7 @@ public final class HashCommons{
 		if(key == null) return 0;
 		var h  = key.hashCode();
 		var h2 = mixMurmur32(h);
-		return Math.abs(h2);
+		return h2 == Integer.MIN_VALUE? 0 : Math.abs(h2);
 	}
 	
 	/// Source: jdk.internal.util.random.RandomSupport
