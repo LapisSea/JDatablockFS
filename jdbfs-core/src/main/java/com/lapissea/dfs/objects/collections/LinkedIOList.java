@@ -301,18 +301,23 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		if(count == 0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		T val = getElementType().make();
-		
-		
 		IONode<T> chainStart = null;
-		
+		IONode<T> prev = null;
 		for(long i = 0; i<count; i++){
+			// Each element must be a distinct instance: create and initialize it per node so the
+			// initializer's effect is not shared across nodes.
+			T val = getElementType().make();
 			if(initializer != null){
 				initializer.accept(val);
 			}
-			//inverse order add, reduce chance for fragmentation by providing the next node immediately
-			var nextNode = chainStart;
-			chainStart = allocNode(val, nextNode);
+			var node = allocNode(val, null);
+			if(prev == null){
+				chainStart = node;
+			}else{
+				// link in forward order so iteration visits elements in the order they were created
+				prev.setNext(node);
+			}
+			prev = node;
 		}
 		
 		var last = getLastNode();
@@ -321,6 +326,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		}else{
 			last.setNext(chainStart);
 		}
+		deltaSize(count);
 	}
 	@Override
 	public void clear() throws IOException{

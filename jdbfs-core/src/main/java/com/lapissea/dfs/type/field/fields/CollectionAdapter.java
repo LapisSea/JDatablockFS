@@ -112,7 +112,7 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 				var pip = getPipe(element);
 				int id;
 				try{
-					id = provider.getTypeDb().toID(root, (Class<E>)element.getClass(), false);
+					id = provider.getTypeDb().toID(root, (Class<E>)element.getClass(), true);
 				}catch(IOException e){
 					throw new RuntimeException("Failed to compute ID", e);
 				}
@@ -132,7 +132,7 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 					var type = (Class<E>)element.getClass();
 					id = provider.getTypeDb().toID(root, type, true);
 				}
-				dest.writeInt4Dynamic(id);
+				dest.writeUnsignedInt4Dynamic(id);
 				if(id != 0){
 					var pip = getPipe(element);
 					pip.write(provider, dest, element);
@@ -140,16 +140,18 @@ public abstract sealed class CollectionAdapter<ElementType, CollectionType>{
 			}
 			@Override
 			public E read(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				var id = src.readInt4Dynamic();
+				var id = src.readUnsignedInt4Dynamic();
 				if(id == 0) return null;
 				var type = provider.getTypeDb().fromID(root, id);
+				if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, root);
 				return getPipe(type).readNew(provider, src, genericContext);
 			}
 			@Override
 			public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-				var id = src.readInt4Dynamic();
+				var id = src.readUnsignedInt4Dynamic();
 				if(id == 0) return;
 				var type = provider.getTypeDb().fromID(root, id);
+				if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, root);
 				getPipe(type).skip(provider, src, genericContext);
 			}
 		}

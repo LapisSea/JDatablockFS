@@ -159,9 +159,10 @@ public final class RangeIO implements RandomIO, Stringify{
 	}
 	@Override
 	public void trim() throws IOException{
-		var localRemaining = parent.remaining() - offset;
-		if(localRemaining>maxLength) throw new UnsupportedOperationException();
-		parent.trim();
+		var localPos = getLocalPos();
+		var viewSize = getSize();
+		if(localPos>=viewSize) return;
+		parent.setCapacity(offset + localPos);
 	}
 	@Override
 	public boolean isDirect(){

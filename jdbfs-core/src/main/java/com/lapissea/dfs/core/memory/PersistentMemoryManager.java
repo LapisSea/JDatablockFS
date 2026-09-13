@@ -54,7 +54,8 @@ public final class PersistentMemoryManager
 	private final IOList<ChunkPointer> queuedFreeChunksIO = IOList.wrap(queuedFreeChunks);
 	
 	private final IOList<ChunkPointer> freeChunks;
-	private final Lock                 freeChunksLock = new ReentrantLock();
+	// Free-list edits can recursively allocate/free storage, so all layout changes share one reentrant lock.
+	private final Lock                 allocationLock = new ReentrantLock();
 	private       boolean              defragmentMode;
 	
 	private boolean adding, allowFreeRemove = true;
@@ -100,8 +101,6 @@ public final class PersistentMemoryManager
 	private final ThreadLocal<Node> stacks    = new ThreadLocal<>();
 	private final Map<Thread, Node> allStacks = new HashMap<>();
 	private       Node              last;
-	private       boolean           drainIO;
-	private       Thread            drainThread;
 	
 	private Node getStack(){
 		var th = Thread.currentThread();
@@ -132,15 +131,24 @@ public final class PersistentMemoryManager
 	
 	@Override
 	public void notifyStart(ChunkChainIO chain){
-		if(drainIO) block();
-		getStack().add(chain);
+		allocationLock.lock();
+		try{
+			getStack().add(chain);
+		}finally{
+			allocationLock.unlock();
+		}
 	}
 	@Override
 	public void notifyEnd(ChunkChainIO chain){
-		var s  = getStack();
-		var ch = s.pop();
-		if(ch != chain){
-			failNotifyEnd(s, ch, chain);
+		allocationLock.lock();
+		try{
+			var s  = getStack();
+			var ch = s.pop();
+			if(ch != chain){
+				failNotifyEnd(s, ch, chain);
+			}
+		}finally{
+			allocationLock.unlock();
 		}
 	}
 	private static void failNotifyEnd(Node stack, ChunkChainIO popped, ChunkChainIO chain){
@@ -158,63 +166,37 @@ public final class PersistentMemoryManager
 		throw new IllegalStateException("Chain was already closed!");
 	}
 	
-	private void block(){
-		if(drainThread == Thread.currentThread()) return;
-		UtilL.sleepWhile(() -> drainIO, 0, 0.1F);
-	}
-	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context, AllocStrategy.class.getEnumConstants(), AllocToStrategy.class.getEnumConstants());
 		this.freeChunks = freeChunks;
 	}
 	
-	private final Lock fileSizeLock = new ReentrantLock();
-	
 	@Override
 	protected Chunk alloc(AllocStrategy strategy, DataProvider ctx, AllocateTicket ticket, boolean dryRun) throws IOException{
-		return switch(strategy){
-			case REUSE_FREE_CHUNKS -> {
-				if(defragmentMode) yield null;
-				freeChunksLock.lock();
-				try{
-					yield MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
-				}finally{
-					freeChunksLock.unlock();
-				}
-			}
-			case APPEND_TO_FILE -> {
-				fileSizeLock.lock();
-				try{
-					yield MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
-				}finally{
-					fileSizeLock.unlock();
-				}
-			}
-		};
+		allocationLock.lock();
+		try{
+			return switch(strategy){
+				case REUSE_FREE_CHUNKS -> defragmentMode? null : MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
+				case APPEND_TO_FILE -> MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
+			};
+		}finally{
+			allocationLock.unlock();
+		}
 	}
 	@Override
 	protected long allocTo(AllocToStrategy strategy, Chunk first, Chunk target, long toAllocate) throws IOException{
-		return switch(strategy){
-			case GROW_FILE_ALLOC -> {
-				fileSizeLock.lock();
-				try{
-					yield MemoryOperations.growFileAlloc(target, toAllocate);
-				}finally{
-					fileSizeLock.unlock();
-				}
-			}
-			case GROW_FREE_ALLOC -> {
-				freeChunksLock.lock();
-				try{
-					yield MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
-				}finally{
-					freeChunksLock.unlock();
-				}
-			}
-			case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
-			case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
-			case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
-		};
+		allocationLock.lock();
+		try{
+			return switch(strategy){
+				case GROW_FILE_ALLOC -> MemoryOperations.growFileAlloc(target, toAllocate);
+				case GROW_FREE_ALLOC -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
+				case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
+				case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
+				case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
+			};
+		}finally{
+			allocationLock.unlock();
+		}
 	}
 	
 	@Override
@@ -257,30 +239,36 @@ public final class PersistentMemoryManager
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
-		
-		for(Chunk chToFree : toFree){
-			var stack = getStack();
-			for(var c : stack){
-				for(Chunk lockedCH : c.head.walkNext()){
-					if(chToFree == lockedCH){
-						var err = Log.fmt(
-							"{}#red was called to be freed but it is currently locked{}!",
-							chToFree,
-							lockedCH == c.head? "" : Log.fmt(" by {}#yellow", lockedCH)
-						);
-						throw new FreeWhileUsed(err);
+		allocationLock.lock();
+		try{
+			freeLocked(toFree);
+		}finally{
+			allocationLock.unlock();
+		}
+	}
+	
+	private void freeLocked(Collection<Chunk> toFree) throws IOException{
+		// The allocation lock also protects stack registration and notifyStart/notifyEnd.
+		synchronized(allStacks){
+			for(var stack : allStacks.values()){
+				for(Chunk chToFree : toFree){
+					for(var c : stack){
+						for(Chunk lockedCH : c.head.walkNext()){
+							if(chToFree.getPtr().equals(lockedCH.getPtr())){
+								var err = Log.fmt(
+									"{}#red was called to be freed but it is currently locked{}!",
+									chToFree,
+									lockedCH == c.head? "" : Log.fmt(" by {}#yellow", lockedCH)
+								);
+								throw new FreeWhileUsed(err);
+							}
+						}
 					}
 				}
 			}
 		}
-		
-		Collection<Chunk> popped;
-		fileSizeLock.lock();
-		try{
-			popped = popFile(toFree);
-		}finally{
-			fileSizeLock.unlock();
-		}
+
+		var popped = popFile(toFree);
 		if(popped.isEmpty()){
 			return;
 		}
@@ -292,7 +280,6 @@ public final class PersistentMemoryManager
 			return;
 		}
 		
-		freeChunksLock.lock();
 		adding = true;
 		var oldAllowFreeRemove = allowFreeRemove;
 		allowFreeRemove = false;
@@ -313,7 +300,6 @@ public final class PersistentMemoryManager
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{
 			adding = false;
-			freeChunksLock.unlock();
 			allowFreeRemove = oldAllowFreeRemove;
 		}
 		
@@ -366,23 +352,15 @@ public final class PersistentMemoryManager
 								return;
 							}
 						}
+						// Compaction is optional. Waiting here would deadlock readers that need
+						// this lock to allocate, open a nested chain, or close their current chain.
+						// notifyStart/notifyEnd use the same lock, keeping this check stable during the move.
+						synchronized(allStacks){
+							cleanupStacks();
+							if(Iters.values(allStacks).anyMatch(l -> l != stack && !l.isEmpty())) return;
+						}
 						var oldAllowFreeRemove = allowFreeRemove;
 						try{
-							drainThread = Thread.currentThread();
-							drainIO = true;
-							while(true){
-								synchronized(allStacks){
-									cleanupStacks();
-									var anyActive =
-										allStacks.size()>1 &&
-										Iters.entries(allStacks)
-										     .filter(e -> e.getKey().isAlive()).map(Map.Entry::getValue)
-										     .anyMatch(l -> l != stack && !l.isEmpty());
-									if(!anyActive) break;
-								}
-								UtilL.sleep(0.1F);
-							}
-							
 							{//Disable modification of the list while it is being moved
 								var fch     = (IOInstance.Unmanaged<?>)Wrapper.fullyUnwrappObj(freeChunks);
 								var freeRef = fch.getPointer();
@@ -405,7 +383,6 @@ public final class PersistentMemoryManager
 							}else badMoveState = new MoveState(lastFree.clone(), toMove.clone());
 						}finally{
 							allowFreeRemove = oldAllowFreeRemove;
-							drainIO = false;
 						}
 					}
 				}

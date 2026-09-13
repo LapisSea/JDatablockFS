@@ -69,7 +69,7 @@ public interface IOMap<K, V> extends IterablePPSource<IOMap.IOEntry<K, V>>, Quer
 			@Override
 			public int hashCode(){
 				var k = getKey();
-				var v = getKey();
+				var v = getValue();
 				
 				int result = 1;
 				result = 31*result + (k == null? 0 : k.hashCode());

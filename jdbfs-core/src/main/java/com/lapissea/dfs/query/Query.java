@@ -160,7 +160,7 @@ public interface Query<T>{
 			@Override
 			public boolean fieldTest(V field){
 				var res = field.compareTo(check);
-				if(res == 0 && equal) return true;
+				if(res == 0) return equal;
 				return (res>0) == greater;
 			}
 		}

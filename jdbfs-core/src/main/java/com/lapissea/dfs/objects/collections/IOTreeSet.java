@@ -18,6 +18,8 @@ import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -587,26 +589,45 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public IOIterator<T> iterator(){
-		
-		var src = values.iterator();
+		var nodes = this.nodes;
 		return new IOIterator<>(){
+			private final Deque<Integer> stack = new ArrayDeque<>();
 			private T val;
+			private boolean hasVal;
+			private boolean initialized;
+			private void pushLeftPath(int idx) throws IOException{
+				while(idx != -1){
+					stack.push(idx);
+					var node = nodes.get(idx);
+					idx = node.hasChild(false)? (int)node.getChild(false) : -1;
+				}
+			}
+			private void advance() throws IOException{
+				hasVal = false;
+				if(!initialized){
+					if(nodes.size() > 0) pushLeftPath(0);
+					initialized = true;
+				}
+				if(stack.isEmpty()) return;
+				var idx  = stack.pop();
+				var node = nodes.get(idx);
+				val = getVal(node);
+				if(node.hasChild(true)){
+					pushLeftPath((int)node.getChild(true));
+				}
+				hasVal = true;
+			}
 			@Override
 			public boolean hasNext() throws IOException{
-				if(val == null) next();
-				return val != null;
-			}
-			private void next() throws IOException{
-				while(src.hasNext()){
-					val = src.ioNext().val;
-					if(val != null) return;
-				}
+				if(!hasVal) advance();
+				return hasVal;
 			}
 			@Override
 			public T ioNext() throws IOException{
-				if(val == null) next();
+				if(!hasVal) advance();
 				var v = val;
 				val = null;
+				hasVal = false;
 				return v;
 			}
 		};

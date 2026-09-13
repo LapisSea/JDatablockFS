@@ -41,7 +41,7 @@ public final class RNGEnum<E extends Enum<E>> implements Function<RandomGenerato
 	
 	private final List<E>         randomPick;
 	private final List<Chance<E>> chances = new ArrayList<>();
-	private       float           totalChance;
+	private       double          totalChance;
 	
 	private RNGEnum(Class<E> type){
 		randomPick = new ArrayList<>(getUniverse(type));
@@ -49,36 +49,30 @@ public final class RNGEnum<E extends Enum<E>> implements Function<RandomGenerato
 	
 	@Override
 	public E apply(RandomGenerator random){
-		for(var ch : chances){
-			if(random.nextFloat()<=ch.chance){
-				return ch.val;
+		if(!chances.isEmpty()){
+			if(randomPick.isEmpty() && totalChance == 0){
+				throw new IllegalStateException("At least one choice must have a positive chance");
+			}
+			double remaining = random.nextFloat()*(randomPick.isEmpty()? totalChance : Math.max(1F, totalChance));
+			for(var ch : chances){
+				if(remaining<ch.chance) return ch.val;
+				remaining -= ch.chance;
 			}
 		}
-		
-		if(randomPick.isEmpty()){
-			int idx = 0;
-			for(float r = random.nextFloat()*totalChance; idx<chances.size() - 1; ++idx){
-				r -= chances.get(idx).chance;
-				if(r<=0.0) break;
-			}
-			return chances.get(idx).val;
-		}
-		
+
 		return randomPick.get(random.nextInt(randomPick.size()));
 	}
 	
 	public RNGEnum<E> chanceFor(E val, float chance){
+		if(!Float.isFinite(chance) || chance<0){
+			throw new IllegalArgumentException("Chance must be finite and non-negative");
+		}
 		Objects.requireNonNull(val);
 		chances.add(new Chance<>(val, chance));
 		randomPick.remove(val);
 		
-		if(randomPick.isEmpty()){
-			var totalChance = 0;
-			for(var i : chances){
-				totalChance += i.chance;
-			}
-			this.totalChance = totalChance;
-		}
+		totalChance += chance;
+
 		return this;
 	}
 	

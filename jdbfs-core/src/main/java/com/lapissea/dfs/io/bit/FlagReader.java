@@ -32,13 +32,13 @@ public class FlagReader implements BitReader, AutoCloseable{
 			int data = in.readUnsignedInt1();
 			
 			var eSiz          = enumInfo.bitSize;
-			int integrityBits = ((1<<eSiz) - 1)<<eSiz;
+			int integrityBits = 0xFF&-(1<<eSiz);
 			
 			if((data&integrityBits) != integrityBits){
 				throw new IllegalBitValue(BitUtils.findBinaryZero(data, 8));
 			}
 			
-			return enumInfo.get((int)(data&((1L<<eSiz) - 1L)));
+			return enumInfo.decodeOrdinal((int)(data&((1L<<eSiz) - 1L)));
 		}
 		
 		

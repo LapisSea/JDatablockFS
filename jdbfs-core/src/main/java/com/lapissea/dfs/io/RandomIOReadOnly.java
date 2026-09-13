@@ -51,7 +51,7 @@ public class RandomIOReadOnly implements RandomIO{
 	
 	@Override
 	public void flush() throws IOException{
-		io.close();
+		io.flush();
 	}
 	
 	@Override

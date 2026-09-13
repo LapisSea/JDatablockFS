@@ -74,7 +74,7 @@ public interface FuzzSequenceSource{
 					System.err.println("fuzz.iterationMultiplier system property must be greater than zero! Value: \"" + mulS + '"');
 					return iterCount;
 				}
-				return mul.multiply(new BigDecimal(iterCount), MathContext.DECIMAL64).toBigInteger().longValueExact();
+				return Math.max(1, mul.multiply(new BigDecimal(iterCount), MathContext.DECIMAL64).toBigInteger().longValueExact());
 			}catch(NumberFormatException e){
 				System.err.println("fuzz.iterationMultiplier system property is not a valid number! Value: \"" + mulS + '"');
 				return iterCount;

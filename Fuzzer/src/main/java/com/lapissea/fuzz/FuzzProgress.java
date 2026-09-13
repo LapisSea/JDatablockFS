@@ -6,6 +6,7 @@ import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
@@ -179,6 +180,13 @@ public final class FuzzProgress{
 	private BigInteger calcElapsedWork(){
 		return elapsedSum.add(BigInteger.valueOf(elapsedSumAcum.get()));
 	}
+	private static Optional<Duration> estimatedDuration(BigDecimal nanos){
+		try{
+			return some(bigToDuration(nanos));
+		}catch(ArithmeticException e){
+			return none();
+		}
+	}
 	
 	private static LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress, BigInteger elapsedWork){
 		var elapsedTime = Duration.between(start, now);
@@ -192,8 +200,8 @@ public final class FuzzProgress{
 		boolean estimate = count>100 && !progressZero;
 		return new LogMessage.State(
 			progress.doubleValue(),
-			!estimate? none() : some(bigToDuration(totalTimeEstimated)),
-			!estimate? none() : some(bigToDuration(timeRemaining)),
+			!estimate? none() : estimatedDuration(totalTimeEstimated),
+			!estimate? none() : estimatedDuration(timeRemaining),
 			elapsedTime,
 			!estimate? OptionalDouble.empty() : OptionalDouble.of(new BigDecimal(elapsedWork).divide(BigDecimal.valueOf(count), MathContext.DECIMAL64).doubleValue()),
 			errMark

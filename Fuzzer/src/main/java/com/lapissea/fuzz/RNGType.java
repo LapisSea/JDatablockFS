@@ -21,7 +21,7 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 	
 	private final List<Function<RandomGenerator, E>> randomPick;
 	private final List<Chance<E>>                    chances = new ArrayList<>();
-	private       float                              totalChance;
+	private       double                             totalChance;
 	
 	private RNGType(List<Function<RandomGenerator, E>> definition){
 		if(definition.isEmpty()) throw new IllegalArgumentException("Definitions required");
@@ -34,7 +34,7 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 			                     Function.identity()
 		                     ));
 		
-		randomPick = new ArrayList<>(universe.values());
+		randomPick = new ArrayList<>(definition);
 	}
 	
 	@Override
@@ -43,24 +43,24 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 	}
 	
 	private Function<RandomGenerator, E> getFn(RandomGenerator random){
-		for(var ch : chances){
-			if(random.nextFloat()<=ch.chance){
-				return ch.gen;
+		if(!chances.isEmpty()){
+			if(randomPick.isEmpty() && totalChance == 0){
+				throw new IllegalStateException("At least one choice must have a positive chance");
+			}
+			double remaining = random.nextFloat()*(randomPick.isEmpty()? totalChance : Math.max(1F, totalChance));
+			for(var ch : chances){
+				if(remaining<ch.chance) return ch.gen;
+				remaining -= ch.chance;
 			}
 		}
-		if(randomPick.isEmpty()){
-			int idx = 0;
-			for(float r = random.nextFloat()*totalChance; idx<chances.size() - 1; ++idx){
-				r -= chances.get(idx).chance;
-				if(r<=0.0) break;
-			}
-			return chances.get(idx).gen;
-		}
-		
+
 		return randomPick.get(random.nextInt(randomPick.size()));
 	}
 	
 	public RNGType<E> chanceFor(Class<? extends E> val, float chance){
+		if(!Float.isFinite(chance) || chance<0){
+			throw new IllegalArgumentException("Chance must be finite and non-negative");
+		}
 		var fn = universe.get(Objects.requireNonNull(val));
 		if(fn == null){
 			var types = universe.keySet().stream().map(Class::getName).collect(Collectors.joining("\n"));
@@ -70,13 +70,8 @@ public final class RNGType<E> implements Function<RandomGenerator, E>{
 		chances.add(new Chance<>(fn, chance));
 		randomPick.remove(fn);
 		
-		if(randomPick.isEmpty()){
-			var totalChance = 0F;
-			for(var i : chances){
-				totalChance += i.chance;
-			}
-			this.totalChance = totalChance;
-		}
+		totalChance += chance;
+
 		return this;
 	}
 	

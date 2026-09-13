@@ -543,7 +543,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 						
 						growVaryingSizes(e.tooSmallIdMap);
 						
-						addAll(bufferedElements);
+						addAll(bufferedElements.subList((int)change, bufferedElements.size()));
 						addMany(count - c - 1, source);
 						
 						return;
@@ -620,6 +620,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	}
 	
 	private void forwardDup(long index) throws IOException{
+		// 0-byte elements all sit at headSize (calcElementOffset = headSize + size*index), so there is
+		// no data to shift; skipping also avoids BATCH_BYTES/elementSize dividing by zero.
+		if(getElementSize() == 0) return;
 		try(var io = selfIO()){
 			var  size              = size();
 			long remainingElements = size - index;
@@ -724,6 +727,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			
 			long sm1 = size - 1;
 			if(sm1 == index) return;
+			// 0-byte elements all sit at headSize, so there is no data to shift; skipping also avoids
+			// BATCH_BYTES/siz dividing by zero.
+			if(getElementSize() == 0) return;
 			long remainingElements = sm1 - index;
 			
 			var siz      = Math.toIntExact(getElementSize());

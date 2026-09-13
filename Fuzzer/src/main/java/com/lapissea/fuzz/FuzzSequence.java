@@ -51,7 +51,8 @@ public record FuzzSequence(long startIndex, long index, long seed, int iteration
 	private static long read(ByteArrayInputStream src, int bytes){
 		var bb = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
 		src.readNBytes(bb.array(), 0, bytes);
-		return bb.getLong();
+		int shift = (Long.BYTES - bytes)*Byte.SIZE;
+		return (bb.getLong()<<shift)>>shift;
 	}
 	
 	public String makeDataStick(){
