@@ -51,7 +51,6 @@ import com.lapissea.jorth.ClassDefinition;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -65,7 +64,6 @@ import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -160,7 +158,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, int syncStage) throws E{
 		this.type = type;
-		ObjectHolder<CompletableFuture<StructPipe<ProxyBuilder<T>>>> builderTask = new ObjectHolder<>();
 		init(syncStage, runStage -> {
 			switch(runStage){
 				case STATE_IO_FIELD -> {
@@ -193,10 +190,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					);
 				}
 				case STATE_DONE -> {
-					var bt = builderTask.obj;
-					if(bt != null){
-						builderPipe = bt.join();
-					}
 				}
 				default -> throw new NotImplementedException();
 			}
