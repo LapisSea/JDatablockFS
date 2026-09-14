@@ -889,7 +889,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		if(dest.isDirect()){
 			var siz = getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
-			if(siz>Integer.MAX_VALUE) throw new IOException("Object of type " + getType() + " has a predicted allocation of " + siz + " bytes, exceeding the 2GiB buffer limit");
 			destBuff = new ContentOutputBuilder((int)siz);
 			target = destBuff;
 		}else{
