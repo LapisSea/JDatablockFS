@@ -14,9 +14,13 @@ import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +35,17 @@ public class CodeBlock{
 	}
 	
 	private final LocalsArray localValues = new LocalsArray();
+	
+	private static final class LocalDebugRange{
+		final int start;
+		int end = -1;
+		LocalDebugRange(int start){
+			this.start = start;
+		}
+	}
+	
+	// Debug history info for debugging emit
+	private final Map<Local, LocalDebugRange> debugLocals = new IdentityHashMap<>();
 	
 	private final List<Insn> insns = new ArrayList<>();
 	private final TypeStack  localStack;
@@ -158,7 +173,9 @@ public class CodeBlock{
 			throw new MalformedJorth("Duplicated localValue: " + name);
 		}
 		int index = localValues.findSlot(type.getBaseType().slots);
-		addLocal(new Local(name, type, index, canRemove));
+		var local = new Local(name, type, index, canRemove);
+		addLocal(local);
+		debugLocals.put(local, new LocalDebugRange(insns.size()));
 	}
 	
 	private void addLocal(Local local){
@@ -167,6 +184,11 @@ public class CodeBlock{
 	private void removeLocal(Local local){
 		checkFreeze();
 		localValues.remove(local);
+		
+		var debRange = debugLocals.get(local);
+		if(debRange != null){
+			debRange.end = insns.size();
+		}
 	}
 	
 	private CodeBlock createBlockFromHere(CodeArg code) throws MalformedJorth{
@@ -601,7 +623,7 @@ public class CodeBlock{
 	
 	void visitConstructorPrefix(MethodVisitor writer) throws MalformedJorth{
 		var prefix = new CodeBlock(null, typeSource, fnOwner);
-		prefix.defineLocalValue("this", new GenericType(cName()), false);
+		prefix.addLocal(getLocal("this").withoutRemoval());
 		for(String argName : fnOwner.getArgNames()){
 			prefix.addLocal(getLocal(argName).withoutRemoval());
 		}
@@ -612,9 +634,98 @@ public class CodeBlock{
 		prefix.visit(writer);
 	}
 	
+	private static final class InstructionLines extends MethodVisitor{
+		private record Line(int number, Label start){ }
+		
+		private final List<Line> lines = new ArrayList<>();
+		
+		InstructionLines(MethodVisitor writer){
+			super(Opcodes.ASM9, writer);
+		}
+		void instruction(Label start) throws MalformedJorth{
+			if(lines.size() == 65535){
+				throw new MalformedJorth("Jorth instruction number exceeds the JVM line number limit (65535)");
+			}
+			lines.add(new Line(lines.size() + 1, start));
+		}
+		void finish(Label end){
+			for(var line : lines){
+				// Empty structural instructions at the end have no bytecode to map.
+				if(line.start.getOffset()<end.getOffset()) visitLineNumber(line.number, line.start);
+			}
+		}
+	}
+	
 	public void visit(MethodVisitor fn) throws MalformedJorth{
-		for(Insn i : insns){
-			i.visit(fn);
+		visit(fn, false, null);
+	}
+	void visit(MethodVisitor fn, boolean constructorPrefix, ReturnOp implicitReturn) throws MalformedJorth{
+		if(fnOwner.owner().debugEmitLevel() == ClassDefinition.DebugEmitLevel.NONE){
+			if(constructorPrefix){
+				visitConstructorPrefix(fn);
+			}
+			for(var insn : insns){
+				insn.visit(fn);
+			}
+			if(implicitReturn != null) implicitReturn.visit(fn);
+			return;
+		}
+		
+		// Instructions count as lines
+		boolean root  = !(fn instanceof InstructionLines);
+		var     lines = root? new InstructionLines(fn) : (InstructionLines)fn;
+		fn = lines;
+		
+		var boundaries = new Label[insns.size() + 1];
+		for(int i = 0; i<boundaries.length; i++){
+			boundaries[i] = new Label();
+		}
+		
+		fn.visitLabel(boundaries[0]);
+		var bodyStart = boundaries[0];
+		if(constructorPrefix){
+			visitConstructorPrefix(fn);
+			bodyStart = new Label();
+			fn.visitLabel(bodyStart);
+		}
+		for(int i = 0; i<insns.size(); i++){
+			if(i != 0) fn.visitLabel(boundaries[i]);
+			lines.instruction(i == 0? bodyStart : boundaries[i]);
+			insns.get(i).visit(fn);
+		}
+		if(insns.size() != 0){
+			fn.visitLabel(boundaries[insns.size()]);
+		}
+		if(implicitReturn != null){
+			lines.instruction(insns.isEmpty()? bodyStart : boundaries[insns.size()]);
+			implicitReturn.visit(fn);
+		}
+		
+		var end = new Label();
+		fn.visitLabel(end);
+		if(root){
+			lines.finish(end);
+		}
+		
+		var iter = debugLocals.entrySet().stream().sorted(
+			Comparator.<Map.Entry<Local, LocalDebugRange>>comparingInt(e -> e.getKey().index())
+			          .thenComparing(e -> e.getKey().name())
+		).iterator();
+		while(iter.hasNext()){
+			var entry = iter.next();
+			var local = entry.getKey();
+			var range = entry.getValue();
+			
+			var startLabel = boundaries[range.start];
+			var endLabel   = range.end == -1? end : boundaries[range.end];
+			if(startLabel.getOffset() == endLabel.getOffset()) continue;
+			
+			var descriptor = local.type().jvmDescriptorStr();
+			var signature  = local.type().jvmSignatureStr();
+			fn.visitLocalVariable(
+				local.name(), descriptor, descriptor.equals(signature)? null : signature,
+				startLabel, endLabel, local.index()
+			);
 		}
 	}
 	ReturnOp prepareImplicitReturn() throws MalformedJorth{

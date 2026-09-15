@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.ACC_VARARGS;
 
 public final class FunctionDefinition extends AnnotationContainer<FunctionDefinition> implements FunctionInfo{
@@ -204,15 +205,19 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 		String[] exceptions = thrownExceptions.isEmpty()? null :
 		                      thrownExceptions.stream().map(ClassName::slashed).toArray(String[]::new);
 		var fn = writer.visitMethod(accessFlags, name, descriptor, signature, exceptions);
+		if(owner.debugEmitLevel() != ClassDefinition.DebugEmitLevel.NONE){
+			if(isEnumConstructor()){
+				fn.visitParameter("€enum€name", ACC_SYNTHETIC);
+				fn.visitParameter("€enum€ordinal", ACC_SYNTHETIC);
+			}
+			for(String argName : args.keySet()) fn.visitParameter(argName, 0);
+		}
 		for(AnnotationDefinition annotation : annotations){
 			annotation.visit(fn);
 		}
 		if(body != null){
-			if(isConstructor() && !ranInstanceInitializers){
-				body.visitConstructorPrefix(fn);
-			}
-			body.visit(fn);
-			if(implicitReturn != null) implicitReturn.visit(fn);
+			fn.visitCode();
+			body.visit(fn, isConstructor() && !ranInstanceInitializers, implicitReturn);
 			fn.visitMaxs(0, 0);
 		}
 		fn.visitEnd();

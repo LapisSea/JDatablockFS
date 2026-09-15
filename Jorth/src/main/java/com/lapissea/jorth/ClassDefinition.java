@@ -11,6 +11,7 @@ import com.lapissea.jorth.lang.type.JType;
 import com.lapissea.jorth.lang.type.TypeSource;
 import com.lapissea.jorth.lang.type.TypeStack;
 import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 
@@ -22,6 +23,27 @@ import java.util.stream.Stream;
 import static org.objectweb.asm.Opcodes.*;
 
 public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
+	
+	public enum DebugEmitLevel{
+		NONE,
+		LIMITED;
+		
+		private static boolean warn = true;
+		
+		private static DebugEmitLevel read(){
+			var defaultLevel = ClassDefinition.class.desiredAssertionStatus()? LIMITED : NONE;
+			var value        = System.getProperty("jorth.debugEmitLevel", defaultLevel.name());
+			try{
+				return valueOf(value.toUpperCase());
+			}catch(Throwable e){
+				if(warn){
+					warn = false;
+					LogUtil.printlnEr("jorth.debugEmitLevel can only be one of:", List.of(DebugEmitLevel.values()), "but is \"" + value + "\"");
+				}
+				return defaultLevel;
+			}
+		}
+	}
 	
 	static{
 		Thread.startVirtualThread(() -> {
@@ -58,7 +80,10 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	
 	private Map<String, ClassName> typeDefinitions = new HashMap<>();
 	
+	private DebugEmitLevel debugEmitLevel;
+	
 	public ClassDefinition(ClassLoader classLoader){
+		debugEmitLevel = DebugEmitLevel.read();
 		typeSource = TypeSource.of(this::generatedClassInfo, classLoader == null? this.getClass().getClassLoader() : classLoader);
 	}
 	
@@ -70,6 +95,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		return new ClassDefinition(definitionHost);
 	}
 	private ClassDefinition(Class<?> definitionHost){
+		debugEmitLevel = DebugEmitLevel.read();
 		typeSource = TypeSource.ofNestmate(this::generatedClassInfo, Objects.requireNonNull(definitionHost));
 	}
 	
@@ -528,5 +554,13 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 	}
 	public ClassType getType(){
 		return type;
+	}
+	
+	public DebugEmitLevel debugEmitLevel(){
+		return debugEmitLevel;
+	}
+	public ClassDefinition debugEmitLevel(DebugEmitLevel debugEmitLevel){
+		this.debugEmitLevel = Objects.requireNonNull(debugEmitLevel);
+		return this;
 	}
 }
