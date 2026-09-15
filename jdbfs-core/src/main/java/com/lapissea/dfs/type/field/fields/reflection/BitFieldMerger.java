@@ -176,7 +176,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		}
 		@Override
 		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-			var rawBits = accessMap.temporaryLocalField(long.class, body);
+			var rawBits = accessMap.temporaryLocalField(long.class, "rawBits", body);
 			
 			int totalBits = 0;
 			for(var fi : group){
@@ -194,7 +194,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			
 			body.set(rawBits);
 			
-			var field = accessMap.temporaryLocalField(int.class, body);
+			var field = accessMap.temporaryLocalField(int.class, "fieldPortion", body);
 			
 			int bitOffset = 0;
 			

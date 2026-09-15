@@ -36,16 +36,16 @@ public interface SpecializedGenerator{
 		default void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 			var bits  = Math.toIntExact(getSizeDescriptor().requireFixed(WordSpace.BIT));
 			var bytes = BitUtils.bitsToBytes(bits);
-			var name  = accessMap.temporaryLocalField(bits<32? int.class : long.class, body);
+			var field = accessMap.temporaryLocalField(bits<32? int.class : long.class, "fieldBits", body);
 			
 			CodeUtils.readBytesFromSrc(body, bytes);
 			CodeUtils.rawBitsToValidatedBits(body, bytes, bits);
 			if(bits<32){
 				body.cast(int.class);
 			}
-			body.set(name);
+			body.set(field);
 			
-			injectReadFieldFromBits(body, accessMap, name);
+			injectReadFieldFromBits(body, accessMap, field);
 			
 		}
 	}
@@ -254,8 +254,8 @@ public interface SpecializedGenerator{
 			enumArrays.put(type, new AccessMap.GetInfo(className, fieldName));
 		}
 		
-		public String temporaryLocalField(Class<?> type, CodeBlock code) throws MalformedJorth{
-			var name = "tmp_" + type.getSimpleName().replaceAll("[^A-Za-z]", "") + "_" + uniqueCounter();
+		public String temporaryLocalField(Class<?> type, String nameHint, CodeBlock code) throws MalformedJorth{
+			var name = "tmp_" + (nameHint != null? nameHint : type.getSimpleName().replaceAll("[^A-Za-z]", "")) + "_" + uniqueCounter();
 			code.var(type, name);
 			tmpFieldCount++;
 			if(!temporaryStack.isEmpty()){
