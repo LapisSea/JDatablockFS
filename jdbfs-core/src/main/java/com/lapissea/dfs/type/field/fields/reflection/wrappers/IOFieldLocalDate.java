@@ -16,6 +16,8 @@ import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -84,7 +86,7 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends IOFie
 	protected LocalDate readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		long day;
 		if(varSize != null){
-			day = varSize.size.read(src);
+			day = varSize.size.readSigned(src);
 		}else{
 			day = src.readInt8Dynamic();
 		}
@@ -99,5 +101,16 @@ public final class IOFieldLocalDate<CTyp extends IOInstance<CTyp>> extends IOFie
 			size = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 		}
 		size.skip(src);
+	}
+	
+	@Override
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(LocalDate.class, "ofEpochDay", arg -> {
+			if(varSize != null){
+				varSize.size.readIntConst(arg, true);
+			}else{
+				arg.get("src").call("readInt8Dynamic");
+			}
+		});
 	}
 }

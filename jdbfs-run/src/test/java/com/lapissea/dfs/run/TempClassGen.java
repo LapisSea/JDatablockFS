@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
+import java.util.stream.Stream;
 
 public final class TempClassGen{
 	
@@ -101,6 +102,9 @@ public final class TempClassGen{
 		}
 		public ClassGen withName(String name){
 			return new ClassGen(name, fields, constructors, parent, annotations, List.of());
+		}
+		public ClassGen withAnnotation(Annotation annotation){
+			return new ClassGen(name, fields, constructors, parent, Stream.concat(annotations.stream(), Stream.of(annotation)).toList(), List.of());
 		}
 	}
 	

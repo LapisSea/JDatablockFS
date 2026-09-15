@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.FieldIsNull;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
@@ -9,6 +10,7 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.FieldSet;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldDuration;
@@ -19,13 +21,16 @@ import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldLocalDateTi
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldLocalTime;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.dfs.utils.IOUtils;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-public abstract sealed class IOFieldWrapper<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>
+public abstract sealed class IOFieldWrapper<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType> implements SpecializedGenerator
 	permits IOFieldDuration, IOFieldInlineString, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime, IOFieldStringCollection{
 	
 	private final Supplier<ValueType> defaultValue = this::defaultValue;
@@ -46,7 +51,9 @@ public abstract sealed class IOFieldWrapper<CTyp extends IOInstance<CTyp>, Value
 		return Set.of(TypeFlag.HAS_NO_POINTERS);
 	}
 	
-	protected final boolean isFixed(){ return fixed; }
+	protected final int fixedSize(){
+		return fixedSize;
+	}
 	
 	protected abstract ValueType defaultValue();
 	
@@ -114,7 +121,23 @@ public abstract sealed class IOFieldWrapper<CTyp extends IOInstance<CTyp>, Value
 		skipValue(ioPool, provider, src, instance, genericContext);
 	}
 	
+	@Override
+	public final void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		injectReadFieldNullable(body, accessMap, bod -> {
+			if(fixed){
+				bod.get("src").call("skipExact", a -> a.val((long)fixedSize));
+			}
+		}, bod -> {
+			try{
+				injectReadValue(bod, accessMap);
+			}catch(UnsupportedCodeGenType e){
+				throw UtilL.uncheckedThrow(e);
+			}
+		});
+	}
+	
 	protected abstract void writeValue(DataProvider provider, ContentWriter dest, ValueType value) throws IOException;
 	protected abstract ValueType readValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException;
 	protected abstract void skipValue(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException;
+	protected abstract void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType;
 }

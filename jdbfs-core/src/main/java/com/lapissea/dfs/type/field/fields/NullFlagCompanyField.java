@@ -2,26 +2,18 @@ package com.lapissea.dfs.type.field.fields;
 
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldBooleanArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldByteBuffer;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldDirectType;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldEnumCollection;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldFloatArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldInlineSealedObject;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldIntegerArray;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
-import com.lapissea.dfs.type.field.fields.reflection.InstanceCollection;
+import com.lapissea.dfs.type.field.fields.reflection.*;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.util.List;
 
@@ -72,4 +64,19 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 		if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
 	}
 	
+	public void injectReadFieldNullable(CodeBlock body, SpecializedGenerator.AccessMap accessMap, CodeArg skip, CodeArg readParsed) throws MalformedJorth, UnsupportedCodeGenType{
+		accessMap.set(getAccessor(), body, bod -> {
+			if(nullable()){
+				accessMap.get(isNull, body);
+				body.ifTrue(b -> {
+					if(skip != null){
+						skip.accept(b);
+					}
+					b.nullVal(getType());
+				}).elseRun(readParsed);
+			}else{
+				readParsed.accept(bod);
+			}
+		});
+	}
 }

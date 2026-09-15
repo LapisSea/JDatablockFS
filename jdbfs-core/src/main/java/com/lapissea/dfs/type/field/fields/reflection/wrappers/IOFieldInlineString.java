@@ -18,7 +18,6 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
-import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.List;
@@ -97,20 +96,11 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 		if(val == null || val.length() == 0) return Optional.empty();
 		return Optional.of('"' + val + '"');
 	}
+	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-		if(!nullable()){
-			throw new ShouldNeverHappenError();
-		}
-		
-		accessMap.set(getAccessor(), body, bod -> {
-			accessMap.get(isNull, bod);
-			bod.ifTrue(b -> b.nullVal(String.class))
-			   .elseRun(b -> {
-				   b.get(AutoText.class, "STR_PIPE")
-				    .call("readNew", args -> args.get("provider").get("src").nullVal(GenericContext.class))
-				    .cast(String.class);
-			   });
-		});
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get(AutoText.class, "STR_PIPE")
+		    .call("readNew", args -> args.get("provider").get("src").nullVal(GenericContext.class))
+		    .cast(String.class);
 	}
 }

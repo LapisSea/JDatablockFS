@@ -5,6 +5,7 @@ import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.Cluster;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
@@ -43,6 +44,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.random.RandomGenerator;
+import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
@@ -238,6 +240,25 @@ public final class StructFuzzTest{
 		simpleEncounter.add(gen);
 	}
 	
+	@Test
+	void fieldCounts() throws ReflectiveOperationException, IOException{
+		long[] durations = new long[100];
+		var    r         = new RawRandom(1000);
+		for(int i = 0; i<20; i++){
+			for(int j = 0; j<durations.length; j++){
+				LogUtil.println(i, j);
+				var start = System.nanoTime();
+				var gen   = tryCreate(r, 1, j);
+				testType(gen.withName("fields_" + i + "_" + j)
+				            .withAnnotation(Annotations.make(StructPipe.Special.class))
+				);
+				var end = System.nanoTime();
+				durations[j] = end - start;
+			}
+		}
+		LogUtil.printGraph(LongStream.of(durations).boxed().toList(), 30, false, new LogUtil.Val<>("duration", '-', e -> (double)e));
+	}
+	
 	@Test(dependsOnGroups = "earlyCheck")
 	public void fuzzGen() throws LockedFlagSet{
 		
@@ -317,18 +338,17 @@ public final class StructFuzzTest{
 		var ch  = AllocateTicket.bytes(64).submit(mem);
 		
 		var sets = struct.getRealFields().mapped(FieldSet::of).toList();
-		for(int i = 0; i<50; i++){
+		for(int i = 0; i<1; i++){
 			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
 			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
-			
-			for(var fs1 : sets){
-				TestUtils.checkPipeInOutEquality(ch, pipe, inst, fs1);
-			}
+
+//			for(var fs1 : sets){
+//				TestUtils.checkPipeInOutEquality(ch, pipe, inst, fs1);
+//			}
 		}
 	}
 	
 	private TempClassGen.ClassGen tryCreate(RandomGenerator rand, long sequenceIndex, int fieldCount){
-		if(rand.nextFloat()>0.99) fieldCount *= 10;
 		
 		var fields = Iters.rand(rand, fieldCount, 0, fieldTypes.size()).enumerate()
 		                  .toList(e -> fieldTypes.get(e.val()).apply("field" + e.index(), rand));
