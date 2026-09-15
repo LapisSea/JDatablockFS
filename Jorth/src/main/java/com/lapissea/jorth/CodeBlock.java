@@ -420,11 +420,15 @@ public class CodeBlock{
 			throw new MalformedJorth("Enum instances can only be created by enumConstant: " + clazz);
 		}
 		if(type.dims() != 0){
-			add(NewOp.simulate(localStack, type, false));
 			var args = doArgs(arguments);
-			if(args.size() != 0){
-				throw new MalformedJorth("Cannot pass arguments to an array type");
+			if(args.size() != type.dims()){
+				throw new MalformedJorth(
+					"Incorrect number of arguments for " + clazz + "\n" +
+					"  Got:      " + args.size() + "\n" +
+					"  Expected: " + type.dims()
+				);
 			}
+			add(NewOp.simulate(localStack, type, false));
 			return this;
 		}
 		add(NewOp.simulate(localStack, type, true));
@@ -642,10 +646,7 @@ public class CodeBlock{
 		InstructionLines(MethodVisitor writer){
 			super(Opcodes.ASM9, writer);
 		}
-		void instruction(Label start) throws MalformedJorth{
-			if(lines.size() == 65535){
-				throw new MalformedJorth("Jorth instruction number exceeds the JVM line number limit (65535)");
-			}
+		void instruction(Label start){
 			lines.add(new Line(lines.size() + 1, start));
 		}
 		void finish(Label end){

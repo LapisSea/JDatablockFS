@@ -204,7 +204,7 @@ public class ReproJorthTests{
 	@Test(dataProvider = "arrays")
 	void createsArrayWithCorrectTypeAndLength(Class<?> type, int length) throws Exception{
 		var cls = generateAndLoad("test.ArrayAllocation", cd ->
-			                                                  cd.function("make").staticAcc().returns(type).body().val(length).newObj(type));
+			                                                  cd.function("make").staticAcc().returns(type).body().newObj(type, args -> args.val(length)));
 		var result = cls.getMethod("make").invoke(null);
 		assertThat(result.getClass()).isEqualTo(type);
 		assertThat(Array.getLength(result)).isEqualTo(length);
@@ -1056,7 +1056,7 @@ public class ReproJorthTests{
 	void arrayLookupDoesNotHideComponentFields() throws Exception{
 		var cls = generateAndLoad("test.ArrayAndComponent", cd ->
 			                                                    cd.function("maxValue").staticAcc().returns(int.class).body()
-			                                                      .val(3).newObj(Integer[].class).call("hashCode").pop()
+			                                                      .newObj(Integer[].class, args -> args.val(3)).call("hashCode").pop()
 			                                                      .get(Integer.class, "MAX_VALUE"));
 		assertThat(cls.getMethod("maxValue").invoke(null)).isEqualTo(Integer.MAX_VALUE);
 	}

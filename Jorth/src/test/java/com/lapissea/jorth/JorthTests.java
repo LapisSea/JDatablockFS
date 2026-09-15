@@ -125,9 +125,9 @@ public class JorthTests{
 	@Test
 	void multidimensionalArrays() throws Exception{
 		var cls = generateAndLoadInstanceSimple(autoName(), cd -> {
-			cd.function("ints").staticAcc().returns(int[][].class).body().val(2).val(3).newObj(int[][].class);
-			cd.function("strings").staticAcc().returns(String[][][].class).body().val(2).val(3).val(4).newObj(String[][][].class);
-			cd.function("empty").staticAcc().returns(long[][][].class).body().val(2).val(0).val(4).newObj(long[][][].class);
+			cd.function("ints").staticAcc().returns(int[][].class).body().newObj(int[][].class, args -> args.val(2).val(3));
+			cd.function("strings").staticAcc().returns(String[][][].class).body().newObj(String[][][].class, args -> args.val(2).val(3).val(4));
+			cd.function("empty").staticAcc().returns(long[][][].class).body().newObj(long[][][].class, args -> args.val(2).val(0).val(4));
 		});
 		var ints = (int[][])cls.getMethod("ints").invoke(null);
 		assertThat(ints.length).isEqualTo(2);
@@ -147,13 +147,13 @@ public class JorthTests{
 	@Test(expectedExceptions = MalformedJorth.class)
 	void multidimensionalArrayRequiresAllLengths() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd ->
-			                                          cd.function("run").staticAcc().body().val(2).newObj(int[][].class));
+			                                          cd.function("run").staticAcc().body().newObj(int[][].class, args -> args.val(2)));
 	}
 	
 	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Array size is not an integer")
 	void multidimensionalArrayRejectsNonIntegerLength() throws Exception{
 		generateAndLoadInstanceSimple(autoName(), cd ->
-			                                          cd.function("run").staticAcc().body().val(2L).val(3).newObj(int[][].class));
+			                                          cd.function("run").staticAcc().body().newObj(int[][].class, args -> args.val(2L).val(3)));
 	}
 	
 	@Test

@@ -350,7 +350,7 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 				}
 			}
 			
-			enumInit.val(constants.size()).newObj(ClassName.slashed(vType.jvmDescriptorStr()));
+			enumInit.newObj(ClassName.slashed(vType.jvmDescriptorStr()), arg -> arg.val(constants.size()));
 			for(int i = 0; i<constants.size(); i++){
 				enumInit.dup().val(i).get(constants.get(i)).setArrayElement();
 			}
