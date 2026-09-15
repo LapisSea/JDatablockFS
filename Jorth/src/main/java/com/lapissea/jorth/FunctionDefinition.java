@@ -184,7 +184,7 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	public void visit(ClassWriter writer) throws MalformedJorth{
 		
 		Insn.ReturnOp implicitReturn = null;
-		if(body != null && !body.terminates()){
+		if(body != null){
 			try{
 				body.mergeBranch();
 			}catch(MalformedJorth e){

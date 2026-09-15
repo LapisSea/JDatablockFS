@@ -1175,5 +1175,85 @@ sealed interface Insn{
 		}
 	}
 	
+	final class TryBlock implements TerminatingInsn, BranchingInsn{
+		
+		record Handler(ClassName type, LocalsArray.Local exception, CodeBlock body){ }
+		
+		final CodeBlock     body;
+		final List<Handler> handlers = new ArrayList<>();
+		boolean sealed;
+		
+		TryBlock(CodeBlock body){
+			this.body = body;
+		}
+		@Override
+		public void merge(TypeStack stack) throws MalformedJorth{
+			sealed = true;
+			if(handlers.isEmpty()){
+				throw new MalformedJorth("Try requires a catch clause");
+			}
+			
+			var point = new BranchPoint();
+			point.addIngoing(BranchPoint.Edge.capture("try", body));
+			
+			for(var handler : handlers){
+				point.addIngoing(BranchPoint.Edge.capture("catch " + handler.type().dotted(), handler.body()));
+			}
+			
+			var outgoing = point.getOutgoingTypeStack();
+			stack.getLocalPortion().clear();
+			outgoing.ifPresent(types -> types.forEach(stack::push));
+		}
+		@Override
+		public boolean terminates(){
+			if(!body.terminates()) return false;
+			for(Handler h : handlers){
+				if(!h.body().terminates()){
+					return false;
+				}
+			}
+			return true;
+		}
+		@Override
+		public void visit(MethodVisitor writer) throws MalformedJorth{
+			var start         = new Label();
+			var end           = new Label();
+			var merge         = new Label();
+			var handlerLabels = new ArrayList<Label>();
+			
+			writer.visitLabel(start);
+			writer.visitInsn(NOP); // Try needs a nonempty protected range.
+			
+			body.visit(writer);
+			
+			writer.visitLabel(end);
+			
+			if(!body.terminates()){
+				writer.visitJumpInsn(GOTO, merge);
+			}
+			
+			for(var handler : handlers){
+				var label = new Label();
+				handlerLabels.add(label);
+				writer.visitLabel(label);
+				
+				if(handler.exception() == null){
+					writer.visitInsn(POP);
+				}else{
+					writer.visitVarInsn(ASTORE, handler.exception().index());
+				}
+				handler.body().visit(writer);
+				if(!handler.body().terminates()){
+					writer.visitJumpInsn(GOTO, merge);
+				}
+			}
+			writer.visitLabel(merge);
+			
+			for(int i = 0; i<handlers.size(); i++){
+				writer.visitTryCatchBlock(start, end, handlerLabels.get(i), handlers.get(i).type().slashed());
+			}
+		}
+	}
+	
 	void visit(MethodVisitor writer) throws MalformedJorth;
 }

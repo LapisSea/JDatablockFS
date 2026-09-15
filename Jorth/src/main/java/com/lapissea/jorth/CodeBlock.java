@@ -119,6 +119,63 @@ public class CodeBlock{
 		return add(InlineBlock.simulate(block));
 	}
 	
+	public CodeBlock tryRun(CodeArg code) throws MalformedJorth{
+		preInsn();
+		if(!localStack.isEmpty()) throw new MalformedJorth("tryRun requires an empty operand stack; store incoming values in locals");
+		var block = createBlockFromHere(Objects.requireNonNull(code));
+		block.lockEditing();
+		return add(new Insn.TryBlock(block));
+	}
+	/**
+	 * Adds a scoped handler that discards the caught exception.
+	 */
+	public CodeBlock tryCatch(Class<? extends Throwable> type, CodeArg code) throws MalformedJorth{
+		return tryCatch(type, null, code);
+	}
+	/**
+	 * Adds a scoped handler. The exception is available the exceptionName.
+	 * Example: {@code tryCatch(IOException.class, "error", c -> c.throwNew(RuntimeException.class, a -> a.get("error")))}.
+	 * Handlers are matched in declaration order, and a catch hidden by an earlier catch is rejected.
+	 */
+	public CodeBlock tryCatch(Class<? extends Throwable> type, String exceptionName, CodeArg code) throws MalformedJorth{
+		return tryCatch(ClassName.of(type), exceptionName, code);
+	}
+	/**
+	 * Adds a scoped handler. The exception is available the exceptionName.
+	 * Example: {@code tryCatch(IOException.class, "error", c -> c.throwNew(RuntimeException.class, a -> a.get("error")))}.
+	 * Handlers are matched in declaration order, and a catch hidden by an earlier catch is rejected.
+	 */
+	public CodeBlock tryCatch(ClassName type, String exceptionName, CodeArg code) throws MalformedJorth{
+		
+		checkFreeze();
+		if(insns.isEmpty() || !(insns.getLast() instanceof Insn.TryBlock tryBlock) || tryBlock.sealed){
+			throw new MalformedJorth("Catch must follow an unfinished try block");
+		}
+		
+		Objects.requireNonNull(type, "type");
+		
+		if(!type.instanceOf(typeSource, ClassName.of(Throwable.class))){
+			throw new MalformedJorth("Catch type must extend Throwable but is " + type);
+		}
+		
+		for(var handler : tryBlock.handlers){
+			if(type.instanceOf(typeSource, handler.type())){
+				throw new MalformedJorth("Unreachable catch: " + type);
+			}
+		}
+		
+		var block = createBlockFromHere(b -> {
+			if(exceptionName != null){
+				b.defineLocalValue(exceptionName, GenericType.of(type), false);
+			}
+			Objects.requireNonNull(code).accept(b);
+		});
+		block.lockEditing();
+		
+		tryBlock.handlers.add(new Insn.TryBlock.Handler(type, exceptionName == null? null : block.getLocal(exceptionName), block));
+		
+		return this;
+	}
 	/**
 	 * Builds a (while) loop. Both callbacks have local scopes.<br/>
 	 * The check must add one boolean to the stack, and normal body completion must preserve the entry stack.
@@ -365,10 +422,12 @@ public class CodeBlock{
 		return falseBlock(code, ConditionalJump.Type.EQUALITY);
 	}
 	public CodeBlock ifIsNull(CodeArg code) throws MalformedJorth{
+		preInsn();
 		var type = localStack.peekLast();
 		return nullVal(type).ifEquality(code);
 	}
 	public CodeBlock ifIsNotNull(CodeArg code) throws MalformedJorth{
+		preInsn();
 		var type = localStack.peekLast();
 		return nullVal(type).ifNotEquality(code);
 	}
@@ -838,6 +897,7 @@ public class CodeBlock{
 		return localValues.get(name) != null;
 	}
 	public CodeBlock setIntoNewVar(String name) throws MalformedJorth{
+		preInsn();
 		var type = localStack.peekLast();
 		return var(type, name).set(name);
 	}
@@ -872,6 +932,7 @@ public class CodeBlock{
 		return add(BitShiftLeft.simulate(localStack));
 	}
 	public CodeBlock bitAnd(int val) throws MalformedJorth{
+		preInsn();
 		if(localStack.peekLast().equals(GenericType.LONG)){
 			val((long)val);
 		}else{
@@ -880,6 +941,7 @@ public class CodeBlock{
 		return bitAnd();
 	}
 	public CodeBlock bitAnd(long val) throws MalformedJorth{
+		preInsn();
 		if(localStack.peekLast().equals(GenericType.LONG)){
 			val(val);
 		}else{
