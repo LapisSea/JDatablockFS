@@ -23,6 +23,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.type;
 	exports com.lapissea.dfs.type.field;
 	exports com.lapissea.dfs.type.field.fields;
+	exports com.lapissea.dfs.type.field.fields.reflection.wrappers;
 	exports com.lapissea.dfs.exceptions;
 	exports com.lapissea.dfs.query;
 	exports com.lapissea.dfs.utils;
@@ -38,7 +39,6 @@ module JDatablockFS.core {
 	
 	exports com.lapissea.dfs.type.field.fields.reflection to JDatablockFS.tools, jlapisutil;
 	exports com.lapissea.dfs.logging to JDatablockFS.tools, JDatablockFS.run;
-	exports com.lapissea.dfs.type.field.fields.reflection.wrappers to JDatablockFS.tools, jlapisutil;
 	
 	
 	exports com.lapissea.dfs.io.compress;

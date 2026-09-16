@@ -224,7 +224,7 @@ public final class PipeCodeGen{
 	}
 	
 	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
 	){
 		Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
 		
@@ -234,7 +234,7 @@ public final class PipeCodeGen{
 			var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
 				cw.typeDef("ObjType", objType);
 				
-				var accessMap = new SpecializedGenerator.AccessMap(cw);
+				var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
 				accessMap.setup(true, false);
 				
 				Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
@@ -294,7 +294,7 @@ public final class PipeCodeGen{
 	}
 	
 	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
 	){
 		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
 		
@@ -303,7 +303,7 @@ public final class PipeCodeGen{
 			
 			var target = makeImpl(lookup, name, cw -> {
 				cw.typeDef("ObjType", objType);
-				var accessMap = new SpecializedGenerator.AccessMap(cw);
+				var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
 				
 				ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
 				var body = cw.function(name).staticAcc()
@@ -347,9 +347,9 @@ public final class PipeCodeGen{
 	
 	public static void standardPipeImpl(
 		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
-		List<SpecializedGenerator> generators
+		List<SpecializedGenerator> generators, Class<? extends StructPipe> pipeType
 	) throws MalformedJorth, UnsupportedCodeGenType{
-		var accessMap = new SpecializedGenerator.AccessMap(cw);
+		var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
 		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		

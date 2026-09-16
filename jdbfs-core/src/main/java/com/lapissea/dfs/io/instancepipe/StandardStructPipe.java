@@ -257,12 +257,12 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields, StandardStructPipe.class);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields, StandardStructPipe.class);
 	}
 	
 	@Override
@@ -289,7 +289,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, StandardStructPipe.class);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

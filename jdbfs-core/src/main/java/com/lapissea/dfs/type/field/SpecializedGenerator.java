@@ -2,6 +2,7 @@ package com.lapissea.dfs.type.field;
 
 import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.BitUtils;
+import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.WordSpace;
@@ -52,17 +53,23 @@ public interface SpecializedGenerator{
 	
 	final class AccessMap{
 		
-		private record GetInfo(ClassName className, String fieldName){ }
+		private record GetInfo(ClassName className, String fieldName){
+			void get(CodeBlock block) throws MalformedJorth{
+				block.get(className, fieldName);
+			}
+		}
 		
 		private final Map<FieldAccessor<?>, String>            localFields    = new HashMap<>();
 		private final Map<FieldAccessor<?>, AccessMap.GetInfo> accessorFields = new HashMap<>();
 		private final Map<IOField<?, ?>, AccessMap.GetInfo>    fieldRefFields = new HashMap<>();
 		private final Map<Class<?>, AccessMap.GetInfo>         enumArrays     = new HashMap<>();
+		private final Map<Struct<?>, AccessMap.GetInfo>        pipeRefs       = new HashMap<>();
 		
 		private int tmpFieldCount;
 		
-		private final ClassDefinition cw;
-		private       int             constantIndex;
+		private final ClassDefinition                cw;
+		private final Class<? extends StructPipe<?>> pipeType;
+		private       int                            constantIndex;
 		
 		private final List<Set<String>> temporaryStack = new ArrayList<>();
 		
@@ -71,7 +78,11 @@ public interface SpecializedGenerator{
 		/// indicates that the object being built has its fields in local variables, not a builder
 		private boolean localObject;
 		
-		public AccessMap(ClassDefinition cw){ this.cw = cw; }
+		@SuppressWarnings({"unchecked", "rawtypes"})
+		public AccessMap(ClassDefinition cw, Class<? extends StructPipe> pipeType){
+			this.cw = cw;
+			this.pipeType = (Class<? extends StructPipe<?>>)pipeType;
+		}
 		
 		public void setup(boolean hasIOPool, boolean localObject){
 			this.hasIOPool = hasIOPool;
@@ -145,12 +156,15 @@ public interface SpecializedGenerator{
 			return accessorInfo;
 		}
 		
-		private void createEnumConstant(Class<? extends Enum<?>> type) throws MalformedJorth{
+		private GetInfo createEnumConstant(Class<? extends Enum<?>> type) throws MalformedJorth{
 			var name = "eArr_" + (constantIndex++) + "_" + type.getSimpleName().replaceAll("[^A-Za-z]", "");
 			cw.field(type.arrayType(), name)
 			  .visibility(Visibility.PRIVATE).staticFinal(e -> e.call(type, "values"));
 			
-			addEnumArray(type, cw.getTypeDef("ThisClass"), name);
+			ClassName className = cw.getTypeDef("ThisClass");
+			GetInfo   info      = new GetInfo(className, name);
+			enumArrays.put(type, info);
+			return info;
 		}
 		
 		private GetInfo createFieldAccessorConstant(FieldAccessor<?> accessor) throws MalformedJorth{
@@ -164,19 +178,34 @@ public interface SpecializedGenerator{
 			cinit.call("getAccessor").cast(VirtualAccessor.class)
 			     .setField(field);
 			
-			return addAccessorField(accessor, cw.getTypeDef("ThisClass"), name);
+			ClassName className = cw.getTypeDef("ThisClass");
+			GetInfo   info      = new GetInfo(className, name);
+			accessorFields.put(accessor, info);
+			return info;
 		}
 		private GetInfo createFieldRefConstant(IOField<?, ?> ioField) throws MalformedJorth{
 			var name = "fieldRef_" + (constantIndex++) + "_" + ioField.getName().replaceAll("[^A-Za-z]", "");
 			
-			var field = cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name)
-			              .visibility(Visibility.PRIVATE).staticFinal();
+			cw.field(GenericType.of(IOField.class).withArgs(cw.getTypeDef("ObjType")), name)
+			  .visibility(Visibility.PRIVATE)
+			  .staticFinal(code -> getObjField(code, cw, ioField.getName()));
 			
-			var cinit = cw.staticInit().body();
-			getObjField(cinit, cw, ioField.getName());
-			cinit.setField(field);
+			ClassName className = cw.getTypeDef("ThisClass");
+			GetInfo   info      = new GetInfo(className, name);
+			fieldRefFields.put(ioField, info);
+			return info;
+		}
+		private GetInfo createPipeRefConstant(Struct<?> struct) throws MalformedJorth{
+			var name = "pipeRef_" + (constantIndex++) + "_" + struct.cleanName().replaceAll("[^A-Za-z]", "");
 			
-			return addFieldRefField(ioField, cw.getTypeDef("ThisClass"), name);
+			cw.field(GenericType.of(StructPipe.class).withArgs(struct.getType()), name)
+			  .visibility(Visibility.PRIVATE)
+			  .staticFinal(code -> code.call(pipeType, "of", e -> e.val(struct.getType())));
+			
+			ClassName className = cw.getTypeDef("ThisClass");
+			GetInfo   info      = new GetInfo(className, name);
+			pipeRefs.put(struct, info);
+			return info;
 		}
 		
 		private static void getObjField(CodeBlock cinit, ClassDefinition cw, String name) throws MalformedJorth{
@@ -195,18 +224,30 @@ public interface SpecializedGenerator{
 		public <E extends Enum<E>> void getEnumArray(Class<E> type, CodeBlock code) throws MalformedJorth{
 			var info = enumArrays.get(type);
 			if(info == null){
-				createEnumConstant(type);
-				info = Objects.requireNonNull(enumArrays.get(type));
+				info = createEnumConstant(type);
 			}
-			code.get(info.className, info.fieldName);
+			info.get(code);
 		}
 		
-		public <E extends Enum<E>> void getFieldRef(IOField<?, ?> field, CodeBlock block) throws MalformedJorth{
+		public void getFieldRef(IOField<?, ?> field, CodeBlock block) throws MalformedJorth{
 			var info = fieldRefFields.get(field);
 			if(info == null){
 				info = createFieldRefConstant(field);
 			}
-			block.get(info.className, info.fieldName);
+			info.get(block);
+		}
+		
+		public void readStruct(Struct<?> struct, CodeBlock block, CodeArg genericContext) throws MalformedJorth{
+			var info = pipeRefs.get(struct);
+			if(info == null){
+				info = createPipeRefConstant(struct);
+			}
+			info.get(block);
+			block.call("readNew", args -> {
+				     args.get("provider").get("src");
+				     genericContext.accept(args);
+			     })
+			     .cast(struct.getType());
 		}
 		
 		public void get(IOField<?, ?> field, CodeBlock body) throws MalformedJorth{
@@ -239,19 +280,6 @@ public interface SpecializedGenerator{
 				}
 				default -> throw new UnsupportedOperationException(field.getClass().getTypeName() + " not supported");
 			}
-		}
-		private AccessMap.GetInfo addAccessorField(FieldAccessor<?> accessor, ClassName className, String fieldName){
-			var info = new AccessMap.GetInfo(className, fieldName);
-			accessorFields.put(accessor, info);
-			return info;
-		}
-		private GetInfo addFieldRefField(IOField<?, ?> accessor, ClassName className, String fieldName){
-			var info = new AccessMap.GetInfo(className, fieldName);
-			fieldRefFields.put(accessor, info);
-			return info;
-		}
-		public void addEnumArray(Class<?> type, ClassName className, String fieldName){
-			enumArrays.put(type, new AccessMap.GetInfo(className, fieldName));
 		}
 		
 		public String temporaryLocalField(Class<?> type, String nameHint, CodeBlock code) throws MalformedJorth{
