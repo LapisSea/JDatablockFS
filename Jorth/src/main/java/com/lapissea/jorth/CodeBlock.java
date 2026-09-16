@@ -20,6 +20,7 @@ import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -480,20 +481,19 @@ public class CodeBlock{
 		}
 		if(type.dims() != 0){
 			var args = doArgs(arguments);
-			if(args.size() != type.dims()){
+			if(args.stack.size() != type.dims()){
 				throw new MalformedJorth(
 					"Incorrect number of arguments for " + clazz + "\n" +
-					"  Got:      " + args.size() + "\n" +
+					"  Got:      " + args.stack.size() + "\n" +
 					"  Expected: " + type.dims()
 				);
 			}
-			add(NewOp.simulate(localStack, type, false));
-			return this;
+			return addWithArguments(NewOp.simulate(localStack, type, false), args.insnStart);
 		}
 		add(NewOp.simulate(localStack, type, true));
 		var args = doArgs(arguments);
-		var fn   = resolveFunction(typeSource.byName(clazz), "<init>", args);
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
+		var fn   = resolveFunction(typeSource.byName(clazz), "<init>", args.stack);
+		return addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), fn, false), args.insnStart);
 	}
 	
 	private void checkEnumConstructorCall(String name) throws MalformedJorth{
@@ -523,15 +523,22 @@ public class CodeBlock{
 		
 		var args = doArgs(gatherArguments);
 		
-		FunctionInfo fn = resolveFunction(caller, name, args);
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
+		FunctionInfo fn = resolveFunction(caller, name, args.stack);
+		return addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), fn, false), args.insnStart);
 	}
 	
-	private List<JType> doArgs(CodeArg gatherArguments) throws MalformedJorth{
-		var mark = localStack.size();
+	private CodeBlock addWithArguments(ArgumentInsn instruction, int argumentStart) throws MalformedJorth{
+		return add(argumentStart<insns.size()? instruction.withArgumentStart(argumentStart) : instruction);
+	}
+	
+	private record ArgsInfo(List<JType> stack, int insnStart){ }
+	
+	private ArgsInfo doArgs(CodeArg gatherArguments) throws MalformedJorth{
+		var mark      = localStack.size();
+		var insnStart = insns.size();
 		gatherArguments.accept(this);
 		mergeBranch();
-		return readCallStack(mark);
+		return new ArgsInfo(readCallStack(mark), insnStart);
 	}
 	
 	public CodeBlock call(Class<?> staticCaller, String name) throws MalformedJorth{
@@ -550,9 +557,9 @@ public class CodeBlock{
 		
 		var args = doArgs(gatherArguments);
 		
-		var fn = cl.getFunction(new FunctionInfo.Signature(name, args));
+		var fn = cl.getFunction(new FunctionInfo.Signature(name, args.stack));
 		
-		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
+		return addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), fn, false), args.insnStart);
 	}
 	
 	private List<JType> readCallStack(int mark) throws MalformedJorth{
@@ -571,15 +578,14 @@ public class CodeBlock{
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	public CodeBlock call(FunctionDefinition fn, CodeArg gatherArguments) throws MalformedJorth{
-		var mark = localStack.size();
-		gatherArguments.accept(this);
-		var argCount = localStack.size() - mark;
-		
+		checkEnumConstructorCall(fn.name());
+		preInsn();
+		var args   = doArgs(gatherArguments);
 		var fnArgs = fn.getArgs();
-		if(argCount != fnArgs.size()){
-			throw new MalformedJorth("Function argument takes " + fnArgs.size() + " but got " + argCount);
+		if(args.stack.size() != fnArgs.size()){
+			throw new MalformedJorth("Function argument takes " + fnArgs.size() + " but got " + args.stack.size());
 		}
-		return call(fn);
+		return addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), fn, false), args.insnStart);
 	}
 	
 	public CodeBlock set(Class<?> declaringClass, String fieldName) throws MalformedJorth{
@@ -650,8 +656,8 @@ public class CodeBlock{
 		preInsn();
 		get("this");
 		var          args    = doArgs(gatherArguments);
-		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args);
-		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), args.stack);
+		addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true), args.insnStart);
 		if(fnOwner.isConstructor()){
 			fnOwner.ranInstanceInitializers = true;
 			fnOwner.owner().initializeInstanceFields(this);
@@ -668,11 +674,12 @@ public class CodeBlock{
 		if(fnOwner.isEnumConstructor()) throw new MalformedJorth("Enum constructor superclass call is supplied by Jorth");
 		preInsn();
 		get("this");
+		var argumentStart = insns.size();
 		for(String argName : fnOwner.getArgNames()){
 			get(argName);
 		}
 		FunctionInfo superFn = resolveFunction(fnOwner.owner().superType(), fnOwner.name(), fnOwner.getArgs());
-		add(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true));
+		addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), superFn, true), argumentStart);
 		if(fnOwner.isConstructor()){
 			fnOwner.ranInstanceInitializers = true;
 			fnOwner.owner().initializeInstanceFields(this);
@@ -861,7 +868,7 @@ public class CodeBlock{
 	
 	public CodeBlock callVirtual(Consumer<BootstrapFn> bootstrap, Consumer<CallingFn> fnDef, CodeArg arguments) throws MalformedJorth{
 		preInsn();
-		List<JType> args = doArgs(arguments);
+		var args = doArgs(arguments);
 		
 		var boot = new BootstrapFn();
 		var fn   = new CallingFn();
@@ -875,7 +882,7 @@ public class CodeBlock{
 			throw new MalformedJorth("Calling function name must be specified");
 		}
 		
-		return add(VirtualCallOp.simulate(localStack, typeSource, boot, fn, args));
+		return addWithArguments(VirtualCallOp.simulate(localStack, typeSource, boot, fn, args.stack), args.insnStart);
 	}
 	
 	public CodeBlock var(Class<?> type, String name) throws MalformedJorth{
@@ -1039,5 +1046,57 @@ public class CodeBlock{
 	}
 	FreezeReason getFreezeReason(){
 		return freezeReason;
+	}
+	
+	public String print(){
+		var out = new DefinitionPrinter();
+		print(out);
+		return out.toString();
+	}
+	
+	void print(DefinitionPrinter out){
+		var declarations = debugLocals.entrySet().stream()
+		                              .filter(e -> e.getKey().canRemove())
+		                              .sorted(Comparator.<Map.Entry<Local, LocalDebugRange>>comparingInt(e -> e.getValue().start)
+		                                                .thenComparingInt(e -> e.getKey().index())
+		                                                .thenComparing(e -> e.getKey().name()))
+		                              .iterator();
+		
+		var declaration = declarations.hasNext()? declarations.next() : null;
+		
+		var openings = new HashMap<Integer, List<Integer>>();
+		for(int end = 0; end<insns.size(); end++){
+			if(insns.get(end) instanceof ArgumentInsn instruction && instruction.argumentStart()>=0){
+				openings.computeIfAbsent(instruction.argumentStart(), ignored -> new ArrayList<>()).add(end);
+			}
+		}
+		openings.values().forEach(ends -> ends.sort(Comparator.reverseOrder()));
+		
+		for(int i = 0; i<=insns.size(); i++){
+			for(int end : openings.getOrDefault(i, List.of())){
+				out.open(switch(insns.get(end)){
+					case InvokeOp call -> InstructionPrinter.callHeader(call);
+					case VirtualCallOp call -> InstructionPrinter.callHeader(call);
+					case NewOp array -> DefinitionPrinter.keyword("new") + " " + DefinitionPrinter.type(array.type());
+					default -> throw new IllegalStateException("Unsupported argument block");
+				});
+				if(insns.get(end) instanceof VirtualCallOp call){
+					InstructionPrinter.printBootstrap(call, out);
+				}
+			}
+			
+			while(declaration != null && declaration.getValue().start == i){
+				var local = declaration.getKey();
+				out.line(DefinitionPrinter.keyword("var") + " " + DefinitionPrinter.type(local.type()) + " " + DefinitionPrinter.name(local.name()) + ";");
+				declaration = declarations.hasNext()? declarations.next() : null;
+			}
+			
+			if(i<insns.size()){
+				var instruction = insns.get(i);
+				if(instruction instanceof ArgumentInsn args && args.argumentStart()>=0){
+					out.close();
+				}else instruction.print(out);
+			}
+		}
 	}
 }

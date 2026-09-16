@@ -35,6 +35,17 @@ import java.util.stream.Collectors;
 import static org.objectweb.asm.Opcodes.*;
 
 sealed interface Insn{
+	default void print(DefinitionPrinter out){
+		InstructionPrinter.print(this, out);
+	}
+	
+	sealed interface ArgumentInsn extends Insn permits NewOp, InvokeOp, VirtualCallOp{
+		/**
+		 * -1 when there is no explicit, nonempty argument block.
+		 */
+		int argumentStart();
+		ArgumentInsn withArgumentStart(int start);
+	}
 	
 	sealed interface TerminatingInsn extends Insn{
 		boolean terminates();
@@ -625,7 +636,11 @@ sealed interface Insn{
 		}
 	}
 	
-	record NewOp(GenericType type, boolean dup) implements Insn{
+	record NewOp(GenericType type, boolean dup, int argumentStart) implements ArgumentInsn{
+		@Override
+		public NewOp withArgumentStart(int start){
+			return new NewOp(type, dup, start);
+		}
 		
 		static NewOp simulate(TypeStack stack, GenericType type, boolean dup) throws MalformedJorth{
 			if(type.dims()<0 || type.dims()>255){
@@ -642,7 +657,7 @@ sealed interface Insn{
 			if(dup){
 				stack.push(type);
 			}
-			return new NewOp(type, dup);
+			return new NewOp(type, dup, -1);
 		}
 		
 		@Override
@@ -728,7 +743,7 @@ sealed interface Insn{
 		}
 	}
 	
-	record PutLocalVarOp(BaseType type, int index) implements Insn{
+	record PutLocalVarOp(BaseType type, int index, String name) implements Insn{
 		
 		static PutLocalVarOp simulate(TypeStack stack, TypeSource typeSource, LocalsArray.Local local) throws MalformedJorth{
 			var fieldType = local.type();
@@ -736,7 +751,7 @@ sealed interface Insn{
 			if(!type.instanceOf(typeSource, fieldType)){
 				throw new MalformedJorth("Tried to set local field of type " + fieldType + " to " + type);
 			}
-			return new PutLocalVarOp(fieldType.getBaseType(), local.index());
+			return new PutLocalVarOp(fieldType.getBaseType(), local.index(), local.name());
 		}
 		
 		@Override
@@ -795,7 +810,11 @@ sealed interface Insn{
 	}
 	
 	
-	record InvokeOp(FunctionInfo function, boolean superCall, ClassName caller) implements Insn{
+	record InvokeOp(FunctionInfo function, boolean superCall, ClassName caller, int argumentStart) implements ArgumentInsn{
+		@Override
+		public InvokeOp withArgumentStart(int start){
+			return new InvokeOp(function, superCall, caller, start);
+		}
 		
 		static InvokeOp simulate(TypeStack stack, TypeSource typeSource, ClassName caller, FunctionInfo function, boolean superCall) throws MalformedJorth{
 			ClassInfo owner = function.ownerInfo();
@@ -828,7 +847,7 @@ sealed interface Insn{
 				stack.push(returnType.asGeneric());
 			}
 			
-			return new InvokeOp(function, superCall, caller);
+			return new InvokeOp(function, superCall, caller, -1);
 		}
 		
 		@Override
@@ -882,7 +901,11 @@ sealed interface Insn{
 	}
 	
 	record VirtualCallOp(FunctionInfo.Signature callingSignature, GenericType callingReturnType, Handle bootstrapHandle,
-	                     Object[] bootstrapArgs) implements Insn{
+	                     Object[] bootstrapArgs, int argumentStart) implements ArgumentInsn{
+		@Override
+		public VirtualCallOp withArgumentStart(int start){
+			return new VirtualCallOp(callingSignature, callingReturnType, bootstrapHandle, bootstrapArgs, start);
+		}
 		
 		static VirtualCallOp simulate(TypeStack stack, TypeSource typeSource, BootstrapFn boot, CallingFn callingFn, List<JType> args) throws MalformedJorth{
 			if(args.size() != callingFn.args.size()){
@@ -919,7 +942,7 @@ sealed interface Insn{
 			
 			var staticArgs = boot.bootstrapStaticArgs.stream().map(BootstrapFn.StaticArg::value).toArray();
 			
-			return new VirtualCallOp(new FunctionInfo.Signature(callingFn.name, callingFn.args), callingFn.returns, bsmh, staticArgs);
+			return new VirtualCallOp(new FunctionInfo.Signature(callingFn.name, callingFn.args), callingFn.returns, bsmh, staticArgs, -1);
 		}
 		private static FunctionInfo pickBootstrapFunction(TypeSource typeSource, BootstrapFn bootstrap, ClassInfo bc, List<JType> bArgs) throws MalformedJorth{
 			var fns = bc.getFunctionsByName(bootstrap.functionName).filter(e -> {

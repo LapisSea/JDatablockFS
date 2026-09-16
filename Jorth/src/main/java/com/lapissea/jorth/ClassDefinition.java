@@ -563,4 +563,54 @@ public class ClassDefinition extends AnnotationContainer<ClassDefinition>{
 		this.debugEmitLevel = Objects.requireNonNull(debugEmitLevel);
 		return this;
 	}
+	
+	public String print(){
+		var out = new DefinitionPrinter();
+		for(var annotation : annotations){
+			out.line(annotation.print());
+		}
+		var header = new StringBuilder(DefinitionPrinter.modifiers(visibility, access)).append(' ');
+		header.append(DefinitionPrinter.keyword(switch(type){
+			case CLASS -> "class";
+			case INTERFACE -> "interface";
+			case ENUM -> "enum";
+			case ANNOTATION -> "@interface";
+		})).append(' ').append(DefinitionPrinter.type(name == null? "<unnamed>" : name));
+		if(!typeArgs.isEmpty()){
+			var args = new StringJoiner(", ", "<", ">");
+			for(var arg : typeArgs.entrySet()){
+				args.add(DefinitionPrinter.type(arg.getKey()) + " " + DefinitionPrinter.keyword("extends") + " " +
+				         DefinitionPrinter.type(arg.getValue().withTypeArgName(Optional.empty())));
+			}
+			header.append(args);
+		}
+		if(!extension.equals(GenericType.OBJECT)){
+			header.append(' ').append(DefinitionPrinter.keyword("extends")).append(' ').append(DefinitionPrinter.type(extension));
+		}
+		if(!interfaces.isEmpty()){
+			header.append(' ').append(DefinitionPrinter.keyword(type == ClassType.INTERFACE? "extends" : "implements"))
+			      .append(' ').append(DefinitionPrinter.types(interfaces));
+		}
+		if(!permits.isEmpty()){
+			header.append(' ').append(DefinitionPrinter.keyword("permits")).append(' ').append(DefinitionPrinter.types(permits));
+		}
+		out.open(header.toString());
+		
+		for(var field : fields.values()){
+			field.print(out);
+		}
+		
+		var allFunctions = new LinkedHashSet<>(functions.values());
+		allFunctions.addAll(danglingFunctions);
+		
+		for(var function : allFunctions){
+			out.line("");
+			function.print(out);
+		}
+		
+		out.close();
+		
+		return out.toString();
+	}
+	
 }

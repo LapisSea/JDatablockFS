@@ -11,6 +11,7 @@ import java.lang.reflect.Array;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 public class AnnotationDefinition{
 	
@@ -59,4 +60,18 @@ public class AnnotationDefinition{
 			writer.visit(name, value);
 		}
 	}
+	
+	public String print(){
+		var result = DefinitionPrinter.type("@" + type.dotted());
+		if(args.isEmpty()){
+			return result;
+		}
+		
+		var values = new StringJoiner(", ", "(", ")");
+		for(var arg : args.entrySet()){
+			values.add(DefinitionPrinter.name(arg.getKey()) + " = " + DefinitionPrinter.literal(arg.getValue()));
+		}
+		return result + values;
+	}
+	
 }

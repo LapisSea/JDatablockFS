@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.ACC_VARARGS;
@@ -287,4 +288,42 @@ public final class FunctionDefinition extends AnnotationContainer<FunctionDefini
 	public List<ClassName> getThrownExceptions(){
 		return thrownExceptions;
 	}
+	
+	public String print(){
+		var out = new DefinitionPrinter();
+		print(out);
+		return out.toString();
+	}
+	void print(DefinitionPrinter out){
+		for(var annotation : annotations){
+			out.line(annotation.print());
+		}
+		
+		var parameters = new StringJoiner(", ");
+		int index      = 0;
+		for(var arg : args.entrySet()){
+			var argType = DefinitionPrinter.type(arg.getValue());
+			if(varargs && ++index == args.size()){
+				var generic = arg.getValue().asGeneric();
+				argType = generic.dims()>0? DefinitionPrinter.type(generic.withDims(generic.dims() - 1)) + "..." : argType + "...";
+			}
+			parameters.add(argType + " " + DefinitionPrinter.name(arg.getKey()));
+		}
+		
+		var header = DefinitionPrinter.modifiers(visibility, access) + " " +
+		             DefinitionPrinter.type(returnType) + " " +
+		             DefinitionPrinter.name(name) + "(" + parameters + ")";
+		if(!thrownExceptions.isEmpty()){
+			header += " " + DefinitionPrinter.keyword("throws") + " " + DefinitionPrinter.types(thrownExceptions);
+		}
+		
+		if(body == null){
+			out.line(header + ";");
+		}else{
+			out.open(header);
+			body.print(out);
+			out.close();
+		}
+	}
+	
 }

@@ -110,4 +110,26 @@ public final class FieldDefinition extends AnnotationContainer<FieldDefinition> 
 	public String name(){
 		return name;
 	}
+	
+	public String print(){
+		var out = new DefinitionPrinter();
+		print(out);
+		return out.toString();
+	}
+	void print(DefinitionPrinter out){
+		for(var annotation : annotations){
+			out.line(annotation.print());
+		}
+		var declaration = DefinitionPrinter.modifiers(visibility, access) + " " +
+		                  DefinitionPrinter.type(type) + " " +
+		                  DefinitionPrinter.name(name);
+		if(isEnumConstant()){
+			declaration += " " + DefinitionPrinter.comment("/* enum constant; deferred arguments */");
+		}
+		if(instanceInitializer != null){
+			declaration += " = " + DefinitionPrinter.comment("/* deferred initializer */");
+		}
+		out.line(declaration + ";");
+	}
+	
 }
