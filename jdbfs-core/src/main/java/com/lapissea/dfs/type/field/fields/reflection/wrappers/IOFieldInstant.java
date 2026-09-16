@@ -1,7 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -50,7 +49,7 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	private static MethodHandle CONSTR;
 	
 	@IOInstance.Order({"seconds", "nanos"})
-	private interface IOInstant extends IOInstance.Def<IOInstant>{
+	public interface IOInstant extends IOInstance.Def<IOInstant>{
 		
 		static String toString(IOInstant val){
 			return val.getData().toString();
@@ -137,7 +136,8 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	}
 	
 	@Override
-	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-		throw new UnsupportedCodeGenType();
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.readStruct(IOInstant.STRUCT, body, a -> a.nullVal(GenericContext.class));
+		body.call("getData");
 	}
 }

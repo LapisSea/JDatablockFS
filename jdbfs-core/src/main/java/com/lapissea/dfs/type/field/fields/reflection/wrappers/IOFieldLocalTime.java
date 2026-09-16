@@ -1,7 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -105,7 +104,13 @@ public final class IOFieldLocalTime<CTyp extends IOInstance<CTyp>> extends IOFie
 	}
 	
 	@Override
-	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-		throw new UnsupportedCodeGenType();
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(LocalTime.class, "ofNanoOfDay", arg -> {
+			if(varSize != null){
+				varSize.size.readIntConst(arg, true);
+			}else{
+				arg.get("src").call("readInt8Dynamic");
+			}
+		});
 	}
 }

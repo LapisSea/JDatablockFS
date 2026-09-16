@@ -295,6 +295,14 @@ public enum NumberSize{
 		return toSigned(read(in));
 	}
 	
+	public int[] readIntsSigned(ContentReader in, int count) throws IOException{
+		var res = new int[count];
+		if(this == VOID) return res;
+		for(int i = 0; i<res.length; i++){
+			res[i] = toSigned(readInt(in));
+		}
+		return res;
+	}
 	public int readIntSigned(ContentReader in) throws IOException{
 		if(this == VOID) return 0;
 		return toSigned(readInt(in));

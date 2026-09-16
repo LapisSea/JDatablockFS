@@ -1,7 +1,6 @@
 package com.lapissea.dfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.internal.Preload;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
@@ -50,7 +49,7 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 	private static MethodHandle CONSTR;
 	
 	@IOInstance.Order({"date", "time"})
-	private interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
+	public interface IOLocalDateTime extends IOInstance.Def<IOLocalDateTime>{
 		
 		static String toString(IOLocalDateTime val){
 			return val.getData().toString();
@@ -140,7 +139,8 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 		instancePipe.skip(provider, src, genericContext);
 	}
 	@Override
-	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-		throw new UnsupportedCodeGenType();
+	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.readStruct(IOLocalDateTime.STRUCT, body, a -> a.nullVal(GenericContext.class));
+		body.call("getData");
 	}
 }

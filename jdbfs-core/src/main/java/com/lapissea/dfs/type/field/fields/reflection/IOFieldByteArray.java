@@ -152,13 +152,9 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		if(compression != null){
 			throw new UnsupportedCodeGenType("Compression variation not implemented");
 		}
-		if(nullable()){
-			throw new UnsupportedCodeGenType("Nullable variation not implemented");
-		}
-		
-		accessMap.set(getAccessor(), body, b -> {
-			b.get("src")
-			 .call("readInts1", e -> accessMap.get(arraySize, e));
+		injectReadFieldNullable(body, accessMap, null, bod -> {
+			bod.get("src")
+			   .call("readInts1", e -> accessMap.get(arraySize, e));
 		});
 	}
 	
