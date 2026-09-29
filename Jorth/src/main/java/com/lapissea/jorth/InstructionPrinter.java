@@ -52,6 +52,7 @@ final class InstructionPrinter{
 			case BitShiftLeft ignored -> op(out, "bitShiftLeft", "");
 			case BitShiftRight i -> op(out, i.logical()? "unsignedBitShiftRight" : "bitShiftRight", "");
 			case BitAnd ignored -> op(out, "bitAnd", "");
+			case BitOr ignored -> op(out, "bitOr", "");
 			case LoopJump i -> op(out, i.isBreak()? "break" : "continue", "");
 			case ConditionalJump i -> {
 				var condition = switch(i.type()){

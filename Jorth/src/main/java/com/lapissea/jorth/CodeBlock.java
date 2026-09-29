@@ -960,6 +960,10 @@ public class CodeBlock{
 		preInsn();
 		return add(BitAnd.simulate(localStack));
 	}
+	public CodeBlock bitOr() throws MalformedJorth{
+		preInsn();
+		return add(BitOr.simulate(localStack));
+	}
 	
 	public CodeBlock nullVal(Class<?> type) throws MalformedJorth { return nullVal(ClassName.of(type)); }
 	public CodeBlock nullVal(ClassName type) throws MalformedJorth{ return nullVal(GenericType.of(type)); }

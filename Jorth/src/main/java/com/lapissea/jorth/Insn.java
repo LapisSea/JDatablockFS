@@ -1126,7 +1126,31 @@ sealed interface Insn{
 			writer.visitInsn(isLong? LAND : IAND);
 		}
 	}
-	
+		record BitOr(boolean isLong) implements Insn{
+
+		public static BitOr simulate(TypeStack stack) throws MalformedJorth{
+			var a = stack.pop();
+			var b = stack.pop();
+
+			var isLong = a.equals(GenericType.LONG);
+
+			if(!a.equals(GenericType.INT) && !isLong){
+				throw new MalformedJorth("For bit-or, the stack must have 2 elements of int or long are: " + a + " and " + b);
+			}
+			if(!a.equals(b)){
+				throw new MalformedJorth("For bit-or, the last 2 stack elements must have the same type but are: " + a + " and " + b);
+			}
+
+			stack.push(a);
+			return new BitOr(isLong);
+		}
+
+		@Override
+		public void visit(MethodVisitor writer){
+			writer.visitInsn(isLong? LOR : IOR);
+		}
+	}
+
 	record NullConstant() implements Insn{
 		
 		public static NullConstant simulate(TypeStack stack, GenericType type) throws MalformedJorth{
