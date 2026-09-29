@@ -162,7 +162,7 @@ final class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>>{
 			}
 		}
 		
-		if(!(pipe.buildSpecializedImplementation() instanceof Match.Some(var specializedImplementation))){
+		if(!(pipe.buildSpecializedImplementation(syncStage) instanceof Match.Some(var specializedImplementation))){
 			return pipe;
 		}
 		

@@ -648,7 +648,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		T instance = type.make();
 		try{
 			return doRead(makeIOPool(), provider, src, instance, genericContext);
-		}catch(IOException e){
+		}catch(IOException|BootstrapMethodError e){
 			throw new TypeIOFail("Failed reading", getType().getType(), e);
 		}
 	}
@@ -1114,7 +1114,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
 		return Match.empty();
 	}
-	protected Match<StructPipe<T>> buildSpecializedImplementation(){
+	protected Match<StructPipe<T>> buildSpecializedImplementation(int syncStage){
 		if(!(getSpecializedImplementationWriter() instanceof Match.Some(var pipeWriter))){
 			return Match.empty();
 		}
@@ -1144,7 +1144,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
 			var cls    = access.defineClass(type, bytecode, true);
 			//noinspection unchecked
-			return Match.of((StructPipe<T>)cls.getConstructor().newInstance());
+			return Match.of((StructPipe<T>)cls.getConstructor(int.class).newInstance(syncStage));
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate specialized pipe for type: " + getType().getType().getTypeName(), e);
 		}catch(AccessProvider.Defunct e){

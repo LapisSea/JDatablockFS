@@ -208,7 +208,7 @@ public final class PipeCodeGen{
 		try{
 			return new ConstantCallSite(makeImpl(lookup, name, (cw) -> {
 				cw.typeDef("ObjType", ClassName.of(objType));
-				cw.function(name)
+				cw.function(name).staticAcc()
 				  .arg(GenericType.of(VarPool.class).withArgs(objType), "ioPool")
 				  .arg(DataProvider.class, "provider")
 				  .arg(ContentReader.class, "src")
@@ -334,10 +334,11 @@ public final class PipeCodeGen{
 		  .implement(StructPipe.SpecializedImplementation.class);
 		
 		cw.instanceInit()
+		  .arg(int.class, "syncStage")
 		  .body()
 		  .callSuper(c -> {
 			  c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType")))
-			   .val(StructPipe.STATE_DONE);
+			   .get("syncStage");
 		  });
 		
 		cw.function("getGenericType").visibility(Visibility.PUBLIC)
