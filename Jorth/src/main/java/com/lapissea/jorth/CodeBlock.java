@@ -501,9 +501,31 @@ public class CodeBlock{
 			throw new MalformedJorth("Explicit constructor calls are not supported in enum constructors");
 		}
 	}
+	
+	/**
+	 * Calls a function on the last object on the stack with zero arguments (eg: toString)
+	 *
+	 * @param name function name
+	 * @return this for chaining
+	 * @throws MalformedJorth
+	 */
 	public CodeBlock call(String name) throws MalformedJorth{
 		return call(name, 0);
 	}
+	/**
+	 *
+	 * This is a variant of the {@link #call(String, CodeArg)} without a lambda. You must specify the number of
+	 * arguments the function will take and the caller will be the first next object on the stack before the arguments. <br>
+	 * This style of calling is closer to the way bytecode is actually written out, but it is generally not preferable. <br>
+	 * <code> body.get("this").val("myName").val("nickname").call("sayHelloTo", 2) </code> <br>
+	 * Equivalent to the java code of: <br>
+	 * <code> this.sayHelloTo(myName, nickname)</code>
+	 *
+	 * @param name function name
+	 * @param argumentCount number of arguments the calling function takes
+	 * @return self for chaining
+	 * @throws MalformedJorth
+	 */
 	public CodeBlock call(String name, int argumentCount) throws MalformedJorth{
 		checkEnumConstructorCall(name);
 		preInsn();
@@ -516,21 +538,41 @@ public class CodeBlock{
 		FunctionInfo fn = resolveFunction(caller, name, args);
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
+	
 	/**
-	 * {@link #call(String, CodeArg)} utility overload for when all arguments are constants
+	 * {@link #call(String, CodeArg)} utility overload for when all arguments are constants. Example: <br>
+	 * <code>body.get("reader").call("readBytes", List.of(neededBytes))</code> <br>
+	 * Equivalent to the java code of: <br>
+	 * <code>reader.readBytes({ what ever int value neededBytes resolves to })</code>
 	 *
 	 * @param name function name that will be called
-	 * @param vals constants that will be inserted on to the stack
+	 * @param constants constant values that will be inserted on to the stack
 	 * @return this for chaining
 	 * @throws MalformedJorth
 	 */
-	public CodeBlock call(String name, List<Object> vals) throws MalformedJorth{
+	public CodeBlock call(String name, List<Object> constants) throws MalformedJorth{
 		return call(name, args -> {
-			for(Object val : vals){
+			for(Object val : constants){
 				args.val(val);
 			}
 		});
 	}
+	
+	/**
+	 * Calls a function on the instance of the last object on the stack. So... <br>
+	 * <code> body.get("this").call("sayHelloTo", arg->arg.get("myName")) </code> <br>
+	 * is equivalent to the java code of: <br>
+	 * <code> this.sayHelloTo(myName)</code> <br>
+	 * The argument gathering works trough the stack. Meaning, if you have
+	 * [int, long, Foo] on the stack before the call(...), and after gatherArguments is done executing, there is
+	 * [int, long, Foo, String, int] then that means that a function on Foo will be
+	 * called with 2 arguments of String and int.
+	 * 
+	 * @param name function name that will be called
+	 * @param gatherArguments lambda that collects the arguments for the function
+	 * @return this for chaining
+	 * @throws MalformedJorth
+	 */
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
 		checkEnumConstructorCall(name);
 		preInsn();
