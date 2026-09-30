@@ -15,6 +15,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -229,7 +230,7 @@ public enum NumberSize{
 			case VOID -> target.val(0L);
 			case BYTE, SHORT, SMALL_INT -> {
 				getContentReader.accept(target);
-				target.call("readWord", args -> args.val(bytes));
+				target.call("readWord", List.of(bytes));
 			}
 			case INT, BIG_INT, SMALL_LONG -> {
 				getContentReader.accept(target);

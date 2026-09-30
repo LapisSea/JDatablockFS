@@ -191,9 +191,9 @@ public class JorthCoverageStoreArithTests{
 			  .val("str").set("s")
 			  .newObj(StringBuilder.class)
 			  .call("append", c -> c.get("d"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("l"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("s"))
 			  .call("toString");
 		};

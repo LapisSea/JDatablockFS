@@ -438,7 +438,7 @@ public class JorthCoverageCoreTests{
 			  .set("c", 10000)
 			  .newObj(StringBuilder.class)
 			  .call("append", c -> c.get("b"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("c"))
 			  .call("toString");
 		});
@@ -504,11 +504,11 @@ public class JorthCoverageCoreTests{
 			  .set("d", 2.75)
 			  .newObj(StringBuilder.class)
 			  .call("append", c -> c.get("i1"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("l"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("i2"))
-			  .call("append", c -> c.val(" "))
+			  .call("append", List.of(" "))
 			  .call("append", c -> c.get("d"))
 			  .call("toString");
 		});

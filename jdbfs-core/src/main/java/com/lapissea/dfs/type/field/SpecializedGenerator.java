@@ -210,7 +210,7 @@ public interface SpecializedGenerator{
 		
 		private static void getObjField(CodeBlock cinit, ClassDefinition cw, String name) throws MalformedJorth{
 			getObjFields(cinit, cw);
-			cinit.call("requireByName", e -> e.val(name));
+			cinit.call("requireByName", List.of(name));
 		}
 		private static void getObjFields(CodeBlock cinit, ClassDefinition cw) throws MalformedJorth{
 			if(!cinit.hasVar("objFields")){

@@ -15,6 +15,7 @@ import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.TextUtil;
 
 import java.lang.invoke.MethodHandles;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -74,9 +75,9 @@ public final class WrapperStructs{
 			cw.function("toString").override()
 			  .body()
 			  .newObj(StringBuilder.class)
-			  .call("append", args -> args.val("WrapperOf€" + type.getSimpleName() + "{"))
+			  .call("append", List.of("WrapperOf€" + type.getSimpleName() + "{"))
 			  .call("append", args -> args.call(TextUtil.class, "toString", a -> a.getThis(val)))
-			  .call("append", args -> args.val("}"))
+			  .call("append", List.of("}"))
 			  .call("toString");
 			
 			var file = cw.getClassFile();

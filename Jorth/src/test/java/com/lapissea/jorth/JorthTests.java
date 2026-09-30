@@ -309,9 +309,9 @@ public class JorthTests{
 				      .returnOp();
 			  })
 			  .newObj(StringBuilder.class)
-			  .call("append", c -> c.val("lmao "))
+			  .call("append", List.of("lmao "))
 			  .call("append", c -> c.get("index"))
-			  .call("toString", 0);
+			  .call("toString");
 		});
 		
 		var test = cls.getMethod("test", int.class);
@@ -655,7 +655,7 @@ public class JorthTests{
 			  .body()
 			  .get("this")
 			  .val("ay ")
-			  .call("concat", c -> c.val("lmao"));
+			  .call("concat", List.of("lmao"));
 		});
 		TestCls test = new TestCls();
 		assertThat(test.flag).isFalse();
@@ -980,7 +980,7 @@ public class JorthTests{
 	void enumRejectsExplicitConstructorInvocation() throws Exception{
 		var cd = new ClassDefinition(null).name(ClassName.dotted(autoName())).type(ClassType.ENUM);
 		cd.instanceInit().body()
-		  .get("this").call("<init>", c -> c.val("ILLEGAL").val(0));
+		  .get("this").call("<init>", List.of("ILLEGAL", 0));
 	}
 	
 	@Test(expectedExceptions = MalformedJorth.class)

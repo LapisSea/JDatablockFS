@@ -145,7 +145,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 					accessMap.get(isNull, body);
 					body.ifTrue(b -> {
 						b.get("src")
-						 .call("skipExact", e -> e.val((long)maxSize.size.bytes))
+						 .call("skipExact", List.of((long)maxSize.size.bytes))
 						 .nullVal(type);
 					}).elseRun(b -> {
 						readOp.readInsn(b, accessMap);

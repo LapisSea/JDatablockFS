@@ -516,6 +516,21 @@ public class CodeBlock{
 		FunctionInfo fn = resolveFunction(caller, name, args);
 		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
+	/**
+	 * {@link #call(String, CodeArg)} utility overload for when all arguments are constants
+	 *
+	 * @param name function name that will be called
+	 * @param vals constants that will be inserted on to the stack
+	 * @return this for chaining
+	 * @throws MalformedJorth
+	 */
+	public CodeBlock call(String name, List<Object> vals) throws MalformedJorth{
+		return call(name, args -> {
+			for(Object val : vals){
+				args.val(val);
+			}
+		});
+	}
 	public CodeBlock call(String name, CodeArg gatherArguments) throws MalformedJorth{
 		checkEnumConstructorCall(name);
 		preInsn();

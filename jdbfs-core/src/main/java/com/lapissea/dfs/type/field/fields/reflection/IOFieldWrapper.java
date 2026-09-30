@@ -26,6 +26,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -125,7 +126,7 @@ public abstract sealed class IOFieldWrapper<CTyp extends IOInstance<CTyp>, Value
 	public final void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, bod -> {
 			if(fixed){
-				bod.get("src").call("skipExact", a -> a.val((long)fixedSize));
+				bod.get("src").call("skipExact", List.of((long)fixedSize));
 			}
 		}, bod -> {
 			try{
