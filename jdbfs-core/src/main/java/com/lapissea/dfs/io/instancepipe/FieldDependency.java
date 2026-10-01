@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -38,10 +39,21 @@ public class FieldDependency<T extends IOInstance<T>>{
 	private Map<IOField<T, ?>, Ticket<T>> singleDependencyCache = Map.of();
 	private Map<FieldSet<T>, Ticket<T>>   multiDependencyCache  = Map.of();
 	
-	private final FieldSet<T> allFields;
+	private final FieldSet<T>                             allFields;
+	private final Map<IOField<T, ?>, List<IOField<T, ?>>> dependencyOwners;
+	private final Map<IOField<T, ?>, List<IOField<T, ?>>> directDependencies = new ConcurrentHashMap<>();
 	
 	public FieldDependency(FieldSet<T> allFields){
 		this.allFields = allFields;
+		
+		var owners = new HashMap<IOField<T, ?>, List<IOField<T, ?>>>();
+		for(var field : allFields){
+			for(var unpacked : field.iterUnpackedFields()){
+				owners.computeIfAbsent(unpacked, ignored -> new ArrayList<>()).add(field);
+			}
+		}
+		owners.replaceAll((field, containingFields) -> List.copyOf(containingFields));
+		dependencyOwners = Map.copyOf(owners);
 	}
 	
 	public Ticket<T> getDeps(Iterable<String> names){
@@ -145,15 +157,16 @@ public class FieldDependency<T extends IOInstance<T>>{
 	private void includeFieldDependency(IOField<T, ?> field, Consumer<IOField<T, ?>> deps){
 		if(!field.hasDependencies()) return;
 		
-		// add fields that are a dependency or contain any dependencies
-		for(IOField<T, ?> f : allFields){
-			for(IOField<T, ?> tioField : f.iterUnpackedFields()){
-				if(field.isDependency(tioField)){
-					deps.accept(f);
-					break;
-				}
+		directDependencies.computeIfAbsent(field, selected -> {
+			var containingFields = new HashSet<IOField<T, ?>>();
+			
+			for(var dependency : selected.getDependencies()){
+				var owners = dependencyOwners.get(dependency);
+				if(owners != null) containingFields.addAll(owners);
 			}
-		}
+			
+			return Iters.from(allFields).filter(containingFields::contains).toList();
+		}).forEach(deps);
 	}
 	
 	private Ticket<T> generateFieldDependency(IOField<T, ?> selectedField){
