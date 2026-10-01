@@ -3,6 +3,7 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedStruct;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
@@ -184,30 +185,18 @@ public final class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, Val
 	}
 	
 	@Override
-	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		var type = Objects.requireNonNull(getType());
-		
-		accessMap.set(getAccessor(), body, b -> {
-			if(nullable()){
-				accessMap.get(isNull, b);
-				b.ifTrue(e -> e.nullVal(type))
-				 .elseRun(e -> {
-					 callReadTyp(e, accessMap);
-					 if(type != Object.class) e.cast(type);
-				 });
-			}else{
-				callReadTyp(b, accessMap);
-			}
+		injectReadFieldNullable(body, accessMap, null, b -> {
+			b.call(CodeUtils.class, "dynamic_readTyp", b1 -> {
+				accessMap.getFieldRef(this, b1);
+				accessMap.get(typeID, b1);
+				b1.get("provider")
+				  .get("src")
+				  .get("genericContext");
+			});
+			if(type != Object.class) b.cast(type);
 		});
 	}
 	
-	private void callReadTyp(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-		body.call(CodeUtils.class, "dynamic_readTyp", b -> {
-			accessMap.getFieldRef(this, b);
-			accessMap.get(typeID, b);
-			b.get("provider")
-			 .get("src")
-			 .get("genericContext");
-		});
-	}
 }
