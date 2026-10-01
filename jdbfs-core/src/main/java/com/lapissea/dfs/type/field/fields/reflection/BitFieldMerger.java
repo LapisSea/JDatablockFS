@@ -10,6 +10,7 @@ import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
+import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
@@ -30,6 +31,7 @@ import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -38,7 +40,112 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
-	private static final class GeneralMerger<T extends IOInstance<T>> extends BitFieldMerger<T>{
+	private static final class GeneralMerger<T extends IOInstance<T>> extends BitFieldMerger<T> implements SpecializedGenerator{
+		
+		private record ReadPlan(List<ReadStep> steps, int initialBytes, int windowBits, int offset){ }
+		
+		private sealed interface ReadStep{
+			record Read(OnBitSpace<?> generator, int bits, int offset) implements ReadStep{ }
+			
+			record AppendBytes(int bytes) implements ReadStep{ }
+		}
+		
+		@Override
+		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			if(safetyBits.isEmpty()){
+				throw new UnsupportedCodeGenType("Dynamic merged bits field");
+			}
+			
+			ReadPlan plan = computePlan();
+			
+			var rawBits = accessMap.temporaryLocalField(long.class, "rawBits", body);
+			var field   = accessMap.temporaryLocalField(int.class, "fieldPortion", body);
+			
+			body.get("src")
+			    .call("readWord", List.of(plan.initialBytes()))
+			    .set(rawBits);
+			
+			for(var step : plan.steps()){
+				switch(step){
+					case ReadStep.AppendBytes(var bytes) -> {
+						body.get(rawBits).bitShiftRight(true, Integer.SIZE)
+						    .get("src").call("readWord", List.of(bytes))
+						    .bitShiftLeft(Integer.SIZE)
+						    .bitOr()
+						    .set(rawBits);
+					}
+					case ReadStep.Read(var generator, var bits, var offset) -> {
+						body.get(rawBits);
+						if(offset>0){
+							body.bitShiftRight(true, offset);
+						}
+						body.cast(int.class)
+						    .bitAnd(BitUtils.makeMask(bits))
+						    .set(field);
+						
+						accessMap.markTemporary();
+						try{
+							generator.injectReadFieldFromBits(body, accessMap, field);
+						}finally{
+							accessMap.dropTemporary(body);
+						}
+					}
+				}
+			}
+			
+			if(plan.windowBits()>plan.offset()){
+				body.get(rawBits);
+				CodeUtils.validateOneBits(body, plan.windowBits()/Byte.SIZE, plan.offset());
+			}
+		}
+		
+		private ReadPlan computePlan() throws UnsupportedCodeGenType{
+			var plan = new ArrayList<ReadStep>(group.size());
+			
+			long bytes        = getSizeDescriptor().requireFixed(WordSpace.BYTE);
+			int  initialBytes = (int)Math.min(Long.BYTES, bytes);
+			
+			long remainingBytes = bytes - initialBytes;
+			int  windowBits     = initialBytes*Byte.SIZE;
+			int  offset         = 0;
+			
+			for(var fi : group){
+				var sizeO = fi.getSizeDescriptor().getFixed(WordSpace.BIT);
+				if(sizeO.isEmpty()){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red has dynamic size", fi));
+				}
+				long size = sizeO.getAsLong();
+				if(size<0 || size>31){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red larger than 4 bytes", fi));
+				}
+				
+				if(!(fi instanceof OnBitSpace<?> generator)){
+					throw new UnsupportedCodeGenType(Log.fmt("Field {}#red does not support code generation", fi));
+				}
+				
+				int bits = (int)size;
+				if(offset + bits>windowBits){
+					if(offset<Integer.SIZE || remainingBytes == 0){
+						throw new UnsupportedCodeGenType("Bits field cannot fit a rolling window: " + fi);
+					}
+					
+					int appendBytes = (int)Math.min(Integer.BYTES, remainingBytes);
+					remainingBytes -= appendBytes;
+					offset -= Integer.SIZE;
+					windowBits = Integer.SIZE + appendBytes*Byte.SIZE;
+					if(offset + bits>windowBits){
+						throw new UnsupportedCodeGenType("Bits field exceeds appended window: " + fi);
+					}
+					plan.add(new ReadStep.AppendBytes(appendBytes));
+				}
+				
+				plan.add(new ReadStep.Read(generator, bits, offset));
+				offset += bits;
+			}
+			
+			return new ReadPlan(plan, initialBytes, windowBits, offset);
+		}
+		
 		private GeneralMerger(List<BitField<T, ?>> group){
 			super(group);
 		}

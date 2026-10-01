@@ -521,7 +521,7 @@ public class CodeBlock{
 	 * Equivalent to the java code of: <br>
 	 * <code> this.sayHelloTo(myName, nickname)</code>
 	 *
-	 * @param name function name
+	 * @param name          function name
 	 * @param argumentCount number of arguments the calling function takes
 	 * @return self for chaining
 	 * @throws MalformedJorth
@@ -545,7 +545,7 @@ public class CodeBlock{
 	 * Equivalent to the java code of: <br>
 	 * <code>reader.readBytes({ what ever int value neededBytes resolves to })</code>
 	 *
-	 * @param name function name that will be called
+	 * @param name      function name that will be called
 	 * @param constants constant values that will be inserted on to the stack
 	 * @return this for chaining
 	 * @throws MalformedJorth
@@ -567,8 +567,8 @@ public class CodeBlock{
 	 * [int, long, Foo] on the stack before the call(...), and after gatherArguments is done executing, there is
 	 * [int, long, Foo, String, int] then that means that a function on Foo will be
 	 * called with 2 arguments of String and int.
-	 * 
-	 * @param name function name that will be called
+	 *
+	 * @param name            function name that will be called
 	 * @param gatherArguments lambda that collects the arguments for the function
 	 * @return this for chaining
 	 * @throws MalformedJorth
@@ -617,6 +617,20 @@ public class CodeBlock{
 		var fn = cl.getFunction(new FunctionInfo.Signature(name, args.stack));
 		
 		return addWithArguments(InvokeOp.simulate(localStack, typeSource, cName(), fn, false), args.insnStart);
+	}
+	public CodeBlock call(Class<?> staticCaller, String name, int argumentCount) throws MalformedJorth{
+		return call(ClassName.of(staticCaller), name, argumentCount);
+	}
+	public CodeBlock call(ClassName staticCaller, String name, int argumentCount) throws MalformedJorth{
+		var stackSize = localStack.size();
+		var mark      = stackSize - argumentCount;
+		var cl        = typeSource.byName(staticCaller);
+		
+		List<JType> args = argumentCount == 0? List.of() : readCallStack(mark);
+		
+		var fn = cl.getFunction(new FunctionInfo.Signature(name, args));
+		
+		return add(InvokeOp.simulate(localStack, typeSource, cName(), fn, false));
 	}
 	
 	private List<JType> readCallStack(int mark) throws MalformedJorth{

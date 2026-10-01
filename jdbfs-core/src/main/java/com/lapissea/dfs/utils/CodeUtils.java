@@ -57,4 +57,26 @@ public interface CodeUtils{
 		
 	}
 	
+	static void validateOneBits(CodeBlock body, int bytes, int bits) throws MalformedJorth{
+		//Check integrity bits
+		var oneBits = bytes*8 - bits;
+		
+		if(oneBits == 0){
+			//If there is exactly 0 extra bits, then just exit. Nothing to do
+			return;
+		}
+		if(oneBits<0){
+			throw new IllegalStateException("More bits than bytes*8");
+		}
+		
+		long checkMask = BitUtils.makeMask(oneBits)<<bits;
+		
+		body.val(checkMask);
+		body.call(UtilL.class, "checkFlag", 2)
+		    .ifFalse(branch -> {
+			    branch.throwNew(IOException.class, "Illegal enum integrity bits");
+		    });
+		
+	}
+	
 }
