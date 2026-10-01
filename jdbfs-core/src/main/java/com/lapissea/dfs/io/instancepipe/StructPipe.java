@@ -1120,7 +1120,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		try{
-			var type      = getType().getConcreteType();
+			Class<T>       type = getType().getConcreteType();
+			AccessProvider access;
+			try{
+				access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
+			}catch(IllegalAccessException e){
+				Log.info("Failed to generate specialization for {}#red because there the engine does not have full access\n  {}", type, e);
+				return Match.empty();
+			}
+			
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 			
 			var cw = ClassDefinition.hiddenNestmate(type).finalAcc();
@@ -1141,8 +1149,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			byte[] bytecode = cw.getClassFile();
 			
-			var access = Access.findAccess(type, Access.Mode.PRIVATE, Access.Mode.MODULE);
-			var cls    = access.defineClass(type, bytecode, true);
+			var cls = access.defineClass(type, bytecode, true);
 			//noinspection unchecked
 			return Match.of((StructPipe<T>)cls.getConstructor(int.class).newInstance(syncStage));
 		}catch(MalformedJorth e){

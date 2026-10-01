@@ -27,8 +27,8 @@ public class ReadOnlyTests{
 	}
 	
 	@BeforeTest
-	public void before(){
-		Cluster.emptyMem();
+	public void before() throws IOException{
+		Cluster.emptyMem().roots().provide(0, "test");
 	}
 	
 	@Test

@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.utils.RawRandom;
+import com.lapissea.fuzz.FuzzConfig;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
@@ -44,7 +45,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.random.RandomGenerator;
-import java.util.stream.LongStream;
 
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
@@ -241,22 +241,13 @@ public final class StructFuzzTest{
 	}
 	
 	@Test
-	void fieldCounts() throws ReflectiveOperationException, IOException{
-		long[] durations = new long[100];
-		var    r         = new RawRandom(1000);
-		for(int i = 0; i<20; i++){
-			for(int j = 0; j<durations.length; j++){
-				LogUtil.println(i, j);
-				var start = System.nanoTime();
-				var gen   = tryCreate(r, 1, j);
-				testType(gen.withName("fields_" + i + "_" + j)
-				            .withAnnotation(Annotations.make(StructPipe.Special.class))
-				);
-				var end = System.nanoTime();
-				durations[j] = end - start;
-			}
-		}
-		LogUtil.printGraph(LongStream.of(durations).boxed().toList(), 30, false, new LogUtil.Val<>("duration", '-', e -> (double)e));
+	void fieldCounts(){
+		TestUtils.randomBatch(255, (r, size) -> {
+			var gen = tryCreate(r, 1, (int)size);
+			testType(gen.withName("fields_count_" + size)
+			            .withAnnotation(Annotations.make(StructPipe.Special.class))
+			);
+		});
 	}
 	
 	@Test(dependsOnGroups = "earlyCheck")
@@ -337,14 +328,25 @@ public final class StructFuzzTest{
 		var mem = Cluster.emptyMem();
 		var ch  = AllocateTicket.bytes(64).submit(mem);
 		
-		var sets = struct.getRealFields().mapped(FieldSet::of).toList();
-		for(int i = 0; i<1; i++){
+		var sets    = struct.getRealFields().mapped(FieldSet::of).toList();
+		var mul     = FuzzConfig.iterationMultiplier().map(Number::doubleValue).orElse(1D);
+		var maxIter = Math.round(mul*20);
+		
+		if(sets.size()>maxIter){
+			Set<Integer> idx = new HashSet<>();
+			while(idx.size()<maxIter){
+				idx.add(rand.nextInt(sets.size()));
+			}
+			sets = Iters.from(idx).map(sets::get).toList();
+		}
+		
+		for(int i = 0; i<20; i++){
 			var inst = ctor.newInstance(fs.map(t -> t.generator().apply(rand)).toArray(Object[]::new));
 			TestUtils.checkPipeInOutEquality(ch, pipe, inst);
-
-//			for(var fs1 : sets){
-//				TestUtils.checkPipeInOutEquality(ch, pipe, inst, fs1);
-//			}
+			
+			for(var fs1 : sets){
+				TestUtils.checkPipeInOutEquality(ch, pipe, inst, fs1);
+			}
 		}
 	}
 	

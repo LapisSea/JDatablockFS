@@ -431,7 +431,9 @@ public class SpecializedPipeTests{
 			StructPipe<T1> basicPipe   = makeUncheckedPipe(basic, specialDelay == 0);
 			StructPipe<T2> specialPipe = makeUncheckedPipe(special, specialDelay == 0);
 			
-			assertThat(basicPipe).isNotInstanceOf(StructPipe.SpecializedImplementation.class);
+			if(ConfigDefs.OPTIMIZED_PIPE.resolve() != ConfigDefs.PipeOptimization.TRY_ALWAYS){
+				assertThat(basicPipe).isNotInstanceOf(StructPipe.SpecializedImplementation.class);
+			}
 			assertThat(specialPipe).isInstanceOf(StructPipe.SpecializedImplementation.class);
 			
 			return new BasicSpecial<>(basicPipe, specialPipe);
