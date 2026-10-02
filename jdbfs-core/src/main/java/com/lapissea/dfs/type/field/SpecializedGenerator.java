@@ -16,6 +16,7 @@ import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -75,8 +76,9 @@ public interface SpecializedGenerator{
 		
 		/// indicates that if any field requires the (var) io pool
 		private boolean hasIOPool;
-		/// indicates that the object being built has its fields in local variables, not a builder
-		private boolean localObject;
+		/// indicates that field values are held in locals until constructor invocation
+		private boolean constructorFields;
+		private String  objectLocal;
 		
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public AccessMap(ClassDefinition cw, Class<? extends StructPipe> pipeType){
@@ -84,19 +86,34 @@ public interface SpecializedGenerator{
 			this.pipeType = (Class<? extends StructPipe<?>>)pipeType;
 		}
 		
-		public void setup(boolean hasIOPool, boolean localObject){
+		public void setup(boolean hasIOPool, boolean constructorFields){
 			this.hasIOPool = hasIOPool;
-			this.localObject = localObject;
+			this.constructorFields = constructorFields;
+			objectLocal = null;
 			tmpFieldCount = 0;
 			localFields.clear();
 			temporaryStack.clear();
 		}
 		
+		public void captureObject(CodeBlock body) throws MalformedJorth{
+			if(constructorFields) throw new ShouldNeverHappenError("No object to capture when using local fields");
+			if(objectLocal != null) throw new ShouldNeverHappenError("Object already captured");
+			
+			objectLocal = "readObject_" + uniqueCounter();
+			body.var(GenericType.of(body.getTypeDef("ObjType")), objectLocal)
+			    .set(objectLocal);
+		}
+		
+		public void getObject(CodeBlock body) throws MalformedJorth{
+			if(constructorFields) throw new ShouldNeverHappenError("Constructing object does not exist till final constructor call");
+			body.get(objectLocal);
+		}
+		
 		public void set(FieldAccessor<?> field, CodeBlock body, CodeArg args) throws MalformedJorth{
 			switch(field){
 				case FieldAccessor.FieldOrMethod fom -> {
-					if(!localObject){
-						body.dup();
+					if(!constructorFields){
+						body.get(objectLocal);
 						switch(fom.setter()){
 							case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
 								args.accept(body);
@@ -256,7 +273,7 @@ public interface SpecializedGenerator{
 		public void get(FieldAccessor<?> field, CodeBlock body) throws MalformedJorth{
 			switch(field){
 				case FieldAccessor.FieldOrMethod fom -> {
-					if(localObject){
+					if(constructorFields){
 						var localFieldName = localFields.get(field);
 						Objects.requireNonNull(localFieldName);
 						body.get(localFieldName);
@@ -265,7 +282,7 @@ public interface SpecializedGenerator{
 					
 					switch(fom.setter()){
 						case FieldAccessor.FieldOrMethod.AccessType.Field(var declaringClass, var name) -> {
-							body.dup()
+							body.get(objectLocal)
 							    .get(declaringClass, name);
 						}
 						case FieldAccessor.FieldOrMethod.AccessType.Method(var name) -> {

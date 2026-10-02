@@ -101,24 +101,17 @@ public final class PipeCodeGen{
 			case ConstructionStrategy.Setters ignore -> {
 				accessMap.setup(false, false);
 				body.newObj(body.getTypeDef("ObjType"));
+				accessMap.captureObject(body);
 			}
 			case ConstructionStrategy.Constructor ignore -> {
 				accessMap.setup(false, true);
 			}
 		}
 		
-		for(SpecializedGenerator generator : generators){
-			accessMap.markTemporary();
-			try{
-				generator.injectReadField(body, accessMap);
-			}catch(UnsupportedCodeGenType e){
-				throw new UnsupportedCodeGenType("Failed to generate code for: " + generator, e);
-			}
-			accessMap.dropTemporary(body);
-		}
-		
+		injectReadFields(body, generators, accessMap);
+
 		switch(strategy){
-			case ConstructionStrategy.Setters ignore -> { }
+			case ConstructionStrategy.Setters ignore -> accessMap.getObject(body);
 			case ConstructionStrategy.Constructor(var fields) -> {
 				body.newObj(body.getTypeDef("ObjType"), args -> {
 					for(IOField<?, ?> field : fields){
@@ -178,7 +171,9 @@ public final class PipeCodeGen{
 			
 			body.get("instance")
 			    .cast(objType);
+			accessMap.captureObject(body);
 			injectReadFields(body, generators, accessMap);
+			accessMap.getObject(body);
 			
 		}else{
 			CodeArg getArgs = c -> c.get("ioPool")
@@ -226,7 +221,9 @@ public final class PipeCodeGen{
 	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
 		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
 	){
-		Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
+		if(ConfigDefs.CompLogLevel.SMALL.isEnabled()){
+			Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
+		}
 		
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
@@ -249,8 +246,10 @@ public final class PipeCodeGen{
 					  .returns(objType);
 				
 				CodeBlock body = bootstrapDoRead.body().get("instance");
+				accessMap.captureObject(body);
 				
 				injectReadFields(body, generators, accessMap);
+				accessMap.getObject(body);
 			});
 			return new ConstantCallSite(target);
 		}catch(UnsupportedCodeGenType e){
@@ -265,10 +264,17 @@ public final class PipeCodeGen{
 	}
 	
 	private static void injectReadFields(CodeBlock body, List<SpecializedGenerator> generators, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		if(!body.stackView().isEmpty()) throw new MalformedJorth("Field reads require an empty operand stack");
+
 		for(SpecializedGenerator generator : generators){
 			accessMap.markTemporary();
 			try{
 				generator.injectReadField(body, accessMap);
+				if(!body.stackView().isEmpty()){
+					throw new MalformedJorth("Field read left values on the operand stack: " + generator + " " + body.stackView());
+				}
+			}catch(UnsupportedCodeGenType e){
+				throw new UnsupportedCodeGenType("Failed to generate code for: " + generator, e);
 			}finally{
 				accessMap.dropTemporary(body);
 			}
