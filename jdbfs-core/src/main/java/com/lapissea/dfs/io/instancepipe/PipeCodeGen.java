@@ -296,7 +296,9 @@ public final class PipeCodeGen{
 	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
 		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
 	){
-		Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
+		if(ConfigDefs.CompLogLevel.SMALL.isEnabled()){
+			Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
+		}
 		
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);

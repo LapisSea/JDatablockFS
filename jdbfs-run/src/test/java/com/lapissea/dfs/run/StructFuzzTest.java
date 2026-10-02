@@ -241,13 +241,15 @@ public final class StructFuzzTest{
 	}
 	
 	@Test
-	void fieldCounts(){
-		TestUtils.randomBatch(255, (r, size) -> {
-			var gen = tryCreate(r, 1, (int)size);
-			testType(gen.withName("fields_count_" + size)
-			            .withAnnotation(Annotations.make(StructPipe.Special.class))
-			);
-		});
+	void fieldCounts() throws LockedFlagSet{
+		try(var ignore = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
+			TestUtils.randomBatch(255, (r, size) -> {
+				var gen = tryCreate(r, 1, (int)size);
+				testType(gen.withName("fields_count_" + size)
+				            .withAnnotation(Annotations.make(StructPipe.Special.class))
+				);
+			});
+		}
 	}
 	
 	@Test(dependsOnGroups = "earlyCheck")

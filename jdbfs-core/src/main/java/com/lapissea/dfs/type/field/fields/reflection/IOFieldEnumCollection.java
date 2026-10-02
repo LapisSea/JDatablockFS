@@ -113,9 +113,7 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 	public IOFieldEnumCollection(FieldAccessor<T> accessor, Class<? extends CollectionAdapter> adapterType){
 		super(accessor);
 		adapter = makeAdapter(accessor, adapterType);
-		var gt   = accessor.getGenericType(null);
-		var etyp = ((ParameterizedType)gt).getActualTypeArguments()[0];
-		universe = EnumUniverse.of((Class<E>)etyp);
+		universe = EnumUniverse.ofUnknown(CollectionAdapter.getComponentType(adapterType, accessor.getGenericType(null)));
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = collectionLength.getValue(ioPool, inst);

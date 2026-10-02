@@ -287,14 +287,34 @@ public class SpecializedPipeTests{
 	
 	private final Map<FieldDef, Integer> retries = new ConcurrentHashMap<>();
 	
+	@Test(groups = "specializedSimple")
+	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void boxedBooleanDuringAsyncInitialization() throws IOException, LockedFlagSet{
+		var fields = List.of(new FieldDef(Boolean.class, RandomGenerator::nextBoolean).withGetter(true).withFinalMod(true));
+		var random = new RawRandom(1234);
+		synchronized(ConfigDefs.OPTIMIZED_PIPE){
+			try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
+				for(int i = 0; i<32; i++){
+					// A single field bypasses dependency sorting, which otherwise waits for field descriptors.
+					BasicSpecial<T1, T2> pipes = makeBasicSpecial(fields, 15);
+					doIOTest(fields, pipes.basicPipe(), pipes.specialPipe(), random);
+					doIOTest(fields, pipes.specialPipe(), pipes.basicPipe(), random);
+				}
+			}
+		}
+	}
+
 	@Test(dataProvider = "fieldVariations", retryAnalyzer = SoftRetry.class, dependsOnGroups = "specializedSimple")
 	<T1 extends IOInstance<T1>, T2 extends IOInstance<T2>> void testType(FieldDef field, boolean immediate) throws IOException, LockedFlagSet{
 		LogUtil.println("Testing: " + field + (immediate? ", immediate" : ""));
 		
 		var                  fields = List.of(field);
 		BasicSpecial<T1, T2> pipes;
-		try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
-			pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
+		// Temporary flag values are process-wide; parallel cases must not restore another case's optimization mode
+		// while its pipes are being constructed
+		synchronized(ConfigDefs.OPTIMIZED_PIPE){
+			try(var ignore = ConfigDefs.OPTIMIZED_PIPE.temporarySet(ConfigDefs.PipeOptimization.SPECIAL_ONLY)){
+				pipes = makeBasicSpecial(fields, immediate? 0 : retries.compute(field, (k, c) -> c == null? 1 : c + 1)*15);
+			}
 		}
 		boolean debRead = getPipeFlag(pipes.specialPipe(), "DEBUG_READY_READ");
 		assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
@@ -416,7 +436,9 @@ public class SpecializedPipeTests{
 
 //		fuz.runAndAssert("EhiCBS9IBUqHIAgGMR4");
 		
-		try(var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
+		// Keep the global override active until all fuzz workers and reruns finish.
+		try(var integrityCheck = ConfigDefs.DO_INTEGRITY_CHECK.temporarySet(false);
+		    var ignore = ConfigDefs.CLASSGEN_PRINT_BYTECODE.temporarySet(false);
 		    var ignore2 = ConfigDefs.PRINT_COMPILATION.temporarySet(ConfigDefs.CompLogLevel.NONE)){
 			FuzzingUtils.stableRun(Plan.start(fuz, new FuzzConfig().withErrorDelay(Duration.ofSeconds(60)), 123, 5_000, 30), "testMultiFuzz");
 		}
