@@ -270,7 +270,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return Match.of((cw, type) -> {
 			PipeCodeGen.defaultClassDef(cw);
 			
-			boolean hasReadyStruct = getType().getInitializationState()>=StructPipe.STATE_IO_FIELD;
+			boolean hasReadyStruct = getType().getInitializationState()>=Struct.STATE_INIT_FIELDS;
 			cw.field(boolean.class, "DEBUG_READY_READ")
 			  .visibility(Visibility.PUBLIC).staticFinal(e -> e.val(hasReadyStruct));
 			
