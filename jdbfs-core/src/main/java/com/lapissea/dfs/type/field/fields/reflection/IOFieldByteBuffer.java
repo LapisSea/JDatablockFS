@@ -167,7 +167,17 @@ public final class IOFieldByteBuffer<T extends IOInstance<T>> extends NullFlagCo
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		if(compression != null){
-			throw new UnsupportedCodeGenType("Compression not implemented yet");
+			var res = accessMap.temporaryLocalField(ByteBuffer.class, "unpackedBuffer", body);
+			
+			body.call(ByteBuffer.class, "wrap", args -> {
+				args.get(IOCompression.Type.class, compression.name())
+				    .call("unpack", data -> accessMap.get(compressed, data));
+			}).set(res);
+			
+			accessMap.get(modifiable, body);
+			body.ifFalse(b -> b.get(res).call("asReadOnlyBuffer").set(res));
+			accessMap.set(getAccessor(), body, b -> b.get(res));
+			return;
 		}
 		var res = accessMap.temporaryLocalField(ByteBuffer.class, "bbRes", body);
 		injectReadFieldNullable(body, accessMap, null, bod -> {

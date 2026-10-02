@@ -150,8 +150,21 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		if(compression != null){
-			throw new UnsupportedCodeGenType("Compression variation not implemented");
+			var unpackedBytes = accessMap.temporaryLocalField(byte[].class, "unpackedBytes", body);
+			
+			body.tryRun(bod -> {
+				    bod.get(IOCompression.Type.class, compression.name())
+				       .call("unpack", args -> accessMap.get(compressed, args))
+				       .set(unpackedBytes);
+			    })
+			    .tryCatch(IOException.class, b -> {
+				    b.throwNew(IOException.class, this + " has invalid data");
+			    });
+			
+			accessMap.set(getAccessor(), body, b -> b.get(unpackedBytes));
+			return;
 		}
+		
 		injectReadFieldNullable(body, accessMap, null, bod -> {
 			bod.get("src")
 			   .call("readInts1", e -> accessMap.get(arraySize, e));
