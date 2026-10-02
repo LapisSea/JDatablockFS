@@ -20,6 +20,8 @@ public final class FuzzProgress{
 	
 	public final FuzzConfig config;
 	
+	private final WarmupTiming timing = new WarmupTiming();
+	
 	private final AtomicLong executedCount  = new AtomicLong();
 	private final AtomicLong elapsedSumAcum = new AtomicLong();
 	private       BigInteger elapsedSum     = BigInteger.ZERO;
@@ -49,14 +51,14 @@ public final class FuzzProgress{
 		hasErr = errMark = true;
 		if(!oldErr){
 			var count = executedCount.get();
-			logInc(count, calcProgressI(count));
+			logInc(calcProgressI(count));
 		}
 	}
 	synchronized void errLater(){
 		if(errMark || !config.shouldLog()) return;
 		errMark = true;
 		var count = executedCount.get();
-		logInc(count, calcProgressI(count));
+		logInc(calcProgressI(count));
 	}
 	
 	public boolean hasErr(){
@@ -91,20 +93,22 @@ public final class FuzzProgress{
 		if(nsDuration<0) throw new IllegalArgumentException("Duration must be positive!");
 		if(!config.shouldLog()) return;
 		
-		var dur = elapsedSumAcum.addAndGet(nsDuration);
-		if(dur>Long.MAX_VALUE/2){
-			synchronized(this){
+		long count;
+		synchronized(this){
+			timing.add(num, nsDuration);
+			var dur = elapsedSumAcum.addAndGet(nsDuration);
+			if(dur>Long.MAX_VALUE/2){
 				elapsedSumAcum.getAndAdd(-dur);
 				elapsedSum = elapsedSum.add(BigInteger.valueOf(dur));
 			}
+			count = executedCount.addAndGet(num);
 		}
 		
-		var count     = executedCount.addAndGet(num);
 		var progressI = calcProgressI(count);
 		
 		if(progressI == last) return;
 		
-		logInc(count, progressI);
+		logInc(progressI);
 	}
 	
 	synchronized void reportStart(){
@@ -128,6 +132,9 @@ public final class FuzzProgress{
 	
 	private int calcProgressI(long count){
 		var ti = totalIterations();
+		if(ti == 0){
+			return PROGRESS_PRECISION;
+		}
 		if(count<MAX_FAST_COUNT){
 			return (int)((count*PROGRESS_PRECISION)/ti);
 		}
@@ -153,7 +160,7 @@ public final class FuzzProgress{
 		return iters;
 	}
 	
-	private void logInc(long count, int progressI){
+	private void logInc(int progressI){
 		var now   = NanoClock.now();
 		var ltout = config.logTimeout();
 		if(Duration.between(lastLog, now).compareTo(ltout)<=0) return;
@@ -166,8 +173,9 @@ public final class FuzzProgress{
 			lastLog = now;
 			last = progressI;
 			
+			long       count = executedCount.get();
 			BigDecimal progress;
-			if(iterationsComputed()){
+			if(iterationsComputed() && totalIterations()>0){
 				progress = BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalIterations()), MathContext.DECIMAL128);
 			}else{
 				progress = BigDecimal.ZERO;
@@ -188,22 +196,36 @@ public final class FuzzProgress{
 		}
 	}
 	
-	private static LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress, BigInteger elapsedWork){
+	private LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress, BigInteger elapsedWork){
 		var elapsedTime = Duration.between(start, now);
 		
-		var progressZero = progress.equals(BigDecimal.ZERO);
+		double     perOp         = timing.nanosPerOp();
+		boolean    hasData       = count>0 && Double.isFinite(perOp);
+		boolean    estimate      = hasData && progress.signum()>0;
+		BigDecimal elapsedTimeNs = new BigDecimal(durationToBigDecimal(elapsedTime));
+		BigDecimal timeRemaining = null, totalTimeEstimated = null;
 		
-		var elapsedTimeNs      = new BigDecimal(durationToBigDecimal(elapsedTime));
-		var totalTimeEstimated = progressZero? null : elapsedTimeNs.divide(progress, MathContext.DECIMAL32);
-		var timeRemaining      = progressZero? null : totalTimeEstimated.subtract(elapsedTimeNs).max(BigDecimal.ZERO);
+		if(estimate){
+			BigDecimal correction;
+			if(elapsedWork.signum() == 0){
+				correction = BigDecimal.ONE;
+			}else{
+				correction = BigDecimal.valueOf(perOp)
+				                       .multiply(BigDecimal.valueOf(count))
+				                       .divide(new BigDecimal(elapsedWork), MathContext.DECIMAL64);
+			}
+			timeRemaining = elapsedTimeNs.multiply(BigDecimal.ONE.divide(progress, MathContext.DECIMAL64).subtract(BigDecimal.ONE))
+			                             .multiply(correction)
+			                             .max(BigDecimal.ZERO);
+			totalTimeEstimated = elapsedTimeNs.add(timeRemaining);
+		}
 		
-		boolean estimate = count>100 && !progressZero;
 		return new LogMessage.State(
 			progress.doubleValue(),
 			!estimate? none() : estimatedDuration(totalTimeEstimated),
 			!estimate? none() : estimatedDuration(timeRemaining),
 			elapsedTime,
-			!estimate? OptionalDouble.empty() : OptionalDouble.of(new BigDecimal(elapsedWork).divide(BigDecimal.valueOf(count), MathContext.DECIMAL64).doubleValue()),
+			!hasData? OptionalDouble.empty() : OptionalDouble.of(perOp),
 			errMark
 		);
 	}
