@@ -2,6 +2,7 @@ package com.lapissea.dfs.run;
 
 import com.lapissea.dfs.SyntheticParameterizedType;
 import com.lapissea.dfs.config.ConfigDefs;
+import com.lapissea.dfs.config.GlobalConfig;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.LockedFlagSet;
@@ -317,7 +318,10 @@ public class SpecializedPipeTests{
 			}
 		}
 		boolean debRead = getPipeFlag(pipes.specialPipe(), "DEBUG_READY_READ");
-		assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
+		// The artificial initialization delay only runs with debug validation enabled.
+		if(GlobalConfig.DEBUG_VALIDATION || immediate){
+			assertThat(debRead).as("Pipe generation flag: DEBUG_READY_READ").isEqualTo(immediate);
+		}
 		
 		var random = new RawRandom();//field.toString().hashCode()
 		for(int i = 0; i<50; i++){

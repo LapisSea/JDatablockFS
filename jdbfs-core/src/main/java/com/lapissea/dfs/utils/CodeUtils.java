@@ -8,11 +8,15 @@ import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOType;
+import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.dfs.type.field.fields.reflection.DynamicSupport;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.UtilL;
@@ -20,6 +24,25 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 
 public interface CodeUtils{
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	static NumberSize primitive_writeSize(IOField<?, ?> field, VarPool<?> pool, IOInstance<?> instance, NumberSize needed){
+		return ((IOFieldPrimitive)field).generatedWriteSize(pool, instance, needed);
+	}
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	static NumberSize primitive_size(IOField<?, ?> field, VarPool<?> pool, IOInstance<?> instance){
+		return ((IOFieldPrimitive)field).generatedSize(pool, instance);
+	}
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	static NumberSize pointer_writeSize(IOField<?, ?> field, VarPool<?> pool, IOInstance<?> instance, long value){
+		return ((IOFieldChunkPointer)field).generatedWriteSize(pool, instance, value);
+	}
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	static NumberSize pointer_size(IOField<?, ?> field, VarPool<?> pool, IOInstance<?> instance){
+		return ((IOFieldChunkPointer)field).generatedSize(pool, instance);
+	}
+	static long writeIntegrityBits(long raw, int oneBits, int usedBits){
+		return BitFieldMerger.calcIntegrityBits(raw, oneBits, usedBits);
+	}
 
 	static Object dynamic_readReference(IOField<?, ?> caller, int typeID, Reference reference, DataProvider provider, GenericContext genericContext) throws IOException{
 		return ((IOFieldDynamicReferenceObject<?, ?>)caller).readReferencedValue(provider, typeID, reference, genericContext);

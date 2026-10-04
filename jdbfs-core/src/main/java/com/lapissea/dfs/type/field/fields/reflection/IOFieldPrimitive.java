@@ -32,9 +32,11 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.CodeArg;
 import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -1284,6 +1286,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
+		@Override
+		public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			accessMap.get(getAccessor(), body);
+			body.cast(long.class);
+		}
 		
 		private FBoolean(FieldAccessor<T> field){
 			super(field, SizeDescriptor.Fixed.of(BIT, 1));
@@ -1353,6 +1360,19 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	public static final class FBooleanBoxed<T extends IOInstance<T>> extends BitField<T, Boolean> implements SpecializedGenerator.OnBitSpace<T>{
+		@Override
+		public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			accessMap.markTemporary();
+			var value = accessMap.temporaryLocalField(Boolean.class, "writeBoolean", body);
+			accessMap.getFieldRef(this, body);
+			body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(Boolean.class).set(value);
+			if(nullable()){
+				body.get(value).ifIsNull(b -> b.val(2L)).elseRun(b -> b.get(value).unbox().cast(long.class));
+			}else{
+				body.get(value).unbox().cast(long.class);
+			}
+			accessMap.dropTemporary(body);
+		}
 		
 		private FBooleanBoxed(FieldAccessor<T> field){
 			super(field);
@@ -1528,6 +1548,95 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	@Override
 	public final void injectReadField(CodeBlock body, SpecializedGenerator.AccessMap accessMap) throws MalformedJorth{
 		std.readField(body, accessMap);
+	}
+
+	/** The generated writer uses the same size guard as the interpreted writer. */
+	public final NumberSize generatedWriteSize(VarPool<T> ioPool, T instance, NumberSize needed){
+		return getSafeSize(ioPool, instance, needed);
+	}
+	public final NumberSize generatedSize(VarPool<T> ioPool, T instance){
+		return getSize(ioPool, instance);
+	}
+	@Override
+	public final void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(CodeUtils.class, "primitive_size", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool"); accessMap.getObject(args);
+		}).call("skip", args -> args.get("src"));
+	}
+
+	private void injectWriteSize(CodeBlock body, AccessMap accessMap, CodeArg needed) throws MalformedJorth{
+		body.call(CodeUtils.class, "primitive_writeSize", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool");
+			accessMap.getObject(args);
+			needed.accept(args);
+		});
+	}
+
+	@Override
+	public final void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.markTemporary();
+		var value = accessMap.temporaryLocalField(getType(), "writeValue", body);
+		if(getType().isPrimitive()){
+			accessMap.get(getAccessor(), body);
+		}else{
+			// Field.get also supplies DEFAULT_IF_NULL values and the normal null diagnostics.
+			accessMap.getFieldRef(this, body);
+			body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(getType());
+		}
+		body.set(value);
+		if(getType().isPrimitive()){
+			injectWriteValue(body, accessMap, value, false);
+		}else{
+			body.get(value).ifIsNull(b -> {
+				if(!nullable()){
+					b.throwNew(FieldIsNull.class, args -> accessMap.getFieldRef(this, args));
+				}else{
+					b.get("dest").val(0L);
+					injectWriteSize(b, accessMap, args -> args.get(NumberSize.class, "VOID"));
+					b.get(NumberSize.class, "bytes").call("writeWord", 2);
+				}
+			}).elseRun(b -> injectWriteValue(b, accessMap, value, true));
+		}
+		accessMap.dropTemporary(body);
+	}
+
+	private void injectWriteValue(CodeBlock body, AccessMap accessMap, String value, boolean boxed) throws MalformedJorth{
+		var primitive = SupportedPrimitive.get(getType()).orElseThrow();
+		CodeArg getValue = args -> { args.get(value); if(boxed) args.unbox(); };
+		if(primitive == SupportedPrimitive.BYTE){
+			if(!boxed){
+				injectWriteSize(body, accessMap, args -> args.get(NumberSize.class, "BYTE"));
+				body.pop();
+			}
+			body.get("dest").call("writeInt1", args -> { getValue.accept(args); args.cast(int.class); });
+			return;
+		}
+		boolean unsigned = switch(this){
+			case FLongBase<?> f -> f.unsigned;
+			case FIntBase<?> f -> f.unsigned;
+			case FShortBase<?> f -> f.unsigned;
+			case FCharBase<?> ignored -> true;
+			default -> false;
+		};
+		injectWriteSize(body, accessMap, args -> {
+			if(primitive == SupportedPrimitive.FLOAT || primitive == SupportedPrimitive.DOUBLE){
+				args.get(NumberSize.class, boxed? "VOID" : primitive == SupportedPrimitive.FLOAT? "INT" : "LONG");
+			}else{
+				args.call(NumberSize.class, "bySize", a -> { getValue.accept(a); a.cast(long.class).val(unsigned); });
+			}
+		});
+		var method = switch(primitive){
+			case DOUBLE -> "writeDouble";
+			case FLOAT -> "writeFloat";
+			case LONG -> unsigned? "write" : "writeSigned";
+			default -> unsigned? "writeInt" : "writeIntSigned";
+		};
+		body.call(method, args -> {
+			args.get("dest"); getValue.accept(args);
+			if(primitive != SupportedPrimitive.FLOAT && primitive != SupportedPrimitive.DOUBLE && primitive != SupportedPrimitive.LONG) args.cast(int.class);
+		});
 	}
 	
 	protected abstract EnumSet<NumberSize> allowedSizes();

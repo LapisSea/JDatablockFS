@@ -223,6 +223,16 @@ public class InstanceCollection{
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 
 		@Override
+		public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			injectWriteFieldNullable(body, accessMap, null, writer -> {
+				var value = accessMap.temporaryLocalField(getType(), "instanceCollection", writer);
+				writer.set(value);
+				accessMap.getConstant(dataAdapter, CollectionAdapter.class, writer);
+				writer.call("write", args -> args.get(value).get("provider").get("dest"));
+			});
+		}
+
+		@Override
 		public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 			injectReadFieldNullable(body, accessMap, null, value -> {
 				accessMap.getConstant(dataAdapter, CollectionAdapter.class, value);

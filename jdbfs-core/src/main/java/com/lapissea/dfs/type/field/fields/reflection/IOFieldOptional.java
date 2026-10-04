@@ -159,6 +159,16 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	}
 
 	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap){
+		// The companion value field stores the optional's contents.
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap){
+		// The companion value field consumes the optional's bytes.
+	}
+
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
 		accessMap.set(getAccessor(), body, value -> value.call(Optional.class, "ofNullable", args -> {
 			accessMap.get(valueField, args);

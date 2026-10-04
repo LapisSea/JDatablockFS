@@ -48,7 +48,7 @@ final class InstructionPrinter{
 				printBootstrap(i, out);
 				out.close();
 			}
-			case Increment i -> op(out, "inc", literal(i.val()));
+			case Arithmetic i -> op(out, i.operation().name().toLowerCase(java.util.Locale.ROOT), i.constant() == null? "" : literal(i.constant()));
 			case BitShiftLeft ignored -> op(out, "bitShiftLeft", "");
 			case BitShiftRight i -> op(out, i.logical()? "unsignedBitShiftRight" : "bitShiftRight", "");
 			case BitAnd ignored -> op(out, "bitAnd", "");

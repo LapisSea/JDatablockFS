@@ -26,6 +26,9 @@ import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
@@ -119,9 +122,9 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
-	private static final int SKIP_FIXED = 0;
-	private static final int SKIP       = 1;
-	private static final int READ       = 2;
+	static final int SKIP_FIXED = 0;
+	static final int SKIP       = 1;
+	static final int READ       = 2;
 	
 	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, byte[] cmds, boolean needsInstance, boolean needsPool){ }
 	
@@ -173,11 +176,28 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		
 		FieldSet<T>    fields = report.allFields();
 		List<CmdBuild> cmds   = new ArrayList<>(fields.size());
+
+		// Only variable-size skips need values. Include prerequisites of the reads they require,
+		// and map unpacked bit fields back to the merged field that must be read as a whole.
+		var owners = new HashMap<IOField<T, ?>, IOField<T, ?>>();
+		var pending = new ArrayDeque<IOField<T, ?>>();
+		for(var field : fields){
+			for(var unpacked : field.iterUnpackedFields()){
+				owners.put(unpacked, field);
+				if(field.getSizeDescriptor().getFixed(WordSpace.BYTE).isEmpty()) pending.addAll(unpacked.getDependencies());
+			}
+		}
+		var requiredReads = new HashSet<IOField<T, ?>>();
+		while(!pending.isEmpty()){
+			var dependency = pending.removeFirst();
+			var owner = owners.getOrDefault(dependency, dependency);
+			if(!requiredReads.add(owner)) continue;
+			for(var unpacked : owner.iterUnpackedFields()) pending.addAll(unpacked.getDependencies());
+		}
 		
 		for(IOField<T, ?> field : fields){
 			
-			//If any other field depends on this field, then it has to be read
-			if(field.iterUnpackedFields().flatMap(fields::iterDependentOn).hasAny()){
+			if(requiredReads.contains(field)){
 				var needsInstance = !field.iterUnpackedFields().filter(e -> e.getAccessor() != null).allMatch(f -> f.isVirtual(StoragePool.IO));
 				cmds.add(new CmdBuild.Read(needsInstance, field.needsIOPool()));
 				continue;
@@ -235,6 +255,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		var pool = skip.needsPool? makeIOPool() : null;
 		var inst = skip.needsInstance? getType().make() : null;
 		
+		skipFields(pool, provider, src, inst, genericContext);
+	}
+
+	protected void skipFields(VarPool<T> pool, DataProvider provider, ContentReader src, T inst, GenericContext genericContext) throws IOException{
+		var skip = skipData();
 		var cmds = skip.cmds;
 		for(int f = 0, c = 0; c<cmds.length; f++){
 			switch(cmds[c++]){
@@ -251,6 +276,25 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		}
 	}
 	
+	record SkipStep(int operation, long bytes, IOField<?, ?> field){ }
+
+	List<SkipStep> skipSteps(){
+		var skip = skipData();
+		if(skip == null) return List.of();
+		var result = new ArrayList<SkipStep>();
+		var cmds = skip.cmds;
+		for(int f = 0, c = 0; c<cmds.length; f++){
+			int operation = cmds[c++];
+			if(operation == SKIP_FIXED){
+				result.add(new SkipStep(operation, BBView.readInt8(cmds, c), null));
+				c += 8;
+				f += BBView.readInt4(cmds, c);
+				c += 4;
+			}else result.add(new SkipStep(operation, 0, skip.fields.get(f)));
+		}
+		return result;
+	}
+
 	private T genericReadNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		return super.readNew(provider, src, genericContext);
 	}
@@ -289,7 +333,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, this);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

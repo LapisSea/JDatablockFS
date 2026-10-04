@@ -741,13 +741,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		try{
-			for(IOField<T, ?> field : fields){
-				if(DEBUG_VALIDATION){
-					writeFieldKnownSize(ioPool, provider, target, instance, field);
-				}else{
-					field.writeReported(ioPool, provider, target, instance);
-				}
-			}
+			writeFields(fields, ioPool, provider, target, instance);
 		}catch(VaryingSize.TooSmall e){
 			throw VaryingSize.makeInvalid(fields, ioPool, instance, e);
 		}
@@ -760,6 +754,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
+	protected void writeFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		for(IOField<T, ?> field : fields){
+			if(DEBUG_VALIDATION) writeFieldKnownSize(ioPool, provider, dest, instance, field);
+			else field.writeReported(ioPool, provider, dest, instance);
+		}
+	}
+
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		generateAll(ioPool, provider, instance, true);
 		if(instance instanceof IOInstance.Unmanaged) return null;
@@ -855,7 +856,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private void writeFieldKnownSize(VarPool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
+	protected final void writeFieldKnownSize(VarPool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
 		var desc     = field.getSizeDescriptor();
 		var bytes    = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 		var safeBuff = target.writeTicket(bytes).requireExact().submit();

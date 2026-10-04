@@ -202,6 +202,18 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 	}
 	
 	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, empty -> {
+			if(fixed) empty.call(IOUtils.class, "zeroFill", args -> args.get("dest").val(getSizeDescriptor().requireFixed(WordSpace.BYTE)));
+		}, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "inlineValue", writer);
+			writer.set(value);
+			accessMap.getConstant(instancePipe, StructPipe.class, writer);
+			writer.call("write", args -> args.get("provider").get("dest").get(value));
+		});
+	}
+
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, skip -> {
 			if(fixed){

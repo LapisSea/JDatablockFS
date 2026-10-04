@@ -221,12 +221,12 @@ public class ReproJorthTests{
 		return cd.function("run").staticAcc().body();
 	}
 	
-	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Cannot increment .* by int")
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Arithmetic requires a numeric primitive, got .*")
 	void addIntRejectsReference() throws MalformedJorth{
 		body().val("text").add(1);
 	}
 	
-	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Cannot increment .* by double")
+	@Test(expectedExceptions = MalformedJorth.class, expectedExceptionsMessageRegExp = "Arithmetic constant requires DOUBLE, got FLOAT")
 	void addDoubleRejectsFloat() throws MalformedJorth{
 		body().val(1.5F).add(1.5);
 	}

@@ -1,6 +1,7 @@
 package com.lapissea.dfs.io.bit;
 
 import com.lapissea.dfs.io.content.ContentReader;
+import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.util.NotNull;
@@ -129,6 +130,12 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T> imple
 	public T[] read(int len, ContentReader src) throws IOException{
 		try(var bits = new BitInputStream(src, (long)bitSize*len)){
 			return read(len, bits);
+		}
+	}
+
+	public void write(List<T> enums, ContentWriter dest) throws IOException{
+		try(var bits = new BitOutputStream(dest)){
+			write(enums, bits);
 		}
 	}
 

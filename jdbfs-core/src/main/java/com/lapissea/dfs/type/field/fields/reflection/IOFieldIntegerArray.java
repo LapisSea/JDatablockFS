@@ -240,6 +240,42 @@ public final class IOFieldIntegerArray<T extends IOInstance<T>, CollectionType> 
 	}
 
 	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, null, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "integers", writer);
+			writer.set(value);
+			var width = accessMap.temporaryLocalField(NumberSize.class, "integerWidth", writer);
+			accessMap.get(numSize, writer);
+			writer.set(width);
+			var index = accessMap.temporaryLocalField(int.class, "integerIndex", writer);
+			writer.set(index, 0);
+			writer.loop(check -> {
+				check.get(index);
+				accessMap.get(collectionSize, check);
+				check.lessThanOp();
+			}, loop -> {
+				loop.get(width).call("writeIntSigned", args -> {
+					args.get("dest").get(value);
+					if(getType().isArray()) args.get(index).getArrayElement();
+					else args.call("get", i -> i.get(index)).cast(Integer.class);
+					args.call("intValue");
+				});
+				loop.inc(index);
+			});
+		});
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(collectionSize, args);
+			args.cast(long.class);
+			accessMap.get(numSize, args);
+			args.get(NumberSize.class, "bytes").cast(long.class).mul();
+		});
+	}
+
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {
 			accessMap.markTemporary();

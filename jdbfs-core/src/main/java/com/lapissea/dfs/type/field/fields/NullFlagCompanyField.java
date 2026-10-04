@@ -79,4 +79,22 @@ public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type>
 			}
 		});
 	}
+
+	/** The writer consumes the non-null field value from the operand stack. */
+	protected final void injectWriteFieldNullable(CodeBlock body, SpecializedGenerator.AccessMap accessMap, CodeArg whenNull, CodeArg writer) throws MalformedJorth{
+		accessMap.getValue(this, body);
+		if(nullable()){
+			var value = accessMap.temporaryLocalField(getType(), "writeValue", body);
+			body.set(value).get(value).nullVal(getType()).ifEquality(empty -> {
+				if(whenNull != null) whenNull.accept(empty);
+			}).elseRun(present -> {
+				present.get(value);
+				accessMap.markTemporary();
+				writer.accept(present);
+				accessMap.dropTemporary(present);
+			});
+		}else{
+			writer.accept(body);
+		}
+	}
 }

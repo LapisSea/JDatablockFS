@@ -235,6 +235,36 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	}
 	
 	private static final class SimpleMerger<T extends IOInstance<T>> extends BitFieldMerger<T> implements SpecializedGenerator{
+		@Override
+		public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+			body.get("src").call("skipExact", args -> args.val(bytes));
+		}
+		@Override
+		public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+			accessMap.markTemporary();
+			var raw = accessMap.temporaryLocalField(long.class, "writeMergedBits", body);
+			body.set(raw, 0L);
+			int offset = 0;
+			for(var field : group){
+				if(!(field instanceof SpecializedGenerator.OnBitSpace<?> generator)){
+					throw new UnsupportedCodeGenType("Unsupported merged bit writer: " + field);
+				}
+				body.get(raw);
+				generator.injectWriteFieldToBits(body, accessMap);
+				if(offset != 0) body.bitShiftLeft(offset);
+				body.bitOr().set(raw);
+				offset += Math.toIntExact(field.getSizeDescriptor().requireFixed(WordSpace.BIT));
+			}
+			body.get("dest").get(raw);
+			if(oneBits>1){
+				int usedBits = offset;
+				body.call(CodeUtils.class, "writeIntegrityBits", args -> args.get(raw).val(oneBits).val(usedBits)).bitOr();
+			}else if(oneBits == 1){
+				body.val(1L<<offset).bitOr();
+			}
+			body.val(numSize.bytes).call("writeWord", 2);
+			accessMap.dropTemporary(body);
+		}
 		
 		private final long       bytes;
 		private final int        oneBits;

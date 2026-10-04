@@ -148,6 +148,14 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends NullFlagCom
 		set(ioPool, instance, data);
 	}
 	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		if(compression != null) return;
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class);
+		});
+	}
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		if(compression != null){
 			var unpackedBytes = accessMap.temporaryLocalField(byte[].class, "unpackedBytes", body);

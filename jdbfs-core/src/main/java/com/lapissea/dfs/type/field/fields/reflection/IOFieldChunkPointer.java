@@ -17,6 +17,7 @@ import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
+import com.lapissea.dfs.utils.CodeUtils;
 import com.lapissea.iterableplus.Match.Some;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
@@ -137,5 +138,34 @@ public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<
 				}
 			});
 		});
+	}
+
+	public NumberSize generatedWriteSize(VarPool<T> ioPool, T instance, long value){
+		return getSafeSize(ioPool, instance, value);
+	}
+	public NumberSize generatedSize(VarPool<T> ioPool, T instance){
+		return getSize(ioPool, instance);
+	}
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.call(CodeUtils.class, "pointer_size", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool"); accessMap.getObject(args);
+		}).call("skip", args -> args.get("src"));
+	}
+
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.markTemporary();
+		var pointer = accessMap.temporaryLocalField(ChunkPointer.class, "writePointer", body);
+		accessMap.getFieldRef(this, body);
+		body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(ChunkPointer.class).set(pointer);
+		var value = accessMap.temporaryLocalField(long.class, "writePointerValue", body);
+		body.get(pointer).ifIsNull(b -> b.val(0L)).elseRun(b -> b.get(pointer).call("getValue")).set(value);
+		body.call(CodeUtils.class, "pointer_writeSize", args -> {
+			accessMap.getFieldRef(this, args);
+			args.get("ioPool"); accessMap.getObject(args); args.get(value);
+		}).call("write", args -> args.get("dest").get(value));
+		accessMap.dropTemporary(body);
 	}
 }

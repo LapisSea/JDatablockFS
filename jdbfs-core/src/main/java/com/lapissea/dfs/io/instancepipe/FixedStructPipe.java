@@ -133,7 +133,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, this);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

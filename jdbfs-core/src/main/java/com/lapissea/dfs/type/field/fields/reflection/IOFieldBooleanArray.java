@@ -102,6 +102,13 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends NullFlag
 		src.skipExact(BitUtils.bitsToBytes(size));
 	}
 	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class).add(7).bitShiftRight(true, 3);
+		});
+	}
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		var arr = accessMap.temporaryLocalField(boolean[].class, "boolArrResult", body);
 		injectReadFieldNullable(body, accessMap, null, bod -> {

@@ -27,6 +27,7 @@ import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.jorth.CodeArg;
 import com.lapissea.jorth.CodeBlock;
 import com.lapissea.jorth.exceptions.MalformedJorth;
+import com.lapissea.jorth.lang.type.GenericType;
 
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -170,6 +171,28 @@ public final class IOFieldEnumCollection<T extends IOInstance<T>, E extends Enum
 		src.skipExact(byteCount(size));
 	}
 	
+	@Override
+	public void injectWriteField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		injectWriteFieldNullable(body, accessMap, null, writer -> {
+			var value = accessMap.temporaryLocalField(getType(), "enumCollection", writer);
+			writer.set(value);
+			accessMap.getConstant(universe, EnumUniverse.class, writer);
+			writer.call("write", args -> {
+				accessMap.getConstant(adapter, CollectionAdapter.class, args);
+				args.call("asListView", collection -> collection.get(value))
+				    .cast(GenericType.of(List.class).withArgs(universe.type)).get("dest");
+			});
+		});
+	}
+
+	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(collectionLength, args);
+			args.cast(long.class).mul(universe.bitSize).add(7).bitShiftRight(true, 3);
+		});
+	}
+
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {

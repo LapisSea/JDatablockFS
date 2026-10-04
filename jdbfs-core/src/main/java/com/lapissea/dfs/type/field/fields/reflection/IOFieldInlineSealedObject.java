@@ -236,6 +236,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		CodeArg read = value -> {
+			// Concrete IOInstances can implement a sealed root that is an unrelated interface.
 			value.call(PipeCodeGen.class, "resolveSealedPipe", args -> {
 				args.get("provider").val(rootType);
 				accessMap.get(universeID, args);
@@ -244,7 +245,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 				args.get("provider").get("src");
 				accessMap.getFieldRef(this, args);
 				args.call("makeContext", context -> context.get("genericContext"));
-			}).cast(getType());
+			}).cast(Object.class).cast(getType());
 		};
 		injectReadFieldNullable(body, accessMap, null, value -> {
 			if(nullable()){

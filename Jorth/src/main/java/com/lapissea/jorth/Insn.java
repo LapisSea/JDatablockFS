@@ -982,55 +982,66 @@ sealed interface Insn{
 		}
 	}
 	
-	record Increment(Number val, BaseType type) implements Insn{
-		
-		public static Increment simulate(TypeStack stack, int val) throws MalformedJorth{
-			var      type = stack.peekLast();
-			BaseType typ;
-			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) || type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)){
-				typ = BaseType.INT;
-				stack.pop();
-				stack.push(GenericType.INT);
-			}else if(type.equals(GenericType.LONG)) typ = BaseType.LONG;
-			else if(type.equals(GenericType.FLOAT)) typ = BaseType.FLOAT;
-			else if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
-			else{
-				throw new MalformedJorth("Cannot increment stack value of type: " + type + " by int");
-			}
-			return new Increment(val, typ);
+	/** Arithmetic uses JVM numeric categories; small integral operands produce int. */
+	enum ArithmeticOp{
+		ADD(IADD), SUB(ISUB), MUL(IMUL), DIV(IDIV), MOD(IREM), NEG(INEG);
+		final int opcode;
+		ArithmeticOp(int opcode){ this.opcode = opcode; }
+	}
+
+	record Arithmetic(ArithmeticOp operation, BaseType type, Number constant) implements Insn{
+		private static BaseType numericType(GenericType type) throws MalformedJorth{
+			if(type.equals(GenericType.INT) || type.equals(GenericType.BYTE) ||
+			   type.equals(GenericType.SHORT) || type.equals(GenericType.CHAR)) return BaseType.INT;
+			if(type.equals(GenericType.LONG)) return BaseType.LONG;
+			if(type.equals(GenericType.FLOAT)) return BaseType.FLOAT;
+			if(type.equals(GenericType.DOUBLE)) return BaseType.DOUBLE;
+			throw new MalformedJorth("Arithmetic requires a numeric primitive, got " + type);
 		}
-		public static Increment simulate(TypeStack stack, double val) throws MalformedJorth{
-			var      type = stack.peekLast();
-			BaseType typ;
-			if(type.equals(GenericType.DOUBLE)) typ = BaseType.DOUBLE;
-			else{
-				throw new MalformedJorth("Cannot increment stack value of type: " + type + " by double");
+		static Arithmetic simulate(TypeStack stack, ArithmeticOp operation, Number constant) throws MalformedJorth{
+			int count = constant != null || operation == ArithmeticOp.NEG? 1 : 2;
+			stack.requireElements(count);
+			// Validate before changing the stack, including the code-path ownership boundary.
+			if(stack.getLocalPortion().size()<count){
+				throw new MalformedJorth("can not pop values outside the code path");
 			}
-			return new Increment(val, typ);
+			var type = numericType(stack.peekLast());
+			if(constant == null && count == 2){
+				var left = numericType(stack.peek(stack.size() - 2));
+				if(left != type) throw new MalformedJorth("Arithmetic operands have incompatible types: " + left + " and " + type);
+			}else if(constant != null && !(constant instanceof Integer)){
+				var expected = constant instanceof Long? BaseType.LONG : constant instanceof Float? BaseType.FLOAT : BaseType.DOUBLE;
+				if(type != expected) throw new MalformedJorth("Arithmetic constant requires " + expected + ", got " + type);
+			}
+			for(int i = 0; i<count; i++) stack.pop();
+			stack.push(switch(type){
+				case INT -> GenericType.INT;
+				case LONG -> GenericType.LONG;
+				case FLOAT -> GenericType.FLOAT;
+				case DOUBLE -> GenericType.DOUBLE;
+				default -> throw new IllegalStateException();
+			});
+			return new Arithmetic(operation, type, constant);
 		}
-		
 		@Override
 		public void visit(MethodVisitor writer){
-			switch(type){
-				case OBJ, VOID, CHAR, BYTE, SHORT, BOOLEAN -> throw new IllegalStateException();
-				case INT -> {
-					// pop top int, add constant
-					IVal.emit(writer, val.intValue());
-					writer.visitInsn(IADD);
-				}
-				case LONG -> {
-					LVal.emit(writer, val.longValue());
-					writer.visitInsn(LADD);
-				}
-				case FLOAT -> {
-					FVal.emit(writer, val.floatValue());
-					writer.visitInsn(FADD);
-				}
-				case DOUBLE -> {
-					DVal.emit(writer, val.doubleValue());
-					writer.visitInsn(DADD);
+			if(constant != null){
+				switch(type){
+					case INT -> IVal.emit(writer, constant.intValue());
+					case LONG -> LVal.emit(writer, constant.longValue());
+					case FLOAT -> FVal.emit(writer, constant.floatValue());
+					case DOUBLE -> DVal.emit(writer, constant.doubleValue());
+					default -> throw new IllegalStateException();
 				}
 			}
+			int offset = switch(type){
+				case INT -> 0;
+				case LONG -> 1;
+				case FLOAT -> 2;
+				case DOUBLE -> 3;
+				default -> throw new IllegalStateException();
+			};
+			writer.visitInsn(operation.opcode + offset);
 		}
 	}
 	

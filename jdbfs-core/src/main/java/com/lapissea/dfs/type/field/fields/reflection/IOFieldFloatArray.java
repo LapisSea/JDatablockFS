@@ -96,6 +96,13 @@ public final class IOFieldFloatArray<T extends IOInstance<T>> extends NullFlagCo
 	}
 	
 	@Override
+	public void injectSkipField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		body.get("src").call("skipExact", args -> {
+			accessMap.get(arraySize, args);
+			args.cast(long.class).mul(Float.BYTES);
+		});
+	}
+	@Override
 	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
 		injectReadFieldNullable(body, accessMap, null, bod -> {
 			bod.get("src")

@@ -117,4 +117,19 @@ public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> exten
 			    .getArrayElement();
 		});
 	}
+
+	@Override
+	public void injectWriteFieldToBits(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.markTemporary();
+		var value = accessMap.temporaryLocalField(enumUniverse.type, "writeEnum", body);
+		accessMap.getFieldRef(this, body);
+		body.call("get", args -> { args.get("ioPool"); accessMap.getObject(args); }).cast(enumUniverse.type).set(value);
+		if(nullable()){
+			body.get(value).ifIsNull(b -> b.val(0L))
+			    .elseRun(b -> b.get(value).call("ordinal").add(1).cast(long.class));
+		}else{
+			body.get(value).call("ordinal").cast(long.class);
+		}
+		accessMap.dropTemporary(body);
+	}
 }

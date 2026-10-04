@@ -234,7 +234,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			
 			List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(type, getSpecificFields());
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, true);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, true, this);
 		});
 	}
 }
