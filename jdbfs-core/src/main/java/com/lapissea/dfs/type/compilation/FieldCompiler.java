@@ -231,7 +231,8 @@ public final class FieldCompiler{
 					
 					VirtualAccessor.TypeOff typeOff;
 					
-					var primitive = SupportedPrimitive.get(s.type);
+					// Boxed virtual values need object storage so they can retain null.
+					var primitive = SupportedPrimitive.getStrict(s.type);
 					
 					if(primitive.isEmpty()){
 						var index = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);

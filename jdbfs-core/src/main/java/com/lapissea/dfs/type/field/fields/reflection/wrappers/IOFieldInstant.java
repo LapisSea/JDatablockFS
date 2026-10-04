@@ -137,7 +137,7 @@ public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends IOField
 	
 	@Override
 	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-		accessMap.readStruct(IOInstant.STRUCT, body, a -> a.nullVal(GenericContext.class));
+		accessMap.readStruct(instancePipe, body, a -> a.nullVal(GenericContext.class));
 		body.call("getData");
 	}
 }

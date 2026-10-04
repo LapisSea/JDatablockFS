@@ -803,14 +803,14 @@ public abstract class DynamicCollectionSupport{
 			case LONG -> {
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				for(int i = 0; i<len; i++){
-					dest.add(siz.read(src));
+					dest.add(siz.readSigned(src));
 				}
 			}
 			case INT -> {
 				var siz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr = new int[len];
 				for(int i = 0; i<arr.length; i++){
-					dest.add(siz.readInt(src));
+					dest.add(siz.readIntSigned(src));
 				}
 			}
 			case SHORT -> {

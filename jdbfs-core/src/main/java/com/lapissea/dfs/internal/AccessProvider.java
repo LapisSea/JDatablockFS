@@ -163,6 +163,12 @@ public interface AccessProvider{
 		}
 		
 		@Override
+		public Class<?> defineClassWithClassData(Class<?> target, byte[] bytecode, Object classData) throws IllegalAccessException, Defunct{
+			var lookup = getLookup(target, true, true, Mode.PRIVATE, Mode.MODULE);
+			return lookup.defineHiddenClassWithClassData(bytecode, classData, true, MethodHandles.Lookup.ClassOption.NESTMATE).lookupClass();
+		}
+
+		@Override
 		public AccessProvider adapt(Class<?> target, boolean required, Mode... modes) throws IllegalAccessException, Defunct{
 			var lookup = getLookup(target, true, required, modes);
 			if(lookup == null) return null;
@@ -364,6 +370,9 @@ public interface AccessProvider{
 		return defineClass(target, bytecode, false);
 	}
 	Class<?> defineClass(Class<?> target, byte[] bytecode, boolean hidden) throws IllegalAccessException, Defunct;
+	default Class<?> defineClassWithClassData(Class<?> target, byte[] bytecode, Object classData) throws IllegalAccessException, Defunct{
+		throw new UnsupportedOperationException();
+	}
 	
 	default AccessProvider adapt(Class<?> target, Mode... modes) throws IllegalAccessException, Defunct{
 		return adapt(target, true, modes);

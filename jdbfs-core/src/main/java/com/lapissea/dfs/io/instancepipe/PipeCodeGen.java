@@ -3,6 +3,7 @@ package com.lapissea.dfs.io.instancepipe;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
+import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.type.GenericContext;
@@ -23,17 +24,19 @@ import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.io.IOException;
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public final class PipeCodeGen{
 	
 	public interface PipeWriter<T extends IOInstance<T>>{
-		void writePipeClass(ClassDefinition cw, Class<T> type) throws MalformedJorth, UnsupportedCodeGenType;
+		void writePipeClass(ClassDefinition cw, Class<T> type, List<Object> constants) throws MalformedJorth, UnsupportedCodeGenType;
 	}
 	
 	sealed interface ConstructionStrategy{
@@ -41,7 +44,29 @@ public final class PipeCodeGen{
 		
 		record Constructor(FieldSet<?> fields) implements ConstructionStrategy{ }
 	}
+	public static <T extends IOInstance<T>> StructPipe<T> resolveSealedPipe(
+		DataProvider provider, Class<T> rootType, int id, Map<Class<T>, StructPipe<T>> pipes
+	) throws IOException{
+		var type = provider.getTypeDb().fromID(rootType, id);
+		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
+		return pipes.get(type);
+	}
+
+	// The generated class supplies its own lookup; class data keeps captured objects alive with that class.
+	public static Object classConstant(MethodHandles.Lookup lookup, int index) throws IllegalAccessException{
+		return MethodHandles.classDataAt(lookup, "_", Object.class, index);
+	}
+
+	public static void loadConstant(CodeBlock body, List<Object> constants, Object value, Class<?> type) throws MalformedJorth{
+		int index = constants.size();
+		constants.add(value);
+		body.call(PipeCodeGen.class, "classConstant", args -> args.call(MethodHandles.class, "lookup").val(index)).cast(type);
+	}
+
 	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, UnsafeConsumer<ClassDefinition, Throwable> generateFn) throws Throwable{
+		return makeImpl(lookup, fnName, new ArrayList<>(), generateFn);
+	}
+	static MethodHandle makeImpl(MethodHandles.Lookup lookup, String fnName, List<Object> constants, UnsafeConsumer<ClassDefinition, Throwable> generateFn) throws Throwable{
 		var c     = lookup.lookupClass();
 		var cname = c.getName();
 		
@@ -54,7 +79,7 @@ public final class PipeCodeGen{
 		
 		var bb = cw.getClassFile();
 		
-		var implClass = lookup.defineHiddenClass(bb, true, MethodHandles.Lookup.ClassOption.NESTMATE);
+		var implClass = lookup.defineHiddenClassWithClassData(bb, List.copyOf(constants), true, MethodHandles.Lookup.ClassOption.NESTMATE);
 		var method = Iters.from(implClass.lookupClass().getMethods())
 		                  .filter(e -> e.getName().equals(fnName))
 		                  .getFirst();
@@ -118,6 +143,7 @@ public final class PipeCodeGen{
 						accessMap.get(field, args);
 					}
 				});
+				accessMap.storeConstructedInstanceFields(body);
 			}
 		}
 	}
@@ -219,7 +245,7 @@ public final class PipeCodeGen{
 	}
 	
 	static <T extends IOInstance<T>> ConstantCallSite boostrapDoReadFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
 	){
 		if(ConfigDefs.CompLogLevel.SMALL.isEnabled()){
 			Log.debug("Generating specialized bootstrapDoRead for {}#green", objType.getTypeName());
@@ -228,10 +254,11 @@ public final class PipeCodeGen{
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
 			
-			var target = makeImpl(lookup, "bootstrapDoRead", (cw) -> {
+			var constants = new ArrayList<Object>();
+			var target = makeImpl(lookup, "bootstrapDoRead", constants, (cw) -> {
 				cw.typeDef("ObjType", objType);
 				
-				var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
+				var accessMap = new SpecializedGenerator.AccessMap(cw, constants);
 				accessMap.setup(true, false);
 				
 				Struct.of(objType, Struct.STATE_INIT_FIELDS);//Wait for fields to be initialized
@@ -300,7 +327,7 @@ public final class PipeCodeGen{
 	}
 	
 	static <T extends IOInstance<T>> ConstantCallSite boostrapReadNewFromFields(
-		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields, Class<? extends StructPipe> pipeType
+		MethodHandles.Lookup lookup, String name, Class<T> objType, List<IOField<T, ?>> fields
 	){
 		if(ConfigDefs.CompLogLevel.SMALL.isEnabled()){
 			Log.debug("Generating specialized {}#yellow for {}#green", name, objType.getTypeName());
@@ -309,9 +336,10 @@ public final class PipeCodeGen{
 		try{
 			List<SpecializedGenerator> generators = getSpecializedGenerators(objType, fields);
 			
-			var target = makeImpl(lookup, name, cw -> {
+			var constants = new ArrayList<Object>();
+			var target = makeImpl(lookup, name, constants, cw -> {
 				cw.typeDef("ObjType", objType);
-				var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
+				var accessMap = new SpecializedGenerator.AccessMap(cw, constants);
 				
 				ConstructionStrategy strategy = getStrategy(Struct.of(objType, Struct.STATE_INIT_FIELDS));
 				var body = cw.function(name).staticAcc()
@@ -337,6 +365,9 @@ public final class PipeCodeGen{
 		}
 	}
 	static void defaultClassDef(ClassDefinition cw) throws MalformedJorth{
+		defaultClassDef(cw, c -> c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType"))).get("syncStage"));
+	}
+	static void defaultClassDef(ClassDefinition cw, CodeArg superArgs) throws MalformedJorth{
 		var superType = GenericType.of(cw.getTypeDef("GeneratorPipeClass")).withArgs(cw.getTypeDef("ObjType"));
 		cw.name(cw.getTypeDef("ThisClass")).extendsType(superType)
 		  .implement(StructPipe.SpecializedImplementation.class);
@@ -344,10 +375,7 @@ public final class PipeCodeGen{
 		cw.instanceInit()
 		  .arg(int.class, "syncStage")
 		  .body()
-		  .callSuper(c -> {
-			  c.call(Struct.class, "of", c2 -> c2.val(cw.getTypeDef("ObjType")))
-			   .get("syncStage");
-		  });
+		  .callSuper(superArgs);
 		
 		cw.function("getGenericType").visibility(Visibility.PUBLIC)
 		  .returns(Class.class)
@@ -356,12 +384,27 @@ public final class PipeCodeGen{
 	
 	public static void standardPipeImpl(
 		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
-		List<SpecializedGenerator> generators, Class<? extends StructPipe> pipeType
+		List<SpecializedGenerator> generators, List<Object> constants
 	) throws MalformedJorth, UnsupportedCodeGenType{
-		var accessMap = new SpecializedGenerator.AccessMap(cw, pipeType);
+		standardPipeImpl(concreteType, cw, type, generators, constants, false);
+	}
+	static void standardPipeImpl(
+		Class<?> concreteType, ClassDefinition cw, Struct<?> type,
+		List<SpecializedGenerator> generators, List<Object> constants, boolean eagerDoRead
+	) throws MalformedJorth, UnsupportedCodeGenType{
+		var accessMap = new SpecializedGenerator.AccessMap(cw, constants);
 		
 		boolean noCtor = concreteType.isAnnotationPresent(Struct.NoDefaultConstructor.class);
 		
+		if(eagerDoRead){
+			if(!type.needsBuilderObj()){
+				overwrite_doRead(cw, generators, accessMap);
+			}
+			if(!noCtor || getStrategy(type) instanceof ConstructionStrategy.Constructor){
+				overwrite_readNew(cw, generators, accessMap, type);
+			}
+			return;
+		}
 		overwrite_doRead(cw, noCtor? generators : null, accessMap);
 		
 		if(!noCtor){

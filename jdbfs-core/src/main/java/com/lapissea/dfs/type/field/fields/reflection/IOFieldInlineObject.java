@@ -97,7 +97,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		var desc = instancePipe.getSizeDescriptor();
 		
 		var fixedSiz = desc.getFixed();
-		if(fixedSiz.isPresent()){
+		if(fixedSiz.isPresent() && (fixed || !nullable())){
 			initSizeDescriptor(SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong()));
 		}else{
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
@@ -105,7 +105,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				nullable()? 0 : desc.getMin(),
 				desc.getMax(),
 				(ioPool, prov, inst) -> {
-					var val = get(null, inst);
+					var val = get(ioPool, inst);
 					if(val == null){
 						if(!nullable()) throw new NullPointerException();
 						return 0;
@@ -208,14 +208,10 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				skip.get("src").call("skipExact", List.of(getSizeDescriptor().requireFixed(WordSpace.BYTE)));
 			}
 		}, bod -> {
-			if(instancePipe instanceof StandardStructPipe){
-				accessMap.readStruct(instancePipe.getType(), bod, arg -> {
-					accessMap.getFieldRef(this, arg);
-					arg.call("makeContext", a -> a.get("genericContext"));
-				});
-			}else{
-				throw UtilL.uncheckedThrow(new UnsupportedCodeGenType("Only for standard pipe for now"));
-			}
+			accessMap.readStruct(instancePipe, bod, arg -> {
+				accessMap.getFieldRef(this, arg);
+				arg.call("makeContext", a -> a.get("genericContext"));
+			});
 		});
 	}
 }

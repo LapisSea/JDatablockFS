@@ -226,23 +226,18 @@ public enum NumberSize{
 		readConst(target, e -> e.get("src"), signed);
 	}
 	public void readConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
-		switch(this){
-			case VOID -> target.val(0L);
-			case BYTE, SHORT, SMALL_INT -> {
-				getContentReader.accept(target);
-				target.call("readWord", List.of(bytes));
-			}
-			case INT, BIG_INT, SMALL_LONG -> {
-				getContentReader.accept(target);
-				target.call((signed? "readInt" : "readUnsignedInt") + bytes);
-			}
-			case LONG -> {
-				getContentReader.accept(target);
-				target.call("readInt8");
-			}
+		if(this == VOID){
+			target.val(0L);
+			return;
+		}
+		getContentReader.accept(target);
+		target.call("readWord", List.of(bytes));
+		if(signed && this != LONG){
+			int shift = Long.SIZE - bytes*Byte.SIZE;
+			target.bitShiftLeft(shift).bitShiftRight(false, shift);
 		}
 	}
-	
+
 	public int readInt(ContentReader in) throws IOException{
 		return switch(this){
 			case VOID -> 0;
@@ -258,21 +253,19 @@ public enum NumberSize{
 		readIntConst(target, e -> e.get("src"), signed);
 	}
 	public void readIntConst(CodeBlock target, CodeArg getContentReader, boolean signed) throws MalformedJorth{
-		switch(this){
-			case VOID -> target.val(0);
-			case BYTE, SHORT, SMALL_INT -> {
-				getContentReader.accept(target);
-				target.call((signed? "readInt" : "readUnsignedInt") + bytes);
-			}
-			case INT -> {
-				getContentReader.accept(target);
-				if(signed) target.call("readInt4");
-				else target.call("readUnsignedInt4").cast(int.class);
-			}
-			case BIG_INT, SMALL_LONG, LONG -> throw new MalformedJorth("Attempted to read too large of a number");
+		if(bytes>Integer.BYTES) throw new MalformedJorth("Attempted to read too large of a number");
+		if(this == VOID){
+			target.val(0);
+			return;
+		}
+		getContentReader.accept(target);
+		target.call("readWord", List.of(bytes)).cast(int.class);
+		if(signed && this != INT){
+			int shift = Integer.SIZE - bytes*Byte.SIZE;
+			target.bitShiftLeft(shift).bitShiftRight(false, shift);
 		}
 	}
-	
+
 	public static void readIntDyn(CodeBlock target, boolean signed) throws MalformedJorth{
 		readIntDyn(target, e -> e.get("src"), signed);
 	}

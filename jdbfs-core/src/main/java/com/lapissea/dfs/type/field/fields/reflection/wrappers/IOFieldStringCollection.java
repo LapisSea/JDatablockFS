@@ -158,6 +158,10 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	}
 	@Override
 	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
-		throw new UnsupportedCodeGenType();
+		accessMap.getConstant(adapter, CollectionAdapter.class, body);
+		body.call("read", args -> {
+			accessMap.get(collectionSize, args);
+			args.get("provider").get("src").get("genericContext");
+		}).cast(getType());
 	}
 }

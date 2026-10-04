@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
+public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
 	private static final class ProviderReply<T extends IOInstance<T>>{
 		
@@ -37,7 +37,8 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 		
 		private List<Step> steps;
 		
-		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
+		// IDs belong to the enclosing provider, so equal widths at different positions are distinct layouts.
+		private final Map<List<VaryingSize>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
 		private final ReadWriteClosableLock                            cacheLock = ReadWriteClosableLock.reentrant();
 		
 		private ProviderReply(Struct<T> type){
@@ -59,12 +60,12 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				var state = intercept.getState();
 				pipe.sizesStr = state.sb.toString();
 				this.steps = List.copyOf(state.steps);
-				return pipe;
+				return pipe.specialize();
 			}
 			
-			List<NumberSize> buff = new ArrayList<>(steps.size());
+			List<VaryingSize> buff = new ArrayList<>(steps.size());
 			for(var step : steps){
-				buff.add(rule.provide(step.max, null, step.ptr).size);
+				buff.add(rule.provide(step.max, null, step.ptr));
 			}
 			buff = List.copyOf(buff);
 			
@@ -79,8 +80,9 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 				
 				ConfigDefs.CompLogLevel.JUST_START.log("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
-				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
-				pipe.sizesStr = Iters.from(buff).map(NumberSize::shortName).joinAsStr();
+				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeatSizes(buff));
+				pipe.sizesStr = Iters.from(buff).map(v -> v.size.shortName()).joinAsStr();
+				pipe = pipe.specialize();
 				cache.put(buff, pipe);
 				
 				return pipe;
@@ -117,6 +119,28 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	public static final class UseFixed extends Exception{ }
 	
 	private String sizesStr;
+	private final PipeFieldCompiler.Result<T> layout;
+
+	public FixedVaryingStructPipe(FixedVaryingStructPipe<T> source, int syncStage){
+		super(source.getType(), (type, fields, testRun) -> {
+			if(testRun) throw new DoNotTest();
+			return source.layout;
+		}, syncStage);
+		layout = source.layout;
+		sizesStr = source.sizesStr;
+	}
+
+	private FixedVaryingStructPipe<T> specialize(){
+		boolean enabled = switch(ConfigDefs.OPTIMIZED_PIPE.resolve()){
+			case NEVER -> false;
+			case TRY_ALWAYS -> true;
+			case SPECIAL_ONLY -> getType().getType().isAnnotationPresent(StructPipe.Special.class);
+		};
+		if(enabled && buildSpecializedImplementation(STATE_DONE) instanceof Match.Some(var pipe)){
+			return (FixedVaryingStructPipe<T>)pipe;
+		}
+		return this;
+	}
 	
 	private FixedVaryingStructPipe(Struct<T> type, VaryingSize.Provider rule) throws UseFixed{
 		super(type, (t, structFields, testRun) -> {
@@ -146,6 +170,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			}
 			return new PipeFieldCompiler.Result<>(result, state.ruleReply);
 		}, STATE_DONE);
+		layout = compiledLayout();
 		if(type instanceof Struct.Unmanaged){
 			throw new IllegalArgumentException("Unmanaged types are not supported");
 		}
@@ -194,11 +219,14 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
-		return Match.of((cw, type) -> {
-			if(type != getType().getType()){
+		return Match.of((cw, type, constants) -> {
+			if(type != getType().getConcreteType()){
 				throw new AssertionError();
 			}
-			PipeCodeGen.defaultClassDef(cw);
+			PipeCodeGen.defaultClassDef(cw, args -> {
+				PipeCodeGen.loadConstant(args, constants, this, FixedVaryingStructPipe.class);
+				args.get("syncStage");
+			});
 			
 			//Always true, varying pipe needs object info, can't generate fields on the fly so delegation is not possible
 			cw.field(boolean.class, "DEBUG_READY_READ")
@@ -206,7 +234,7 @@ public final class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseF
 			
 			List<SpecializedGenerator> generators = PipeCodeGen.getSpecializedGenerators(type, getSpecificFields());
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, null); //TODO: pass varying fixed pipe info for elements
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants, true);
 		});
 	}
 }

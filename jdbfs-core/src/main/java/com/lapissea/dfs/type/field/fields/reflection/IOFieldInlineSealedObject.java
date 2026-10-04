@@ -3,10 +3,10 @@ package com.lapissea.dfs.type.field.fields.reflection;
 import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
-import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
+import com.lapissea.dfs.io.instancepipe.PipeCodeGen;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.GetAnnotation;
 import com.lapissea.dfs.type.IOInstance;
@@ -18,6 +18,11 @@ import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
+import com.lapissea.dfs.exceptions.UnsupportedCodeGenType;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.CodeArg;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
@@ -35,7 +40,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType> implements SpecializedGenerator{
 	
 	@SuppressWarnings({"unused", "rawtypes"})
 	private static final class Usage implements FieldUsage{
@@ -194,9 +199,7 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		}
 		
-		var type         = provider.getTypeDb().fromID(rootType, id);
-		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
-		var instancePipe = typeToPipe.get(type);
+		var instancePipe = resolveInstancePipe(provider, id);
 		
 		return instancePipe.readNew(provider, src, makeContext(genericContext));
 	}
@@ -220,12 +223,36 @@ public final class IOFieldInlineSealedObject<CTyp extends IOInstance<CTyp>, Valu
 			}
 		}
 		
-		var id   = getUniverseID(ioPool, instance);
-		var type = provider.getTypeDb().fromID(rootType, id);
-		if(type == null) throw new MalformedStruct("fmt", "Unknown sealed id {}#red for root type {}#yellow", id, rootType);
-		
-		var instancePipe = typeToPipe.get(type);
+		var id = getUniverseID(ioPool, instance);
+		var instancePipe = resolveInstancePipe(provider, id);
 		
 		instancePipe.skip(provider, src, makeContext(genericContext));
+	}
+
+	public StructPipe<ValueType> resolveInstancePipe(DataProvider provider, int id) throws IOException{
+		return PipeCodeGen.resolveSealedPipe(provider, rootType, id, typeToPipe);
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth, UnsupportedCodeGenType{
+		CodeArg read = value -> {
+			value.call(PipeCodeGen.class, "resolveSealedPipe", args -> {
+				args.get("provider").val(rootType);
+				accessMap.get(universeID, args);
+				accessMap.getConstant(typeToPipe, Map.class, args);
+			}).call("readNew", args -> {
+				args.get("provider").get("src");
+				accessMap.getFieldRef(this, args);
+				args.call("makeContext", context -> context.get("genericContext"));
+			}).cast(getType());
+		};
+		injectReadFieldNullable(body, accessMap, null, value -> {
+			if(nullable()){
+				accessMap.get(universeID, value);
+				value.val(0).lessThanOrEqualOp().ifTrue(empty -> empty.nullVal(getType())).elseRun(read);
+			}else{
+				read.accept(value);
+			}
+		});
 	}
 }

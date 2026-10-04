@@ -201,6 +201,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		waitForState(STATE_IO_FIELD);
 		return needsBuilderObj;
 	}
+	protected final PipeFieldCompiler.Result<T> compiledLayout(){
+		waitForState(STATE_IO_FIELD);
+		return new PipeFieldCompiler.Result<>(List.copyOf(getSpecificFields()), builderMetadata);
+	}
+
 	protected StructPipe<ProxyBuilder<T>> createBuilderPipe(Object builderMetadata){
 		var struct = getType().getBuilderObjType(true);
 		
@@ -1132,13 +1137,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var className = type.getName() + "&GeneratedPipe_" + type.getSimpleName();
 			
 			var cw = ClassDefinition.hiddenNestmate(type).finalAcc();
+			var constants = new ArrayList<Object>();
 			
 			cw.typeDef("GeneratorPipeClass", this.getClass());
 			cw.typeDef("ObjType", type);
 			cw.typeDef("ThisClass", ClassName.dotted(className));
 			
 			try{
-				pipeWriter.writePipeClass(cw, type);
+				pipeWriter.writePipeClass(cw, type, constants);
 			}catch(UnsupportedCodeGenType e){
 				if(ConfigDefs.OPTIMIZED_PIPE.resolve() == ConfigDefs.PipeOptimization.TRY_ALWAYS){
 					Log.info("Failed to generate specialization for {}#red because\n  {}", type, e);
@@ -1149,7 +1155,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			byte[] bytecode = cw.getClassFile();
 			
-			var cls = access.defineClass(type, bytecode, true);
+			var cls = access.defineClassWithClassData(type, bytecode, List.copyOf(constants));
 			//noinspection unchecked
 			return Match.of((StructPipe<T>)cls.getConstructor(int.class).newInstance(syncStage));
 		}catch(MalformedJorth e){

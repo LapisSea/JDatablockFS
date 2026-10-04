@@ -1,28 +1,38 @@
 package com.lapissea.dfs.type.field.fields.reflection;
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedStruct;
 import com.lapissea.dfs.io.content.ContentReader;
 import com.lapissea.dfs.io.content.ContentWriter;
 import com.lapissea.dfs.type.GenericContext;
 import com.lapissea.dfs.type.IOInstance;
+import com.lapissea.dfs.type.Struct;
+import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.FieldCompiler;
+import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.type.field.Annotations;
 import com.lapissea.dfs.type.field.FieldNames;
 import com.lapissea.dfs.type.field.FieldSet;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VirtualFieldDefinition;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.iterableplus.Iters;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +40,7 @@ import java.util.Set;
 
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
-public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T, Optional<V>>{
+public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T, Optional<V>> implements SpecializedGenerator{
 	
 	@SuppressWarnings("unused")
 	private static final class Usage<V> extends FieldUsage.InstanceOf<Optional<V>>{
@@ -84,7 +94,30 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	}
 	@Override
 	protected Set<TypeFlag> computeTypeFlags(){
-		return Set.of(TypeFlag.HAS_NO_POINTERS);
+		var flags = EnumSet.noneOf(TypeFlag.class);
+		var type = IOFieldTools.unwrapOptionalTypeRequired(getAccessor().getGenericType(null));
+		boolean generic = IOFieldTools.isGeneric(getAccessor());
+		if(generic || SealedUtil.isSealedCached(Utils.typeToRaw(type))){
+			flags.add(TypeFlag.DYNAMIC);
+		}
+		// Collection wrappers inherit the classification of their element type.
+		while(true){
+			if(type instanceof Class<?> cls && cls.isArray()){
+				type = cls.componentType();
+			}else if(List.class.isAssignableFrom(Utils.typeToRaw(type))){
+				type = type instanceof ParameterizedType parameterized? parameterized.getActualTypeArguments()[0] : Object.class;
+			}else break;
+		}
+		var rawType = Utils.typeToRaw(type);
+		if(IOInstance.isInstanceOrSealed(rawType)){
+			flags.add(TypeFlag.IO_INSTANCE);
+			if(!generic && !Struct.canUnknownHavePointers(rawType)) flags.add(TypeFlag.HAS_NO_POINTERS);
+		}
+		if(SupportedPrimitive.isAny(rawType) || rawType.isEnum() || Type.class.isAssignableFrom(rawType) ||
+		   rawType == String.class || WrapperStructs.isWrapperType(rawType)){
+			flags.add(TypeFlag.HAS_NO_POINTERS);
+		}
+		return flags;
 	}
 	
 	@Override
@@ -123,5 +156,12 @@ public final class IOFieldOptional<T extends IOInstance<T>, V> extends IOField<T
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		//Noop value field is skipped
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.set(getAccessor(), body, value -> value.call(Optional.class, "ofNullable", args -> {
+			accessMap.get(valueField, args);
+		}));
 	}
 }

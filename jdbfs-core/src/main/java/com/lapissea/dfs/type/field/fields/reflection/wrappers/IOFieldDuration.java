@@ -142,7 +142,7 @@ public final class IOFieldDuration<CTyp extends IOInstance<CTyp>> extends IOFiel
 	
 	@Override
 	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-		accessMap.readStruct(IODuration.STRUCT, body, a -> a.nullVal(GenericContext.class));
+		accessMap.readStruct(instancePipe, body, a -> a.nullVal(GenericContext.class));
 		body.call("getData");
 	}
 }

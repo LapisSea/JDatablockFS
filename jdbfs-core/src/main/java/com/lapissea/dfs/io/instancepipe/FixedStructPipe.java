@@ -105,17 +105,17 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapDoRead(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields, FixedStructPipe.class);
+		return PipeCodeGen.boostrapDoReadFromFields(lookup, name, objType, fields);
 	}
 	
 	public static <T extends IOInstance<T>> CallSite bootstrapReadNew(MethodHandles.Lookup lookup, String name, MethodType ignore, Class<T> objType) throws Throwable{
 		var fields = makeSTDFields(objType);
-		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields, FixedStructPipe.class);
+		return PipeCodeGen.boostrapReadNewFromFields(lookup, name, objType, fields);
 	}
 	
 	@Override
 	protected Match<PipeCodeGen.PipeWriter<T>> getSpecializedImplementationWriter(){
-		return Match.of((cw, type) -> {
+		return Match.of((cw, type, constants) -> {
 			PipeCodeGen.defaultClassDef(cw);
 			
 			boolean hasReadyStruct = getType().getInitializationState()>=Struct.STATE_INIT_FIELDS;
@@ -133,7 +133,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 				}
 			}else generators = null;
 			
-			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, FixedStructPipe.class);
+			PipeCodeGen.standardPipeImpl(type, cw, getType(), generators, constants);
 		});
 	}
 	private static <T extends IOInstance<T>> List<IOField<T, ?>> makeSTDFields(Class<T> type){

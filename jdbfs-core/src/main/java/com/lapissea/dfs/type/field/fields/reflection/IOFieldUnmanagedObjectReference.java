@@ -20,9 +20,13 @@ import com.lapissea.dfs.type.Struct;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.WordSpace;
 import com.lapissea.dfs.type.field.SizeDescriptor;
+import com.lapissea.dfs.type.field.SpecializedGenerator;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.utils.CodeUtils;
+import com.lapissea.jorth.CodeBlock;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
@@ -32,7 +36,7 @@ import java.util.Set;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType>{
+public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType> implements SpecializedGenerator{
 	
 	
 	private final Struct.Unmanaged<ValueType>     struct;
@@ -135,7 +139,7 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 		return val.getPointer();
 	}
 	
-	private ValueType makeValueObject(DataProvider provider, Chunk identity, GenericContext genericContext) throws IOException{
+	public ValueType makeValueObject(DataProvider provider, Chunk identity, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION && genericContext != null){
 			var struct = declaringStruct();
 			assert struct == null || UtilL.instanceOf(struct.getType(), genericContext.owner) :
@@ -171,5 +175,18 @@ public final class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, Valu
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		ptrPipe.skip(provider, src, null);
+	}
+
+	@Override
+	public void injectReadField(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
+		accessMap.set(getAccessor(), body, value -> {
+			value.call(CodeUtils.class, "unmanaged_readValue", args -> {
+				accessMap.getFieldRef(this, args);
+				accessMap.getConstant(ptrPipe, ObjectPipe.NoPool.class, args);
+				args.call("readNew", read -> read.get("provider").get("src").nullVal(GenericContext.class))
+				    .cast(ChunkPointer.class);
+				args.get("provider").get("genericContext");
+			}).cast(getType());
+		});
 	}
 }

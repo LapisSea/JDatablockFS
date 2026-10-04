@@ -27,6 +27,8 @@ public class IntegerCollectionCodegenTests{
 		@IONullability(IONullability.Mode.NULLABLE)
 		public Integer[] array;
 		@IONullability(IONullability.Mode.NULLABLE)
+		public int[] primitive;
+		@IONullability(IONullability.Mode.NULLABLE)
 		public List<Integer> list;
 		public ArrayList<Integer> concrete;
 		public int tail;
@@ -69,10 +71,12 @@ public class IntegerCollectionCodegenTests{
 		assertThat(generated).isInstanceOf(StructPipe.SpecializedImplementation.class);
 		var chunk = AllocateTicket.bytes(32).submit(DataProvider.newVerySimpleProvider());
 		for(var values : List.of(List.<Integer>of(), List.of(0, 0, 0), List.of(-128, 127),
-		                        List.of(-32768, 32767), List.of(Integer.MIN_VALUE, Integer.MAX_VALUE))){
+		                        List.of(-32768, 32767), List.of(-8388608, 8388607),
+		                        List.of(Integer.MIN_VALUE, Integer.MAX_VALUE))){
 			for(boolean nulls : new boolean[]{false, true}){
 				var value = new Value();
 				value.array = nulls? null : values.toArray(Integer[]::new);
+				value.primitive = nulls? null : values.stream().mapToInt(Integer::intValue).toArray();
 				value.list = nulls? null : new ArrayList<>(values);
 				value.concrete = new ArrayList<>(values);
 				value.tail = 0x12345678;
@@ -89,6 +93,7 @@ public class IntegerCollectionCodegenTests{
 
 	private static void assertValue(Value actual, Value expected){
 		assertThat(actual.array).isEqualTo(expected.array);
+		assertThat(actual.primitive).isEqualTo(expected.primitive);
 		assertThat(actual.list).isEqualTo(expected.list);
 		assertThat(actual.concrete).isEqualTo(expected.concrete).isInstanceOf(ArrayList.class);
 		assertThat(actual.tail).isEqualTo(expected.tail);

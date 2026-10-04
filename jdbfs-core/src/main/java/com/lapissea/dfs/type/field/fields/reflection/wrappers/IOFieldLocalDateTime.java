@@ -140,7 +140,7 @@ public final class IOFieldLocalDateTime<CTyp extends IOInstance<CTyp>> extends I
 	}
 	@Override
 	public void injectReadValue(CodeBlock body, AccessMap accessMap) throws MalformedJorth{
-		accessMap.readStruct(IOLocalDateTime.STRUCT, body, a -> a.nullVal(GenericContext.class));
+		accessMap.readStruct(instancePipe, body, a -> a.nullVal(GenericContext.class));
 		body.call("getData");
 	}
 }
