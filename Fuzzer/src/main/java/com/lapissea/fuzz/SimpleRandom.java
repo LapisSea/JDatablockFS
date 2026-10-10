@@ -1,11 +1,12 @@
 package com.lapissea.fuzz;
 
+import java.io.Serializable;
 import java.util.random.RandomGenerator;
 
 /**
  * Random number generator that is thread unsafe, light weight and deterministic. Based of {@link java.util.Random}
  */
-final class SimpleRandom implements RandomGenerator{
+final class SimpleRandom implements RandomGenerator, Serializable{
 	
 	private static final long MULTIPLIER = 0x5DEECE66DL;
 	private static final long ADDEND     = 0xBL;
@@ -66,5 +67,14 @@ final class SimpleRandom implements RandomGenerator{
 	@Override
 	public double nextDouble(){
 		return (((long)(next(Double.PRECISION - 27))<<27) + next(27))*DOUBLE_UNIT;
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		return o instanceof SimpleRandom other && seed == other.seed;
+	}
+	@Override
+	public int hashCode(){
+		return Long.hashCode(seed);
 	}
 }

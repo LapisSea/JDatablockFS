@@ -1,5 +1,9 @@
 package com.lapissea.fuzz;
 
+import com.lapissea.fuzz.distributed.RecipeCodec;
+import com.lapissea.fuzz.distributed.master.DistributedSession;
+import com.lapissea.fuzz.internal.RunCoordinator;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.NotSerializableException;
@@ -7,22 +11,13 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.Spliterator;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -31,18 +26,35 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.fuzz.FuzzConfig.none;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	private record NOOP() implements Serializable{ }
 	
-	private static final class SequenceHolder{
-		private FuzzSequence sequence;
-	}
-	
 	public static final Object NOOP_ACTION = new NOOP();
 	public static Object noopAction(RandomGenerator r){ return NOOP_ACTION; }
+	
+	public interface Recipe<R extends FuzzingRunner<?, ?, ?>> extends Serializable{
+		R create();
+	}
+	
+	private byte[] remoteRecipe;
+	
+	/**
+	 * Creates a {@link #FuzzingRunner} that can run across multiple machines.
+	 * The recipe is a serializable lambda and thus, all the values it captures must be serializable.
+	 */
+	public static <R extends FuzzingRunner<?, ?, ?>> R distributed(Recipe<R> recipe){
+		var encoded = RecipeCodec.encode(Objects.requireNonNull(recipe));
+		
+		@SuppressWarnings("unchecked")
+		var frozen = (Recipe<R>)RecipeCodec.decode(encoded);
+		
+		var runner = Objects.requireNonNull(frozen.create(), "Distributed recipe returned null");
+		((FuzzingRunner<?, ?, ?>)runner).remoteRecipe = encoded;
+		
+		return runner;
+	}
 	
 	private final FuzzingStateEnv<State, Action, Err> stateEnv;
 	private final Function<RandomGenerator, Action>   actionFactory;
@@ -51,6 +63,41 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		this.stateEnv = stateEnv;
 		this.actionFactory = actionFactory;
 	}
+	
+	public void prepareRun(){
+		try{ stateEnv.prepareRun(); }catch(Throwable e){ throw unchecked(e); }
+	}
+	public void cleanupRun(){
+		try{ stateEnv.cleanupRun(); }catch(Throwable e){ throw unchecked(e); }
+	}
+	
+	public <T> T runWithLifecycle(Supplier<T> run){
+		Throwable failure = null;
+		try{
+			prepareRun();
+			return run.get();
+		}catch(Throwable e){
+			failure = e;
+			throw unchecked(e);
+		}finally{
+			try{
+				cleanupRun();
+			}catch(Throwable cleanup){
+				if(failure != null){
+					if(failure != cleanup) failure.addSuppressed(cleanup);
+				}else{
+					throw unchecked(cleanup);
+				}
+			}
+		}
+	}
+	
+	private static RuntimeException unchecked(Throwable e){
+		FuzzingRunner.<RuntimeException>throwUnchecked(e);
+		throw new AssertionError("unreachable");
+	}
+	@SuppressWarnings("unchecked")
+	private static <E extends Throwable> void throwUnchecked(Throwable e) throws E{ throw (E)e; }
 	
 	public sealed interface Stability{
 		record Ok(FuzzSequence sequence, OptionalLong actionIndex) implements Stability{
@@ -66,8 +113,8 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		
 		record DidntFail(int expectedCount, int actualCount) implements Stability{
 			public DidntFail{
-				if(expectedCount<=0) throw new AssertionError();
-				if(expectedCount<=actualCount) throw new AssertionError();
+				if(expectedCount<=0){ throw new AssertionError(); }
+				if(expectedCount<=actualCount){ throw new AssertionError(); }
 			}
 			@Override
 			public String makeReport(){
@@ -106,7 +153,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	public Stability establishFailStability(FuzzFail<State, Action> fail, int reruns){
 		Objects.requireNonNull(fail);
-		if(reruns<1) throw new IllegalArgumentException("Rerun count must be at least 1");
+		if(reruns<1){ throw new IllegalArgumentException("Rerun count must be at least 1"); }
 		
 		ensureActionEquality(fail.sequence());
 		
@@ -115,7 +162,7 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		var sequence = failShort.sequence();
 		var mark     = failShort.mark();
 		
-		var fails = run(
+		var fails = runLocal(
 			new FuzzConfig().withName("establishStableFail")
 			                .withErrorDelay(Duration.ofMillis(Long.MAX_VALUE))
 			                .withErrorTracking(new FuzzConfig.ErrorTracking(OptionalInt.empty(), false))
@@ -154,50 +201,37 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			throw new RuntimeException("Failed to create state", e);
 		}
 		Objects.requireNonNull(a, "State can not be null");
-		State b;
-		try{
-			byte[] aData;
-			{
-				var buff = new ByteArrayOutputStream();
-				try(var out = new ObjectOutputStream(buff)){
-					out.writeObject(a);
-				}
-				aData = buff.toByteArray();
-			}
-			try(var in = new ObjectInputStream(new ByteArrayInputStream(aData))){
-				//noinspection unchecked
-				b = (State)in.readObject();
-			}
-		}catch(NotSerializableException e){
-			throw new RuntimeException("State is required to be serializable", e);
-		}catch(Throwable e){
-			throw new RuntimeException("State is required to be serializable but failed", e);
-		}
+		State b = serializationRoundTrip("State", a);
 		
 		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
-			throw new RuntimeException("Faulty state equality or serializability! A state that is serialized should always be deserialized in to an equal object!");
+			throw new RuntimeException(
+				"Faulty state equality or serializability! A state that is serialized should always be deserialized in to an equal object!");
 		}
 	}
 	public void ensureActionSerializability(FuzzSequence sequence){
 		Action a = actionFactory.apply(new SimpleRandom(sequence.seed()));
-		Action b;
+		Action b = serializationRoundTrip("Action", a);
+		
+		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
+			throw new RuntimeException(
+				"Faulty action equality or serializability! An action that is serialized should always be deserialized in to an equal object!");
+		}
+	}
+	private static <T> T serializationRoundTrip(String what, T value){
 		try{
 			var buff = new ByteArrayOutputStream();
 			try(var out = new ObjectOutputStream(buff)){
-				out.writeObject(a);
+				out.writeObject(value);
 			}
 			try(var in = new ObjectInputStream(new ByteArrayInputStream(buff.toByteArray()))){
-				//noinspection unchecked
-				b = (Action)in.readObject();
+				@SuppressWarnings("unchecked")
+				var copy = (T)in.readObject();
+				return copy;
 			}
 		}catch(NotSerializableException e){
-			throw new RuntimeException("Action is required to be serializable", e);
+			throw new RuntimeException(what + " is required to be serializable", e);
 		}catch(Throwable e){
-			throw new RuntimeException("Action is required to be serializable but failed", e);
-		}
-		
-		if(!Objects.equals(a, b) || !Objects.equals(b, a)){
-			throw new RuntimeException("Faulty action equality or serializability! An action that is serialized should always be deserialized in to an equal object!");
+			throw new RuntimeException(what + " is required to be serializable but failed", e);
 		}
 	}
 	
@@ -211,61 +245,134 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return new FuzzFail.Action<>(action.e(), sequence, action.action(), action.actionIndex(), action.timeToFail(), action.badState());
 	}
 	
-	public Optional<FuzzFail<State, Action>> runSequence(FuzzSequence sequence)              { return runSequence(RunMark.NONE, sequence, null); }
+	public Optional<FuzzFail<State, Action>> runSequence(FuzzSequence sequence){
+		return runSequence(RunMark.NONE, sequence, null);
+	}
 	public Optional<FuzzFail<State, Action>> runSequence(RunMark mark, FuzzSequence sequence){ return runSequence(mark, sequence, null); }
 	public Optional<FuzzFail<State, Action>> runSequence(RunMark mark, FuzzSequence sequence, FuzzProgress progress){
-		if(progress != null && progress.hasErr()) return none();
-		
-		var start = NanoClock.now();
-		var rand  = new SimpleRandom(sequence.seed());
-		
-		State state;
+		var outcome = executeSequence(mark, sequence, progress, () -> progress != null && progress.hasErr());
+		return switch(outcome){
+			case SequenceOutcome.Failed<State, Action>(var failure) -> Optional.of(failure);
+			case SequenceOutcome.Ok<State, Action> ignored -> none();
+			case SequenceOutcome.Cancelled<State, Action> ignored -> none();
+		};
+	}
+	
+	public boolean shouldRunSequence(FuzzSequence sequence, RunMark mark){
+		return stateEnv.shouldRun(sequence, mark);
+	}
+	
+	public SequenceOutcome<State, Action> executeSequence(RunMark mark, FuzzSequence sequence, BooleanSupplier cancelled){
+		return executeSequence(mark, sequence, null, cancelled, null);
+	}
+	
+	public record SequenceProgress(long completedOperations, long executionNanos){ }
+	
+	public SequenceOutcome<State, Action> executeSequence(RunMark mark, FuzzSequence sequence,
+	                                                      BooleanSupplier cancelled, Consumer<SequenceProgress> observer){
+		return executeSequence(mark, sequence, null, cancelled, observer);
+	}
+	
+	private SequenceOutcome<State, Action> executeSequence(RunMark mark, FuzzSequence sequence, FuzzProgress progress, BooleanSupplier cancelled){
+		return executeSequence(mark, sequence, progress, cancelled, null);
+	}
+	
+	private SequenceOutcome<State, Action> executeSequence(
+		RunMark mark, FuzzSequence sequence, FuzzProgress progress,
+		BooleanSupplier cancelled, Consumer<SequenceProgress> observer
+	){
+		var            telemetry = observer == null? null : new ExecutionTelemetry(observer);
+		ProgressRecord record    = null;
+		int            completed = 0;
 		try{
-			state = stateEnv.create(rand, sequence.index(), mark);
-			Objects.requireNonNull(state, "State can not be null");
-		}catch(Throwable e){
-			FuzzFail.trimErr(e);
-			return Optional.of(new FuzzFail.Create<>(e, sequence, Duration.between(start, NanoClock.now())));
-		}
-		
-		var record = progress != null && progress.config.shouldLog()? new ProgressRecord(progress, sequence.iterations()) : null;
-		
-		for(var actionIndex = 0; actionIndex<sequence.iterations(); actionIndex++){
-			if(progress != null && progress.hasErr()) return none();
-			
-			var action = actionFactory.apply(rand);
-			if(action == null){
-				var e = new NullPointerException("Action can not be null");
-				FuzzFail.trimErr(e);
-				return Optional.of(new FuzzFail.Create<>(
-					e,
-					sequence, Duration.between(start, NanoClock.now())
-				));
+			if(cancelled.getAsBoolean()){
+				return new SequenceOutcome.Cancelled<>();
 			}
 			
-			var incOff = record == null? 0 : actionIndex - record.lastInc;
+			var start = NanoClock.now();
+			var rand  = new SimpleRandom(sequence.seed());
 			
-			var idx = sequence.startIndex() + actionIndex;
+			State state;
 			try{
-				stateEnv.applyAction(state, idx, action, mark);
+				state = stateEnv.create(rand, sequence.index(), mark);
+				Objects.requireNonNull(state, "State can not be null");
 			}catch(Throwable e){
-				if(record != null) record.reportFinal(false);
-				var duration = Duration.between(start, NanoClock.now());
-				FuzzFail.trimErr(e);
-				return Optional.of(new FuzzFail.Action<>(e, sequence, action, idx, duration, state));
+				if(cancelled.getAsBoolean()) return new SequenceOutcome.Cancelled<>();
+				
+				return failedOutcome(sequence, e, start);
 			}
 			
-			if(record != null && incOff>=record.incPeriod) record.report(incOff, actionIndex);
+			record = progress != null && progress.config.shouldLog()? new ProgressRecord(progress) : null;
+			
+			for(var actionIndex = 0; actionIndex<sequence.iterations(); actionIndex++){
+				if(cancelled.getAsBoolean()) return new SequenceOutcome.Cancelled<>();
+				
+				Action action;
+				try{
+					action = actionFactory.apply(rand);
+				}catch(Throwable e){
+					if(cancelled.getAsBoolean()) return new SequenceOutcome.Cancelled<>();
+					return failedOutcome(sequence, e, start);
+				}
+				if(action == null){
+					var e = new NullPointerException("Action can not be null");
+					return failedOutcome(sequence, e, start);
+				}
+				
+				var idx = sequence.startIndex() + actionIndex;
+				try{
+					stateEnv.applyAction(state, idx, action, mark);
+				}catch(Throwable e){
+					if(cancelled.getAsBoolean()) return new SequenceOutcome.Cancelled<>();
+					var duration = Duration.between(start, NanoClock.now());
+					FuzzFail.trimErr(e);
+					return new SequenceOutcome.Failed<>(new FuzzFail.Action<>(e, sequence, action, idx, duration, state));
+				}
+				
+				completed++;
+				if(record != null && completed - record.lastInc>=record.incPeriod) record.report(completed - record.lastInc, completed);
+				if(telemetry != null) telemetry.completedAction();
+			}
+			
+			return cancelled.getAsBoolean()? new SequenceOutcome.Cancelled<>() : new SequenceOutcome.Ok<>();
+		}finally{
+			if(record != null) record.reportFinal(completed, completed == sequence.iterations());
+			if(telemetry != null) telemetry.report();
+		}
+	}
+	
+	private static <State, Action> SequenceOutcome.Failed<State, Action> failedOutcome(FuzzSequence sequence, Throwable e, Instant start){
+		FuzzFail.trimErr(e);
+		return new SequenceOutcome.Failed<>(new FuzzFail.Create<>(e, sequence, Duration.between(start, NanoClock.now())));
+	}
+	
+	private static final class ExecutionTelemetry{
+		private final Consumer<SequenceProgress> observer;
+		private final long                       started = System.nanoTime();
+		private       long                       completed, lastReport, callbackNanos;
+		
+		private ExecutionTelemetry(Consumer<SequenceProgress> observer){
+			this.observer = observer;
 		}
 		
-		if(record != null) record.reportFinal(true);
-		
-		return none();
+		private void completedAction(){
+			completed++;
+			long now = System.nanoTime();
+			if(completed == 1 || now - lastReport>=200_000_000L) report();
+		}
+		private void report(){
+			long before = System.nanoTime();
+			try{
+				observer.accept(new SequenceProgress(completed, Math.max(0, before - started - callbackNanos)));
+			}finally{
+				lastReport = System.nanoTime();
+				callbackNanos += lastReport - before;
+			}
+		}
 	}
 	
 	private static final class ProgressRecord{
 		private final FuzzProgress progress;
-		private final int          iterations;
 		
 		private int  lastInc     = 0;
 		private long lastIncTime = System.nanoTime();
@@ -273,15 +380,14 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		private       int  incPeriod;
 		private final long desiredMsReportPeriod;
 		
-		private ProgressRecord(FuzzProgress progress, int iterations){
+		private ProgressRecord(FuzzProgress progress){
 			this.progress = progress;
-			this.iterations = iterations;
 			incPeriod = progress.estimatedIncrementPeriod();
 			desiredMsReportPeriod = Math.max(10, progress.config.logTimeout().toMillis()/5);
 		}
 		
-		private void report(int incOff, int actionIndex){
-			lastInc = actionIndex;
+		private void report(int incOff, int completed){
+			lastInc = completed;
 			long t     = System.nanoTime();
 			var  durNs = t - lastIncTime;
 			lastIncTime = t;
@@ -290,20 +396,26 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 			incPeriod = adjustIncrementPeriod(durNs);
 		}
 		
-		private void reportFinal(boolean adjust){
+		private void reportFinal(int completed, boolean adjust){
 			var durNs = System.nanoTime() - lastIncTime;
 			if(adjust) incPeriod = Math.max(adjustIncrementPeriod(durNs), 2);
-			progress.reportStepsAndPeriod(iterations - lastInc, durNs, incPeriod);
+			progress.reportStepsAndPeriod(completed - lastInc, durNs, incPeriod);
 		}
 		
 		private int adjustIncrementPeriod(long durationNs){
 			var duration = durationNs/1000_000;
 			if(duration<desiredMsReportPeriod){
-				if(duration<desiredMsReportPeriod/3) return incPeriod*2;
-				else return incPeriod + 1;
+				if(duration<desiredMsReportPeriod/3){
+					return incPeriod*2;
+				}else{
+					return incPeriod + 1;
+				}
 			}else if(incPeriod>2){
-				if(duration>desiredMsReportPeriod*3) return Math.max(2, incPeriod/2);
-				else return incPeriod - 1;
+				if(duration>desiredMsReportPeriod*3){
+					return Math.max(2, incPeriod/2);
+				}else{
+					return incPeriod - 1;
+				}
 			}
 			return incPeriod;
 		}
@@ -316,7 +428,9 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		var errO = runSequence(sequence);
 		if(errO.isEmpty()) return;
 		var err = errO.get();
+		
 		System.err.println(FuzzFail.report(List.of(err)));
+		
 		var err2 = runSequence(err.mark(), sequence, null);
 		throw new AssertionError(err2.orElse(err));
 	}
@@ -338,302 +452,27 @@ public final class FuzzingRunner<State, Action, Err extends Throwable>{
 		return run(config, mark, new FuzzSequenceSource.LenSeed(seed, totalIterations, sequenceLength));
 	}
 	public List<FuzzFail<State, Action>> run(FuzzConfig config, RunMark mark, FuzzSequenceSource source){
-		final var conf = config == null? new FuzzConfig().withName(getTaskName()) : config;
-		
-		return switch(RunType.of(source, stateEnv, mark, conf.maxWorkers()<=1)){
-			case RunType.Noop ignored -> List.of();
-			case RunType.Single(var sequence) -> {
-				var progress = new FuzzProgress(conf, CompletableFuture.completedFuture((long)sequence.iterations()));
-				progress.reportStart();
-				var fail = runSequence(mark, sequence, progress);
-				progress.reportDone();
-				yield fail.stream().toList();
-			}
-			case RunType.Many(var data) -> {
-				var name = conf.name().orElseGet(FuzzingRunner::getTaskName);
-				int nThreads = Math.max(1, switch(data){
-					case ManyData.Async ignore -> conf.maxWorkers();
-					case ManyData.Instant d -> (int)Math.min(conf.maxWorkers(), d.sequencesToRun);
-				});
-				var progress = switch(data){
-					case ManyData.Async d -> new FuzzProgress(conf, d.totalIterations);
-					case ManyData.Instant d -> new FuzzProgress(conf, CompletableFuture.completedFuture(d.totalIterations));
-				};
-				var fails = new ArrayList<FuzzFail<State, Action>>(conf.errorTracking().maxErrorsTracked().orElse(16)){
-					synchronized void deduplicateStacktrace(){
-						var errC = conf.errorTracking();
-						if(!errC.deduplicateByStacktrace()) return;
-						var res = FuzzFail.sortFails(this, conf.failOrder().orElse(null));
-						clear();
-						addAll(res);
-						
-						var errs = new HashSet<String>();
-						removeIf(err -> {
-							var sw = new StringBuilder(err.e().getClass().getName());
-							for(var e : err.e().getStackTrace()){
-								sw.append(e);
-							}
-							return !errs.add(sw.toString());
-						});
-					}
-					@Override
-					public synchronized boolean add(FuzzFail<State, Action> f){
-						var errC = conf.errorTracking();
-						var errs = errC.maxErrorsTracked();
-						if(errs.isEmpty()){
-							return super.add(f);
-						}
-						if(this.size()>=errs.getAsInt()){
-							deduplicateStacktrace();
-						}
-						return errs.getAsInt()>this.size() && super.add(f);
-					}
-				};
-				
-				ScheduledExecutorService          delayExec;
-				Consumer<FuzzFail<State, Action>> reportFail;
-				if(conf.errorDelay().isZero()){
-					delayExec = null;
-					reportFail = f -> {
-						progress.err();
-						fails.add(f);
-					};
-				}else{
-					delayExec = Executors.newScheduledThreadPool(
-						1, r -> Thread.ofPlatform().name("errorDelayThread(" + name + ")").daemon().unstarted(r));
-					var reported = new boolean[]{false};
-					reportFail = f -> {
-						progress.errLater();
-						if(!reported[0]){
-							reported[0] = true;
-							delayExec.schedule(progress::err, conf.errorDelay().toMillis(), MILLISECONDS);
-						}
-						fails.add(f);
-					};
-				}
-				
-				Supplier<List<FuzzFail<State, Action>>> finalize = () -> {
-					progress.reportDone();
-					fails.deduplicateStacktrace();
-					var res = FuzzFail.sortFails(fails, conf.failOrder().orElse(null));
-					Thread.startVirtualThread(System::gc);
-					return res;
-				};
-				
-				progress.reportStart();
-				
-				if(nThreads == 1){
-					assert data instanceof ManyData.Instant;
-					try{
-						source.all().sequential().filter(seq -> stateEnv.shouldRun(seq, mark)).forEach(sequence -> {
-							if(progress.hasErr()) throw new HasErr();
-							runSequence(mark, sequence, progress).ifPresent(reportFail);
-						});
-					}catch(HasErr ignore){ }
-					yield finalize.get();
-				}
-				var poolThreads = nThreads - 1;
-				try(var executor = new ThreadPoolExecutor(
-					poolThreads, poolThreads, 500, MILLISECONDS, new LinkedBlockingQueue<>(), new RunnerFactory(poolThreads, name))
-				){
-					
-					if(data instanceof ManyData.Async async){
-						async.compute.accept(task -> executor.execute(() -> {
-							progress.reportCusomMsg("Computing stats...");
-							task.run();
-							progress.reportCusomMsg("Stats computed!");
-						}));
-					}
-					
-					var jobsBuild = List.of(source.all().spliterator());
-					while(jobsBuild.size()<nThreads){
-						var res = jobsBuild.stream().flatMap(s -> Stream.of(s.trySplit(), s)).filter(Objects::nonNull).toList();
-						if(jobsBuild.size() == res.size()) break;
-						jobsBuild = res;
-					}
-					
-					while(data instanceof ManyData.Async async && !async.computeFlags.started) sleep1();
-					
-					var heldSegmentCount = new int[]{0};
-					var jobSegments      = new ArrayDeque<>(jobsBuild);
-					
-					Runnable fuzz = () -> {
-						var holder = new SequenceHolder();
-						while(true){
-							Spliterator<FuzzSequence> split;
-							findSplit:
-							synchronized(jobSegments){
-								split = jobSegments.poll();
-								if(split != null){
-									heldSegmentCount[0]++;
-									break findSplit;
-								}
-								if(heldSegmentCount[0] == 0){//No more segments! Job done.
-									return;
-								}
-								// There is a split that may potentially have more sequences to process.
-								// Wait for it to prevent CPU under-utilization
-								try{
-									jobSegments.wait(100);
-								}catch(InterruptedException e){ throw new RuntimeException(e); }
-								continue;
-							}
-							boolean count = true;
-							try{
-								holder.sequence = null;
-								while(!progress.hasErr() && holder.sequence == null && split.tryAdvance(seq -> {
-									if(stateEnv.shouldRun(seq, mark)) holder.sequence = seq;
-								})) ;
-								if(holder.sequence == null) continue;
-								
-								count = false;
-								synchronized(jobSegments){
-									jobSegments.addFirst(split);
-									heldSegmentCount[0]--;
-									jobSegments.notify();
-								}
-							}finally{
-								if(count) synchronized(jobSegments){
-									heldSegmentCount[0]--;
-									jobSegments.notify();
-								}
-							}
-							
-							runSequence(mark, holder.sequence, progress).ifPresent(reportFail);
-						}
-					};
-					
-					while(!progress.hasErr() && !jobSegments.isEmpty()){
-						var workerBatch = IntStream.range(0, Math.max(jobSegments.size(), poolThreads)).mapToObj(__ -> {
-							sleep1();
-							return CompletableFuture.runAsync(fuzz, executor);
-						}).toList();
-						
-						fuzz.run();
-						
-						for(var worker : workerBatch){
-							worker.join();
-						}
-					}
-					
-					if(data instanceof ManyData.Async async){
-						async.computeFlags.stop = true;
-					}
-					
-				}finally{
-					if(delayExec != null){
-						var tasks = delayExec.shutdownNow();
-						if(!tasks.isEmpty()){
-							tasks.getFirst().run();
-						}
-						delayExec.close();
-					}
-				}
-				
-				yield finalize.get();
-			}
-		};
-	}
-	
-	private static void sleep1(){
-		try{ Thread.sleep(1); }catch(InterruptedException e){ throw new RuntimeException(e); }
-	}
-	
-	private sealed interface RunType{
-		static RunType of(FuzzSequenceSource source, FuzzingStateEnv<?, ?, ?> stateEnv, RunMark mark, boolean alwaysFull){
-			instant:
-			{
-				var start = NanoClock.now();
-				var iter  = source.all().sequential().iterator();
-				
-				long sequencesToRun = 0, totalIterations = 0;
-				var  sequence       = (FuzzSequence)null;
-				long count          = 0;
-				while(iter.hasNext()){
-					if(!alwaysFull && ((++count)%5 == 0) && Duration.between(start, NanoClock.now()).toMillis()>100){
-						break instant;
-					}
-					var seq = iter.next();
-					if(!stateEnv.shouldRun(seq, mark)) continue;
-					sequence = seq;
-					sequencesToRun++;
-					totalIterations += seq.iterations();
-				}
-				
-				if(sequencesToRun == 0) return new Noop();
-				if(sequencesToRun == 1) return new Single(sequence);
-				return new Many(new ManyData.Instant(sequencesToRun, totalIterations));
-			}
-			
-			var                     flags           = new ManyData.Async.ComputeFlag();
-			CompletableFuture<Long> totalIterations = new CompletableFuture<>();
-			return new Many(new ManyData.Async(totalIterations, exec -> {
-				exec.execute(() -> {
-					flags.started = true;
-					long iterSum = 0;
-					try{
-						var iter = source.all().iterator();
-						
-						while(iter.hasNext()){
-							if(flags.stop){
-								break;
-							}
-							var seq = iter.next();
-							if(!stateEnv.shouldRun(seq, mark)) continue;
-							iterSum += seq.iterations();
-						}
-					}finally{
-						totalIterations.complete(iterSum);
-					}
-				});
-			}, flags));
+		if(remoteRecipe != null && mark.equals(RunMark.NONE)){
+			return DistributedSession.run(this, remoteRecipe, config == null? new FuzzConfig().withName(getTaskName()) : config, mark, source::all);
 		}
-		
-		record Noop() implements RunType{ }
-		
-		record Single(FuzzSequence sequence) implements RunType{ }
-		
-		record Many(ManyData data) implements RunType{ }
+		return runLocal(config, mark, source);
 	}
 	
-	sealed interface ManyData{
-		record Instant(long sequencesToRun, long totalIterations) implements ManyData{ }
-		
-		record Async(CompletableFuture<Long> totalIterations, Consumer<Executor> compute, ComputeFlag computeFlags) implements ManyData{
-			private static final class ComputeFlag{
-				private boolean started, stop;
-			}
-		}
+	public List<FuzzFail<State, Action>> runLocal(FuzzConfig config, RunMark mark, FuzzSequenceSource source){
+		var conf = config == null? new FuzzConfig().withName(getTaskName()) : config;
+		return runWithLifecycle(() -> RunCoordinator.run(this, conf, mark, source, null));
 	}
-	
 	
 	private static String getTaskName(){
-		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                  .walk(s -> s.dropWhile(f -> !f.getMethodName().equals("run"))
-		                              .dropWhile(f -> f.getClassName().startsWith(FuzzingRunner.class.getPackageName() + "."))
-		                              .findAny()
-		                              .orElseThrow()
-		                              .getMethodName());
+		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).walk(FuzzingRunner::taskName);
 	}
 	
-	private static final class HasErr extends RuntimeException{ }
-	
-	private static final class RunnerFactory implements ThreadFactory{
-		private       int    threadIndex;
-		private final int    numLen;
-		private final String prefix;
-		
-		public RunnerFactory(int nThreads, String name){
-			numLen = String.valueOf(nThreads).length();
-			this.prefix = "fuzzWorker(" + name + ")-";
-		}
-		
-		@Override
-		public Thread newThread(Runnable r){
-			var indexStr = String.valueOf(threadIndex++);
-			return Thread.ofPlatform()
-			             .name(prefix + "0".repeat(Math.max(0, numLen - indexStr.length())) + indexStr)
-			             .unstarted(r);
-		}
+	static String taskName(Stream<StackWalker.StackFrame> frames){
+		return frames.dropWhile(f -> !f.getMethodName().equals("run"))
+		             .dropWhile(f -> f.getClassName().startsWith(FuzzingRunner.class.getPackageName() + "."))
+		             .findAny()
+		             .map(StackWalker.StackFrame::getMethodName)
+		             .orElse("unnamed");
 	}
+	
 }

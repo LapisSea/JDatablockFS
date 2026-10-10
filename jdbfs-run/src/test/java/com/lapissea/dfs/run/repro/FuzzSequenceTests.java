@@ -4,13 +4,16 @@ import com.lapissea.fuzz.FuzzSequence;
 import com.lapissea.fuzz.FuzzSequenceSource;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 
 public class FuzzSequenceTests{
-
+	
 	private static final String MULTIPLIER = "fuzz.iterationMultiplier";
-
+	
 	private static FuzzSequenceSource.LenSeed source(long count, String multiplier){
 		var previous = System.getProperty(MULTIPLIER);
 		try{
@@ -22,7 +25,7 @@ public class FuzzSequenceTests{
 			else System.setProperty(MULTIPLIER, previous);
 		}
 	}
-
+	
 	@DataProvider
 	Object[][] scaledCounts(){
 		return new Object[][]{
@@ -44,11 +47,11 @@ public class FuzzSequenceTests{
 			{Long.MAX_VALUE, "2", Long.MAX_VALUE}
 		};
 	}
-
+	
 	@Test(dataProvider = "scaledCounts")
 	void scaledCountPreservesPositiveRun(long count, String multiplier, long expected){
 		var previous = System.getProperty(MULTIPLIER);
-		var source = source(count, multiplier);
+		var source   = source(count, multiplier);
 		assertEquals(System.getProperty(MULTIPLIER), previous);
 		assertEquals(source.totalIterations(), expected);
 		if(expected<=1000){
@@ -63,8 +66,8 @@ public class FuzzSequenceTests{
 			assertEquals(position, expected);
 		}
 	}
-
-
+	
+	
 	@DataProvider(name = "negativeSeeds")
 	Object[][] negativeSeeds(){
 		return new Object[][]{
@@ -75,14 +78,14 @@ public class FuzzSequenceTests{
 			{-123456L},
 			{-999999999L},
 			{Long.MIN_VALUE},
-		};
+			};
 	}
-
+	
 	@Test(dataProvider = "negativeSeeds")
 	void negativeSeedRoundTrip(long seed){
 		var original = new FuzzSequence(0, 0, seed, 100);
-		var stick = original.makeDataStick();
-		var back = FuzzSequence.fromDataStick(stick);
+		var stick    = original.makeDataStick();
+		var back     = FuzzSequence.fromDataStick(stick);
 		assertThat(back.seed())
 			.as("round-tripped seed (original=%d, stick=%s)", seed, stick)
 			.isEqualTo(seed);
@@ -90,10 +93,10 @@ public class FuzzSequenceTests{
 			.as("full sequence round trip (stick=%s)", stick)
 			.isEqualTo(original);
 	}
-
+	
 	@DataProvider(name = "signedBoundaries")
 	Object[][] signedBoundaries(){
-		var values = new java.util.ArrayList<Object[]>();
+		var values = new ArrayList<Object[]>();
 		for(int bytes = 1; bytes<Long.BYTES; bytes++){
 			long boundary = 1L<<(bytes*Byte.SIZE - 1);
 			for(long value : new long[]{-boundary - 1, -boundary, -boundary + 1,
@@ -106,23 +109,23 @@ public class FuzzSequenceTests{
 		}
 		return values.toArray(Object[][]::new);
 	}
-
+	
 	@Test(dataProvider = "signedBoundaries")
 	void signedBoundaryRoundTrip(long value){
 		var original = new FuzzSequence(Long.MAX_VALUE - Integer.MAX_VALUE, value, value, Integer.MAX_VALUE);
 		assertThat(FuzzSequence.fromDataStick(original.makeDataStick())).isEqualTo(original);
 	}
-
+	
 	@Test
 	void existingCompactNegativeSeedStick(){
 		assertThat(FuzzSequence.fromDataStick("EREAAPtk"))
 			.isEqualTo(new FuzzSequence(0, 0, -5, 100));
 	}
-
+	
 	@Test
 	void positiveSeedRoundTripSanity(){
 		var original = new FuzzSequence(0, 0, 5L, 100);
-		var stick = original.makeDataStick();
+		var stick    = original.makeDataStick();
 		assertThat(FuzzSequence.fromDataStick(stick))
 			.as("positive seed sanity (stick=%s)", stick)
 			.isEqualTo(original);

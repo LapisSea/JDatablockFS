@@ -12,7 +12,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,14 +25,14 @@ public class RandomIOViewTests{
 		for(int i = 0; i<size; i++) data[i] = (byte)(i*31 + 7);
 		return data;
 	}
-
+	
 	@DataProvider
 	public Object[][] rangeLengths(){ return new Object[][]{{30}, {50}, {95}}; }
-
+	
 	@Test(dataProvider = "rangeLengths")
 	public void trimAtRangeEndPreservesParent(int length) throws IOException{
 		var bytes = pattern(100);
-		var data = MemoryData.of(bytes.clone());
+		var data  = MemoryData.of(bytes.clone());
 		try(var view = RangeIO.of(data.io(), 5, length)){
 			view.setPos(100);
 			assertThat(view.getPos()).isEqualTo(length);
@@ -39,20 +42,20 @@ public class RandomIOViewTests{
 			assertThat(data.readAll()).isEqualTo(bytes);
 		}
 	}
-
+	
 	@Test
 	public void trimInsideRangePreservesPrefix() throws IOException{
 		var bytes = pattern(100);
-		var data = MemoryData.of(bytes.clone());
+		var data  = MemoryData.of(bytes.clone());
 		try(var view = RangeIO.of(data.io(), 5, 50)){
 			view.setPos(20);
 			view.trim();
 			assertThat(view.getSize()).isEqualTo(20);
 			assertThat(view.getPos()).isEqualTo(20);
-			assertThat(data.readAll()).isEqualTo(java.util.Arrays.copyOf(bytes, 25));
+			assertThat(data.readAll()).isEqualTo(Arrays.copyOf(bytes, 25));
 		}
 	}
-
+	
 	private static void assertReadsAcrossFlush(RandomIO io, byte[] expected) throws IOException{
 		assertThat(io.setPos(0).readRemaining()).isEqualTo(expected);
 		for(int i = 0; i<2; i++){
@@ -62,17 +65,17 @@ public class RandomIOViewTests{
 			assertThat(io.setPos(0).readRemaining()).as("read after flush").isEqualTo(expected);
 		}
 	}
-
+	
 	@DataProvider
 	public Object[][] fileBackends(){ return new Object[][]{{false}, {true}}; }
-
+	
 	@Test(dataProvider = "fileBackends")
 	public void readOnlyFileRemainsUsableAfterFlush(boolean mapped) throws IOException{
-		var path = Files.createTempFile("readonly-view", ".bin");
+		var path  = Files.createTempFile("readonly-view", ".bin");
 		var bytes = pattern(8192);
 		try{
 			try(var data = mapped? new FileMemoryMappedData(path.toFile()) :
-			                       new FileRandomAccessData(path.toFile(), FileRandomAccessData.Mode.READ_WRITE)){
+			               new FileRandomAccessData(path.toFile(), FileRandomAccessData.Mode.READ_WRITE)){
 				try(var io = data.io()){
 					io.write(bytes);
 				}
@@ -85,12 +88,12 @@ public class RandomIOViewTests{
 			Files.deleteIfExists(path);
 		}
 	}
-
+	
 	@Test
 	public void readOnlyChainCanCloseNormallyAfterFlush() throws IOException{
 		var cluster = Cluster.emptyMem();
-		var chunk = AllocateTicket.bytes(4096).submit(cluster);
-		var bytes = pattern(8192);
+		var chunk   = AllocateTicket.bytes(4096).submit(cluster);
+		var bytes   = pattern(8192);
 		try(var io = chunk.io()){
 			io.write(bytes);
 		}
@@ -99,12 +102,12 @@ public class RandomIOViewTests{
 		}
 		assertThat(chunk.readAll()).as("fresh chain after view closes").isEqualTo(bytes);
 	}
-
+	
 	@Test
 	public void readOnlyFlushDelegatesWithoutClosing() throws IOException{
 		try(var source = MemoryData.of(pattern(32)).io()){
 			int[] calls = new int[2];
-			var proxy = (RandomIO)java.lang.reflect.Proxy.newProxyInstance(
+			var proxy = (RandomIO)Proxy.newProxyInstance(
 				RandomIO.class.getClassLoader(), new Class<?>[]{RandomIO.class},
 				(instance, method, args) -> {
 					if(method.getName().equals("flush")){
@@ -117,7 +120,7 @@ public class RandomIOViewTests{
 					}
 					try{
 						return method.invoke(source, args);
-					}catch(java.lang.reflect.InvocationTargetException e){
+					}catch(InvocationTargetException e){
 						throw e.getCause();
 					}
 				});

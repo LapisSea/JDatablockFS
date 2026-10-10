@@ -39,6 +39,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.ref.Cleaner;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
@@ -264,7 +265,9 @@ public class GeneralTypeHandlingTests{
 		
 	}
 	
-	record LongTyp<T extends IOInstance.Def<T>>(Class<T> typ, LongFunction<T> func){
+	interface SerializableLongFunction<T> extends LongFunction<T>, Serializable{ }
+	
+	record LongTyp<T extends IOInstance.Def<T>>(Class<T> typ, SerializableLongFunction<T> func) implements Serializable{
 		LongTyp{ StandardStructPipe.of(typ); }
 		@Override
 		public String toString(){
@@ -296,6 +299,10 @@ public class GeneralTypeHandlingTests{
 	
 	@Test(dataProvider = "longTypes")
 	<T extends IOInstance.Def<T>> void testLongClass(LongTyp<T> typ){
+		TestUtils.distributedRandomBatch("testLongClass" + typ, 10_000, () -> createLongClassTask(typ));
+	}
+	
+	private static <T extends IOInstance.Def<T>> TestUtils.Task<IOException> createLongClassTask(LongTyp<T> typ){
 		var hold = StandardStructPipe.of(typ.typ);
 		var chunks = ThreadLocal.withInitial(() -> {
 			try{
@@ -305,12 +312,12 @@ public class GeneralTypeHandlingTests{
 				throw new RuntimeException(e);
 			}
 		});
-		TestUtils.randomBatch("testLongClass" + typ, 10_000, (r, i) -> {
+		return (r, i) -> {
 			var chunk = chunks.get();
 			var l     = r.nextLong();
 			var val   = typ.func.apply(l);
 			TestUtils.checkPipeInOutEquality(chunk, hold, val);
-		});
+		};
 	}
 	
 	@Test

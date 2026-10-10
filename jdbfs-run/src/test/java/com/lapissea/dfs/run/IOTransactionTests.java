@@ -173,7 +173,7 @@ public class IOTransactionTests{
 		int cap = 50;
 		
 		//Dumb brute force all possible edge cases
-		TestUtils.randomBatch(300000, (rand, run) -> {
+		TestUtils.distributedRandomBatch(300000, (rand, run) -> {
 			int runIndex = 0;
 			
 			IOInterface data   = MemoryData.builder().withCapacity(cap + 10).build();
@@ -244,7 +244,7 @@ public class IOTransactionTests{
 		});
 	}
 	
-	private void check(byte[] before, IOInterface expected, IOInterface data, String s){
+	private static void check(byte[] before, IOInterface expected, IOInterface data, String s){
 		byte[] reference, bytes;
 		try{
 			reference = expected.readAll();

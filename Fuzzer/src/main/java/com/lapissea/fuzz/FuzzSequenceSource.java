@@ -66,18 +66,10 @@ public interface FuzzSequenceSource{
 		}
 		
 		private static long modIterCount(long iterCount){
-			var mulS = System.getProperty("fuzz.iterationMultiplier");
-			if(mulS == null || mulS.isBlank()) return iterCount;
+			var multiplier = FuzzConfig.iterationMultiplier();
+			if(multiplier.isEmpty()) return iterCount;
 			try{
-				var mul = new BigDecimal(mulS);
-				if(mul.compareTo(BigDecimal.ZERO)<=0){
-					System.err.println("fuzz.iterationMultiplier system property must be greater than zero! Value: \"" + mulS + '"');
-					return iterCount;
-				}
-				return Math.max(1, mul.multiply(new BigDecimal(iterCount), MathContext.DECIMAL64).toBigInteger().longValueExact());
-			}catch(NumberFormatException e){
-				System.err.println("fuzz.iterationMultiplier system property is not a valid number! Value: \"" + mulS + '"');
-				return iterCount;
+				return Math.max(1, multiplier.get().multiply(new BigDecimal(iterCount), MathContext.DECIMAL64).toBigInteger().longValueExact());
 			}catch(ArithmeticException e){
 				return Long.MAX_VALUE;
 			}
@@ -110,7 +102,7 @@ public interface FuzzSequenceSource{
 				}
 				
 				return new FuzzSequence(from, idx, seed^mixMurmur64(idx), (int)(to - from));
-			}).parallel();
+			});
 		}
 	}
 }

@@ -5,9 +5,9 @@ import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.impl.FileRandomAccessData;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 public class FileCopyTests{
 	
-	private static final int  STOP_AFTER = 4;                    // abort readInto after this many write() calls
+	private static final int STOP_AFTER = 4;                    // abort readInto after this many write() calls
 	
 	
 	private static final class StopReadingException extends IOException{
@@ -64,7 +64,7 @@ public class FileCopyTests{
 					pos += len;
 					size = Math.max(size, pos);
 					capacity = Math.max(capacity, pos);
-					if(writes >= STOP_AFTER){
+					if(writes>=STOP_AFTER){
 						// intended early abort: a full 2 GiB copy would take far too long
 						throw new StopReadingException();
 					}
@@ -144,7 +144,7 @@ public class FileCopyTests{
 		}
 	}
 	
-	@org.testng.annotations.DataProvider
+	@DataProvider
 	public Object[][] largeLengths(){
 		return new Object[][]{{(long)Integer.MAX_VALUE}, {1L<<31}, {(1L<<31) + 1}, {(1L<<32) + 1}};
 	}
@@ -171,11 +171,11 @@ public class FileCopyTests{
 			}
 			
 			assertThat(dest.writeSizes)
-			    .as("readInto should have delivered chunks before the abort")
-			    .isNotEmpty();
+				.as("readInto should have delivered chunks before the abort")
+				.isNotEmpty();
 			
 			assertThat(dest.writeSizes).as("copy batches before early abort")
-			    .hasSize(STOP_AFTER).containsOnly(GlobalConfig.BATCH_BYTES);
+			                           .hasSize(STOP_AFTER).containsOnly(GlobalConfig.BATCH_BYTES);
 		}finally{
 			Files.deleteIfExists(path);
 			Files.deleteIfExists(dir);

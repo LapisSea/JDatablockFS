@@ -8,7 +8,10 @@ import java.io.Writer;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public interface FuzzLogger{
 	
@@ -42,6 +45,8 @@ public interface FuzzLogger{
 		public void log(LogMessage message){
 			try{
 				switch(message){
+					case LogMessage.WorkerConnected worker ->
+						line("", "", "", "", "", "", "", "", "", "Distributed worker connected: \"" + worker.name() + "\"");
 					case LogMessage.CustomMessage customMessage -> {
 						line(
 							"", "",
@@ -66,8 +71,9 @@ public interface FuzzLogger{
 						line(
 							state.hasFail()? "Fail" : "Ok", state.progress(),
 							stdTime(state.estimatedTotalTime()), stdTime(state.estimatedTimeRemaining()), stdTime(state.elapsed()),
-							optMs(state.estimatedTotalTime()), optMs(state.estimatedTimeRemaining()), state.elapsed().toMillis(), state.nanosecondsPerOp().orElse(0),
-							""
+							optMs(state.estimatedTotalTime()), optMs(state.estimatedTimeRemaining()), state.elapsed().toMillis(),
+							state.nanosecondsPerOp().orElse(0),
+							state.workerNanosecondsPerOp().isEmpty()? "" : state.workerNanosecondsPerOp()
 						);
 					}
 				}
@@ -85,8 +91,8 @@ public interface FuzzLogger{
 			for(int i = 0; i<line.length; i++){
 				var     s     = String.valueOf(line[i]);
 				boolean quote = s.contains("\"");
-				if(quote) s = s.replace("\"", "\"\"");
-				if(quote || s.contains("\n") || s.contains("\r") || s.contains(",")) s = '"' + s + '"';
+				if(quote){ s = s.replace("\"", "\"\""); }
+				if(quote || s.contains("\n") || s.contains("\r") || s.contains(",")){ s = '"' + s + '"'; }
 				strs[i] = s;
 			}
 			line(String.join(",", strs));
@@ -106,42 +112,30 @@ public interface FuzzLogger{
 				final String gray  = "\033[0;90m";
 				final String reset = "\033[0m";
 				
-				var    fRaw = String.format("%.1f", state.progress()*100);
+				var    fRaw = String.format(Locale.ROOT, "%.1f", state.progress()*100);
 				String f;
-				if(fRaw.equals("100.0")) f = green + " 100%" + reset;
-				else{
+				if(fRaw.equals("100.0")){ f = green + " 100%" + reset; }else{
 					f = (fRaw.length()<4? " " + fRaw : fRaw) + "%";
 				}
 				
-				var    perOpO = state.nanosecondsPerOp();
-				String unit;
-				String value;
-				if(perOpO.isEmpty()){
-					unit = "ms";
-					value = "--";
-				}else{
-					var perOp = perOpO.getAsDouble();
-					if(perOp>1000_000_000){
-						unit = " S";
-						value = String.format("~%.4f", perOp/1000_000_000D);
-					}else if(perOp>1000){
-						unit = "ms";
-						value = String.format("~%.4f", perOp/1_000_000D);
-					}else{
-						unit = "Ns";
-						value = String.format("~%.2f", perOp);
-					}
-				}
+				String value = state.nanosecondsPerOp().isEmpty()? "--" : String.format(Locale.ROOT, "~%.4f",
+				                                                                        state.nanosecondsPerOp().getAsDouble()/1_000_000D);
+				String workers = state.workerNanosecondsPerOp().entrySet().stream().sorted(Map.Entry.comparingByKey())
+				                      .map(entry -> gray + ", " + entry.getKey() + " ms/op: " + reset +
+				                                    (Double.isNaN(entry.getValue())? "--" : String.format(Locale.ROOT, "~%.4f",
+				                                                                                          entry.getValue()/1_000_000D)))
+				                      .collect(Collectors.joining());
 				
 				System.out.println(
-					(state.hasFail()? red + "FAIL " : green + "OK | ") +
+					(state.hasFail()? red + "FAIL | " : green + "OK | ") +
 					gray + "Progress: " + reset + f +
 					gray + ", ET: " + reset + stdTime(state.estimatedTotalTime()) +
 					gray + ", ETR: " + reset + stdTime(state.estimatedTimeRemaining()) +
 					gray + ", elapsed: " + reset + stdTime(state.elapsed()) +
-					gray + ", " + unit + "/op: " + reset + value
+					gray + ", ms/op: " + reset + value + workers
 				);
 			}
+			case LogMessage.WorkerConnected worker -> System.out.println("OK | Distributed worker connected: \"" + worker.name() + "\"");
 			case LogMessage.Start initial -> {
 				System.out.println("Fuzzing of \033[0;92m" + initial.fuzzName().orElse("<unnamed task>") + "\033[0m started");
 			}
@@ -156,7 +150,7 @@ public interface FuzzLogger{
 		return stdTime(tim.orElse(null));
 	}
 	static String stdTime(Duration tim){
-		if(tim == null) return "--:--:--";
+		if(tim == null){ return "--:--:--"; }
 		var days = tim.toDays();
 		if(days == 0){
 			return String.format("%02d:%02d:%02d",

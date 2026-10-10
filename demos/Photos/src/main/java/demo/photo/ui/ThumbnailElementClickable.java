@@ -87,7 +87,7 @@ public abstract class ThumbnailElementClickable extends ThumbnailElement{
 						
 						setCursor(Cursor.getDefaultCursor());
 						try{
-							@SuppressWarnings("unchecked") java.util.List<File> dropppedFiles = (List<File>)transferable.getTransferData(DataFlavor.javaFileListFlavor);
+							@SuppressWarnings("unchecked") List<File> dropppedFiles = (List<File>)transferable.getTransferData(DataFlavor.javaFileListFlavor);
 							LogUtil.println("it's done!");
 							LogUtil.println(dropppedFiles);
 						}catch(Exception e){

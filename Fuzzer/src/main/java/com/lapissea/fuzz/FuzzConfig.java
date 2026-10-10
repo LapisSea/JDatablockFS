@@ -1,5 +1,6 @@
 package com.lapissea.fuzz;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,6 +13,26 @@ public record FuzzConfig(
 	Duration errorDelay, Optional<FailOrder> failOrder,
 	ErrorTracking errorTracking
 ){
+	
+	private static String lastIterationMultiplierWarning;
+	
+	public static synchronized Optional<BigDecimal> iterationMultiplier(){
+		var value = System.getProperty("fuzz.iterationMultiplier");
+		if(value == null || value.isBlank()) return Optional.empty();
+		String warning;
+		try{
+			var multiplier = new BigDecimal(value);
+			if(multiplier.signum()>0) return Optional.of(multiplier);
+			warning = "fuzz.iterationMultiplier system property must be greater than zero!";
+		}catch(NumberFormatException e){
+			warning = "fuzz.iterationMultiplier system property is not a valid number!";
+		}
+		if(!value.equals(lastIterationMultiplierWarning)){
+			lastIterationMultiplierWarning = value;
+			System.err.println(warning + " Value: \"" + value + '"');
+		}
+		return Optional.empty();
+	}
 	
 	public record ErrorTracking(OptionalInt maxErrorsTracked, boolean deduplicateByStacktrace){
 		public ErrorTracking{

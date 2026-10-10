@@ -63,6 +63,23 @@ public sealed interface FuzzFail<State, Act>{
 		};
 	}
 	
+	static <S, A> void deduplicateFailures(List<FuzzFail<S, A>> failures, FuzzConfig config){
+		if(!config.errorTracking().deduplicateByStacktrace()){
+			return;
+		}
+		var sorted = List.copyOf(sortFails(failures, config.failOrder().orElse(null)));
+		
+		failures.clear();
+		failures.addAll(sorted);
+		
+		var seen = new HashSet<String>();
+		failures.removeIf(f -> {
+			var key = new StringBuilder(f.e().getClass().getName());
+			for(var frame : f.e().getStackTrace()){ key.append(frame); }
+			return !seen.add(key.toString());
+		});
+	}
+	
 	record Create<Action, State>(Throwable e, FuzzSequence sequence, Duration timeToFail) implements FuzzFail<State, Action>, Serializable{
 		public Create{
 			Objects.requireNonNull(e);
@@ -92,14 +109,13 @@ public sealed interface FuzzFail<State, Act>{
 			if(this == o) return true;
 			if(!(o instanceof Create<?, ?> create)) return false;
 			
-			if(!e.equals(create.e)) return false;
-			return sequence.equals(create.sequence);
+			return sameFailure(e, create.e) && sequence.equals(create.sequence);
 		}
 	}
 	
-	record Action<Actio, State>(
-		Throwable e, FuzzSequence sequence, Actio action, long actionIndex, Duration timeToFail, State badState
-	) implements FuzzFail<State, Actio>, Serializable{
+	record Action<A, State>(
+		Throwable e, FuzzSequence sequence, A action, long actionIndex, Duration timeToFail, State badState
+	) implements FuzzFail<State, A>, Serializable{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -135,12 +151,6 @@ public sealed interface FuzzFail<State, Act>{
 			return note();
 		}
 		
-		private static String getStackTraceAsString(Throwable e){
-			var sw = new StringWriter();
-			e.printStackTrace(new PrintWriter(sw));
-			return sw.toString();
-		}
-		
 		@Override
 		public boolean equals(Object o){
 			if(this == o) return true;
@@ -148,27 +158,29 @@ public sealed interface FuzzFail<State, Act>{
 				Throwable e2, FuzzSequence sequence2, Object action2,
 				long actionIndex2, Duration timeToFail2, Object badState2
 			))) return false;
-			boolean overridesEquals;
-			try{
-				var obj = e.getClass().getMethod("equals", Object.class);
-				overridesEquals = obj.getDeclaringClass() != Object.class;
-			}catch(NoSuchMethodException ex){
-				throw new RuntimeException(ex);
-			}
-			if(overridesEquals){
-				if(!e.equals(e2)) return false;
-			}else{
-				var s1 = getStackTraceAsString(e);
-				var s2 = getStackTraceAsString(e2);
-				if(!s1.equals(s2)) return false;
-			}
 			
-			
-			return actionIndex == actionIndex2 &&
+			return sameFailure(e, e2) &&
+			       actionIndex == actionIndex2 &&
 			       sequence.equals(sequence2) &&
 			       Objects.equals(action, action2);
 		}
 		public int localIndex(){ return Math.toIntExact(actionIndex - sequence.startIndex()); }
+	}
+	
+	private static boolean sameFailure(Throwable a, Throwable b){
+		boolean overridesEquals;
+		try{
+			overridesEquals = a.getClass().getMethod("equals", Object.class).getDeclaringClass() != Object.class;
+		}catch(NoSuchMethodException e){
+			throw new RuntimeException(e);
+		}
+		if(overridesEquals){ return a.equals(b); }
+		return stackTrace(a).equals(stackTrace(b));
+	}
+	private static String stackTrace(Throwable e){
+		var sw = new StringWriter();
+		e.printStackTrace(new PrintWriter(sw));
+		return sw.toString();
 	}
 	
 	static void trimErr(Throwable e){

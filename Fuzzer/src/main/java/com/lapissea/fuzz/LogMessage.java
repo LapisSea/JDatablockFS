@@ -2,6 +2,7 @@ package com.lapissea.fuzz;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
@@ -10,9 +11,14 @@ public sealed interface LogMessage{
 		double progress,
 		Optional<Duration> estimatedTotalTime, Optional<Duration> estimatedTimeRemaining,
 		Duration elapsed, OptionalDouble nanosecondsPerOp,
-		boolean hasFail
+		boolean hasFail, Map<String, Double> workerNanosecondsPerOp
 	) implements LogMessage{
+		public State(double progress, Optional<Duration> estimatedTotalTime, Optional<Duration> estimatedTimeRemaining, Duration elapsed,
+		             OptionalDouble nanosecondsPerOp, boolean hasFail){
+			this(progress, estimatedTotalTime, estimatedTimeRemaining, elapsed, nanosecondsPerOp, hasFail, Map.of());
+		}
 		public State{
+			workerNanosecondsPerOp = Map.copyOf(workerNanosecondsPerOp);
 			Objects.requireNonNull(estimatedTotalTime);
 			Objects.requireNonNull(estimatedTimeRemaining);
 			Objects.requireNonNull(elapsed);
@@ -24,6 +30,10 @@ public sealed interface LogMessage{
 		public Start{
 			Objects.requireNonNull(fuzzName);
 		}
+	}
+	
+	record WorkerConnected(String name) implements LogMessage{
+		public WorkerConnected{ Objects.requireNonNull(name); }
 	}
 	
 	record End() implements LogMessage{ }

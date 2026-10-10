@@ -1,0 +1,34 @@
+package com.lapissea.dfs.run;
+
+import com.lapissea.fuzz.FuzzConfig;
+import org.testng.annotations.Test;
+
+import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicIntegerArray;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+
+public class RandomBatchTests{
+	@Test
+	public void localBatchesKeepAbsoluteIndexes(){
+		// Small jobs used to produce a zero sequence length; larger jobs include a partial last batch.
+		for(int total : new int[]{1, 7, 255, 10003}){
+			var visits = new AtomicIntegerArray(total);
+			TestUtils.randomBatch("indexCoverage", total, (random, index) -> {
+				assertTrue(index>=0 && index<total, "Out-of-range index " + index);
+				visits.incrementAndGet((int)index);
+			});
+			int expected = Math.max(1, (int)(total*FuzzConfig.iterationMultiplier().orElse(BigDecimal.ONE).doubleValue()));
+			for(int i = 0; i<total; i++){ assertEquals(visits.get(i), i<expected? 1 : 0, "Index " + i); }
+		}
+	}
+	@Test
+	public void failuresKeepOriginalIndex(){
+		var failure = expectThrows(RuntimeException.class, () -> TestUtils.randomBatch("indexFailure", 10003, (random, index) -> {
+			if(index == 17){ throw new IllegalStateException("index=" + index); }
+		}));
+		assertEquals(failure.getCause().getMessage(), "index=17");
+	}
+}

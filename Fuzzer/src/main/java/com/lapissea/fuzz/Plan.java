@@ -249,20 +249,26 @@ public final class Plan<TState, TAction>{
 			case Fails.StableFail(var f, var stability) -> stability instanceof FuzzingRunner.Stability.Ok? f : null;
 		};
 		if(fail != null){
-			System.out.println("Saving fail");
-			var buff = new ByteArrayOutputStream();
-			try(var out = new ObjectOutputStream(buff)){
-				out.writeObject(fail);
+			byte[] data;
+			try{
+				var buff = new ByteArrayOutputStream();
+				try(var out = new ObjectOutputStream(buff)){
+					out.writeObject(fail);
+				}
+				data = buff.toByteArray();
 			}catch(NotSerializableException e){
 				new RuntimeException("Fail not saved because it is not serializable", e).printStackTrace();
+				return withState(state.withFile(fileInf));
 			}catch(Throwable e){
 				System.err.println("Failed to save data: " + e);
+				return withState(state.withFile(fileInf));
 			}
 			
+			System.out.println("Saving fail");
 			var parent = fileInf.getParentFile();
-			if(parent != null) parent.mkdir();
+			if(parent != null) parent.mkdirs();
 			try(var out = new FileOutputStream(fileInf)){
-				buff.writeTo(out);
+				out.write(data);
 			}catch(Throwable e){
 				System.err.println("Failed to save data: " + e);
 				fileInf.delete();

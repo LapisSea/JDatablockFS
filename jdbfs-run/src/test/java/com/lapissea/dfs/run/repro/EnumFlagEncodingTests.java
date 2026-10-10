@@ -4,15 +4,16 @@ import com.lapissea.dfs.exceptions.IllegalBitValue;
 import com.lapissea.dfs.io.bit.EnumUniverse;
 import com.lapissea.dfs.io.bit.FlagReader;
 import com.lapissea.dfs.io.bit.FlagWriter;
-import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.io.content.ContentInputStream;
+import com.lapissea.dfs.io.content.ContentOutputBuilder;
 import com.lapissea.dfs.objects.NumberSize;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 
-public class EnumFlagEncodingTests {
+public class EnumFlagEncodingTests{
 	
 	public enum Big129{
 		C000, C001, C002, C003, C004, C005, C006, C007, C008, C009, C010, C011, C012,
@@ -25,7 +26,8 @@ public class EnumFlagEncodingTests {
 		C091, C092, C093, C094, C095, C096, C097, C098, C099, C100, C101, C102, C103,
 		C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116,
 		C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128;
-	}	
+	}
+	
 	public enum Boundary128{
 		D000, D001, D002, D003, D004, D005, D006, D007, D008, D009, D010, D011, D012,
 		D013, D014, D015, D016, D017, D018, D019, D020, D021, D022, D023, D024, D025,
@@ -37,15 +39,18 @@ public class EnumFlagEncodingTests {
 		D091, D092, D093, D094, D095, D096, D097, D098, D099, D100, D101, D102, D103,
 		D104, D105, D106, D107, D108, D109, D110, D111, D112, D113, D114, D115, D116,
 		D117, D118, D119, D120, D121, D122, D123, D124, D125, D126, D127;
-	}	
+	}
+	
 	public enum Tiny16{
 		T000, T001, T002, T003, T004, T005, T006, T007, T008, T009, T010, T011, T012,
 		T013, T014, T015;
-	}	
-	public enum Tiny2{ A, B }
-	public enum Boundary17{ A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q }
-
-	@org.testng.annotations.DataProvider
+	}
+	
+	public enum Tiny2{A, B}
+	
+	public enum Boundary17{A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q}
+	
+	@DataProvider
 	Object[][] universes(){
 		return new Object[][]{
 			{EnumUniverse.of(Tiny2.class)}, {EnumUniverse.of(Tiny16.class)},
@@ -53,35 +58,35 @@ public class EnumFlagEncodingTests {
 			{EnumUniverse.of(Big129.class)}
 		};
 	}
-
+	
 	@Test(dataProvider = "universes")
 	public <T extends Enum<T>> void singleValueMatchesFlagEncoding(EnumUniverse<T> universe) throws IOException{
 		for(var value : universe){
 			var out = new ContentOutputBuilder();
 			FlagWriter.writeSingle(out, universe, value);
 			var expected = new ContentOutputBuilder();
-			var flags = new FlagWriter(NumberSize.BYTE);
+			var flags    = new FlagWriter(NumberSize.BYTE);
 			flags.writeEnum(universe, value);
 			flags.fillRestAllOne().export(expected);
 			Assert.assertEquals(out.toByteArray(), expected.toByteArray(), value.name());
 			Assert.assertEquals(FlagReader.readSingle(new ContentInputStream.BA(out.toByteArray()), universe), value);
 		}
 	}
-
+	
 	@Test(dataProvider = "universes")
 	public <T extends Enum<T>> void singleValueReadsFlagEncoding(EnumUniverse<T> universe) throws IOException{
 		for(var value : universe){
-			var out = new ContentOutputBuilder();
+			var out   = new ContentOutputBuilder();
 			var flags = new FlagWriter(NumberSize.BYTE);
 			flags.writeEnum(universe, value);
 			flags.fillRestAllOne().export(out);
 			Assert.assertEquals(FlagReader.readSingle(new ContentInputStream.BA(out.toByteArray()), universe), value);
 		}
 	}
-
+	
 	@Test(dataProvider = "universes")
 	public <T extends Enum<T>> void unsetPaddingBitIsRejected(EnumUniverse<T> universe) throws IOException{
-		var out = new ContentOutputBuilder();
+		var out   = new ContentOutputBuilder();
 		var flags = new FlagWriter(NumberSize.BYTE);
 		flags.writeEnum(universe, universe.getFirst());
 		flags.fillRestAllOne().export(out);
@@ -91,5 +96,5 @@ public class EnumFlagEncodingTests {
 			Assert.assertThrows(IllegalBitValue.class, () -> FlagReader.readSingle(new ContentInputStream.BA(data), universe));
 		}
 	}
-
+	
 }

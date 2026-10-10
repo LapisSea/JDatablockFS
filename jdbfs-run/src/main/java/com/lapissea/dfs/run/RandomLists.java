@@ -78,11 +78,11 @@ public final class RandomLists{
 		if(err[0] != null) throw UtilL.uncheckedThrow(err[0]);
 	}
 	
-	private static void fuzz(){
+	private static FuzzingRunner<?, ?, RuntimeException> createFuzzRunner(){
 		
 		record Work(int lists, int iters){ }
 		
-		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<Work, Object, RuntimeException>(){
+		return new FuzzingRunner<>(new FuzzingStateEnv.Marked<Work, Object, RuntimeException>(){
 			@Override
 			public void applyAction(Work work, long actionIndex, Object o, RunMark mark){
 				LateInit.Safe<DataLogger> logger;
@@ -104,8 +104,10 @@ public final class RandomLists{
 				return new Work(1 + random.nextInt(20), random.nextInt(2000));
 			}
 		}, FuzzingRunner::noopAction);
-		
-		
+	}
+	
+	private static void fuzz(){
+		var runner = FuzzingRunner.distributed(RandomLists::createFuzzRunner);
 		Plan.start(runner, 69, 50000, 1)
 		    .configMod(c -> c.withLogTimeout(Duration.ofSeconds(1)))
 		    .loadFail(new File("tmpfail"))

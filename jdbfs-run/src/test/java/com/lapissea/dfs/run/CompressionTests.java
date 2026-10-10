@@ -8,13 +8,14 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.fuzz.FuzzingRunner;
 import com.lapissea.fuzz.FuzzingStateEnv;
 import com.lapissea.jorth.Jorth;
+import com.lapissea.jorth.exceptions.MalformedJorth;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 
-import static com.lapissea.dfs.run.TestUtils.randomBatch;
+import static com.lapissea.dfs.run.TestUtils.distributedRandomBatch;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class CompressionTests{
@@ -31,7 +32,7 @@ public class CompressionTests{
 	
 	@Test(dataProvider = "comps")
 	void directIntegrity(IOCompression.Type type){
-		randomBatch(500, (r, iter) -> {
+		distributedRandomBatch(500, (r, iter) -> {
 			try{
 				byte[] raw;
 				if(iter == 0){
@@ -67,7 +68,18 @@ public class CompressionTests{
 	
 	
 	@Test(dataProvider = "comps")
-	<T extends IOInstance<T>> void typeIntegrity(IOCompression.Type type) throws Exception{
+	void typeIntegrity(IOCompression.Type type){
+		var fuz = FuzzingRunner.distributed(() -> {
+			try{
+				return createTypeIntegrityRunner(type);
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
+		});
+		fuz.runAndAssert(69, 500, 50);
+	}
+	
+	private static <T extends IOInstance<T>> FuzzingRunner<?, ?, ?> createTypeIntegrityRunner(IOCompression.Type type) throws MalformedJorth{
 		
 		var name = CompressionTests.class.getPackageName() + ".Holder$" + type;
 		var bytecode = Jorth.generateClass(null, name, code -> {
@@ -84,12 +96,12 @@ public class CompressionTests{
 		});
 		
 		//noinspection unchecked
-		var clazz = (Class<T>)MethodHandles.lookup().defineClass(bytecode);
+		var clazz = (Class<T>)compressionHolder(name, bytecode);
 		
 		var struct = Struct.of(clazz);
 		var pipe   = StandardStructPipe.of(struct);
 		
-		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
+		return new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
 			(rand, actionIndex, mark) -> {
 				var instance = struct.emptyConstructor().make();
 				
@@ -103,6 +115,18 @@ public class CompressionTests{
 			}
 		), FuzzingRunner::noopAction);
 		
-		fuz.runAndAssert(69, 500, 50);
+	}
+	
+	private static synchronized Class<?> compressionHolder(String name, byte[] bytecode){
+		var lookup = MethodHandles.lookup();
+		try{
+			return Class.forName(name, false, lookup.lookupClass().getClassLoader());
+		}catch(ClassNotFoundException ignored){
+			try{
+				return lookup.defineClass(bytecode);
+			}catch(IllegalAccessException e){
+				throw new IllegalStateException("Unable to define compression holder " + name, e);
+			}
+		}
 	}
 }

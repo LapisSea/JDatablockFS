@@ -19,7 +19,7 @@ public class BitTests{
 	
 	@Test
 	void bitStreamIntegrity(){
-		TestUtils.randomBatch(10000, (r, actionIndex) -> {
+		TestUtils.distributedRandomBatch(10000, (r, actionIndex) -> {
 			int i = Math.toIntExact(actionIndex);
 			
 			boolean[] bs;
@@ -54,7 +54,7 @@ public class BitTests{
 	
 	@Test
 	void bitFlagIntegrity(){
-		TestUtils.randomBatch(10000, (r, actionIndex) -> {
+		TestUtils.distributedRandomBatch(10000, (r, actionIndex) -> {
 			for(var siz : NumberSize.FLAG_INFO){
 				var bs = new boolean[r.nextInt(siz.bits() + 1)];
 				for(int j = 0; j<bs.length; j++){

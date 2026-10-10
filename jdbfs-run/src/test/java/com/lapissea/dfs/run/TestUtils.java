@@ -42,6 +42,7 @@ import org.assertj.core.api.OptionalAssert;
 import org.testng.ITestResult;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.List;
@@ -210,17 +211,48 @@ public final class TestUtils{
 		void run(RandomGenerator r, long iter) throws E;
 	}
 	
+	public interface SerializableTask<E extends Exception> extends Task<E>, Serializable{ }
+	
+	public interface TaskRecipe<E extends Exception> extends Serializable{
+		Task<E> create();
+	}
+	
+	public static <E extends Exception> void distributedRandomBatch(int totalTasks, SerializableTask<E> task){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
+		distributedRandomBatch(name, totalTasks, () -> task);
+	}
+	
+	public static <E extends Exception> void distributedRandomBatch(int totalTasks, TaskRecipe<E> recipe){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
+		distributedRandomBatch(name, totalTasks, recipe);
+	}
+	
+	public static <E extends Exception> void distributedRandomBatch(String name, int totalTasks, TaskRecipe<E> recipe){
+		var fuz = FuzzingRunner.distributed(() -> createRandomBatchRunner(recipe.create()));
+		runRandomBatch(name, totalTasks, fuz);
+	}
+	
+	private static <E extends Exception> FuzzingRunner<RandomGenerator, Object, E> createRandomBatchRunner(Task<E> task){
+		return new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
+			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
+		), FuzzingRunner::noopAction);
+	}
+	
 	public static <E extends Exception> void randomBatch(int totalTasks, Task<E> task){
 		var name = StackWalker.getInstance().walk(s -> s.skip(1).findFirst().orElseThrow().getMethodName());
 		randomBatch(name, totalTasks, task);
 	}
 	
 	public static <E extends Exception> void randomBatch(String name, int totalTasks, Task<E> task){
-		var fuz = new FuzzingRunner<>(FuzzingStateEnv.JustRandom.of(
-			(rand, actionIndex, mark) -> task.run(rand, actionIndex)
-		), FuzzingRunner::noopAction);
-		var conf  = new FuzzConfig().withName(name);
-		var fails = fuz.run(conf, name.hashCode(), totalTasks, totalTasks/conf.maxWorkers());
+		runRandomBatch(name, totalTasks, createRandomBatchRunner(task));
+	}
+	
+	private static void runRandomBatch(String name, int totalTasks, FuzzingRunner<?, ?, ?> runner){
+		var conf = new FuzzConfig().withName(name);
+		// Independent loop iterations need enough batches for load balancing, including late helpers.
+		// Cap batch size to keep larger runs divisible, but avoid one network round trip per cheap action.
+		int sequenceLength = (int)Math.max(1, Math.min(1024, totalTasks/Math.max(256L, conf.maxWorkers()*16L)));
+		var fails          = runner.run(conf, name.hashCode(), totalTasks, sequenceLength);
 		if(fails.isEmpty()) return;
 		throw new RuntimeException("Failed fuzzing action", fails.getFirst().e());
 	}

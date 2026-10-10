@@ -38,6 +38,7 @@ import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RNGEnum;
 import com.lapissea.fuzz.RNGType;
 import com.lapissea.fuzz.RunMark;
+import com.lapissea.fuzz.distributed.master.DistributedSession;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
@@ -46,6 +47,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -78,26 +80,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class SlowTests{
 	
+	@BeforeClass(alwaysRun = true)
+	public void preloadFuzzHelpers(){
+		DistributedSession.preload();
+	}
+	
 	@AfterMethod
 	public void cleanup(ITestResult method){ TestUtils.cleanup(method); }
 	
 	@Test
 	void ioMultiWrite() throws IOException{
+		TestUtils.distributedRandomBatch(300000, SlowTests::createIoMultiWriteTask);
+	}
+	
+	private static TestUtils.Task<Exception> createIoMultiWriteTask(){
 		var logger = new LateInit<>(() -> DataLogger.Blank.INSTANCE);
 //		var logger=LoggedMemoryUtils.createLoggerFromConfig();
 		
-		TestUtils.randomBatch(300000, (r, iter) -> {
+		return (r, iter) -> {
 			try{
 				List<RandomIO.WriteChunk> allWrites;
 				if(iter == 0){
 					var b = new byte[10];
 					Arrays.fill(b, (byte)(1));
 					allWrites = List.of(new RandomIO.WriteChunk(1, b));
-				}else allWrites = IntStream.range(0, r.nextInt(10) + 1).mapToObj(i -> {
-					var bytes = new byte[15];
-					Arrays.fill(bytes, (byte)(i + 1));
-					return new RandomIO.WriteChunk(r.nextInt(20), bytes);
-				}).toList();
+				}else{
+					allWrites = IntStream.range(0, r.nextInt(10) + 1).mapToObj(i -> {
+						var bytes = new byte[15];
+						Arrays.fill(bytes, (byte)(i + 1));
+						return new RandomIO.WriteChunk(r.nextInt(20), bytes);
+					}).toList();
+				}
 				
 				Chunk head;
 				
@@ -161,7 +174,7 @@ public class SlowTests{
 			}catch(Throwable e){
 				throw new RuntimeException(iter + "", e);
 			}
-		});
+		};
 		
 	}
 	
@@ -185,8 +198,7 @@ public class SlowTests{
 		Mode mode;
 		{
 			var prop = System.getProperty("chmode");
-			if(prop != null) mode = Mode.valueOf(prop);
-			else mode = Mode.DEFAULT;
+			if(prop != null){ mode = Mode.valueOf(prop); }else{ mode = Mode.DEFAULT; }
 		}
 		
 		var checkpointFile = new File("bigmap.bin");
@@ -196,15 +208,15 @@ public class SlowTests{
 			var prop = System.getProperty("checkpointStep");
 			if(prop != null){
 				checkpointStep = Integer.parseInt(prop);
-				if(checkpointStep<0) throw new IllegalArgumentException();
-			}else checkpointStep = -1;
+				if(checkpointStep<0){ throw new IllegalArgumentException(); }
+			}else{ checkpointStep = -1; }
 		}
 		
 		read:
 		if(mode == Mode.CHECKPOINT){
 			info("loading checkpoint from:", checkpointFile.getAbsoluteFile());
 			if(!checkpointFile.exists()){
-				if(checkpointStep == -1) throw new IllegalStateException("No checkpointStep defined");
+				if(checkpointStep == -1){ throw new IllegalStateException("No checkpointStep defined"); }
 				info("No checkpoint, making checkpoint...");
 				mode = Mode.MAKE_CHECKPOINT;
 				break read;
@@ -275,19 +287,20 @@ public class SlowTests{
 		info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
 	}
 	
-	void checkSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, boolean log) throws IOException{
+	void checkSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session,
+	              boolean log) throws IOException{
 		Cluster provider;
-		if(log) provider = TestUtils.testCluster();
-		else provider = Cluster.emptyMem();
+		if(log){ provider = TestUtils.testCluster(); }else{ provider = Cluster.emptyMem(); }
 		doCheckSet(type, session, provider);
 	}
-	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
+	private static void doCheckSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type,
+	                               UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session, Cluster provider) throws IOException{
 		var set = provider.roots().<IOSet<Integer>>request(1, type, Integer.class);
 		session.accept(provider, new CheckSet<>(set));
 		provider.scanGarbage(ERROR);
 	}
 	
-	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
+	private static FuzzingRunner<?, ?, IOException> createSetRunner(@SuppressWarnings("rawtypes") Class<? extends IOSet> type){
 		record State(Cluster cluster, IOSet<Integer> set) implements Serializable{
 			
 			record StateForm(byte[] data) implements Serializable{
@@ -346,12 +359,17 @@ public class SlowTests{
 			}
 		};
 		
-		var runner = new FuzzingRunner<State, Action, IOException>(
+		return new FuzzingRunner<State, Action, IOException>(
 			rnr,
 			RNGEnum.of(Type.class)
 			       .chanceFor(Type.CLEAR, 1F/1000)
 			       .map((e, rand) -> new Action(e, rand.nextInt(200)))
 		);
+		
+	}
+	
+	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
+		var runner = FuzzingRunner.distributed(() -> createSetRunner(type));
 		
 		stableRunAndSave(
 			Plan.start(runner, 69, iterations, 2000),
@@ -361,42 +379,44 @@ public class SlowTests{
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void simpleHashSet() throws IOException{
-		checkSet(IOHashSet.class, (d, set) -> {
-			set.add(2);
-			set.add(1);
-			set.add(3);
-			set.add(4);
-			set.remove(2);
-			set.contains(2);
-			set.contains(3);
-			set.add(5);
-			set.remove(5);
-		}, false);
+		checkSet(
+			IOHashSet.class, (d, set) -> {
+				set.add(2);
+				set.add(1);
+				set.add(3);
+				set.add(4);
+				set.remove(2);
+				set.contains(2);
+				set.contains(3);
+				set.add(5);
+				set.remove(5);
+			}, false);
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void fuzzIOHashSet(){
-		runSetFuzz(100000, IOHashSet.class);
+		runSetFuzz(1_000_000, IOHashSet.class);
 	}
 	
 	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
 	void simpleTreeSet() throws IOException{
-		checkSet(IOTreeSet.class, (d, set) -> {
-			set.add(2);
-			set.add(1);
-			set.add(3);
-			set.add(4);
-			set.remove(2);
-			set.contains(2);
-			set.contains(3);
-			set.add(5);
-			set.remove(5);
-		}, false);
+		checkSet(
+			IOTreeSet.class, (d, set) -> {
+				set.add(2);
+				set.add(1);
+				set.add(3);
+				set.add(4);
+				set.remove(2);
+				set.contains(2);
+				set.contains(3);
+				set.add(5);
+				set.remove(5);
+			}, false);
 	}
 	
 	@Test(dependsOnMethods = "simpleTreeSet", ignoreMissingDependencies = true)
 	void fuzzTreeSet(){
-		runSetFuzz(20000, IOTreeSet.class);
+		runSetFuzz(200_000, IOTreeSet.class);
 	}
 	
 	interface ListAction{
@@ -420,13 +440,14 @@ public class SlowTests{
 		}
 	}
 	
-	static final class ListMaker{
+	static final class ListMaker implements Serializable{
+		interface Factory extends UnsafeSupplier<IOList<Integer>, IOException>, Serializable{ }
 		
-		final String                                       name;
-		final double                                       weight;
-		final UnsafeSupplier<IOList<Integer>, IOException> make;
+		final String  name;
+		final double  weight;
+		final Factory make;
 		
-		ListMaker(String name, double weight, UnsafeSupplier<IOList<Integer>, IOException> make){
+		ListMaker(String name, double weight, Factory make){
 			this.name = name;
 			this.weight = weight;
 			this.make = make;
@@ -441,7 +462,7 @@ public class SlowTests{
 	}
 	
 	@DataProvider
-	Object[][] listMakers(){
+	static Object[][] listMakers(){
 		return new Object[][]{
 			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
 			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40, 20))},
@@ -450,9 +471,8 @@ public class SlowTests{
 			};
 	}
 	
-	@Test(dataProvider = "listMakers", dependsOnGroups = "lists", ignoreMissingDependencies = true)
-	void fuzzIOList(ListMaker maker){
-		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingStateEnv.Marked<>(){
+	private static FuzzingRunner<?, ?, IOException> createListRunner(ListMaker maker){
+		return new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			@Override
 			public IOList<Integer> create(RandomGenerator random, long sequenceIndex, RunMark mark) throws IOException{
 				return new CheckIOList<>(maker.make());
@@ -469,7 +489,7 @@ public class SlowTests{
 							case ADD -> state.add(num);
 							case REMOVE -> {
 								var idx = state.indexOf(num);
-								if(idx != -1) state.remove(idx);
+								if(idx != -1){ state.remove(idx); }
 							}
 							case CONTAINS -> state.contains(num);
 						}
@@ -492,13 +512,15 @@ public class SlowTests{
 			r -> new ListAction.Num(RNGEnum.anyOf(r, ListAction.NumT.class), r.nextInt(200)),
 			r -> new ListAction.Num2(RNGEnum.anyOf(r, ListAction.Num2T.class), r.nextInt(200), r.nextInt(200))
 		)).chanceFor(ListAction.Clear.class, 1F/1000));
-		
-		
+	}
+	
+	@Test(dataProvider = "listMakers", dependsOnGroups = "lists", ignoreMissingDependencies = true)
+	void fuzzIOList(ListMaker maker){
+		var runner = FuzzingRunner.distributed(() -> createListRunner(maker));
 		stableRun(Plan.start(runner, 69_420, (long)(400_000L*maker.weight), 5000), maker.name);
 	}
 	
-	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")
-	void fuzzIOListIter(ListMaker maker){
+	private static FuzzingRunner<?, ?, IOException> createListIteratorRunner(ListMaker maker){
 		enum Type{
 			NEXT, PREV, SKIP, SKIP_PREV, REMOVE, ADD, SET
 		}
@@ -516,7 +538,7 @@ public class SlowTests{
 			}
 		}
 		
-		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingStateEnv<>(){
+		return new FuzzingRunner<State, Action, IOException>(new FuzzingStateEnv<>(){
 			@Override
 			public boolean shouldRun(FuzzSequence sequence, RunMark mark){
 //				return sequence.index() == 12;
@@ -576,7 +598,11 @@ public class SlowTests{
 				}
 			}
 		}, RNGEnum.of(Type.class).map((t, rand) -> new Action(t, rand.nextInt(200))));
-		
+	}
+	
+	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")
+	void fuzzIOListIter(ListMaker maker){
+		var runner = FuzzingRunner.distributed(() -> createListIteratorRunner(maker));
 		runner.runAndAssert(69_420, (long)(1000_000L*maker.weight), 1000);
 	}
 	
@@ -592,8 +618,7 @@ public class SlowTests{
 		record ContainsKey(Object key) implements MapAction{ }
 	}
 	
-	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
-	void fuzzHashMap(){
+	private static FuzzingRunner<?, ?, IOException> createHashMapFuzzRunner(){
 		record MapState(Cluster provider, IOMap<Object, Object> map){ }
 		var rnr = new FuzzingStateEnv.Marked<MapState, MapAction, IOException>(){
 			@Override
@@ -632,7 +657,7 @@ public class SlowTests{
 		
 		int range = 400;
 		
-		var runner = new FuzzingRunner<MapState, MapAction, IOException>(rnr, RNGType.<MapAction>of(List.of(
+		return new FuzzingRunner<>(rnr, RNGType.<MapAction>of(List.of(
 			r -> new MapAction.Put(10 + r.nextInt(range), 10 + r.nextInt(90)),
 			r -> new MapAction.PutAll(
 				r.ints(10, 10 + range).distinct().limit(2 + r.nextInt(10)).boxed()
@@ -642,6 +667,12 @@ public class SlowTests{
 			r -> new MapAction.ContainsKey(10 + r.nextInt(range)),
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/1000).chanceFor(MapAction.PutAll.class, 0.1F));
+		
+	}
+	
+	@Test(dependsOnGroups = "hashMap", ignoreMissingDependencies = true)
+	void fuzzHashMap(){
+		var runner = FuzzingRunner.distributed(SlowTests::createHashMapFuzzRunner);
 		
 		stableRun(
 			Plan.start(runner, 69, 200_000, 2000),
@@ -653,10 +684,10 @@ public class SlowTests{
 		record Write(int off, byte[] data) implements BlobAction{
 			@Override
 			public boolean equals(Object o){
-				if(this == o) return true;
-				if(!(o instanceof Write(int off1, byte[] data1))) return false;
+				if(this == o){ return true; }
+				if(!(o instanceof Write(int off1, byte[] data1))){ return false; }
 				
-				if(off != off1) return false;
+				if(off != off1){ return false; }
 				return Arrays.equals(data, data1);
 			}
 		}
@@ -664,10 +695,9 @@ public class SlowTests{
 		record Trim(int newSiz) implements BlobAction{ }
 	}
 	
-	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
-	void fuzzBlobIO(){//TODO: do better IO testing, this is not super robust
+	private static FuzzingRunner<?, ?, IOException> createBlobRunner(){//TODO: do better IO testing, this is not super robust
 		record BlobState(IOInterface blob, IOInterface mem){ }
-		var runner = new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv.Marked<>(){
+		return new FuzzingRunner<BlobState, BlobAction, IOException>(new FuzzingStateEnv.Marked<>(){
 			
 			@Override
 			public void applyAction(BlobState state, long actionIndex, BlobAction action, RunMark mark) throws IOException{
@@ -678,15 +708,13 @@ public class SlowTests{
 				switch(action){
 					case BlobAction.Write(var off, var data) -> {
 						var siz = state.mem.getIOSize();
-						if(siz>0) off = (int)(off%siz);
-						else off = 0;
+						if(siz>0){ off = (int)(off%siz); }else{ off = 0; }
 						state.mem.write(off, false, data);
 						state.blob.write(off, false, data);
 					}
 					case BlobAction.Trim(var siz) -> {
 						var siz0 = state.mem.getIOSize();
-						if(siz0>0) siz = (int)(siz%siz0);
-						else siz = 0;
+						if(siz0>0){ siz = (int)(siz%siz0); }else{ siz = 0; }
 						state.mem.ioAt(siz, RandomIO::trim);
 						state.blob.ioAt(siz, RandomIO::trim);
 					}
@@ -717,8 +745,11 @@ public class SlowTests{
 			},
 			r -> new BlobAction.Trim(r.nextInt(500))
 		)).chanceFor(BlobAction.Trim.class, 1F/20));
-		
-		
+	}
+	
+	@Test(dependsOnGroups = "rootProvider", ignoreMissingDependencies = true)
+	void fuzzBlobIO(){
+		var runner = FuzzingRunner.distributed(SlowTests::createBlobRunner);
 		stableRun(
 			Plan.start(runner, 69, 500_000, 5_000),
 			"runFuzzBlobIO"
@@ -744,8 +775,7 @@ public class SlowTests{
 		int rootID();
 	}
 	
-	@Test
-	void fuzzChainResize(){
+	private static FuzzingRunner<?, ?, IOException> createChainResizeRunner(){
 		
 		var rootCount    = 10;
 		var allocMaxSize = 100;
@@ -753,7 +783,7 @@ public class SlowTests{
 		record State(
 			com.lapissea.dfs.core.DataProvider dp, List<Chunk> roots, List<MemoryData> reference, long sequenceIndex
 		){ }
-		var runner = new FuzzingRunner<>(new FuzzingStateEnv.Marked<State, AllocAction, IOException>(){
+		return new FuzzingRunner<>(new FuzzingStateEnv.Marked<State, AllocAction, IOException>(){
 			@Override
 			public void applyAction(State state, long actionIndex, AllocAction action, RunMark mark) throws IOException{
 				var root = state.roots.get(action.rootID());
@@ -803,7 +833,7 @@ public class SlowTests{
 					if(first != null){
 						var set = new PhysicalChunkWalker(first).toModSet();
 						for(var ch : set){
-							if(!ch.hasNextPtr()) continue;
+							if(!ch.hasNextPtr()){ continue; }
 							var next = ch.requireNext();
 							if(!set.contains(next)){
 								throw new IllegalStateException("Corrupt chunk at " + next.getPtr());
@@ -837,7 +867,11 @@ public class SlowTests{
 			},
 			r -> new AllocAction.Dealloc(r.nextInt(allocMaxSize), r.nextInt(rootCount))
 		)).chanceFor(AllocAction.Dealloc.class, 1F/3));
-		
+	}
+	
+	@Test
+	void fuzzChainResize(){
+		var runner = FuzzingRunner.distributed(SlowTests::createChainResizeRunner);
 		stableRun(Plan.start(
 			runner, new FuzzConfig(),
 			new FuzzSequenceSource.LenSeed(42069, 200_000, 500)

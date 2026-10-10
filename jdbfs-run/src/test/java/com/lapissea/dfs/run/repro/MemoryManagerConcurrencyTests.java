@@ -8,10 +8,10 @@ import com.lapissea.dfs.exceptions.FreeWhileUsed;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,13 +25,13 @@ public class MemoryManagerConcurrencyTests{
 	@Test(timeOut = 15_000)
 	public void optionalCompactionDoesNotWaitForOpenReaders() throws Exception{
 		var cluster = Cluster.emptyMem();
-		var memory = cluster.getMemoryManager();
+		var memory  = cluster.getMemoryManager();
 		// Separated holes avoid merging; the larger hole precedes the physical tail.
-		var reader = AllocateTicket.bytes(16).submit(cluster);
+		var reader    = AllocateTicket.bytes(16).submit(cluster);
 		var firstHole = AllocateTicket.bytes(16).submit(cluster);
 		var separator = AllocateTicket.bytes(16).submit(cluster);
-		var lastHole = AllocateTicket.bytes(64).submit(cluster);
-		var tail = AllocateTicket.bytes(16).submit(cluster);
+		var lastHole  = AllocateTicket.bytes(64).submit(cluster);
+		var tail      = AllocateTicket.bytes(16).submit(cluster);
 		assertThat(reader.isNextPhysical(firstHole)).isTrue();
 		assertThat(firstHole.isNextPhysical(separator)).isTrue();
 		assertThat(separator.isNextPhysical(lastHole)).isTrue();
@@ -67,22 +67,22 @@ public class MemoryManagerConcurrencyTests{
 		}
 		assertThat(freeing.isAlive()).as("free worker terminated").isFalse();
 	}
-
+	
 	@DataProvider
 	public Object[][] openChainTargets(){
 		return new Object[][]{{false, false}, {true, false}, {false, true}, {true, true}};
 	}
-
+	
 	@Test(dataProvider = "openChainTargets", timeOut = 30_000)
 	public void openChainOnAnotherThreadPreventsFree(boolean tailTarget, boolean batch) throws Exception{
 		var cluster = Cluster.emptyMem();
-		var memory = cluster.getMemoryManager();
-		var tail = AllocateTicket.bytes(64).withDataPopulated((p, io) -> io.writeInt1(0x42)).submit(cluster);
-		var head = AllocateTicket.bytes(64).withNext(tail).submit(cluster);
-		var other = AllocateTicket.bytes(64).withDataPopulated((p, io) -> io.writeInt1(0x73)).submit(cluster);
-		var target = tailTarget? tail : head;
-		var toFree = batch? List.of(other, target) : List.of(target);
-		var opened = new CountDownLatch(1);
+		var memory  = cluster.getMemoryManager();
+		var tail    = AllocateTicket.bytes(64).withDataPopulated((p, io) -> io.writeInt1(0x42)).submit(cluster);
+		var head    = AllocateTicket.bytes(64).withNext(tail).submit(cluster);
+		var other   = AllocateTicket.bytes(64).withDataPopulated((p, io) -> io.writeInt1(0x73)).submit(cluster);
+		var target  = tailTarget? tail : head;
+		var toFree  = batch? List.of(other, target) : List.of(target);
+		var opened  = new CountDownLatch(1);
 		var release = new CountDownLatch(1);
 		var failure = new AtomicReference<Throwable>();
 		var holder = worker("open-chain-holder", failure, () -> {
@@ -117,11 +117,11 @@ public class MemoryManagerConcurrencyTests{
 		assertThat(failure.get()).as("holder failure").isNull();
 		memory.free(List.of(head, tail, other));
 	}
-
+	
 	@Test
 	public void sameThreadOpenChainPreventsFree() throws Exception{
 		var cluster = Cluster.emptyMem();
-		var chunk = AllocateTicket.bytes(64).submit(cluster);
+		var chunk   = AllocateTicket.bytes(64).submit(cluster);
 		try(var ignored = chunk.io()){
 			assertThatThrownBy(() -> cluster.getMemoryManager().free(chunk)).isInstanceOf(FreeWhileUsed.class);
 		}
@@ -170,12 +170,10 @@ public class MemoryManagerConcurrencyTests{
 		cluster.getChunk(reused.get().getPtr());
 	}
 	
-	@FunctionalInterface
 	private interface Action{
 		void run() throws Exception;
 	}
 	
-	@FunctionalInterface
 	private interface PausedAction{
 		void run(Gate gate) throws Exception;
 	}
