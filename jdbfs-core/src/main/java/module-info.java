@@ -1,5 +1,7 @@
 module JDatablockFS.core {
 	requires jdk.unsupported;
+	// Test-only: For AccessConsentDeclaredTests
+	requires static java.compiler;
 	
 	requires jlapisutil;
 	requires roaringbitmap;
@@ -10,6 +12,7 @@ module JDatablockFS.core {
 	exports com.lapissea.dfs.objects;
 	
 	exports com.lapissea.dfs;
+	exports com.lapissea.dfs.access;
 	exports com.lapissea.dfs.config;
 	exports com.lapissea.dfs.core;
 	exports com.lapissea.dfs.core.chunk;
@@ -43,4 +46,7 @@ module JDatablockFS.core {
 	
 	exports com.lapissea.dfs.io.compress;
 	uses com.lapissea.dfs.io.compress.Packer;
+	uses com.lapissea.dfs.access.AccessConsent;
+	
+	provides com.lapissea.dfs.access.AccessConsent with com.lapissea.dfs.DFSAccessConsent;
 }

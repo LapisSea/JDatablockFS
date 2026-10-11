@@ -7,12 +7,10 @@ import com.lapissea.dfs.utils.RawRandom;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.stream.IntStream;
 
 public final class World{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
+
 	public static void main(String[] args) throws IOException{
 		LoggedMemoryUtils.simpleLoggedMemorySession(mem -> {
 			var map = Cluster.init(mem).roots().request("map", Map.class);

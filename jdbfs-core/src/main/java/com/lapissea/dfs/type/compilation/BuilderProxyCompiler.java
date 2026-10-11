@@ -153,7 +153,7 @@ public final class BuilderProxyCompiler{
 			try{
 				//noinspection unchecked
 				return (Class<ProxyBuilder<T>>)concreteClassAccess.defineClass(concreteClass, clazzBytes);
-			}catch(IllegalAccessException|AccessProvider.Defunct e){
+			}catch(IllegalAccessException e){
 				throw new ShouldNeverHappenError(e);
 			}
 		}catch(MalformedJorth e){

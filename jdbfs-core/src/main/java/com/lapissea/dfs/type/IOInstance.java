@@ -1,13 +1,11 @@
 package com.lapissea.dfs.type;
 
 import com.lapissea.dfs.SealedUtil;
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.core.chunk.ChunkChainIO;
 import com.lapissea.dfs.core.memory.MemoryOperations;
 import com.lapissea.dfs.internal.Access;
-import com.lapissea.dfs.internal.AccessProvider;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
@@ -273,17 +271,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
-		static{ allowFullAccess(MethodHandles.lookup()); }
-		
-		protected static void registerAccess(Class<?> lookupProvider){
-			registerAccess0(lookupProvider, true);
-		}
-		protected static void registerAccess(Class<?> lookupProvider, boolean selfCheck){
-			registerAccess0(lookupProvider, selfCheck);
-		}
-		protected static void allowFullAccess(MethodHandles.Lookup lookup){
-			Access.addLookup(lookup);
-		}
 		
 		private Struct<SELF>  thisStruct;
 		private VarPool<SELF> virtualFields;
@@ -480,10 +467,6 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			Iterable<IOField<SELF, ?>> listDynamicUnmanagedFields();
 			@NotNull
 			CommandSet.CmdReader getUnmanagedReferenceWalkCommands();
-		}
-		
-		protected static void allowFullAccess(MethodHandles.Lookup lookup){
-			Access.addLookup(lookup);
 		}
 		
 		private final DataProvider   provider;
@@ -778,27 +761,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	}
 	
 	
-	static Void allowFullAccessI(MethodHandles.Lookup lookup){
+	/**
+	 * Registers full module access for the class that {@code lookup} was created in
+	 */
+	static void allowFullAccess(MethodHandles.Lookup lookup){
 		Access.addLookup(lookup);
-		return null;
-	}
-	static Void registerAccessI(Class<?> lookupProvider){
-		registerAccess0(lookupProvider, true);
-		return null;
-	}
-	static Void registerAccessI(Class<?> lookupProvider, boolean selfCheck){
-		registerAccess0(lookupProvider, selfCheck);
-		return null;
-	}
-	
-	private static void registerAccess0(Class<?> lookupProvider, boolean selfCheck){
-		AccessProvider provider;
-		if(selfCheck){
-			var callee = Utils.getCallee(2);
-			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider, callee);
-		}else{
-			provider = new AccessProvider.WeaklyProvidedLookup(lookupProvider);
-		}
-		Access.registerProvider(provider);
 	}
 }

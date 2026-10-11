@@ -9,7 +9,6 @@ import com.lapissea.dfs.exceptions.InvalidGenericArgument;
 import com.lapissea.dfs.exceptions.MalformedObject;
 import com.lapissea.dfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.dfs.exceptions.TypeIOFail;
-import com.lapissea.dfs.internal.Access;
 import com.lapissea.dfs.internal.Runner;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.bit.BitUtils;
@@ -61,7 +60,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
@@ -88,11 +86,6 @@ import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.util.ConsoleColors.RESET;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
-	
-	protected static void allowFullAccess(MethodHandles.Lookup lookup){
-		Access.addLookup(lookup);
-	}
-	static{ allowFullAccess(MethodHandles.lookup()); }
 	
 	/**
 	 * This annotation specifies that the defined type contains critical information within the static initializer.<br>

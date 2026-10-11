@@ -11,12 +11,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-
 public class HashBucketBoundaryTests{
-	
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
+
 	private static final int MIN_HASH_KEY = 0x7EC69360;
 	
 	private static int mixMurmur32(int z){

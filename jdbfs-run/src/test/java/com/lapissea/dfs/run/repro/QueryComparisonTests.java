@@ -8,7 +8,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.List;
 
 import static com.lapissea.dfs.query.Query.Test.fieldLe;
@@ -16,7 +15,6 @@ import static com.lapissea.dfs.query.Query.Test.fieldLeEq;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class QueryComparisonTests{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 
 	@IOValue
 	static class Element extends IOInstance.Managed<Element>{

@@ -10,14 +10,10 @@ import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import java.lang.invoke.MethodHandles;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class NullableReferenceWalkTests{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
+
 	@IOValue
 	public static class Payload extends IOInstance.Managed<Payload>{
 		@IOValue long value;

@@ -24,7 +24,6 @@ import com.lapissea.util.UtilL;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +36,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 public final class RandomLists{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
+
 	public static void main(String[] args){
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER|LogUtil.Init.USE_CALL_THREAD);
 		Configuration conf = new Configuration();

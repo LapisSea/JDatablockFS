@@ -258,7 +258,7 @@ public final class DefInstanceCompiler{
 				try{
 					//noinspection unchecked
 					completed = (Class<T>)interfAccess.defineClass(interf, file);
-				}catch(AccessProvider.Defunct|IllegalAccessException e){
+				}catch(IllegalAccessException e){
 					throw new ShouldNeverHappenError(e);
 				}
 				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters));
@@ -693,7 +693,7 @@ public final class DefInstanceCompiler{
 			try{
 				//noinspection unchecked
 				return (Class<T>)interfAccess.defineClass(interf, file);
-			}catch(IllegalAccessException|AccessProvider.Defunct e){
+			}catch(IllegalAccessException e){
 				throw new ShouldNeverHappenError(e);
 			}
 		}catch(MalformedJorth e){

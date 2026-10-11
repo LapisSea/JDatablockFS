@@ -11,14 +11,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ContiguousListMutationTests{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 
 	@IOValue
 	public static class Element extends IOInstance.Managed<Element>{

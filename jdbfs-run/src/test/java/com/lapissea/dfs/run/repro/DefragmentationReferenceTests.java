@@ -18,15 +18,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-
 import static com.lapissea.dfs.type.MemoryWalker.CONTINUE;
 import static com.lapissea.dfs.type.MemoryWalker.END;
 import static com.lapissea.dfs.type.MemoryWalker.SAVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class DefragmentationReferenceTests{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
 
 	@IOValue
 	public static class Payload extends IOInstance.Managed<Payload>{

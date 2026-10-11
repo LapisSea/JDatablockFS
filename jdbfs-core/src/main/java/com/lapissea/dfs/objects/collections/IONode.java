@@ -45,7 +45,6 @@ import com.lapissea.util.UtilL;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
@@ -57,7 +56,6 @@ import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePPSource<IONode<T>>{
-	static{ allowFullAccess(MethodHandles.lookup()); }
 	
 	private static final class Info{
 		@SuppressWarnings("unchecked")

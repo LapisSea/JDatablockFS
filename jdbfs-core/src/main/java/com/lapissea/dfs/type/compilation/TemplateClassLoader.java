@@ -264,7 +264,7 @@ public final class TemplateClassLoader extends ClassLoader{
 						end
 					end
 					""",
-				name, Objects.class, IOInstance.Managed.class, MethodHandles.class);
+				name, Objects.class, IOInstance.class, MethodHandles.class);
 		}else{
 			writer.write(
 				"""
@@ -274,7 +274,7 @@ public final class TemplateClassLoader extends ClassLoader{
 						end
 					end
 					""",
-				IOInstance.Managed.class, MethodHandles.class);
+				IOInstance.class, MethodHandles.class);
 		}
 		
 		for(var field : fields){

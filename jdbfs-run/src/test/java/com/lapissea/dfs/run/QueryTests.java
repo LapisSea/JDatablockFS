@@ -12,7 +12,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,9 +19,7 @@ import static com.lapissea.dfs.query.Query.Test.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class QueryTests{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
-	
+
 	@IOInstance.Order({"a", "b", "someData"})
 	interface FF extends IOInstance.Def<FF>{
 		static FF of(float a, float b){

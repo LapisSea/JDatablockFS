@@ -28,7 +28,6 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,8 +47,7 @@ import java.util.random.RandomGenerator;
 import static com.lapissea.dfs.type.StagedInit.STATE_DONE;
 
 public final class StructFuzzTest{
-	static{ IOInstance.allowFullAccessI(MethodHandles.lookup()); }
-	
+
 	private static final List<BiFunction<String, RandomGenerator, TempClassGen.FieldGen>> fieldTypes = List.of(
 		StructFuzzTest::signedInt,
 		StructFuzzTest::unsignedInt,
