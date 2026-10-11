@@ -4,16 +4,24 @@ import java.util.Objects;
 
 public record StringifySettings(
 	boolean doShort, boolean showName, boolean showFieldNames,
-	String start, String end, String fieldValueSeparator, String fieldSeparator
+	String start, String end, String fieldValueSeparator, String fieldSeparator,
+	int width, int flatCollectionLimit, int repeatThreshold, int maxCollectionPrint
 ){
 	
 	public static final StringifySettings DEFAULT = new StringifySettings(
 		false, true, true,
-		"{", "}", "=", ", "
+		"{", "}", "=", ", ", 0, 300, 4, 200
+	);
+	
+	public static final int DEFAULT_WIDTH = 100;
+	
+	public static final StringifySettings PRETTY = new StringifySettings(
+		false, true, true,
+		"{", "}", ": ", ", ", DEFAULT_WIDTH, 300, 4, 200
 	);
 	
 	public StringifySettings(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		this(doShort, !doShort, true, start, end, fieldValueSeparator, fieldSeparator);
+		this(doShort, !doShort, true, start, end, fieldValueSeparator, fieldSeparator, 0, 300, 4, 200);
 	}
 	
 	public StringifySettings{
@@ -28,11 +36,31 @@ public record StringifySettings(
 	}
 	public StringifySettings withDoShort(boolean doShort){
 		if(this.doShort == doShort) return this;
-		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator);
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
 	}
 	public StringifySettings withShowName(boolean showName){
 		if(this.showName == showName) return this;
-		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator);
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
+	}
+	public StringifySettings withWidth(int width){
+		if(this.width == width) return this;
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
+	}
+	public StringifySettings withFlatCollectionLimit(int flatCollectionLimit){
+		if(this.flatCollectionLimit == flatCollectionLimit) return this;
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
+	}
+	public StringifySettings withRepeatThreshold(int repeatThreshold){
+		if(this.repeatThreshold == repeatThreshold) return this;
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
+	}
+	public StringifySettings withMaxCollectionPrint(int maxCollectionPrint){
+		if(this.maxCollectionPrint == maxCollectionPrint) return this;
+		return new StringifySettings(doShort, showName, showFieldNames, start, end, fieldValueSeparator, fieldSeparator, width, flatCollectionLimit, repeatThreshold, maxCollectionPrint);
+	}
+	
+	public boolean flat(){
+		return width<=0;
 	}
 	
 	public boolean stringsEqual(StringifySettings other){

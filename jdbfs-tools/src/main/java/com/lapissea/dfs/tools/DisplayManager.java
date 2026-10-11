@@ -383,7 +383,7 @@ public class DisplayManager implements DataLogger{
 					}else{
 						switch(object){
 							case IOInstance<?> inst -> {
-								var str = inst.toString(false, "{\n\t", "\n}", ": ", ",\n\t");
+								var str = inst.toString(StringifySettings.PRETTY, StringifySettings.DEFAULT_WIDTH);
 								
 								if(str == null) str = "";
 								var col = msg.color();
@@ -393,9 +393,7 @@ public class DisplayManager implements DataLogger{
 							case DataRenderer.FieldVal<?> inst -> {
 								String str;
 								try{
-									str = inst.instanceToString(new StringifySettings(
-										false, "{\n\t", "\n}", ": ", ",\n\t"
-									)).orElse("");
+									str = inst.instanceToPrettyString(StringifySettings.DEFAULT_WIDTH).orElse("");
 								}catch(Throwable e){
 									str = "<CORRUPT :" + e + ">";
 								}

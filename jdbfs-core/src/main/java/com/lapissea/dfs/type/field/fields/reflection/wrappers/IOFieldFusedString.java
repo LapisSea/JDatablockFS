@@ -23,6 +23,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
 
 import java.io.IOException;
@@ -183,9 +184,9 @@ public final class IOFieldFusedString<CTyp extends IOInstance<CTyp>> extends IOF
 	}
 	
 	@Override
-	public Optional<String> instanceToString(VarPool<CTyp> ioPool, CTyp instance, StringifySettings settings){
+	public Optional<Doc> instanceToDoc(VarPool<CTyp> ioPool, CTyp instance, StringifySettings settings){
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
-		return Optional.of('"' + val + '"');
+		return Optional.of(Doc.text('"' + val + '"'));
 	}
 }

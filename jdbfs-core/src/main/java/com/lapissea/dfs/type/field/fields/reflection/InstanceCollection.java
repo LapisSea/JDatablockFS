@@ -30,10 +30,8 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.CollectionAdapter;
 import com.lapissea.dfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.dfs.type.field.fields.RefField;
-import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.reflect.Modifier;
@@ -197,18 +195,6 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-			var val = get(ioPool, instance);
-			if(val == null || dataAdapter.getSize(get(ioPool, instance)) == 0){
-				return Optional.empty();
-			}
-			return Optional.of(
-				settings.doShort()?
-				Utils.toShortString(val) :
-				TextUtil.toString(val)
-			);
-		}
-		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}
 	
@@ -368,18 +354,6 @@ public class InstanceCollection{
 		}
 		
 		
-		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-			var val = get(ioPool, instance);
-			if(val == null || dataAdapter.getSize(get(ioPool, instance)) == 0){
-				return Optional.empty();
-			}
-			return Optional.of(
-				settings.doShort()?
-				Utils.toShortString(val) :
-				TextUtil.toString(val)
-			);
-		}
 		@Override
 		public CollectionAdapter<ElementType, CollectionType> getCollectionAddapter(){ return dataAdapter; }
 	}

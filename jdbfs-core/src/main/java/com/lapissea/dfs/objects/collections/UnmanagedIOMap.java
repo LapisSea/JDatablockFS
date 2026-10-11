@@ -5,8 +5,13 @@ import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
+import com.lapissea.dfs.type.field.FieldSupport;
+import com.lapissea.dfs.type.string.Doc;
+import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.type.string.StringifyState;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 public abstract class UnmanagedIOMap<K, V> extends IOInstance.Unmanaged<UnmanagedIOMap<K, V>> implements IOMap<K, V>{
 	
@@ -18,10 +23,11 @@ public abstract class UnmanagedIOMap<K, V> extends IOInstance.Unmanaged<Unmanage
 		if(o == this)
 			return true;
 		
-		if(!(o instanceof IOMap m)) return false;
+		if(!(o instanceof IOMap<?, ?> m)) return false;
 		
 		try{
-			return equals(m);
+			//noinspection unchecked
+			return equals((IOMap<K, V>)m);
 		}catch(IOException e){
 			throw new RuntimeException();
 		}
@@ -54,11 +60,32 @@ public abstract class UnmanagedIOMap<K, V> extends IOInstance.Unmanaged<Unmanage
 	}
 	
 	@Override
-	public String toString(){
-		return IOMap.toString(this);
-	}
-	@Override
-	public String toShortString(){
-		return IOMap.toString(this);
+	public Doc instanceToDoc(StringifySettings settings){
+		if(!StringifyState.enter()){
+			return Doc.text("{...}");
+		}
+		try{
+			var  entries = new ArrayList<Doc>();
+			var  iter    = iterator();
+			long total   = size();
+			int  shown   = 0;
+			while(iter.hasNext() && shown<settings.maxCollectionPrint()){
+				var e = iter.ioNext();
+				entries.add(Doc.concat(
+					FieldSupport.elementDoc(e.getKey(), settings),
+					Doc.text(": "),
+					FieldSupport.elementDoc(e.getValue(), settings)
+				));
+				shown++;
+			}
+			if(total>shown){
+				entries.add(Doc.text("... " + (total - shown) + " more"));
+			}
+			return FieldSupport.mapDoc(entries);
+		}catch(Throwable e){
+			return Doc.text("CORRUPTED_MAP{" + (e.getMessage() == null? e.getClass().getSimpleName() : e.getMessage()) + "}");
+		}finally{
+			StringifyState.exit();
+		}
 	}
 }

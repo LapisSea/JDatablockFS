@@ -23,6 +23,7 @@ import com.lapissea.dfs.type.field.annotations.IODependency;
 import com.lapissea.dfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.dfs.type.field.annotations.IOValue;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match.Some;
@@ -134,10 +135,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -196,8 +197,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.of(Doc.text(String.valueOf(getValue(ioPool, instance))));
 		}
 		
 		@Override
@@ -255,10 +256,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -332,10 +333,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -410,10 +411,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -488,10 +489,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -548,10 +549,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
 			var val = getValue(ioPool, instance);
 			if(val == 0) return Optional.empty();
-			return Optional.of(String.valueOf(val));
+			return Optional.of(Doc.text(String.valueOf(val)));
 		}
 		
 		@Override
@@ -606,14 +607,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public void skipReadBits(BitReader src, T instance) throws IOException{
 			src.skip(1);
 		}
-		
 		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-			return instanceToString(ioPool, instance, settings.doShort());
-		}
-		@Override
-		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+			return Optional.of(Doc.text(String.valueOf(getValue(ioPool, instance))));
 		}
 		
 		@Override
@@ -700,8 +696,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected abstract IOField<T, ValueType> withVaryingSize(VaryingSize size);
 	
 	@Override
-	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		return instanceToString(ioPool, instance, settings.doShort());
+	public final Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return instanceToDoc(ioPool, instance, settings.doShort());
 	}
 	
 	@Override

@@ -25,6 +25,7 @@ import com.lapissea.dfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldOptional;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.dfs.type.field.fields.reflection.wrappers.IOFieldFusedString;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
@@ -464,17 +465,33 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	}
 	
 	/**
-	 * @return string of the resolved value or no value if string has no substance
+	 * @return document of the resolved value or no value if the value has no substance
 	 */
+	public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return FieldSupport.instanceToDoc(this, ioPool, instance, settings);
+	}
+	
+	public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+		return instanceToDoc(ioPool, instance, StringifySettings.ofDoShort(doShort));
+	}
+	
+	/**
+	 * @return string of the resolved value or no value if the value has no substance
+	 */
+	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
+		return instanceToString(ioPool, instance, settings, settings.width());
+	}
+	
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, StringifySettings.ofDoShort(doShort));
 	}
 	
 	/**
-	 * @return string of the resolved value or no value if string has no substance
+	 * @param width column budget for group breaking, or {@code <= 0} to render flat
+	 * @return string of the resolved value or no value if the value has no substance
 	 */
-	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		return FieldSupport.instanceToString(this, ioPool, instance, settings);
+	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings, int width){
+		return instanceToDoc(ioPool, instance, settings.withWidth(width)).map(doc -> doc.render(width));
 	}
 	
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){

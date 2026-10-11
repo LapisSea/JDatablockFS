@@ -6,13 +6,17 @@ import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.RuntimeType;
 import com.lapissea.dfs.type.TypeCheck;
+import com.lapissea.dfs.type.field.FieldSupport;
 import com.lapissea.dfs.type.field.IOField;
+import com.lapissea.dfs.type.string.Doc;
+import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.type.string.StringifyState;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Objects;
-import java.util.StringJoiner;
 
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -79,24 +83,33 @@ public abstract class UnmanagedIOList<T, SELF extends UnmanagedIOList<T, SELF>> 
 	}
 	
 	@Override
-	public String toString(){
+	public Doc instanceToDoc(StringifySettings settings){
 		if(isFreed()){
-			return freeStr();
+			return Doc.text(freeStr());
 		}
 		
-		StringJoiner sj = new StringJoiner(", ", getStringPrefix() + "{size: " + size() + "}" + "[", "]");
-		IOList.elementSummary(sj, this);
-		return sj.toString();
-	}
-	@Override
-	public String toShortString(){
-		if(isFreed()){
-			return freeStr();
+		if(!StringifyState.enter()){
+			return Doc.text("[...]");
 		}
-		
-		StringJoiner sj = new StringJoiner(", ", "[", "]");
-		IOList.elementSummary(sj, this);
-		return sj.toString();
+		try{
+			var  elems = new ArrayList<Doc>();
+			var  iter  = iterator();
+			long total = size();
+			int  shown = 0;
+			while(iter.hasNext() && shown<settings.maxCollectionPrint()){
+				Object e;
+				try{
+					e = iter.ioNext();
+				}catch(Throwable ex){
+					e = "CORRUPT: " + ex.getClass().getSimpleName();
+				}
+				elems.add(FieldSupport.elementDoc(e, settings));
+				shown++;
+			}
+			return FieldSupport.collectionDoc(FieldSupport.finishElements(elems, total, settings));
+		}finally{
+			StringifyState.exit();
+		}
 	}
 	
 	@Override

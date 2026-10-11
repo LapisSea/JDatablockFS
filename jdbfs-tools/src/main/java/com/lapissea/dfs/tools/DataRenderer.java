@@ -133,6 +133,12 @@ public interface DataRenderer{
 			}
 			return field.instanceToString(ioPool, instance, settings);
 		}
+		Optional<String> instanceToPrettyString(int width){
+			if(field.getType() == byte[].class && instance instanceof AutoText t){
+				return Optional.of(t.getData());
+			}
+			return field.instanceToDoc(ioPool, instance, StringifySettings.PRETTY.withWidth(width)).map(doc -> doc.render(width));
+		}
 	}
 	
 	void markDirty();

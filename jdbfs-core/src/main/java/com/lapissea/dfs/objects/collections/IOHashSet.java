@@ -1,6 +1,5 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
@@ -12,7 +11,6 @@ import com.lapissea.dfs.type.field.annotations.IOValue;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.StringJoiner;
 
 public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
@@ -216,21 +214,5 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	private static long smallHash(int hash, long size){
 		return Math.abs(hash)%size;
-	}
-	
-	@Override
-	public String toString(){
-		try{
-			var iter = iterator();
-			var j    = new StringJoiner(", ", "{", "}");
-			
-			while(iter.hasNext()){
-				j.add(Utils.toShortString(iter.ioNext()));
-			}
-			
-			return j.toString();
-		}catch(Throwable e){
-			return "CORRUPTED_SET{" + e.getMessage() + "}";
-		}
 	}
 }

@@ -14,6 +14,7 @@ import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.access.FieldAccessor;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.reflection.IOFieldWrapper;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
 
 import java.io.IOException;
@@ -88,9 +89,9 @@ public final class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IO
 	}
 	
 	@Override
-	public Optional<String> instanceToString(VarPool<CTyp> ioPool, CTyp instance, StringifySettings settings){
+	public Optional<Doc> instanceToDoc(VarPool<CTyp> ioPool, CTyp instance, StringifySettings settings){
 		var val = get(ioPool, instance);
 		if(val == null || val.length() == 0) return Optional.empty();
-		return Optional.of('"' + val + '"');
+		return Optional.of(Doc.text('"' + val + '"'));
 	}
 }

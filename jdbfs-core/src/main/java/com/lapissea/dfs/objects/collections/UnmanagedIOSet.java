@@ -1,16 +1,19 @@
 package com.lapissea.dfs.objects.collections;
 
-import com.lapissea.dfs.Utils;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.dfs.type.IOType;
 import com.lapissea.dfs.type.TypeCheck;
+import com.lapissea.dfs.type.field.FieldSupport;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IOValue;
+import com.lapissea.dfs.type.string.Doc;
+import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.type.string.StringifyState;
 
 import java.io.IOException;
-import java.util.StringJoiner;
+import java.util.ArrayList;
 
 public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIOSet<T>> implements IOSet<T>{
 	
@@ -52,38 +55,24 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 	
 	
 	@Override
-	public String toShortString(){
-		try{
-			var j = new StringJoiner(", ", "{", "}");
-			
-			var iter = iterator();
-			while(iter.hasNext()){
-				j.add(Utils.toShortString(iter.ioNext()));
-			}
-			
-			return j.toString();
-		}catch(Throwable e){
-			return "CORRUPTED_SET{" + (e.getMessage() == null? e.getClass().getSimpleName() : e.getMessage()) + "}";
+	public Doc instanceToDoc(StringifySettings settings){
+		if(!StringifyState.enter()){
+			return Doc.text("{...}");
 		}
-	}
-	
-	@Override
-	public String toString(){
 		try{
-			var name = this.getClass().getSimpleName();
-			if(name.startsWith("IO")) name = name.substring(2);
-			if(name.endsWith("Set")) name = name.substring(0, name.length() - 3);
-			
-			var j = new StringJoiner(", ", name + "[size=" + size() + "]{", "}");
-			
-			var iter = iterator();
-			while(iter.hasNext()){
-				j.add(Utils.toShortString(iter.ioNext()));
+			var  elems = new ArrayList<Doc>();
+			var  iter  = iterator();
+			long total = size();
+			int  shown = 0;
+			while(iter.hasNext() && shown<settings.maxCollectionPrint()){
+				elems.add(FieldSupport.elementDoc(iter.ioNext(), settings));
+				shown++;
 			}
-			
-			return j.toString();
+			return FieldSupport.setDoc(FieldSupport.finishElements(elems, total, settings));
 		}catch(Throwable e){
-			return "CORRUPTED_SET{" + (e.getMessage() == null? e.getClass().getSimpleName() : e.getMessage()) + "}";
+			return Doc.text("CORRUPTED_SET{" + (e.getMessage() == null? e.getClass().getSimpleName() : e.getMessage()) + "}");
+		}finally{
+			StringifyState.exit();
 		}
 	}
 	

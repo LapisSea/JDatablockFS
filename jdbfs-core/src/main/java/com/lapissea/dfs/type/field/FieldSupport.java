@@ -7,25 +7,25 @@ import com.lapissea.dfs.type.SupportedPrimitive;
 import com.lapissea.dfs.type.VarPool;
 import com.lapissea.dfs.type.compilation.WrapperStructs;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
-import com.lapissea.iterableplus.Iters;
+import com.lapissea.dfs.type.string.StringifyState;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.StringJoiner;
 
 import static com.lapissea.dfs.SealedUtil.isSealedCached;
 import static com.lapissea.dfs.type.field.IOField.*;
@@ -35,7 +35,7 @@ import static com.lapissea.dfs.type.field.annotations.IONullability.Mode.DEFAULT
 /**
  * Stores bulk code for basic operations and information for {@link IOField}. Also provides emotional support
  */
-final class FieldSupport{
+public final class FieldSupport{
 	static <T extends IOInstance<T>> int hash(IOField<T, ?> field, VarPool<T> ioPool, T instance){
 		var acc = field.getAccessor();
 		var id  = acc.getTypeID();
@@ -153,8 +153,6 @@ final class FieldSupport{
 		};
 	}
 	
-	private static String rem(int remaining){ return "... " + remaining + " more"; }
-	
 	private static final class Arr extends AbstractList<Object>{
 		private final Object arr;
 		private final int    len;
@@ -168,77 +166,184 @@ final class FieldSupport{
 		public int size(){ return len; }
 	}
 	
-	@SuppressWarnings({"rawtypes", "unchecked"})
-	static <T extends IOInstance<T>> Optional<String> instanceToString(IOField<T, ?> field, VarPool<T> ioPool, T instance, StringifySettings settings){
+	static <T extends IOInstance<T>> Optional<Doc> instanceToDoc(IOField<T, ?> field, VarPool<T> ioPool, T instance, StringifySettings settings){
 		Object val;
 		try{
 			val = field.get(ioPool, instance);
 		}catch(Throwable e){
-			return Optional.of(IOFieldTools.corruptedGet(e));
+			return Optional.of(Doc.text(IOFieldTools.corruptedGet(e)));
 		}
+		
 		if(val == null){
 			if(field.isNonNullable()){
-				return Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
+				return Optional.of(Doc.text(IOFieldTools.UNINITIALIZED_FIELD_SIGN));
 			}
 			return Optional.empty();
 		}
 		
-		if(val instanceof IOInstance inst){
-			if(settings.stringsEqual(StringifySettings.DEFAULT)){
-				return Optional.ofNullable(settings.doShort()? inst.toShortString() : inst.toString());
-			}
-			
-			var struct = inst.getThisStruct();
-			return Optional.of(struct.instanceToString(inst, settings));
+		if(val instanceof IOInstance<?> inst){
+			return Optional.of(inst.instanceToDoc(settings.withShowName(false)));
 		}
 		
 		if(val.getClass().isArray()){
 			val = new Arr(val, Array.getLength(val));
 		}
-		if(val instanceof Collection<?> data){
-			int resLen = 0, remaining = data.size();
-			if(remaining == 0) return Optional.empty();
-			
-			var res = new StringJoiner(", ", "[", "]");
-			for(var o : data){
-				var e = Utils.toShortString(o);
-				resLen += 2 + e.length();
-				var lenNow = resLen + rem(remaining).length();
-				if(settings.doShort() && lenNow>=200){
-					String prefix;
-					if(data instanceof Arr arr){
-						var typ = arr.arr.getClass().componentType();
-						if(Modifier.isFinal(typ.getModifiers()) || SupportedPrimitive.getStrict(typ).isPresent()){
-							prefix = typ.getTypeName();
-						}else{
-							var type = Utils.findClosestCommonSuper(Iters.from(arr).nonNulls().map(Object::getClass));
-							prefix = (type == Object.class? typ : type).getTypeName();
-						}
-					}else{
-						var type = Utils.findClosestCommonSuper(Iters.from(data).nonNulls().map(Object::getClass));
-						var dataName = switch(data){
-							case List<?> ignored -> "List";
-							case Set<?> ignored -> "Set";
-							default -> data.getClass().getSimpleName();
-						};
-						prefix = type == Object.class? dataName + "<?>" : dataName + "<" + type.getSimpleName() + ">";
-					}
-					return Optional.of(prefix + "[" + data.size() + "]");
-				}
-				if(lenNow<(settings.doShort()? 100 : 200)){
-					res.add(e);
-					remaining--;
-				}
+		
+		switch(val){
+			case Collection<?> data -> {
+				if(data.isEmpty()) return Optional.empty();
+				return Optional.of(collectionDoc(data, settings));
 			}
-			if(remaining>0) res.add(rem(remaining));
-			return Optional.of(res.toString());
+			case Map<?, ?> data -> {
+				if(data.isEmpty()) return Optional.empty();
+				return Optional.of(mapDoc(data, settings));
+			}
+			default -> {
+				return Optional.of(Doc.text(settings.doShort()? Utils.toShortString(val) : TextUtil.toString(val)));
+			}
+		}
+	}
+	
+	public static Doc elementDoc(Object val, StringifySettings settings){
+		if(val == null) return Doc.text("null");
+		
+		if(val instanceof IOInstance<?> inst){
+			return inst.instanceToDoc(settings.withShowName(false));
 		}
 		
-		return Optional.of(
-			settings.doShort()?
-			Utils.toShortString(val) :
-			TextUtil.toString(val)
-		);
+		if(val.getClass().isArray()) val = new Arr(val, Array.getLength(val));
+		return switch(val){
+			case Collection<?> data -> collectionDoc(data, settings);
+			case Map<?, ?> data -> mapDoc(data, settings);
+			case CharSequence str -> Doc.text('"' + str.toString() + '"');
+			default -> Doc.text(settings.doShort()? Utils.toShortString(val) : TextUtil.toString(val));
+		};
+		
+	}
+	
+	public static Doc mapDoc(Map<?, ?> data, StringifySettings settings){
+		if(data.isEmpty()) return Doc.text("{}");
+		
+		int total   = data.size();
+		int cap     = settings.maxCollectionPrint();
+		var entries = new ArrayList<Doc>(Math.min(total, cap) + 1);
+		
+		int shown = 0;
+		for(var e : data.entrySet()){
+			if(shown>=cap) break;
+			entries.add(Doc.concat(elementDoc(e.getKey(), settings), Doc.text(": "), elementDoc(e.getValue(), settings)));
+			shown++;
+		}
+		
+		var kept = applyFlatBudget(entries, settings);
+		if(total>kept.size()){
+			kept = new ArrayList<>(kept);
+			kept.add(Doc.text("... " + (total - kept.size()) + " more"));
+		}
+		
+		return mapDoc(kept);
+	}
+	
+	public static Doc mapDoc(List<Doc> entries){
+		return bracketedDoc("{", "}", entries);
+	}
+	
+	public static Doc setDoc(List<Doc> elems){
+		return bracketedDoc("{", "}", elems);
+	}
+	
+	public static Doc collectionDoc(Collection<?> data, StringifySettings settings){
+		if(data.isEmpty()){
+			return Doc.text("[]");
+		}
+		
+		int total = data.size();
+		int cap   = settings.maxCollectionPrint();
+		var elems = new ArrayList<Doc>(Math.min(total, cap) + 1);
+		
+		int shown = 0;
+		for(var o : data){
+			if(shown>=cap) break;
+			elems.add(elementDoc(o, settings));
+			shown++;
+		}
+		
+		var compressed = finishElements(elems, total, settings);
+		return collectionDoc(compressed);
+	}
+	
+	public static List<Doc> finishElements(List<Doc> elems, long total, StringifySettings settings){
+		var kept       = applyFlatBudget(elems, settings);
+		var compressed = compressRepeats(kept, settings);
+		
+		long shown = kept.size();
+		if(total>shown){
+			compressed = new ArrayList<>(compressed);
+			compressed.add(Doc.text("... " + (total - shown) + " more"));
+		}
+		return compressed;
+	}
+	
+	private static List<Doc> applyFlatBudget(List<Doc> elems, StringifySettings settings){
+		int limit = settings.flatCollectionLimit();
+		if(!settings.flat() || limit<=0 || elems.size()<=1){
+			return elems;
+		}
+		
+		int used = 0;
+		for(int i = 0; i<elems.size(); i++){
+			int len = elems.get(i).render(0).length() + 2;
+			if(i>0 && used + len>limit){
+				return elems.subList(0, i);
+			}
+			used += len;
+		}
+		return elems;
+	}
+	
+	public static List<Doc> compressRepeats(List<Doc> elems, StringifySettings settings){
+		int threshold = settings.repeatThreshold();
+		if(threshold<=0 || elems.size()<=threshold){
+			return elems;
+		}
+		
+		var flats = new ArrayList<String>(elems.size());
+		for(var d : elems) flats.add(d.render(0));
+		
+		var result = new ArrayList<Doc>(elems.size());
+		for(int i = 0; i<elems.size(); ){
+			var flat = flats.get(i);
+			int j    = i + 1;
+			while(j<elems.size() && flats.get(j).equals(flat)) j++;
+			
+			int run = j - i;
+			if(run>threshold){
+				result.add(Doc.text(flat + " (" + run + " times)"));
+			}else{
+				for(int k = i; k<j; k++) result.add(elems.get(k));
+			}
+			i = j;
+		}
+		return result;
+	}
+	
+	public static Doc collectionDoc(List<Doc> elems){
+		return bracketedDoc("[", "]", elems);
+	}
+	
+	public static Doc bracketedDoc(String open, String close, List<Doc> elems){
+		if(elems.isEmpty()) return Doc.text(open + close);
+		if(!StringifyState.enter()) return Doc.text(open + "..." + close);
+		try{
+			return Doc.group(Doc.concat(
+				Doc.text(open),
+				Doc.nest(Doc.concat(Doc.softLine(), Doc.join(Doc.concat(Doc.text(","), Doc.line()), elems))),
+				Doc.softLine(),
+				Doc.text(close)
+			));
+		}finally{
+			StringifyState.exit();
+		}
 	}
 	
 	static int typeFlags(IOField<?, ?> field){

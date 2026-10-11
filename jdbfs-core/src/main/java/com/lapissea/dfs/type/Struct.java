@@ -27,7 +27,9 @@ import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Primitive;
 import com.lapissea.dfs.type.field.access.VirtualAccessor.TypeOff.Ptr;
 import com.lapissea.dfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
+import com.lapissea.dfs.type.string.StringifyState;
 import com.lapissea.dfs.type.string.ToStringFormat;
 import com.lapissea.dfs.type.string.ToStringFragment;
 import com.lapissea.iterableplus.IterablePP;
@@ -191,17 +193,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		@Override
-		public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-			IterablePP<IOField<T, ?>> fields;
-			try{
-				fields = generatedFields();
-			}catch(Throwable e){
-				fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
-			}
-			return instanceToString0(
-				ioPool, instance, settings,
-				Iters.concat(fields, instance.listUnmanagedFields())
-			);
+		protected IterablePP<IOField<T, ?>> fieldsFor(T instance){
+			return Iters.concat(super.fieldsFor(instance), instance.listUnmanagedFields());
 		}
 		
 		public FieldSet<T> getUnmanagedStaticFields(){
@@ -713,33 +706,45 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return instanceToString(allocVirtualVarPool(IO), instance, doShort);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		if(toStrType == null) toStrType = computeToStr();
-		return switch(toStrType){
-			case ToStrType.Default<T> f -> {
-				yield instanceToString(ioPool, instance, StringifySettings.ofDoShort(doShort));
-			}
-			case ToStrType.Custom<T> f -> {
-				yield fragmentToStr(ioPool, instance, doShort, f.format);
-			}
-			case ToStrType.Format<T> fmt -> {
-				var format = fmt.format;
-				var curly  = format.curly();
-				var sett   = new StringifySettings(doShort, format.name(), format.fNames(), curly? "{" : "", curly? "}" : "", "=", ", ");
-				yield instanceToString0(ioPool, instance, sett, fmt.fields);
-			}
-		};
+		return instanceToString(ioPool, instance, StringifySettings.ofDoShort(doShort));
 	}
 	public String instanceToString(T instance, StringifySettings settings){
 		return instanceToString(allocVirtualVarPool(IO), instance, settings);
 	}
 	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings){
-		IterablePP<IOField<T, ?>> fields;
+		return instanceToDoc(ioPool, instance, settings).render(settings.width());
+	}
+	
+	public String instanceToString(T instance, StringifySettings settings, int width){
+		return instanceToString(allocVirtualVarPool(IO), instance, settings, width);
+	}
+	public String instanceToString(VarPool<T> ioPool, T instance, StringifySettings settings, int width){
+		return instanceToDoc(ioPool, instance, settings.withWidth(width)).render(width);
+	}
+	
+	public Doc instanceToDoc(T instance, StringifySettings settings){
+		return instanceToDoc(allocVirtualVarPool(IO), instance, settings);
+	}
+	public Doc instanceToDoc(VarPool<T> ioPool, T instance, StringifySettings settings){
+		if(toStrType == null) toStrType = computeToStr();
+		return switch(toStrType){
+			case ToStrType.Default<T> f -> structToDoc(ioPool, instance, settings, fieldsFor(instance));
+			case ToStrType.Format<T> fmt -> {
+				var format = fmt.format;
+				var curly  = format.curly();
+				var sett   = new StringifySettings(settings.doShort(), format.name(), format.fNames(), curly? "{" : "", curly? "}" : "", settings.fieldValueSeparator(), ", ", settings.width(), settings.flatCollectionLimit(), settings.repeatThreshold(), settings.maxCollectionPrint());
+				yield structToDoc(ioPool, instance, sett, fmt.fields);
+			}
+			case ToStrType.Custom<T> f -> fragmentToDoc(ioPool, instance, settings, f.format);
+		};
+	}
+	
+	protected IterablePP<IOField<T, ?>> fieldsFor(T instance){
 		try{
-			fields = generatedFields();
+			return generatedFields();
 		}catch(Throwable e){
-			fields = getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
+			return getFields().filtered(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME_FLAG));
 		}
-		return instanceToString0(ioPool, instance, settings, fields);
 	}
 	
 	private IterablePP<IOField<T, ?>> generatedFieldsCache;
@@ -753,98 +758,110 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return generatedFieldsCache = tryOrderFields(fs).bake();
 	}
 	
-	protected String instanceToString0(
-		VarPool<T> ioPool, T instance,
-		StringifySettings settings,
-		IterablePP<IOField<T, ?>> fields
-	){
-		var    prefix = settings.start();
-		String name   = null;
-		if(settings.showName()){
-			name = cleanName();
-			if(Modifier.isStatic(getType().getModifiers())){
-				var index = name.lastIndexOf('$');
-				if(index != -1) name = name.substring(index + 1);
+	private Doc structToDoc(VarPool<T> ioPool, T instance, StringifySettings settings, IterablePP<IOField<T, ?>> fields){
+		if(!StringifyState.enter()) return Doc.text("...");
+		try{
+			String prefix = settings.start();
+			String name   = null;
+			if(settings.showName()){
+				name = cleanName();
+				if(Modifier.isStatic(getType().getModifiers())){
+					var index = name.lastIndexOf('$');
+					if(index != -1) name = name.substring(index + 1);
+				}
+				prefix = name + prefix;
 			}
 			
-			prefix = name + prefix;
+			var fieldDocs = new ArrayList<Doc>();
+			for(var field : fields){
+				var doc = fieldToDoc(ioPool, instance, field, settings);
+				if(doc != null) fieldDocs.add(doc);
+			}
+			
+			if(fieldDocs.isEmpty()){
+				if(settings.showName()) return Doc.text(name);
+				return Doc.text(prefix + settings.end());
+			}
+			
+			var body = Doc.join(Doc.concat(Doc.text(","), Doc.line()), fieldDocs);
+			return Doc.group(Doc.concat(
+				Doc.text(prefix),
+				Doc.nest(Doc.concat(Doc.softLine(), body)),
+				Doc.softLine(),
+				Doc.text(settings.end())
+			));
+		}finally{
+			StringifyState.exit();
 		}
-		
-		var str = fields.flatOptionals(field -> {
-			if(SupportedPrimitive.get(field.getType()).orElse(null) == SupportedPrimitive.BOOLEAN){
-				Boolean val = (Boolean)field.get(ioPool, instance);
-				if(val != null){
-					return val? Optional.of(field.getName()) : Optional.empty();
-				}
-			}
-			
-			Optional<String> valStr;
-			try{
-				if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
-					valStr = Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
-				}else{
-					var set = settings.withDoShort(settings.doShort() || TextUtil.USE_SHORT_IN_COLLECTIONS)
-					                  .withShowName(false);
-					valStr = field.instanceToString(ioPool, instance, set);
-				}
-			}catch(Throwable e){
-				//Tried to get excluded field
-				if(IOInstance.Def.isDefinitionImplementation(getType()) && e instanceof UnsupportedOperationException){
-					valStr = Optional.empty();
-				}else{
-					valStr = Optional.of(IOFieldTools.corruptedGet(e));
-				}
-			}
-			if(!settings.showFieldNames()) return valStr;
-			return valStr.map(value -> field.getName() + settings.fieldValueSeparator() + value);
-		}).joinAsOptionalStr(settings.fieldSeparator(), prefix, settings.end());
-		
-		if(str.isPresent()) return str.get();
-		if(settings.showName()) return name;
-		return prefix + settings.end();
 	}
 	
-	private String fragmentToStr(VarPool<T> ioPool, T instance, boolean doShort, ToStringFragment format){
+	private Doc fieldToDoc(VarPool<T> ioPool, T instance, IOField<T, ?> field, StringifySettings settings){
+		if(SupportedPrimitive.get(field.getType()).orElse(null) == SupportedPrimitive.BOOLEAN){
+			Boolean val;
+			try{
+				val = (Boolean)field.get(ioPool, instance);
+			}catch(Throwable e){
+				val = null;
+			}
+			if(val != null) return val? Doc.text(field.getName()) : null;
+		}
+		
+		Optional<Doc> valStr;
+		try{
+			if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
+				valStr = Optional.of(Doc.text(IOFieldTools.UNINITIALIZED_FIELD_SIGN));
+			}else{
+				valStr = field.instanceToDoc(ioPool, instance, settings.withShowName(false));
+			}
+		}catch(Throwable e){
+			//Tried to get excluded field
+			if(IOInstance.Def.isDefinitionImplementation(getType()) && e instanceof UnsupportedOperationException){
+				valStr = Optional.empty();
+			}else{
+				valStr = Optional.of(Doc.text(IOFieldTools.corruptedGet(e)));
+			}
+		}
+		
+		if(valStr.isEmpty()) return null;
+		var valueDoc = valStr.get();
+		if(!settings.showFieldNames()) return valueDoc;
+		return Doc.concat(Doc.text(field.getName()), Doc.text(settings.fieldValueSeparator()), valueDoc);
+	}
+	
+	private Doc fragmentToDoc(VarPool<T> ioPool, T instance, StringifySettings settings, ToStringFragment format){
 		return switch(format){
 			case ToStringFragment.Concat frag -> {
-				List<String> res = new ArrayList<>(frag.fragments().size());
-				var          siz = 0;
+				var parts = new ArrayList<Doc>(frag.fragments().size());
 				for(var fragment : frag.fragments()){
-					var f = fragmentToStr(ioPool, instance, doShort, fragment);
-					res.add(f);
-					siz += f.length();
+					parts.add(fragmentToDoc(ioPool, instance, settings, fragment));
 				}
-				var sb = new StringBuilder(siz);
-				for(String re : res) sb.append(re);
-				yield sb.toString();
+				yield Doc.concat(parts.toArray(Doc[]::new));
 			}
 			case ToStringFragment.FieldValue frag -> {
 				var f = getFields().requireByName(frag.name());
 				
-				Optional<String> str;
+				Optional<Doc> doc;
 				try{
-					str = f.instanceToString(ioPool, instance, doShort);
+					doc = f.instanceToDoc(ioPool, instance, settings);
 				}catch(FieldIsNull e){
-					str = Optional.of("null");
+					doc = Optional.of(Doc.text("null"));
 				}
-				if(str.isPresent()) yield str.get();
+				if(doc.isPresent()) yield doc.get();
 				try{
 					var v = f.get(ioPool, instance);
-					yield doShort?
-					      TextUtil.toShortString(v) :
-					      TextUtil.toString(v);
+					yield Doc.text(settings.doShort()? TextUtil.toShortString(v) : TextUtil.toString(v));
 				}catch(Throwable e){
-					yield IOFieldTools.corruptedGet(e);
+					yield Doc.text(IOFieldTools.corruptedGet(e));
 				}
 			}
-			case ToStringFragment.Literal frag -> frag.value();
-			case ToStringFragment.NOOP ignore -> "";
+			case ToStringFragment.Literal frag -> Doc.text(frag.value());
+			case ToStringFragment.NOOP ignore -> Doc.empty();
 			case ToStringFragment.OptionalBlock frag -> {
-				if(doShort) yield "";
-				yield fragmentToStr(ioPool, instance, doShort, frag.content());
+				if(settings.doShort()) yield Doc.empty();
+				yield fragmentToDoc(ioPool, instance, settings, frag.content());
 			}
 			case ToStringFragment.SpecialValue frag -> switch(frag.value()){
-				case CLASS_NAME -> cleanName();
+				case CLASS_NAME -> Doc.text(cleanName());
 			};
 		};
 	}

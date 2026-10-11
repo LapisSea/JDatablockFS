@@ -20,11 +20,12 @@ import com.lapissea.dfs.type.field.IOFieldTools;
 import com.lapissea.dfs.type.field.SizeDescriptor;
 import com.lapissea.dfs.type.field.VaryingSize;
 import com.lapissea.dfs.type.field.fields.BitField;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.iterableplus.IterablePP;
 import com.lapissea.iterableplus.Iters;
-import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -265,16 +266,25 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	}
 	
 	@Override
-	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
-		return Iters.from(group).flatOptionals(field -> {
-			Optional<String> str;
+	public Optional<Doc> instanceToDoc(VarPool<T> ioPool, T instance, boolean doShort){
+		var entries = new ArrayList<Doc>();
+		for(var field : group){
+			Optional<Doc> doc;
 			try{
-				str = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
+				doc = field.instanceToDoc(ioPool, instance, doShort);
 			}catch(FieldIsNull e){
-				str = Optional.of(IOFieldTools.UNINITIALIZED_FIELD_SIGN);
+				doc = Optional.of(Doc.text(IOFieldTools.UNINITIALIZED_FIELD_SIGN));
 			}
-			return str.map(s -> field.getName() + "=" + s);
-		}).joinAsOptionalStr(" + ", "{", "}");
+			var name = field.getName();
+			doc.ifPresent(d -> entries.add(Doc.concat(Doc.text(name + "="), d)));
+		}
+		if(entries.isEmpty()) return Optional.empty();
+		return Optional.of(Doc.group(Doc.concat(
+			Doc.text("{"),
+			Doc.nest(Doc.concat(Doc.softLine(), Doc.join(Doc.concat(Doc.text(" +"), Doc.line()), entries))),
+			Doc.softLine(),
+			Doc.text("}")
+		)));
 	}
 	
 	@Override

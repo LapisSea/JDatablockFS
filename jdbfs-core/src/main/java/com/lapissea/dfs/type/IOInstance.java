@@ -16,6 +16,7 @@ import com.lapissea.dfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.dfs.type.field.IOField;
 import com.lapissea.dfs.type.field.annotations.IONullability;
 import com.lapissea.dfs.type.field.fields.RefField;
+import com.lapissea.dfs.type.string.Doc;
 import com.lapissea.dfs.type.string.StringifySettings;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.iterableplus.Match;
@@ -318,11 +319,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		@Override
 		public String toString(){
-			return getThisStruct().instanceToString(self(), false);
+			return instanceToDoc(StringifySettings.ofDoShort(false)).render(0);
 		}
 		@Override
 		public String toShortString(){
-			return getThisStruct().instanceToString(self(), true);
+			return instanceToDoc(StringifySettings.ofDoShort(true)).render(0);
 		}
 		
 		@Override
@@ -724,14 +725,50 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	@Override
 	default String toShortString(){
-		return getThisStruct().instanceToString(self(), true);
+		return instanceToDoc(StringifySettings.ofDoShort(true)).render(0);
 	}
 	
 	default String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return toString(new StringifySettings(doShort, start, end, fieldValueSeparator, fieldSeparator));
 	}
 	default String toString(StringifySettings settings){
-		return getThisStruct().instanceToString(self(), settings);
+		return instanceToDoc(settings).render(settings.width());
+	}
+	
+	/**
+	 * Builds the width aware document form of this instance, the single source for all printing. Types that override
+	 * {@code toString} or {@code toShortString} keep that bespoke form
+	 *
+	 * @param settings controls what is shown, not where lines break
+	 */
+	default Doc instanceToDoc(StringifySettings settings){
+		var type = getClass();
+		if(settings.doShort() && CustomStringForms.hasToShortString(type)){
+			return Doc.text(toShortString());
+		}
+		if(CustomStringForms.hasToString(type)){
+			return Doc.text(toString());
+		}
+		return getThisStruct().instanceToDoc(self(), settings);
+	}
+	
+	/**
+	 * Renders this instance within {@code width} columns, breaking nested groups as needed.
+	 */
+	default String toString(StringifySettings settings, int width){
+		return instanceToDoc(settings.withWidth(width)).render(width);
+	}
+	
+	default String toString(int width){
+		return toString(StringifySettings.PRETTY, width);
+	}
+	
+	default String toPrettyString(){
+		return toString(StringifySettings.DEFAULT_WIDTH);
+	}
+	
+	default String toPrettyString(int width){
+		return toString(width);
 	}
 	
 	SELF clone();
