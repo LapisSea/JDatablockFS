@@ -22,16 +22,30 @@ import static com.lapissea.fuzz.FuzzTime.durationToBigDecimal;
 
 public final class FuzzProgress{
 	
+	private static final class Timing{
+		BigInteger ops, nanos;
+		public Timing(){
+			ops = nanos = BigInteger.ZERO;
+		}
+		void add(Timing other){
+			ops = ops.add(other.ops);
+			nanos = nanos.add(other.nanos);
+		}
+		void add(long ops, long nanos){
+			this.ops = this.ops.add(BigInteger.valueOf(ops));
+			this.nanos = this.nanos.add(BigInteger.valueOf(nanos));
+		}
+	}
+	
 	public final FuzzConfig config;
 	
-	private final    WarmupTiming              timing        = new WarmupTiming();
-	private final    Map<String, BigInteger[]> workerTimings = new LinkedHashMap<>();
-	private final    AtomicLong                executedCount = new AtomicLong();
-	private          BigInteger                elapsedSum    = BigInteger.ZERO;
-	private          Instant                   lastLog       = NanoClock.now();
-	private          Instant                   start         = NanoClock.now();
-	private volatile boolean                   hasErr;
-	private          boolean                   errMark;
+	private final    WarmupTiming        timing        = new WarmupTiming();
+	private final    Map<String, Timing> workerTimings = new LinkedHashMap<>();
+	private final    AtomicLong          executedCount = new AtomicLong();
+	private          Instant             lastLog       = NanoClock.now();
+	private          Instant             start         = NanoClock.now();
+	private volatile boolean             hasErr;
+	private          boolean             errMark;
 	
 	private final int[] incPeriods   = new int[10];
 	private       int   incPeriodPos = -1;
@@ -101,11 +115,7 @@ public final class FuzzProgress{
 	public synchronized void reportWorkerTiming(String worker, long operations, long nsDuration){
 		if(operations<0 || nsDuration<0) throw new IllegalArgumentException("Negative timing");
 		
-		var timing = workerTimings.computeIfAbsent(Objects.requireNonNull(worker),
-		                                           key -> new BigInteger[]{BigInteger.ZERO, BigInteger.ZERO});
-		
-		timing[0] = timing[0].add(BigInteger.valueOf(operations));
-		timing[1] = timing[1].add(BigInteger.valueOf(nsDuration));
+		workerTimings.computeIfAbsent(Objects.requireNonNull(worker), key -> new Timing()).add(operations, nsDuration);
 		if(worker.equals("local")){
 			reportTiming(operations, nsDuration);
 		}
@@ -113,7 +123,6 @@ public final class FuzzProgress{
 	
 	private synchronized void reportTiming(long operations, long nsDuration){
 		timing.add(operations, nsDuration);
-		elapsedSum = elapsedSum.add(BigInteger.valueOf(nsDuration));
 	}
 	public void reportResolvedSteps(long operations){
 		if(operations<0){ throw new IllegalArgumentException("Negative progress"); }
@@ -145,7 +154,7 @@ public final class FuzzProgress{
 	public synchronized void reportDone(boolean complete){
 		if(logger == null) return;
 		BigDecimal progress = complete && !errMark? BigDecimal.ONE : progress(executedCount.get());
-		logger.log(makeLogState(NanoClock.now(), start, errMark, executedCount.get(), progress, calcElapsedWork()));
+		logger.log(makeLogState(NanoClock.now(), start, errMark, executedCount.get(), progress));
 		logger.log(new LogMessage.End());
 	}
 	public synchronized void reportCustomMsg(String msg){
@@ -206,7 +215,7 @@ public final class FuzzProgress{
 			
 			BigDecimal progress = progress(count);
 			
-			var logState = makeLogState(now, start, errMark, count, progress, calcElapsedWork());
+			var logState = makeLogState(now, start, errMark, count, progress);
 			logger.log(logState);
 		}
 	}
@@ -218,9 +227,6 @@ public final class FuzzProgress{
 		                 .divide(BigDecimal.valueOf(totalIterations()), MathContext.DECIMAL128)
 		                 .min(BigDecimal.ONE);
 	}
-	private BigInteger calcElapsedWork(){
-		return elapsedSum;
-	}
 	private static Optional<Duration> estimatedDuration(BigDecimal nanos){
 		try{
 			return some(bigToDuration(nanos));
@@ -229,7 +235,7 @@ public final class FuzzProgress{
 		}
 	}
 	
-	private LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress, BigInteger elapsedWork){
+	private LogMessage.State makeLogState(Instant now, Instant start, boolean errMark, long count, BigDecimal progress){
 		var elapsedTime = Duration.between(start, now);
 		
 		double     perOp         = timing.nanosPerOp();
@@ -239,13 +245,15 @@ public final class FuzzProgress{
 		BigDecimal timeRemaining = null, totalTimeEstimated = null;
 		
 		if(estimate){
+			var total = new Timing();
+			for(var worker : workerTimings.values()){
+				total.add(worker);
+			}
 			BigDecimal correction;
-			if(!hasData || elapsedWork.signum() == 0){
+			if(total.ops.signum() == 0 || total.nanos.signum() == 0){
 				correction = BigDecimal.ONE;
 			}else{
-				correction = BigDecimal.valueOf(perOp)
-				                       .multiply(BigDecimal.valueOf(count))
-				                       .divide(new BigDecimal(elapsedWork), MathContext.DECIMAL64);
+				correction = BigDecimal.valueOf(count).divide(new BigDecimal(total.ops), MathContext.DECIMAL64);
 			}
 			timeRemaining = elapsedTimeNs.multiply(BigDecimal.ONE.divide(progress, MathContext.DECIMAL64).subtract(BigDecimal.ONE))
 			                             .multiply(correction)
@@ -257,10 +265,10 @@ public final class FuzzProgress{
 		workerTimings.forEach((name, timing) -> {
 			if(!name.equals("local")){
 				double value;
-				if(timing[0].signum() == 0) value = Double.NaN;
+				if(timing.ops.signum() == 0) value = Double.NaN;
 				else{
-					value = new BigDecimal(timing[1])
-						        .divide(new BigDecimal(timing[0]), MathContext.DECIMAL64)
+					value = new BigDecimal(timing.nanos)
+						        .divide(new BigDecimal(timing.ops), MathContext.DECIMAL64)
 						        .doubleValue();
 				}
 				workers.put(name, value);

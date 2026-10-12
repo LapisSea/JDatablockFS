@@ -5,7 +5,6 @@ import org.testng.annotations.Test;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.math.MathContext;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -39,13 +38,13 @@ public final class FuzzProgressTests{
 			
 			report.invoke(instance, Math.toIntExact(count), 1_000_000_000L);
 			
-			var method = type.getDeclaredMethod("makeLogState", Instant.class, Instant.class,
-			                                    boolean.class, long.class, BigDecimal.class, BigInteger.class);
+			var method = type.getDeclaredMethod(
+				"makeLogState", Instant.class, Instant.class, boolean.class, long.class, BigDecimal.class);
 			method.setAccessible(true);
 			Object result;
 			try{
-				result = method.invoke(instance, Instant.EPOCH.plusSeconds(2000), Instant.EPOCH,
-				                       true, count, progress, BigInteger.valueOf(1_000_000_000));
+				result = method.invoke(
+					instance, Instant.EPOCH.plusSeconds(2000), Instant.EPOCH, true, count, progress);
 			}catch(InvocationTargetException e){
 				if(e.getCause() instanceof Exception cause) throw cause;
 				throw e;
