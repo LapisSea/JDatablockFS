@@ -24,7 +24,7 @@ public interface FuzzingStateEnv<State, Action, Err extends Throwable>{
 			return new JustRandom<>(){
 				@Override
 				public void applyAction(RandomGenerator rawRandom, long actionIndex, Action action, RunMark mark) throws Err{
-					rAction.applyAction(rawRandom, actionIndex, mark);
+					rAction.applyAction(rawRandom instanceof SimpleRandom state? state.derive(actionIndex) : rawRandom, actionIndex, mark);
 				}
 			};
 		}
@@ -33,7 +33,7 @@ public interface FuzzingStateEnv<State, Action, Err extends Throwable>{
 			return new JustRandom<>(){
 				@Override
 				public void applyAction(RandomGenerator rawRandom, long actionIndex, Action action, RunMark mark) throws Err{
-					rAction.applyAction(rawRandom, actionIndex, mark);
+					rAction.applyAction(rawRandom instanceof SimpleRandom state? state.derive(actionIndex) : rawRandom, actionIndex, mark);
 				}
 				@Override
 				public void prepareRun(){

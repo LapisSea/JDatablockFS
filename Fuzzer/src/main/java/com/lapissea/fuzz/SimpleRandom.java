@@ -18,6 +18,15 @@ final class SimpleRandom implements RandomGenerator, Serializable{
 	
 	private long seed;
 	
+	private static long mix(long z){
+		z = (z^(z >>> 33))*0xff51afd7ed558ccdL;
+		z = (z^(z >>> 33))*0xc4ceb9fe1a85ec53L;
+		return z^(z >>> 33);
+	}
+	SimpleRandom derive(long index){
+		return new SimpleRandom(seed^mix(index));
+	}
+	
 	private int next(int bits){
 		var s = seed = (seed*MULTIPLIER + ADDEND)&MASK;
 		return (int)(s >>> (48 - bits));

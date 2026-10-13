@@ -257,7 +257,12 @@ public final class TestUtils{
 		int sequenceLength = (int)Math.max(1, Math.min(1024, totalTasks/Math.max(256L, conf.maxWorkers()*16L)));
 		var fails          = runner.run(conf, name.hashCode(), totalTasks, sequenceLength);
 		if(fails.isEmpty()) return;
-		throw new RuntimeException("Failed fuzzing action", fails.getFirst().e());
+		var fail = fails.getFirst();
+		var mark = fail.mark();
+		if(!mark.hasAction()){
+			throw new RuntimeException("Failed fuzzing create at sequence " + mark.sequence(), fail.e());
+		}
+		throw new RuntimeException("Failed fuzzing action at index " + mark.action() + " (sequence " + mark.sequence() + ")", fail.e());
 	}
 	
 	
