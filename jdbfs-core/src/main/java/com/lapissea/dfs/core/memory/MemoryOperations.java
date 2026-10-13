@@ -412,18 +412,25 @@ public final class MemoryOperations{
 	}
 	
 	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
-		if(target.getNextSize() == NumberSize.VOID){
+		var nextSize = target.getNextSize();
+		if(nextSize == NumberSize.VOID){
 			return 0;
 		}
 		
 		boolean isChain = first != target;
 		
 		var toPin = AllocateTicket.bytes(toAllocate)
-		                          .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
+		                          .withApproval(Chunk.sizeFitsPointer(nextSize))
 		                          .withPositionMagnet(target)
 		                          .withExplicitNextSize(calcExplicitNextSize(manager, isChain))
 		                          .submit(manager);
 		if(toPin == null) return 0;
+		// Allocating the pin can re-enter the allocator and change target (for example compressing
+		// its next pointer). Only link it when target can still hold the pointer, otherwise discard it.
+		if(!target.getNextSize().canFit(toPin.getPtr())){
+			toPin.freeChaining();
+			return 0;
+		}
 		target.modifyAndSave(c -> {
 			try{
 				c.setNextPtr(toPin.getPtr());
@@ -450,7 +457,7 @@ public final class MemoryOperations{
 			var ch = iter.previous();
 			
 			Chunk allocated;
-			if(ch.getNextSize() == NumberSize.VOID) allocated = null;
+			if(!ch.hasNextPtr()) allocated = null;
 			else allocated = AllocateTicket.bytes(toAllocate + toCopy)
 			                               .withPositionMagnet(ch)
 			                               .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
@@ -726,7 +733,7 @@ public final class MemoryOperations{
 		chunk.writeHeader();
 		ch.writeHeader();
 		
-		context.getChunkCache().add(chunk);
+		context.getChunkCache().addReplacing(chunk);
 		return chunk;
 	}
 	private static ChunkBuilder chBuilderFromTicketSafeSize(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
@@ -755,7 +762,7 @@ public final class MemoryOperations{
 		if(src.getIOSize() != end){
 			correctIOsize(src, end);
 		}
-		context.getChunkCache().add(chunk);
+		context.getChunkCache().addReplacing(chunk);
 		return chunk;
 	}
 	private static void correctIOsize(IOInterface src, long end) throws IOException{
@@ -801,18 +808,23 @@ public final class MemoryOperations{
 			
 			var remaining = size - toAllocate;
 			if(allowRemove && remaining<16){
-				var newCapacity = target.getCapacity() + size;
+				var absorbEnd   = freeChunk.dataEnd();
+				var newCapacity = absorbEnd - target.dataStart();
 				
 				if(!target.getBodyNumSize().canFit(newCapacity)){
 					return 0;
 				}
 				
 				iter.ioRemove();
+				// ioRemove can re-enter the allocator and shrink target's header (compressing a next pointer), could move dataStart.
+				// Need to recompute capacity to catch this edge case.
+				newCapacity = absorbEnd - target.dataStart();
 				try{
 					target.setCapacity(newCapacity);
 				}catch(OutOfBitDepth e){
 					throw new ShouldNeverHappenError(e);
 				}
+				assert target.dataEnd() == absorbEnd : target + ": " + target.dataEnd() + " != " + absorbEnd;
 				target.syncStruct();
 				
 				freeChunk.destroy(false);
@@ -828,13 +840,15 @@ public final class MemoryOperations{
 				var chCap = size - ch.getHeaderSize() - safeToAllocate;
 				
 				if(chCap<0 || !ch.setCapacityAndModifyNumSize(chCap) || ch.totalSize()<Chunk.minSafeSize()){
-					newCapacity = target.getCapacity() + size;
+					var absorbEnd = freeChunk.dataEnd();
+					newCapacity = absorbEnd - target.dataStart();
 					if(!target.getBodyNumSize().canFit(newCapacity)){
 						continue freeIter;
 					}
 					try(var ignored = provider.getSource().startTransaction()){
 						iter.ioRemove();
-						
+						// ioRemove can re-enter the allocator and move dataStart, so recompute here.
+						newCapacity = absorbEnd - target.dataStart();
 						try{
 							target.setCapacity(newCapacity);
 						}catch(OutOfBitDepth e){
@@ -861,6 +875,7 @@ public final class MemoryOperations{
 			// We solve this by first removing the chunk, so the freeing mechanism is not aware of it.
 			// We can then finally add the chunk back by using the free mechanism
 			var growEdgecase = NumberSize.bySize(ch.getPtr()).greaterThan(NumberSize.bySize(freePtr));
+			var absorbEnd    = freePtr.getValue() + safeToAllocate;
 			
 			try(var ignored = provider.getSource().startTransaction()){
 				if(growEdgecase){
@@ -868,10 +883,11 @@ public final class MemoryOperations{
 				}
 				
 				ch.writeHeader();
-				provider.getChunkCache().add(ch);
+				provider.getChunkCache().addReplacing(ch);
 				
 				try{
-					target.setCapacity(newCapacity);
+					// Recompute after any removal, it can move target's dataStart
+					target.setCapacity(absorbEnd - target.dataStart());
 				}catch(OutOfBitDepth e){
 					throw new ShouldNeverHappenError(e);
 				}

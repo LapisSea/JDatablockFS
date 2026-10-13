@@ -45,6 +45,21 @@ public final class ChunkCache{
 		}
 	}
 	
+	
+	/**
+	 * Registers a written chunk over a reused pointer with a previous chunk no longer exists at it.
+	 * Difference with {@link #add(Chunk)} is that a live previous entry is replaced because the pointer was repurposed.
+	 */
+	public synchronized void addReplacing(Chunk chunk){
+		var prev = data.put(chunk.getPtr(), box(chunk));
+		chunk.setReal(true);
+		if(prev != null){
+			var old = prev.get();
+			if(old != null) old.setReal(false);
+			prev.inData = false;
+		}
+	}
+	
 	public synchronized void add(Chunk chunk){
 		Objects.requireNonNull(chunk);
 		poolRefQueue();
@@ -59,6 +74,7 @@ public final class ChunkCache{
 	}
 	private void add0(Chunk chunk){
 		var existing = data.put(chunk.getPtr(), box(chunk));
+		chunk.setReal(true);
 		if(existing != null){
 			handleExisting(existing);
 		}
@@ -106,6 +122,7 @@ public final class ChunkCache{
 		}
 	}
 	private void rem(Chunk chunk){
+		chunk.setReal(false);
 		chunk.getDataProvider().getUnmanagedRegistry().destroyed(chunk);
 		if(DEBUG_VALIDATION) validateDestroyed(chunk);
 		var rem    = data.remove(chunk.getPtr());
@@ -175,20 +192,35 @@ public final class ChunkCache{
 		for(Chunk chunk : destroyed){
 			if(chunk.createdInTransaction(epoch)) continue;
 			var prev = data.put(chunk.getPtr(), box(chunk));
+			chunk.setReal(true);
 			if(prev != null) prev.inData = false;
 		}
 		var it = data.entrySet().iterator();
 		while(it.hasNext()){
 			var ent   = it.next();
 			var chunk = ent.getValue().get();
-			if(chunk == null || chunk.createdInTransaction(epoch)){
+			// A rolled-back free/merge can leave an entry whose pointer is no longer a chunk.
+			// Evict those rather than failing the rollback on a slot that no longer exists.
+			if(chunk == null || chunk.createdInTransaction(epoch) || !Chunk.isChunkValidAt(chunk.getDataProvider(), chunk.getPtr())){
+				if(chunk != null) chunk.setReal(false);
 				ent.getValue().inData = false;
 				it.remove();
-			}else chunk.readHeader();
+			}else{
+				chunk.readHeader();
+			}
 		}
 	}
 	
 	private Entry box(Chunk chunk){
 		return new Entry(chunk, refQueue);
+	}
+	
+	public synchronized void remove(ChunkPointer ptr){
+		var e = data.remove(ptr);
+		if(e != null){
+			var chunk = e.get();
+			if(chunk != null) chunk.setReal(false);
+			e.inData = false;
+		}
 	}
 }

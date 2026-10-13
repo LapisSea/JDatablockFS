@@ -334,7 +334,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	private int     headerSize;
 	private boolean dirty, reading;
-	private Chunk nextCache;
+	
+	private boolean real = true;
+	private Chunk   nextCache;
 	
 	private Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr){
 		super(STRUCT);
@@ -453,6 +455,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}finally{
 			reading = false;
 		}
+		dirty = false;
+		nextCache = null;
 		refreshHeaderSize();
 	}
 	
@@ -683,12 +687,14 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	@Nullable
 	public Chunk next() throws IOException{
-		if(nextCache == null){
-			if(!hasNextPtr()) return null;
-			nextCache = provider.getChunk(getNextPtr());
-		}
+		if(!hasNextPtr()) return null;
+		var cached = nextCache;
+		// The cache is the source of truth. A cached next that the cache has drops or replaced is dead, so  need to refresh
+		if(cached != null && cached.real) return cached;
+		nextCache = provider.getChunk(getNextPtr());
 		return nextCache;
 	}
+	void setReal(boolean real){ this.real = real; }
 	
 	public void clearAndCompressHeader(){
 		try{

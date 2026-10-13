@@ -307,12 +307,14 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	}
 	
 	private void newMainSet(long size) throws IOException{
-		mainSet = new BucketSet<>();
-		
 		var bType   = ((IOType.RawAndArg)getTypeDef()).withRaw(BucketSet.class);
 		var generic = bType.generic(getDataProvider().getTypeDb());
 		var ctx     = GenericContext.of(BucketSet.class, generic);
-		mainSet.init(getDataProvider(), ctx, size);
+		// set.init() allocates the data reference, and that allocation can trigger a memory walk.
+		// Need to be careful to only reference objects once they are fully constructed...
+		var set = new BucketSet<K, V>();
+		set.init(getDataProvider(), ctx, size);
+		mainSet = set;
 	}
 	
 	private static IOField<BucketEntry<Object, Object>, ?> keyVar;

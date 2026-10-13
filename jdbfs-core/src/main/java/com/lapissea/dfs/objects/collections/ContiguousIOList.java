@@ -15,7 +15,6 @@ import com.lapissea.dfs.io.impl.MemoryData;
 import com.lapissea.dfs.io.instancepipe.FieldDependency;
 import com.lapissea.dfs.io.instancepipe.ObjectPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
-import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.NumberSize;
 import com.lapissea.dfs.objects.Reference;
@@ -64,7 +63,6 @@ import java.util.RandomAccess;
 import java.util.Set;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
-import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.INSTANCE;
 import static com.lapissea.dfs.type.TypeCheck.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;
@@ -779,13 +777,24 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 				var newLastCapacity = last.getCapacity() - freeSpace;
 				if(freeSpace>=Chunk.minSafeSize() && newLastCapacity>=Chunk.minSafeSize()){
 					var ptr      = ChunkPointer.of(last.dataEnd() - freeSpace);
+					
 					var builder  = new ChunkBuilder(getDataProvider(), ptr).withCapacity(freeSpace);
 					var tmpSplit = builder.create();
-					var splitOne = builder.withExplicitBodyNumSize(tmpSplit.getBodyNumSize()).withCapacity(freeSpace - tmpSplit.getHeaderSize()).create();
+					var splitOne = builder.withExplicitBodyNumSize(tmpSplit.getBodyNumSize())
+					                      .withCapacity(freeSpace - tmpSplit.getHeaderSize())
+					                      .create();
+					
 					if(splitOne.dataEnd() != last.dataEnd()){
 						throw new IllegalStateException("Illegal list capacity free split");
 					}
+					
+					// The freed tail could reuse a pointer whose cached chunk was freed and collapsed earlier.
+					// Need to replace that entry so the cache reflects the chunk now on disk.
+					var cache = getDataProvider().getChunkCache();
+					cache.remove(ptr);
 					splitOne.writeHeader();
+					cache.add(splitOne);
+					
 					try{
 						last.setCapacity(last.getCapacity() - freeSpace);
 						last.syncStruct();

@@ -19,7 +19,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	
 	@Override
 	public boolean acceptsType(IOType requested){ return getTypeDef().equals(((IOType.RawAndArg)requested).withArgs(IOType.TypeRaw.OBJ)); }
-
+	
 	public IOHashSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, ((IOType.RawAndArg)typeDef).withArgs(IOType.TypeRaw.OBJ));
 		
@@ -138,7 +138,7 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 			var ctx = getGenerics().argAsContext("T");
 			@SuppressWarnings("unchecked")
 			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, ctx, new ValueStorage.StorageRule.Default());
-			var magnet = OptionalLong.of(data.getPointer().getValue());
+			var magnet            = OptionalLong.of(data.getPointer().getValue());
 			var transactionResult = IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), type, provider, magnet);
 			ignored.commit();
 			return transactionResult;
@@ -167,13 +167,23 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	@Override
 	public void clear() throws IOException{
 		if(isEmpty()) return;
-		deltaSize(-size());
-		var oldData = data;
-		data = null;
-		allocateNulls();
-		data.addMultipleNew(2);
-		writeManagedFields();
-		oldData.free();
+		var provider = getDataProvider();
+		try(var ignored = provider.getSource().startTransaction()){
+			var oldSize = size();
+			var b2      = data.getPointer().dereference(provider).chainLength()*2;
+			var chunk = AllocateTicket.bytes(b2)
+			                          .withPositionMagnet(getPointer().getValue())
+			                          .submit(provider);
+			var oldData = data;
+			var newData = new ContiguousIOList<IONode<T>>(provider, chunk, oldData.getTypeDef());
+			newData.addMultipleNew(2);
+			
+			data = newData;
+			deltaSize(-oldSize);
+			writeManagedFields();
+			oldData.free();
+			ignored.commit();
+		}
 	}
 	
 	@Override
