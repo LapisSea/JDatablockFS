@@ -10,6 +10,7 @@ import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
@@ -195,7 +196,11 @@ public final class MemoryData extends CursorIOData{
 	@Override
 	public MemoryData asReadOnly(){
 		if(isReadOnly()) return this;
-		return builder().withRaw(fileData).withUsedLength((int)used).asReadOnly().build();
+		try(var ioAccess = lockIO()){
+			return builder().withRaw(readAll()).asReadOnly().build();
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
 	}
 	
 }

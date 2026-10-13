@@ -17,6 +17,9 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 	@IOValue
 	private ContiguousIOList<IONode<T>> data;
 	
+	@Override
+	public boolean acceptsType(IOType requested){ return getTypeDef().equals(((IOType.RawAndArg)requested).withArgs(IOType.TypeRaw.OBJ)); }
+
 	public IOHashSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, ((IOType.RawAndArg)typeDef).withArgs(IOType.TypeRaw.OBJ));
 		
@@ -26,7 +29,8 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 			writeManagedFields();
 		}
 		
-		readManagedFields();
+		loadState();
+		finishConstruction();
 	}
 	
 	private static <T> BucketResult<T> find(IOList<IONode<T>> data, T value) throws IOException{
@@ -79,16 +83,17 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		
 		var node = allocByValue(value);
 		
-		try(var ignored = data.getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = data.getDataProvider().getSource().startTransaction()){
 			applyAdd(data, place, node);
 			deltaSize(1);
+			ignored.commit();
 		}
 		return true;
 	}
 	
 	private void grow() throws IOException{
 		var provider = getDataProvider();
-		try(var ignored = provider.getSource().openIOTransaction()){
+		try(var ignored = provider.getSource().startTransaction()){
 			
 			var b2 = data.getPointer().dereference(provider).chainLength()*2;
 			var chunk = AllocateTicket.bytes(b2)
@@ -119,12 +124,13 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 			writeManagedFields();
 			oldData.clear();
 			oldData.free();
+			ignored.commit();
 		}
 	}
 	
 	private IONode<T> allocByValue(T value) throws IOException{
 		var provider = getDataProvider();
-		try(var ignored = provider.getSource().openIOTransaction()){
+		try(var ignored = provider.getSource().startTransaction()){
 			var genericType = IOType.getArg(getTypeDef(), 0);
 			var type        = IOType.of(IONode.class, genericType);
 			provider.getTypeDb().toID(type);
@@ -133,7 +139,9 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 			@SuppressWarnings("unchecked")
 			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, ctx, new ValueStorage.StorageRule.Default());
 			var magnet = OptionalLong.of(data.getPointer().getValue());
-			return IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), type, provider, magnet);
+			var transactionResult = IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), type, provider, magnet);
+			ignored.commit();
+			return transactionResult;
 		}
 	}
 	
@@ -142,13 +150,14 @@ public final class IOHashSet<T> extends UnmanagedIOSet<T>{
 		var place = find(data, value);
 		if(!(place instanceof BucketResult.EqualsResult(var index, var prev, var node))) return false;
 		
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = getDataProvider().getSource().startTransaction()){
 			if(prev != null){
 				prev.setNext(node.getNext());
 			}else{
 				data.set(index, node.getNext());
 			}
 			deltaSize(-1);
+			ignored.commit();
 		}
 		node.setNext(null);
 		node.free();

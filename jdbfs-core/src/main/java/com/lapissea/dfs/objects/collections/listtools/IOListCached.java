@@ -1,6 +1,7 @@
 package com.lapissea.dfs.objects.collections.listtools;
 
 import com.lapissea.dfs.config.GlobalConfig;
+import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.objects.Stringify;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOIterator;
@@ -274,12 +275,22 @@ public final class IOListCached<T> implements IOList<T>, Stringify, Wrapper<IOLi
 		this.data = Objects.requireNonNull(data);
 		this.maxCacheSize = maxCacheSize;
 		this.maxLinearCache = maxLinearCache;
+		
+		Object origin = data;
+		while(origin instanceof Wrapper<?> wrapper){
+			origin = wrapper.getWrappedObj();
+		}
+		
+		if(origin instanceof DataProvider.Holder holder){
+			holder.getDataProvider().getUnmanagedRegistry().registerCache(this, value -> ((IOListCached<?>)value).clearCache());
+		}
+		
 		if(maxCacheSize<maxLinearCache){
 			throw new IllegalArgumentException("maxCacheSize < maxLinearCache (" + maxCacheSize + " < " + maxLinearCache + ")");
 		}
 	}
 	
-	private void clearCache(){ cache = new CacheLayer.Array<>(); }
+	public void clearCache(){ cache = new CacheLayer.Array<>(); }
 	private void checkOpt(){
 //		try{
 //			checkCache();

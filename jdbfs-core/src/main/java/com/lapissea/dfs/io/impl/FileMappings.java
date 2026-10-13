@@ -32,15 +32,17 @@ final class FileMappings implements Closeable{
 	private       boolean     closed;
 	
 	private final boolean readOnly;
+	private final boolean retainMappings;
 	private       long    size;
 	
 	private       Reference<MappedByteBuffer>[]          mappings = new Reference[1];
 	private       Map<Long, Reference<MappedByteBuffer>> largeMappings;//null by default as most of the time it will never be used
 	private final ReadWriteClosableLock                  lock     = ReadWriteClosableLock.reentrant();
 	
-	FileMappings(FileChannel fileChannel, boolean readOnly) throws IOException{
+	FileMappings(FileChannel fileChannel, boolean readOnly, boolean retainMappings) throws IOException{
 		this.fileChannel = fileChannel;
 		this.readOnly = readOnly;
+		this.retainMappings = retainMappings;
 		size = fileChannel.size();
 	}
 	
@@ -60,6 +62,15 @@ final class FileMappings implements Closeable{
 		var lm = largeMappings;
 		if(lm == null) lm = largeMappings = new HashMap<>();
 		lm.put(index, ref);
+	}
+	
+	public void force() throws IOException{
+		try(var ignored = lock.write()){
+			checkClosed();
+			// Channel.force alone does not promise to flush writes through mappings...
+			iterateMappings(MappedByteBuffer::force);
+			fileChannel.force(true);
+		}
 	}
 	
 	public long fileSize(){
@@ -226,7 +237,24 @@ final class FileMappings implements Closeable{
 	private static MappedByteBuffer unwrap(Reference<MappedByteBuffer> wrapped){
 		return wrapped == null? null : wrapped.get();
 	}
-	private static Reference<MappedByteBuffer> wrap(MappedByteBuffer raw){
+	
+	private static final class RetainedMapping extends WeakReference<MappedByteBuffer>{
+		
+		private final MappedByteBuffer mapping;
+		
+		RetainedMapping(MappedByteBuffer mapping){
+			super(mapping);
+			this.mapping = mapping;
+		}
+		
+		@Override
+		public MappedByteBuffer get(){
+			return mapping;
+		}
+	}
+	private Reference<MappedByteBuffer> wrap(MappedByteBuffer raw){
+		// Retain durable mappings until unmap so force() covers every dirty mapping
+		if(retainMappings) return new RetainedMapping(raw);
 		return new WeakReference<>(raw);
 	}
 }

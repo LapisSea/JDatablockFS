@@ -36,8 +36,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
@@ -264,9 +262,10 @@ public final class MemoryOperations{
 	private static void mergeFreeChunks(Chunk prev, Chunk next) throws IOException{
 		prepareFreeChunkMerge(prev, next);
 		if(prev.dataStart()>next.getPtr().getValue()){
-			try(var ignore = next.getDataProvider().getSource().openIOTransaction()){
+			try(var ignore = next.getDataProvider().getSource().startTransaction()){
 				next.destroy(true);
 				prev.syncStruct();
+				ignore.commit();
 			}
 		}else{
 			prev.syncStruct();
@@ -318,77 +317,61 @@ public final class MemoryOperations{
 		}
 		
 		var purgeAccidental  = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
-		var purgeTransaction = purgeAccidental != FreedMemoryPurgeType.NO_OP? provider.getSource().openIOTransaction() : null;
+		var purgeTransaction = purgeAccidental != FreedMemoryPurgeType.NO_OP? provider.getSource().startTransaction() : null;
 		
-		if(!toDestroy.isEmpty()){
-			byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    destroyChunks = Iters.from(toDestroy).toModList(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize()));
-			
-			if(purgeTransaction != null){
-				try(var io = provider.getSource().io()){
-					io.writeAtOffsets(writeChunks);
-					io.writeAtOffsets(destroyChunks);
+		try{
+			if(!toDestroy.isEmpty()){
+				byte[] empty         = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
+				var    destroyChunks = Iters.from(toDestroy).toModList(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize()));
+				
+				if(purgeTransaction != null){
+					try(var io = provider.getSource().io()){
+						io.writeAtOffsets(writeChunks);
+						io.writeAtOffsets(destroyChunks);
+					}
+				}else{
+					writeChunks.addAll(destroyChunks);
+					writeChunks.sort(Comparator.naturalOrder());
+					try(var io = provider.getSource().io()){
+						io.writeAtOffsets(writeChunks);
+					}
 				}
+				
+				provider.getChunkCache().notifyDestroyed(toDestroy);
 			}else{
-				writeChunks.addAll(destroyChunks);
-				writeChunks.sort(Comparator.naturalOrder());
 				try(var io = provider.getSource().io()){
 					io.writeAtOffsets(writeChunks);
 				}
 			}
-			
-			provider.getChunkCache().notifyDestroyed(toDestroy);
-		}else{
-			try(var io = provider.getSource().io()){
-				io.writeAtOffsets(writeChunks);
-			}
-		}
-		ExecutorService service = null;
-		if(purgeAccidental != FreedMemoryPurgeType.NO_OP) try{
-			for(Chunk chunk : oks){
-				switch(purgeAccidental){
-					case ONLY_HEADER_BYTES -> {
-						if(chunk.getCapacity()>3000){
-							if(service == null) service = Executors.newVirtualThreadPerTaskExecutor();
-							for(long off = 0; off<=chunk.getCapacity(); off += 512){
-								var rem = Math.min(chunk.getCapacity() - off, 512 + Chunk.minSafeSize());
-								var pos = chunk.dataStart() + off;
-								
-								service.execute(() -> {
-									try{
-										purgePossibleChunkHeaders(chunk.getDataProvider(), pos, rem);
-									}catch(IOException e){
-										throw new RuntimeException(e);
-									}
-								});
-							}
-						}else{
+			if(purgeAccidental != FreedMemoryPurgeType.NO_OP){
+				for(Chunk chunk : oks){
+					switch(purgeAccidental){
+						case ONLY_HEADER_BYTES -> {
 							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 						}
-					}
-					case ZERO_OUT -> {
-						try(var io = chunk.getDataProvider().getSource().io()){
-							var start = chunk.dataStart();
-							if(io.getSize()>=start){
-								io.setPos(start);
-								if(io.getPos() != start){
-									throw new IOException("Failed to zero out " + chunk + " : " + io.getPos() + " -> " + start + " size: " + io.getSize());
+						case ZERO_OUT -> {
+							try(var io = chunk.getDataProvider().getSource().io()){
+								var start = chunk.dataStart();
+								if(io.getSize()>=start){
+									io.setPos(start);
+									if(io.getPos() != start){
+										throw new IOException("Failed to zero out " + chunk + " : " + io.getPos() + " -> " + start + " size: " + io.getSize());
+									}
+									IOUtils.zeroFill(io, chunk.getCapacity());
 								}
-								IOUtils.zeroFill(io, chunk.getCapacity());
 							}
 						}
 					}
-				}
-				if(service == null && purgeTransaction != null &&
-				   (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>BATCH_BYTES){
-					purgeTransaction.close();
-					purgeTransaction = provider.getSource().openIOTransaction();
+					if(purgeTransaction != null &&
+					   (purgeTransaction.getTotalBytes() + purgeTransaction.getChunkCount()*20L)>BATCH_BYTES){
+						purgeTransaction.commit();
+						purgeTransaction.close();
+						purgeTransaction = provider.getSource().startTransaction();
+					}
 				}
 			}
+			if(purgeTransaction != null) purgeTransaction.commit();
 		}finally{
-			if(service != null){
-				service.close();
-			}
 			if(purgeTransaction != null) purgeTransaction.close();
 		}
 		
@@ -611,9 +594,10 @@ public final class MemoryOperations{
 		
 		assert dataEnd == target.dataEnd() : target + ": " + dataEnd + "!=" + target.dataEnd();
 		
-		try(var ignored = source.openIOTransaction()){
+		try(var ignored = source.startTransaction()){
 			target.syncStruct();
 			source.write(target.dataStart(), false, toShift);
+			ignored.commit();
 		}
 		
 		var moved = 0L;
@@ -760,9 +744,12 @@ public final class MemoryOperations{
 		
 		if(dryRun) return chunk;
 		
-		try(var ignore = src.openIOTransaction(); var io = src.ioAt(chunk.getPtr().getValue())){
-			chunk.writeHeader(io);
-			IOUtils.zeroFill(io, chunk.getCapacity());
+		try(var ignore = src.startTransaction()){
+			try(var io = src.ioAt(chunk.getPtr().getValue())){
+				chunk.writeHeader(io);
+				IOUtils.zeroFill(io, chunk.getCapacity());
+			}
+			ignore.commit();
 		}
 		var end = chunk.dataEnd();
 		if(src.getIOSize() != end){
@@ -845,7 +832,7 @@ public final class MemoryOperations{
 					if(!target.getBodyNumSize().canFit(newCapacity)){
 						continue freeIter;
 					}
-					try(var ignored = provider.getSource().openIOTransaction()){
+					try(var ignored = provider.getSource().startTransaction()){
 						iter.ioRemove();
 						
 						try{
@@ -856,6 +843,7 @@ public final class MemoryOperations{
 						target.syncStruct();
 						
 						freeChunk.destroy(false);
+						ignored.commit();
 					}
 					return size;
 				}
@@ -874,7 +862,7 @@ public final class MemoryOperations{
 			// We can then finally add the chunk back by using the free mechanism
 			var growEdgecase = NumberSize.bySize(ch.getPtr()).greaterThan(NumberSize.bySize(freePtr));
 			
-			try(var ignored = provider.getSource().openIOTransaction()){
+			try(var ignored = provider.getSource().startTransaction()){
 				if(growEdgecase){
 					iter.ioRemove();
 				}
@@ -894,7 +882,7 @@ public final class MemoryOperations{
 				}else{
 					iter.ioSet(ch.getPtr());
 				}
-				
+				ignored.commit();
 			}
 			
 			

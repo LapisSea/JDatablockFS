@@ -1,5 +1,6 @@
 package com.lapissea.dfs.type.field;
 
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.exceptions.MalformedPointer;
 import com.lapissea.dfs.io.IOInterface;
@@ -69,10 +70,13 @@ public final class VaryingSize implements Stringify{
 	
 	private static IOInterface makeFakeData(){
 		return new IOInterface(){
+			private final UnmanagedRegistry registry = new UnmanagedRegistry(this);
+			@Override
+			public UnmanagedRegistry getUnmanagedRegistry(){ return registry; }
 			@Override
 			public boolean isReadOnly(){ return false; }
 			@Override
-			public IOTransaction openIOTransaction(){ return IOTransaction.NOOP; }
+			public IOTransaction startTransaction(){ return IOTransaction.NOOP; }
 			@Override
 			public RandomIO io(){
 				return new RandomIO(){

@@ -237,7 +237,8 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		if(!readOnly && isSelfDataEmpty()){
 			writeManagedFields();
 		}
-		readManagedFields();
+		loadState();
+		finishConstruction();
 	}
 	
 	private void putToSet(BucketSet<K, V> dest, int keyHash, BucketEntry<K, V> entry) throws IOException{
@@ -245,10 +246,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			case EmptyIndex(var index) -> {
 				var node = allocNewNode(entry, dest.data.magentPos(index));
 				
-				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+				try(var ignore = getDataProvider().getSource().startTransaction()){
 					dest.data.set(index, node);
 					dest.deltaCount(1);
 					writeManagedFields();
+					ignore.commit();
 				}
 			}
 			case EqualsResult<BucketEntry<K, V>> place -> {
@@ -256,10 +258,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			case TailNode(var node) -> {
 				var nextNode = allocNewNode(entry, node.getPointer().getValue());
-				try(var ignore = getDataProvider().getSource().openIOTransaction()){
+				try(var ignore = getDataProvider().getSource().startTransaction()){
 					node.setNext(nextNode);
 					dest.deltaCount(1);
 					writeManagedFields();
+					ignore.commit();
 				}
 			}
 		}
@@ -268,7 +271,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		if(!(set.find(keyHash, key) instanceof EqualsResult(var index, var prev, var node))){
 			return false;
 		}
-		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+		try(var ignore = getDataProvider().getSource().startTransaction()){
 			var next = node.getNext();
 			if(prev == null){
 				set.data.set(index, next);
@@ -277,6 +280,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			set.deltaCount(-1);
 			writeManagedFields();
+			ignore.commit();
 		}
 		node.setNext(null);
 		node.free();
@@ -435,15 +439,16 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 	private long reconcile(long count) throws IOException{
 		Unmanaged<?> toFree = null;
 		
-		var  transaction  = getDataProvider().getSource().openIOTransaction();
+		var  transaction  = getDataProvider().getSource().startTransaction();
 		long removedTotal = 0;
 		try{
 			var remaining = count;
 			int acum      = 0;
 			while(remaining>0 && !amortizedSet.data.isEmpty()){
 				if(acum>64){
+					transaction.commit();
 					transaction.close();
-					transaction = getDataProvider().getSource().openIOTransaction();
+					transaction = getDataProvider().getSource().startTransaction();
 					acum = 0;
 				}
 				var removed = amortizedSet.transferTo(mainSet, (int)Math.min(Integer.MAX_VALUE, remaining));
@@ -460,6 +465,7 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 				toFree = data;
 			}
 			writeManagedFields();
+			transaction.commit();
 			return removedTotal;
 		}finally{
 			transaction.close();
@@ -511,11 +517,12 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 			}
 			assert amortizedSet == null;
 		}
-		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+		try(var ignore = getDataProvider().getSource().startTransaction()){
 			amortizedSet = mainSet;
 			newMainSet(newSize);
 			writeManagedFields();
 			reconcile((int)Math.max(2, Math.min(10, amortizedSet.capacity/8)));
+			ignore.commit();
 		}
 	}
 	
@@ -616,10 +623,11 @@ public class HashIOMap<K, V> extends UnmanagedIOMap<K, V>{
 		var as = amortizedSet;
 		var ms = mainSet;
 		
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = getDataProvider().getSource().startTransaction()){
 			amortizedSet = null;
 			mainSet = null;
 			writeManagedFields();
+			ignored.commit();
 		}
 		
 		if(as != null){

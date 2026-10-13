@@ -12,6 +12,7 @@ import com.lapissea.dfs.logging.Log;
 import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.Wrapper;
 import com.lapissea.dfs.objects.collections.IOList;
+import com.lapissea.dfs.objects.collections.listtools.IOListCached;
 import com.lapissea.dfs.type.IOInstance;
 import com.lapissea.iterableplus.IterablePPSource;
 import com.lapissea.iterableplus.Iters;
@@ -20,17 +21,7 @@ import com.lapissea.iterableplus.OptionalPP;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.OptionalInt;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -131,24 +122,30 @@ public final class PersistentMemoryManager
 	
 	@Override
 	public void notifyStart(ChunkChainIO chain){
-		allocationLock.lock();
-		try{
-			getStack().add(chain);
-		}finally{
-			allocationLock.unlock();
+		try(var ioAccess = context.getSource().lockIO()){
+			context.checkValid();
+			allocationLock.lock();
+			try{
+				getStack().add(chain);
+			}finally{
+				allocationLock.unlock();
+			}
 		}
 	}
 	@Override
 	public void notifyEnd(ChunkChainIO chain){
-		allocationLock.lock();
-		try{
-			var s  = getStack();
-			var ch = s.pop();
-			if(ch != chain){
-				failNotifyEnd(s, ch, chain);
+		try(var ioAccess = context.getSource().lockIO()){
+			context.checkValid();
+			allocationLock.lock();
+			try{
+				var s  = getStack();
+				var ch = s.pop();
+				if(ch != chain){
+					failNotifyEnd(s, ch, chain);
+				}
+			}finally{
+				allocationLock.unlock();
 			}
-		}finally{
-			allocationLock.unlock();
 		}
 	}
 	private static void failNotifyEnd(Node stack, ChunkChainIO popped, ChunkChainIO chain){
@@ -166,6 +163,13 @@ public final class PersistentMemoryManager
 		throw new IllegalStateException("Chain was already closed!");
 	}
 	
+	public void refreshAfterRollback(){
+		queuedFreeChunks.clear();
+		if(freeChunks instanceof IOListCached<?> cached){
+			cached.clearCache();
+		}
+	}
+	
 	public PersistentMemoryManager(Cluster context, IOList<ChunkPointer> freeChunks){
 		super(context, AllocStrategy.class.getEnumConstants(), AllocToStrategy.class.getEnumConstants());
 		this.freeChunks = freeChunks;
@@ -173,40 +177,48 @@ public final class PersistentMemoryManager
 	
 	@Override
 	protected Chunk alloc(AllocStrategy strategy, DataProvider ctx, AllocateTicket ticket, boolean dryRun) throws IOException{
-		allocationLock.lock();
-		try{
-			return switch(strategy){
-				case REUSE_FREE_CHUNKS -> defragmentMode? null : MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
-				case APPEND_TO_FILE -> MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
-			};
-		}finally{
-			allocationLock.unlock();
+		try(var ioAccess = context.getSource().lockIO()){
+			context.checkValid();
+			allocationLock.lock();
+			try{
+				return switch(strategy){
+					case REUSE_FREE_CHUNKS -> defragmentMode? null : MemoryOperations.allocateReuseFreeChunk(ctx, ticket, allowFreeRemove, dryRun);
+					case APPEND_TO_FILE -> MemoryOperations.allocateAppendToFile(ctx, ticket, dryRun);
+				};
+			}finally{
+				allocationLock.unlock();
+			}
 		}
 	}
 	@Override
 	protected long allocTo(AllocToStrategy strategy, Chunk first, Chunk target, long toAllocate) throws IOException{
-		allocationLock.lock();
-		try{
-			return switch(strategy){
-				case GROW_FILE_ALLOC -> MemoryOperations.growFileAlloc(target, toAllocate);
-				case GROW_FREE_ALLOC -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
-				case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
-				case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
-				case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
-			};
-		}finally{
-			allocationLock.unlock();
+		try(var ioAccess = context.getSource().lockIO()){
+			context.checkValid();
+			allocationLock.lock();
+			try{
+				return switch(strategy){
+					case GROW_FILE_ALLOC -> MemoryOperations.growFileAlloc(target, toAllocate);
+					case GROW_FREE_ALLOC -> MemoryOperations.growFreeAlloc(this, target, toAllocate, allowFreeRemove);
+					case SIMPLE_NEXT_ASSIGN -> MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate);
+					case CHAIN_WALK_UP_DEFRAGMENT -> MemoryOperations.allocateByChainWalkUpDefragment(this, first, target, toAllocate);
+					case GROWING_HEADER_NEXT_ASSIGN -> MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate);
+				};
+			}finally{
+				allocationLock.unlock();
+			}
 		}
 	}
 	
 	@Override
 	public DefragSes openDefragmentMode(){
+		context.checkValid();
 		boolean oldDefrag = defragmentMode;
 		defragmentMode = true;
 		return () -> defragmentMode = oldDefrag;
 	}
 	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
+		context.checkValid();
 		return adding? queuedFreeChunksIO : freeChunks;
 	}
 	
@@ -238,16 +250,25 @@ public final class PersistentMemoryManager
 	
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
-		if(toFree.isEmpty()) return;
-		allocationLock.lock();
-		try{
-			freeLocked(toFree);
-		}finally{
-			allocationLock.unlock();
+		try(var ioAccess = context.getSource().lockIO()){
+			context.checkValid();
+			if(toFree.isEmpty()) return;
+			allocationLock.lock();
+			try{
+				// A locked chunk is an expected refusal before any mutation; callers may recover.
+				checkCanFree(toFree);
+				try(var transaction = context.getSource().startTransaction()){
+					freeLocked(toFree);
+					for(var chunk : toFree) context.getUnmanagedRegistry().freed(chunk);
+					transaction.commit();
+				}
+			}finally{
+				allocationLock.unlock();
+			}
 		}
 	}
 	
-	private void freeLocked(Collection<Chunk> toFree) throws IOException{
+	private void checkCanFree(Collection<Chunk> toFree) throws FreeWhileUsed{
 		// The allocation lock also protects stack registration and notifyStart/notifyEnd.
 		synchronized(allStacks){
 			for(var stack : allStacks.values()){
@@ -267,7 +288,9 @@ public final class PersistentMemoryManager
 				}
 			}
 		}
-
+	}
+	
+	private void freeLocked(Collection<Chunk> toFree) throws IOException{
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
 			return;
@@ -294,8 +317,9 @@ public final class PersistentMemoryManager
 				}
 				
 				var chs = popQueue();
-				try(var ignored = context.getSource().openIOTransaction()){
+				try(var ignored = context.getSource().startTransaction()){
 					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
+					ignored.commit();
 				}
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{

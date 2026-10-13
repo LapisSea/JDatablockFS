@@ -61,6 +61,7 @@ public abstract class UnmanagedIOMap<K, V> extends IOInstance.Unmanaged<Unmanage
 	
 	@Override
 	public Doc instanceToDoc(StringifySettings settings){
+		checkValid();
 		if(!StringifyState.enter()){
 			return Doc.text("{...}");
 		}

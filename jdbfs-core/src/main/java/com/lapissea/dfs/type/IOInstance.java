@@ -495,6 +495,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			setIdentity(identity);
 			this.typeDef = typeDef;
 			readOnly = getDataProvider().isReadOnly();
+			provider.getUnmanagedRegistry().register(this, identity);
 		}
 		
 		public Unmanaged(DataProvider provider, Chunk identity, IOType typeDef){
@@ -502,6 +503,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			setIdentity(identity);
 			this.typeDef = typeDef;
 			readOnly = getDataProvider().isReadOnly();
+			provider.getUnmanagedRegistry().register(this, identity);
 		}
 		
 		private void setIdentity(Reference reference){
@@ -523,6 +525,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		private Chunk getIdentity(){
+			if(identity == null) throw new IllegalStateException("Unmanaged object no longer has a database identity");
 			return identity;
 		}
 		
@@ -538,6 +541,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			if(fs.isEmpty()) return dynamic;
 			
 			return Iters.concat(fs, dynamic);
+		}
+		
+		public boolean acceptsType(IOType requested){
+			return typeDef.equals(requested);
 		}
 		
 		public final IOType getTypeDef(){
@@ -556,6 +563,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public final DataProvider getDataProvider(){
 			return provider;
 		}
+		
+		/**
+		 * Provider guard for an unrecoverable physical commit
+		 */
+		public final void checkValid(){ provider.checkValid(); }
 		
 		protected final boolean isSelfDataEmpty(){
 			var id = getIdentity();
@@ -582,7 +594,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			
 			if(DEBUG_VALIDATION) ensureDataIntegrity(newRef);
 			
-			setIdentity(newRef);
+			provider.getUnmanagedRegistry().move(this, getIdentity(), newRef);
 		}
 		
 		private void ensureDataIntegrity(Chunk newRef){
@@ -614,13 +626,35 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public boolean isFreed(){
 			return freed;
 		}
+		public final Chunk getIdentityForRegistry(){ return getIdentity(); }
+		
+		/**
+		 * Complete direct construction after persisted and derived state has been initialized
+		 */
+		protected final void finishConstruction(){
+			provider.getUnmanagedRegistry().markCompleted(this);
+		}
+		
+		protected void loadState() throws IOException      { readManagedFields(); }
+		public final void refreshState() throws IOException{ loadState(); }
+		public final void detachIdentity(){
+			identity = null;
+			freed = true;
+		}
+		public final void restoreIdentity(Chunk chunk){
+			identity = Objects.requireNonNull(chunk);
+			freed = false;
+		}
+		
 		protected void notifyFreed(){
 			freed = true;
 		}
 		
 		public void free() throws IOException{
-			MemoryOperations.freeSelfAndReferenced(self());
-			notifyFreed();
+			provider.getSource().openIOTransaction(() -> {
+				MemoryOperations.freeSelfAndReferenced(self());
+				notifyFreed();
+			});
 		}
 		
 		protected final void selfIO(UnsafeConsumer<RandomIO, IOException> session) throws IOException{

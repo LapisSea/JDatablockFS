@@ -48,16 +48,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -171,7 +162,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public T make(DataProvider provider, Chunk identity, IOType type) throws IOException{
 			var ctor = unmanagedConstructor;
 			if(ctor == null) ctor = initConstructor();
-			return ctor.make(provider, identity, type);
+			var constructor = ctor;
+			
+			var registry = provider.getUnmanagedRegistry();
+			
+			return registry.getOrCreate(identity, getType(), type, provider.isReadOnly(), ident -> {
+				return constructor.make(provider, ident, type);
+			});
 		}
 		private NewUnmanaged<T> initConstructor(){
 			try{

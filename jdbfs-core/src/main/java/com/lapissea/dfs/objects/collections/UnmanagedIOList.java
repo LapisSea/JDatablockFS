@@ -84,6 +84,7 @@ public abstract class UnmanagedIOList<T, SELF extends UnmanagedIOList<T, SELF>> 
 	
 	@Override
 	public Doc instanceToDoc(StringifySettings settings){
+		checkValid();
 		if(isFreed()){
 			return Doc.text(freeStr());
 		}

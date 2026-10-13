@@ -4,6 +4,7 @@ import com.lapissea.dfs.SealedUtil;
 import com.lapissea.dfs.config.ConfigDefs;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
+import com.lapissea.dfs.io.IOTransactionState;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.io.instancepipe.StructPipe;
 import com.lapissea.dfs.objects.ObjectID;
@@ -29,6 +30,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -529,6 +531,22 @@ public sealed interface IOTypeDB{
 		@IOValue
 		private IOMap<TypeName, TypeDef> defs;
 		
+		private IOTransactionState.Access lockIO(){
+			if(data instanceof DataProvider.Holder holder) return holder.getDataProvider().getSource().lockIO();
+			return IOTransactionState.NOOP_ACCESS;
+		}
+		
+		private void checkValid(){
+			if(data instanceof DataProvider.Holder holder) holder.getDataProvider().checkValid();
+		}
+		
+		public void clearCaches(){
+			dataCache.clear();
+			reverseDataCache = null;
+			max = 0;
+			templateLoader.clear();
+		}
+		
 		private final Map<Integer, IOType> dataCache = new HashMap<>();
 		private       Map<IOType, Integer> reverseDataCache;
 		private       int                  max;
@@ -538,60 +556,73 @@ public sealed interface IOTypeDB{
 		private final ReadWriteClosableLock defsLock = ReadWriteClosableLock.reentrant();
 		
 		@Override
-		public long typeLinkCount(){ return data.size(); }
+		public long typeLinkCount(){
+			try(var ioAccess = lockIO()){
+				checkValid();
+				return data.size();
+			}
+		}
 		@Override
-		public long definitionCount(){ return defs.size(); }
+		public long definitionCount(){
+			try(var ioAccess = lockIO()){
+				checkValid();
+				return defs.size();
+			}
+		}
 		
 		@Override
 		public TypeID toID(IOType type, boolean recordNew) throws IOException{
-			var builtIn = getBuiltIn();
-			var id      = builtIn.toID(type, false);
-			if(id.stored()) return id;
-			
-			if(reverseDataCache == null && data.size()<=100000){
-				reverseDataCache = HashMap.newHashMap((int)data.size());
+			try(var ioAccess = lockIO()){
+				checkValid();
+				var builtIn = getBuiltIn();
+				var id      = builtIn.toID(type, false);
+				if(id.stored()) return id;
 				
-				int max = FIRST_ID;
-				for(var entry : data){
-					var key   = entry.getKey();
-					var value = entry.getValue();
-					reverseDataCache.put(value, key);
-					max = Math.max(key, max);
-				}
-				this.max = max;
-			}
-			
-			int max;
-			
-			if(reverseDataCache != null){
-				var existing = reverseDataCache.get(type);
-				if(existing != null){
-					return new TypeID(existing, true);
-				}
-				max = this.max;
-			}else{
-				max = FIRST_ID;
-				for(var entry : data){
-					var key = entry.getKey();
-					if(entry.getValue().equals(type)){
-						return new TypeID(key, true);
+				if(reverseDataCache == null && data.size()<=100000){
+					reverseDataCache = HashMap.newHashMap((int)data.size());
+					
+					int max = FIRST_ID;
+					for(var entry : data){
+						var key   = entry.getKey();
+						var value = entry.getValue();
+						reverseDataCache.put(value, key);
+						max = Math.max(key, max);
 					}
-					max = Math.max(key, max);
+					this.max = max;
 				}
+				
+				int max;
+				
+				if(reverseDataCache != null){
+					var existing = reverseDataCache.get(type);
+					if(existing != null){
+						return new TypeID(existing, true);
+					}
+					max = this.max;
+				}else{
+					max = FIRST_ID;
+					for(var entry : data){
+						var key = entry.getKey();
+						if(entry.getValue().equals(type)){
+							return new TypeID(key, true);
+						}
+						max = Math.max(key, max);
+					}
+				}
+				
+				
+				var newID = max + 1;
+				if(!recordNew) return new TypeID(newID, false);
+				
+				data.put(newID, type);
+				reverseDataCache = null;
+				try{
+					recordType(List.of(type));
+				}catch(Throwable e){
+					throw new RuntimeException("Failed to record " + type, e);
+				}
+				return new TypeID(newID, true);
 			}
-			
-			
-			var newID = max + 1;
-			if(!recordNew) return new TypeID(newID, false);
-			
-			data.put(newID, type);
-			reverseDataCache = null;
-			try{
-				recordType(List.of(type));
-			}catch(Throwable e){
-				throw new RuntimeException("Failed to record " + type, e);
-			}
-			return new TypeID(newID, true);
 		}
 		private static MemoryOnlyDB.Fixed getBuiltIn(){
 			if(!BUILT_IN.isInitialized()){
@@ -608,12 +639,16 @@ public sealed interface IOTypeDB{
 				recordType(builtIn, type, newDefs);
 			}
 			defsLock.write(() -> defs.putAll(newDefs));
+			templateLoader.clear();
 			
 			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 		}
 		
 		public Set<String> listStoredTypeDefinitionNames(){
-			return defsLock.read(() -> defs.mapped(k -> k.getKey().typeName).toModSet());
+			try(var ioAccess = lockIO()){
+				checkValid();
+				return defsLock.read(() -> defs.mapped(k -> k.getKey().typeName).toModSet());
+			}
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs) throws IOException{
@@ -662,12 +697,20 @@ public sealed interface IOTypeDB{
 			RuntimeException e = null;
 			
 			
-			Set<String> containedKeys;
+			// The compiler may resolve dependent classes on another thread. A live DB would
+			// wait on the IO gate held by this writer while this writer waits on compilation.
+			var definitions   = new HashMap<>(getBuiltIn().defs);
+			var containedKeys = new HashSet<String>();
 			try(var ignore = defsLock.read()){
-				containedKeys = Iters.from(defs).map(ent -> ent.getKey().typeName).toModSet();
+				for(var definition : defs){
+					var name = definition.getKey().typeName;
+					definitions.put(name, definition.getValue());
+					containedKeys.add(name);
+				}
 			}catch(Throwable e1){
-				throw new IOException("Failed to read def keys", e1);
+				throw new IOException("Failed to snapshot definitions for validation", e1);
 			}
+			var validationDB = new MemoryOnlyDB.Fixed(definitions, Map.of(), Map.of());
 			
 			for(var name : names){
 				ConfigDefs.CompLogLevel.SMALL.log("Checking validity of {}#blueBright", name);
@@ -675,7 +718,7 @@ public sealed interface IOTypeDB{
 					var cls = Class.forName(
 						name, true,
 						new TemplateClassLoader(
-							this,
+							validationDB,
 							new BlacklistClassLoader(
 								false,
 								this.getClass().getClassLoader(),
@@ -797,28 +840,31 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public IOType fromID(int id) throws IOException{
-			var builtIn = getBuiltIn();
-			if(builtIn.hasID(id)){
-				return builtIn.fromID(id);
+			try(var ioAccess = lockIO()){
+				checkValid();
+				var builtIn = getBuiltIn();
+				if(builtIn.hasID(id)){
+					return builtIn.fromID(id);
+				}
+				
+				var cached = dataCache.get(id);
+				if(cached != null){
+					return cached;
+				}
+				
+				var type = data.get(id);
+				if(type == null){
+					throw new RuntimeException("Unknown type from ID of " + id);
+				}
+				
+				if(dataCache.size()>64){
+					dataCache.remove(Iters.keys(dataCache).skip(Rand.i(dataCache.size() - 1)).getFirst());
+				}
+				dataCache.put(id, type);
+				
+				
+				return type;
 			}
-			
-			var cached = dataCache.get(id);
-			if(cached != null){
-				return cached;
-			}
-			
-			var type = data.get(id);
-			if(type == null){
-				throw new RuntimeException("Unknown type from ID of " + id);
-			}
-			
-			if(dataCache.size()>64){
-				dataCache.remove(Iters.keys(dataCache).skip(Rand.i(dataCache.size() - 1)).getFirst());
-			}
-			dataCache.put(id, type);
-			
-			
-			return type;
 		}
 		
 		@IOValue
@@ -828,71 +874,77 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public <T> Class<T> fromID(Class<T> rootType, int id) throws IOException{
-			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
-			
-			var builtIn = getBuiltIn();
-			var bcls    = builtIn.fromID(rootType, id);
-			if(bcls != null) return bcls;
-			
-			if(id<=0){
-				return null;
+			try(var ioAccess = lockIO()){
+				checkValid();
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
+				
+				var builtIn = getBuiltIn();
+				var bcls    = builtIn.fromID(rootType, id);
+				if(bcls != null) return bcls;
+				
+				if(id<=0){
+					return null;
+				}
+				
+				var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
+				if(touched.isPresent()){
+					return touched.get();
+				}
+				
+				var universe = sealedMultiverse.get(rootType.getName());
+				if(universe == null || id>universe.size()){
+					return null;
+				}
+				var name = universe.get(id - 1);
+				if(name == null) return null;
+				//noinspection unchecked
+				return (Class<T>)loadClass(name);
 			}
-			
-			var touched = getTouchedUniverse(rootType).map(u -> u.id2cl.get(id));
-			if(touched.isPresent()){
-				return touched.get();
-			}
-			
-			var universe = sealedMultiverse.get(rootType.getName());
-			if(universe == null || id>universe.size()){
-				return null;
-			}
-			var name = universe.get(id - 1);
-			if(name == null) return null;
-			//noinspection unchecked
-			return (Class<T>)loadClass(name);
 		}
 		
 		@Override
 		public <T> int toID(Class<T> rootType, Class<T> type, boolean record) throws IOException{
-			var builtIn = getBuiltIn();
-			var bid     = builtIn.toID(rootType, type, false);
-			if(bid != -1) return bid;
-			
-			
-			if(!isSealedCached(rootType)) throw new IllegalArgumentException();
-			
-			var touched = getTouched(rootType, type);
-			if(touched.isPresent()){
+			try(var ioAccess = lockIO()){
+				checkValid();
+				var builtIn = getBuiltIn();
+				var bid     = builtIn.toID(rootType, type, false);
+				if(bid != -1) return bid;
+				
+				
+				if(!isSealedCached(rootType)) throw new IllegalArgumentException();
+				
+				var touched = getTouched(rootType, type);
+				if(touched.isPresent()){
+					if(record){
+						recordTouched(rootType);
+					}
+					return touched.get();
+				}
+				
+				
+				var typeName     = type.getName();
+				var rootTypeName = rootType.getName();
+				var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
+				if(universe == null){
+					return touch(rootType, type, 1);
+				}
+				
+				var max = Math.toIntExact(universe.size());
+				for(int i = 0; i<max; i++){
+					var name = universe.get(i);
+					if(name.equals(typeName)){
+						return i + 1;
+					}
+				}
+				
 				if(record){
-					recordTouched(rootType);
+					recordType(List.of(IOType.of(type)));
+					universe.add(typeName);
+					return max + 1;
 				}
-				return touched.get();
+				
+				return touch(rootType, type, max + 1);
 			}
-			
-			
-			var typeName     = type.getName();
-			var rootTypeName = rootType.getName();
-			var universe     = record? requireIOUniverse(rootTypeName) : sealedMultiverse.get(rootTypeName);
-			if(universe == null){
-				return touch(rootType, type, 1);
-			}
-			
-			var max = Math.toIntExact(universe.size());
-			for(int i = 0; i<max; i++){
-				var name = universe.get(i);
-				if(name.equals(typeName)){
-					return i + 1;
-				}
-			}
-			
-			if(record){
-				recordType(List.of(IOType.of(type)));
-				universe.add(typeName);
-				return max + 1;
-			}
-			
-			return touch(rootType, type, max + 1);
 		}
 		
 		private <T> void recordTouched(Class<T> rootType) throws IOException{
@@ -958,31 +1010,48 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public OptionalPP<TypeDef> getDefinitionFromClassName(String className) throws IOException{
-			if(className == null || className.isEmpty()) return OptionalPP.empty();
-			return getBuiltIn().getDefinitionFromClassName(className).or(() -> {
-				return OptionalPP.ofNullable(defsLock.read(() -> defs.get(new TypeName(className))));
-			});
+			try(var ioAccess = lockIO()){
+				checkValid();
+				if(className == null || className.isEmpty()) return OptionalPP.empty();
+				return getBuiltIn().getDefinitionFromClassName(className).or(() -> {
+					return OptionalPP.ofNullable(defsLock.read(() -> defs.get(new TypeName(className))));
+				});
+			}
+		}
+		
+		private MemoryOnlyDB.Fixed snapshotDefinitions() throws IOException{
+			var definitions = new HashMap<>(getBuiltIn().defs);
+			try(var ignored = defsLock.read()){
+				for(var definition : defs) definitions.put(definition.getKey().typeName, definition.getValue());
+			}
+			return new MemoryOnlyDB.Fixed(definitions, Map.of(), Map.of());
 		}
 		
 		public void init(DataProvider provider) throws IOException{
+			checkValid();
 			allocateNulls(provider, null);
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){
-			var l = templateLoader.get();
-			if(l == null){
-				templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
-			}
-			return l;
+			try(var ioAccess = lockIO()){
+				checkValid();
+				var l = templateLoader.get();
+				if(l == null){
+					templateLoader = new WeakReference<>(l = new TemplateClassLoader(snapshotDefinitions(), getClass().getClassLoader()));
+				}
+				return l;
+			}catch(IOException e){ throw new UncheckedIOException("Failed to snapshot schema definitions", e); }
 		}
 		
 		@Override
 		public String toString(){
+			checkValid();
 			return getClass().getSimpleName() + toShortString();
 		}
 		
 		@Override
 		public String toShortString(){
+			checkValid();
 			if(data == null) return "{uninitialized}";
 			return "{" + data.size() + " " + TextUtil.plural("link", (int)data.size()) + ", " + defs.size() + " class " + TextUtil.plural("definition", (int)defs.size()) + "}";
 		}

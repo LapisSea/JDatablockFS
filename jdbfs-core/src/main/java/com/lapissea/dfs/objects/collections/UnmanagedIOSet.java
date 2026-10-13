@@ -56,6 +56,7 @@ public abstract class UnmanagedIOSet<T> extends IOInstance.Unmanaged<UnmanagedIO
 	
 	@Override
 	public Doc instanceToDoc(StringifySettings settings){
+		checkValid();
 		if(!StringifyState.enter()){
 			return Doc.text("{...}");
 		}

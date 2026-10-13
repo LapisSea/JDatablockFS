@@ -40,7 +40,7 @@ public class FileCopyTests{
 		}
 		
 		@Override
-		public IOTransaction openIOTransaction(){
+		public IOTransaction startTransaction(){
 			return IOTransaction.NOOP;
 		}
 		

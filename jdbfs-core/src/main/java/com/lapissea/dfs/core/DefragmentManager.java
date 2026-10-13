@@ -392,7 +392,7 @@ public class DefragmentManager{
 					.create();
 			
 			Chunk fragmentData;
-			try(var ignored = cluster.getSource().openIOTransaction()){
+			try(var ignored = cluster.getSource().startTransaction()){
 				
 				if(!remainingData.setCapacityAndModifyNumSize(remainingSpace - remainingData.getHeaderSize())){
 					throw new AssertionError("Failed to set chunk size: " + remainingData);
@@ -415,6 +415,7 @@ public class DefragmentManager{
 					src.transferTo(dest);
 				}
 				fragmentedChunk.syncStruct();
+				ignored.commit();
 			}
 			
 			fragmentData.freeChaining();

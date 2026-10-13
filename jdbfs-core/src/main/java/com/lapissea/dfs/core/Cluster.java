@@ -131,6 +131,8 @@ public final class Cluster implements DataProvider{
 			return (T)val;
 		}
 		
+		private void cacheClear(){ if(cache != null) cache.clear(); }
+		
 		private Object readOrMake(ObjectID id, UnsafeSupplier<Object, IOException> objectGenerator) throws IOException{
 			return metadata.rootObjects.computeIfAbsent(id, objectGenerator);
 		}
@@ -138,6 +140,7 @@ public final class Cluster implements DataProvider{
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{
+			checkValid();
 			Objects.requireNonNull(id);
 			Objects.requireNonNull(objectGenerator);
 			
@@ -150,6 +153,7 @@ public final class Cluster implements DataProvider{
 		
 		@Override
 		public <T> void provide(ObjectID id, T obj) throws IOException{
+			checkValid();
 			Objects.requireNonNull(obj);
 			if(ROOT_PROVIDER_WARMUP_COUNT>0){
 				cache.remove(id);
@@ -159,16 +163,19 @@ public final class Cluster implements DataProvider{
 		
 		@Override
 		public DataProvider getDataProvider(){
+			checkValid();
 			return Cluster.this;
 		}
 		
 		@Override
 		public IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll(){
+			checkValid();
 			return () -> metadata.rootObjects.iterator();
 		}
 		
 		@Override
 		public void drop(ObjectID id) throws IOException{
+			checkValid();
 			if(cache != null) cache.remove(id);
 			metadata.rootObjects.remove(id);
 		}
@@ -293,10 +300,10 @@ public final class Cluster implements DataProvider{
 		}
 	}
 	
-	
 	private final ChunkCache chunkCache = new ChunkCache();
 	
 	private final IOInterface   source;
+	private final long          transactionVersion;
 	private final MemoryManager memoryManager;
 	
 	private final RootRef  root;
@@ -306,6 +313,7 @@ public final class Cluster implements DataProvider{
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source = source;
+		transactionVersion = source.getTransactionVersion();
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
@@ -330,6 +338,7 @@ public final class Cluster implements DataProvider{
 				.cachedView(128, 128)
 		);
 		
+		source.getUnmanagedRegistry().registerProvider(this);
 		if(GlobalConfig.TYPE_VALIDATION){
 			scanTypeDB();
 		}
@@ -445,15 +454,40 @@ public final class Cluster implements DataProvider{
 	}
 	
 	@Override
-	public IOTypeDB.PersistentDB getTypeDb(){ return metadata == null? null : metadata.db; }
-	@Override
-	public IOInterface getSource(){ return source; }
-	@Override
-	public MemoryManager getMemoryManager(){ return memoryManager; }
-	@Override
-	public ChunkCache getChunkCache(){ return chunkCache; }
+	public void checkValid(){ source.checkTransactionVersion(transactionVersion); }
 	
-	public RootProvider roots(){ return roots; }
+	@Override
+	public void refreshAfterRollback() throws IOException{
+		((Roots)roots).cacheClear();
+		metadata.db.clearCaches();
+		memoryManager.refreshAfterRollback();
+	}
+	
+	@Override
+	public IOTypeDB.PersistentDB getTypeDb(){
+		checkValid();
+		return metadata == null? null : metadata.db;
+	}
+	@Override
+	public IOInterface getSource(){
+		checkValid();
+		return source;
+	}
+	@Override
+	public MemoryManager getMemoryManager(){
+		checkValid();
+		return memoryManager;
+	}
+	@Override
+	public ChunkCache getChunkCache(){
+		checkValid();
+		return chunkCache;
+	}
+	
+	public RootProvider roots(){
+		checkValid();
+		return roots;
+	}
 	
 	@Override
 	public String toString(){

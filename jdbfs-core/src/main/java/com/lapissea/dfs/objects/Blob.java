@@ -1,11 +1,12 @@
 package com.lapissea.dfs.objects;
 
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.core.AllocateTicket;
 import com.lapissea.dfs.core.DataProvider;
 import com.lapissea.dfs.core.chunk.Chunk;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
-import com.lapissea.dfs.io.IOTransactionBuffer;
+import com.lapissea.dfs.io.IOTransactionState;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.dfs.type.IOInstance;
@@ -15,8 +16,6 @@ import com.lapissea.dfs.utils.IOUtils;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.util.Collection;
 import java.util.StringJoiner;
 
@@ -44,7 +43,7 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public void setSize(long requestedSize) throws IOException{
 			if(requestedSize<0) throw new IllegalArgumentException();
-			if(transactionOpen) throw new UnsupportedOperationException();
+
 			var cap = getCapacity();
 			data.setSize(Math.min(cap, requestedSize));
 		}
@@ -55,9 +54,6 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		
 		@Override
 		public long getCapacity() throws IOException{
-			if(transactionOpen){
-				return transactionBuff.getCapacity(data.getCapacity());
-			}
 			return data.getCapacity();
 		}
 		
@@ -74,9 +70,6 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public void flush() throws IOException{ data.flush(); }
 		
-		
-		private final IOTransactionBuffer.BaseAccess readAt = this::readAt;
-		
 		private int readAt(long pos, byte[] b, int off, int len) throws IOException{
 			return readAt((int)pos, b, off, len);
 		}
@@ -91,26 +84,14 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		
 		@Override
 		public int read() throws IOException{
-			if(transactionOpen){
-				int b = transactionBuff.readByte(readAt, pos);
-				if(b>=0){
-					this.pos++;
-				}
-				return b;
-			}
 			
 			int remaining = (int)(getSize() - getPos());
 			if(remaining<=0) return -1;
-			return data.setPos(pos++).readInt1();
+			return data.setPos(pos++).readUnsignedInt1();
 		}
 		
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
-			if(transactionOpen){
-				int read = transactionBuff.read(readAt, pos, b, off, len);
-				pos += read;
-				return read;
-			}
 			
 			int read = readAt(pos, b, off, len);
 			if(read>=0) pos += read;
@@ -119,11 +100,6 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		
 		@Override
 		public long readWord(int len) throws IOException{
-			if(transactionOpen){
-				var word = transactionBuff.readWord(readAt, pos, len);
-				pos += len;
-				return word;
-			}
 			
 			long remaining = getSize() - pos;
 			if(remaining<len){
@@ -137,11 +113,6 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public void write(int b) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				transactionBuff.writeByte(pos, b);
-				pos++;
-				return;
-			}
 			
 			data.setPos(pos).write(b);
 			pos++;
@@ -150,11 +121,6 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		@Override
 		public void write(byte[] b, int off, int len) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				transactionBuff.write(pos, b, off, len);
-				pos += len;
-				return;
-			}
 			
 			if(len>0){
 				data.setPos(pos).write(b, off, len);
@@ -166,21 +132,14 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		public void writeAtOffsets(Collection<WriteChunk> writeData) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
-			if(transactionOpen){
-				transactionBuff.writeChunks(writeData);
-				return;
-			}
 			data.writeAtOffsets(writeData);
 		}
 		
 		@Override
 		public void writeWord(long v, int len) throws IOException{
+			if(readOnly) throw new UnsupportedOperationException();
 			if(len == 0) return;
-			if(transactionOpen){
-				transactionBuff.writeWord(pos, v, len);
-			}else{
-				data.setPos(pos).writeWord(v, len);
-			}
+			data.setPos(pos).writeWord(v, len);
 			pos += len;
 		}
 		
@@ -198,19 +157,24 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		
 		@Override
 		public boolean inTransaction(){
-			return transactionOpen;
+			return data.inTransaction();
 		}
 	}
 	
 	
+	private UnmanagedRegistry contentsRegistry;
+
 	public static Blob request(DataProvider provider, long capacity) throws IOException{
-		var ch = AllocateTicket.bytes(capacity).submit(provider);
-		return new Blob(provider, ch, IOType.of(Blob.class));
+		return provider.getSource().openIOTransaction(() -> {
+			var ch = AllocateTicket.bytes(capacity).submit(provider);
+			return new Blob(provider, ch, IOType.of(Blob.class));
+		});
 	}
 	
 	public Blob(DataProvider provider, Chunk identity, IOType typeDef){
 		super(provider, identity, typeDef);
 		assert StandardStructPipe.of(getThisStruct()).getSizeDescriptor().getMin() == 0;
+		finishConstruction();
 	}
 	
 	@Override
@@ -218,25 +182,32 @@ public final class Blob extends IOInstance.Unmanaged<Blob> implements IOInterfac
 		return readOnly;
 	}
 	
-	@SuppressWarnings("unused")
-	private              boolean             transactionOpen;
-	private final        IOTransactionBuffer transactionBuff = new IOTransactionBuffer();
-	private static final VarHandle           TRANSACTION_OPEN;
-	
-	static{
-		try{
-			TRANSACTION_OPEN = MethodHandles.lookup().findVarHandle(Blob.class, "transactionOpen", boolean.class);
-		}catch(ReflectiveOperationException e){
-			throw new Error(e);
+	@Override
+	public IOTransaction startTransaction(){
+		var provider = getDataProvider();
+		var source = provider.getSource();
+		try(var ioAccess = source.lockIO()){
+			return source.startTransaction();
 		}
 	}
 	
 	@Override
-	public IOTransaction openIOTransaction(){
-		if(IOTransaction.DISABLE_TRANSACTIONS) return IOTransaction.NOOP;
-		return transactionBuff.open(this, TRANSACTION_OPEN);
+	public UnmanagedRegistry getUnmanagedRegistry(){
+		try(var ignored = lockIO()){
+			if(contentsRegistry == null){
+				contentsRegistry = new UnmanagedRegistry(this);
+				getDataProvider().getUnmanagedRegistry().registerChild(contentsRegistry);
+			}
+			return contentsRegistry;
+		}
 	}
-	
+	@Override
+	public long getTransactionVersion(){ return getDataProvider().getSource().getTransactionVersion(); }
+	@Override
+	public IOTransactionState.Access lockIO(){ return getDataProvider().getSource().lockIO(); }
+	@Override
+	public void checkTransactionVersion(long expected){ getDataProvider().getSource().checkTransactionVersion(expected); }
+
 	@Override
 	public RandomIO io() throws IOException{
 		return new BlobIO();

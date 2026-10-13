@@ -13,7 +13,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 
-public final class FileMemoryMappedData extends ClosableIOData{
+public final class FileMemoryMappedData extends FileIOData{
 	
 	private final File         file;
 	private final FileMappings mappedFileData;
@@ -23,7 +23,13 @@ public final class FileMemoryMappedData extends ClosableIOData{
 	public FileMemoryMappedData(File file, boolean readOnly) throws IOException{ this(null, file, readOnly); }
 	public FileMemoryMappedData(IOHook hook, File file) throws IOException     { this(hook, file, false); }
 	public FileMemoryMappedData(IOHook hook, File file, boolean readOnly) throws IOException{
-		super(hook, readOnly);
+		this(hook, file, readOnly, ConfigDefs.DURABLE_FILE_IO.resolveVal());
+	}
+	public FileMemoryMappedData(File file, boolean readOnly, boolean durable) throws IOException{
+		this(null, file, readOnly, durable);
+	}
+	public FileMemoryMappedData(IOHook hook, File file, boolean readOnly, boolean durable) throws IOException{
+		super(hook, file, readOnly, durable);
 		this.file = file;
 		
 		var ioOptions = EnumSet.of(
@@ -32,7 +38,7 @@ public final class FileMemoryMappedData extends ClosableIOData{
 		);
 		if(!readOnly){
 			ioOptions.add(StandardOpenOption.WRITE);
-			if(ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()){
+			if(!durable && ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()){
 				ioOptions.add(StandardOpenOption.SYNC);
 			}
 		}
@@ -46,28 +52,31 @@ public final class FileMemoryMappedData extends ClosableIOData{
 				throw new IOException(file + " is not a valid file!");
 			}
 		}catch(NoSuchFileException e){
+			releaseFileOwnership();
 			if(readOnly){
 				throw new NoSuchFileException("File must exist if in read only mode: " + e.getMessage());
 			}
 			throw e;
+		}catch(Throwable e){
+			releaseFileOwnership();
+			throw e;
 		}
 		try{
-			if(!readOnly){
-				try{
-					//noinspection ResultOfMethodCallIgnored
-					fileChannel.lock();
-				}catch(IOException|OverlappingFileLockException e){
-					throw new IOException("Unable to acquire exclusive access to: " + file, e);
-				}
+			try{
+				var fileLock = fileChannel.tryLock(0, Long.MAX_VALUE, readOnly);
+				if(fileLock == null) throw new IOException("File is already in use: " + file);
+			}catch(IOException|OverlappingFileLockException e){
+				throw new IOException("Unable to acquire file access: " + file, e);
 			}
 			
-			mappedFileData = new FileMappings(fileChannel, readOnly);
+			mappedFileData = new FileMappings(fileChannel, readOnly, durable || Files.exists(FileWriteAheadLog.path(file.toPath())));
 			
 			this.used = getLength();
+			initializeJournal(file);
 			
 			if(!isReadOnly()) bindCloseOnShutdown(this);
 		}catch(Throwable e){
-			fileChannel.close();
+			try{ fileChannel.close(); }finally{ releaseFileOwnership(); }
 			throw e;
 		}
 	}
@@ -86,6 +95,9 @@ public final class FileMemoryMappedData extends ClosableIOData{
 	public int hashCode(){
 		return file.hashCode();
 	}
+	
+	@Override
+	protected void forceFile() throws IOException{ mappedFileData.force(); }
 	
 	@Override
 	protected long getLength(){
@@ -169,9 +181,26 @@ public final class FileMemoryMappedData extends ClosableIOData{
 	
 	@Override
 	public void close() throws IOException{
-		markClosed();
-		resize(getIOSize());
-		mappedFileData.close();
-		if(!isReadOnly()) unbindCloseOnShutdown(this);
+		try(var ignored = closeAccess()){
+			try{
+				closeJournal();
+			}finally{
+				markClosed();
+				try{
+					if(!isReadOnly()){
+						resize(used);
+					}
+				}finally{
+					try{
+						mappedFileData.close();
+					}finally{
+						releaseFileOwnership();
+						if(!isReadOnly()){
+							unbindCloseOnShutdown(this);
+						}
+					}
+				}
+			}
+		}
 	}
 }

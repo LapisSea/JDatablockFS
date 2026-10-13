@@ -150,7 +150,10 @@ public final class TestUtils{
 			
 			T read;
 			try{
-				read = constr.make(provider, chunk, typeDef);
+				// Reopen a byte snapshot: canonical identity forbids a second instance on this source.
+				var snapshot = MemoryData.of(provider.getSource().readAll());
+				DataProvider reader = provider instanceof Cluster? new Cluster(snapshot) : DataProvider.newVerySimpleProvider(snapshot);
+				read = constr.make(reader, chunk.getPtr().dereference(reader), typeDef);
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to read object with data", e);
 			}

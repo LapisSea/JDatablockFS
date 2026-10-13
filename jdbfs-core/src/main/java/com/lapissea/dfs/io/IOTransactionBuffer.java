@@ -9,15 +9,12 @@ import com.lapissea.util.UtilL;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PrimitiveIterator;
-
-import static com.lapissea.dfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 /**
  * This class provides the logic for {@link IOTransaction} by buffering data changes in memory as a sorted
@@ -195,19 +192,28 @@ public final class IOTransactionBuffer{
 		
 		static final class Arr extends WriteEvent{
 			private byte[] data;
+			private int    length;
 			
 			public Arr(long offset, byte[] data){
 				super(offset);
 				this.data = data;
+				this.length = data.length;
 			}
+			
+			private void ensureCapacity(int requiredLength){
+				if(requiredLength<=data.length) return;
+				var newCapacity = Math.max(requiredLength, data.length*2);
+				data = Arrays.copyOf(data, newCapacity);
+			}
+			
 			@Override
-			public int length(){ return data.length; }
+			public int length(){ return length; }
 			@Override
 			public int read1(int off){ return Byte.toUnsignedInt(data[off]); }
 			@Override
 			long asWord(){
-				if(data.length>8) throw new UnsupportedOperationException();
-				return WordIO.getWord(data, 0, data.length);
+				if(length>8) throw new UnsupportedOperationException();
+				return WordIO.getWord(data, 0, length);
 			}
 			@Override
 			public long readWord(int off, int len){ return WordIO.getWord(data, off, len); }
@@ -222,7 +228,7 @@ public final class IOTransactionBuffer{
 			}
 			@Override
 			public WriteEvent trimStart(int newLen){
-				var copyOff = data.length - newLen;
+				var copyOff = length - newLen;
 				var newOff  = offset + copyOff;
 				if(newLen<=8){
 					return new Word(newOff, WordIO.getWord(data, copyOff, newLen), newLen);
@@ -233,54 +239,58 @@ public final class IOTransactionBuffer{
 			}
 			@Override
 			boolean tryInlineSet(int localOff, long word, int len){
-				var nl = localOff + len;
-				if(nl>data.length) data = Arrays.copyOf(data, nl);
+				var newLength = localOff + len;
+				ensureCapacity(newLength);
 				WordIO.setWord(word, data, localOff, len);
+				if(newLength>length) length = newLength;
 				return true;
 			}
 			@Override
 			boolean tryInlineSet(int localOff, byte[] bb, int off, int len){
-				var nl = localOff + len;
-				if(nl>data.length){
-					var old = data;
-					data = new byte[nl];
-					System.arraycopy(old, 0, data, 0, old.length);
-				}
+				var newLength = localOff + len;
+				ensureCapacity(newLength);
 				System.arraycopy(bb, off, data, localOff, len);
+				if(newLength>length) length = newLength;
 				return true;
 			}
 			@Override
 			WriteEvent append(byte[] b, int off, int len){
-				var bb = Arrays.copyOf(data, data.length + len);
-				System.arraycopy(b, off, bb, data.length, len);
-				return new Arr(offset, bb);
+				ensureCapacity(length + len);
+				System.arraycopy(b, off, data, length, len);
+				length += len;
+				return this;
 			}
 			@Override
 			WriteEvent append(WriteEvent other){
-				var bb = Arrays.copyOf(data, data.length + other.length());
-				other.writeTo(bb, data.length, other.length());
-				return new Arr(offset, bb);
+				var otherLength = other.length();
+				ensureCapacity(length + otherLength);
+				other.writeTo(data, length, otherLength);
+				length += otherLength;
+				return this;
 			}
 			@Override
-			byte[] byteArr(){ return data; }
+			byte[] byteArr(){
+				if(data.length != length) data = Arrays.copyOf(data, length);
+				return data;
+			}
 			@Override
 			WriteEvent prepend(byte[] b, int off, int len){
-				var newLen = data.length + len;
+				var newLen = length + len;
 				if(newLen<=8){
 					return new Word(
 						offset - len,
 						WordIO.getWord(b, off, len)|
-						WordIO.getWord(data, 0, data.length)<<(len*Byte.SIZE),
+						WordIO.getWord(data, 0, length)<<(len*Byte.SIZE),
 						(byte)newLen
 					);
 				}
 				var bb = new byte[newLen];
 				System.arraycopy(b, off, bb, 0, len);
-				System.arraycopy(data, 0, bb, len, data.length);
+				System.arraycopy(data, 0, bb, len, length);
 				return new Arr(offset - len, bb);
 			}
 			@Override
-			public String toString(){ return "A" + start() + " - " + end() + " " + Arrays.toString(data); }
+			public String toString(){ return "A" + start() + " - " + end() + " " + Arrays.toString(byteArr()); }
 		}
 	}
 	
@@ -332,58 +342,6 @@ public final class IOTransactionBuffer{
 		@Override
 		public boolean hasNext(){
 			return next != -1;
-		}
-	}
-	
-	private final class BufferedTransaction implements IOTransaction{
-		private final int  startingChunkCount;
-		private final long startingTotalBytes;
-		
-		private final boolean          oldTransactionOpen;
-		private final VarHandle        transactionOpenVar;
-		private final RandomIO.Creator target;
-		
-		public BufferedTransaction(boolean oldTransactionOpen, VarHandle transactionOpenVar, RandomIO.Creator target){
-			startingChunkCount = DEBUG_VALIDATION && oldTransactionOpen? getChunkCount() : 0;
-			startingTotalBytes = DEBUG_VALIDATION && oldTransactionOpen? getTotalBytes() : 0;
-			this.oldTransactionOpen = oldTransactionOpen;
-			this.transactionOpenVar = transactionOpenVar;
-			this.target = target;
-		}
-		
-		@Override
-		public int getChunkCount(){
-			return IOTransactionBuffer.this.getChunkCount();
-		}
-		@Override
-		public long getTotalBytes(){
-			return IOTransactionBuffer.this.getTotalBytes();
-		}
-		
-		private void exportData() throws IOException{
-			transactionOpenVar.set(target, oldTransactionOpen);
-			if(!oldTransactionOpen){
-				var data = export();
-				target.io(data::apply);
-			}
-		}
-		
-		@Override
-		public void close() throws IOException{
-			try(var ignore = lock.write()){
-				exportData();
-			}
-		}
-		
-		@Override
-		public String toString(){
-			if(oldTransactionOpen){
-				if(!DEBUG_VALIDATION){
-					return "Transaction{child}";
-				}
-				return "Transaction{Δ count: " + (startingChunkCount - getChunkCount()) + ", Δ bytes: " + (startingTotalBytes - getTotalBytes()) + "}";
-			}
-			return "Transaction{count: " + getChunkCount() + ", bytes: " + getTotalBytes() + "}";
 		}
 	}
 	
@@ -887,11 +845,6 @@ public final class IOTransactionBuffer{
 		return combined;
 	}
 	
-	public IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
-		var oldTransactionOpen = (boolean)transactionOpenVar.get(target);
-		transactionOpenVar.set(target, true);
-		return new BufferedTransaction(oldTransactionOpen, transactionOpenVar, target);
-	}
 	public TransactionExport export(){
 		try(var ignored = lock.write()){
 			return export0();
@@ -912,7 +865,7 @@ public final class IOTransactionBuffer{
 		return new TransactionExport(setCapacity, writes);
 	}
 	
-	private void reset(){
+	void reset(){
 		writeEvents.clear();
 		modifiedCapacity = -1;
 	}
@@ -932,7 +885,7 @@ public final class IOTransactionBuffer{
 	
 	public long getTotalBytes(){
 		try(var ignored = lock.read()){
-			int sum = 0;
+			long sum = 0;
 			for(WriteEvent writeEvent : writeEvents){
 				sum += writeEvent.length();
 			}

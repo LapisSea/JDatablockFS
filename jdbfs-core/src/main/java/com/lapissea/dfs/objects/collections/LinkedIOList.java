@@ -134,7 +134,8 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 		}
 		
 		//read data needed for proper function such as number of elements
-		readManagedFields();
+		loadState();
+		finishConstruction();
 	}
 	
 	@Override
@@ -216,7 +217,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 	public void add(T value) throws IOException{
 		IONode<T> newNode = allocNode(value, null);
 		
-		try(var ignore = getDataProvider().getSource().openIOTransaction()){
+		try(var ignore = getDataProvider().getSource().startTransaction()){
 			if(isEmpty()){
 				setHead(newNode);
 			}else{
@@ -224,6 +225,7 @@ public class LinkedIOList<T> extends UnmanagedIOList<T, LinkedIOList<T>>{
 			}
 			
 			deltaSize(1);
+			ignore.commit();
 		}
 	}
 	

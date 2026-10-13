@@ -251,18 +251,20 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, IOType nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
-		var nextSize = getNextSize(next, provider);
+		try(var ignored = provider.getSource().startTransaction()){
+			var nextSize = getNextSize(next, provider);
 		
-		var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
-			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
-			case SizeDescriptor.Unknown unknown ->
-				unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
-			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
-		};
+			var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
+				case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
+				case SizeDescriptor.Unknown unknown ->
+					unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
+				case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
+			};
 		
-		Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
-		try(var ignored = provider.getSource().openIOTransaction()){
-			return new IONode<>(provider, chunk, nodeType, value, next);
+			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
+			var transactionResult = new IONode<>(provider, chunk, nodeType, value, next);
+			ignored.commit();
+			return transactionResult;
 		}
 	}
 	
@@ -271,13 +273,14 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		
 		var bytes = 1 + nextSize.bytes + valueBytes.remaining();
 		
-		try(var ignored = provider.getSource().openIOTransaction()){
+		try(var ignored = provider.getSource().startTransaction()){
 			var chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 			var node  = new IONode<>(provider, chunk, nodeType, null, next);
 			node.ensureNextSpace();
 			try(var io = node.getValueDataIO()){
 				valueBytes.transferTo(io);
 			}
+			ignored.commit();
 			return node;
 		}
 	}
@@ -312,7 +315,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, IOType.getArg(typeDef, 0), getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
 		
 		try{
-			readManagedFields();
+			loadState();
 		}catch(EOFException eof){
 			if(isSelfDataEmpty() && !readOnly){
 				nextSize = calcOptimalNextSize(provider);
@@ -321,6 +324,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				throw eof;
 			}
 		}
+		finishConstruction();
 	}
 
 //	@Override
@@ -520,7 +524,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(ptr.isNull()) return null;
 		
 		var prov = getDataProvider();
-		return new IONode<>(prov, ptr.dereference(prov), getTypeDef());
+		return ((Struct.Unmanaged<IONode<T>>)getThisStruct()).make(prov, ptr.dereference(prov), getTypeDef());
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -557,9 +561,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			var grow = newSiz.bytes - nextSize.bytes;
 			nextSize = newSiz;
 			selfIO(io -> io.ensureCapacity(io.getCapacity() + grow));
-			try(var ignored = getDataProvider().getSource().openIOTransaction()){
+			try(var ignored = getDataProvider().getSource().startTransaction()){
 				writeManagedFields();
 				setValue(val);
+				ignored.commit();
 			}
 		}
 		

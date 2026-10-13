@@ -76,6 +76,8 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.FEnum<FreedMemoryPurgeType> PURGE_ACCIDENTAL_CHUNK_HEADERS = flagE("purgeAccidentalChunkHeaders", () -> deb()? ONLY_HEADER_BYTES : ZERO_OUT);
 	
 	Flag.FBool DISABLE_TRANSACTIONS = flagB("io.disableTransactions", false);
+	Flag.FInt  WAL_CHECKPOINT_BYTES = flagI("io.walCheckpointBytes", 64*1024*1024).positive();
+	Flag.FBool DURABLE_FILE_IO      = flagB("io.durableFileIO", true);
 	Flag.FBool SYNCHRONOUS_FILE_IO  = flagB("io.synchronousFileIO", false);
 	
 	Flag.FStr  RUNNER_BASE_TASK_NAME       = flagS("runner.baseTaskName", "Task");

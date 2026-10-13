@@ -329,6 +329,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	@NotNull
 	private final ChunkPointer ptr;
 	
+	private final long creationEpoch;
+	
 	
 	private int     headerSize;
 	private boolean dirty, reading;
@@ -338,12 +340,14 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		super(STRUCT);
 		this.provider = provider;
 		this.ptr = Objects.requireNonNull(ptr);
+		creationEpoch = 0;
 		nextPtr = ChunkPointer.NULL;
 	}
 	
 	public Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr, @NotNull NumberSize bodyNumSize, long capacity, long size, NumberSize nextSize, ChunkPointer nextPtr){
 		this.provider = Objects.requireNonNull(provider);
 		this.ptr = Objects.requireNonNull(ptr);
+		creationEpoch = provider.getUnmanagedRegistry().creationEpoch();
 		this.bodyNumSize = bodyNumSize;
 		this.capacity = requireCapacityPositive(capacity);
 		this.size = size;
@@ -364,6 +368,10 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		refreshHeaderSize();
 		dirty = true;
+	}
+	
+	public boolean createdInTransaction(long epoch){
+		return creationEpoch != 0 && creationEpoch == epoch;
 	}
 	
 	private static void badBodyNumSize(OutOfBitDepth e){

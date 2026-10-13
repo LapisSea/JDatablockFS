@@ -142,6 +142,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 		RawCheck.of(Comparable.class::isAssignableFrom, "is not Comparable").arg()
 	);
 	
+	@Override
+	public boolean acceptsType(IOType requested){ return getTypeDef().equals(((IOType.RawAndArg)requested).withDefaultArgs(IOType.TypeRaw.OBJ)); }
+
 	public IOTreeSet(DataProvider provider, Chunk identity, IOType typeDef) throws IOException{
 		super(provider, identity, ((IOType.RawAndArg)typeDef).withDefaultArgs(IOType.TypeRaw.OBJ));
 		
@@ -150,9 +153,18 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			writeManagedFields();
 		}
 		
-		readManagedFields();
+		loadState();
+		finishConstruction();
 	}
 	
+	@Override
+	protected void loadState() throws IOException{
+		nodeCache.clear();
+		blankNodeIds.clear(); blankValueIds.clear();
+		blankNodeIdsScanned = false; blankValueIdsScanned = false;
+		readManagedFields();
+	}
+
 	private record IndexedNode(long idx, @NotNull Node node){
 		private IndexedNode{
 			Objects.requireNonNull(node);
@@ -393,6 +405,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			}else{
 				values.set(valIdx, new Val<>(value));
 			}
+			ignored.commit();
 		}
 		return nodeIdx;
 	}
@@ -452,7 +465,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 	}
 	
 	private IOTransaction transaction(){
-		return getDataProvider().getSource().openIOTransaction();
+		return getDataProvider().getSource().startTransaction();
 	}
 	
 	private void validate() throws IOException{
@@ -515,6 +528,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 			parent.setChild(addNode(value, true));
 			updateNode(parent.index());
 			deltaSize(1);
+			ignored.commit();
 		}
 		if(DEBUG_VALIDATION) validate();
 		return true;
@@ -563,6 +577,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends UnmanagedIOSet<T>{
 		try(var ignored = transaction()){
 			removeLR(res);
 			deltaSize(-1);
+			ignored.commit();
 		}
 		if(DEBUG_VALIDATION) validate();
 		return true;

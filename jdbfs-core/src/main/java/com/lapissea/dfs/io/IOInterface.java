@@ -1,6 +1,7 @@
 package com.lapissea.dfs.io;
 
 import com.lapissea.dfs.Utils;
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.io.impl.FileMemoryMappedData;
 import com.lapissea.dfs.io.impl.FileRandomAccessData;
 import com.lapissea.dfs.io.impl.MemoryData;
@@ -16,6 +17,10 @@ import java.io.IOException;
  * This interface is a container or accessor of binary data that can provide a way to write/read contents in a random or sequential manner.
  */
 public interface IOInterface extends RandomIO.Creator{
+	/**
+	 * Canonical weak identities shared by every provider over this source.
+	 */
+	default UnmanagedRegistry getUnmanagedRegistry(){ throw new UnsupportedOperationException("Source does not support unmanaged identities"); }
 	
 	final class Builder{
 		private File    file;
@@ -87,27 +92,54 @@ public interface IOInterface extends RandomIO.Creator{
 	boolean isReadOnly();
 	
 	/**
-	 * Call to this function signifies that future write events need to be treated as an atomic
-	 * operation. (atomic meaning, partial execution is not acceptable) This stands true until
-	 * {@link IOTransaction#close()} has been called. This function may be called multiple times
-	 * before any close has been called. The transaction ends only when all {@link IOTransaction}s
-	 * have been closed.
-	 * The changes of data must be visible to while the transaction is ongoing, although they do not
-	 * need to be stored.
-	 *
-	 * @return a transaction object that is active until closed
-	 * @see IOTransactionBuffer
+	 * Opens a scope owned by the calling thread. Nested scopes join the root transaction. Every scope
+	 * must call {@link IOTransaction#commit()}, otherwise the root rolls back!<br>
+	 * <br>
+	 * Backing IO access from other threads waits for the root scope to close.<br>
+	 * Rollback refreshes live unmanaged identities and clears internal caches before releasing the access lock.<br>
+	 * Objects allocated by the failed root lose their identity.
 	 */
-	IOTransaction openIOTransaction();
+	IOTransaction startTransaction();
+	
+	/**
+	 * Coordinates bookkeeping locks with backing IO. Acquire this before allocator/cache locks
+	 * that may perform IO, and release it on the same thread. This does not open a transaction!
+	 */
+	default IOTransactionState.Access lockIO(){ return IOTransactionState.NOOP_ACCESS; }
+	
+	/**
+	 * @see #startTransaction()
+	 */
+	default IOTransaction openIOTransaction(){ return startTransaction(); }
 	
 	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
-		try(var ignored = openIOTransaction()){
+		try(var transaction = startTransaction()){
 			session.run();
+			transaction.commit();
 		}
 	}
 	default <T, E extends Throwable> T openIOTransaction(UnsafeSupplier<T, E> session) throws E, IOException{
-		try(var ignored = openIOTransaction()){
-			return session.get();
+		try(var transaction = startTransaction()){
+			var result = session.get();
+			transaction.commit();
+			return result;
+		}
+	}
+	
+	/**
+	 * @return true when there is a wall file backing the writes
+	 */
+	default boolean isDurable(){ return false; }
+	
+	default void applyTransaction(IOTransactionBuffer.TransactionExport changes) throws IOException{
+		io(changes::apply);
+	}
+	
+	default long getTransactionVersion(){ return 0; }
+	
+	default void checkTransactionVersion(long expected){
+		if(getTransactionVersion() != expected){
+			throw new IllegalStateException("Data provider is invalidated by transaction rollback. Objects must be reloaded");
 		}
 	}
 	
@@ -119,9 +151,17 @@ public interface IOInterface extends RandomIO.Creator{
 				return true;
 			}
 			@Override
-			public IOTransaction openIOTransaction(){
+			public IOTransaction startTransaction(){
 				return IOTransaction.NOOP;
 			}
+			@Override
+			public long getTransactionVersion(){ return IOInterface.this.getTransactionVersion(); }
+			@Override
+			public UnmanagedRegistry getUnmanagedRegistry(){ return IOInterface.this.getUnmanagedRegistry(); }
+			@Override
+			public IOTransactionState.Access lockIO(){ return IOInterface.this.lockIO(); }
+			@Override
+			public void checkTransactionVersion(long expected){ IOInterface.this.checkTransactionVersion(expected); }
 			@Override
 			public RandomIO io() throws IOException{
 				var io = IOInterface.this.readOnlyIO();

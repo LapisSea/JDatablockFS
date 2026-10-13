@@ -1,9 +1,11 @@
 package com.lapissea.dfs.io.impl;
 
+import com.lapissea.dfs.core.UnmanagedRegistry;
 import com.lapissea.dfs.io.IOHook;
 import com.lapissea.dfs.io.IOInterface;
 import com.lapissea.dfs.io.IOTransaction;
 import com.lapissea.dfs.io.IOTransactionBuffer;
+import com.lapissea.dfs.io.IOTransactionState;
 import com.lapissea.dfs.io.RandomIO;
 import com.lapissea.dfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
@@ -11,12 +13,12 @@ import com.lapissea.util.NotNull;
 import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.LongStream;
 
 public abstract class CursorIOData implements IOInterface{
@@ -63,47 +65,70 @@ public abstract class CursorIOData implements IOInterface{
 		
 		@Override
 		public CursorRandomIO setPos(long pos){
-			if(pos<0) throw new IndexOutOfBoundsException();
-			this.pos = pos;
-			return this;
+			try(var ignored = access(false)){
+				if(pos<0) throw new IndexOutOfBoundsException();
+				this.pos = pos;
+				return this;
+			}
 		}
 		
 		@Override
 		public long getPos(){
-			return Math.min(pos, getSize());
+			try(var ignored = access(false)){
+				return Math.min(pos, getSize());
+			}
 		}
 		
 		@Override
 		public long getSize(){
-			return getCapacity();
+			try(var ignored = access(false)){
+				return getCapacity();
+			}
 		}
 		
 		@Override
 		public void setSize(long targetSize){
-			if(targetSize<0) throw new IllegalArgumentException();
-			if(transactionOpen) throw new UnsupportedOperationException();
-			var cap = getCapacity();
-			if(targetSize>cap) targetSize = cap;
-			CursorIOData.this.used = targetSize;
+			if(needsImplicitTransaction()){
+				var requestedSize = targetSize;
+				try{ openIOTransaction(() -> setSize(requestedSize)); }catch(IOException e){ throw new UncheckedIOException(e); }
+				return;
+			}
+			if(readOnly) throw new UnsupportedOperationException();
+			try(var ignored = access(true)){
+				if(targetSize<0) throw new IllegalArgumentException();
+				var cap = getCapacity();
+				if(targetSize>cap) targetSize = cap;
+				if(transactions.inTransaction()) transactionBuff.capacityChange(targetSize);
+				else CursorIOData.this.used = targetSize;
+			}
 		}
 		
 		@Override
 		public long getCapacity(){
-			if(transactionOpen){
-				return transactionBuff.getCapacity(used);
+			try(var ignored = access(false)){
+				if(transactions.inTransaction()){
+					return transactionBuff.getCapacity(used);
+				}
+				return used;
 			}
-			return used;
 		}
 		
 		@Override
 		public CursorRandomIO setCapacity(long newCapacity) throws IOException{
-			if(readOnly) throw new UnsupportedOperationException();
-			setCapacity0(newCapacity, true);
-			return this;
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> { setCapacity(newCapacity); });
+				return this;
+			}
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				setCapacity0(newCapacity, true);
+				return this;
+			}
 		}
 		private void setCapacity0(long newCapacity, boolean log) throws IOException{
+			var oldSize = getSize();
 			CursorIOData.this.setCapacity(newCapacity, log);
-			pos = Math.min(pos, getSize());
+			if(newCapacity<oldSize) pos = Math.min(pos, getSize());
 		}
 		
 		@Override
@@ -114,50 +139,62 @@ public abstract class CursorIOData implements IOInterface{
 		
 		@Override
 		public int read() throws IOException{
-			if(transactionOpen){
-				int b = transactionBuff.readByte(readAt, pos);
-				if(b>=0){
-					this.pos++;
+			try(var ignored = access(false)){
+				if(pos>=getSize()) return -1;
+				if(transactions.inTransaction()){
+					int b = transactionBuff.readByte(readAt, pos);
+					if(b>=0){
+						this.pos++;
+					}
+					return b;
 				}
-				return b;
+				
+				var remaining = getSize() - getPos();
+				if(remaining<=0){
+					return -1;
+				}
+				return Byte.toUnsignedInt(read1(pos++));
 			}
-			
-			var remaining = getSize() - getPos();
-			if(remaining<=0){
-				return -1;
-			}
-			return Byte.toUnsignedInt(read1(pos++));
 		}
 		
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
-			if(transactionOpen){
-				int read = transactionBuff.read(readAt, pos, b, off, len);
-				if(read != -1) pos += read;
+			try(var ignored = access(false)){
+				Objects.checkFromIndexSize(off, len, b.length);
+				if(len == 0) return 0;
+				if(pos>=getSize()) return -1;
+				len = (int)Math.min(len, getSize() - pos);
+				if(transactions.inTransaction()){
+					int read = transactionBuff.read(readAt, pos, b, off, len);
+					if(read != -1) pos += read;
+					return read;
+				}
+				
+				int read = readAt(pos, b, off, len);
+				if(read>=0) pos += read;
 				return read;
 			}
-			
-			int read = readAt(pos, b, off, len);
-			if(read>=0) pos += read;
-			return read;
 		}
 		
 		@Override
 		public long readWord(int len) throws IOException{
-			if(transactionOpen){
-				var word = transactionBuff.readWord(readAt, pos, len);
+			try(var ignored = access(false)){
+				if(getSize() - pos<len) throw new EOFException();
+				if(transactions.inTransaction()){
+					var word = transactionBuff.readWord(readAt, pos, len);
+					pos += len;
+					return word;
+				}
+				
+				long remaining = used - pos;
+				if(remaining<len){
+					throw new EOFException();
+				}
+				
+				long val = CursorIOData.this.readWord(pos, len);
 				pos += len;
-				return word;
+				return val;
 			}
-			
-			long remaining = used - pos;
-			if(remaining<len){
-				throw new EOFException();
-			}
-			
-			long val = CursorIOData.this.readWord(pos, len);
-			pos += len;
-			return val;
 		}
 		
 		private final IOTransactionBuffer.BaseAccess readAt = this::readAt;
@@ -169,77 +206,97 @@ public abstract class CursorIOData implements IOInterface{
 			}
 			
 			int clampedLen = (int)Math.min(remaining, len);
-			readN(pos, b, off, clampedLen);
+			int storedLen  = (int)Math.min(clampedLen, Math.max(0, used - pos));
+			if(storedLen>0) readN(pos, b, off, storedLen);
+			if(storedLen<clampedLen) Arrays.fill(b, off + storedLen, off + clampedLen, (byte)0);
 			return clampedLen;
 		}
 		
 		@Override
 		public void write(int b) throws IOException{
-			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				transactionBuff.writeByte(pos, b);
-				pos++;
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> write(b));
 				return;
 			}
-			
-			var  cap       = getCapacity();
-			long remaining = cap - getPos();
-			if(remaining<=0) setCapacity0(Math.max(4, Math.max(cap + 1, cap + 1 - remaining)), false);
-			var oldPos = pos;
-			write1(pos, (byte)b);
-			pos++;
-			used = Math.max(used, pos);
-			if(hook != null) logWriteEvent(oldPos);
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				if(transactions.inTransaction()){
+					transactionBuff.writeByte(pos, b);
+					pos++;
+					return;
+				}
+				
+				var  cap       = getCapacity();
+				long remaining = cap - pos;
+				if(remaining<=0) setCapacity0(Math.max(4, Math.max(cap + 1, cap + 1 - remaining)), false);
+				var oldPos = pos;
+				write1(pos, (byte)b);
+				pos++;
+				used = Math.max(used, pos);
+				if(hook != null) logWriteEvent(oldPos);
+			}
 		}
 		
 		@Override
 		public void write(byte[] b, int off, int len) throws IOException{
-			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				transactionBuff.write(pos, b, off, len);
-				pos += len;
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> write(b, off, len));
 				return;
 			}
-			
-			var oldPos = pos;
-			write0(b, off, len);
-			
-			pos += len;
-			used = Math.max(used, pos);
-			if(hook != null) logWriteEvent(oldPos, oldPos + len);
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				if(transactions.inTransaction()){
+					transactionBuff.write(pos, b, off, len);
+					pos += len;
+					return;
+				}
+				
+				var oldPos = pos;
+				write0(b, off, len);
+				
+				pos += len;
+				used = Math.max(used, pos);
+				if(hook != null) logWriteEvent(oldPos, oldPos + len);
+			}
 		}
 		
 		@Override
 		public void writeAtOffsets(Collection<WriteChunk> writeData) throws IOException{
-			if(readOnly) throw new UnsupportedOperationException();
-			if(writeData.isEmpty()) return;
-			if(transactionOpen){
-				transactionBuff.writeChunks(writeData);
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> writeAtOffsets(writeData));
 				return;
 			}
-			
-			long required = Long.MIN_VALUE;
-			for(var writeDatum : writeData){
-				long ioEnd = writeDatum.ioEnd();
-				if(ioEnd>required) required = ioEnd;
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				if(writeData.isEmpty()) return;
+				if(transactions.inTransaction()){
+					transactionBuff.writeChunks(writeData);
+					return;
+				}
+				
+				long required = Long.MIN_VALUE;
+				for(var writeDatum : writeData){
+					long ioEnd = writeDatum.ioEnd();
+					if(ioEnd>required) required = ioEnd;
+				}
+				var cap = getCapacity();
+				if(cap<required) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), required)));
+				
+				used = Math.max(used, required);
+				
+				for(var e : writeData){
+					writeN(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				}
+				
+				if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
 			}
-			var cap = getCapacity();
-			if(cap<required) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), required)));
-			
-			used = Math.max(used, required);
-			
-			for(var e : writeData){
-				writeN(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
-			}
-			
-			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
 		}
 		
 		private void write0(byte[] b, int off, int len) throws IOException{
 			if(len == 0) return;
 			
 			var cap       = getCapacity();
-			var remaining = cap - getPos();
+			var remaining = cap - pos;
 			if(remaining<len) setCapacity0(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)), false);
 			
 			writeN(pos, b, off, len);
@@ -247,31 +304,44 @@ public abstract class CursorIOData implements IOInterface{
 		
 		@Override
 		public void writeWord(long v, int len) throws IOException{
-			if(transactionOpen){
-				transactionBuff.writeWord(pos, v, len);
-				pos += len;
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> writeWord(v, len));
 				return;
 			}
-			
-			if(len == 0) return;
-			
-			var cap       = getCapacity();
-			var remaining = cap - getPos();
-			if(remaining<len) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)));
-			
-			CursorIOData.this.writeWord(pos, v, len);
-			var oldPos = pos;
-			pos += len;
-			used = Math.max(used, pos);
-			if(hook != null) logWriteEvent(oldPos, oldPos + len);
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				if(transactions.inTransaction()){
+					transactionBuff.writeWord(pos, v, len);
+					pos += len;
+					return;
+				}
+				
+				if(len == 0) return;
+				
+				var cap       = getCapacity();
+				var remaining = cap - pos;
+				if(remaining<len) setCapacity(Math.max(4, Math.max((long)(cap*4D/3), cap + len - remaining)));
+				
+				CursorIOData.this.writeWord(pos, v, len);
+				var oldPos = pos;
+				pos += len;
+				used = Math.max(used, pos);
+				if(hook != null) logWriteEvent(oldPos, oldPos + len);
+			}
 		}
 		
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
-			if(readOnly) throw new UnsupportedOperationException();
-			var pos = this.pos;
-			IOUtils.zeroFill(this, requestedMemory);
-			this.pos = pos;
+			if(needsImplicitTransaction()){
+				openIOTransaction(() -> fillZero(requestedMemory));
+				return;
+			}
+			try(var ignored = access(true)){
+				if(readOnly) throw new UnsupportedOperationException();
+				var pos = this.pos;
+				IOUtils.zeroFill(this, requestedMemory);
+				this.pos = pos;
+			}
 		}
 		@Override
 		public boolean isReadOnly(){
@@ -280,79 +350,98 @@ public abstract class CursorIOData implements IOInterface{
 		
 		@Override
 		public boolean inTransaction(){
-			return transactionOpen;
+			try(var ignored = access(false)){
+				return transactions.inTransaction();
+			}
 		}
 		
 		@Override
 		public String toString(){
-			int count = 64;
-			
-			long start = getPos(), end = start + count;
-			
-			var used = getSize();
-			
-			var overshoot = end - used;
-			if(overshoot>0){
-				start = Math.max(0, start - overshoot);
-				end = used;
-			}
-			
-			String transactionStr = transactionOpen? ", transaction: {" + transactionBuff.infoString() + "}" : "";
-			
-			String name = getClass().getSimpleName();
-			String pre  = "{pos=" + getPos() + " / " + getSize() + transactionStr;
-			if(start != 0 || start != end){
-				pre += ", data=";
-			}
-			if(start != 0) pre += start + " ... ";
-			
-			var more = used - end;
-			var post = more == 0? "}" : " ... " + more + "}";
-			
-			var result = new StringBuilder((int)(name.length() + pre.length() + post.length() + end - start));
-			
-			result.append(name).append(pre);
-			try(var io = ioAt(start)){
-				for(long i = start; i<end - 1; i++){
-					char c = (char)io.readInt1();
-					result.append(switch(c){
-						case 0 -> '␀';
-						case '\n' -> '↵';
-						case '\r' -> '®';
-						case '\b' -> '␈';
-						case '\t' -> '↹';
-						default -> c;
-					});
+			try(var ignored = access(false)){
+				int count = 64;
+				
+				long start = getPos(), end = start + count;
+				
+				var used = getSize();
+				
+				var overshoot = end - used;
+				if(overshoot>0){
+					start = Math.max(0, start - overshoot);
+					end = used;
 				}
-			}catch(IOException e){
-				throw new RuntimeException(e);
+				
+				String transactionStr = transactions.inTransaction()? ", transaction: {" + transactionBuff.infoString() + "}" : "";
+				
+				String name = getClass().getSimpleName();
+				String pre  = "{pos=" + getPos() + " / " + getSize() + transactionStr;
+				if(start != 0 || start != end){
+					pre += ", data=";
+				}
+				if(start != 0) pre += start + " ... ";
+				
+				var more = used - end;
+				var post = more == 0? "}" : " ... " + more + "}";
+				
+				var result = new StringBuilder((int)(name.length() + pre.length() + post.length() + end - start));
+				
+				result.append(name).append(pre);
+				try(var io = ioAt(start)){
+					for(long i = start; i<end - 1; i++){
+						char c = (char)io.readInt1();
+						result.append(switch(c){
+							case 0 -> '␀';
+							case '\n' -> '↵';
+							case '\r' -> '®';
+							case '\b' -> '␈';
+							case '\t' -> '↹';
+							default -> c;
+						});
+					}
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+				
+				result.append(post);
+				
+				return result.toString();
 			}
-			
-			result.append(post);
-			
-			return result.toString();
 		}
 		@Override
 		public boolean isDirect(){
-			return !transactionOpen;
+			try(var ignored = access(false)){
+				return !transactions.inTransaction();
+			}
 		}
+	}
+	
+	/**
+	 * File backends use this to journal standalone mutations as implicit root transactions.
+	 */
+	protected boolean needsImplicitTransaction(){ return false; }
+	protected final void physicalCommitFailed(Throwable failure){ transactions.physicalCommitFailed(failure); }
+	protected final boolean hasActiveTransaction()              { return transactions.inTransaction(); }
+	protected final void applyDirect(IOTransactionBuffer.TransactionExport changes) throws IOException{
+		IOInterface.super.applyTransaction(changes);
 	}
 	
 	private final IOHook hook;
 	
 	protected long used;
 	
-	private final boolean readOnly;
-	private       boolean closed;
+	private final    boolean readOnly;
+	private volatile boolean closed;
 	
-	@SuppressWarnings("unused")
-	private       boolean             transactionOpen;
-	private final IOTransactionBuffer transactionBuff = new IOTransactionBuffer();
+	private final UnmanagedRegistry   unmanagedRegistry = new UnmanagedRegistry(this);
+	private final IOTransactionState  transactions      = new IOTransactionState(this);
+	private final IOTransactionBuffer transactionBuff   = transactions.buffer();
 	
 	public CursorIOData(IOHook hook, boolean readOnly){
 		this.readOnly = readOnly;
 		this.hook = hook;
 	}
+	
+	@Override
+	public final UnmanagedRegistry getUnmanagedRegistry(){ return unmanagedRegistry; }
 	
 	protected void markClosed(){ closed = true; }
 	
@@ -377,24 +466,30 @@ public abstract class CursorIOData implements IOInterface{
 	@Override
 	@NotNull
 	public CursorRandomIO io(){
-		return new CursorRandomIO();
+		try(var ignored = access(false)){
+			return new CursorRandomIO();
+		}
 	}
 	@Override
 	public RandomIO ioAt(long offset) throws IOException{
-		return new CursorRandomIO(offset);
+		try(var ignored = access(false)){
+			return new CursorRandomIO(offset);
+		}
 	}
 	
 	@Override
 	public long getIOSize(){
-		if(transactionOpen){
-			return transactionBuff.getCapacity(used);
+		try(var ignored = access(false)){
+			if(transactions.inTransaction()){
+				return transactionBuff.getCapacity(used);
+			}
+			return used;
 		}
-		return used;
 	}
 	
 	private void setCapacity(long newCapacity, boolean log) throws IOException{
 		if(readOnly) throw new UnsupportedOperationException();
-		if(transactionOpen){
+		if(transactions.inTransaction()){
 			var siz = transactionBuff.getCapacity(used);
 			transactionBuff.capacityChange(Math.min(siz, newCapacity));
 			return;
@@ -417,38 +512,53 @@ public abstract class CursorIOData implements IOInterface{
 		return readOnly;
 	}
 	
-	private static final VarHandle TRANSACTION_OPEN;
-	
-	static{
-		try{
-			TRANSACTION_OPEN = MethodHandles.lookup().findVarHandle(CursorIOData.class, "transactionOpen", boolean.class);
-		}catch(ReflectiveOperationException e){
-			throw new Error(e);
-		}
-	}
-	
 	@Override
-	public IOTransaction openIOTransaction(){
-		if(IOTransaction.DISABLE_TRANSACTIONS) return IOTransaction.NOOP;
-		return transactionBuff.open(this, TRANSACTION_OPEN);
+	public IOTransaction startTransaction(){
+		if(closed) throw new IllegalStateException("closed");
+		if(readOnly) return IOTransaction.NOOP;
+		if(IOTransaction.DISABLE_TRANSACTIONS) throw new UnsupportedOperationException("Cancellable transactions cannot be disabled");
+		var result = transactions.open();
+		if(closed){
+			try{ result.close(); }catch(IOException e){ throw new UncheckedIOException(e); }
+			throw new IllegalStateException("closed");
+		}
+		return result;
+	}
+	@Override
+	public long getTransactionVersion(){ return transactions.version(); }
+	@Override
+	public IOTransactionState.Access lockIO(){ return access(false); }
+	@Override
+	public void checkTransactionVersion(long expected){ transactions.checkVersion(expected); }
+	
+	protected final IOTransactionState.Access closeAccess(){ return transactions.closeAccess(); }
+	private IOTransactionState.Access access(boolean write){
+		var result = write? transactions.writeAccess() : transactions.access();
+		if(closed){
+			result.close();
+			throw new IllegalStateException("closed");
+		}
+		return result;
 	}
 	
 	@Override
 	public byte[] readAll() throws IOException{
-		if(transactionOpen) return IOInterface.super.readAll();
-		var u = used;
-		if(u>Integer.MAX_VALUE) throw new OutOfMemoryError();
-		var iUsed = (int)u;
-		var copy  = new byte[iUsed];
-		try{
-			readN(0, copy, 0, iUsed);
-		}catch(Throwable e){
-			throw switch(e){
-				case IOException io -> io;
-				default -> new IOException("Failed to read " + iUsed + " bytes", e);
-			};
+		try(var ignored = access(false)){
+			if(transactions.inTransaction()) return IOInterface.super.readAll();
+			var u = used;
+			if(u>Integer.MAX_VALUE) throw new OutOfMemoryError();
+			var iUsed = (int)u;
+			var copy  = new byte[iUsed];
+			try{
+				readN(0, copy, 0, iUsed);
+			}catch(Throwable e){
+				throw switch(e){
+					case IOException io -> io;
+					default -> new IOException("Failed to read " + iUsed + " bytes", e);
+				};
+			}
+			return copy;
 		}
-		return copy;
 	}
 	
 	@Override

@@ -96,7 +96,9 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		super(provider, identity, typeDef, TYPE_CHECK);
 		//read data needed for proper function such as number of elements and varying sizes
 		if(!isSelfDataEmpty()){
-			readManagedFields();
+			loadState();
+			finishConstruction();
+			return;
 		}
 		
 		var ptrSize = NumberSize.bySize(getDataProvider().getSource().getIOSize());
@@ -120,8 +122,16 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			writeManagedFields();
 		}
 		calcHead();
+		finishConstruction();
 	}
 	
+	@Override
+	protected void loadState() throws IOException{
+		readManagedFields();
+		storage = makeValueStorage(VaryingSize.Provider.record((max, ptr, id) -> max.min(varyingBuffer.get(id))), IOType.getArg(getTypeDef(), 0));
+		calcHead();
+	}
+
 	private void calcHead(){
 		headSize = (int)calcInstanceSize(WordSpace.BYTE);
 	}
@@ -392,7 +402,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		
 		selfIO(io -> io.ensureCapacity(newSize));
 		
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = getDataProvider().getSource().startTransaction()){
 			
 			varyingBuffer = newVarying;
 			writeManagedFields();
@@ -422,6 +432,7 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 					newVal.writeInline(io, el);
 				}
 			}
+			ignored.commit();
 		}
 		storage = newStorage;
 		calcHead();
@@ -476,10 +487,11 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			return;
 		}
 		
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = getDataProvider().getSource().startTransaction()){
 			forwardDup(index);
 			writeAt(index, value);
 			deltaSize(1);
+			ignored.commit();
 		}
 		defragData(0);
 	}
@@ -572,9 +584,10 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 		checkSize(index);
 		
 		var size = size();
-		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+		try(var ignored = getDataProvider().getSource().startTransaction()){
 			deltaSize(-1);
 			squash(index, size);
+			ignored.commit();
 		}
 		
 		var lastOff = calcElementOffset(size - 1);
@@ -757,33 +770,32 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 	public void releaseFreeCapacity() throws IOException{
 		var siz = size();
 		var cap = calcElementOffset(siz);
-		try(var ignore = getDataProvider().getSource().openIOTransaction(); var io = selfIO()){
-			io.setCapacity(cap);
-			io.setPos(cap);
-			var last            = io.getCursor();
-			var freeSpace       = last.getCapacity() - last.getSize();
-			var newLastCapacity = last.getCapacity() - freeSpace;
-			if(freeSpace>=Chunk.minSafeSize() && newLastCapacity>=Chunk.minSafeSize()){
-				var ptr      = ChunkPointer.of(last.dataEnd() - freeSpace);
-				var builder  = new ChunkBuilder(getDataProvider(), ptr).withCapacity(freeSpace);
-				var tmpSplit = builder.create();
-				var splitOne = builder.withExplicitBodyNumSize(tmpSplit.getBodyNumSize()).withCapacity(freeSpace - tmpSplit.getHeaderSize()).create();
-				if(splitOne.dataEnd() != last.dataEnd()){
-					if(DEBUG_VALIDATION){
+		try(var ignore = getDataProvider().getSource().startTransaction()){
+			try(var io = selfIO()){
+				io.setCapacity(cap);
+				io.setPos(cap);
+				var last            = io.getCursor();
+				var freeSpace       = last.getCapacity() - last.getSize();
+				var newLastCapacity = last.getCapacity() - freeSpace;
+				if(freeSpace>=Chunk.minSafeSize() && newLastCapacity>=Chunk.minSafeSize()){
+					var ptr      = ChunkPointer.of(last.dataEnd() - freeSpace);
+					var builder  = new ChunkBuilder(getDataProvider(), ptr).withCapacity(freeSpace);
+					var tmpSplit = builder.create();
+					var splitOne = builder.withExplicitBodyNumSize(tmpSplit.getBodyNumSize()).withCapacity(freeSpace - tmpSplit.getHeaderSize()).create();
+					if(splitOne.dataEnd() != last.dataEnd()){
 						throw new IllegalStateException("Illegal list capacity free split");
 					}
-					Log.debug("Illegal list capacity free split");
-					return;
+					splitOne.writeHeader();
+					try{
+						last.setCapacity(last.getCapacity() - freeSpace);
+						last.syncStruct();
+					}catch(OutOfBitDepth e){
+						throw new ShouldNeverHappenError("Free space negative??", e);
+					}
+					getDataProvider().getMemoryManager().free(splitOne);
 				}
-				splitOne.writeHeader();
-				try{
-					last.setCapacity(last.getCapacity() - freeSpace);
-					last.syncStruct();
-				}catch(OutOfBitDepth e){
-					throw new ShouldNeverHappenError("Free space negative??", e);
-				}
-				getDataProvider().getMemoryManager().free(splitOne);
 			}
+			ignore.commit();
 		}
 		
 	}
@@ -836,9 +848,10 @@ public final class ContiguousIOList<T> extends UnmanagedIOList<T, ContiguousIOLi
 			throw new ShouldNeverHappenError(e);
 		}
 		
-		try(var ignored = prov.getSource().openIOTransaction()){
+		try(var ignored = prov.getSource().startTransaction()){
 			ch.writeHeader();
 			chRem.writeHeader();
+			ignored.commit();
 		}
 		
 		prov.getMemoryManager().free(prov.getChunk(ptr));

@@ -33,25 +33,35 @@ public interface DataProvider{
 		private final ChunkCache    cache         = new ChunkCache();
 		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
+		private final long          transactionVersion;
 		
 		public VerySimple(IOInterface data){
 			this.data = data;
+			transactionVersion = data.getTransactionVersion();
+			data.getUnmanagedRegistry().registerProvider(this);
 		}
 		
 		@Override
+		public void checkValid(){ data.checkTransactionVersion(transactionVersion); }
+		
+		@Override
 		public IOTypeDB getTypeDb(){
+			checkValid();
 			return typeDB;
 		}
 		@Override
 		public IOInterface getSource(){
+			checkValid();
 			return data;
 		}
 		@Override
 		public MemoryManager getMemoryManager(){
+			checkValid();
 			return memoryManager;
 		}
 		@Override
 		public ChunkCache getChunkCache(){
+			checkValid();
 			return cache;
 		}
 		@Override
@@ -95,6 +105,18 @@ public interface DataProvider{
 		return new VerySimple(data);
 	}
 	
+	/**
+	 * Fails after an unrecoverable physical commit or state restoration error
+	 */
+	default void checkValid(){ }
+	
+	default UnmanagedRegistry getUnmanagedRegistry(){ return getSource().getUnmanagedRegistry(); }
+	
+	/**
+	 * Restore provider-owned caches after bytes and unmanaged identities have been restored
+	 */
+	default void refreshAfterRollback() throws IOException{ }
+	
 	IOTypeDB getTypeDb();
 	
 	IOInterface getSource();
@@ -110,19 +132,22 @@ public interface DataProvider{
 		return getChunkCache().get(ptr);
 	}
 	default Chunk getChunk(ChunkPointer ptr) throws IOException{
-		ptr.requireNonNull();
-		if(DEBUG_VALIDATION){
-			ensureChunkValid(ptr);
-		}
-		var cc = getChunkCache();
-		synchronized(cc){
-			var ch = cc.get(ptr);
-			if(ch != null) return ch;
-			
-			var read = readChunk(ptr);
-			Objects.requireNonNull(read);
-			cc.add(read);
-			return read;
+		try(var ioAccess = getSource().lockIO()){
+			checkValid();
+			ptr.requireNonNull();
+			if(DEBUG_VALIDATION){
+				ensureChunkValid(ptr);
+			}
+			var cc = getChunkCache();
+			synchronized(cc){
+				var ch = cc.get(ptr);
+				if(ch != null) return ch;
+				
+				var read = readChunk(ptr);
+				Objects.requireNonNull(read);
+				cc.add(read);
+				return read;
+			}
 		}
 	}
 	
@@ -162,6 +187,9 @@ public interface DataProvider{
 	
 	default DataProvider withRouter(Function<AllocateTicket, AllocateTicket> router){
 		class Routed implements DataProvider, MemoryManager{
+			@Override
+			public void checkValid(){ DataProvider.this.checkValid(); }
+			
 			private MemoryManager src(){
 				return DataProvider.this.getMemoryManager();
 			}
@@ -178,6 +206,10 @@ public interface DataProvider{
 			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
 			@Override
 			public Chunk walkToLastChunk() throws IOException{ return DataProvider.this.walkToLastChunk(); }
+			@Override
+			public void refreshAfterRollback() throws IOException{
+				DataProvider.this.refreshAfterRollback();
+			}
 			@Override
 			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override

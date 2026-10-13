@@ -189,11 +189,12 @@ public final class RunLog{
 					if(!stamps.isEmpty() && stamps.getFirst().time.isBefore(cutoff.minus(Duration.ofHours(12)))){
 						LogUtil.println("Removing old data...");
 						long count = 0;
-						try(var ignore = dbFile.openIOTransaction()){
+						try(var ignore = dbFile.startTransaction()){
 							while(!stamps.isEmpty() && stamps.getFirst().time.isBefore(cutoff)){
 								stamps.remove(0);
 								count++;
 							}
+							ignore.commit();
 						}
 						LogUtil.println("Removed " + count + " records");
 					}

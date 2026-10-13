@@ -30,7 +30,6 @@ public final class ChunkCache{
 	private       Map<ChunkPointer, Entry> data     = new HashMap<>();
 	private final ReferenceQueue<Chunk>    refQueue = new ReferenceQueue<>();
 	
-	public ChunkCache(){ }
 	
 	private void poolRefQueue(){
 		int   count = 0;
@@ -86,17 +85,28 @@ public final class ChunkCache{
 		return chunk;
 	}
 	
-	public synchronized void notifyDestroyed(Iterable<Chunk> chunks){
-		poolRefQueue();
-		for(Chunk chunk : chunks){
-			rem(chunk);
+	public void notifyDestroyed(Iterable<Chunk> chunks){
+		var iterator = chunks.iterator();
+		if(!iterator.hasNext()) return;
+		var first = iterator.next();
+		try(var ignored = first.getDataProvider().getSource().lockIO()){
+			synchronized(this){
+				poolRefQueue();
+				rem(first);
+				while(iterator.hasNext()) rem(iterator.next());
+			}
 		}
 	}
-	public synchronized void notifyDestroyed(Chunk chunk){
-		poolRefQueue();
-		rem(chunk);
+	public void notifyDestroyed(Chunk chunk){
+		try(var ignored = chunk.getDataProvider().getSource().lockIO()){
+			synchronized(this){
+				poolRefQueue();
+				rem(chunk);
+			}
+		}
 	}
 	private void rem(Chunk chunk){
+		chunk.getDataProvider().getUnmanagedRegistry().destroyed(chunk);
 		if(DEBUG_VALIDATION) validateDestroyed(chunk);
 		var rem    = data.remove(chunk.getPtr());
 		var remVal = rem.get();
@@ -122,37 +132,59 @@ public final class ChunkCache{
 		}
 	}
 	
-	public synchronized void validate(DataProvider provider) throws IOException{
-		Chunk f;
-		try{
-			f = provider.getFirstChunk();
-		}catch(Throwable e){
-			return;
+	public void validate(DataProvider provider) throws IOException{
+		try(var ioAccess = provider.getSource().lockIO()){
+			synchronized(this){
+				Chunk f;
+				try{
+					f = provider.getFirstChunk();
+				}catch(Throwable e){
+					return;
+				}
+				poolRefQueue();
+				var vals = Iters.from(data.values()).map(Reference::get).nonNulls().toList();
+				
+				for(Chunk cached : vals){
+					try{
+						var read = Chunk.readChunk(provider, cached.getPtr());
+						if(!read.equals(cached)){
+							throw new CacheOutOfSync(read, cached);
+						}
+					}catch(Throwable e){
+						throw new RuntimeException(cached + "", e);
+					}
+					
+				}
+				
+				outer:
+				for(Chunk value : vals){
+					for(Chunk chunk : new PhysicalChunkWalker(f)){
+						if(chunk.getPtr().getValue()>value.getPtr().getValue()) break;
+						if(chunk == value){
+							continue outer;
+						}
+					}
+					throw new CacheOutOfSync("Unreachable chunk: " + value);
+				}
+			}
 		}
+	}
+	
+	public synchronized void refreshAfterRollback(long epoch, Iterable<Chunk> destroyed) throws IOException{
 		poolRefQueue();
-		var vals = Iters.from(data.values()).map(Reference::get).nonNulls().toList();
-		
-		for(Chunk cached : vals){
-			try{
-				var read = Chunk.readChunk(provider, cached.getPtr());
-				if(!read.equals(cached)){
-					throw new CacheOutOfSync(read, cached);
-				}
-			}catch(Throwable e){
-				throw new RuntimeException(cached + "", e);
-			}
-			
+		for(Chunk chunk : destroyed){
+			if(chunk.createdInTransaction(epoch)) continue;
+			var prev = data.put(chunk.getPtr(), box(chunk));
+			if(prev != null) prev.inData = false;
 		}
-		
-		outer:
-		for(Chunk value : vals){
-			for(Chunk chunk : new PhysicalChunkWalker(f)){
-				if(chunk.getPtr().getValue()>value.getPtr().getValue()) break;
-				if(chunk == value){
-					continue outer;
-				}
-			}
-			throw new CacheOutOfSync("Unreachable chunk: " + value);
+		var it = data.entrySet().iterator();
+		while(it.hasNext()){
+			var ent   = it.next();
+			var chunk = ent.getValue().get();
+			if(chunk == null || chunk.createdInTransaction(epoch)){
+				ent.getValue().inData = false;
+				it.remove();
+			}else chunk.readHeader();
 		}
 	}
 	

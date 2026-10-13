@@ -115,7 +115,7 @@ public class SlowTests{
 				Chunk head;
 				
 				IOInterface mem = LoggedMemoryUtils.newLoggedMemory("default", logger);
-				try(var ignored = mem.openIOTransaction()){
+				try(var ignored = mem.startTransaction()){
 					var chunks = new ArrayList<Chunk>();
 					
 					mem.write(true, new byte[MagicID.size()]);
@@ -147,6 +147,7 @@ public class SlowTests{
 					}
 					last.setNextPtr(ChunkPointer.NULL);
 					last.syncStruct();
+					ignored.commit();
 				}
 				
 				for(int i = 0; i<allWrites.size(); i++){

@@ -74,43 +74,49 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public DataProvider getDataProvider(){
+			context.checkValid();
 			return context;
 		}
 		
 		@Override
 		public final void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
-			Objects.requireNonNull(firstChunk);
-			Objects.requireNonNull(target);
-			if(toAllocate<0){
-				throw new IllegalArgumentException();
-			}
-			
-			if(DEBUG_VALIDATION){
-				MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
-			}
-			
-			var last = target;
-			
-			long remaining = toAllocate;
-			strategyLoop:
-			while(remaining>0){
-				last = last.last();
-				
-				for(var strategy : allocTos){
-					long allocated = allocTo(strategy, firstChunk, last, remaining);
-					
-					if(DEBUG_VALIDATION) validateAlloc(firstChunk, last, allocated);
-					if(allocated == 0) continue;
-					
-					remaining -= allocated;
-					if(allocated>0){
-						continue strategyLoop;
+			try(var ioAccess = context.getSource().lockIO()){
+				context.checkValid();
+				context.getSource().openIOTransaction(() -> {
+					context.checkValid();
+					Objects.requireNonNull(firstChunk);
+					Objects.requireNonNull(target);
+					if(toAllocate<0){
+						throw new IllegalArgumentException();
 					}
-				}
-				
-				throw failAlloc(toAllocate, last);
+					
+					if(DEBUG_VALIDATION){
+						MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+					}
+					
+					var last = target;
+					
+					long remaining = toAllocate;
+					strategyLoop:
+					while(remaining>0){
+						last = last.last();
+						
+						for(var strategy : allocTos){
+							long allocated = allocTo(strategy, firstChunk, last, remaining);
+							
+							if(DEBUG_VALIDATION) validateAlloc(firstChunk, last, allocated);
+							if(allocated == 0) continue;
+							
+							remaining -= allocated;
+							if(allocated>0){
+								continue strategyLoop;
+							}
+						}
+						
+						throw failAlloc(toAllocate, last);
+					}
+				});
 			}
-			
 		}
 		
 		private void validateAlloc(Chunk firstChunk, Chunk last, long allocated) throws IOException{
@@ -150,31 +156,39 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public final Chunk alloc(AllocateTicket ticket) throws IOException{
-			Chunk chunk;
-			
-			tryStrategies:
-			{
-				for(var strategy : allocs){
-					chunk = alloc(strategy, context, ticket, false);
-					if(chunk != null){
-						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
-						break tryStrategies;
+			try(var ioAccess = context.getSource().lockIO()){
+				context.checkValid();
+				return context.getSource().openIOTransaction(() -> {
+					context.checkValid();
+					Chunk chunk;
+					
+					tryStrategies:
+					{
+						for(var strategy : allocs){
+							chunk = alloc(strategy, context, ticket, false);
+							if(chunk != null){
+								if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
+								break tryStrategies;
+							}
+						}
+						return null;
 					}
-				}
-				return null;
+					
+					
+					context.getUnmanagedRegistry().allocated(chunk.getPtr());
+					var initial = ticket.dataPopulator();
+					if(initial != null){
+						initial.accept(chunk);
+					}
+					
+					return chunk;
+				});
 			}
-			
-			
-			var initial = ticket.dataPopulator();
-			if(initial != null){
-				initial.accept(chunk);
-			}
-			
-			return chunk;
 		}
 		
 		@Override
 		public boolean canAlloc(AllocateTicket ticket) throws IOException{
+			context.checkValid();
 			for(var strategy : allocs){
 				var chunk = alloc(strategy, context, ticket, true);
 				if(chunk != null){
@@ -266,4 +280,5 @@ public interface MemoryManager extends DataProvider.Holder{
 	
 	void notifyStart(ChunkChainIO chain);
 	void notifyEnd(ChunkChainIO chain);
+	void refreshAfterRollback() throws IOException;
 }

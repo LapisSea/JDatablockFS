@@ -23,148 +23,161 @@ public class IOTransactionTests{
 	void simpleWriteRead() throws IOException{
 		var mem = initialMem(4);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
-			io.setPos(1);
-			io.write(new byte[]{11, 12});
-			checkMismatchBin(mem, 0, 11, 12, 3);
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
+				io.setPos(1);
+				io.write(new byte[]{11, 12});
+				checkMismatchBin(mem, 0, 11, 12, 3);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void overwrite() throws IOException{
 		var mem = initialMem(4);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
-			io.setPos(1);
-			io.write(new byte[]{11, 12});
-			checkMismatchBin(mem, 0, 11, 12, 3);
-			io.setPos(1);
-			io.write(new byte[]{111, 112});
-			checkMismatchBin(mem, 0, 111, 112, 3);
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
+				io.setPos(1);
+				io.write(new byte[]{11, 12});
+				checkMismatchBin(mem, 0, 11, 12, 3);
+				io.setPos(1);
+				io.write(new byte[]{111, 112});
+				checkMismatchBin(mem, 0, 111, 112, 3);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void intersectRead() throws IOException{
 		var mem = initialMem(6);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
-			io.setPos(1);
-			io.write(new byte[]{11, 12, 13, 14});
-			checkMismatchBin(mem, 0, 11, 12, 13, 14, 5);
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
+				io.setPos(1);
+				io.write(new byte[]{11, 12, 13, 14});
+				checkMismatchBin(mem, 0, 11, 12, 13, 14, 5);
 			
-			io.setPos(0);
-			checkMismatchBin(io.readInts1(3), new byte[]{0, 11, 12});
-			io.setPos(3);
-			checkMismatchBin(io.readInts1(3), new byte[]{13, 14, 5});
+				io.setPos(0);
+				checkMismatchBin(io.readInts1(3), new byte[]{0, 11, 12});
+				io.setPos(3);
+				checkMismatchBin(io.readInts1(3), new byte[]{13, 14, 5});
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void eventGapJoin() throws IOException{
 		var mem = initialMem(8);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
 			
-			io.setPos(1);
-			io.write(new byte[]{11, 12});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
+				io.setPos(1);
+				io.write(new byte[]{11, 12});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
 			
-			io.setPos(5);
-			io.write(new byte[]{15, 16});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
+				io.setPos(5);
+				io.write(new byte[]{15, 16});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
 			
-			io.setPos(3);
-			io.write(new byte[]{13, 14});
-			checkMismatchBin(mem, 0, 11, 12, 13, 14, 15, 16, 7);
-			
+				io.setPos(3);
+				io.write(new byte[]{13, 14});
+				checkMismatchBin(mem, 0, 11, 12, 13, 14, 15, 16, 7);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void eventGapJoinOverrideBackward() throws IOException{
 		var mem = initialMem(8);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
 			
-			io.setPos(1);
-			io.write(new byte[]{11, 12});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
+				io.setPos(1);
+				io.write(new byte[]{11, 12});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
 			
-			io.setPos(5);
-			io.write(new byte[]{15, 16});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
+				io.setPos(5);
+				io.write(new byte[]{15, 16});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
 			
-			io.setPos(2);
-			io.write(new byte[]{112, 13, 14});
-			checkMismatchBin(mem, 0, 11, 112, 13, 14, 15, 16, 7);
-			
+				io.setPos(2);
+				io.write(new byte[]{112, 13, 14});
+				checkMismatchBin(mem, 0, 11, 112, 13, 14, 15, 16, 7);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void eventGapJoinOverrideForward() throws IOException{
 		var mem = initialMem(8);
 		
-		try(var ignore = mem.openIOTransaction();
-		    var io = mem.io()){
+		try(var ignore = mem.startTransaction()){
+			try(var io = mem.io()){
 			
-			io.setPos(1);
-			io.write(new byte[]{11, 12});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
+				io.setPos(1);
+				io.write(new byte[]{11, 12});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 5, 6, 7);
 			
-			io.setPos(5);
-			io.write(new byte[]{15, 16});
-			checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
+				io.setPos(5);
+				io.write(new byte[]{15, 16});
+				checkMismatchBin(mem, 0, 11, 12, 3, 4, 15, 16, 7);
 			
-			io.setPos(3);
-			io.write(new byte[]{13, 14, 115});
-			checkMismatchBin(mem, 0, 11, 12, 13, 14, 115, 16, 7);
-			
+				io.setPos(3);
+				io.write(new byte[]{13, 14, 115});
+				checkMismatchBin(mem, 0, 11, 12, 13, 14, 115, 16, 7);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void eventMultiSquashBackwards() throws IOException{
 		var e = initialMem(8);
 		
-		try(var ignore = e.openIOTransaction();
-		    var io = e.io()){
+		try(var ignore = e.startTransaction()){
+			try(var io = e.io()){
 			
-			io.setPos(0);
-			io.write(new byte[]{10});
-			checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
-			io.setPos(2);
-			io.write(new byte[]{12});
-			checkMismatchBin(e, 10, 1, 12, 3, 4, 5, 6, 7);
-			io.setPos(4);
-			io.write(new byte[]{14, 15, 16});
-			checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
+				io.setPos(0);
+				io.write(new byte[]{10});
+				checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
+				io.setPos(2);
+				io.write(new byte[]{12});
+				checkMismatchBin(e, 10, 1, 12, 3, 4, 5, 6, 7);
+				io.setPos(4);
+				io.write(new byte[]{14, 15, 16});
+				checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
 			
-			io.setPos(0);
-			io.write(new byte[]{110, 11, 112, 13});
-			checkMismatchBin(e, 110, 11, 112, 13, 14, 15, 16, 7);
+				io.setPos(0);
+				io.write(new byte[]{110, 11, 112, 13});
+				checkMismatchBin(e, 110, 11, 112, 13, 14, 15, 16, 7);
+			}
+			ignore.commit();
 		}
 	}
 	@Test
 	void eventMultiSquashBackwardsIntersect() throws IOException{
 		var e = initialMem(8);
 		
-		try(var ignore = e.openIOTransaction();
-		    var io = e.io()){
+		try(var ignore = e.startTransaction()){
+			try(var io = e.io()){
 			
-			io.setPos(0);
-			io.write(new byte[]{10});
-			checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
-			io.setPos(2);
-			io.write(new byte[]{12});
-			checkMismatchBin(e, 10, 1, 12, 3, 4, 5, 6, 7);
-			io.setPos(4);
-			io.write(new byte[]{14, 15, 16});
-			checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
+				io.setPos(0);
+				io.write(new byte[]{10});
+				checkMismatchBin(e, 10, 1, 2, 3, 4, 5, 6, 7);
+				io.setPos(2);
+				io.write(new byte[]{12});
+				checkMismatchBin(e, 10, 1, 12, 3, 4, 5, 6, 7);
+				io.setPos(4);
+				io.write(new byte[]{14, 15, 16});
+				checkMismatchBin(e, 10, 1, 12, 3, 14, 15, 16, 7);
 			
-			io.setPos(0);
-			io.write(new byte[]{20, 11, 22, 13, 114});
-			checkMismatchBin(e, 20, 11, 22, 13, 114, 15, 16, 7);
+				io.setPos(0);
+				io.write(new byte[]{20, 11, 22, 13, 114});
+				checkMismatchBin(e, 20, 11, 22, 13, 114, 15, 16, 7);
+			}
+			ignore.commit();
 		}
 	}
 	
@@ -179,7 +192,7 @@ public class IOTransactionTests{
 			IOInterface data   = MemoryData.builder().withCapacity(cap + 10).build();
 			IOInterface mirror = MemoryData.builder().withCapacity(cap + 10).build();
 			
-			try(var ignored = data.openIOTransaction()){
+			try(var ignored = data.startTransaction()){
 				var runSize = rand.nextInt(40);
 				for(int j = 1; j<runSize + 1; j++){
 					runIndex++;
@@ -237,6 +250,7 @@ public class IOTransactionTests{
 					
 					check(before, mirror, data, "post write");
 				}
+				ignored.commit();
 			}catch(Throwable e){
 				throw new RuntimeException("failed on run==" + run + " && runIndex==" + runIndex, e);
 			}

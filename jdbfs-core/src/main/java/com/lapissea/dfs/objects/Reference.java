@@ -204,8 +204,9 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	}
 	
 	public <T> void writeAtomic(DataProvider provider, boolean trim, ObjectPipe<T, ?> pipe, T val) throws IOException{
-		try(var ignored = provider.getSource().openIOTransaction()){
+		try(var ignored = provider.getSource().startTransaction()){
 			write(provider, trim, pipe, val);
+			ignored.commit();
 		}
 	}
 	public <T> void write(DataProvider provider, boolean trim, ObjectPipe<T, ?> pipe, T val) throws IOException{

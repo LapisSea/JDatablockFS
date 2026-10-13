@@ -24,6 +24,7 @@ import com.lapissea.fuzz.Plan;
 import com.lapissea.fuzz.RunMark;
 import com.lapissea.iterableplus.Iters;
 import com.lapissea.util.LogUtil;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -176,7 +177,7 @@ public final class StructFuzzTest{
 		return bb;
 	}
 	
-	@org.testng.annotations.DataProvider
+	@DataProvider
 	Object[][] finVis(){
 		return Iters.from(VisiblityGen.class)
 		            .flatMap(v -> List.of(new Object[]{true, v}, new Object[]{false, v}))

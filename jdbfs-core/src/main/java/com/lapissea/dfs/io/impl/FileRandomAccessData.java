@@ -16,7 +16,7 @@ import java.nio.channels.OverlappingFileLockException;
 
 import static com.lapissea.dfs.config.GlobalConfig.BATCH_BYTES;
 
-public final class FileRandomAccessData extends ClosableIOData{
+public final class FileRandomAccessData extends FileIOData{
 	
 	public enum Mode{
 		READ_ONLY("r"),
@@ -57,36 +57,46 @@ public final class FileRandomAccessData extends ClosableIOData{
 	public FileRandomAccessData(File file, Mode mode) throws IOException{
 		this(null, file, mode);
 	}
+	public FileRandomAccessData(File file, boolean readOnly, boolean durable) throws IOException{
+		this(null, file, readOnly? Mode.READ_ONLY :
+		                 ConfigDefs.SYNCHRONOUS_FILE_IO.resolveVal()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE, durable);
+	}
 	public FileRandomAccessData(IOHook hook, File file, Mode mode) throws IOException{
-		super(hook, mode == Mode.READ_ONLY);
+		this(hook, file, mode, ConfigDefs.DURABLE_FILE_IO.resolveVal());
+	}
+	public FileRandomAccessData(IOHook hook, File file, Mode mode, boolean durable) throws IOException{
+		super(hook, file, mode == Mode.READ_ONLY, durable);
 		this.file = file;
 		try{
-			fileData = new RandomAccessFile(file, mode.str);
+			fileData = new RandomAccessFile(file, durable && mode != Mode.READ_ONLY? "rw" : mode.str);
 		}catch(FileNotFoundException e){
+			releaseFileOwnership();
 			if(mode == Mode.READ_ONLY){
 				throw new FileNotFoundException("File must exist if in read only mode: " + e.getMessage());
 			}
 			throw e;
-		}
-		if(mode != Mode.READ_ONLY){
-			try{
-				fileLock = fileData.getChannel().lock();
-			}catch(IOException|OverlappingFileLockException e){
-				fileData.close();
-				throw new IOException("Unable to acquire exclusive access to: " + file, e);
-			}catch(Throwable e){
-				fileData.close();
-				throw e;
-			}
-		}else{
-			fileLock = null;
+		}catch(Throwable e){
+			releaseFileOwnership();
+			throw e;
 		}
 		try{
+			fileLock = fileData.getChannel().tryLock(0, Long.MAX_VALUE, mode == Mode.READ_ONLY);
+			if(fileLock == null) throw new IOException("File is already in use: " + file);
+		}catch(IOException|OverlappingFileLockException e){
+			try{ fileData.close(); }finally{ releaseFileOwnership(); }
+			throw new IOException("Unable to acquire file access: " + file, e);
+		}catch(Throwable e){
+			try{ fileData.close(); }finally{ releaseFileOwnership(); }
+			throw e;
+		}
+		
+		try{
 			this.used = getLength();
+			initializeJournal(file);
 			
 			if(!isReadOnly()) bindCloseOnShutdown(this);
 		}catch(Throwable e){
-			fileData.close();
+			try{ fileData.close(); }finally{ releaseFileOwnership(); }
 			throw e;
 		}
 	}
@@ -106,6 +116,11 @@ public final class FileRandomAccessData extends ClosableIOData{
 	@Override
 	public int hashCode(){
 		return file.hashCode();
+	}
+	
+	@Override
+	protected void forceFile() throws IOException{
+		fileData.getChannel().force(true);
 	}
 	
 	@Override
@@ -167,10 +182,26 @@ public final class FileRandomAccessData extends ClosableIOData{
 	
 	@Override
 	public void close() throws IOException{
-		markClosed();
-		resize(getIOSize());
-		if(fileLock != null) fileLock.close();
-		fileData.close();
-		if(!isReadOnly()) unbindCloseOnShutdown(this);
+		try(var ignored = closeAccess()){
+			try{
+				closeJournal();
+			}finally{
+				markClosed();
+				try{
+					if(!isReadOnly()){
+						resize(used);
+					}
+				}finally{
+					try{
+						fileData.close();
+					}finally{
+						releaseFileOwnership();
+						if(!isReadOnly()){
+							unbindCloseOnShutdown(this);
+						}
+					}
+				}
+			}
+		}
 	}
 }

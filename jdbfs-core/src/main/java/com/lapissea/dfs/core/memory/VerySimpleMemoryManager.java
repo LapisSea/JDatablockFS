@@ -9,6 +9,7 @@ import com.lapissea.dfs.objects.ChunkPointer;
 import com.lapissea.dfs.objects.collections.IOList;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -61,24 +62,47 @@ public class VerySimpleMemoryManager
 	
 	@Override
 	public DefragSes openDefragmentMode(){
+		context.checkValid();
 		boolean oldDefrag = defragmentMode;
 		defragmentMode = true;
 		return () -> defragmentMode = oldDefrag;
 	}
 	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
+		context.checkValid();
+		try{
+			context.getUnmanagedRegistry().enlist(this, () -> {
+				var snapshot = new ArrayList<ChunkPointer>();
+				for(var pointer : freeChunks){
+					snapshot.add(pointer);
+				}
+				return () -> {
+					freeChunks.clear();
+					freeChunks.addAll(snapshot);
+				};
+			});
+		}catch(IOException e){
+			throw new UncheckedIOException(e);
+		}
 		return freeChunks;
 	}
 	
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
-		if(toFree.isEmpty()) return;
-		List<Chunk> toAdd = MemoryOperations.mergeChunks(toFree);
-		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
+		context.getSource().openIOTransaction(() -> {
+			context.checkValid();
+			if(toFree.isEmpty()) return;
+			getFreeChunks(); // Capture the transient free list before its first mutation
+			List<Chunk> toAdd = MemoryOperations.mergeChunks(toFree);
+			MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
+			for(var chunk : toFree) context.getUnmanagedRegistry().freed(chunk);
+		});
 	}
 	
 	@Override
 	public void notifyStart(ChunkChainIO chain){ }
 	@Override
 	public void notifyEnd(ChunkChainIO chain){ }
+	@Override
+	public void refreshAfterRollback(){ }
 }
